@@ -8,7 +8,7 @@
 
 #include "Json.h"
 
-#include "thirdparty/rapidjson/include/rapidjson/document.h"
+#include "rapidjson/document.h"
 
 namespace rkit::Utilities
 {
