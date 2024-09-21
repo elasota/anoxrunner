@@ -1,0 +1,7 @@
+[submodule "include/thirdparty/rapidjson"]
+	path = include/thirdparty/rapidjson
+	url = https://github.com/elasota/rapidjson.git
+[submodule "thirdparty/rapidjson"]
+	path = thirdparty/rapidjson
+	url = https://github.com/elasota/rapidjson.git
+	branch = master

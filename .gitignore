@@ -1,0 +1,17 @@
+.vs
+*.dll
+*.exe
+*.exp
+*.lib
+*.user
+*.ilk
+*.log
+*.idb
+*.pdb
+*.obj
+*.tlog
+*.lastbuildstate
+*.recipe
+*.FileListAbsolute.txt
+*.iobj
+*.ipdb
