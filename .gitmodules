@@ -5,3 +5,7 @@
 	path = thirdparty/rapidjson
 	url = https://github.com/elasota/rapidjson.git
 	branch = master
+[submodule "thirdparty/Vulkan-Headers"]
+	path = thirdparty/Vulkan-Headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers.git
+	branch = main
