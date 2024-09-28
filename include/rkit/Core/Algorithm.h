@@ -34,7 +34,7 @@ namespace rkit
 		};
 
 		template<class TSigned, class TUnsigned>
-		static TUnsigned ToUnsignedAbs(TSigned v);
+		TUnsigned ToUnsignedAbs(TSigned v);
 
 		template<class T>
 		struct AssignSpanOp
@@ -120,6 +120,9 @@ namespace rkit
 	template<class T>
 	Result SafeDivMod(T &divResult, T &modResult, const T &a, const T &b);
 
+	template<class TSigned, class TUnsigned>
+	TUnsigned ToUnsignedAbs(TSigned v);
+
 	template<class T>
 	T Min(const T &a, const T &b);
 
@@ -186,6 +189,13 @@ template<class T>
 rkit::Result rkit::SafeDivMod(T &divResult, T &modResult, const T &a, const T &b)
 {
 	return Private::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::Div(divResult, modResult, a, b);
+}
+
+
+template<class TSigned, class TUnsigned>
+inline TUnsigned rkit::ToUnsignedAbs(TSigned v)
+{
+	return Private::ToUnsignedAbs<TSigned, TUnsigned>(v);
 }
 
 

@@ -12,6 +12,7 @@
 #include "rkit/Core/Vector.h"
 
 #include <Windows.h>
+#include <Shlwapi.h>
 
 #undef GetCommandLine
 
@@ -23,12 +24,14 @@ namespace rkit
 		File_Win32(HANDLE hfile, FilePos_t initialSize);
 		~File_Win32();
 
-		Result Write(const void *data, size_t count, size_t &outCountWritten) override;
-		Result Read(void *data, size_t count, size_t &outCountRead) override;
+		Result WritePartial(const void *data, size_t count, size_t &outCountWritten) override;
+		Result ReadPartial(void *data, size_t count, size_t &outCountRead) override;
 
 		Result SeekStart(FilePos_t pos) override;
 		Result SeekCurrent(FileOffset_t pos) override;
 		Result SeekEnd(FileOffset_t pos) override;
+		FilePos_t Tell() const override;
+		FilePos_t GetSize() const override;
 
 	private:
 		HANDLE m_hfile;
@@ -49,16 +52,17 @@ namespace rkit
 		void AssertionFailure(const char *expr, const char *file, unsigned int line) override;
 
 		UniquePtr<ISeekableReadStream> OpenFileRead(FileLocation location, const char *path) override;
-		UniquePtr<ISeekableWriteStream> OpenFileWrite(FileLocation location, const char *path, bool createIfNotExists, bool truncateIfExists) override;
-		UniquePtr<ISeekableReadWriteStream> OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool truncateIfExists) override;
+		UniquePtr<ISeekableWriteStream> OpenFileWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
+		UniquePtr<ISeekableReadWriteStream> OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
 
 	private:
 		Result UTF8ToUTF16(const char *str8, Vector<wchar_t> &outStr16);
 		Result UTF16ToUTF8(const wchar_t *str16, Vector<char> &outStr16);
 
 		static DWORD OpenFlagsToDisposition(bool createIfNotExists, bool truncateIfExists);
-		UniquePtr<File_Win32> OpenFileGeneral(FileLocation location, const char *path, DWORD access, DWORD shareMode, DWORD disposition);
-		Result OpenFileGeneralChecked(UniquePtr<File_Win32> &outFile, FileLocation location, const char *path, DWORD access, DWORD shareMode, DWORD disposition);
+		UniquePtr<File_Win32> OpenFileGeneral(FileLocation location, const char *path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition);
+		Result OpenFileGeneralChecked(UniquePtr<File_Win32> &outFile, FileLocation location, const char *path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition);
+		static Result CheckCreateDirectories(Vector<wchar_t> &pathChars);
 
 		IMallocDriver *m_alloc;
 		Vector<Vector<char> > m_commandLineCharBuffers;
@@ -86,7 +90,7 @@ namespace rkit
 		CloseHandle(m_hfile);
 	}
 
-	Result File_Win32::Write(const void *data, size_t count, size_t &outCountWritten)
+	Result File_Win32::WritePartial(const void *data, size_t count, size_t &outCountWritten)
 	{
 		size_t countWritten = 0;
 		while (count > 0)
@@ -120,7 +124,7 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
-	Result File_Win32::Read(void *data, size_t count, size_t &outCountRead)
+	Result File_Win32::ReadPartial(void *data, size_t count, size_t &outCountRead)
 	{
 		FilePos_t maxSize = m_fileSize - m_filePos;
 		if (count > maxSize)
@@ -192,6 +196,16 @@ namespace rkit
 			return ResultCode::kIOSeekOutOfRange;
 
 		return SeekStart(static_cast<FilePos_t>(static_cast<FileOffset_t>(m_fileSize) + offset));
+	}
+
+	FilePos_t File_Win32::Tell() const
+	{
+		return m_filePos;
+	}
+
+	FilePos_t File_Win32::GetSize() const
+	{
+		return m_fileSize;
 	}
 
 	SystemDriver_Win32::SystemDriver_Win32(IMallocDriver *alloc)
@@ -293,30 +307,79 @@ namespace rkit
 
 	UniquePtr<ISeekableReadStream> SystemDriver_Win32::OpenFileRead(FileLocation location, const char *path)
 	{
-		return OpenFileGeneral(location, path, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING);
+		return OpenFileGeneral(location, path, false, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING);
 	}
 
-	UniquePtr<ISeekableWriteStream> SystemDriver_Win32::OpenFileWrite(FileLocation location, const char *path, bool createIfNotExists, bool truncateIfExists)
+	UniquePtr<ISeekableWriteStream> SystemDriver_Win32::OpenFileWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists)
 	{
-		return OpenFileGeneral(location, path, GENERIC_WRITE, 0, OpenFlagsToDisposition(createIfNotExists, truncateIfExists));
+		return OpenFileGeneral(location, path, createDirectories, GENERIC_WRITE, 0, OpenFlagsToDisposition(createIfNotExists, truncateIfExists));
 	}
 
-	UniquePtr<ISeekableReadWriteStream> SystemDriver_Win32::OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool truncateIfExists)
+	UniquePtr<ISeekableReadWriteStream> SystemDriver_Win32::OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists)
 	{
-		return OpenFileGeneral(location, path, GENERIC_READ | GENERIC_WRITE, 0, OpenFlagsToDisposition(createIfNotExists, truncateIfExists));
+		return OpenFileGeneral(location, path, createDirectories, GENERIC_READ | GENERIC_WRITE, 0, OpenFlagsToDisposition(createIfNotExists, truncateIfExists));
 	}
 
-	UniquePtr<File_Win32> SystemDriver_Win32::OpenFileGeneral(FileLocation location, const char *path, DWORD access, DWORD shareMode, DWORD disposition)
+	UniquePtr<File_Win32> SystemDriver_Win32::OpenFileGeneral(FileLocation location, const char *path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition)
 	{
 		UniquePtr<File_Win32> filePtr;
-		Result result = OpenFileGeneralChecked(filePtr, location, path, access, shareMode, disposition);
+		Result result = OpenFileGeneralChecked(filePtr, location, path, createDirectories, access, shareMode, disposition);
 		if (!result.IsOK())
 			return UniquePtr<File_Win32>();
 
 		return filePtr;
 	}
 
-	Result SystemDriver_Win32::OpenFileGeneralChecked(UniquePtr<File_Win32> &outFile, FileLocation location, const char *path, DWORD access, DWORD shareMode, DWORD disposition)
+	Result SystemDriver_Win32::CheckCreateDirectories(Vector<wchar_t> &pathChars)
+	{
+		size_t dirScanTermination = 0;
+		for (size_t i = 0; i < pathChars.Count(); i++)
+		{
+			if (pathChars[i] == ':')
+				dirScanTermination = i + 2;
+		}
+
+		size_t i = pathChars.Count() - 1;
+
+		size_t firstFailedDirectoryPos = 0;
+
+		while (i > dirScanTermination)
+		{
+			if (pathChars[i] == '\\')
+			{
+				pathChars[i] = 0;
+				BOOL isDirectory = PathIsDirectoryW(pathChars.GetBuffer());
+				pathChars[i] = '\\';
+				if (!isDirectory)
+				{
+					firstFailedDirectoryPos = i;
+					break;
+				}
+			}
+
+			i--;
+		}
+
+		if (firstFailedDirectoryPos != 0)
+		{
+			for (size_t i = firstFailedDirectoryPos; i < pathChars.Count(); i++)
+			{
+				if (pathChars[i] == '\\')
+				{
+					pathChars[i] = 0;
+
+					if (!CreateDirectoryW(pathChars.GetBuffer(), nullptr))
+						return ResultCode::kFileOpenError;
+
+					pathChars[i] = '\\';
+				}
+			}
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result SystemDriver_Win32::OpenFileGeneralChecked(UniquePtr<File_Win32> &outFile, FileLocation location, const char *path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition)
 	{
 		Vector<wchar_t> pathW;
 
@@ -368,6 +431,23 @@ namespace rkit
 
 		wcscpy(fullPathW.GetBuffer(), baseW);
 		wcscat(fullPathW.GetBuffer(), pathW.GetBuffer());
+
+		for (wchar_t &wc : fullPathW)
+		{
+			if (wc == '/')
+				wc = '\\';
+		}
+
+		for (size_t i = 1; i < fullPathW.Count(); i++)
+		{
+			if (fullPathW[i] == '\\' && fullPathW[i - 1] == '\\')
+				return ResultCode::kFileOpenError;
+		}
+
+		if (createDirectories)
+		{
+			RKIT_CHECK(CheckCreateDirectories(fullPathW));
+		}
 
 		HANDLE fHandle = CreateFileW(fullPathW.GetBuffer(), access, shareMode, nullptr, disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
 

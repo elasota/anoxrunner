@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rkit/Core/UniquePtr.h"
+#include "rkit/Core/StreamProtos.h"
 
 namespace rkit
 {
@@ -12,7 +12,18 @@ namespace rkit
 	template<class T>
 	class UniquePtr;
 
+	template<class T>
+	class SharedPtr;
+
+	struct IMutexProtectedReadWriteStream;
+	struct IMutexProtectedReadStream;
+	struct IMutexProtectedWriteStream;
+
+	struct IMallocDriver;
 	struct IReadStream;
+	struct ISeekableReadWriteStream;
+	struct ISeekableReadStream;
+	struct ISeekableWriteStream;
 	struct Result;
 
 	struct IUtilitiesDriver
@@ -20,5 +31,12 @@ namespace rkit
 		virtual ~IUtilitiesDriver() {}
 
 		virtual Result CreateJsonDocument(UniquePtr<Utilities::IJsonDocument> &outDocument, IMallocDriver *alloc, IReadStream *readStream) const = 0;
+
+		virtual Result CreateMutexProtectedReadWriteStream(SharedPtr<IMutexProtectedReadWriteStream> &outStream, UniquePtr<ISeekableReadWriteStream> &&stream) const = 0;
+		virtual Result CreateMutexProtectedReadStream(SharedPtr<IMutexProtectedReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream) const = 0;
+		virtual Result CreateMutexProtectedWriteStream(SharedPtr<IMutexProtectedWriteStream> &outStream, UniquePtr<ISeekableWriteStream> &&stream) const = 0;
+
+		virtual Result CreateDeflateDecompressStream(UniquePtr<IReadStream> &outStream, UniquePtr<IReadStream> &&compressedStream) const = 0;
+		virtual Result CreateRangeLimitedReadStream(UniquePtr<IReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream, FilePos_t startPos, FilePos_t size) const = 0;
 	};
 }

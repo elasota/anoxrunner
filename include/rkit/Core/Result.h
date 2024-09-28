@@ -26,10 +26,14 @@ namespace rkit
 		kInvalidJson,
 
 		kEndOfStream,
+		kIOReadError,
 		kIOWriteError,
 		kIOSeekOutOfRange,
 		kIOError,
 		kFileOpenError,
+
+		kDecompressionFailed,
+		kMalformedFile,
 	};
 
 	struct RKIT_NODISCARD Result

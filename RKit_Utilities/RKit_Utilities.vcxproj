@@ -41,11 +41,14 @@
     <Import Project="..\Common.props" />
     <Import Project="..\Debug.props" />
     <Import Project="..\rapidjson_export.props" />
+    <Import Project="..\zlib_export.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Release.props" />
     <Import Project="..\Common.props" />
+    <Import Project="..\rapidjson_export.props" />
+    <Import Project="..\zlib_export.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -77,11 +80,22 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="DeflateDecompressStream.cpp" />
     <ClCompile Include="Json.cpp" />
+    <ClCompile Include="MutexProtectedStream.cpp" />
+    <ClCompile Include="RangeLimitedReadStream.cpp" />
     <ClCompile Include="Utilities.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DeflateDecompressStream.h" />
     <ClInclude Include="Json.h" />
+    <ClInclude Include="MutexProtectedStream.h" />
+    <ClInclude Include="RangeLimitedReadStream.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\zlib\zlib.vcxproj">
+      <Project>{1819d6ae-1d9c-45af-881c-7350b6638b29}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

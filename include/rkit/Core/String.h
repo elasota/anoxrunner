@@ -55,6 +55,7 @@ namespace rkit
 		BaseString &operator=(BaseString &&other);
 
 		Result Set(const BaseStringView<TChar> &strView);
+		Result Append(const BaseStringView<TChar> &strView);
 
 		operator View_t() const;
 
@@ -63,6 +64,8 @@ namespace rkit
 
 		bool operator!=(const BaseStringView<TChar> &other) const;
 		bool operator!=(const BaseString &other) const;
+
+		const TChar &operator[](size_t index) const;
 
 		void Clear();
 
@@ -95,6 +98,8 @@ namespace rkit
 
 		const TChar &operator[](size_t index) const;
 
+		BaseStringView<TChar> SubString(size_t start, size_t length) const;
+
 		Span<const TChar> ToSpan() const;
 
 		const TChar *GetChars() const;
@@ -110,6 +115,7 @@ namespace rkit
 	};
 }
 
+#include "RKitAssert.h"
 #include "Algorithm.h"
 #include "MallocDriver.h"
 #include "Result.h"
@@ -363,6 +369,42 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::Set(const BaseStringView<TCha
 }
 
 template<class TChar, size_t TStaticSize>
+rkit::Result rkit::BaseString<TChar, TStaticSize>::Append(const BaseStringView<TChar> &strView)
+{
+	if (strView.Length() == 0)
+		return ResultCode::kOK;
+
+	if (std::numeric_limits<size_t>::max() - m_length < strView.Length())
+		return ResultCode::kOutOfMemory;
+
+	const size_t combinedLength = m_length + strView.Length();
+
+	if (combinedLength < TStaticSize)
+	{
+		// Existing length will also be under static size
+		memcpy(m_staticString + m_length, strView.GetChars(), strView.Length());
+		m_staticString[combinedLength] = static_cast<TChar>(0);
+
+		m_length = combinedLength;
+	}
+	else
+	{
+		// New string won't fit
+		BaseString<TChar, TStaticSize> newString;
+
+		Span<TChar> uninitSpan;
+		RKIT_CHECK(CreateAndReturnUninitializedSpan(newString, combinedLength, uninitSpan));
+
+		CopySpanNonOverlapping(Span<TChar>(uninitSpan.Ptr(), m_length), Span<const TChar>(m_chars, m_length));
+		CopySpanNonOverlapping(Span<TChar>(uninitSpan.Ptr() + m_length, strView.Length()), strView.ToSpan());
+
+		(*this) = std::move(newString);
+	}
+
+	return ResultCode::kOK;
+}
+
+template<class TChar, size_t TStaticSize>
 rkit::BaseString<TChar, TStaticSize>::operator View_t() const
 {
 	return BaseStringView<TChar>(m_chars, m_length);
@@ -390,6 +432,14 @@ template<class TChar, size_t TStaticSize>
 bool rkit::BaseString<TChar, TStaticSize>::operator!=(const BaseString &other) const
 {
 	return !((*this) == other);
+}
+
+
+template<class TChar, size_t TStaticSize>
+const TChar &rkit::BaseString<TChar, TStaticSize>::operator[](size_t index) const
+{
+	RKIT_ASSERT(index < m_length);
+	return CStr()[index];
 }
 
 template<class TChar, size_t TStaticSize>
@@ -456,6 +506,20 @@ template<class TChar>
 const TChar &rkit::BaseStringView<TChar>::operator[](size_t index) const
 {
 	return m_span[index];
+}
+
+
+template<class TChar>
+rkit::BaseStringView<TChar> rkit::BaseStringView<TChar>::SubString(size_t start, size_t length) const
+{
+	if (start > m_span.Count())
+		start = m_span.Count();
+
+	const size_t maxLength = m_span.Count() - start;
+	if (length > maxLength)
+		length = maxLength;
+
+	return BaseStringView<TChar>(m_span.Ptr() + start, length);
 }
 
 template<class TChar>

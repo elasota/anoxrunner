@@ -14,6 +14,7 @@ namespace rkit
 	struct ISystemDriver;
 	struct IUnicodeDriver;
 	struct IUtilitiesDriver;
+	struct ILogDriver;
 	struct Drivers;
 	struct Result;
 
@@ -40,7 +41,9 @@ namespace rkit
 		SimpleObjectAllocation<ISystemDriver> m_systemDriver;
 		SimpleObjectAllocation<IUnicodeDriver> m_unicodeDriver;
 		SimpleObjectAllocation<IUtilitiesDriver> m_utilitiesDriver;
+		SimpleObjectAllocation<ILogDriver> m_logDriver;
 
+		ICustomDriver *FindDriver(uint32_t namespaceID, const StringView &driverName) const;
 		Result RegisterDriver(UniquePtr<ICustomDriver> &&driver);
 		void UnregisterDriver(ICustomDriver *driver);
 
@@ -64,9 +67,22 @@ namespace rkit
 
 #include "Result.h"
 #include "NewDelete.h"
+#include "String.h"
 #include "UniquePtr.h"
 
 #include <utility>
+
+inline rkit::ICustomDriver *rkit::Drivers::FindDriver(uint32_t namespaceID, const rkit::StringView &driverName) const
+{
+	for (const CustomDriverLink *link = m_firstCustomDriverLink; link != nullptr; link = link->m_next)
+	{
+		ICustomDriver *driver = link->m_driver;
+		if (driver->GetDriverNamespaceID() == namespaceID && driver->GetDriverName() == driverName)
+			return driver;
+	}
+
+	return nullptr;
+}
 
 inline rkit::Result rkit::Drivers::RegisterDriver(UniquePtr<ICustomDriver> &&driver)
 {

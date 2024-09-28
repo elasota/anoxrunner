@@ -15,34 +15,26 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Utilities.cpp">
+    <ClCompile Include="..\thirdparty\zlib\adler32.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Json.cpp">
+    <ClCompile Include="..\thirdparty\zlib\crc32.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="MutexProtectedStream.cpp">
+    <ClCompile Include="..\thirdparty\zlib\inffast.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DeflateDecompressStream.cpp">
+    <ClCompile Include="..\thirdparty\zlib\inflate.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RangeLimitedReadStream.cpp">
+    <ClCompile Include="..\thirdparty\zlib\inftrees.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Json.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="MutexProtectedStream.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="DeflateDecompressStream.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="RangeLimitedReadStream.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
+    <ClCompile Include="..\thirdparty\zlib\trees.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\thirdparty\zlib\zutil.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

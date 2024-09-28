@@ -184,7 +184,7 @@ namespace rkit::Utilities
 		size_t preloadCapacity = kPreloadBufferSize - m_preloadedEnd;
 		size_t amountPreloaded = 0;
 
-		Result result = m_readStream->Read(m_preloadBuffer + m_preloadedStart, preloadCapacity, amountPreloaded);
+		Result result = m_readStream->ReadPartial(m_preloadBuffer + m_preloadedStart, preloadCapacity, amountPreloaded);
 		if (!result.IsOK())
 		{
 			m_isEOF = true;

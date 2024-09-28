@@ -11,12 +11,14 @@ namespace rkit
 	public:
 		explicit FixedSizeMemoryStream(void *data, size_t size);
 
-		Result Read(void *data, size_t count, size_t &outCountRead) override;
-		Result Write(const void *data, size_t count, size_t &outCountWritten) override;
+		Result ReadPartial(void *data, size_t count, size_t &outCountRead) override;
+		Result WritePartial(const void *data, size_t count, size_t &outCountWritten) override;
 
 		Result SeekStart(FilePos_t pos) override;
 		Result SeekCurrent(FileOffset_t pos) override;
 		Result SeekEnd(FileOffset_t pos) override;
+		FilePos_t Tell() const override;
+		FilePos_t GetSize() const override;
 
 	private:
 		char *m_bytes;
@@ -29,7 +31,7 @@ namespace rkit
 	public:
 		explicit ReadOnlyMemoryStream(const void *data, size_t size);
 
-		Result Read(void *data, size_t count, size_t &outCountRead) override;
+		Result ReadPartial(void *data, size_t count, size_t &outCountRead) override;
 
 		Result SeekStart(FilePos_t pos) override;
 		Result SeekCurrent(FileOffset_t pos) override;
@@ -52,7 +54,7 @@ inline rkit::FixedSizeMemoryStream::FixedSizeMemoryStream(void *data, size_t siz
 {
 }
 
-inline rkit::Result rkit::FixedSizeMemoryStream::Read(void *data, size_t count, size_t &outCountRead)
+inline rkit::Result rkit::FixedSizeMemoryStream::ReadPartial(void *data, size_t count, size_t &outCountRead)
 {
 	size_t amountAvailable = m_size - m_pos;
 
@@ -74,7 +76,7 @@ inline rkit::Result rkit::FixedSizeMemoryStream::Read(void *data, size_t count, 
 	}
 }
 
-inline rkit::Result rkit::FixedSizeMemoryStream::Write(const void *data, size_t count, size_t &outCountWritten)
+inline rkit::Result rkit::FixedSizeMemoryStream::WritePartial(const void *data, size_t count, size_t &outCountWritten)
 {
 	size_t amountAvailable = m_size - m_pos;
 
@@ -131,14 +133,24 @@ inline rkit::Result rkit::FixedSizeMemoryStream::SeekEnd(FileOffset_t pos)
 	return ResultCode::kOK;
 }
 
+inline rkit::FilePos_t rkit::FixedSizeMemoryStream::Tell() const
+{
+	return m_pos;
+}
+
+inline rkit::FilePos_t rkit::FixedSizeMemoryStream::GetSize() const
+{
+	return m_size;
+}
+
 inline rkit::ReadOnlyMemoryStream::ReadOnlyMemoryStream(const void *data, size_t size)
 	: m_stream(const_cast<void *>(data), size)
 {
 }
 
-inline rkit::Result rkit::ReadOnlyMemoryStream::Read(void *data, size_t count, size_t &outCountRead)
+inline rkit::Result rkit::ReadOnlyMemoryStream::ReadPartial(void *data, size_t count, size_t &outCountRead)
 {
-	return m_stream.Read(data, count, outCountRead);
+	return m_stream.ReadPartial(data, count, outCountRead);
 }
 
 inline rkit::Result rkit::ReadOnlyMemoryStream::SeekStart(FilePos_t pos)

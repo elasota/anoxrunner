@@ -10,6 +10,7 @@
 #include "rkit/Core/UtilitiesDriver.h"
 #include "rkit/Core/Vector.h"
 #include "rkit/Core/MemoryStream.h"
+#include "rkit/Core/SystemDriver.h"
 
 #include "rkit/Utilities/Json.h"
 #include "rkit/Core/MemoryStream.h"
