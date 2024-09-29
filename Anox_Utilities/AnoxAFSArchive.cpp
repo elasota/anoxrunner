@@ -125,10 +125,17 @@ namespace anox
 			rkit::UniquePtr<rkit::ISeekableReadStream> mutualAccessorStream;
 			RKIT_CHECK(m_stream->CreateReadStream(mutualAccessorStream));
 
-			rkit::UniquePtr<rkit::IReadStream> sliceStream;
-			RKIT_CHECK(utils->CreateRangeLimitedReadStream(sliceStream, std::move(mutualAccessorStream), fileInfo.m_filePosition, fileInfo.m_compressedSize));
+			if (fileInfo.m_compressedSize > 0)
+			{
+				rkit::UniquePtr<rkit::IReadStream> sliceStream;
+				RKIT_CHECK(utils->CreateRangeLimitedReadStream(sliceStream, std::move(mutualAccessorStream), fileInfo.m_filePosition, fileInfo.m_compressedSize));
 
-			RKIT_CHECK(utils->CreateDeflateDecompressStream(outStream, std::move(sliceStream)));
+				RKIT_CHECK(utils->CreateDeflateDecompressStream(outStream, std::move(sliceStream)));
+			}
+			else
+			{
+				RKIT_CHECK(utils->CreateRangeLimitedReadStream(outStream, std::move(mutualAccessorStream), fileInfo.m_filePosition, fileInfo.m_uncompressedSize));
+			}
 
 			return rkit::ResultCode::kOK;
 		}
@@ -226,7 +233,22 @@ namespace anox
 				if (c == '.' && i > 0 && sliceName[i - 1] == '.')
 					return rkit::ResultCode::kMalformedFile;
 
-				bool isValidChar = ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.' || c == ' ' || c == '+');
+				bool isValidChar = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+
+				if (!isValidChar)
+				{
+					const char *extChars = "_-. +~#";
+
+					for (size_t j = 0; extChars[j] != 0; j++)
+					{
+						if (extChars[j] == c)
+						{
+							isValidChar = true;
+							break;
+						}
+					}
+				}
+
 				if (!isValidChar)
 					return rkit::ResultCode::kMalformedFile;
 			}
