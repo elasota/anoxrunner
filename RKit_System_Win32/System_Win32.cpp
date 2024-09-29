@@ -350,11 +350,10 @@ namespace rkit
 				pathChars[i] = 0;
 				BOOL isDirectory = PathIsDirectoryW(pathChars.GetBuffer());
 				pathChars[i] = '\\';
-				if (!isDirectory)
-				{
-					firstFailedDirectoryPos = i;
+				if (isDirectory)
 					break;
-				}
+				else
+					firstFailedDirectoryPos = i;
 			}
 
 			i--;
