@@ -47,6 +47,7 @@ namespace anox
 			uint32_t GetFileSizeByIndex(uint32_t fileIndex) const override;
 			rkit::StringView GetFilePathByIndex(uint32_t fileIndex) const override;
 
+			static size_t FixBrokenFilePath(char *chars, size_t len);
 			static rkit::Result CheckName(const rkit::StringView &name);
 			static rkit::Result CheckSlice(const rkit::StringView &sliceName);
 

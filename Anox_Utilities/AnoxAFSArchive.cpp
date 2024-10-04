@@ -69,6 +69,9 @@ namespace anox
 
 				char *charsWriteLoc = m_fileNameChars.GetBuffer() + filePathWritePos;
 				memcpy(charsWriteLoc, fileData.m_filePath, filePathLen);
+
+				filePathLen = FixBrokenFilePath(charsWriteLoc, filePathLen);
+
 				charsWriteLoc[filePathLen] = '\0';
 
 				fileInfo.m_name = rkit::StringView(charsWriteLoc, filePathLen);
@@ -167,6 +170,24 @@ namespace anox
 		{
 		}
 
+		size_t Archive::FixBrokenFilePath(char *chars, size_t len)
+		{
+			for (size_t i = 0; i < len - 1; )
+			{
+				if ((chars[i] == '/' || chars[i] == '\\') && chars[i + 1] == ' ')
+				{
+					for (size_t j = i + 1; j < len - 1; j++)
+						chars[j] = chars[j + 1];
+
+					len--;
+				}
+				else
+					i++;
+			}
+
+			return len;
+		}
+
 		rkit::Result Archive::CheckName(const rkit::StringView &name)
 		{
 			size_t sliceStart = 0;
@@ -237,7 +258,7 @@ namespace anox
 
 				if (!isValidChar)
 				{
-					const char *extChars = "_-. +~#";
+					const char *extChars = "_-. +~#()";
 
 					for (size_t j = 0; extChars[j] != 0; j++)
 					{
