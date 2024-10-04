@@ -10,6 +10,8 @@
 #include <cstdlib>
 #include <new>
 
+#include <crtdbg.h>
+
 namespace rkit
 {
 	struct MallocDriver_Win32 final : public IMallocDriver
@@ -17,6 +19,7 @@ namespace rkit
 		void *Alloc(size_t size) override;
 		void *Realloc(void *ptr, size_t size) override;
 		void Free(void *ptr) override;
+		void CheckIntegrity() override;
 	};
 
 	struct ModuleDriver_Win32 final : public IModuleDriver
@@ -51,20 +54,42 @@ namespace rkit
 		if (size == 0)
 			return nullptr;
 
-		return malloc(size);
+		_ASSERTE(_CrtCheckMemory());
+		void *ptr = malloc(size);
+		_ASSERTE(_CrtCheckMemory());
+
+		return ptr;
 	}
 
 	void *MallocDriver_Win32::Realloc(void *ptr, size_t size)
 	{
-		if (ptr == nullptr && size == 0)
-			return nullptr;
+		if (ptr == nullptr)
+		{
+			if (size == 0)
+				return nullptr;
 
-		return realloc(ptr, size);
+			return malloc(size);
+		}
+		else
+		{
+			if (size == 0)
+			{
+				free(ptr);
+				return nullptr;
+			}
+			else
+				return realloc(ptr, size);
+		}
 	}
 
 	void MallocDriver_Win32::Free(void *ptr)
 	{
 		free(ptr);
+	}
+
+	void MallocDriver_Win32::CheckIntegrity()
+	{
+		_ASSERTE(_CrtCheckMemory());
 	}
 
 	IModule *ModuleDriver_Win32::LoadModule(uint32_t moduleNamespace, const char *moduleName)
