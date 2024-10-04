@@ -5,6 +5,9 @@
 namespace rkit
 {
 	template<class T>
+	struct ISpan;
+
+	template<class T>
 	class SpanIterator
 	{
 	public:
@@ -65,6 +68,48 @@ namespace rkit
 
 	private:
 		T *m_arr;
+		size_t m_count;
+	};
+
+	template<class T>
+	class ISpanIterator
+	{
+	public:
+		explicit ISpanIterator(const ISpan<T> &span, size_t index);
+
+	private:
+		ISpanIterator() = delete;
+
+		const ISpan<T> &m_span;
+		size_t m_index;
+	};
+
+	template<class T>
+	struct ISpan
+	{
+		virtual ~ISpan() {}
+
+		virtual size_t Count() const = 0;
+		virtual T &operator[](size_t index) const = 0;
+
+		ISpanIterator<T> begin() const;
+		ISpanIterator<T> end() const;
+	};
+
+	template<class T, class TUserdata>
+	class CallbackSpan final : public ISpan<T>
+	{
+	public:
+		typedef T &(*GetElementFunc_t)(const TUserdata &, size_t);
+
+		CallbackSpan(GetElementFunc_t getElementFunc, const TUserdata &userdata, size_t count);
+
+		size_t Count() const override;
+		T &operator[](size_t index) const override;
+
+	private:
+		GetElementFunc_t m_callback;
+		TUserdata m_userdata;
 		size_t m_count;
 	};
 }
@@ -263,4 +308,46 @@ T &rkit::Span<T>::operator[](size_t index) const
 {
 	RKIT_ASSERT(index < m_count);
 	return m_arr[index];
+}
+
+
+
+
+template<class T>
+rkit::ISpanIterator<T>::ISpanIterator(const ISpan<T> &span, size_t index)
+	: m_span(span)
+{
+}
+
+template<class T>
+rkit::ISpanIterator<T> rkit::ISpan<T>::begin() const
+{
+	return ISpanIterator<T>(*this, 0);
+}
+
+template<class T>
+rkit::ISpanIterator<T> rkit::ISpan<T>::end() const
+{
+	return ISpanIterator<T>(*this, this->Count());
+}
+
+
+template<class T, class TUserdata>
+rkit::CallbackSpan<T, TUserdata>::CallbackSpan(GetElementFunc_t getElementFunc, const TUserdata &userdata, size_t count)
+	: m_callback(getElementFunc)
+	, m_userdata(userdata)
+	, m_count(count)
+{
+}
+
+template<class T, class TUserdata>
+size_t rkit::CallbackSpan<T, TUserdata>::Count() const
+{
+	return m_count;
+}
+
+template<class T, class TUserdata>
+T &rkit::CallbackSpan<T, TUserdata>::operator[](size_t index) const
+{
+	return m_callback(m_userdata, index);
 }

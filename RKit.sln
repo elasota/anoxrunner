@@ -27,6 +27,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Anox_Utilities", "Anox_Util
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "zlib", "zlib\zlib.vcxproj", "{1819D6AE-1D9C-45AF-881C-7350B6638B29}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RKit_Build", "RKit_Build\RKit_Build.vcxproj", "{AA6B3BC2-EC0D-406C-A184-6E637F079AD9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -91,6 +93,14 @@ Global
 		{1819D6AE-1D9C-45AF-881C-7350B6638B29}.Release|x64.Build.0 = Release|x64
 		{1819D6AE-1D9C-45AF-881C-7350B6638B29}.Release|x86.ActiveCfg = Release|Win32
 		{1819D6AE-1D9C-45AF-881C-7350B6638B29}.Release|x86.Build.0 = Release|Win32
+		{AA6B3BC2-EC0D-406C-A184-6E637F079AD9}.Debug|x64.ActiveCfg = Debug|x64
+		{AA6B3BC2-EC0D-406C-A184-6E637F079AD9}.Debug|x64.Build.0 = Debug|x64
+		{AA6B3BC2-EC0D-406C-A184-6E637F079AD9}.Debug|x86.ActiveCfg = Debug|Win32
+		{AA6B3BC2-EC0D-406C-A184-6E637F079AD9}.Debug|x86.Build.0 = Debug|Win32
+		{AA6B3BC2-EC0D-406C-A184-6E637F079AD9}.Release|x64.ActiveCfg = Release|x64
+		{AA6B3BC2-EC0D-406C-A184-6E637F079AD9}.Release|x64.Build.0 = Release|x64
+		{AA6B3BC2-EC0D-406C-A184-6E637F079AD9}.Release|x86.ActiveCfg = Release|Win32
+		{AA6B3BC2-EC0D-406C-A184-6E637F079AD9}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
