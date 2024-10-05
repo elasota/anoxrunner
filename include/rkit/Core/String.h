@@ -3,6 +3,8 @@
 #include "Atomic.h"
 #include "NoCopy.h"
 
+#include <cstddef>
+
 namespace rkit
 {
 	struct IMallocDriver;
@@ -52,10 +54,16 @@ namespace rkit
 		~BaseString();
 
 		BaseString &operator=(const BaseString &other);
-		BaseString &operator=(BaseString &&other);
+		BaseString &operator=(BaseString &&other) noexcept;
 
 		Result Set(const BaseStringView<TChar> &strView);
 		Result Append(const BaseStringView<TChar> &strView);
+		Result Append(const Span<const TChar> &span);
+		Result Append(TChar ch);
+
+		bool EndsWith(const BaseStringView<TChar> &strView) const;
+		bool EndsWith(const Span<const TChar> &span) const;
+		bool EndsWith(TChar ch) const;
 
 		operator View_t() const;
 
@@ -289,7 +297,7 @@ rkit::BaseString<TChar, TStaticSize> &rkit::BaseString<TChar, TStaticSize>::oper
 }
 
 template<class TChar, size_t TStaticSize>
-rkit::BaseString<TChar, TStaticSize> &rkit::BaseString<TChar, TStaticSize>::operator=(BaseString &&other)
+rkit::BaseString<TChar, TStaticSize> &rkit::BaseString<TChar, TStaticSize>::operator=(BaseString &&other) noexcept
 {
 	Evict();
 
@@ -369,20 +377,20 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::Set(const BaseStringView<TCha
 }
 
 template<class TChar, size_t TStaticSize>
-rkit::Result rkit::BaseString<TChar, TStaticSize>::Append(const BaseStringView<TChar> &strView)
+rkit::Result rkit::BaseString<TChar, TStaticSize>::Append(const Span<const TChar> &span)
 {
-	if (strView.Length() == 0)
+	if (span.Count() == 0)
 		return ResultCode::kOK;
 
-	if (std::numeric_limits<size_t>::max() - m_length < strView.Length())
+	if (std::numeric_limits<size_t>::max() - m_length < span.Count())
 		return ResultCode::kOutOfMemory;
 
-	const size_t combinedLength = m_length + strView.Length();
+	const size_t combinedLength = m_length + span.Count();
 
 	if (combinedLength < TStaticSize)
 	{
 		// Existing length will also be under static size
-		memcpy(m_staticString + m_length, strView.GetChars(), strView.Length());
+		memcpy(m_staticString + m_length, span.Ptr(), span.Count() * sizeof(TChar));
 		m_staticString[combinedLength] = static_cast<TChar>(0);
 
 		m_length = combinedLength;
@@ -396,12 +404,46 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::Append(const BaseStringView<T
 		RKIT_CHECK(CreateAndReturnUninitializedSpan(newString, combinedLength, uninitSpan));
 
 		CopySpanNonOverlapping(Span<TChar>(uninitSpan.Ptr(), m_length), Span<const TChar>(m_chars, m_length));
-		CopySpanNonOverlapping(Span<TChar>(uninitSpan.Ptr() + m_length, strView.Length()), strView.ToSpan());
+		CopySpanNonOverlapping(Span<TChar>(uninitSpan.Ptr() + m_length, span.Count()), span);
 
 		(*this) = std::move(newString);
 	}
 
 	return ResultCode::kOK;
+}
+
+template<class TChar, size_t TStaticSize>
+rkit::Result rkit::BaseString<TChar, TStaticSize>::Append(const BaseStringView<TChar> &strView)
+{
+	return this->Append(strView.ToSpan());
+}
+
+template<class TChar, size_t TStaticSize>
+rkit::Result rkit::BaseString<TChar, TStaticSize>::Append(TChar ch)
+{
+	return this->Append(Span<const TChar>(&ch, 1));
+}
+
+
+template<class TChar, size_t TStaticSize>
+bool rkit::BaseString<TChar, TStaticSize>::EndsWith(const BaseStringView<TChar> &strView) const
+{
+	return this->EndsWith(strView.ToSpan());
+}
+
+template<class TChar, size_t TStaticSize>
+bool rkit::BaseString<TChar, TStaticSize>::EndsWith(const Span<const TChar> &span) const
+{
+	if (m_length < span.Count())
+		return false;
+
+	return !memcmp(this->CStr() + m_length - span.Count(), span.Ptr(), sizeof(TChar) * span.Count());
+}
+
+template<class TChar, size_t TStaticSize>
+bool rkit::BaseString<TChar, TStaticSize>::EndsWith(TChar ch) const
+{
+	return this->EndsWith(Span<const TChar>(&ch, 1));
 }
 
 template<class TChar, size_t TStaticSize>

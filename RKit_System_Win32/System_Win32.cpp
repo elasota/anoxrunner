@@ -55,6 +55,8 @@ namespace rkit
 		UniquePtr<ISeekableWriteStream> OpenFileWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
 		UniquePtr<ISeekableReadWriteStream> OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
 
+		char GetPathSeparator() const override;
+
 	private:
 		Result UTF8ToUTF16(const char *str8, Vector<wchar_t> &outStr16);
 		Result UTF16ToUTF8(const wchar_t *str16, Vector<char> &outStr16);
@@ -318,6 +320,11 @@ namespace rkit
 	UniquePtr<ISeekableReadWriteStream> SystemDriver_Win32::OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists)
 	{
 		return OpenFileGeneral(location, path, createDirectories, GENERIC_READ | GENERIC_WRITE, 0, OpenFlagsToDisposition(createIfNotExists, truncateIfExists));
+	}
+
+	char SystemDriver_Win32::GetPathSeparator() const
+	{
+		return '\\';
 	}
 
 	UniquePtr<File_Win32> SystemDriver_Win32::OpenFileGeneral(FileLocation location, const char *path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition)

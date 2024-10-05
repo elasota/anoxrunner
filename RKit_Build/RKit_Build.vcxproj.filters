@@ -18,5 +18,16 @@
     <ClInclude Include="..\include\rkit\BuildSystem\DependencyGraph.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="BuildSystemInstance.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="BuildSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildSystemInstance.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

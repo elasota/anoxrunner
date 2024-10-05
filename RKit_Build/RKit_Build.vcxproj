@@ -136,6 +136,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\include\rkit\BuildSystem\DependencyGraph.h" />
+    <ClInclude Include="BuildSystemInstance.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="BuildSystem.cpp" />
+    <ClCompile Include="BuildSystemInstance.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

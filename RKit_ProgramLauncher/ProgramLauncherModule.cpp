@@ -294,7 +294,7 @@ namespace rkit
 				GetDrivers().m_systemDriver->RemoveCommandLineArgs(0, 3);
 			}
 			else
-				GetDrivers().m_systemDriver->RemoveCommandLineArgs(0, 2);
+				GetDrivers().m_systemDriver->RemoveCommandLineArgs(0, 1);
 
 			IModule *programModule = GetDrivers().m_moduleDriver->LoadModule(programNamespaceID, programName.GetChars());
 
@@ -340,6 +340,7 @@ namespace rkit
 		IMallocDriver *m_mallocDriver;
 		TrackedModuleDriver *m_trackedModuleDriver;
 		IModule *m_module;
+		bool m_initialized;
 	};
 
 	class ProgramModule
@@ -401,6 +402,7 @@ namespace rkit
 		, m_nextModule(nullptr)
 		, m_mallocDriver(mallocDriver)
 		, m_trackedModuleDriver(trackedModuleDriver)
+		, m_initialized(false)
 	{
 		if (prevModule)
 			prevModule->m_nextModule = this;
@@ -408,7 +410,14 @@ namespace rkit
 
 	Result TrackedModule::Init(const ModuleInitParameters *initParams)
 	{
-		return m_module->Init(initParams);
+		if (m_initialized)
+			return ResultCode::kOK;
+
+		RKIT_CHECK(m_module->Init(initParams));
+
+		m_initialized = true;
+
+		return ResultCode::kOK;
 	}
 
 	void TrackedModule::Unload()

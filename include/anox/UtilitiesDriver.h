@@ -21,5 +21,6 @@ namespace anox
 	struct IUtilitiesDriver : public rkit::ICustomDriver
 	{
 		virtual rkit::Result OpenAFSArchive(rkit::UniquePtr<rkit::ISeekableReadStream> &&stream, rkit::UniquePtr<afs::IArchive> &outArchive) = 0;
+		virtual rkit::Result RunDataBuild(const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir) = 0;
 	};
 }

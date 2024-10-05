@@ -33,5 +33,7 @@ namespace rkit
 		virtual UniquePtr<ISeekableReadStream> OpenFileRead(FileLocation location, const char *path) = 0;
 		virtual UniquePtr<ISeekableWriteStream> OpenFileWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) = 0;
 		virtual UniquePtr<ISeekableReadWriteStream> OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) = 0;
+
+		virtual char GetPathSeparator() const = 0;
 	};
 }

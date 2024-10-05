@@ -22,6 +22,8 @@ namespace rkit
 
 	namespace buildsystem
 	{
+		struct IDependencyNode;
+
 		enum class DependencyState
 		{
 			// All dependencies are up-to-date and this node is also up-to-date
@@ -31,34 +33,51 @@ namespace rkit
 			NotAnalyzedOrProcessed,
 
 			// Analysis has been run on the node (sub-nodes and dependencies are known) but the node itself
-			// has not been processed yet.
-			NotProcessed,
+			// has not been processed yet.  Dependencies will be available, but
+			// products will not.
+			NotCompiled,
+		};
+
+		struct FileStatus
+		{
+			StringView m_filePath;
+			uint64_t m_fileSize;
+			UTCMSecTimestamp_t m_fileTime;
 		};
 
 		struct FileDependencyInfo
 		{
-			StringView m_filePath;
+			FileStatus m_status;
 			bool m_fileExists;
-			uint64_t m_fileSize;
-			UTCMSecTimestamp_t m_fileTime;
+			bool m_mustBeUpToDate;
+		};
+
+		struct NodeDependecyInfo
+		{
+			IDependencyNode *m_node;
+			bool m_mustBeUpToDate;
 		};
 
 		struct IDependencyNode
 		{
 			virtual ~IDependencyNode() {}
 
-			virtual void Reset() = 0;
+			virtual void MarkOutOfDate() = 0;
 
 			virtual StringView GetIdentifier() const = 0;
 			virtual DependencyState GetDependencyState() const = 0;
 
 			virtual uint32_t GetDependencyNodeType() const = 0;
 			virtual Result RunAnalysis() = 0;
-			virtual Result RunProcess() = 0;
+			virtual Result RunCompile() = 0;
 
-			virtual Span<StringView> GetProducts() const = 0;
+			virtual CallbackSpan<FileStatus, IDependencyNode *> GetIntermediateProducts() const = 0;
+			virtual CallbackSpan<FileStatus, IDependencyNode *> GetOutputProducts() const = 0;
 			virtual Span<FileDependencyInfo> GetFileDependencies() const = 0;
-			virtual CallbackSpan<IDependencyNode*, IDependencyNode*> GetNodeDependencies() const = 0;
+			virtual CallbackSpan<NodeDependecyInfo, IDependencyNode*> GetNodeDependencies() const = 0;
+
+			virtual Result Serialize(IWriteStream *stream) const = 0;
+			virtual Result Deserialize(IReadStream *stream) = 0;
 		};
 
 		struct INodeCreationParameters
@@ -68,11 +87,19 @@ namespace rkit
 			virtual Result CreateNode(UniquePtr<IDependencyNode> &outNode) = 0;
 		};
 
+		struct INodeFactory
+		{
+			virtual ~INodeFactory() {}
+
+			virtual Result CreateNode(UniquePtr<IDependencyNode> &outNode, const StringView &identifier) const = 0;
+		};
+
 		struct IDependencyGraphFactory
 		{
 			virtual ~IDependencyGraphFactory() {}
 
-			virtual Result CreateNode(uint32_t nodeType, const StringView &identifier, UniquePtr<IDependencyNode> &outNode) const = 0;
+			virtual Result CreateNode(uint32_t nodeNamespace, uint32_t nodeType, const StringView &identifier, UniquePtr<IDependencyNode> &outNode) const = 0;
+			virtual Result RegisterNodeFactory(uint32_t nodeNamespace, uint32_t nodeType, INodeFactory *factory) = 0;
 		};
 	}
 }

@@ -1,4 +1,5 @@
 #include "AnoxAFSArchive.h"
+#include "AnoxDataBuilder.h"
 
 #include "anox/AnoxModule.h"
 #include "anox/AFSFormat.h"
@@ -26,6 +27,7 @@ namespace anox
 		rkit::StringView GetDriverName() const override { return "Utilities"; }
 
 		rkit::Result OpenAFSArchive(rkit::UniquePtr<rkit::ISeekableReadStream> &&stream, rkit::UniquePtr<anox::afs::IArchive> &outArchive) override;
+		rkit::Result RunDataBuild(const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir) override;
 	};
 
 	typedef rkit::CustomDriverModuleStub<UtilitiesDriver> UtilitiesModule;
@@ -41,6 +43,17 @@ rkit::Result anox::UtilitiesDriver::OpenAFSArchive(rkit::UniquePtr<rkit::ISeekab
 	RKIT_CHECK(archive->Open(std::move(stream)));
 
 	outArchive = rkit::UniquePtr<anox::afs::IArchive>(std::move(archive));
+
+	return rkit::ResultCode::kOK;
+}
+
+
+rkit::Result anox::UtilitiesDriver::RunDataBuild(const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir)
+{
+	rkit::UniquePtr<anox::utils::IDataBuilder> dataBuilder;
+	RKIT_CHECK(anox::utils::IDataBuilder::Create(dataBuilder));
+
+	RKIT_CHECK(dataBuilder->Run(sourceDir, intermedDir, dataDir));
 
 	return rkit::ResultCode::kOK;
 }

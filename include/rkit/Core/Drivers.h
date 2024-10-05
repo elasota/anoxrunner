@@ -99,6 +99,10 @@ inline rkit::Result rkit::Drivers::RegisterDriver(UniquePtr<ICustomDriver> &&dri
 
 	if (!m_firstCustomDriverLink)
 		m_firstCustomDriverLink = driverLink;
+
+	if (m_lastCustomDriverLink)
+		m_lastCustomDriverLink->m_next = driverLink;
+
 	m_lastCustomDriverLink = driverLink;
 
 	return ResultCode::kOK;
