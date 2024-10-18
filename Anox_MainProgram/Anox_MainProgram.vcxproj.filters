@@ -18,5 +18,8 @@
     <ClCompile Include="AnoxMain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="AnoxGame.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

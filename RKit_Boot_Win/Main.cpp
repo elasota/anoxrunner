@@ -2,11 +2,12 @@
 #include "rkit/Core/MallocDriver.h"
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/Module.h"
-#include "rkit/Core/ModuleAPI_Win32.h"
 #include "rkit/Core/ProgramDriver.h"
-#include "rkit/Core/SystemModuleParams_Win32.h"
 
-#include <Windows.h>
+#include "rkit/Win32/SystemModuleInitParameters_Win32.h"
+#include "rkit/Win32/ModuleAPI_Win32.h"
+#include "rkit/Win32/IncludeWindows.h"
+
 #include <cstdlib>
 #include <new>
 
@@ -139,6 +140,7 @@ namespace rkit
 		, m_initFunc(initFunc)
 		, m_mallocDriver(mallocDriver)
 		, m_isInitialized(false)
+		, m_moduleAPI{}
 	{
 	}
 
@@ -164,7 +166,12 @@ namespace rkit
 
 		m_isInitialized = true;
 
-		return m_moduleAPI.m_initFunction(initParams);
+		if (m_moduleAPI.m_initFunction)
+		{
+			RKIT_CHECK(m_moduleAPI.m_initFunction(initParams));
+		}
+
+		return ResultCode::kOK;
 	}
 
 	void Module_Win32::Unload()
@@ -188,7 +195,7 @@ static int WinMainCommon(HINSTANCE hInstance)
 	if (!systemModule)
 		return rkit::Result(rkit::ResultCode::kModuleLoadFailed).ToExitCode();
 
-	rkit::SystemModuleParams_Win32 systemParams;
+	rkit::SystemModuleInitParameters_Win32 systemParams(hInstance);
 
 	rkit::Result systemInitResult = systemModule->Init(&systemParams);
 

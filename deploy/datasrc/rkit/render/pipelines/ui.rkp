@@ -1,0 +1,44 @@
+include "bindings.rki"
+
+GraphicsPipelineDef GP_InterfaceSimple
+{
+	DescriptorLayout = DL_Interface
+	InputLayout = IL_InterfaceSimple
+
+	VertexShaderOutput =
+	{
+	}
+
+	VertexShader = { Source = "ui.rkc", EntryPoint = "VertexMain" }
+	PixelShader = { Source = "ui.rkc", EntryPoint = "PixelMain" }
+
+	Topology = Triangle
+
+	RenderTargets
+	{
+		Color =
+		{
+			ColorAccess = ReadWrite
+			Format = Option(CFG_LinearLighting, 0 = R8G8B8A8_sRGB, 1 = R8G8B8A8)
+		}
+	}
+}
+
+RenderPass RP_InterfaceSimple
+{
+	BindPoints
+	{
+		Color = { ColorAccess = ReadWrite, Format = Option(CFG_LinearLighting, 0 = R8G8B8A8_sRGB, 1 = R8G8B8A8) }
+	}
+
+	SubPasses
+	{
+		{
+			Pipeline = GP_InterfaceSimple
+			RenderTargets
+			{
+				Color = { BindPoint = Color, SrcBlend = One, DstBlend = ZeroMinusSrcAlpha }
+			}
+		}
+	}
+}

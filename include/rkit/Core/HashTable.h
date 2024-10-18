@@ -8,6 +8,24 @@
 
 namespace rkit
 {
+	template<class TKey, class TValue, class TSize>
+	class HashTableBase;
+
+	template<class TKey, class TValue, class TSize>
+	class HashMap;
+
+	template<class TKey, class TSize>
+	class HashSet;
+
+	template<class TKey, class TValue, class TSize>
+	class HashMapIterator;
+
+	template<class TKey, class TValue, class TSize>
+	class HashMapConstIterator;
+
+	template<class TKey, class TSize>
+	class HashSetIterator;
+
 	template<class T>
 	class HashMapValueContainer
 	{
@@ -22,6 +40,7 @@ namespace rkit
 		void DestructValueAt(size_t index);
 		void RelocateValue(size_t thisIndex, HashMapValueContainer<T> &other, size_t otherIndex);
 		T *GetValuePtrAt(size_t index);
+		const T *GetValuePtrAt(size_t index) const;
 
 	private:
 		T *m_values;
@@ -38,6 +57,80 @@ namespace rkit
 	public:
 		static Result Construct(void *memory, TOriginal &&original);
 		static Result Assign(TTarget &target, TOriginal &&original);
+	};
+
+	template<class TKey, class TValue>
+	class HashMapKeyValueView
+	{
+	public:
+		HashMapKeyValueView(const TKey &key, TValue &value);
+
+		const TKey &Key() const;
+		TValue &Value() const;
+
+	private:
+		HashMapKeyValueView() = delete;
+
+		const TKey &m_key;
+		TValue &m_value;
+	};
+
+	template<class TKey, class TValue, class TSize>
+	class HashMapIterator
+	{
+		friend class HashMap<TKey, TValue, TSize>;
+		friend class HashMapConstIterator<TKey, TValue, TSize>;
+
+	public:
+		HashMapIterator<TKey, TValue, TSize> operator++();
+		HashMapIterator<TKey, TValue, TSize>& operator++(int);
+
+		bool operator==(const HashMapIterator<TKey, TValue, TSize> &other) const;
+		bool operator!=(const HashMapIterator<TKey, TValue, TSize> &other) const;
+
+		bool operator==(const HashMapConstIterator<TKey, TValue, TSize> &other) const;
+		bool operator!=(const HashMapConstIterator<TKey, TValue, TSize> &other) const;
+
+	private:
+		HashMapIterator(HashMap<TKey, TValue, TSize> &hashMap, TSize offset);
+
+		HashMapIterator() = delete;
+
+		void Normalize();
+
+		HashMap<TKey, TValue, TSize> &m_hashMap;
+		TSize m_offset;
+	};
+
+	template<class TKey, class TValue, class TSize>
+	class HashMapConstIterator
+	{
+		friend class HashMap<TKey, TValue, TSize>;
+		friend class HashMapIterator<TKey, TValue, TSize>;
+
+	public:
+		HashMapConstIterator(const HashMapIterator<TKey, TValue, TSize> &other);
+
+		HashMapConstIterator<TKey, TValue, TSize> operator++();
+		HashMapConstIterator<TKey, TValue, TSize> &operator++(int);
+
+		bool operator==(const HashMapConstIterator<TKey, TValue, TSize> &other) const;
+		bool operator!=(const HashMapConstIterator<TKey, TValue, TSize> &other) const;
+
+		HashMapKeyValueView<TKey, const TValue> operator*() const;
+
+		const TKey &Key() const;
+		const TValue &Value() const;
+
+	private:
+		HashMapConstIterator(const HashMap<TKey, TValue, TSize> &hashTable, TSize offset);
+
+		HashMapConstIterator() = delete;
+
+		void Normalize();
+
+		const HashMap<TKey, TValue, TSize> &m_hashMap;
+		TSize m_offset;
 	};
 
 	// This uses a scheme similar to Lua, where collisions are moved out of their position
@@ -66,7 +159,7 @@ namespace rkit
 		void RemoveEntryNoDestruct(TSize position);
 
 		template<class TCandidateKey>
-		bool Find(HashValue_t keyHash, const TCandidateKey &key, TSize &outPosition) const;
+		bool FindKeyPosition(HashValue_t keyHash, const TCandidateKey &key, TSize &outPosition) const;
 
 	private:
 		struct NextChainAndOccupancy
@@ -75,7 +168,10 @@ namespace rkit
 			TSize m_next : sizeof(TSize) * 8 - 1;
 		};
 
+	protected:
 		bool GetOccupancyAt(TSize index) const;
+
+	private:
 		void SetOccupancyAt(TSize index, bool occupied);
 		TSize GetMainPosition(HashValue_t hash) const;
 
@@ -88,9 +184,9 @@ namespace rkit
 	protected:
 		HashMapValueContainer<TValue> m_values;
 		TKey *m_keys;
+		TSize m_capacity;
 
 	private:
-		TSize m_capacity;
 		TSize m_count;
 		TSize m_freePosScan;
 	};
@@ -113,7 +209,13 @@ namespace rkit
 	template<class TKey, class TValue, class TSize = uint32_t>
 	class HashMap final : public HashTableBase<TKey, TValue, TSize>
 	{
+		friend class HashMapIterator<TKey, TValue, TSize>;
+		friend class HashMapConstIterator<TKey, TValue, TSize>;
+
 	public:
+		typedef HashMapIterator<TKey, TValue, TSize> Iterator_t;
+		typedef HashMapConstIterator<TKey, TValue, TSize> ConstIterator_t;
+
 		HashMap() = default;
 		explicit HashMap(IMallocDriver *alloc);
 		HashMap(HashMap<TKey, TValue, TSize> &&other) = default;
@@ -122,6 +224,18 @@ namespace rkit
 
 		template<class TCandidateKey, class TCandidateValue, class TKeyHasher = Hasher<TCandidateKey>, class TKeyConstructor = DefaultElementConstructor<TKey, TCandidateKey>, class TValueConstructor = DefaultElementConstructor<TValue, TCandidateValue>>
 		Result Set(TCandidateKey &&key, TCandidateValue &&value);
+
+		HashMapIterator<TKey, TValue, TSize> begin();
+		HashMapIterator<TKey, TValue, TSize> end();
+
+		HashMapConstIterator<TKey, TValue, TSize> begin() const;
+		HashMapConstIterator<TKey, TValue, TSize> end() const;
+
+		template<class TCandidateKey, class TKeyHasher = Hasher<TCandidateKey>>
+		HashMapIterator<TKey, TValue, TSize> Find(const TCandidateKey &key);
+
+		template<class TCandidateKey, class TKeyHasher = Hasher<TCandidateKey>>
+		HashMapConstIterator<TKey, TValue, TSize> Find(const TCandidateKey &key) const;
 	};
 }
 
@@ -165,6 +279,94 @@ T *rkit::HashMapValueContainer<T>::GetValuePtrAt(size_t index)
 {
 	return m_values + index;
 }
+
+template<class T>
+const T *rkit::HashMapValueContainer<T>::GetValuePtrAt(size_t index) const
+{
+	return m_values + index;
+}
+
+
+template<class TKey, class TValue, class TSize>
+rkit::HashMapConstIterator<TKey, TValue, TSize>::HashMapConstIterator(const HashMapIterator<TKey, TValue, TSize> &other)
+	: m_hashMap(other.m_hashMap)
+	, m_offset(other.m_offset)
+{
+}
+
+template<class TKey, class TValue, class TSize>
+rkit::HashMapConstIterator<TKey, TValue, TSize> rkit::HashMapConstIterator<TKey, TValue, TSize>::operator++()
+{
+	m_offset++;
+	this->Normalize();
+	return *this;
+}
+
+template<class TKey, class TValue, class TSize>
+ rkit::HashMapConstIterator<TKey, TValue, TSize> &rkit::HashMapConstIterator<TKey, TValue, TSize>::operator++(int)
+{
+	TSize oldOffset = m_offset;
+
+	m_offset++;
+	this->Normalize();
+
+	return HashMapConstIterator<TKey, TValue, TSize>(m_hashMap, oldOffset);
+}
+
+template<class TKey, class TValue, class TSize>
+bool rkit::HashMapConstIterator<TKey, TValue, TSize>::operator==(const HashMapConstIterator<TKey, TValue, TSize> &other) const
+{
+	return m_offset == other.m_offset && (&m_hashMap) == (&other.m_hashMap);
+}
+
+template<class TKey, class TValue, class TSize>
+bool rkit::HashMapConstIterator<TKey, TValue, TSize>::operator!=(const HashMapConstIterator<TKey, TValue, TSize> &other) const
+{
+	return !((*this) == other);
+}
+
+template<class TKey, class TValue, class TSize>
+rkit::HashMapKeyValueView<TKey, const TValue> rkit::HashMapConstIterator<TKey, TValue, TSize>::operator*() const
+{
+	return HashMapKeyValueView<TKey, const TValue>(this->Key(), this->Value());
+}
+
+template<class TKey, class TValue, class TSize>
+const TKey &rkit::HashMapConstIterator<TKey, TValue, TSize>::Key() const
+{
+	RKIT_ASSERT(m_offset < m_hashMap.m_capacity && m_hashMap.GetOccupancyAt(m_offset));
+	return m_hashMap.m_keys[m_offset];
+}
+
+template<class TKey, class TValue, class TSize>
+const TValue &rkit::HashMapConstIterator<TKey, TValue, TSize>::Value() const
+{
+	RKIT_ASSERT(m_offset < m_hashMap.m_capacity && m_hashMap.GetOccupancyAt(m_offset));
+	return *m_hashMap.m_values.GetValuePtrAt(m_offset);
+}
+
+template<class TKey, class TValue, class TSize>
+rkit::HashMapConstIterator<TKey, TValue, TSize>::HashMapConstIterator(const HashMap<TKey, TValue, TSize> &hashMap, TSize offset)
+	: m_hashMap(hashMap)
+	, m_offset(offset)
+{
+}
+
+template<class TKey, class TValue, class TSize>
+void rkit::HashMapConstIterator<TKey, TValue, TSize>::Normalize()
+{
+	TSize capacity = m_hashMap.m_capacity;
+	TSize offset = m_offset;
+
+	while (offset < capacity)
+	{
+		if (m_hashMap.GetOccupancyAt(offset))
+			break;
+	}
+
+	m_offset = offset;
+}
+
 
 template<class TKey, class TValue, class TSize>
 rkit::HashTableBase<TKey, TValue, TSize>::HashTableBase()
@@ -266,13 +468,13 @@ rkit::Result rkit::HashTableBase<TKey, TValue, TSize>::Resize(TSize newCapacity)
 {
 	struct ResizePlanChunk
 	{
-		size_t m_count;
 		size_t m_size;
 		size_t m_alignment;
+		size_t m_count;
 		size_t m_blobOffset;
 	};
 
-	size_t maxBlobSize = std::numeric_limits<size_t>::max();
+	constexpr size_t maxBlobSize = std::numeric_limits<size_t>::max();
 
 	if (newCapacity == 0)
 	{
@@ -394,13 +596,16 @@ rkit::Result rkit::HashTableBase<TKey, TValue, TSize>::CreatePositionForNewEntry
 	if (m_count == std::numeric_limits<TSize>::max())
 		return ResultCode::kOutOfMemory;
 
-	TSize mainPosition = GetMainPosition(newKeyHash);
-
-	if (!GetOccupancyAt(mainPosition))
+	if (m_capacity > 0)
 	{
-		ReserveMainPosition(newKeyHash, mainPosition);
-		outPosition = mainPosition;
-		return ResultCode::kOK;
+		TSize mainPosition = GetMainPosition(newKeyHash);
+
+		if (!GetOccupancyAt(mainPosition))
+		{
+			ReserveMainPosition(newKeyHash, mainPosition);
+			outPosition = mainPosition;
+			return ResultCode::kOK;
+		}
 	}
 
 	TSize insertPosition = m_freePosScan;
@@ -519,8 +724,11 @@ void rkit::HashTableBase<TKey, TValue, TSize>::RemoveEntryNoDestruct(TSize posit
 
 template<class TKey, class TValue, class TSize>
 template<class TCandidateKey>
-bool rkit::HashTableBase<TKey, TValue, TSize>::Find(HashValue_t keyHash, const TCandidateKey &key, TSize &outPosition) const
+bool rkit::HashTableBase<TKey, TValue, TSize>::FindKeyPosition(HashValue_t keyHash, const TCandidateKey &key, TSize &outPosition) const
 {
+	if (m_capacity == 0)
+		return false;
+
 	TSize pos = GetMainPosition(keyHash);
 	TSize initialPos = pos;
 
@@ -603,7 +811,7 @@ rkit::Result rkit::HashMap<TKey, TValue, TSize>::Set(TCandidateKey &&key, TCandi
 	HashValue_t hash = TKeyHasher::ComputeHash(key);
 
 	TSize position = 0;
-	if (this->Find<TCandidateKey>(hash, key, position))
+	if (this->FindKeyPosition<TCandidateKey>(hash, key, position))
 	{
 		TValue *valuePtr = this->m_values.GetValuePtrAt(position);
 		return TValueConstructor::Assign(*valuePtr, std::forward<TCandidateValue>(value));
@@ -615,7 +823,6 @@ rkit::Result rkit::HashMap<TKey, TValue, TSize>::Set(TCandidateKey &&key, TCandi
 		Result keyConstructResult = TKeyConstructor::Construct(this->m_keys + position, std::forward<TCandidateKey>(key));
 		if (!keyConstructResult.IsOK())
 		{
-			this->m_keys[position].~TKey();
 			this->RemoveEntryNoDestruct(position);
 			return keyConstructResult;
 		}
@@ -625,7 +832,6 @@ rkit::Result rkit::HashMap<TKey, TValue, TSize>::Set(TCandidateKey &&key, TCandi
 		Result valueConstructResult = TValueConstructor::Construct(this->m_values.GetValuePtrAt(position), std::forward<TCandidateValue>(value));
 		if (!valueConstructResult.IsOK())
 		{
-			this->m_values.DestructValueAt(position);
 			this->m_keys[position].~TKey();
 
 			this->RemoveEntryNoDestruct(position);
@@ -634,6 +840,63 @@ rkit::Result rkit::HashMap<TKey, TValue, TSize>::Set(TCandidateKey &&key, TCandi
 	}
 
 	return ResultCode::kOK;
+}
+
+
+template<class TKey, class TValue, class TSize>
+rkit::HashMapIterator<TKey, TValue, TSize> rkit::HashMap<TKey, TValue, TSize>::begin()
+{
+	HashMapIterator<TKey, TValue, TSize> result(*this, 0);
+	result.Normalize();
+
+	return result;
+}
+
+template<class TKey, class TValue, class TSize>
+rkit::HashMapIterator<TKey, TValue, TSize> rkit::HashMap<TKey, TValue, TSize>::end()
+{
+	return HashMapIterator<TKey, TValue, TSize>(*this, this->m_capacity);
+}
+
+template<class TKey, class TValue, class TSize>
+rkit::HashMapConstIterator<TKey, TValue, TSize> rkit::HashMap<TKey, TValue, TSize>::begin() const
+{
+	HashMapConstIterator<TKey, TValue, TSize> result(*this, 0);
+	result.Normalize();
+
+	return result;
+}
+
+template<class TKey, class TValue, class TSize>
+rkit::HashMapConstIterator<TKey, TValue, TSize> rkit::HashMap<TKey, TValue, TSize>::end() const
+{
+	return HashMapConstIterator<TKey, TValue, TSize>(*this, this->m_capacity);
+}
+
+template<class TKey, class TValue, class TSize>
+template<class TCandidateKey, class TKeyHasher>
+rkit::HashMapIterator<TKey, TValue, TSize> rkit::HashMap<TKey, TValue, TSize>::Find(const TCandidateKey &key)
+{
+	HashValue_t keyHash = TKeyHasher::ComputeHash(key);
+
+	TSize position = 0;
+	if (this->FindKeyPosition(keyHash, key, position))
+		return rkit::HashMapIterator<TKey, TValue, TSize>(*this, position);
+
+	return end();
+}
+
+template<class TKey, class TValue, class TSize>
+template<class TCandidateKey, class TKeyHasher>
+rkit::HashMapConstIterator<TKey, TValue, TSize> rkit::HashMap<TKey, TValue, TSize>::Find(const TCandidateKey &key) const
+{
+	HashValue_t keyHash = TKeyHasher::ComputeHash(key);
+
+	TSize position = 0;
+	if (this->FindKeyPosition(keyHash, key, position))
+		return rkit::HashMapConstIterator<TKey, TValue, TSize>(*this, position);
+
+	return end();
 }
 
 
@@ -649,4 +912,23 @@ rkit::Result rkit::DefaultElementConstructor<TTarget, TOriginal>::Assign(TTarget
 {
 	target = std::forward<TOriginal>(original);
 	return rkit::ResultCode::kOK;
+}
+
+template<class TKey, class TValue>
+rkit::HashMapKeyValueView<TKey, TValue>::HashMapKeyValueView(const TKey &key, TValue &value)
+	: m_key(key)
+	, m_value(value)
+{
+}
+
+template<class TKey, class TValue>
+const TKey &rkit::HashMapKeyValueView<TKey, TValue>::Key() const
+{
+	return m_key;
+}
+
+template<class TKey, class TValue>
+TValue &rkit::HashMapKeyValueView<TKey, TValue>::Value() const
+{
+	return m_value;
 }

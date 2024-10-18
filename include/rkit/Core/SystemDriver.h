@@ -16,6 +16,11 @@ namespace rkit
 	struct ISeekableReadWriteStream;
 	struct ISeekableWriteStream;
 
+	struct IPlatformDriver
+	{
+		virtual ~IPlatformDriver() {}
+	};
+
 	enum class FileLocation
 	{
 		kGameDirectory,
@@ -35,5 +40,7 @@ namespace rkit
 		virtual UniquePtr<ISeekableReadWriteStream> OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) = 0;
 
 		virtual char GetPathSeparator() const = 0;
+
+		virtual IPlatformDriver *GetPlatformDriver() const = 0;
 	};
 }

@@ -11,10 +11,12 @@
 #include "rkit/Core/UniquePtr.h"
 #include "rkit/Core/Vector.h"
 
-#include <Windows.h>
+#include "rkit/Win32/Win32PlatformDriver.h"
+#include "rkit/Win32/SystemModuleInitParameters_Win32.h"
+
+#include <shellapi.h>
 #include <Shlwapi.h>
 
-#undef GetCommandLine
 
 namespace rkit
 {
@@ -39,10 +41,10 @@ namespace rkit
 		FilePos_t m_fileSize;
 	};
 
-	class SystemDriver_Win32 final : public ISystemDriver
+	class SystemDriver_Win32 final : public NoCopy, public ISystemDriver, public IWin32PlatformDriver
 	{
 	public:
-		explicit SystemDriver_Win32(IMallocDriver *alloc);
+		SystemDriver_Win32(IMallocDriver *alloc, const SystemModuleInitParameters_Win32 &initParams);
 		~SystemDriver_Win32();
 
 		Result Initialize();
@@ -57,6 +59,10 @@ namespace rkit
 
 		char GetPathSeparator() const override;
 
+		IPlatformDriver *GetPlatformDriver() const override;
+
+		HINSTANCE GetHInstance() const override;
+
 	private:
 		Result UTF8ToUTF16(const char *str8, Vector<wchar_t> &outStr16);
 		Result UTF16ToUTF8(const wchar_t *str16, Vector<char> &outStr16);
@@ -70,6 +76,8 @@ namespace rkit
 		Vector<Vector<char> > m_commandLineCharBuffers;
 		Vector<StringView> m_commandLine;
 		LPWSTR *m_argvW;
+
+		HINSTANCE m_hInstance;
 	};
 
 	class SystemModule_Win32
@@ -210,10 +218,11 @@ namespace rkit
 		return m_fileSize;
 	}
 
-	SystemDriver_Win32::SystemDriver_Win32(IMallocDriver *alloc)
+	SystemDriver_Win32::SystemDriver_Win32(IMallocDriver *alloc, const SystemModuleInitParameters_Win32 &initParams)
 		: m_commandLine(alloc)
 		, m_argvW(nullptr)
 		, m_alloc(alloc)
+		, m_hInstance(initParams.m_hinst)
 	{
 	}
 
@@ -325,6 +334,16 @@ namespace rkit
 	char SystemDriver_Win32::GetPathSeparator() const
 	{
 		return '\\';
+	}
+
+	IPlatformDriver *SystemDriver_Win32::GetPlatformDriver() const
+	{
+		return const_cast<SystemDriver_Win32 *>(this);
+	}
+
+	HINSTANCE SystemDriver_Win32::GetHInstance() const
+	{
+		return m_hInstance;
 	}
 
 	UniquePtr<File_Win32> SystemDriver_Win32::OpenFileGeneral(FileLocation location, const char *path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition)
@@ -507,13 +526,13 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
-	Result SystemModule_Win32::Init(const ModuleInitParameters *)
+	Result SystemModule_Win32::Init(const ModuleInitParameters *baseInitParams)
 	{
 		IMallocDriver *alloc = GetDrivers().m_mallocDriver;
 
 		UniquePtr<SystemDriver_Win32> driver;
 
-		RKIT_CHECK(NewWithAlloc<SystemDriver_Win32>(driver, alloc, alloc));
+		RKIT_CHECK(NewWithAlloc<SystemDriver_Win32>(driver, alloc, alloc, *static_cast<const SystemModuleInitParameters_Win32 *>(baseInitParams)));
 		ms_systemDriver = driver.Detach();
 		GetMutableDrivers().m_systemDriver = ms_systemDriver;
 

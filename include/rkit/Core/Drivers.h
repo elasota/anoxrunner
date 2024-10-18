@@ -10,6 +10,7 @@ namespace rkit
 	struct IShellDriver;
 	struct IModuleDriver;
 	struct IMallocDriver;
+	struct IPlatformDriver;
 	struct IProgramDriver;
 	struct ISystemDriver;
 	struct IUnicodeDriver;

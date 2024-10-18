@@ -3,7 +3,7 @@
 
 #if defined(_WIN32)
 
-#include "rkit/Core/ModuleAPI_Win32.h"
+#include "rkit/Win32/ModuleAPI_Win32.h"
 
 #define RKIT_IMPLEMENT_MODULE(moduleNamespace, moduleName, moduleClass)	\
 namespace rkit\

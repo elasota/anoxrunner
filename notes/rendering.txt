@@ -1,0 +1,48 @@
+API equivalencies:
+
+Descriptors:
+Sampler: Sampler
+Combined image sampler: Sampler-accessible image and sampler (optimal layout only)
+Sampled image: Sampler-accessible image
+Storage image: Image with load, store, and atomic operations allowed
+Uniform texel buffer: Sampler-accessible buffer (1D array of texels)
+Storage texel buffer: Buffer with image load, store, and atomic operations allowed
+Uniform buffer: Uniforms (constants)
+Storage buffer: Storage
+Uniform buffer dynamic: Uniforms with a command-specifiable dynamic offset
+Storage buffer dynamic: Storage buffer with a command-specifiable dynamic offset
+Input attachment: Framebuffer local operation input
+Inline uniform block: Constants inlined into descriptor pool memory
+
+
+D3D12 equivalencies:
+Uniform buffer -> Constant buffer view
+Storage buffer -> Shader resource view or unordered access view, depending on mutability
+Samplers -> Sampler
+
+
+Mapping of pipeline layouts to D3D12 root signature:
+- Push constants -> 32-bit constant root parameters
+- Mutable resources -> UAV descriptor
+- Read-only resources -> SRV descriptor
+
+Only buffer descriptors and constant buffers may be inlined in D3D12.
+
+Inlined sampler states are in HLSL in D3D12.  In Vulkan they are created with the
+descriptor set.
+
+
+D3D12 SRVs must be specified as one of:
+- Buffer, texture (array), potentially multisampled if 2D, acceleration structure
+
+SRVs for textures can remap input components to different input components, 0, or 1
+
+UAV types are the same as SRV type except no acceleration structure
+
+
+Texture UAVs to snorm/unorm formats must specify as such.
+
+
+
+Descriptor layout mappings:
+- RWTexture -> Whatever

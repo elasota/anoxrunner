@@ -23,6 +23,7 @@ namespace rkit
 	namespace buildsystem
 	{
 		struct IDependencyNode;
+		struct IDependencyNodeCompiler;
 
 		enum class DependencyState
 		{
@@ -38,24 +39,46 @@ namespace rkit
 			NotCompiled,
 		};
 
-		struct FileStatus
+		struct FileStatusView
 		{
 			StringView m_filePath;
 			uint64_t m_fileSize;
 			UTCMSecTimestamp_t m_fileTime;
 		};
 
+		struct FileStatus
+		{
+			String m_filePath;
+			uint64_t m_fileSize;
+			UTCMSecTimestamp_t m_fileTime;
+		};
+
+		struct FileDependencyInfoView
+		{
+			FileStatusView m_status;
+			bool m_fileExists;
+			bool m_mustBeUpToDate;
+		};
+
 		struct FileDependencyInfo
 		{
 			FileStatus m_status;
-			bool m_fileExists;
-			bool m_mustBeUpToDate;
+			bool m_fileExists = true;
+			bool m_mustBeUpToDate = true;
 		};
 
 		struct NodeDependecyInfo
 		{
 			IDependencyNode *m_node;
-			bool m_mustBeUpToDate;
+			bool m_mustBeUpToDate = true;
+		};
+
+		struct IDependencyNodePrivateData
+		{
+			virtual ~IDependencyNodePrivateData() {}
+
+			virtual Result Serialize(IWriteStream *stream) const = 0;
+			virtual Result Deserialize(IReadStream *stream) = 0;
 		};
 
 		struct IDependencyNode
@@ -71,35 +94,50 @@ namespace rkit
 			virtual Result RunAnalysis() = 0;
 			virtual Result RunCompile() = 0;
 
-			virtual CallbackSpan<FileStatus, IDependencyNode *> GetIntermediateProducts() const = 0;
-			virtual CallbackSpan<FileStatus, IDependencyNode *> GetOutputProducts() const = 0;
-			virtual Span<FileDependencyInfo> GetFileDependencies() const = 0;
+			virtual CallbackSpan<FileStatusView, IDependencyNode *> GetIntermediateProducts() const = 0;
+			virtual CallbackSpan<FileStatusView, IDependencyNode *> GetOutputProducts() const = 0;
+			virtual CallbackSpan<FileDependencyInfoView, IDependencyNode *> GetFileDependencies() const = 0;
 			virtual CallbackSpan<NodeDependecyInfo, IDependencyNode*> GetNodeDependencies() const = 0;
 
 			virtual Result Serialize(IWriteStream *stream) const = 0;
 			virtual Result Deserialize(IReadStream *stream) = 0;
 		};
 
-		struct INodeCreationParameters
+		struct IDependencyNodeCompilerFeedback
 		{
-			virtual ~INodeCreationParameters() {}
+			virtual ~IDependencyNodeCompilerFeedback() {}
 
-			virtual Result CreateNode(UniquePtr<IDependencyNode> &outNode) = 0;
+			virtual Result AddIntermediateProduct(const FileStatusView &file) = 0;
+			virtual Result AddOutputProduct(const FileStatusView &file) = 0;
+		};
+
+		struct IDependencyNodeCompiler
+		{
+			virtual ~IDependencyNodeCompiler() {}
+
+			virtual Result Initialize() = 0;
+
+			virtual Result RunAnalysis(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback) = 0;
+			virtual Result RunCompile(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback) = 0;
+
+			virtual Result CreatePrivateData(UniquePtr<IDependencyNodePrivateData> &outPrivateData) = 0;
+
+			virtual uint32_t GetVersion() const = 0;
 		};
 
 		struct INodeFactory
 		{
 			virtual ~INodeFactory() {}
 
-			virtual Result CreateNode(UniquePtr<IDependencyNode> &outNode, const StringView &identifier) const = 0;
+			virtual Result CreateNode(UniquePtr<IDependencyNodeCompiler> &outNode, const StringView &identifier) const = 0;
 		};
 
 		struct IDependencyGraphFactory
 		{
 			virtual ~IDependencyGraphFactory() {}
 
-			virtual Result CreateNode(uint32_t nodeNamespace, uint32_t nodeType, const StringView &identifier, UniquePtr<IDependencyNode> &outNode) const = 0;
-			virtual Result RegisterNodeFactory(uint32_t nodeNamespace, uint32_t nodeType, INodeFactory *factory) = 0;
+			virtual Result CreateNode(uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation buildFileLocation, const StringView &identifier, UniquePtr<IDependencyNode> &outNode) const = 0;
+			virtual Result RegisterNodeCompiler(uint32_t nodeNamespace, uint32_t nodeType, UniquePtr<IDependencyNodeCompiler> &&factory) = 0;
 		};
 	}
 }

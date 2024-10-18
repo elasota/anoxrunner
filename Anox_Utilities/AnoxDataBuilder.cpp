@@ -3,6 +3,7 @@
 #include "anox/AnoxModule.h"
 
 #include "rkit/BuildSystem/BuildSystem.h"
+#include "rkit/BuildSystem/DependencyGraph.h"
 
 #include "rkit/Core/Drivers.h"
 #include "rkit/Core/LogDriver.h"
@@ -17,7 +18,7 @@ namespace anox::utils
 	public:
 		AnoxDataBuilder();
 
-		rkit::Result Run(const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir) override;
+		rkit::Result Run(const rkit::StringView &targetName, const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir) override;
 
 	private:
 		rkit::buildsystem::IBuildSystemDriver *m_bsDriver;
@@ -28,7 +29,7 @@ namespace anox::utils
 	{
 	}
 
-	rkit::Result AnoxDataBuilder::Run(const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir)
+	rkit::Result AnoxDataBuilder::Run(const rkit::StringView &targetName, const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir)
 	{
 		rkit::IModule *buildModule = rkit::GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, "Build");
 		if (!buildModule)
@@ -49,8 +50,12 @@ namespace anox::utils
 		rkit::UniquePtr<rkit::buildsystem::IBuildSystemInstance> instance;
 		RKIT_CHECK(m_bsDriver->CreateBuildSystemInstance(instance));
 
-		RKIT_CHECK(instance->Initialize(sourceDir, intermedDir, dataDir));
+		RKIT_CHECK(instance->Initialize(targetName, sourceDir, intermedDir, dataDir));
 
+		rkit::buildsystem::IDependencyGraphFactory *graphFactory = instance->GetDependencyGraphFactory();
+
+		rkit::UniquePtr<rkit::buildsystem::IDependencyNode> rootDepsNode;
+		RKIT_CHECK(graphFactory->CreateNode(rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kDepsNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, "RootFiles.deps", rootDepsNode));
 
 		RKIT_CHECK(instance->Build());
 
