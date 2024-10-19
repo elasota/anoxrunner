@@ -51,7 +51,7 @@ rkit::Result anox::UtilitiesDriver::OpenAFSArchive(rkit::UniquePtr<rkit::ISeekab
 rkit::Result anox::UtilitiesDriver::RunDataBuild(const rkit::StringView &targetName, const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir)
 {
 	rkit::UniquePtr<anox::utils::IDataBuilder> dataBuilder;
-	RKIT_CHECK(anox::utils::IDataBuilder::Create(dataBuilder));
+	RKIT_CHECK(anox::utils::IDataBuilder::Create(this, dataBuilder));
 
 	RKIT_CHECK(dataBuilder->Run(targetName, sourceDir, intermedDir, dataDir));
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "BuildFileLocation.h"
+
 #include "rkit/Core/Drivers.h"
 
 namespace rkit
@@ -16,11 +18,15 @@ namespace rkit
 
 		struct IDependencyNode;
 		struct IDependencyGraphFactory;
+		struct FileStatusView;
 
-		enum class BuildFileLocation
+		struct IBuildFileSystem
 		{
-			kSourceDir,
-			kIntermediateDir,
+			typedef Result (*ApplyFileStatusCallback_t)(void *userdata, const FileStatusView &fileStatus);
+
+			virtual ~IBuildFileSystem() {}
+
+			virtual Result ResolveFileStatusIfExists(BuildFileLocation inputFileLocation, const StringView &identifier, void *userdata, ApplyFileStatusCallback_t applyStatus) = 0;
 		};
 
 		struct IBuildSystemInstance
@@ -29,10 +35,12 @@ namespace rkit
 
 			virtual Result Initialize(const rkit::StringView &targetName, const StringView &srcDir, const StringView &intermediateDir, const StringView &dataDir) = 0;
 
-			virtual IDependencyNode *FindNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation buildFileLocation, const StringView &identifier) const = 0;
-			virtual Result AddRootNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, UniquePtr<IDependencyNode> &&node) const = 0;
+			virtual IDependencyNode *FindNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) const = 0;
+			virtual Result FindOrCreateNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier, IDependencyNode *&outNode) = 0;
 
-			virtual Result Build() = 0;
+			virtual Result AddRootNode(IDependencyNode *node) = 0;
+
+			virtual Result Build(IBuildFileSystem *fs) = 0;
 
 			virtual IDependencyGraphFactory *GetDependencyGraphFactory() const = 0;
 		};

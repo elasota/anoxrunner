@@ -21,6 +21,9 @@ namespace rkit
 		bool IsValid() const;
 		SimpleObjectAllocation<T> Detach();
 
+		template<class TOther>
+		UniquePtr<TOther> StaticCast();
+
 		void Reset();
 
 		UniquePtr &operator=(UniquePtr &&) noexcept;
@@ -106,6 +109,15 @@ rkit::SimpleObjectAllocation<T> rkit::UniquePtr<T>::Detach()
 	m_allocation.Clear();
 
 	return result;
+}
+
+template<class T>
+template<class TOther>
+rkit::UniquePtr<TOther> rkit::UniquePtr<T>::StaticCast()
+{
+	rkit::SimpleObjectAllocation<T> detached = Detach();
+
+	return rkit::UniquePtr<TOther>(static_cast<TOther *>(detached.m_obj), detached.m_mem, detached.m_alloc);
 }
 
 template<class T>

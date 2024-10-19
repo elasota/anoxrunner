@@ -137,10 +137,12 @@
   <ItemGroup>
     <ClInclude Include="..\include\rkit\BuildSystem\DependencyGraph.h" />
     <ClInclude Include="BuildSystemInstance.h" />
+    <ClInclude Include="DepsNodeCompiler.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BuildSystem.cpp" />
     <ClCompile Include="BuildSystemInstance.cpp" />
+    <ClCompile Include="DepsNodeCompiler.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

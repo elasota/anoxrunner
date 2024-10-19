@@ -13,7 +13,7 @@ namespace rkit
 		typedef void (*SelfDestructFunc_t)(BaseRefCountTracker &tracker);
 
 		std::atomic<size_t> m_count;
-		SelfDestructFunc_t m_selfDestructFunc;
+		SelfDestructFunc_t m_selfDestructFunc = nullptr;
 
 		void ReleaseCheckDelete();
 	};

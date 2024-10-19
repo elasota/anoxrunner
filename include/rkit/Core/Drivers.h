@@ -68,7 +68,7 @@ namespace rkit
 
 #include "Result.h"
 #include "NewDelete.h"
-#include "String.h"
+#include "StringView.h"
 #include "UniquePtr.h"
 
 #include <utility>

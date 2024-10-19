@@ -76,7 +76,7 @@ namespace anox
 
 				fileInfo.m_name = rkit::StringView(charsWriteLoc, filePathLen);
 
-				RKIT_CHECK(CheckName(fileInfo.m_name));
+				RKIT_CHECK(CheckName(fileInfo.m_name.ToSpan()));
 
 				fileInfo.m_filePosition = fileData.m_location.Get();
 				fileInfo.m_compressedSize = fileData.m_compressedSize.Get();
@@ -188,30 +188,30 @@ namespace anox
 			return len;
 		}
 
-		rkit::Result Archive::CheckName(const rkit::StringView &name)
+		rkit::Result Archive::CheckName(const rkit::Span<const char> &name)
 		{
 			size_t sliceStart = 0;
-			for (size_t i = 0; i < name.Length(); i++)
+			for (size_t i = 0; i < name.Count(); i++)
 			{
 				if (name[i] == '\\')
 				{
-					RKIT_CHECK(CheckSlice(name.SubString(sliceStart, i - sliceStart)));
+					RKIT_CHECK(CheckSlice(name.SubSpan(sliceStart, i - sliceStart)));
 					sliceStart = i + 1;
 				}
 			}
 
-			RKIT_CHECK(CheckSlice(name.SubString(sliceStart, name.Length() - sliceStart)));
+			RKIT_CHECK(CheckSlice(name.SubSpan(sliceStart, name.Count() - sliceStart)));
 
 			return rkit::ResultCode::kOK;
 		}
 
-		rkit::Result Archive::CheckSlice(const rkit::StringView &sliceName)
+		rkit::Result Archive::CheckSlice(const rkit::Span<const char> &sliceName)
 		{
-			if (sliceName.Length() == 0)
+			if (sliceName.Count() == 0)
 				return rkit::ResultCode::kMalformedFile;
 
 			char firstChar = sliceName[0];
-			char lastChar = sliceName[sliceName.Length() - 1];
+			char lastChar = sliceName[sliceName.Count() - 1];
 
 			if (firstChar == ' ' || lastChar == ' ' || lastChar == '.')
 				return rkit::ResultCode::kMalformedFile;
@@ -244,11 +244,12 @@ namespace anox
 
 			for (const char *bannedName : bannedNames)
 			{
-				if (sliceName == rkit::StringView(bannedName, strlen(bannedName)))
+				size_t bannedNameLength = strlen(bannedName);
+				if (sliceName.Count() == bannedNameLength && !memcmp(bannedName, sliceName.Ptr(), bannedNameLength))
 					return rkit::ResultCode::kMalformedFile;
 			}
 
-			for (size_t i = 0; i < sliceName.Length(); i++)
+			for (size_t i = 0; i < sliceName.Count(); i++)
 			{
 				char c = sliceName[i];
 				if (c == '.' && i > 0 && sliceName[i - 1] == '.')

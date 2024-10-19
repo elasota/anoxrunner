@@ -61,6 +61,8 @@ namespace rkit
 		T *Ptr() const;
 		size_t Count() const;
 
+		Span<T> SubSpan(size_t start, size_t size) const;
+
 		SpanIterator<T> begin() const;
 		SpanIterator<T> end() const;
 
@@ -77,6 +79,14 @@ namespace rkit
 	public:
 		explicit ISpanIterator(const ISpan<T> &span, size_t index);
 
+		T operator *() const;
+
+		ISpanIterator<T> &operator++();
+		ISpanIterator<T> operator++(int);
+
+		bool operator==(const ISpanIterator<T> &other) const;
+		bool operator!=(const ISpanIterator<T> &other) const;
+
 	private:
 		ISpanIterator() = delete;
 
@@ -90,7 +100,7 @@ namespace rkit
 		virtual ~ISpan() {}
 
 		virtual size_t Count() const = 0;
-		virtual T &operator[](size_t index) const = 0;
+		virtual T operator[](size_t index) const = 0;
 
 		ISpanIterator<T> begin() const;
 		ISpanIterator<T> end() const;
@@ -100,12 +110,12 @@ namespace rkit
 	class CallbackSpan final : public ISpan<T>
 	{
 	public:
-		typedef T &(*GetElementFunc_t)(const TUserdata &, size_t);
+		typedef T (*GetElementFunc_t)(const TUserdata &, size_t);
 
 		CallbackSpan(GetElementFunc_t getElementFunc, const TUserdata &userdata, size_t count);
 
 		size_t Count() const override;
-		T &operator[](size_t index) const override;
+		T operator[](size_t index) const override;
 
 	private:
 		GetElementFunc_t m_callback;
@@ -292,6 +302,14 @@ size_t rkit::Span<T>::Count() const
 }
 
 template<class T>
+rkit::Span<T> rkit::Span<T>::SubSpan(size_t start, size_t size) const
+{
+	RKIT_ASSERT(start <= m_count);
+	RKIT_ASSERT(m_count - start >= size);
+	return Span<T>(m_arr + start, size);
+}
+
+template<class T>
 rkit::SpanIterator<T> rkit::Span<T>::begin() const
 {
 	return SpanIterator<T>(m_arr);
@@ -317,6 +335,40 @@ template<class T>
 rkit::ISpanIterator<T>::ISpanIterator(const ISpan<T> &span, size_t index)
 	: m_span(span)
 {
+}
+
+
+template<class T>
+T rkit::ISpanIterator<T>::operator *() const
+{
+	return m_span[m_index];
+}
+
+template<class T>
+rkit::ISpanIterator<T> &rkit::ISpanIterator<T>::operator++()
+{
+	++m_index;
+	return *this;
+}
+
+template<class T>
+rkit::ISpanIterator<T> rkit::ISpanIterator<T>::operator++(int)
+{
+	ISpanIterator<T> copied(*this);
+	++m_index;
+	return copied;
+}
+
+template<class T>
+bool rkit::ISpanIterator<T>::operator==(const ISpanIterator<T> &other) const
+{
+	return (&m_span) == (&other.m_span) && m_index == other.m_index;
+}
+
+template<class T>
+bool rkit::ISpanIterator<T>::operator!=(const ISpanIterator<T> &other) const
+{
+	return !((*this) == other);
 }
 
 template<class T>
@@ -347,7 +399,7 @@ size_t rkit::CallbackSpan<T, TUserdata>::Count() const
 }
 
 template<class T, class TUserdata>
-T &rkit::CallbackSpan<T, TUserdata>::operator[](size_t index) const
+T rkit::CallbackSpan<T, TUserdata>::operator[](size_t index) const
 {
 	return m_callback(m_userdata, index);
 }

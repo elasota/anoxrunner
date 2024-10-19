@@ -12,6 +12,8 @@ namespace rkit
 
 namespace anox
 {
+	struct IUtilitiesDriver;
+
 	namespace utils
 	{
 		struct IDataBuilder
@@ -20,7 +22,7 @@ namespace anox
 
 			virtual rkit::Result Run(const rkit::StringView &targetName, const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir) = 0;
 
-			static rkit::Result Create(rkit::UniquePtr<IDataBuilder> &outDataBuilder);
+			static rkit::Result Create(IUtilitiesDriver *utils, rkit::UniquePtr<IDataBuilder> &outDataBuilder);
 		};
 	}
 }

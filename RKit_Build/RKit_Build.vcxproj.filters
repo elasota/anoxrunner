@@ -21,12 +21,18 @@
     <ClInclude Include="BuildSystemInstance.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DepsNodeCompiler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BuildSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="BuildSystemInstance.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DepsNodeCompiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

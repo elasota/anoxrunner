@@ -30,7 +30,7 @@ namespace rkit
 		Result CreateDeflateDecompressStream(UniquePtr<IReadStream> &outStream, UniquePtr<IReadStream> &&compressedStream) const override;
 		Result CreateRangeLimitedReadStream(UniquePtr<IReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream, FilePos_t startPos, FilePos_t size) const override;
 
-		HashValue_t ComputeHash(const void *data, size_t size) const override;
+		HashValue_t ComputeHash(HashValue_t baseHash, const void *data, size_t size) const override;
 	};
 
 	typedef DriverModuleStub<UtilitiesDriver, IUtilitiesDriver, &Drivers::m_utilitiesDriver> UtilitiesModule;
@@ -130,12 +130,12 @@ namespace rkit
 	}
 
 
-	HashValue_t UtilitiesDriver::ComputeHash(const void *value, size_t size) const
+	HashValue_t UtilitiesDriver::ComputeHash(HashValue_t baseHash, const void *value, size_t size) const
 	{
 		const uint8_t *bytes = static_cast<const uint8_t *>(value);
 
 		// TODO: Improve this
-		HashValue_t hash = 0;
+		HashValue_t hash = baseHash;
 		for (size_t i = 0; i < size; i++)
 			hash = hash * 223u + bytes[i] * 4447u;
 

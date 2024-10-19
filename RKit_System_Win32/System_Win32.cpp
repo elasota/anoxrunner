@@ -1,4 +1,5 @@
 #include "rkit/Core/Algorithm.h"
+#include "rkit/Core/DirectoryScan.h"
 #include "rkit/Core/Drivers.h"
 #include "rkit/Core/Module.h"
 #include "rkit/Core/ModuleGlue.h"
@@ -16,10 +17,23 @@
 
 #include <shellapi.h>
 #include <Shlwapi.h>
+#include <timezoneapi.h>
 
 
 namespace rkit
 {
+	class ConvUtil_Win32
+	{
+	public:
+		static Result UTF8ToUTF16(const char *str8, Vector<wchar_t> &outStr16);
+		static Result UTF16ToUTF8(const wchar_t *str16, Vector<char> &outStr16);
+
+		static UTCMSecTimestamp_t FileTimeToUTCMSec(const FILETIME &ftime);
+		static FILETIME UTCMSecToFileTime(UTCMSecTimestamp_t timestamp);
+
+		static const uint64_t kUnixEpochStartFT = 116444736000000000ULL;
+	};
+
 	class File_Win32 final : public ISeekableReadWriteStream
 	{
 	public:
@@ -41,6 +55,29 @@ namespace rkit
 		FilePos_t m_fileSize;
 	};
 
+	class DirectoryScan_Win32 final : public IDirectoryScan
+	{
+	public:
+		DirectoryScan_Win32();
+		~DirectoryScan_Win32();
+
+		Result GetNext(bool &haveItem, DirectoryScanItem &outItem) override;
+
+		WIN32_FIND_DATAW *GetFindData();
+		void SetHandle(HANDLE hdl);
+
+	private:
+		bool CheckItem() const;
+		Result ProduceItem(DirectoryScanItem &outItem);
+		Result GetAnotherItem();
+
+		HANDLE m_handle;
+		WIN32_FIND_DATAW m_findData;
+		Vector<char> m_fileNameUTF8;
+		bool m_exhausted;
+		bool m_haveItem;
+	};
+
 	class SystemDriver_Win32 final : public NoCopy, public ISystemDriver, public IWin32PlatformDriver
 	{
 	public:
@@ -57,6 +94,8 @@ namespace rkit
 		UniquePtr<ISeekableWriteStream> OpenFileWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
 		UniquePtr<ISeekableReadWriteStream> OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
 
+		Result OpenDirectoryScan(FileLocation location, const char *path, UniquePtr<IDirectoryScan> &outDirectoryScan) override;
+
 		char GetPathSeparator() const override;
 
 		IPlatformDriver *GetPlatformDriver() const override;
@@ -64,9 +103,6 @@ namespace rkit
 		HINSTANCE GetHInstance() const override;
 
 	private:
-		Result UTF8ToUTF16(const char *str8, Vector<wchar_t> &outStr16);
-		Result UTF16ToUTF8(const wchar_t *str16, Vector<char> &outStr16);
-
 		static DWORD OpenFlagsToDisposition(bool createIfNotExists, bool truncateIfExists);
 		UniquePtr<File_Win32> OpenFileGeneral(FileLocation location, const char *path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition);
 		Result OpenFileGeneralChecked(UniquePtr<File_Win32> &outFile, FileLocation location, const char *path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition);
@@ -89,6 +125,62 @@ namespace rkit
 	private:
 		static SimpleObjectAllocation<SystemDriver_Win32> ms_systemDriver;
 	};
+
+	Result ConvUtil_Win32::UTF8ToUTF16(const char *str8, Vector<wchar_t> &outStr16)
+	{
+		int charsRequired = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str8, -1, nullptr, 0);
+		if (charsRequired == 0)
+			return ResultCode::kInvalidUnicode;
+
+		RKIT_CHECK(outStr16.Resize(charsRequired));
+
+		int convResult = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str8, -1, outStr16.GetBuffer(), static_cast<int>(outStr16.Count()));
+		if (convResult == 0)
+			return ResultCode::kInvalidUnicode;
+
+		return ResultCode::kOK;
+	}
+
+	Result ConvUtil_Win32::UTF16ToUTF8(const wchar_t *str16, Vector<char> &outStr8)
+	{
+		int bytesRequired = WideCharToMultiByte(CP_UTF8, 0, str16, -1, nullptr, 0, nullptr, nullptr);
+		if (bytesRequired == 0)
+			return ResultCode::kInvalidUnicode;
+
+		RKIT_CHECK(outStr8.Resize(bytesRequired));
+
+		int convResult = WideCharToMultiByte(CP_UTF8, 0, str16, -1, outStr8.GetBuffer(), static_cast<int>(outStr8.Count()), nullptr, nullptr);
+		if (convResult == 0)
+			return ResultCode::kInvalidUnicode;
+
+		return ResultCode::kOK;
+	}
+
+
+	UTCMSecTimestamp_t ConvUtil_Win32::FileTimeToUTCMSec(const FILETIME &ftime)
+	{
+		ULARGE_INTEGER ftu64;
+		ftu64.HighPart = ftime.dwHighDateTime;
+		ftu64.LowPart = ftime.dwLowDateTime;
+
+		uint64_t adjustedFT = ftu64.QuadPart - kUnixEpochStartFT;
+
+		return adjustedFT / 10000u;
+	}
+
+	FILETIME ConvUtil_Win32::UTCMSecToFileTime(UTCMSecTimestamp_t timestamp)
+	{
+		uint64_t adjustedFT = timestamp * 10000u;
+
+		ULARGE_INTEGER ftu64;
+		ftu64.QuadPart = adjustedFT + kUnixEpochStartFT;
+
+		FILETIME result;
+		result.dwHighDateTime = ftu64.HighPart;
+		result.dwLowDateTime = ftu64.LowPart;
+
+		return result;
+	}
 
 	File_Win32::File_Win32(HANDLE hfile, FilePos_t initialSize)
 		: m_hfile(hfile), m_filePos(0), m_fileSize(initialSize)
@@ -218,6 +310,94 @@ namespace rkit
 		return m_fileSize;
 	}
 
+
+	DirectoryScan_Win32::DirectoryScan_Win32()
+		: m_handle(INVALID_HANDLE_VALUE)
+		, m_haveItem(true)
+		, m_exhausted(false)
+	{
+	}
+
+	DirectoryScan_Win32::~DirectoryScan_Win32()
+	{
+		if (m_handle != INVALID_HANDLE_VALUE)
+			FindClose(m_handle);
+	}
+
+	Result DirectoryScan_Win32::GetNext(bool &haveItem, DirectoryScanItem &outItem)
+	{
+		for (;;)
+		{
+			if (m_exhausted)
+			{
+				haveItem = false;
+				return ResultCode::kOK;
+			}
+
+			if (m_haveItem && !CheckItem())
+				m_haveItem = false;
+
+			if (m_haveItem)
+			{
+				RKIT_CHECK(ProduceItem(outItem));
+
+				haveItem = true;
+
+				m_haveItem = false;
+				return ResultCode::kOK;
+			}
+
+			RKIT_CHECK(GetAnotherItem());
+		}
+	}
+
+	WIN32_FIND_DATAW *DirectoryScan_Win32::GetFindData()
+	{
+		return &m_findData;
+	}
+
+	void DirectoryScan_Win32::SetHandle(HANDLE hdl)
+	{
+		m_handle = hdl;
+	}
+
+	bool DirectoryScan_Win32::CheckItem() const
+	{
+		if (!wcscmp(m_findData.cFileName, L"."))
+			return false;
+
+		if (!wcscmp(m_findData.cFileName, L".."))
+			return false;
+
+		return true;
+	}
+
+	Result DirectoryScan_Win32::ProduceItem(DirectoryScanItem &outItem)
+	{
+		RKIT_CHECK(ConvUtil_Win32::UTF16ToUTF8(m_findData.cFileName, m_fileNameUTF8));
+
+		outItem.m_fileName = StringView(m_fileNameUTF8.GetBuffer(), m_fileNameUTF8.Count() - 1);
+		outItem.m_attribs.m_isDirectory = ((m_findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0);
+		outItem.m_attribs.m_fileSize = (static_cast<FilePos_t>(m_findData.nFileSizeHigh) << 32) + m_findData.nFileSizeLow;
+		outItem.m_attribs.m_fileTime = ConvUtil_Win32::FileTimeToUTCMSec(m_findData.ftLastWriteTime);
+
+		return ResultCode::kOK;
+	}
+
+	Result DirectoryScan_Win32::GetAnotherItem()
+	{
+		BOOL haveMore = FindNextFileW(m_handle, &m_findData);
+		if (haveMore)
+			m_haveItem = true;
+		else
+		{
+			m_haveItem = false;
+			m_exhausted = true;
+		}
+
+		return ResultCode::kOK;
+	}
+
 	SystemDriver_Win32::SystemDriver_Win32(IMallocDriver *alloc, const SystemModuleInitParameters_Win32 &initParams)
 		: m_commandLine(alloc)
 		, m_argvW(nullptr)
@@ -251,7 +431,7 @@ namespace rkit
 		{
 			Vector<char> &charBuffer = m_commandLineCharBuffers[i];
 
-			RKIT_CHECK(UTF16ToUTF8(m_argvW[i], charBuffer));
+			RKIT_CHECK(ConvUtil_Win32::UTF16ToUTF8(m_argvW[i], charBuffer));
 
 			m_commandLine[i] = StringView(charBuffer.GetBuffer(), charBuffer.Count() - 1);
 		}
@@ -282,8 +462,8 @@ namespace rkit
 		Vector<wchar_t> exprWChar(m_alloc);
 		Vector<wchar_t> fileWChar(m_alloc);
 
-		Result exprConvResult = UTF8ToUTF16(expr, exprWChar);
-		Result fileConvResult = UTF8ToUTF16(file, fileWChar);
+		Result exprConvResult = ConvUtil_Win32::UTF8ToUTF16(expr, exprWChar);
+		Result fileConvResult = ConvUtil_Win32::UTF8ToUTF16(file, fileWChar);
 
 		if (!exprConvResult.IsOK() || !fileConvResult.IsOK())
 		{
@@ -330,6 +510,43 @@ namespace rkit
 	{
 		return OpenFileGeneral(location, path, createDirectories, GENERIC_READ | GENERIC_WRITE, 0, OpenFlagsToDisposition(createIfNotExists, truncateIfExists));
 	}
+
+	Result SystemDriver_Win32::OpenDirectoryScan(FileLocation location, const char *path, UniquePtr<IDirectoryScan> &outDirectoryScan)
+	{
+		UniquePtr<DirectoryScan_Win32> dirScan;
+		RKIT_CHECK(New<DirectoryScan_Win32>(dirScan));
+
+		Vector<wchar_t> pathW;
+
+		RKIT_CHECK(ConvUtil_Win32::UTF8ToUTF16(path, pathW));
+
+		RKIT_CHECK(pathW.Resize(pathW.Count() - 1));
+
+		while (pathW.Count() > 0)
+		{
+			wchar_t lastChar = pathW[pathW.Count() - 1];
+
+			if (lastChar != '/' && lastChar != '\\')
+				break;
+
+			RKIT_CHECK(pathW.Resize(pathW.Count() - 1));
+		}
+
+		RKIT_CHECK(pathW.Append(L'\\'));
+		RKIT_CHECK(pathW.Append(L'*'));
+		RKIT_CHECK(pathW.Append(L'\0'));
+
+		HANDLE ffHandle = FindFirstFileW(pathW.GetBuffer(), dirScan->GetFindData());
+		if (ffHandle == INVALID_HANDLE_VALUE)
+			return ResultCode::kFileOpenError;
+
+		dirScan->SetHandle(ffHandle);
+
+		outDirectoryScan = dirScan.StaticCast<IDirectoryScan>();
+
+		return ResultCode::kOK;
+	}
+
 
 	char SystemDriver_Win32::GetPathSeparator() const
 	{
@@ -408,7 +625,7 @@ namespace rkit
 	{
 		Vector<wchar_t> pathW;
 
-		RKIT_CHECK(UTF8ToUTF16(path, pathW));
+		RKIT_CHECK(ConvUtil_Win32::UTF8ToUTF16(path, pathW));
 
 		Vector<wchar_t> filePathWChars;
 		const wchar_t *baseW = nullptr;	// Base path, must end with dir separator
@@ -492,36 +709,6 @@ namespace rkit
 			CloseHandle(fHandle);
 			return ResultCode::kFileOpenError;
 		}
-
-		return ResultCode::kOK;
-	}
-
-	Result SystemDriver_Win32::UTF8ToUTF16(const char *str8, Vector<wchar_t> &outStr16)
-	{
-		int charsRequired = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str8, -1, nullptr, 0);
-		if (charsRequired == 0)
-			return ResultCode::kInvalidUnicode;
-
-		RKIT_CHECK(outStr16.Resize(charsRequired));
-
-		int convResult = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str8, -1, outStr16.GetBuffer(), static_cast<int>(outStr16.Count()));
-		if (convResult == 0)
-			return ResultCode::kInvalidUnicode;
-
-		return ResultCode::kOK;
-	}
-
-	Result SystemDriver_Win32::UTF16ToUTF8(const wchar_t *str16, Vector<char> &outStr8)
-	{
-		int bytesRequired = WideCharToMultiByte(CP_UTF8, 0, str16, -1, nullptr, 0, nullptr, nullptr);
-		if (bytesRequired == 0)
-			return ResultCode::kInvalidUnicode;
-
-		RKIT_CHECK(outStr8.Resize(bytesRequired));
-
-		int convResult = WideCharToMultiByte(CP_UTF8, 0, str16, -1, outStr8.GetBuffer(), static_cast<int>(outStr8.Count()), nullptr, nullptr);
-		if (convResult == 0)
-			return ResultCode::kInvalidUnicode;
 
 		return ResultCode::kOK;
 	}

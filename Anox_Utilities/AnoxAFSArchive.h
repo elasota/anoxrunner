@@ -48,8 +48,8 @@ namespace anox
 			rkit::StringView GetFilePathByIndex(uint32_t fileIndex) const override;
 
 			static size_t FixBrokenFilePath(char *chars, size_t len);
-			static rkit::Result CheckName(const rkit::StringView &name);
-			static rkit::Result CheckSlice(const rkit::StringView &sliceName);
+			static rkit::Result CheckName(const rkit::Span<const char> &name);
+			static rkit::Result CheckSlice(const rkit::Span<const char> &sliceName);
 
 			rkit::SharedPtr<rkit::IMutexProtectedReadStream> m_stream;
 			rkit::Vector<FileInfo> m_files;

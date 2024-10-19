@@ -13,10 +13,20 @@ namespace rkit
 	};
 
 	template<class T>
+	struct Hasher<const T> : public Hasher<T>
+	{
+	};
+
+	template<class T>
+	struct Hasher<T&> : public Hasher<T>
+	{
+	};
+
+	template<class T>
 	struct BinaryHasher
 	{
-		static HashValue_t ComputeHash(const T &value);
-		static HashValue_t ComputeHash(const Span<const T> &values);
+		static HashValue_t ComputeHash(HashValue_t baseHash, const T &value);
+		static HashValue_t ComputeHash(HashValue_t baseHash, const Span<const T> &values);
 	};
 
 #define RKIT_DECLARE_BINARY_HASHER(type) \
@@ -39,13 +49,13 @@ RKIT_DECLARE_BINARY_HASHER(unsigned long long);
 #include "UtilitiesDriver.h"
 
 template<class T>
-rkit::HashValue_t rkit::BinaryHasher<T>::ComputeHash(const T &value)
+rkit::HashValue_t rkit::BinaryHasher<T>::ComputeHash(HashValue_t baseHash, const T &value)
 {
-	return GetDrivers().m_utilitiesDriver->ComputeHash(&value, sizeof(value));
+	return GetDrivers().m_utilitiesDriver->ComputeHash(baseHash, &value, sizeof(value));
 }
 
 template<class T>
-rkit::HashValue_t rkit::BinaryHasher<T>::ComputeHash(const Span<const T> &values)
+rkit::HashValue_t rkit::BinaryHasher<T>::ComputeHash(HashValue_t baseHash, const Span<const T> &values)
 {
-	return GetDrivers().m_utilitiesDriver->ComputeHash(values.Ptr(), values.Count() * sizeof(T));
+	return GetDrivers().m_utilitiesDriver->ComputeHash(baseHash, values.Ptr(), values.Count() * sizeof(T));
 }

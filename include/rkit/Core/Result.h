@@ -34,6 +34,8 @@ namespace rkit
 
 		kDecompressionFailed,
 		kMalformedFile,
+
+		kOperationFailed,
 	};
 
 	struct RKIT_NODISCARD Result

@@ -91,12 +91,11 @@ rkit::Result rkit::NewUPtr(UniquePtr<TPtrType> &objPtr)
 template<class T>
 void rkit::Delete(const SimpleObjectAllocation<T> &objAllocation)
 {
-	T *obj = objAllocation.m_obj;
-	void *mem = objAllocation.m_mem;
-	IMallocDriver *alloc = objAllocation.m_alloc;
-
-	if (obj)
+	if (T *obj = objAllocation.m_obj)
 	{
+		void *mem = objAllocation.m_mem;
+		IMallocDriver *alloc = objAllocation.m_alloc;
+
 		obj->~T();
 		alloc->Free(mem);
 	}
@@ -105,15 +104,13 @@ void rkit::Delete(const SimpleObjectAllocation<T> &objAllocation)
 template<class T>
 void rkit::SafeDelete(SimpleObjectAllocation<T> &objAllocation)
 {
-	T *obj = objAllocation.m_obj;
-	void *mem = objAllocation.m_mem;
-	IMallocDriver *alloc = objAllocation.m_alloc;
+	SimpleObjectAllocation<T> allocCopy = objAllocation;
 
 	objAllocation.Clear();
 
-	if (obj)
+	if (allocCopy.m_obj)
 	{
-		obj->~T();
-		alloc->Free(mem);
+		allocCopy.m_obj->~T();
+		allocCopy.m_alloc->Free(allocCopy.m_mem);
 	}
 }
