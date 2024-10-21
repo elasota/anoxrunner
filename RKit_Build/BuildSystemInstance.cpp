@@ -7,8 +7,11 @@
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/NewDelete.h"
+#include "rkit/Core/Stream.h"
+#include "rkit/Core/String.h"
 #include "rkit/Core/StringView.h"
 #include "rkit/Core/Vector.h"
+
 
 namespace rkit::buildsystem
 {
@@ -16,6 +19,9 @@ namespace rkit::buildsystem
 	{
 	public:
 		NodeTypeKey(uint32_t typeNamespace, uint32_t typeID);
+
+		uint32_t GetNamespace() const;
+		uint32_t GetType() const;
 
 		bool operator==(const NodeTypeKey &other) const;
 		bool operator!=(const NodeTypeKey &other) const;
@@ -158,6 +164,8 @@ rkit::HashValue_t rkit::Hasher<rkit::buildsystem::NodeKey>::ComputeHash(HashValu
 
 namespace rkit::buildsystem
 {
+	class BuildSystemInstance;
+
 	enum class DependencyCheckPhase
 	{
 		None,
@@ -189,16 +197,21 @@ namespace rkit::buildsystem
 
 		DependencyCheckPhase GetDependencyCheckPhase() const;
 		void SetDependencyCheckPhase(DependencyCheckPhase phase);
+		bool GetNextNodeDependencyToCheck(NodeDependencyInfo &outNDI);
 
 		uint32_t GetDependencyNodeNamespace() const override;
 		uint32_t GetDependencyNodeType() const override;
 		BuildFileLocation GetInputFileLocation() const override;
-		Result RunAnalysis() override;
-		Result RunCompile() override;
+		Result RunAnalysis(IBuildSystemInstance *instance) override;
+		Result RunCompile(IBuildSystemInstance *instance) override;
 
 		CallbackSpan<FileStatusView, const IDependencyNode *> GetProducts() const override;
 		CallbackSpan<FileDependencyInfoView, const IDependencyNode *> GetFileDependencies() const override;
-		CallbackSpan<NodeDependecyInfo, const IDependencyNode *> GetNodeDependencies() const override;
+		CallbackSpan<NodeDependencyInfo, const IDependencyNode *> GetNodeDependencies() const override;
+
+		Result AddProduct(const FileStatusView &fileInfo);
+		Result AddFileDependency(const FileDependencyInfoView &fileInfo);
+		Result AddNodeDependency(const NodeDependencyInfo &nodeInfo);
 
 		Result Serialize(IWriteStream *stream) const override;
 		Result Deserialize(IReadStream *stream) override;
@@ -214,24 +227,30 @@ namespace rkit::buildsystem
 		class DependencyNodeCompilerFeedback final : public IDependencyNodeCompilerFeedback
 		{
 		public:
-			explicit DependencyNodeCompilerFeedback(DependencyNode *node);
+			explicit DependencyNodeCompilerFeedback(BuildSystemInstance *instance, DependencyNode *node);
 
-			Result AddIntermediateProduct(const FileStatusView &file) override;
-			Result AddOutputProduct(const FileStatusView &file) override;
+			Result TryOpenInput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &inputFile) override;
+			Result TryOpenOutput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outputFile) override;
+
+			Result AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) override;
+			bool FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const override;
 
 		private:
+			BuildSystemInstance *m_buildInstance;
 			DependencyNode *m_dependencyNode;
 		};
 
 		static FileStatusView GetProductByIndex(const IDependencyNode *const& node, size_t index);
 		static FileDependencyInfoView GetFileDependencyByIndex(const IDependencyNode *const & node, size_t index);
-		static NodeDependecyInfo GetNodeDependencyByIndex(const IDependencyNode *const & node, size_t index);
+		static NodeDependencyInfo GetNodeDependencyByIndex(const IDependencyNode *const & node, size_t index);
 
 		Vector<FileStatus> m_products;
 		Vector<FileDependencyInfo> m_fileDependencies;
-		Vector<NodeDependecyInfo> m_nodeDependencies;
+		Vector<NodeDependencyInfo> m_nodeDependencies;
 
 		DependencyState m_dependencyState;
+		size_t m_checkNodeIndex;
+
 		uint32_t m_nodeType;
 		uint32_t m_nodeNamespace;
 		uint32_t m_lastCompilerVersion;
@@ -259,6 +278,13 @@ namespace rkit::buildsystem
 		Result CreateNode(uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation buildFileLocation, const StringView &identifier, UniquePtr<IDependencyNode> &outNode) const override;
 		Result RegisterNodeCompiler(uint32_t nodeNamespace, uint32_t nodeType, UniquePtr<IDependencyNodeCompiler> &&compiler) override;
 
+		Result ResolveFileStatus(BuildFileLocation location, const StringView &path, FileStatusView &outStatusView, bool &outExists);
+
+		Result OpenFileRead(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &outFile);
+
+		Result RegisterNodeTypeByExtension(const StringView &ext, uint32_t nodeNamespace, uint32_t nodeType) override;
+		bool FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const;
+
 	private:
 		struct CachedFileStatus
 		{
@@ -266,14 +292,25 @@ namespace rkit::buildsystem
 			FileStatus m_status;
 		};
 
+		class UpdateOnCloseWriteStreamWrapper final : public ISeekableReadWriteStream
+		{
+		public:
+			UpdateOnCloseWriteStreamWrapper(CachedFileStatus *cfs);
+			~UpdateOnCloseWriteStreamWrapper();
+
+			Result Initialize(BuildFileLocation location, const StringView &path);
+
+		private:
+			CachedFileStatus *m_cfs;
+			BuildFileLocation m_location;
+			String m_path;
+		};
+
 		Result AddNode(UniquePtr<DependencyNode> &&node);
 		Result AddRelevantNode(DependencyNode *node);
 		Result ProcessTopDepCheck();
 		Result CheckNodeFilesAndVersion(DependencyNode *node);
 		Result CheckNodeNodeDependencies(DependencyNode *node);
-		Result EnumerateNodeDependencies(DependencyNode *node);
-
-		Result ResolveFileStatus(BuildFileLocation location, const StringView &path, FileStatusView &outStatusView, bool &outExists);
 
 		static Result ResolveCachedFileStatusCallback(void *userdata, const FileStatusView &status);
 
@@ -297,6 +334,7 @@ namespace rkit::buildsystem
 		Vector<DependencyNode *> m_depCheckStack;
 
 		HashMap<FileLocationKey, UniquePtr<CachedFileStatus> > m_cachedFileStatus;
+		HashMap<String, NodeTypeKey> m_nodeTypesByExtension;
 
 		IBuildFileSystem *m_fs;
 	};
@@ -307,6 +345,16 @@ namespace rkit::buildsystem
 	{
 	}
 
+	uint32_t NodeTypeKey::GetNamespace() const
+	{
+		return m_typeNamespace;
+	}
+
+	uint32_t NodeTypeKey::GetType() const
+	{
+		return m_typeID;
+	}
+
 	DependencyNode::DependencyNode(IDependencyNodeCompiler *compiler, uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation inputLocation, UniquePtr<IDependencyNodePrivateData> &&privateData)
 		: m_compiler(compiler)
 		, m_privateData(std::move(privateData))
@@ -314,6 +362,7 @@ namespace rkit::buildsystem
 		, m_nodeType(nodeType)
 		, m_nodeNamespace(nodeNamespace)
 		, m_dependencyState(DependencyState::NotAnalyzedOrCompiled)
+		, m_checkNodeIndex(0)
 		, m_isMarkedAsRoot(false)
 		, m_depCheckPhase(DependencyCheckPhase::None)
 		, m_lastCompilerVersion(0)
@@ -385,6 +434,18 @@ namespace rkit::buildsystem
 	void DependencyNode::SetDependencyCheckPhase(DependencyCheckPhase phase)
 	{
 		m_depCheckPhase = phase;
+
+		if (phase == DependencyCheckPhase::CheckNodes)
+			m_checkNodeIndex = 0;
+	}
+
+	bool DependencyNode::GetNextNodeDependencyToCheck(NodeDependencyInfo &outNDI)
+	{
+		if (m_checkNodeIndex == m_nodeDependencies.Count())
+			return false;
+
+		outNDI = m_nodeDependencies[m_checkNodeIndex++];
+		return true;
 	}
 
 	uint32_t DependencyNode::GetDependencyNodeNamespace() const
@@ -402,18 +463,18 @@ namespace rkit::buildsystem
 		return m_inputLocation;
 	}
 
-	Result DependencyNode::RunAnalysis()
+	Result DependencyNode::RunAnalysis(IBuildSystemInstance *instance)
 	{
-		DependencyNodeCompilerFeedback feedback(this);
+		DependencyNodeCompilerFeedback feedback(static_cast<BuildSystemInstance *>(instance), this);
 
 		RKIT_CHECK(m_compiler->RunAnalysis(this, &feedback));
 
 		return ResultCode::kOK;
 	}
 
-	Result DependencyNode::RunCompile()
+	Result DependencyNode::RunCompile(IBuildSystemInstance *instance)
 	{
-		DependencyNodeCompilerFeedback feedback(this);
+		DependencyNodeCompilerFeedback feedback(static_cast<BuildSystemInstance *>(instance), this);
 
 		RKIT_CHECK(m_compiler->RunCompile(this, &feedback));
 
@@ -430,9 +491,46 @@ namespace rkit::buildsystem
 		return CallbackSpan<FileDependencyInfoView, const IDependencyNode *>(GetFileDependencyByIndex, this, m_fileDependencies.Count());
 	}
 
-	CallbackSpan<NodeDependecyInfo, const IDependencyNode *> DependencyNode::GetNodeDependencies() const
+	CallbackSpan<NodeDependencyInfo, const IDependencyNode *> DependencyNode::GetNodeDependencies() const
 	{
-		return CallbackSpan<NodeDependecyInfo, const IDependencyNode *>(GetNodeDependencyByIndex, this, m_nodeDependencies.Count());
+		return CallbackSpan<NodeDependencyInfo, const IDependencyNode *>(GetNodeDependencyByIndex, this, m_nodeDependencies.Count());
+	}
+
+	Result DependencyNode::AddProduct(const FileStatusView &fileInfo)
+	{
+		return ResultCode::kNotYetImplemented;
+	}
+
+	Result DependencyNode::AddFileDependency(const FileDependencyInfoView &fileInfo)
+	{
+		for (FileDependencyInfo &existingFDI : m_fileDependencies)
+		{
+			if (existingFDI.m_status.m_location == fileInfo.m_status.m_location && existingFDI.m_status.m_filePath == fileInfo.m_status.m_filePath)
+			{
+				RKIT_CHECK(existingFDI.Set(fileInfo));
+				return ResultCode::kOK;
+			}
+		}
+
+		FileDependencyInfo fdi;
+		RKIT_CHECK(fdi.Set(fileInfo));
+
+		RKIT_CHECK(m_fileDependencies.Append(std::move(fdi)));
+
+		return ResultCode::kOK;
+	}
+
+	Result DependencyNode::AddNodeDependency(const NodeDependencyInfo &nodeInfo)
+	{
+		for (const NodeDependencyInfo &nodeInfo : m_nodeDependencies)
+		{
+			if (nodeInfo.m_node == nodeInfo.m_node)
+				return ResultCode::kOK;
+		}
+
+		RKIT_CHECK(m_nodeDependencies.Append(nodeInfo));
+
+		return ResultCode::kOK;
 	}
 
 	Result DependencyNode::Serialize(IWriteStream *stream) const
@@ -445,19 +543,63 @@ namespace rkit::buildsystem
 		return ResultCode::kNotYetImplemented;
 	}
 
-	DependencyNode::DependencyNodeCompilerFeedback::DependencyNodeCompilerFeedback(DependencyNode *node)
-		: m_dependencyNode(node)
+	DependencyNode::DependencyNodeCompilerFeedback::DependencyNodeCompilerFeedback(BuildSystemInstance *instance, DependencyNode *node)
+		: m_buildInstance(instance)
+		, m_dependencyNode(node)
 	{
 	}
 
-	Result DependencyNode::DependencyNodeCompilerFeedback::AddIntermediateProduct(const FileStatusView &file)
+
+	Result DependencyNode::DependencyNodeCompilerFeedback::TryOpenInput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &inputFile)
+	{
+		inputFile.Reset();
+
+		for (FileDependencyInfoView fStatus : m_dependencyNode->GetFileDependencies())
+		{
+			if (fStatus.m_status.m_location == location && fStatus.m_status.m_filePath == path)
+			{
+				if (!fStatus.m_fileExists)
+					return ResultCode::kOK;
+			}
+		}
+
+		FileStatusView newFStatusView;
+		bool exists = false;
+		RKIT_CHECK(m_buildInstance->ResolveFileStatus(location, path, newFStatusView, exists));
+
+		FileDependencyInfoView newDepInfo;
+		newDepInfo.m_status = newFStatusView;
+		newDepInfo.m_fileExists = exists;
+		newDepInfo.m_mustBeUpToDate = true;
+
+		RKIT_CHECK(m_dependencyNode->AddFileDependency(newDepInfo));
+
+		RKIT_CHECK(m_buildInstance->OpenFileRead(location, path, inputFile));
+
+		return ResultCode::kOK;
+	}
+
+	Result DependencyNode::DependencyNodeCompilerFeedback::TryOpenOutput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outputFile)
 	{
 		return ResultCode::kNotYetImplemented;
 	}
 
-	Result DependencyNode::DependencyNodeCompilerFeedback::AddOutputProduct(const FileStatusView &file)
+	Result DependencyNode::DependencyNodeCompilerFeedback::AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier)
 	{
-		return ResultCode::kNotYetImplemented;
+		IDependencyNode *node = nullptr;
+		RKIT_CHECK(m_buildInstance->FindOrCreateNode(nodeTypeNamespace, nodeTypeID, inputFileLocation, identifier, node));
+
+		NodeDependencyInfo depInfo;
+		depInfo.m_mustBeUpToDate = true;
+		depInfo.m_node = node;
+		RKIT_CHECK(m_dependencyNode->AddNodeDependency(depInfo));
+
+		return ResultCode::kOK;
+	}
+
+	bool DependencyNode::DependencyNodeCompilerFeedback::FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const
+	{
+		return m_buildInstance->FindNodeTypeByFileExtension(ext, outNamespace, outType);
 	}
 
 	FileStatusView DependencyNode::GetProductByIndex(const IDependencyNode *const & node, size_t index)
@@ -474,7 +616,7 @@ namespace rkit::buildsystem
 		return fileDependencyInfo.ToView();
 	}
 
-	NodeDependecyInfo DependencyNode::GetNodeDependencyByIndex(const IDependencyNode *const &node, size_t index)
+	NodeDependencyInfo DependencyNode::GetNodeDependencyByIndex(const IDependencyNode *const &node, size_t index)
 	{
 		return static_cast<const DependencyNode *>(node)->m_nodeDependencies[index];
 	}
@@ -507,6 +649,7 @@ namespace rkit::buildsystem
 		RKIT_CHECK(New<DepsNodeCompiler>(depsCompiler));
 
 		RKIT_CHECK(RegisterNodeCompiler(kDefaultNamespace, kDepsNodeID, std::move(depsCompiler)));
+		RKIT_CHECK(RegisterNodeTypeByExtension("deps", kDefaultNamespace, kDepsNodeID));
 
 		return ResultCode::kOK;
 	}
@@ -594,7 +737,7 @@ namespace rkit::buildsystem
 
 			if (node->GetDependencyState() == DependencyState::NotCompiled)
 			{
-				RKIT_CHECK(node->RunCompile());
+				RKIT_CHECK(node->RunCompile(this));
 				node->SetState(DependencyState::UpToDate);
 			}
 		}
@@ -687,14 +830,12 @@ namespace rkit::buildsystem
 			{
 				if (node->GetCompiler()->HasAnalysisStage())
 				{
-					RKIT_CHECK(node->RunAnalysis());
+					RKIT_CHECK(node->RunAnalysis(this));
 				}
 
 				depState = DependencyState::NotCompiled;
 				node->SetState(depState);
 			}
-
-			RKIT_CHECK(EnumerateNodeDependencies(node));
 
 			node->SetDependencyCheckPhase(DependencyCheckPhase::CheckNodes);
 
@@ -704,10 +845,6 @@ namespace rkit::buildsystem
 		RKIT_ASSERT(node->GetDependencyCheckPhase() == DependencyCheckPhase::CheckNodes);
 
 		RKIT_CHECK(CheckNodeNodeDependencies(node));
-
-		node->SetDependencyCheckPhase(DependencyCheckPhase::Completed);
-
-		m_depCheckStack.RemoveRange(m_depCheckStack.Count() - 1, 1);
 
 		return ResultCode::kOK;
 	}
@@ -767,46 +904,44 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
-	Result BuildSystemInstance::EnumerateNodeDependencies(DependencyNode *node)
-	{
-		for (NodeDependecyInfo nodeDep : node->GetNodeDependencies())
-		{
-			DependencyNode *nodeDepNode = static_cast<DependencyNode *>(nodeDep.m_node);
-
-			RKIT_CHECK(AddRelevantNode(nodeDepNode));
-		}
-
-		return ResultCode::kOK;
-	}
-
 	Result BuildSystemInstance::CheckNodeNodeDependencies(DependencyNode *node)
 	{
 		bool allUpToDate = true;
 
-		for (NodeDependecyInfo nodeDep : node->GetNodeDependencies())
+		NodeDependencyInfo nodeDep;
+		if (!node->GetNextNodeDependencyToCheck(nodeDep))
 		{
-			if (!nodeDep.m_mustBeUpToDate)
-				continue;
+			node->SetDependencyCheckPhase(DependencyCheckPhase::Completed);
 
-			DependencyNode *nodeDepNode = static_cast<DependencyNode *>(nodeDep.m_node);
-			if (nodeDepNode->GetDependencyCheckPhase() != DependencyCheckPhase::Completed)
-			{
-				ErrorBlameNode(nodeDepNode, "Circular dependency");
-				return ResultCode::kOperationFailed;
-			}
+			m_depCheckStack.RemoveRange(m_depCheckStack.Count() - 1, 1);
 
-			if (nodeDepNode->GetDependencyState() != DependencyState::UpToDate)
-				allUpToDate = false;
+			return ResultCode::kOK;
 		}
 
-		if (node->GetDependencyState() == DependencyState::UpToDate && !allUpToDate)
+		if (!nodeDep.m_mustBeUpToDate)
+			return ResultCode::kOK;
+
+		DependencyNode *nodeDepNode = static_cast<DependencyNode *>(nodeDep.m_node);
+		if (nodeDepNode->GetDependencyState() != DependencyState::UpToDate)
 			node->SetState(DependencyState::NotCompiled);
+
+		if (nodeDepNode->GetDependencyCheckPhase() == DependencyCheckPhase::Completed)
+			return ResultCode::kOK;
+
+		if (nodeDepNode->GetDependencyCheckPhase() != DependencyCheckPhase::None)
+		{
+			ErrorBlameNode(nodeDepNode, "Circular dependency");
+			return ResultCode::kOperationFailed;
+		}
+
+		RKIT_CHECK(AddRelevantNode(nodeDepNode));
 
 		return ResultCode::kOK;
 	}
 
 	Result BuildSystemInstance::ResolveFileStatus(BuildFileLocation location, const StringView &path, FileStatusView &outStatusView, bool &outExists)
 	{
+		// Keep the behavior here in sync with ResolveFileStatus
 		{
 			FileLocationKey lookupLocKey(location, path);
 
@@ -849,6 +984,52 @@ namespace rkit::buildsystem
 		outExists = cfs->m_exists;
 
 		return ResultCode::kOK;
+	}
+
+	Result BuildSystemInstance::OpenFileRead(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &outFile)
+	{
+		// Keep the behavior here in sync with ResolveFileStatus
+		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+
+		if (location == rkit::buildsystem::BuildFileLocation::kSourceDir)
+		{
+			// Try to import file from the root directory
+			outFile = sysDriver->OpenFileRead(rkit::FileLocation::kDataSourceDirectory, path.GetChars());
+			if (outFile.Get())
+				return ResultCode::kOK;
+		}
+
+		return ResultCode::kNotYetImplemented;
+	}
+
+	Result BuildSystemInstance::RegisterNodeTypeByExtension(const StringView &ext, uint32_t nodeNamespace, uint32_t nodeType)
+	{
+		NodeTypeKey nodeTypeKey(nodeNamespace, nodeType);
+
+		HashMap<String, NodeTypeKey>::Iterator_t it = m_nodeTypesByExtension.Find(ext);
+		if (it != m_nodeTypesByExtension.end())
+		{
+			it.Value() = nodeTypeKey;
+			return ResultCode::kOK;
+		}
+
+		String str;
+		RKIT_CHECK(str.Set(ext));
+		RKIT_CHECK(m_nodeTypesByExtension.Set(std::move(str), nodeTypeKey));
+
+		return ResultCode::kOK;
+	}
+
+	bool BuildSystemInstance::FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const
+	{
+		HashMap<String, NodeTypeKey>::ConstIterator_t it = m_nodeTypesByExtension.Find(ext);
+		if (it == m_nodeTypesByExtension.end())
+			return false;
+
+		outNamespace = it.Value().GetNamespace();
+		outType = it.Value().GetType();
+
+		return true;
 	}
 
 	Result BuildSystemInstance::ResolveCachedFileStatusCallback(void *userdata, const FileStatusView &status)

@@ -18,6 +18,7 @@ namespace rkit
 	struct ISeekableReadStream;
 	struct ISeekableReadWriteStream;
 	struct ISeekableWriteStream;
+	struct FileAttributes;
 
 	struct IPlatformDriver
 	{
@@ -38,12 +39,14 @@ namespace rkit
 		virtual void RemoveCommandLineArgs(size_t firstArg, size_t numArgs) = 0;
 		virtual Span<const StringView> GetCommandLine() const = 0;
 		virtual void AssertionFailure(const char *expr, const char *file, unsigned int line) = 0;
+		virtual void FirstChanceResultFailure(const Result &result) = 0;
 
 		virtual UniquePtr<ISeekableReadStream> OpenFileRead(FileLocation location, const char *path) = 0;
 		virtual UniquePtr<ISeekableWriteStream> OpenFileWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) = 0;
 		virtual UniquePtr<ISeekableReadWriteStream> OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) = 0;
 
 		virtual Result OpenDirectoryScan(FileLocation location, const char *path, UniquePtr<IDirectoryScan> &outDirectoryScan) = 0;
+		virtual Result GetFileAttributes(FileLocation location, const char *path, bool &outExists, FileAttributes &outAttribs) = 0;
 
 		virtual char GetPathSeparator() const = 0;
 

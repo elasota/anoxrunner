@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\rkit">
+      <UniqueIdentifier>{f63651db-801a-4bcd-8211-33f226fb5763}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Utilities.cpp">
@@ -30,127 +33,133 @@
     <ClCompile Include="RangeLimitedReadStream.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="TextParser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Json.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="MutexProtectedStream.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="DeflateDecompressStream.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="RangeLimitedReadStream.h">
+    <ClInclude Include="TextParser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\Algorithm.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\Atomic.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\CoreDefs.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
+    </ClInclude>
+    <ClInclude Include="DeflateDecompressStream.h">
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\DriverModuleStub.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\Drivers.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\Endian.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\Hasher.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\HashTable.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\HashValue.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
+    </ClInclude>
+    <ClInclude Include="Json.h">
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\LogDriver.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\MallocDriver.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\MemoryStream.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\Module.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\ModuleDriver.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\ModuleGlue.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
+    </ClInclude>
+    <ClInclude Include="MutexProtectedStream.h">
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\NewDelete.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\NoCopy.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\ProgramDriver.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\ProgramStub.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
+    </ClInclude>
+    <ClInclude Include="RangeLimitedReadStream.h">
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\ResizableRingBuffer.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\Result.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\RKitAssert.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\SharedPtr.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\ShellDriver.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\SimpleObjectAllocation.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\Span.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\Stream.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\StreamProtos.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\String.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\StringProto.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\SystemDriver.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\Timestamp.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\Unicode.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\UniquePtr.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\UtilitiesDriver.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\Vector.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\rkit</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

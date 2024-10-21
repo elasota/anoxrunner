@@ -23,6 +23,12 @@ namespace rkit
 	};
 
 	template<class T>
+	struct DefaultSpanHasher
+	{
+		static HashValue_t ComputeHash(HashValue_t baseHash, const Span<const T> &values);
+	};
+
+	template<class T>
 	struct BinaryHasher
 	{
 		static HashValue_t ComputeHash(HashValue_t baseHash, const T &value);
@@ -46,6 +52,7 @@ RKIT_DECLARE_BINARY_HASHER(long long);
 RKIT_DECLARE_BINARY_HASHER(unsigned long long);
 
 #include "Drivers.h"
+#include "Span.h"
 #include "UtilitiesDriver.h"
 
 template<class T>
@@ -58,4 +65,14 @@ template<class T>
 rkit::HashValue_t rkit::BinaryHasher<T>::ComputeHash(HashValue_t baseHash, const Span<const T> &values)
 {
 	return GetDrivers().m_utilitiesDriver->ComputeHash(baseHash, values.Ptr(), values.Count() * sizeof(T));
+}
+
+template<class T>
+rkit::HashValue_t rkit::DefaultSpanHasher<T>::ComputeHash(HashValue_t baseHash, const Span<const T> &values)
+{
+	rkit::HashValue_t hash = baseHash;
+	for (const T &value : values)
+		hash = Hasher<T>::ComputeHash(hash, value);
+
+	return hash;
 }

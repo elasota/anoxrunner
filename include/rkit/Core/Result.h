@@ -36,6 +36,7 @@ namespace rkit
 		kMalformedFile,
 
 		kOperationFailed,
+		kTextParsingFailed,
 	};
 
 	struct RKIT_NODISCARD Result
@@ -53,6 +54,19 @@ namespace rkit
 	};
 }
 
+
+#define RKIT_CHECK(expr) do {\
+	::rkit::Result RKIT_PP_CONCAT(exprResult_, __LINE__) = (expr);\
+	if (!RKIT_PP_CONCAT(exprResult_, __LINE__).IsOK())\
+		return RKIT_PP_CONCAT(exprResult_, __LINE__);\
+} while (false)
+
+
+#if RKIT_IS_DEBUG
+#include "Drivers.h"
+#include "SystemDriver.h"
+#endif
+
 inline rkit::Result::Result()
 	: m_resultCode(ResultCode::kOK)
 {
@@ -61,6 +75,13 @@ inline rkit::Result::Result()
 inline rkit::Result::Result(ResultCode resultCode)
 	: m_resultCode(resultCode)
 {
+#if RKIT_IS_DEBUG
+	if (!IsOK())
+	{
+		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+		sysDriver->FirstChanceResultFailure(*this);
+	}
+#endif
 }
 
 inline bool rkit::Result::IsOK() const
@@ -78,8 +99,3 @@ inline rkit::ResultCode rkit::Result::GetResultCode() const
 	return m_resultCode;
 }
 
-#define RKIT_CHECK(expr) do {\
-	::rkit::Result RKIT_PP_CONCAT(exprResult_, __LINE__) = (expr);\
-	if (!RKIT_PP_CONCAT(exprResult_, __LINE__).IsOK())\
-		return RKIT_PP_CONCAT(exprResult_, __LINE__);\
-} while (false)

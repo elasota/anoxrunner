@@ -33,6 +33,7 @@ namespace rkit
 
 		Result Append(const T &item);
 		Result Append(T &&item);
+		Result Append(const Span<const T> &items);
 
 		void Reset();
 
@@ -61,6 +62,7 @@ namespace rkit
 
 		Result Reallocate(size_t newCapacity);
 		Result EnsureCapacityForOneMore();
+		Result EnsureCapacityForMore(size_t extra);
 
 		T *m_arr;
 		size_t m_count;
@@ -177,6 +179,23 @@ rkit::Result rkit::Vector<T>::Append(const T &item)
 }
 
 template<class T>
+rkit::Result rkit::Vector<T>::Append(const Span<const T> &items)
+{
+	RKIT_CHECK(EnsureCapacityForMore(items.Count()));
+
+	T *arr = m_arr;
+	const T *itemsPtr = items.Ptr();
+	const size_t count = items.Count();
+	const size_t initialCount = m_count;
+	for (size_t i = 0; i < count; i++)
+		new (arr + initialCount + i) T(itemsPtr[i]);
+
+	m_count = initialCount + count;
+	return ResultCode::kOK;
+}
+
+
+template<class T>
 rkit::Result rkit::Vector<T>::Append(T &&item)
 {
 	RKIT_CHECK(EnsureCapacityForOneMore());
@@ -280,6 +299,34 @@ rkit::Result rkit::Vector<T>::EnsureCapacityForOneMore()
 
 	if (countToAdd < 8)
 		return ResultCode::kOutOfMemory;
+
+	return Reallocate(m_capacity + countToAdd);
+}
+
+template<class T>
+rkit::Result rkit::Vector<T>::EnsureCapacityForMore(size_t extra)
+{
+	if (m_capacity - m_count >= extra)
+		return ResultCode::kOK;
+
+	constexpr size_t kMaxCount = std::numeric_limits<size_t>::max() / sizeof(T);
+	const size_t kInitialAllocSize = 8;
+
+	const size_t maxCountToAdd = kMaxCount - m_capacity;
+
+	if (maxCountToAdd < extra)
+		return ResultCode::kOutOfMemory;
+
+	size_t countToAdd = m_capacity / 2u;
+
+	if (countToAdd < extra)
+		countToAdd = extra;
+
+	if (countToAdd < kInitialAllocSize)
+		countToAdd = kInitialAllocSize;
+
+	if (countToAdd > maxCountToAdd)
+		countToAdd = maxCountToAdd;
 
 	return Reallocate(m_capacity + countToAdd);
 }

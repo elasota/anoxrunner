@@ -1,7 +1,5 @@
 #pragma once
 
-#include "MallocDriver.h"
-#include "Result.h"
 
 #include <limits>
 #include <utility>
@@ -11,6 +9,7 @@
 namespace rkit
 {
 	struct IMallocDriver;
+	struct Result;
 
 	template<class T>
 	class UniquePtr;
@@ -41,6 +40,8 @@ namespace rkit
 }
 
 #include "Drivers.h"
+#include "MallocDriver.h"
+#include "Result.h"
 #include "UniquePtr.h"
 
 template<class TType, class TPtrType, class... TArgs>

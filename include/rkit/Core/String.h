@@ -104,10 +104,22 @@ namespace rkit
 	};
 }
 
+#include "Hasher.h"
+
+namespace rkit
+{
+	template<class TChar, size_t TStaticSize>
+	struct Hasher<BaseString<TChar, TStaticSize> > : public DefaultSpanHasher<BaseString<TChar, TStaticSize> >
+	{
+	public:
+		static HashValue_t ComputeHash(HashValue_t baseHash, const BaseString<TChar, TStaticSize> &str);
+	};
+}
+
 #include "RKitAssert.h"
 #include "Algorithm.h"
-#include "Hasher.h"
 #include "MallocDriver.h"
+#include "StringView.h"
 #include "Result.h"
 
 #include <cstring>
@@ -560,4 +572,10 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::CreateAndReturnUninitializedS
 	outSpan = Span<TChar>(firstCharAddr, numChars);
 
 	return ResultCode::kOK;
+}
+
+template<class TChar, size_t TStaticSize>
+rkit::HashValue_t rkit::Hasher<rkit::BaseString<TChar, TStaticSize> >::ComputeHash(HashValue_t baseHash, const BaseString<TChar, TStaticSize> &str)
+{
+	return Hasher<BaseStringView<TChar> >::ComputeHash(baseHash, str);
 }

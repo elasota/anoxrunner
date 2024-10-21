@@ -84,6 +84,7 @@
     <ClCompile Include="Json.cpp" />
     <ClCompile Include="MutexProtectedStream.cpp" />
     <ClCompile Include="RangeLimitedReadStream.cpp" />
+    <ClCompile Include="TextParser.cpp" />
     <ClCompile Include="Utilities.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -127,6 +128,7 @@
     <ClInclude Include="Json.h" />
     <ClInclude Include="MutexProtectedStream.h" />
     <ClInclude Include="RangeLimitedReadStream.h" />
+    <ClInclude Include="TextParser.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\zlib\zlib.vcxproj">

@@ -89,12 +89,16 @@ namespace rkit
 		void RemoveCommandLineArgs(size_t firstArg, size_t numArgs) override;
 		Span<const StringView> GetCommandLine() const override;
 		void AssertionFailure(const char *expr, const char *file, unsigned int line) override;
+		void FirstChanceResultFailure(const Result &result) override;
 
 		UniquePtr<ISeekableReadStream> OpenFileRead(FileLocation location, const char *path) override;
 		UniquePtr<ISeekableWriteStream> OpenFileWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
 		UniquePtr<ISeekableReadWriteStream> OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
 
 		Result OpenDirectoryScan(FileLocation location, const char *path, UniquePtr<IDirectoryScan> &outDirectoryScan) override;
+		Result GetFileAttributes(FileLocation location, const char *path, bool &outExists, FileAttributes &outAttribs) override;
+
+		Result ResolveFilePath(FileLocation location, const char *path, Vector<wchar_t> &outPath);
 
 		char GetPathSeparator() const override;
 
@@ -478,6 +482,14 @@ namespace rkit
 #endif
 	}
 
+	void SystemDriver_Win32::FirstChanceResultFailure(const Result &result)
+	{
+#if RKIT_IS_DEBUG
+		if (IsDebuggerPresent())
+			DebugBreak();
+#endif
+	}
+
 	DWORD SystemDriver_Win32::OpenFlagsToDisposition(bool createIfNotExists, bool truncateIfExists)
 	{
 		if (createIfNotExists)
@@ -517,8 +529,7 @@ namespace rkit
 		RKIT_CHECK(New<DirectoryScan_Win32>(dirScan));
 
 		Vector<wchar_t> pathW;
-
-		RKIT_CHECK(ConvUtil_Win32::UTF8ToUTF16(path, pathW));
+		RKIT_CHECK(ResolveFilePath(location, path, pathW));
 
 		RKIT_CHECK(pathW.Resize(pathW.Count() - 1));
 
@@ -547,6 +558,50 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
+	Result SystemDriver_Win32::GetFileAttributes(FileLocation location, const char *path, bool &outExists, FileAttributes &outAttribs)
+	{
+		Vector<wchar_t> pathW;
+
+		RKIT_CHECK(ResolveFilePath(location, path, pathW));
+
+		DWORD attribs = GetFileAttributesW(pathW.GetBuffer());
+
+		if (attribs == INVALID_FILE_ATTRIBUTES)
+		{
+			outExists = false;
+			outAttribs = FileAttributes();
+			return ResultCode::kOK;
+		}
+
+		if ((attribs & FILE_ATTRIBUTE_DIRECTORY) != 0)
+		{
+			outExists = true;
+			outAttribs = FileAttributes();
+			outAttribs.m_isDirectory = true;
+			return ResultCode::kOK;
+		}
+
+		HANDLE hFile = CreateFileW(pathW.GetBuffer(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+
+		if (hFile == INVALID_HANDLE_VALUE)
+			return ResultCode::kFileOpenError;
+
+		BY_HANDLE_FILE_INFORMATION finfo;
+		BOOL gotAttribs = GetFileInformationByHandle(hFile, &finfo);
+
+		CloseHandle(hFile);
+
+		if (!gotAttribs)
+			return ResultCode::kFileOpenError;
+
+		outExists = true;
+		outAttribs = FileAttributes();
+		outAttribs.m_fileSize = (static_cast<uint64_t>(finfo.nFileSizeHigh) << 32) + finfo.nFileSizeLow;
+		outAttribs.m_fileTime = ConvUtil_Win32::FileTimeToUTCMSec(finfo.ftLastWriteTime);
+		outAttribs.m_isDirectory = false;
+
+		return ResultCode::kOK;
+	}
 
 	char SystemDriver_Win32::GetPathSeparator() const
 	{
@@ -621,7 +676,8 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
-	Result SystemDriver_Win32::OpenFileGeneralChecked(UniquePtr<File_Win32> &outFile, FileLocation location, const char *path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition)
+
+	Result SystemDriver_Win32::ResolveFilePath(FileLocation location, const char *path, Vector<wchar_t> &outPath)
 	{
 		Vector<wchar_t> pathW;
 
@@ -633,26 +689,51 @@ namespace rkit
 		switch (location)
 		{
 		case FileLocation::kGameDirectory:
-			{
-				DWORD cwdBufferSize = GetCurrentDirectoryW(0, nullptr);
-				if (cwdBufferSize == 0)
-					return ResultCode::kIOError;
+		{
+			DWORD cwdBufferSize = GetCurrentDirectoryW(0, nullptr);
+			if (cwdBufferSize == 0)
+				return ResultCode::kIOError;
 
-				RKIT_CHECK(filePathWChars.Resize(cwdBufferSize + 1));
+			RKIT_CHECK(filePathWChars.Resize(cwdBufferSize + 1));
 
-				DWORD cwdLen = GetCurrentDirectoryW(cwdBufferSize, filePathWChars.GetBuffer());
-				if (cwdLen != cwdBufferSize - 1)
-					return ResultCode::kIOError;
+			DWORD cwdLen = GetCurrentDirectoryW(cwdBufferSize, filePathWChars.GetBuffer());
+			if (cwdLen != cwdBufferSize - 1)
+				return ResultCode::kIOError;
 
-				filePathWChars[cwdLen] = L'\\';
-				filePathWChars[cwdLen + 1] = L'\0';
-				baseW = filePathWChars.GetBuffer();
-			}
-			break;
+			filePathWChars[cwdLen] = L'\\';
+			filePathWChars[cwdLen + 1] = L'\0';
+			baseW = filePathWChars.GetBuffer();
+		}
+		break;
 
 		case FileLocation::kAbsolute:
 			baseW = L"";
 			break;
+
+		case FileLocation::kDataSourceDirectory:
+		{
+			const wchar_t *dataSrcDir = L"datasrc";
+			const size_t dataSrcDirLen = wcslen(dataSrcDir);
+
+			DWORD cwdBufferSize = GetCurrentDirectoryW(0, nullptr);
+			if (cwdBufferSize == 0)
+				return ResultCode::kIOError;
+
+			RKIT_CHECK(filePathWChars.Resize(cwdBufferSize + 2 + dataSrcDirLen));
+
+			DWORD cwdLen = GetCurrentDirectoryW(cwdBufferSize, filePathWChars.GetBuffer());
+			if (cwdLen != cwdBufferSize - 1)
+				return ResultCode::kIOError;
+
+			filePathWChars[cwdLen] = L'\\';
+			filePathWChars[cwdLen + 1] = L'\0';
+
+			wcscat(filePathWChars.GetBuffer(), dataSrcDir);
+			wcscat(filePathWChars.GetBuffer(), L"\\");
+
+			baseW = filePathWChars.GetBuffer();
+		}
+		break;
 
 		default:
 			return ResultCode::kInvalidParameter;
@@ -685,6 +766,17 @@ namespace rkit
 			if (fullPathW[i] == '\\' && fullPathW[i - 1] == '\\')
 				return ResultCode::kFileOpenError;
 		}
+
+		outPath = std::move(fullPathW);
+
+		return ResultCode::kOK;
+	}
+
+	Result SystemDriver_Win32::OpenFileGeneralChecked(UniquePtr<File_Win32> &outFile, FileLocation location, const char *path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition)
+	{
+		Vector<wchar_t> fullPathW;
+
+		RKIT_CHECK(ResolveFilePath(location, path, fullPathW));
 
 		if (createDirectories)
 		{

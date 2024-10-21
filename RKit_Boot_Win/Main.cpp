@@ -182,6 +182,11 @@ namespace rkit
 		this->~Module_Win32();
 		mallocDriver->Free(thisMem);
 	}
+
+	const Drivers &rkit::GetDrivers()
+	{
+		return g_drivers_Win32;
+	}
 }
 
 static int WinMainCommon(HINSTANCE hInstance)
@@ -236,6 +241,8 @@ static int WinMainCommon(HINSTANCE hInstance)
 
 	return result.ToExitCode();
 }
+
+
 
 #ifdef _CONSOLE
 int main(int argc, const char **argv)

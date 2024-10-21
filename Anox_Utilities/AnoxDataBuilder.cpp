@@ -89,7 +89,7 @@ namespace anox::utils
 		rkit::buildsystem::IDependencyGraphFactory *graphFactory = instance->GetDependencyGraphFactory();
 
 		rkit::buildsystem::IDependencyNode *rootDepsNode;
-		RKIT_CHECK(instance->FindOrCreateNode(rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kDepsNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, "RootFiles.deps", rootDepsNode));
+		RKIT_CHECK(instance->FindOrCreateNode(rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kDepsNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, "rootfiles.deps", rootDepsNode));
 
 		RKIT_CHECK(instance->AddRootNode(rootDepsNode));
 
@@ -104,6 +104,31 @@ namespace anox::utils
 
 	rkit::Result AnoxFileSystem::ResolveFileStatusIfExists(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::StringView &identifier, void *userdata, ApplyFileStatusCallback_t applyStatus)
 	{
+		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
+
+		if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kSourceDir)
+		{
+			// Try to import file from the root directory
+			rkit::FileAttributes attribs;
+			bool exists = false;
+
+			RKIT_CHECK(sysDriver->GetFileAttributes(rkit::FileLocation::kDataSourceDirectory, identifier.GetChars(), exists, attribs));
+
+			if (exists)
+			{
+				if (attribs.m_isDirectory)
+					return rkit::ResultCode::kOK;
+
+				rkit::buildsystem::FileStatusView fsView;
+				fsView.m_filePath = identifier;
+				fsView.m_fileSize = attribs.m_fileSize;
+				fsView.m_fileTime = attribs.m_fileTime;
+				fsView.m_location = inputFileLocation;
+
+				return applyStatus(userdata, fsView);
+			}
+		}
+
 		return rkit::ResultCode::kNotYetImplemented;
 	}
 

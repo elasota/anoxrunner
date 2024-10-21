@@ -9,7 +9,7 @@ namespace rkit
 	struct IMallocDriver;
 	struct IReadStream;
 
-	namespace Utilities
+	namespace utils
 	{
 		struct IJsonDocument;
 

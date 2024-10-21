@@ -2,8 +2,19 @@
 
 #include "rkit/BuildSystem/DependencyGraph.h"
 
+namespace rkit
+{
+	template<class T>
+	class Span;
+
+	template<class T>
+	class Vector;
+}
+
 namespace rkit::buildsystem
 {
+	struct IDependencyNode;
+
 	class DepsNodeCompiler final : public IDependencyNodeCompiler
 	{
 	public:
@@ -18,6 +29,6 @@ namespace rkit::buildsystem
 		uint32_t GetVersion() const override;
 
 	private:
-		String m_path;
+		static Result HandlePathChunk(Vector<char> &constructedPath, bool &outOK, size_t chunkIndex, IDependencyNode *node, const Span<const char> &chunk);
 	};
 }

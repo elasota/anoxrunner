@@ -2,15 +2,18 @@
 #include "rkit/Core/UtilitiesDriver.h"
 #include "rkit/Core/ModuleGlue.h"
 #include "rkit/Core/NewDelete.h"
+#include "rkit/Core/String.h"
+#include "rkit/Core/Vector.h"
 
 #include "DeflateDecompressStream.h"
 #include "Json.h"
 #include "MutexProtectedStream.h"
 #include "RangeLimitedReadStream.h"
+#include "TextParser.h"
 
 namespace rkit
 {
-	namespace Utilities
+	namespace utils
 	{
 		struct IJsonDocument;
 	}
@@ -21,7 +24,7 @@ namespace rkit
 		Result InitDriver();
 		void ShutdownDriver();
 
-		Result CreateJsonDocument(UniquePtr<Utilities::IJsonDocument> &outDocument, IMallocDriver *alloc, IReadStream *readStream) const override;
+		Result CreateJsonDocument(UniquePtr<utils::IJsonDocument> &outDocument, IMallocDriver *alloc, IReadStream *readStream) const override;
 
 		Result CreateMutexProtectedReadWriteStream(SharedPtr<IMutexProtectedReadWriteStream> &outStream, UniquePtr<ISeekableReadWriteStream> &&stream) const override;
 		Result CreateMutexProtectedReadStream(SharedPtr<IMutexProtectedReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream) const override;
@@ -31,6 +34,17 @@ namespace rkit
 		Result CreateRangeLimitedReadStream(UniquePtr<IReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream, FilePos_t startPos, FilePos_t size) const override;
 
 		HashValue_t ComputeHash(HashValue_t baseHash, const void *data, size_t size) const override;
+
+		Result CreateTextParser(const Span<const char> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<utils::ITextParser> &outParser) const override;
+		Result ReadEntireFile(ISeekableReadStream &stream, Vector<uint8_t> &outBytes) const override;
+
+		bool ValidateFilePath(const Span<const char> &fileName) const override;
+
+		void NormalizeFilePath(const Span<char> &chars) const override;
+		bool FindFilePathExtension(const StringView &str, StringView &outExt) const override;
+
+	private:
+		static bool ValidateFilePathSlice(const Span<const char> &name);
 	};
 
 	typedef DriverModuleStub<UtilitiesDriver, IUtilitiesDriver, &Drivers::m_utilitiesDriver> UtilitiesModule;
@@ -44,9 +58,9 @@ namespace rkit
 	{
 	}
 
-	Result UtilitiesDriver::CreateJsonDocument(UniquePtr<Utilities::IJsonDocument> &outDocument, IMallocDriver *alloc, IReadStream *readStream) const
+	Result UtilitiesDriver::CreateJsonDocument(UniquePtr<utils::IJsonDocument> &outDocument, IMallocDriver *alloc, IReadStream *readStream) const
 	{
-		return Utilities::CreateJsonDocument(outDocument, alloc, readStream);
+		return utils::CreateJsonDocument(outDocument, alloc, readStream);
 	}
 
 	Result UtilitiesDriver::CreateMutexProtectedReadWriteStream(SharedPtr<IMutexProtectedReadWriteStream> &outStream, UniquePtr<ISeekableReadWriteStream> &&stream) const
@@ -140,6 +154,152 @@ namespace rkit
 			hash = hash * 223u + bytes[i] * 4447u;
 
 		return hash;
+	}
+
+	Result UtilitiesDriver::CreateTextParser(const Span<const char> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<utils::ITextParser> &outParser) const
+	{
+		UniquePtr<utils::TextParserBase> parser;
+		RKIT_CHECK(utils::TextParserBase::Create(contents, commentType, lexType, parser));
+
+		outParser = std::move(parser);
+
+		return ResultCode::kOK;
+	}
+
+	Result UtilitiesDriver::ReadEntireFile(ISeekableReadStream &stream, Vector<uint8_t> &outBytes) const
+	{
+		FilePos_t fileSizeRemaining = stream.GetSize() - stream.Tell();
+
+		if (fileSizeRemaining == 0)
+			outBytes.Reset();
+		else
+		{
+			if (fileSizeRemaining > std::numeric_limits<size_t>::max())
+				return ResultCode::kOutOfMemory;
+
+			RKIT_CHECK(outBytes.Resize(static_cast<size_t>(fileSizeRemaining)));
+
+			RKIT_CHECK(stream.ReadAll(outBytes.GetBuffer(), static_cast<size_t>(fileSizeRemaining)));
+		}
+
+		return ResultCode::kOK;
+	}
+
+	bool UtilitiesDriver::ValidateFilePathSlice(const rkit::Span<const char> &sliceName)
+	{
+		if (sliceName.Count() == 0)
+			return false;
+
+		char firstChar = sliceName[0];
+		char lastChar = sliceName[sliceName.Count() - 1];
+
+		if (firstChar == ' ' || lastChar == ' ' || lastChar == '.')
+			return false;
+
+		const char *bannedNames[] =
+		{
+			"con",
+			"prn",
+			"aux",
+			"nul",
+			"com1",
+			"com2",
+			"com3",
+			"com4",
+			"com5",
+			"com6",
+			"com7",
+			"com8",
+			"com9",
+			"lpt1",
+			"lpt2",
+			"lpt3",
+			"lpt4",
+			"lpt5",
+			"lpt6",
+			"lpt7",
+			"lpt8",
+			"lpt9",
+		};
+
+		for (const char *bannedName : bannedNames)
+		{
+			size_t bannedNameLength = strlen(bannedName);
+			if (sliceName.Count() == bannedNameLength && !memcmp(bannedName, sliceName.Ptr(), bannedNameLength))
+				return false;
+		}
+
+		for (size_t i = 0; i < sliceName.Count(); i++)
+		{
+			char c = sliceName[i];
+			if (c == '.' && i > 0 && sliceName[i - 1] == '.')
+				return false;
+
+			bool isValidChar = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+
+			if (!isValidChar)
+			{
+				const char *extChars = "_-. +~#()";
+
+				for (size_t j = 0; extChars[j] != 0; j++)
+				{
+					if (extChars[j] == c)
+					{
+						isValidChar = true;
+						break;
+					}
+				}
+			}
+
+			if (!isValidChar)
+				return false;
+		}
+
+		return true;
+	}
+
+	bool UtilitiesDriver::ValidateFilePath(const Span<const char> &name) const
+	{
+		size_t sliceStart = 0;
+		for (size_t i = 0; i < name.Count(); i++)
+		{
+			if (name[i] == '/')
+			{
+				if (!ValidateFilePathSlice(name.SubSpan(sliceStart, i - sliceStart)))
+					return false;
+
+				sliceStart = i + 1;
+			}
+		}
+
+		return ValidateFilePathSlice(name.SubSpan(sliceStart, name.Count() - sliceStart));
+	}
+
+	void UtilitiesDriver::NormalizeFilePath(const Span<char> &chars) const
+	{
+		for (char &ch : chars)
+		{
+			if (ch == '\\')
+				ch = '/';
+			else if (ch >= 'A' && ch <= 'Z')
+				ch = ch - 'A' + 'a';
+		}
+	}
+
+	bool UtilitiesDriver::FindFilePathExtension(const StringView &str, StringView &outExt) const
+	{
+		for (size_t ri = 0; ri < str.Length(); ri++)
+		{
+			size_t i = str.Length() - 1 - ri;
+
+			if (str[i] == '.')
+			{
+				outExt = StringView(str.GetChars() + i + 1, ri);
+				return true;
+			}
+		}
+
+		return false;
 	}
 }
 

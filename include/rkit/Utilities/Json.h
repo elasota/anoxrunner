@@ -8,7 +8,7 @@ namespace rkit
 	template<class T>
 	class Span;
 
-	namespace Utilities
+	namespace utils
 	{
 		struct JsonValue;
 
@@ -125,21 +125,21 @@ namespace rkit
 
 #include "rkit/Core/Span.h"
 
-inline rkit::Utilities::JsonValue::JsonValue()
+inline rkit::utils::JsonValue::JsonValue()
 	: m_jsonValuePtr(nullptr)
 	, m_type(JsonElementType::kNull)
 	, m_vptr(nullptr)
 {
 }
 
-inline rkit::Utilities::JsonValue::JsonValue(JsonElementType type, const JsonValueVFTable *vptr, const void *jsonValuePtr)
+inline rkit::utils::JsonValue::JsonValue(JsonElementType type, const JsonValueVFTable *vptr, const void *jsonValuePtr)
 	: m_type(type)
 	, m_vptr(vptr)
 	, m_jsonValuePtr(jsonValuePtr)
 {
 }
 
-inline rkit::Result rkit::Utilities::JsonValue::ToString(StringView &outStrView) const
+inline rkit::Result rkit::utils::JsonValue::ToString(StringView &outStrView) const
 {
 	const char *charPtr = nullptr;
 	size_t length = 0;
@@ -150,14 +150,14 @@ inline rkit::Result rkit::Utilities::JsonValue::ToString(StringView &outStrView)
 	return ResultCode::kOK;
 }
 
-inline rkit::Utilities::JsonElementType rkit::Utilities::JsonValue::GetType() const
+inline rkit::utils::JsonElementType rkit::utils::JsonValue::GetType() const
 {
 	return m_type;
 }
 
 
 template<class TCallable>
-inline rkit::Result rkit::Utilities::JsonValue::IterateObjectWithCallable(const TCallable &callable) const
+inline rkit::Result rkit::utils::JsonValue::IterateObjectWithCallable(const TCallable &callable) const
 {
 	IterateObjectWithCallableHelper<TCallable> helper(callable);
 
@@ -165,32 +165,32 @@ inline rkit::Result rkit::Utilities::JsonValue::IterateObjectWithCallable(const 
 }
 
 template<class TClass>
-inline rkit::Result rkit::Utilities::JsonValue::IterateObjectWithMethod(TClass *obj, Result(TClass:: *method)(const StringView &, const JsonValue &, bool &)) const
+inline rkit::Result rkit::utils::JsonValue::IterateObjectWithMethod(TClass *obj, Result(TClass:: *method)(const StringView &, const JsonValue &, bool &)) const
 {
 	IterateObjectWithMethodHelper<TClass> helper(obj, method);
 
 	return IterateObject(&helper, IterateObjectWithMethodHelper<TClass>::Thunk);
 }
 
-inline rkit::Result rkit::Utilities::JsonValue::ObjectHasElement(const StringView &key, bool &outHasElement) const
+inline rkit::Result rkit::utils::JsonValue::ObjectHasElement(const StringView &key, bool &outHasElement) const
 {
 	return m_vptr->m_objectHasElement(m_jsonValuePtr, key.GetChars(), key.Length(), outHasElement);
 }
 
-inline rkit::Result rkit::Utilities::JsonValue::GetObjectElement(const StringView &key, JsonValue &outJsonValue) const
+inline rkit::Result rkit::utils::JsonValue::GetObjectElement(const StringView &key, JsonValue &outJsonValue) const
 {
 	return m_vptr->m_getObjectElement(m_jsonValuePtr, key.GetChars(), key.Length(), outJsonValue);
 }
 
 
 template<class TCallable>
-rkit::Utilities::JsonValue::IterateObjectWithCallableHelper<TCallable>::IterateObjectWithCallableHelper(const TCallable &callable)
+rkit::utils::JsonValue::IterateObjectWithCallableHelper<TCallable>::IterateObjectWithCallableHelper(const TCallable &callable)
 	: m_callable(callable)
 {
 }
 
 template<class TCallable>
-rkit::Result rkit::Utilities::JsonValue::IterateObjectWithCallableHelper<TCallable>::Thunk(void *userdata, const char *keyCharPtr, size_t keyLength, const JsonValue &jsonValue, bool &shouldContinue)
+rkit::Result rkit::utils::JsonValue::IterateObjectWithCallableHelper<TCallable>::Thunk(void *userdata, const char *keyCharPtr, size_t keyLength, const JsonValue &jsonValue, bool &shouldContinue)
 {
 	const TCallable &callable = static_cast<IterateObjectWithCallableHelper<TCallable>*>(userdata)->m_callable;
 
@@ -198,14 +198,14 @@ rkit::Result rkit::Utilities::JsonValue::IterateObjectWithCallableHelper<TCallab
 }
 
 template<class TClass>
-rkit::Utilities::JsonValue::IterateObjectWithMethodHelper<TClass>::IterateObjectWithMethodHelper(TClass *obj, MethodPtrType_t method)
+rkit::utils::JsonValue::IterateObjectWithMethodHelper<TClass>::IterateObjectWithMethodHelper(TClass *obj, MethodPtrType_t method)
 	: m_obj(obj)
 	, m_method(method)
 {
 }
 
 template<class TClass>
-rkit::Result rkit::Utilities::JsonValue::IterateObjectWithMethodHelper<TClass>::Thunk(void *userdata, const char *keyCharPtr, size_t keyLength, const JsonValue &jsonValue, bool &shouldContinue)
+rkit::Result rkit::utils::JsonValue::IterateObjectWithMethodHelper<TClass>::Thunk(void *userdata, const char *keyCharPtr, size_t keyLength, const JsonValue &jsonValue, bool &shouldContinue)
 {
 	IterateObjectWithMethodHelper<TClass> *self = static_cast<IterateObjectWithMethodHelper<TClass> *>(userdata);
 

@@ -24,6 +24,7 @@ namespace rkit
 
 	namespace buildsystem
 	{
+		struct IBuildSystemInstance;
 		struct IDependencyNode;
 		struct IDependencyNodeCompiler;
 
@@ -60,6 +61,7 @@ namespace rkit
 			UTCMSecTimestamp_t m_fileTime = 0;
 
 			FileStatusView ToView() const;
+			Result Set(const FileStatusView &view);
 		};
 
 		struct FileDependencyInfoView
@@ -75,14 +77,14 @@ namespace rkit
 		struct FileDependencyInfo
 		{
 			FileStatus m_status;
-			BuildFileLocation m_location = BuildFileLocation::kSourceDir;
 			bool m_fileExists = true;
 			bool m_mustBeUpToDate = true;
 
 			FileDependencyInfoView ToView() const;
+			Result Set(const FileDependencyInfoView &view);
 		};
 
-		struct NodeDependecyInfo
+		struct NodeDependencyInfo
 		{
 			IDependencyNode *m_node;
 			bool m_mustBeUpToDate = true;
@@ -108,12 +110,12 @@ namespace rkit
 			virtual uint32_t GetDependencyNodeNamespace() const = 0;
 			virtual uint32_t GetDependencyNodeType() const = 0;
 			virtual BuildFileLocation GetInputFileLocation() const = 0;
-			virtual Result RunAnalysis() = 0;
-			virtual Result RunCompile() = 0;
+			virtual Result RunAnalysis(IBuildSystemInstance *instance) = 0;
+			virtual Result RunCompile(IBuildSystemInstance *instance) = 0;
 
 			virtual CallbackSpan<FileStatusView, const IDependencyNode *> GetProducts() const = 0;
 			virtual CallbackSpan<FileDependencyInfoView, const IDependencyNode *> GetFileDependencies() const = 0;
-			virtual CallbackSpan<NodeDependecyInfo, const IDependencyNode *> GetNodeDependencies() const = 0;
+			virtual CallbackSpan<NodeDependencyInfo, const IDependencyNode *> GetNodeDependencies() const = 0;
 
 			virtual Result Serialize(IWriteStream *stream) const = 0;
 			virtual Result Deserialize(IReadStream *stream) = 0;
@@ -123,8 +125,11 @@ namespace rkit
 		{
 			virtual ~IDependencyNodeCompilerFeedback() {}
 
-			virtual Result AddIntermediateProduct(const FileStatusView &file) = 0;
-			virtual Result AddOutputProduct(const FileStatusView &file) = 0;
+			virtual Result TryOpenInput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &inputFile) = 0;
+			virtual Result TryOpenOutput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outputFile) = 0;
+
+			virtual Result AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) = 0;
+			virtual bool FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const = 0;
 		};
 
 		struct IDependencyNodeCompiler
@@ -178,6 +183,16 @@ inline rkit::buildsystem::FileStatusView rkit::buildsystem::FileStatus::ToView()
 	return view;
 }
 
+inline rkit::Result rkit::buildsystem::FileStatus::Set(const FileStatusView &view)
+{
+	m_location = view.m_location;
+	RKIT_CHECK(m_filePath.Set(view.m_filePath));
+	m_fileSize = view.m_fileSize;
+	m_fileTime = view.m_fileTime;
+
+	return ResultCode::kOK;
+}
+
 inline rkit::buildsystem::FileDependencyInfoView rkit::buildsystem::FileDependencyInfo::ToView() const
 {
 	rkit::buildsystem::FileDependencyInfoView result;
@@ -186,4 +201,13 @@ inline rkit::buildsystem::FileDependencyInfoView rkit::buildsystem::FileDependen
 	result.m_status = m_status.ToView();
 
 	return result;
+}
+
+inline rkit::Result rkit::buildsystem::FileDependencyInfo::Set(const FileDependencyInfoView &view)
+{
+	m_fileExists = view.m_fileExists;
+	m_mustBeUpToDate = view.m_mustBeUpToDate;
+	RKIT_CHECK(m_status.Set(view.m_status));
+
+	return ResultCode::kOK;
 }

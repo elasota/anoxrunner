@@ -68,6 +68,8 @@ namespace rkit
 
 		T &operator[](size_t index) const;
 
+		operator Span<const T>() const;
+
 	private:
 		T *m_arr;
 		size_t m_count;
@@ -328,12 +330,18 @@ T &rkit::Span<T>::operator[](size_t index) const
 	return m_arr[index];
 }
 
+template<class T>
+rkit::Span<T>::operator Span<const T>() const
+{
+	return Span<const T>(m_arr, m_count);
+}
 
 
 
 template<class T>
 rkit::ISpanIterator<T>::ISpanIterator(const ISpan<T> &span, size_t index)
 	: m_span(span)
+	, m_index(index)
 {
 }
 

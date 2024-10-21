@@ -30,6 +30,7 @@ namespace rkit
 
 		T *Get() const;
 		T *operator->() const;
+		T &operator*() const;
 
 	private:
 		UniquePtr(const UniquePtr &) = delete;
@@ -143,4 +144,11 @@ template<class T>
 T *rkit::UniquePtr<T>::Get() const
 {
 	return m_allocation.m_obj;
+}
+
+template<class T>
+T &rkit::UniquePtr<T>::operator*() const
+{
+	RKIT_ASSERT(m_allocation.m_obj != nullptr);
+	return *m_allocation.m_obj;
 }

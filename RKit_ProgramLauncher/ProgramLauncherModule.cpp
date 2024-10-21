@@ -51,9 +51,9 @@ namespace rkit
 			return utilitiesModule->Init(nullptr);
 		}
 
-		Result TryGetJsonObjectValue(const Utilities::JsonValue &objValue, const StringView &key, bool &outExists, Utilities::JsonValue &outValue)
+		Result TryGetJsonObjectValue(const utils::JsonValue &objValue, const StringView &key, bool &outExists, utils::JsonValue &outValue)
 		{
-			if (objValue.GetType() != Utilities::JsonElementType::kObject)
+			if (objValue.GetType() != utils::JsonElementType::kObject)
 				return ResultCode::kConfigInvalid;
 
 			Result getResult = objValue.GetObjectElement(key, outValue);
@@ -69,7 +69,7 @@ namespace rkit
 			return ResultCode::kOK;
 		}
 
-		Result TryGetJsonObjectValueOfType(const Utilities::JsonValue &objValue, const StringView &key, Utilities::JsonElementType desiredElementType, bool &outExists, Utilities::JsonValue &outValue)
+		Result TryGetJsonObjectValueOfType(const utils::JsonValue &objValue, const StringView &key, utils::JsonElementType desiredElementType, bool &outExists, utils::JsonValue &outValue)
 		{
 			RKIT_CHECK(TryGetJsonObjectValue(objValue, key, outExists, outValue));
 
@@ -96,10 +96,10 @@ namespace rkit
 			return ResultCode::kOK;
 		}
 
-		Result TryGetJsonObjectValueString(const Utilities::JsonValue &objValue, const StringView &key, bool &outExists, StringView &outStr)
+		Result TryGetJsonObjectValueString(const utils::JsonValue &objValue, const StringView &key, bool &outExists, StringView &outStr)
 		{
-			Utilities::JsonValue strValue;
-			RKIT_CHECK(TryGetJsonObjectValueOfType(objValue, key, Utilities::JsonElementType::kString, outExists, strValue));
+			utils::JsonValue strValue;
+			RKIT_CHECK(TryGetJsonObjectValueOfType(objValue, key, utils::JsonElementType::kString, outExists, strValue));
 
 			if (!outExists)
 				return ResultCode::kOK;
@@ -118,30 +118,30 @@ namespace rkit
 			if (!configStream.IsValid())
 				return ResultCode::kConfigMissing;
 
-			UniquePtr<Utilities::IJsonDocument> configJsonDoc;
+			UniquePtr<utils::IJsonDocument> configJsonDoc;
 			RKIT_CHECK(GetDrivers().m_utilitiesDriver->CreateJsonDocument(configJsonDoc, GetDrivers().m_mallocDriver, configStream.Get()));
 
-			Utilities::JsonValue docJV;
+			utils::JsonValue docJV;
 			RKIT_CHECK(configJsonDoc->ToJsonValue(docJV));
 
-			if (docJV.GetType() != Utilities::JsonElementType::kObject)
+			if (docJV.GetType() != utils::JsonElementType::kObject)
 				return ResultCode::kConfigInvalid;
 
 			bool has = false;
-			Utilities::JsonValue defaultProgramJV;
-			RKIT_CHECK(TryGetJsonObjectValueOfType(docJV, "DefaultProgram", Utilities::JsonElementType::kObject, has, defaultProgramJV));
+			utils::JsonValue defaultProgramJV;
+			RKIT_CHECK(TryGetJsonObjectValueOfType(docJV, "DefaultProgram", utils::JsonElementType::kObject, has, defaultProgramJV));
 
 			if (!has)
 				return ResultCode::kConfigInvalid;
 
-			Utilities::JsonValue modulesJV;
-			RKIT_CHECK(TryGetJsonObjectValueOfType(docJV, "Modules", Utilities::JsonElementType::kObject, has, modulesJV));
+			utils::JsonValue modulesJV;
+			RKIT_CHECK(TryGetJsonObjectValueOfType(docJV, "Modules", utils::JsonElementType::kObject, has, modulesJV));
 
 			if (!has)
 				return ResultCode::kConfigInvalid;
 
-			Utilities::JsonValue programsJV;
-			RKIT_CHECK(TryGetJsonObjectValueOfType(docJV, "Programs", Utilities::JsonElementType::kObject, has, programsJV));
+			utils::JsonValue programsJV;
+			RKIT_CHECK(TryGetJsonObjectValueOfType(docJV, "Programs", utils::JsonElementType::kObject, has, programsJV));
 
 			if (!has)
 				return ResultCode::kConfigInvalid;
@@ -171,13 +171,13 @@ namespace rkit
 				outConfig.m_defaultProgramName = std::move(nameStr);
 			}
 
-			auto iterateModules = [&outConfig](const StringView &key, const Utilities::JsonValue &value, bool &shouldContinue) -> Result
+			auto iterateModules = [&outConfig](const StringView &key, const utils::JsonValue &value, bool &shouldContinue) -> Result
 			{
 				uint32_t namespaceID = 0;
 
 				RKIT_CHECK(StringToNamespaceID(key, namespaceID));
 
-				if (value.GetType() != Utilities::JsonElementType::kArray)
+				if (value.GetType() != utils::JsonElementType::kArray)
 					return ResultCode::kConfigInvalid;
 
 				size_t arraySize = 0;
@@ -185,11 +185,11 @@ namespace rkit
 
 				for (size_t i = 0; i < arraySize; i++)
 				{
-					Utilities::JsonValue namespaceNameJV;
+					utils::JsonValue namespaceNameJV;
 
 					RKIT_CHECK(value.GetArrayElement(i, namespaceNameJV));
 
-					if (namespaceNameJV.GetType() != Utilities::JsonElementType::kString)
+					if (namespaceNameJV.GetType() != utils::JsonElementType::kString)
 						return ResultCode::kConfigInvalid;
 
 					StringView namespaceNameSV;
@@ -207,13 +207,13 @@ namespace rkit
 
 			RKIT_CHECK(modulesJV.IterateObjectWithCallable(iterateModules));
 
-			auto iteratePrograms = [&outConfig](const StringView &key, const Utilities::JsonValue &value, bool &shouldContinue) -> Result
+			auto iteratePrograms = [&outConfig](const StringView &key, const utils::JsonValue &value, bool &shouldContinue) -> Result
 			{
 				uint32_t namespaceID = 0;
 
 				RKIT_CHECK(StringToNamespaceID(key, namespaceID));
 
-				if (value.GetType() != Utilities::JsonElementType::kArray)
+				if (value.GetType() != utils::JsonElementType::kArray)
 					return ResultCode::kConfigInvalid;
 
 				size_t arraySize = 0;
@@ -221,11 +221,11 @@ namespace rkit
 
 				for (size_t i = 0; i < arraySize; i++)
 				{
-					Utilities::JsonValue namespaceNameJV;
+					utils::JsonValue namespaceNameJV;
 
 					RKIT_CHECK(value.GetArrayElement(i, namespaceNameJV));
 
-					if (namespaceNameJV.GetType() != Utilities::JsonElementType::kString)
+					if (namespaceNameJV.GetType() != utils::JsonElementType::kString)
 						return ResultCode::kConfigInvalid;
 
 					StringView namespaceNameSV;
