@@ -1,4 +1,5 @@
 #include "rkit/Core/Drivers.h"
+#include "rkit/Core/LogDriver.h"
 #include "rkit/Core/MallocDriver.h"
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/Module.h"
@@ -28,6 +29,12 @@ namespace rkit
 		IModule *LoadModule(uint32_t moduleNamespace, const char *moduleName) override;
 	};
 
+	struct ConsoleLogDriver_Win32 final : public ILogDriver
+	{
+		void LogMessage(LogSeverity severity, const char *msg) override;
+		void VLogMessage(LogSeverity severity, const char *fmt, va_list arg) override;
+	};
+
 	class Module_Win32 final : public IModule
 	{
 	public:
@@ -49,6 +56,7 @@ namespace rkit
 	static rkit::Drivers g_drivers_Win32;
 	static rkit::ModuleDriver_Win32 g_moduleDriver;
 	static rkit::MallocDriver_Win32 g_mallocDriver;
+	static rkit::ConsoleLogDriver_Win32 g_consoleLogDriver;
 
 	void *MallocDriver_Win32::Alloc(size_t size)
 	{
@@ -135,6 +143,52 @@ namespace rkit
 		return new (moduleMemory) Module_Win32(hmodule, initFunc, mallocDriver);
 	}
 
+	void ConsoleLogDriver_Win32::LogMessage(LogSeverity severity, const char *msg)
+	{
+		if (severity == LogSeverity::kInfo)
+		{
+			fputs(msg, stdout);
+			fputc('\n', stdout);
+		}
+		else if (severity == LogSeverity::kWarning)
+		{
+			fputs("WARNING: ", stderr);
+			fputs(msg, stdout);
+			fputc('\n', stderr);
+		}
+		else if (severity == LogSeverity::kError)
+		{
+			fputs("ERROR: ", stderr);
+			fputs(msg, stdout);
+			fputc('\n', stderr);
+		}
+
+	}
+
+	void ConsoleLogDriver_Win32::VLogMessage(LogSeverity severity, const char *fmt, va_list arg)
+	{
+		va_list argCopy;
+		va_copy(argCopy, arg);
+
+		if (severity == LogSeverity::kInfo)
+		{
+			vfprintf(stdout, fmt, argCopy);
+			fputc('\n', stdout);
+		}
+		else if (severity == LogSeverity::kWarning)
+		{
+			fputs("WARNING: ", stderr);
+			vfprintf(stderr, fmt, argCopy);
+			fputc('\n', stderr);
+		}
+		else if (severity == LogSeverity::kError)
+		{
+			fputs("ERROR: ", stderr);
+			vfprintf(stderr, fmt, argCopy);
+			fputc('\n', stderr);
+		}
+	}
+
 	Module_Win32::Module_Win32(HMODULE hmodule, FARPROC initFunc, IMallocDriver *mallocDriver)
 		: m_hmodule(hmodule)
 		, m_initFunc(initFunc)
@@ -195,6 +249,10 @@ static int WinMainCommon(HINSTANCE hInstance)
 
 	drivers->m_mallocDriver.m_obj = &rkit::g_mallocDriver;
 	drivers->m_moduleDriver.m_obj = &rkit::g_moduleDriver;
+
+#if RKIT_IS_DEBUG
+	drivers->m_logDriver.m_obj = &rkit::g_consoleLogDriver;
+#endif
 
 	rkit::IModule *systemModule = ::rkit::g_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "System_Win32");
 	if (!systemModule)

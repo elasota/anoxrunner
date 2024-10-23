@@ -105,7 +105,7 @@ namespace rkit::buildsystem
 			uint32_t nodeType = 0;
 			if (!feedback->FindNodeTypeByFileExtension(extStrView, nodeNamespace, nodeType))
 			{
-				rkit::log::ErrorFmt("%zu:%zu: Unrecognized file extension", line, col);
+				rkit::log::ErrorFmt("%zu:%zu: Unrecognized file extension: '%s'", line, col, extStrView.GetChars());
 				return ResultCode::kMalformedFile;
 			}
 
