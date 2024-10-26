@@ -48,7 +48,7 @@ namespace rkit
 		T &operator[](size_t index);
 		const T &operator[](size_t index) const;
 
-		Vector &operator=(Vector &&other);
+		Vector &operator=(Vector &&other) noexcept;
 
 		Iterator_t begin();
 		ConstIterator_t begin() const;
@@ -358,7 +358,7 @@ const T &rkit::Vector<T>::operator[](size_t index) const
 }
 
 template<class T>
-rkit::Vector<T> &rkit::Vector<T>::operator=(Vector &&other)
+rkit::Vector<T> &rkit::Vector<T>::operator=(Vector &&other) noexcept
 {
 	Reset();
 

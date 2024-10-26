@@ -3,6 +3,10 @@
 #include "rkit/Core/Span.h"
 #include "rkit/Core/NoCopy.h"
 
+#include "rkit/Core/LogDriver.h"
+
+#include <cstring>
+
 namespace rkit::utils
 {
 	struct TextParserLocation
@@ -56,6 +60,7 @@ namespace rkit::utils
 
 		Result SkipWhitespace(bool skipNewLines);
 		Result ReadSimpleToken(Span<const char> &outSpan);
+		Result ReadCToken(Span<const char> &outSpan);
 
 		Result SkipWhitespace() override;
 		Result ReadToken(bool &haveToken, Span<const char> &outSpan) override;
@@ -63,7 +68,16 @@ namespace rkit::utils
 
 		void GetLocation(size_t &outLine, size_t &outCol) const override;
 
+		Result RequireToken(Span<const char> &outSpan) override;
+		Result ExpectToken(const StringView &str) override;
+
 	private:
+		Result ReadCIdentifier();
+		Result ReadCDecimalNumber(bool mightBeOctal);
+		Result ReadCHexOrOctalNumber();
+		Result ReadCHexNumber();
+		Result ReadCString();
+
 		utils::TextParserCommentType m_commentType;
 		utils::TextParserLexerType m_lexType;
 
@@ -147,7 +161,7 @@ namespace rkit::utils
 		if (m_readPos == m_chars.Count())
 			return false;
 
-		char c = m_chars[m_readPos];
+		char c = m_chars[m_readPos++];
 		Advance(c);
 
 		outChar = c;
@@ -329,6 +343,101 @@ namespace rkit::utils
 		return ResultCode::kOK;
 	}
 
+	Result TextParser::ReadCToken(Span<const char> &outSpan)
+	{
+		size_t startLoc = m_charReader.GetLocation().m_pos;
+		size_t endLoc = startLoc;
+
+		char c;
+		if (!m_charReader.ReadOne(c))
+			return ResultCode::kTextParsingFailed;
+
+		if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_')
+		{
+			RKIT_CHECK(ReadCIdentifier());
+		}
+		else if (c >= '1' && c <= '9')
+		{
+			RKIT_CHECK(ReadCDecimalNumber(false));
+		}
+		else if (c == '0')
+		{
+			RKIT_CHECK(ReadCHexOrOctalNumber());
+		}
+		else if (c == '\"')
+		{
+			RKIT_CHECK(ReadCString());
+		}
+		else
+		{
+			if (c == '+')
+			{
+				char nextChar = '\0';
+				if (m_charReader.PeekOne(nextChar))
+				{
+					if (nextChar == '=' || nextChar == '+')
+						m_charReader.SkipOne();
+				}
+			}
+			else if (c == '-')
+			{
+				char nextChar = '\0';
+				if (m_charReader.PeekOne(nextChar))
+				{
+					if (nextChar == '=' || nextChar == '-' || nextChar == '>')
+						m_charReader.SkipOne();
+				}
+			}
+			else if (c == '!' || c == '~' || c == '/' || c == '*' || c == '=' || c == '^')
+			{
+				char nextChar = '\0';
+				if (m_charReader.PeekOne(nextChar))
+				{
+					if (nextChar == '=')
+						m_charReader.SkipOne();
+				}
+			}
+			else if (c == '|' || c == '&')
+			{
+				char nextChar = '\0';
+				if (m_charReader.PeekOne(nextChar))
+				{
+					if (nextChar == '=' || nextChar == c)
+						m_charReader.SkipOne();
+				}
+			}
+			else if (c == '<' || c == '>')
+			{
+				char nextChar = '\0';
+				if (m_charReader.PeekOne(nextChar))
+				{
+					if (nextChar == '=')
+						m_charReader.SkipOne();
+					else if (nextChar == c)
+					{
+						m_charReader.SkipOne();
+						if (m_charReader.PeekOne(nextChar))
+						{
+							if (nextChar == '=')
+								m_charReader.SkipOne();
+						}
+					}
+				}
+			}
+			else if (c == '(' || c == ')' || c == '[' || c == ']' || c == '.' || c == '?' || c == ':' || c == ',')
+			{
+			}
+			else
+				return ResultCode::kTextParsingFailed;
+		}
+
+		endLoc = m_charReader.GetLocation().m_pos;
+
+		outSpan = m_charReader.GetSpan(startLoc, endLoc - startLoc);
+
+		return ResultCode::kOK;
+	}
+
 	Result TextParser::SkipWhitespace()
 	{
 		return SkipWhitespace(true);
@@ -350,8 +459,13 @@ namespace rkit::utils
 			haveToken = true;
 			return ReadSimpleToken(outSpan);
 		}
+		else if (m_lexType == TextParserLexerType::kC)
+		{
+			haveToken = true;
+			return ReadCToken(outSpan);
+		}
 
-		return ResultCode::kNotYetImplemented;
+		return ResultCode::kInternalError;
 	}
 
 	Result TextParser::ReadToEndOfLine(Span<const char> &outSpan)
@@ -378,6 +492,127 @@ namespace rkit::utils
 		const TextParserLocation &loc = m_charReader.GetLocation();
 		outLine = loc.m_line;
 		outCol = loc.m_col;
+	}
+
+	Result TextParser::RequireToken(Span<const char> &outSpan)
+	{
+		bool haveToken = false;
+		RKIT_CHECK(ReadToken(haveToken, outSpan));
+
+		if (!haveToken)
+		{
+			rkit::log::Error("Unexpected end of file");
+			return ResultCode::kTextParsingFailed;
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result TextParser::ExpectToken(const StringView &str)
+	{
+		size_t line = 0;
+		size_t col = 0;
+		GetLocation(line, col);
+
+		Span<const char> span;
+
+		RKIT_CHECK(RequireToken(span));
+
+		if (span.Count() != str.Length() || !memcmp(span.Ptr(), str.GetChars(), span.Count()))
+		{
+			rkit::log::ErrorFmt("[%zu:%zu] Expected '%s'", line, col, str.GetChars());
+			return ResultCode::kTextParsingFailed;
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result TextParser::ReadCIdentifier()
+	{
+		for (;;)
+		{
+			char c = '\0';
+			if (!m_charReader.PeekOne(c))
+				return ResultCode::kOK;
+
+			if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_')
+			{
+				m_charReader.SkipOne();
+				continue;
+			}
+			else
+				break;
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result TextParser::ReadCDecimalNumber(bool mightBeOctal)
+	{
+		return ResultCode::kNotYetImplemented;
+	}
+
+	Result TextParser::ReadCHexOrOctalNumber()
+	{
+		char secondChar = '\0';
+		if (!m_charReader.PeekOne(secondChar))
+			return ResultCode::kOK;
+
+		if (secondChar == 'x')
+		{
+			m_charReader.SkipOne();
+			return ReadCHexNumber();
+		}
+
+		return ReadCDecimalNumber(true);
+	}
+
+	Result TextParser::ReadCString()
+	{
+		for (;;)
+		{
+			char c = '\0';
+
+			if (!m_charReader.ReadOne(c))
+				return ResultCode::kTextParsingFailed;
+
+			if (c == '\"')
+				break;
+
+			if (c == '\\')
+			{
+				if (!m_charReader.ReadOne(c))
+					return ResultCode::kTextParsingFailed;
+
+				if (c == 't' || c == 'n' || c == 'r' || c == '\"' || c == '\'')
+				{
+				}
+				else
+					return ResultCode::kTextParsingFailed;
+			}
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result TextParser::ReadCHexNumber()
+	{
+		char nextChar = '\0';
+
+		while (m_charReader.PeekOne(nextChar))
+		{
+			if ((nextChar >= '0' && nextChar <= '9') || (nextChar >= 'A' && nextChar <= 'Z') || (nextChar >= 'a' && nextChar <= 'z') || nextChar == '_')
+			{
+				m_charReader.SkipOne();
+
+				if (nextChar == '_' || (nextChar > 'F' && nextChar <= 'Z') || (nextChar > 'f' && nextChar <= 'z'))
+					return ResultCode::kTextParsingFailed;
+			}
+			else
+				break;
+		}
+
+		return ResultCode::kOK;
 	}
 }
 

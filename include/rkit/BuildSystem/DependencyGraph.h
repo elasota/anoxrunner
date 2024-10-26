@@ -127,6 +127,7 @@ namespace rkit
 		{
 			virtual ~IDependencyNodeCompilerFeedback() {}
 
+			virtual Result CheckInputExists(BuildFileLocation location, const StringView &path, bool &outExists) = 0;
 			virtual Result TryOpenInput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &inputFile) = 0;
 			virtual Result TryOpenOutput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outputFile) = 0;
 

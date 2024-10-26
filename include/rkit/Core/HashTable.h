@@ -49,6 +49,16 @@ namespace rkit
 	template<>
 	class HashMapValueContainer<void>
 	{
+	public:
+		HashMapValueContainer();
+		explicit HashMapValueContainer(void *ptr);
+		HashMapValueContainer(const HashMapValueContainer<void> &) = default;
+
+		static const size_t kValueSize = 0;
+		static const size_t kValueAlignment = 1;
+
+		void DestructValueAt(size_t index);
+		void RelocateValue(size_t thisIndex, HashMapValueContainer<void> &other, size_t otherIndex);
 	};
 
 	template<class TTarget, class TOriginal>
@@ -207,8 +217,11 @@ namespace rkit
 
 		HashSet &operator=(HashSet<TKey, TSize> &&other) = default;
 
-		template<class TCandidateKey, class TKeyHasher = Hasher<T>, class TKeyConstructor = DefaultElementConstructor<TKey, TCandidateKey>>
+		template<class TCandidateKey, class TKeyHasher = Hasher<TCandidateKey>, class TKeyConstructor = DefaultElementConstructor<TKey, std::remove_reference_t<TCandidateKey>>>
 		Result Add(TCandidateKey &&key);
+
+		template<class TCandidateKey, class TKeyHasher = Hasher<TCandidateKey>>
+		bool Contains(const TCandidateKey &key) const;
 	};
 
 	template<class TKey, class TValue, class TSize = uint32_t>
@@ -289,6 +302,23 @@ template<class T>
 const T *rkit::HashMapValueContainer<T>::GetValuePtrAt(size_t index) const
 {
 	return m_values + index;
+}
+
+
+inline rkit::HashMapValueContainer<void>::HashMapValueContainer()
+{
+}
+
+inline rkit::HashMapValueContainer<void>::HashMapValueContainer(void *ptr)
+{
+}
+
+inline void rkit::HashMapValueContainer<void>::DestructValueAt(size_t index)
+{
+}
+
+inline void rkit::HashMapValueContainer<void>::RelocateValue(size_t thisIndex, HashMapValueContainer<void> &other, size_t otherIndex)
+{
 }
 
 // HashMapIterator
@@ -871,8 +901,8 @@ rkit::Result rkit::HashSet<TKey, TSize>::Add(TCandidateKey &&key)
 {
 	HashValue_t hash = THasher::ComputeHash(0, key);
 
-	size_t position = 0;
-	if (this->Find<TCandidateKey>(hash, key, position))
+	TSize position = 0;
+	if (this->FindKeyPosition<TCandidateKey>(hash, key, position))
 		return ResultCode::kOK;
 
 	RKIT_CHECK(this->CreatePositionForNewEntry(hash, position));
@@ -886,6 +916,16 @@ rkit::Result rkit::HashSet<TKey, TSize>::Add(TCandidateKey &&key)
 	}
 
 	return ResultCode::kOK;
+}
+
+template<class TKey, class TSize>
+template<class TCandidateKey, class THasher>
+bool rkit::HashSet<TKey, TSize>::Contains(const TCandidateKey &key) const
+{
+	HashValue_t hash = THasher::ComputeHash(0, key);
+
+	TSize position = 0;
+	return this->FindKeyPosition<TCandidateKey>(hash, key, position);
 }
 
 

@@ -11,6 +11,8 @@ namespace rkit
 		kOutOfMemory,
 		kInvalidParameter,
 		kNotYetImplemented,
+		kInternalError,
+
 		kIntegerOverflow,
 
 		kKeyNotFound,
@@ -24,6 +26,7 @@ namespace rkit
 
 		kInvalidUnicode,
 		kInvalidJson,
+		kInvalidCString,
 
 		kEndOfStream,
 		kIOReadError,

@@ -3,6 +3,7 @@
 #include "Atomic.h"
 #include "NoCopy.h"
 
+#include <cstdint>
 #include <cstddef>
 
 namespace rkit
@@ -50,7 +51,7 @@ namespace rkit
 
 		BaseString();
 		BaseString(const BaseString &other);
-		BaseString(BaseString &&other);
+		BaseString(BaseString &&other) noexcept;
 		~BaseString();
 
 		BaseString &operator=(const BaseString &other);
@@ -162,7 +163,7 @@ void rkit::StringStorage<TChar>::DecRef()
 template<class TChar>
 TChar *rkit::StringStorage<TChar>::GetFirstCharAddress() const
 {
-	return reinterpret_cast<TChar *>(const_cast<char *>(reinterpret_cast<const char *>(this)) + ComputePaddedBaseSize());
+	return reinterpret_cast<TChar *>(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(this)) + ComputePaddedBaseSize());
 }
 
 template<class TChar>
@@ -180,7 +181,7 @@ rkit::Result rkit::StringStorage<TChar>::ComputeSize(size_t sizeInChars, size_t 
 template<class TChar>
 rkit::StringStorage<TChar> *rkit::StringStorage<TChar>::LocateFromFirstCharAddress(const TChar *chars)
 {
-	return reinterpret_cast<StringStorage<TChar> *>(const_cast<char *>(reinterpret_cast<const char *>(chars) - ComputePaddedBaseSize()));
+	return reinterpret_cast<StringStorage<TChar> *>(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(chars) - ComputePaddedBaseSize()));
 }
 
 template<class TChar>
@@ -215,11 +216,14 @@ rkit::BaseString<TChar, TStaticSize>::BaseString(const BaseString &other)
 		m_chars = m_staticString;
 	}
 	else
+	{
+		m_chars = other.m_chars;
 		StringStorage<TChar>::LocateFromFirstCharAddress(m_chars)->IncRef();
+	}
 }
 
 template<class TChar, size_t TStaticSize>
-rkit::BaseString<TChar, TStaticSize>::BaseString(BaseString &&other)
+rkit::BaseString<TChar, TStaticSize>::BaseString(BaseString &&other) noexcept
 	: m_length(other.m_length)
 {
 	if (other.IsStaticString())

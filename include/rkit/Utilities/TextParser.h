@@ -2,6 +2,8 @@
 
 #include "TextParserProtos.h"
 
+#include "rkit/Core/StringProto.h"
+
 #include <cstdint>
 
 namespace rkit
@@ -23,5 +25,8 @@ namespace rkit::utils
 		virtual Result ReadToEndOfLine(Span<const char> &outSpan) = 0;
 
 		virtual void GetLocation(size_t &outLine, size_t &outCol) const = 0;
+
+		virtual Result RequireToken(Span<const char> &outSpan) = 0;
+		virtual Result ExpectToken(const StringView &str) = 0;
 	};
 }

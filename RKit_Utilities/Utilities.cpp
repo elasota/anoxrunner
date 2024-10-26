@@ -44,6 +44,8 @@ namespace rkit
 		void NormalizeFilePath(const Span<char> &chars) const override;
 		bool FindFilePathExtension(const StringView &str, StringView &outExt) const override;
 
+		Result EscapeCStringInPlace(const Span<char> &chars, size_t &outNewLength) const override;
+
 		const utils::ISha256Calculator *GetSha256Calculator() const override;
 
 	private:
@@ -305,6 +307,51 @@ namespace rkit
 		}
 
 		return false;
+	}
+
+	Result UtilitiesDriver::EscapeCStringInPlace(const Span<char> &charsRef, size_t &outNewLength) const
+	{
+		Span<char> span = charsRef;
+
+		if (span.Count() < 2)
+			return ResultCode::kInvalidCString;
+
+		size_t outPos = 0;
+		size_t inPos = 1;
+		size_t endInPos = charsRef.Count() - 1;
+		while (inPos < endInPos)
+		{
+			char c = charsRef[inPos++];
+			if (c == '\"')
+				break;
+			else if (c == '\\')
+			{
+				if (inPos == endInPos)
+					return ResultCode::kInvalidCString;
+
+				char escC = charsRef[inPos++];
+				if (escC == 't')
+					c = '\t';
+				else if (escC == 'r')
+					c = '\r';
+				else if (escC == 'n')
+					c = '\n';
+				else if (escC == '\"')
+					c = '\"';
+				else if (escC == '\'')
+					c = '\'';
+				else
+					return ResultCode::kInvalidCString;
+
+				span[outPos++] = c;
+			}
+			else
+				span[outPos++] = c;
+		}
+
+		outNewLength = outPos;
+
+		return ResultCode::kOK;
 	}
 
 	const utils::ISha256Calculator *UtilitiesDriver::GetSha256Calculator() const

@@ -233,6 +233,7 @@ namespace rkit::buildsystem
 		public:
 			explicit DependencyNodeCompilerFeedback(BuildSystemInstance *instance, DependencyNode *node, bool isCompilePhase);
 
+			Result CheckInputExists(BuildFileLocation location, const StringView &path, bool &outExists) override;
 			Result TryOpenInput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &inputFile) override;
 			Result TryOpenOutput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outputFile) override;
 
@@ -291,7 +292,7 @@ namespace rkit::buildsystem
 
 		Result ResolveFileStatus(BuildFileLocation location, const StringView &path, FileStatusView &outStatusView, bool &outExists);
 
-		Result OpenFileRead(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &outFile);
+		Result TryOpenFileRead(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &outFile);
 
 		Result RegisterNodeTypeByExtension(const StringView &ext, uint32_t nodeNamespace, uint32_t nodeType) override;
 		bool FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const;
@@ -588,6 +589,42 @@ namespace rkit::buildsystem
 	}
 
 
+	Result DependencyNode::DependencyNodeCompilerFeedback::CheckInputExists(BuildFileLocation location, const StringView &path, bool &outExists)
+	{
+		CallbackSpan<FileDependencyInfoView, const IDependencyNode *> depsSpan = m_isCompilePhase ? m_dependencyNode->GetCompileFileDependencies() : m_dependencyNode->GetAnalysisFileDependencies();
+
+		for (FileDependencyInfoView fStatus : depsSpan)
+		{
+			if (fStatus.m_status.m_location == location && fStatus.m_status.m_filePath == path)
+			{
+				outExists = fStatus.m_fileExists;
+				return ResultCode::kOK;
+			}
+		}
+
+		FileStatusView newFStatusView;
+		bool exists = false;
+		RKIT_CHECK(m_buildInstance->ResolveFileStatus(location, path, newFStatusView, exists));
+
+		FileDependencyInfoView newDepInfo;
+		newDepInfo.m_status = newFStatusView;
+		newDepInfo.m_fileExists = exists;
+		newDepInfo.m_mustBeUpToDate = true;
+
+		if (m_isCompilePhase)
+		{
+			RKIT_CHECK(m_dependencyNode->AddCompileFileDependency(newDepInfo));
+		}
+		else
+		{
+			RKIT_CHECK(m_dependencyNode->AddAnalysisFileDependency(newDepInfo));
+		}
+
+		outExists = exists;
+
+		return ResultCode::kOK;
+	}
+
 	Result DependencyNode::DependencyNodeCompilerFeedback::TryOpenInput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &inputFile)
 	{
 		inputFile.Reset();
@@ -621,7 +658,7 @@ namespace rkit::buildsystem
 			RKIT_CHECK(m_dependencyNode->AddAnalysisFileDependency(newDepInfo));
 		}
 
-		RKIT_CHECK(m_buildInstance->OpenFileRead(location, path, inputFile));
+		RKIT_CHECK(m_buildInstance->TryOpenFileRead(location, path, inputFile));
 
 		return ResultCode::kOK;
 	}
@@ -1088,7 +1125,7 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
-	Result BuildSystemInstance::OpenFileRead(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &outFile)
+	Result BuildSystemInstance::TryOpenFileRead(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &outFile)
 	{
 		// Keep the behavior here in sync with ResolveFileStatus
 		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
@@ -1097,8 +1134,7 @@ namespace rkit::buildsystem
 		{
 			// Try to import file from the root directory
 			outFile = sysDriver->OpenFileRead(rkit::FileLocation::kDataSourceDirectory, path.GetChars());
-			if (outFile.Get())
-				return ResultCode::kOK;
+			return ResultCode::kOK;
 		}
 
 		return ResultCode::kNotYetImplemented;

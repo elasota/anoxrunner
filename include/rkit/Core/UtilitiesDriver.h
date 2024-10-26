@@ -58,6 +58,8 @@ namespace rkit
 		virtual void NormalizeFilePath(const Span<char> &chars) const = 0;
 		virtual bool FindFilePathExtension(const StringView &str, StringView &outExt) const = 0;
 
+		virtual Result EscapeCStringInPlace(const Span<char> &chars, size_t &outNewLength) const = 0;
+
 		virtual const utils::ISha256Calculator *GetSha256Calculator() const = 0;
 	};
 }
