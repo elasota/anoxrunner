@@ -13,8 +13,8 @@ namespace rkit
 
 	namespace buildsystem
 	{
-		static const uint32_t kDefaultNamespace = 0x74694b52;
-		static const uint32_t kDepsNodeID = 0x53504544;
+		static const uint32_t kDefaultNamespace = 0x74694b52;	// RKit
+		static const uint32_t kDepsNodeID = 0x53504544;			// DEPS
 
 		struct IDependencyNode;
 		struct IDependencyGraphFactory;
@@ -49,6 +49,10 @@ namespace rkit
 		struct IBuildSystemDriver : public ICustomDriver
 		{
 			virtual Result CreateBuildSystemInstance(UniquePtr<IBuildSystemInstance> &outInstance) const = 0;
+		};
+
+		struct IBuildSystemAddOnDriver : public ICustomDriver
+		{
 		};
 	}
 }

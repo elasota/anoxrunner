@@ -1,6 +1,7 @@
 #include "DepsNodeCompiler.h"
 
 #include "rkit/Core/LogDriver.h"
+#include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/Vector.h"
 
@@ -21,6 +22,8 @@ namespace rkit::buildsystem
 
 	Result DepsNodeCompiler::RunAnalysis(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
 	{
+		GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, "Data");
+
 		rkit::UniquePtr<ISeekableReadStream> stream;
 		RKIT_CHECK(feedback->TryOpenInput(BuildFileLocation::kSourceDir, depsNode->GetIdentifier(), stream));
 

@@ -36,6 +36,9 @@
     <ClCompile Include="TextParser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Sha2Calculator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TextParser.h">
@@ -160,6 +163,9 @@
     </ClInclude>
     <ClInclude Include="..\include\rkit\Core\Vector.h">
       <Filter>Header Files\rkit</Filter>
+    </ClInclude>
+    <ClInclude Include="Sha2Calculator.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

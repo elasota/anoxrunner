@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{aa6b3bc2-ec0d-406c-a184-6e637f079ad9}</ProjectGuid>
-    <RootNamespace>RKitBuild</RootNamespace>
+    <ProjectGuid>{5970af8b-fef0-451a-8122-94efb6ac1cbb}</ProjectGuid>
+    <RootNamespace>RKitData</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -135,16 +135,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\include\rkit\BuildSystem\DependencyGraph.h" />
-    <ClInclude Include="BuildSystemInstance.h" />
-    <ClInclude Include="DepsNodeCompiler.h" />
-    <ClInclude Include="RenderPipelineCompiler.h" />
+    <ClCompile Include="Data.cpp" />
+    <ClCompile Include="RenderDataHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="BuildSystem.cpp" />
-    <ClCompile Include="BuildSystemInstance.cpp" />
-    <ClCompile Include="DepsNodeCompiler.cpp" />
-    <ClCompile Include="RenderPipelineCompiler.cpp" />
+    <ClInclude Include="RenderDataHandler.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

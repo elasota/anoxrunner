@@ -102,11 +102,11 @@ InputLayout IL_ModelStatic
 
 	VertexInputs
 	{
-		PrevCoordinate { Feed = PrevFrameFeed, InputOffset = Auto(S_StaticModelVertexData, Coordinate) }
-		PrevPackedNormal { Feed = PrevFrameFeed, InputSource = Auto(S_StaticModelVertexData, PackedNormal) }
+		PrevCoordinate = { Feed = PrevFrameFeed, InputOffset = Auto(S_StaticModelVertexData, Coordinate) }
+		PrevPackedNormal = { Feed = PrevFrameFeed, InputSource = Auto(S_StaticModelVertexData, PackedNormal) }
 
-		NextCoordinate { Feed = NextFrameFeed, InputOffset = Auto(S_StaticModelVertexData, Coordinate) }
-		NextPackedNormal { Feed = NextFrameFeed, InputSource = Auto(S_StaticModelVertexData, PackedNormal) }
+		NextCoordinate = { Feed = NextFrameFeed, InputOffset = Auto(S_StaticModelVertexData, Coordinate) }
+		NextPackedNormal = { Feed = NextFrameFeed, InputSource = Auto(S_StaticModelVertexData, PackedNormal) }
 
 		Auto(UVFeed, S_ModelUVData)
 	}

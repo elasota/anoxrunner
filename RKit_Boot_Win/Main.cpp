@@ -10,6 +10,7 @@
 #include "rkit/Win32/IncludeWindows.h"
 
 #include <cstdlib>
+#include <clocale>
 #include <new>
 
 #include <crtdbg.h>
@@ -103,6 +104,7 @@ namespace rkit
 
 	IModule *ModuleDriver_Win32::LoadModule(uint32_t moduleNamespace, const char *moduleName)
 	{
+		// Base module driver does no deduplication
 		IMallocDriver *mallocDriver = g_drivers_Win32.m_mallocDriver;
 
 		char *nameBuf = static_cast<char *>(mallocDriver->Alloc(strlen(moduleName) + strlen("????_.dll") + 1));
@@ -245,6 +247,8 @@ namespace rkit
 
 static int WinMainCommon(HINSTANCE hInstance)
 {
+	setlocale(LC_ALL, "C");
+
 	rkit::Drivers *drivers = &rkit::g_drivers_Win32;
 
 	drivers->m_mallocDriver.m_obj = &rkit::g_mallocDriver;

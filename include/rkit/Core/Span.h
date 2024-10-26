@@ -114,6 +114,7 @@ namespace rkit
 	public:
 		typedef T (*GetElementFunc_t)(const TUserdata &, size_t);
 
+		CallbackSpan();
 		CallbackSpan(GetElementFunc_t getElementFunc, const TUserdata &userdata, size_t count);
 
 		size_t Count() const override;
@@ -391,6 +392,14 @@ rkit::ISpanIterator<T> rkit::ISpan<T>::end() const
 	return ISpanIterator<T>(*this, this->Count());
 }
 
+
+template<class T, class TUserdata>
+rkit::CallbackSpan<T, TUserdata>::CallbackSpan()
+	: m_callback(nullptr)
+	, m_userdata()
+	, m_count(0)
+{
+}
 
 template<class T, class TUserdata>
 rkit::CallbackSpan<T, TUserdata>::CallbackSpan(GetElementFunc_t getElementFunc, const TUserdata &userdata, size_t count)

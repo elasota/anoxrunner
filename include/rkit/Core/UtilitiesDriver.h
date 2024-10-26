@@ -11,6 +11,7 @@ namespace rkit
 	{
 		struct IJsonDocument;
 		struct ITextParser;
+		struct ISha256Calculator;
 	}
 
 	template<class T>
@@ -56,5 +57,7 @@ namespace rkit
 
 		virtual void NormalizeFilePath(const Span<char> &chars) const = 0;
 		virtual bool FindFilePathExtension(const StringView &str, StringView &outExt) const = 0;
+
+		virtual const utils::ISha256Calculator *GetSha256Calculator() const = 0;
 	};
 }

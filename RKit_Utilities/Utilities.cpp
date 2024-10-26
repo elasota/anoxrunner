@@ -9,6 +9,7 @@
 #include "Json.h"
 #include "MutexProtectedStream.h"
 #include "RangeLimitedReadStream.h"
+#include "Sha2Calculator.h"
 #include "TextParser.h"
 
 namespace rkit
@@ -43,8 +44,12 @@ namespace rkit
 		void NormalizeFilePath(const Span<char> &chars) const override;
 		bool FindFilePathExtension(const StringView &str, StringView &outExt) const override;
 
+		const utils::ISha256Calculator *GetSha256Calculator() const override;
+
 	private:
 		static bool ValidateFilePathSlice(const Span<const char> &name);
+
+		utils::Sha256Calculator m_sha256Calculator;
 	};
 
 	typedef DriverModuleStub<UtilitiesDriver, IUtilitiesDriver, &Drivers::m_utilitiesDriver> UtilitiesModule;
@@ -300,6 +305,11 @@ namespace rkit
 		}
 
 		return false;
+	}
+
+	const utils::ISha256Calculator *UtilitiesDriver::GetSha256Calculator() const
+	{
+		return &m_sha256Calculator;
 	}
 }
 

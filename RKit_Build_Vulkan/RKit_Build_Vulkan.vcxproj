@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{aa6b3bc2-ec0d-406c-a184-6e637f079ad9}</ProjectGuid>
-    <RootNamespace>RKitBuild</RootNamespace>
+    <ProjectGuid>{78fc9983-7d03-4d47-96de-365b01a87b3b}</ProjectGuid>
+    <RootNamespace>RKitBuildVulkan</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -135,16 +135,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\include\rkit\BuildSystem\DependencyGraph.h" />
-    <ClInclude Include="BuildSystemInstance.h" />
-    <ClInclude Include="DepsNodeCompiler.h" />
-    <ClInclude Include="RenderPipelineCompiler.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="BuildSystem.cpp" />
-    <ClCompile Include="BuildSystemInstance.cpp" />
-    <ClCompile Include="DepsNodeCompiler.cpp" />
-    <ClCompile Include="RenderPipelineCompiler.cpp" />
+    <ClCompile Include="BuildVulkan.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

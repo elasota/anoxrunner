@@ -84,6 +84,7 @@
     <ClCompile Include="Json.cpp" />
     <ClCompile Include="MutexProtectedStream.cpp" />
     <ClCompile Include="RangeLimitedReadStream.cpp" />
+    <ClCompile Include="Sha2Calculator.cpp" />
     <ClCompile Include="TextParser.cpp" />
     <ClCompile Include="Utilities.cpp" />
   </ItemGroup>
@@ -128,6 +129,7 @@
     <ClInclude Include="Json.h" />
     <ClInclude Include="MutexProtectedStream.h" />
     <ClInclude Include="RangeLimitedReadStream.h" />
+    <ClInclude Include="Sha2Calculator.h" />
     <ClInclude Include="TextParser.h" />
   </ItemGroup>
   <ItemGroup>

@@ -328,12 +328,19 @@ namespace rkit
 	class TrackedModule final : public IModule
 	{
 	public:
-		TrackedModule(IModule *module, TrackedModule *prevModule, IMallocDriver *mallocDriver, TrackedModuleDriver *trackedModuleDriver);
+		TrackedModule(IModule *module, TrackedModule *prevModule, IMallocDriver *mallocDriver, uint32_t namespaceID, String &&name, TrackedModuleDriver *trackedModuleDriver);
 
 		Result Init(const ModuleInitParameters *initParams) override;
 		void Unload() override;
 
+		uint32_t GetNamespace() const;
+		StringView GetName() const;
+		TrackedModule *GetNext() const;
+
 	private:
+		uint32_t m_namespace;
+		String m_name;
+
 		TrackedModule *m_prevModule;
 		TrackedModule *m_nextModule;
 
@@ -370,6 +377,22 @@ namespace rkit
 
 	IModule *TrackedModuleDriver::LoadModule(uint32_t moduleNamespace, const char *moduleName)
 	{
+		StringView moduleNameStringView = StringView(moduleName, strlen(moduleName));
+		TrackedModule *scanModule = m_firstModule;
+
+		while (scanModule != nullptr)
+		{
+			if (scanModule->GetNamespace() == moduleNamespace && scanModule->GetName() == moduleNameStringView)
+				return scanModule;
+
+			scanModule = scanModule->GetNext();
+		}
+
+		String nameStr;
+		rkit::Result strSetResult = nameStr.Set(moduleNameStringView);
+		if (!strSetResult.IsOK())
+			return nullptr;
+
 		IMallocDriver *mallocDriver = GetDrivers().m_mallocDriver;
 
 		void *moduleMem = mallocDriver->Alloc(sizeof(TrackedModule));
@@ -383,7 +406,7 @@ namespace rkit
 			return nullptr;
 		}
 
-		TrackedModule *newModule = new (moduleMem) TrackedModule(module, m_lastModule, mallocDriver, this);
+		TrackedModule *newModule = new (moduleMem) TrackedModule(module, m_lastModule, mallocDriver, moduleNamespace, std::move(nameStr), this);
 		if (!m_firstModule)
 			m_firstModule = newModule;
 		m_lastModule = newModule;
@@ -396,13 +419,15 @@ namespace rkit
 		GetMutableDrivers().m_moduleDriver = m_moduleDriver;
 	}
 
-	TrackedModule::TrackedModule(IModule *module, TrackedModule *prevModule, IMallocDriver *mallocDriver, TrackedModuleDriver *trackedModuleDriver)
+	TrackedModule::TrackedModule(IModule *module, TrackedModule *prevModule, IMallocDriver *mallocDriver, uint32_t namespaceID, String &&nameStr, TrackedModuleDriver *trackedModuleDriver)
 		: m_module(module)
 		, m_prevModule(prevModule)
 		, m_nextModule(nullptr)
 		, m_mallocDriver(mallocDriver)
 		, m_trackedModuleDriver(trackedModuleDriver)
 		, m_initialized(false)
+		, m_namespace(namespaceID)
+		, m_name(std::move(nameStr))
 	{
 		if (prevModule)
 			prevModule->m_nextModule = this;
@@ -441,6 +466,22 @@ namespace rkit
 		this->~TrackedModule();
 
 		mallocDriver->Free(thisMem);
+	}
+
+
+	uint32_t TrackedModule::GetNamespace() const
+	{
+		return m_namespace;
+	}
+
+	StringView TrackedModule::GetName() const
+	{
+		return m_name;
+	}
+
+	TrackedModule *TrackedModule::GetNext() const
+	{
+		return m_nextModule;
 	}
 
 	Result ProgramModule::Init(const ModuleInitParameters *)

@@ -113,8 +113,10 @@ namespace rkit
 			virtual Result RunAnalysis(IBuildSystemInstance *instance) = 0;
 			virtual Result RunCompile(IBuildSystemInstance *instance) = 0;
 
-			virtual CallbackSpan<FileStatusView, const IDependencyNode *> GetProducts() const = 0;
-			virtual CallbackSpan<FileDependencyInfoView, const IDependencyNode *> GetFileDependencies() const = 0;
+			virtual CallbackSpan<FileStatusView, const IDependencyNode *> GetAnalysisProducts() const = 0;
+			virtual CallbackSpan<FileStatusView, const IDependencyNode *> GetCompileProducts() const = 0;
+			virtual CallbackSpan<FileDependencyInfoView, const IDependencyNode *> GetAnalysisFileDependencies() const = 0;
+			virtual CallbackSpan<FileDependencyInfoView, const IDependencyNode *> GetCompileFileDependencies() const = 0;
 			virtual CallbackSpan<NodeDependencyInfo, const IDependencyNode *> GetNodeDependencies() const = 0;
 
 			virtual Result Serialize(IWriteStream *stream) const = 0;
