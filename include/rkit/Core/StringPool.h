@@ -42,12 +42,12 @@ inline rkit::Result rkit::StringPoolBuilder::IndexString(const StringView &str, 
 		RKIT_CHECK(strInstance.Set(str));
 
 		UniquePtr<String> strPtr;
-		New<String>(strPtr, std::move(strInstance));
+		RKIT_CHECK(New<String>(strPtr, std::move(strInstance)));
+
+		StringView strPtrView = *strPtr.Get();
 
 		size_t index = m_strings.Count();
 		RKIT_CHECK(m_strings.Append(std::move(strPtr)));
-
-		StringView strPtrView = *strPtr.Get();
 
 		Result hashMapInsertResult = m_stringToIndex.Set(GetStringByIndex(index), index);
 		if (!hashMapInsertResult.IsOK())

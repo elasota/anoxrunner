@@ -8,5 +8,6 @@ namespace rkit::data
 	class RenderDataHandler final : public IRenderDataHandler
 	{
 	public:
+		const RenderRTTIStructType *GetSamplerDescRTTI() const override;
 	};
 }

@@ -5,6 +5,8 @@
 #include "rkit/Core/ModuleGlue.h"
 #include "rkit/Core/DriverModuleStub.h"
 
+#include "RenderDataHandler.h"
+
 namespace rkit::data
 {
 	class DataDriver final : public rkit::data::IDataDriver
@@ -28,11 +30,14 @@ namespace rkit::data
 
 	rkit::Result DataDriver::InitDriver()
 	{
+		RKIT_CHECK(New<RenderDataHandler>(m_renderDataHandler));
+
 		return rkit::ResultCode::kOK;
 	}
 
 	void DataDriver::ShutdownDriver()
 	{
+		m_renderDataHandler.Reset();
 	}
 
 

@@ -87,13 +87,18 @@ rkit::Span<const TChar> rkit::BaseStringView<TChar>::SubString(size_t start, siz
 template<class TChar>
 rkit::Span<const TChar> rkit::BaseStringView<TChar>::ToSpan() const
 {
+	// If length 0, return the local default char to minimize potential leakage from
+	// other DLL
+	if (m_span.Count() == 0)
+		return Span<const TChar>(&kDefaultStrChar, 0);
+
 	return m_span;
 }
 
 template<class TChar>
 const TChar *rkit::BaseStringView<TChar>::GetChars() const
 {
-	return m_span.Ptr();
+	return ToSpan().Ptr();
 }
 
 template<class TChar>

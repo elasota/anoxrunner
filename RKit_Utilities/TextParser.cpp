@@ -204,7 +204,7 @@ namespace rkit::utils
 			if (charToConsume == '\n')
 			{
 				m_loc.m_col = 1;
-				if (m_loc.m_lastCharWasCR)
+				if (!m_loc.m_lastCharWasCR)
 					m_loc.m_line++;
 			}
 			else
@@ -424,7 +424,7 @@ namespace rkit::utils
 					}
 				}
 			}
-			else if (c == '(' || c == ')' || c == '[' || c == ']' || c == '.' || c == '?' || c == ':' || c == ',')
+			else if (c == '(' || c == ')' || c == '[' || c == ']' || c == '.' || c == '?' || c == ':' || c == ',' || c == '{' || c == '}')
 			{
 			}
 			else
@@ -518,7 +518,7 @@ namespace rkit::utils
 
 		RKIT_CHECK(RequireToken(span));
 
-		if (span.Count() != str.Length() || !memcmp(span.Ptr(), str.GetChars(), span.Count()))
+		if (span.Count() != str.Length() || memcmp(span.Ptr(), str.GetChars(), span.Count()))
 		{
 			rkit::log::ErrorFmt("[%zu:%zu] Expected '%s'", line, col, str.GetChars());
 			return ResultCode::kTextParsingFailed;

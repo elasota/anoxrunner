@@ -6,14 +6,23 @@ StaticSampler SS_MipMapped
 {
 	MinFilter = Linear
 	MagFilter = Linear
-	MipMap = Linear
+	MipMapMode = Linear
 	Anisotropy = Config(Anisotropy)
 }
 
 PushConstants PC_WorldSurface
 {
-	float3 SurfaceNormal
-	float3x4 Transform
+	SurfaceNormal =
+	{
+		Type = float3
+		Visibility = All
+	}
+
+	Transform =
+	{
+		Type = float3x4
+		Visibility = All
+	}
 }
 
 struct S_SurfaceVertexData
@@ -25,12 +34,12 @@ struct S_SurfaceVertexData
 
 InputLayout IL_WorldSurface
 {
-	BufferBindPoints
+	BufferBindPoints =
 	{
 		SurfaceVertexData
 	}
 
-	VertexInputFeeds
+	VertexInputFeeds =
 	{
 		SurfaceVertexDataFeed
 		{
@@ -39,7 +48,7 @@ InputLayout IL_WorldSurface
 		}
 	}
 
-	VertexInputs
+	VertexInputs =
 	{
 		Auto(SurfaceVertexDataFeed, S_SurfaceVertexData)
 	}
@@ -74,33 +83,33 @@ PushConstants PC_FaceModel
 
 InputLayout IL_ModelStatic
 {
-	BufferBindPoints
+	BufferBindPoints =
 	{
 		PrevModelVertexData
 		NextModelVertexData
 		UVData
 	}
 
-	VertexInputFeeds
+	VertexInputFeeds =
 	{
-		PrevFrameFeed
+		PrevFrameFeed =
 		{
 			BindPoint = PrevModelVertexData
 			InputSources = Auto(S_StaticModelVertexData)
 		}
-		NextFrameFeed
+		NextFrameFeed =
 		{
 			BindPoint = NextModelVertexData
 			InputSources = Auto(S_StaticModelVertexData)
 		}
-		UVFeed
+		UVFeed =
 		{
 			BindPoint = UVData
 			InputSources = Auto(S_ModelUVData)
 		}
 	}
 
-	VertexInputs
+	VertexInputs =
 	{
 		PrevCoordinate = { Feed = PrevFrameFeed, InputOffset = Auto(S_StaticModelVertexData, Coordinate) }
 		PrevPackedNormal = { Feed = PrevFrameFeed, InputSource = Auto(S_StaticModelVertexData, PackedNormal) }
@@ -129,7 +138,7 @@ struct S_FaceExpressionMorphVertexData
 
 InputLayout IL_ModelFace
 {
-	BufferBindPoints
+	BufferBindPoints =
 	{
 		PrevModelVertexData
 		NextModelVertexData
@@ -139,34 +148,34 @@ InputLayout IL_ModelFace
 		ExpressionMorphVertexData
 	}
 
-	VertexInputFeeds
+	VertexInputFeeds =
 	{
-		PrevFrameFeed
+		PrevFrameFeed =
 		{
 			BindPoint = PrevModelVertexData
 			InputSources = Auto(S_StaticModelVertexData)
 		}
-		NextFrameFeed
+		NextFrameFeed =
 		{
 			BindPoint = NextModelVertexData
 			InputSources = Auto(S_StaticModelVertexData)
 		}
-		UVFeed
+		UVFeed =
 		{
 			BindPoint = UVData
 			InputSources = Auto(S_ModelUVData)
 		}
-		PrevMouthMorphFeed
+		PrevMouthMorphFeed =
 		{
 			BindPoint = PrevMouthMorphVertexData
 			InputSources = Auto(S_FaceMouthMorphVertexData)
 		}
-		NextMouthMorphFeed
+		NextMouthMorphFeed =
 		{
 			BindPoint = NextMouthMorphVertexData
 			InputSources = Auto(S_FaceMouthMorphVertexData)
 		}
-		ExpressionMorphFeed
+		ExpressionMorphFeed =
 		{
 			BindPoint = ExpressionMorphVertexData
 			InputSources = Auto(S_FaceExpressionMorphVertexData)
@@ -175,12 +184,12 @@ InputLayout IL_ModelFace
 
 	VertexInputs
 	{
-		PrevCoordinate { Feed = PrevFrameFeed, Offset = Auto(S_StaticModelVertexData, Coordinate) }
-		PrevPackedNormal { Feed = PrevFrameFeed, Offset = Auto(S_StaticModelVertexData, PackedNormal) }
-		NextCoordinate { Feed = NextFrameFeed, Offset = Auto(S_StaticModelVertexData, Coordinate) }
-		NextPackedNormal { Feed = NextFrameFeed, Offset = Auto(S_StaticModelVertexData, PackedNormal) }
-		PrevMouthMorph { Feed = PrevMouthMorphFeed, Offset = Auto(S_StaticModelVertexData, Coordinate) }
-		NextMouthMorph { Feed = NextMouthMorphFeed, Offset = Auto(S_StaticModelVertexData, Coordinate) }
+		PrevCoordinate = { Feed = PrevFrameFeed, Offset = Auto(S_StaticModelVertexData, Coordinate) }
+		PrevPackedNormal = { Feed = PrevFrameFeed, Offset = Auto(S_StaticModelVertexData, PackedNormal) }
+		NextCoordinate = { Feed = NextFrameFeed, Offset = Auto(S_StaticModelVertexData, Coordinate) }
+		NextPackedNormal = { Feed = NextFrameFeed, Offset = Auto(S_StaticModelVertexData, PackedNormal) }
+		PrevMouthMorph = { Feed = PrevMouthMorphFeed, Offset = Auto(S_StaticModelVertexData, Coordinate) }
+		NextMouthMorph = { Feed = NextMouthMorphFeed, Offset = Auto(S_StaticModelVertexData, Coordinate) }
 
 		Auto(UVFeed, S_ModelUVData)
 
@@ -190,39 +199,39 @@ InputLayout IL_ModelFace
 
 DescriptorLayout DL_WorldLightMappedSurface
 {
-	Texture2D<float4> SurfaceTexture { Sampler = SS_MipMapped }
-	Texture2D<float4> LightMapTexture { Sampler = SS_MipMapped }
+	Texture2D<float4> SurfaceTexture = { Sampler = SS_MipMapped }
+	Texture2D<float4> LightMapTexture = { Sampler = SS_MipMapped }
 }
 
 DescriptorLayout DL_WorldSimpleSurface
 {
-	Texture2D<float4> SurfaceTexture { Sampler = SS_MipMapped }
+	Texture2D<float4> SurfaceTexture = { Sampler = SS_MipMapped }
 }
 
 DescriptorLayout DL_WorldLightMappedSurface
 {
-	Texture2D<float4> SurfaceTexture { Sampler = SS_MipMapped }
-	Texture2D<float4> LightMapTexture { Sampler = SS_MipMapped }
+	Texture2D<float4> SurfaceTexture = { Sampler = SS_MipMapped }
+	Texture2D<float4> LightMapTexture = { Sampler = SS_MipMapped }
 }
 
 DescriptorLayout DL_WorldSimpleInterformSurface
 {
-	Texture2D<float4> SurfaceTexture1 { Sampler = SS_MipMapped }
-	Texture2D<float4> SurfaceTexture2 { Sampler = SS_MipMapped }
-	Texture2D<float4> PaletteTexture { Sampler = SS_MipMapped }
+	Texture2D<float4> SurfaceTexture1 = { Sampler = SS_MipMapped }
+	Texture2D<float4> SurfaceTexture2 = { Sampler = SS_MipMapped }
+	Texture2D<float4> PaletteTexture = { Sampler = SS_MipMapped }
 }
 
 DescriptorLayout DL_WorldLightMappedInterformSurface
 {
-	Texture2D<float4> SurfaceTexture1 { Sampler = SS_MipMapped }
-	Texture2D<float4> SurfaceTexture2 { Sampler = SS_MipMapped }
-	Texture2D<float4> PaletteTexture { Sampler = SS_MipMapped }
-	Texture2D<float4> LightMapTexture { Sampler = SS_MipMapped }
+	Texture2D<float4> SurfaceTexture1 = { Sampler = SS_MipMapped }
+	Texture2D<float4> SurfaceTexture2 = { Sampler = SS_MipMapped }
+	Texture2D<float4> PaletteTexture = { Sampler = SS_MipMapped }
+	Texture2D<float4> LightMapTexture = { Sampler = SS_MipMapped }
 }
 
 DescriptorLayout DL_Interface
 {
-	Texture2D<float4> UITexture { Sampler = SS_Linear }
+	Texture2D<float4> UITexture = { Sampler = SS_Linear }
 }
 
 struct S_UIVertexCoordinate
@@ -260,7 +269,7 @@ InputLayout IL_InterfaceSimple
 
 	VertexInputs
 	{
-		VertexCoord { Feed = VertexCoordFeed, Offset = Auto(VertexCoord) }
-		ElementPosAndSize { Feed = ElementTransformFeed, Offset = Auto(ElementPosAndSize) }
+		VertexCoord = { Feed = VertexCoordFeed, Offset = Auto(VertexCoord) }
+		ElementPosAndSize = { Feed = ElementTransformFeed, Offset = Auto(ElementPosAndSize) }
 	}
 }

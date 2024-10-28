@@ -2,10 +2,53 @@
 
 #include "rkit/Core/Span.h"
 #include "rkit/Core/StringView.h"
+#include "rkit/Core/Hasher.h"
+
+#include "RenderDefProtos.h"
 
 namespace rkit::render
 {
 	struct StructureMemberDesc;
+
+	template<int TPurpose>
+	class StringIndex
+	{
+	public:
+		typedef size_t IndexType_t;
+
+		StringIndex() : m_index(0) {}
+		explicit StringIndex(IndexType_t index) : m_index(index) {}
+		StringIndex(const StringIndex<TPurpose> &) = default;
+
+		bool operator==(const StringIndex<TPurpose> &other) const { return m_index == other.m_index; }
+		bool operator!=(const StringIndex<TPurpose> &other) const { return !((*this) == other); }
+
+		IndexType_t GetIndex() const { return m_index; }
+
+		HashValue_t ComputeHash(HashValue_t base) const
+		{
+			return Hasher<IndexType_t>::ComputeHash(base, m_index);
+		}
+
+	private:
+		IndexType_t m_index;
+	};
+}
+
+namespace rkit
+{
+	template<int TPurpose>
+	struct Hasher<rkit::render::StringIndex<TPurpose>> : public DefaultSpanHasher<rkit::render::StringIndex<TPurpose>>
+	{
+		static HashValue_t ComputeHash(HashValue_t base, const rkit::render::StringIndex<TPurpose> &value)
+		{
+			return value.ComputeHash(base);
+		}
+	};
+}
+
+namespace rkit::render
+{
 
 	enum class Filter
 	{
@@ -77,7 +120,7 @@ namespace rkit::render
 		Filter m_magFilter = Filter::Nearest;
 		MipMapMode m_mipMapMode = MipMapMode::Linear;
 		AddressMode m_addressModeU = AddressMode::Repeat;
-		AddressMode m_addressMoveV = AddressMode::Repeat;
+		AddressMode m_addressModeV = AddressMode::Repeat;
 		AddressMode m_addressModeW = AddressMode::Repeat;
 		float m_mipLodBias = 0.f;
 		float m_minLod = 0.f;
@@ -265,6 +308,17 @@ namespace rkit::render
 		Count,
 	};
 
+
+	struct PushConstantDesc
+	{
+		StringView m_name;
+	};
+
+	struct PushConstantsDesc
+	{
+		Span<const PushConstantDesc> m_pushConstants;
+	};
+
 	struct GraphicsPipelineDesc
 	{
 		size_t m_descriptorLayoutID;
@@ -280,5 +334,6 @@ namespace rkit::render
 
 		GraphicsPipelineDepthDesc m_depthDesc;
 		GraphicsPipelineStencilDesc m_stencilDesc;
+		PushConstantsDesc m_pushConstants;
 	};
 }
