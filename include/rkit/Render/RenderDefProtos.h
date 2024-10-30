@@ -9,4 +9,5 @@ namespace rkit::render
 
 	typedef StringIndex<0> GlobalStringIndex_t;
 	typedef StringIndex<1> ConfigStringIndex_t;
+	typedef StringIndex<2> TempStringIndex_t;
 }

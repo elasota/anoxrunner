@@ -15,13 +15,11 @@ PushConstants PC_WorldSurface
 	SurfaceNormal =
 	{
 		Type = float3
-		Visibility = All
 	}
 
 	Transform =
 	{
 		Type = float3x4
-		Visibility = All
 	}
 }
 

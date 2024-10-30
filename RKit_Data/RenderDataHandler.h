@@ -9,5 +9,6 @@ namespace rkit::data
 	{
 	public:
 		const RenderRTTIStructType *GetSamplerDescRTTI() const override;
+		const RenderRTTIStructType *GetPushConstantDescRTTI() const override;
 	};
 }

@@ -319,6 +319,7 @@ namespace rkit
 		: m_handle(INVALID_HANDLE_VALUE)
 		, m_haveItem(true)
 		, m_exhausted(false)
+		, m_findData{}
 	{
 	}
 

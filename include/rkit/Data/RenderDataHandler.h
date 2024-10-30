@@ -5,11 +5,23 @@
 
 #include "rkit/Render/RenderDefProtos.h"
 
+namespace rkit
+{
+	struct Result;
+}
+
 namespace rkit::data
 {
 	enum class RenderRTTIMainType
 	{
 		Invalid,
+
+		ValueType,
+
+		// String indexes
+		GlobalStringIndex,
+		ConfigStringIndex,
+		TempStringIndex,
 
 		// Enums
 		Filter,
@@ -20,9 +32,14 @@ namespace rkit::data
 		BorderColor,
 		VectorDimension,
 		NumericType,
+		StageVisibility,
 
 		// Structs
 		SamplerDesc,
+		PushConstantDesc,
+		PushConstantListDesc,
+		StructureMemberDesc,
+		StructureType,
 
 		Count,
 	};
@@ -33,6 +50,8 @@ namespace rkit::data
 		Structure,
 		Number,
 		Array,
+		ValueType,
+		StringIndex,
 	};
 
 	struct RenderRTTIEnumOption
@@ -51,6 +70,17 @@ namespace rkit::data
 
 		const char *m_name;
 		size_t m_nameLength;
+	};
+
+	struct RenderRTTIArrayType
+	{
+		RenderRTTITypeBase base;
+
+		const RenderRTTITypeBase *m_elementType;
+		size_t m_elementSize;
+
+		Result (*m_appendVectorAndUpdateSpanFunc)(void *vectorPtr, void *spanPtr, void **outItemPtr);
+		size_t (*m_getSpanCountFunc)(const void *spanPtr);
 	};
 
 	struct RenderRTTIEnumType
@@ -80,10 +110,10 @@ namespace rkit::data
 		size_t m_nameLength;
 
 		const RenderRTTITypeBase *(*m_getTypeFunc)();
+		bool m_isVisible;
 		bool m_isConfigurable;
 
-		size_t m_fixedOffset;
-		size_t m_dynamicOffet;
+		void *(*m_getMemberPtrFunc)(void *ptr);
 	};
 
 	struct RenderRTTIStructType
@@ -92,6 +122,15 @@ namespace rkit::data
 
 		const RenderRTTIStructField *m_fields;
 		size_t m_numFields;
+	};
+
+	struct RenderRTTIStringIndexType
+	{
+		RenderRTTITypeBase m_base;
+
+		void (*m_writeStringIndexFunc)(void *ptr, size_t index);
+		size_t (*m_readStringIndexFunc)(const void *ptr);
+		int (*m_getPurposeFunc)();
 	};
 
 	enum class RenderRTTINumberBitSize
@@ -146,5 +185,6 @@ namespace rkit::data
 		virtual ~IRenderDataHandler() {}
 
 		virtual const RenderRTTIStructType *GetSamplerDescRTTI() const = 0;
+		virtual const RenderRTTIStructType *GetPushConstantDescRTTI() const = 0;
 	};
 }
