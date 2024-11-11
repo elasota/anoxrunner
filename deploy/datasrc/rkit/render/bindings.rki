@@ -25,30 +25,40 @@ PushConstants PC_WorldSurface
 
 struct S_SurfaceVertexData
 {
-	float3 Coordinate
-	float2 TextureUV
-	float2 LightMapUV
+	float3 Position
+	float4 TextureUV_LightMapUV
+	float3 Normal
+}
+
+struct S_ModelFrameVertexData
+{
+	float3 Position
+	float4 TextureUV_LightMapUV
+	float3 Normal
+}
+
+struct S_ModelConstantVertexData
+{
+	float3 Position
+	float4 TextureUV_LightMapUV
+	float3 Normal
 }
 
 InputLayout IL_WorldSurface
 {
-	BufferBindPoints =
+	VertexInputFeeds =
 	{
 		SurfaceVertexData
 	}
 
-	VertexInputFeeds =
-	{
-		SurfaceVertexDataFeed
-		{
-			BindPoint = SurfaceVertexData
-			InputSources = Auto(S_SurfaceVertexData)
-		}
-	}
-
 	VertexInputs =
 	{
-		Auto(SurfaceVertexDataFeed, S_SurfaceVertexData)
+		SurfaceVertexData =
+		{
+			InputFeed = SurfaceVertexData
+			InputSources = S_SurfaceVertexData
+			Stepping = Vertex
+		}
 	}
 }
 
@@ -63,24 +73,67 @@ struct S_ModelUVData
 	float2 UV
 }
 
-PushConstants PC_StaticModel
+struct S_StaticModelVSPushConstants
 {
 	float3x4 Transform
 	uint PrevFrame
 	uint NextFrame
 	float FrameInterpolator
+}
+
+struct S_FaceModelVSPushConstants
+{
+	float3x4 Transform
+	uint PrevFrame
+	uint NextFrame
+	float FrameInterpolator
+}
+
+PushConstants PC_StaticModel
+{
+	Constants =
+	{
+		Type = S_StaticModelVSPushConstants
+		StageVisibility = Vertex
+	}
 }
 
 PushConstants PC_FaceModel
 {
-	float3x4 Transform
-	uint PrevFrame
-	uint NextFrame
-	float FrameInterpolator
+	Constants =
+	{
+		Type = S_FaceModelVSPushConstants
+		StageVisibility = Vertex
+	}
 }
 
 InputLayout IL_ModelStatic
 {
+	VertexInputFeeds =
+	{
+		PrevModelVertexData
+		NextModelVertexData
+		UVData
+	}
+
+	VertexInputs =
+	{
+		PrevFrameVertexData =
+		{
+			InputFeed = PrevModelVertexData
+			InputSources = S_StaticModelVertexData
+			Stepping = Vertex
+		}
+		NextFrameVertexData =
+		{
+			InputFeed = NextModelVertexData
+			InputSources = S_StaticModelVertexData
+			Stepping = Vertex
+		}
+	}
+	
+	
+	
 	BufferBindPoints =
 	{
 		PrevModelVertexData

@@ -5,8 +5,16 @@
 namespace rkit
 {
 	struct Result;
+
 	template<class T>
 	class Span;
+
+	template<class T>
+	struct DefaultComparer
+	{
+		static int Compare(const T &a, const T &b);
+		static bool CompareEqual(const T &a, const T &b);
+	};
 
 	namespace Private
 	{
@@ -143,6 +151,12 @@ namespace rkit
 
 	template<class T>
 	void MoveSpan(const Span<T> &dest, const Span<T> &src);
+
+	template<class T, class TComparer = DefaultComparer<T>>
+	bool CompareSpansEqual(const Span<const T> &dest, const Span<const T> &src);
+
+	template<class T, class TComparer = DefaultComparer<T>>
+	int CompareSpans(const Span<const T> &dest, const Span<const T> &src);
 }
 
 #include "CoreDefs.h"
@@ -213,6 +227,22 @@ T rkit::Max(const T &a, const T &b)
 	if (b < a)
 		return b;
 	return a;
+}
+
+template<class T>
+int rkit::DefaultComparer<T>::Compare(const T &a, const T &b)
+{
+	if (a < b)
+		return -1;
+	if (b < a)
+		return 1;
+	return 0;
+}
+
+template<class T>
+bool rkit::DefaultComparer<T>::CompareEqual(const T &a, const T &b)
+{
+	return a == b;
 }
 
 // Signed integers
@@ -573,4 +603,46 @@ template<class T>
 void rkit::MoveSpan(const Span<T> &dest, const Span<T> &src)
 {
 	return Private::SpanOpsHelper<T, std::is_trivially_copyable<T>::value>::MoveSpan(dest, src);
+}
+
+template<class T, class TComparer>
+bool rkit::CompareSpansEqual(const Span<const T> &srcA, const Span<const T> &srcB)
+{
+	const T *ptrsA = srcA.Ptr();
+	const T *ptrsB = srcB.Ptr();
+	size_t sz = srcA.Count();
+
+	if (sz != srcB.Count())
+		return false;
+
+	for (size_t i = 0; i < sz; i++)
+	{
+		if (!TComparer::CompareEqual(ptrsA[i], ptrsB[i]))
+			return false;
+	}
+
+	return true;
+}
+
+template<class T, class TComparer>
+int rkit::CompareSpans(const Span<const T> &srcA, const Span<const T> &srcB)
+{
+	if (srcA.Count() > srcB.Count())
+		return -1;
+
+	if (srcA.Count() > srcB.Count())
+		return 1;
+
+	const T *ptrsA = srcA.Ptr();
+	const T *ptrsB = srcB.Ptr();
+	size_t sz = srcA.Count();
+
+	for (size_t i = 0; i < sz; i++)
+	{
+		int cmp = TComparer::Compare(ptrsA[i], ptrsB[i]);
+		if (cmp != 0)
+			return cmp;
+	}
+
+	return 0;
 }

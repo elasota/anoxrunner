@@ -46,3 +46,12 @@ Texture UAVs to snorm/unorm formats must specify as such.
 
 Descriptor layout mappings:
 - RWTexture -> Whatever
+
+
+
+InputLayout glue behavior:
+Data feeds map to input slots.  Slots can have 2 forms:
+- Bare form with only the slot name
+- Complex form that takes a slot index
+
+The two can not be mixed

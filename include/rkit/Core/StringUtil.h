@@ -15,6 +15,7 @@ namespace rkit
 	{
 	public:
 		static int Compare(TChar a, TChar b);
+		static bool CompareEqual(TChar a, TChar b);
 	};
 
 	template<class TChar, class TCaseAdjuster>
@@ -22,6 +23,7 @@ namespace rkit
 	{
 	public:
 		static int Compare(TChar a, TChar b);
+		static bool CompareEqual(TChar a, TChar b);
 	};
 }
 
@@ -54,6 +56,12 @@ int rkit::CharStrictComparer<TChar>::Compare(TChar a, TChar b)
 	return 0;
 }
 
+template<class TChar>
+bool rkit::CharStrictComparer<TChar>::CompareEqual(TChar a, TChar b)
+{
+	return a == b;
+}
+
 template<class TChar, class TCaseAdjuster>
 int rkit::CharCaseInsensitiveComparer<TChar, TCaseAdjuster>::Compare(TChar a, TChar b)
 {
@@ -61,4 +69,13 @@ int rkit::CharCaseInsensitiveComparer<TChar, TCaseAdjuster>::Compare(TChar a, TC
 	b = TCaseAdjuster::ToLower(b);
 
 	return CharStrictComparer<TChar>::Compare(a, b);
+}
+
+template<class TChar, class TCaseAdjuster>
+bool rkit::CharCaseInsensitiveComparer<TChar, TCaseAdjuster>::CompareEqual(TChar a, TChar b)
+{
+	a = TCaseAdjuster::ToLower(a);
+	b = TCaseAdjuster::ToLower(b);
+
+	return a == b;
 }

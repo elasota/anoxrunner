@@ -33,6 +33,7 @@ namespace rkit::data
 		VectorDimension,
 		NumericType,
 		StageVisibility,
+		VertexInputStepping,
 
 		// Structs
 		SamplerDesc,
@@ -186,5 +187,6 @@ namespace rkit::data
 
 		virtual const RenderRTTIStructType *GetSamplerDescRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetPushConstantDescRTTI() const = 0;
+		virtual const RenderRTTIEnumType *GetVertexInputSteppingRTTI() const = 0;
 	};
 }

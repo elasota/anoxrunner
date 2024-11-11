@@ -656,6 +656,11 @@ namespace rkit::data
 			RTTI_STRUCT_FIELD(name)
 		RTTI_STRUCT_END
 
+		RTTI_ENUM_BEGIN(VertexInputStepping)
+			RTTI_ENUM_OPTION(Vertex)
+			RTTI_ENUM_OPTION(Instance)
+		RTTI_ENUM_END
+
 			/*
 	struct VectorNumericType
 	{
@@ -924,5 +929,10 @@ namespace rkit::data
 	const RenderRTTIStructType *RenderDataHandler::GetPushConstantDescRTTI() const
 	{
 		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::PushConstantDesc>::GetRTTIType());
+	}
+
+	const RenderRTTIEnumType *RenderDataHandler::GetVertexInputSteppingRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::VertexInputStepping>::GetRTTIType());
 	}
 }

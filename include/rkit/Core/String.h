@@ -86,6 +86,7 @@ namespace rkit
 		void Clear();
 
 		Span<const TChar> SubString(size_t start, size_t length) const;
+		Span<const TChar> ToSpan() const;
 
 		const TChar *CStr() const;
 		size_t Length() const;
@@ -338,6 +339,12 @@ template<class TChar, size_t TStaticSize>
 rkit::Span<const TChar> rkit::BaseString<TChar, TStaticSize>::SubString(size_t start, size_t length) const
 {
 	return rkit::BaseStringView<TChar>(*this).SubString(start, length);
+}
+
+template<class TChar, size_t TStaticSize>
+rkit::Span<const TChar> rkit::BaseString<TChar, TStaticSize>::ToSpan() const
+{
+	return rkit::BaseStringView<TChar>(*this).ToSpan();
 }
 
 template<class TChar, size_t TStaticSize>

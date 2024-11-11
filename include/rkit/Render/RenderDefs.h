@@ -6,6 +6,8 @@
 
 #include "RenderDefProtos.h"
 
+#include <cstdint>
+
 namespace rkit::render
 {
 	struct StructureMemberDesc;
@@ -245,6 +247,14 @@ namespace rkit::render
 
 		Bool,
 
+		SNorm8,
+		SNorm16,
+		SNorm32,
+
+		UNorm8,
+		UNorm16,
+		UNorm32,
+
 		Count,
 	};
 
@@ -321,6 +331,29 @@ namespace rkit::render
 	struct StructureType
 	{
 		Span<const StructureMemberDesc *> m_members;
+	};
+
+	enum class VertexInputStepping
+	{
+		Vertex,
+		Instance,
+
+		Count,
+	};
+
+	struct InputLayoutVertexInputDesc
+	{
+		TempStringIndex_t m_feedName;
+		TempStringIndex_t m_memberName;
+		uint32_t m_inputSlot = 0;
+		uint32_t m_byteOffset = 0;
+		const VectorNumericType *m_numericType = nullptr;
+		VertexInputStepping m_stepping = VertexInputStepping::Vertex;
+	};
+
+	struct InputLayoutDesc
+	{
+		Span<const InputLayoutVertexInputDesc *> m_vertexFeeds;
 	};
 
 	enum class ReadWriteAccess
