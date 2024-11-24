@@ -23,6 +23,9 @@ namespace rkit::data
 		ConfigStringIndex,
 		TempStringIndex,
 
+		// Object indexes
+		StaticSamplerIndex,
+
 		// Enums
 		Filter,
 		MipMapMode,
@@ -34,6 +37,7 @@ namespace rkit::data
 		NumericType,
 		StageVisibility,
 		VertexInputStepping,
+		DescriptorType,
 
 		// Structs
 		SamplerDesc,
@@ -41,6 +45,7 @@ namespace rkit::data
 		PushConstantListDesc,
 		StructureMemberDesc,
 		StructureType,
+		DescriptorDesc,
 
 		Count,
 	};
@@ -53,6 +58,7 @@ namespace rkit::data
 		Array,
 		ValueType,
 		StringIndex,
+		ObjectPtr,
 	};
 
 	struct RenderRTTIEnumOption
@@ -134,6 +140,15 @@ namespace rkit::data
 		int (*m_getPurposeFunc)();
 	};
 
+	struct RenderRTTIObjectPtrType
+	{
+		RenderRTTITypeBase m_base;
+
+		const RenderRTTITypeBase *(*m_getTypeFunc)();
+		void (*m_writeFunc)(void *ptrLoc, const void *value);
+		const void *(*m_readFunc)(const void *ptrLoc);
+	};
+
 	enum class RenderRTTINumberBitSize
 	{
 		BitSize1,
@@ -188,5 +203,7 @@ namespace rkit::data
 		virtual const RenderRTTIStructType *GetSamplerDescRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetPushConstantDescRTTI() const = 0;
 		virtual const RenderRTTIEnumType *GetVertexInputSteppingRTTI() const = 0;
+		virtual const RenderRTTIStructType *GetDescriptorDescRTTI() const = 0;
+		virtual const RenderRTTIEnumType *GetDescriptorTypeRTTI() const = 0;
 	};
 }

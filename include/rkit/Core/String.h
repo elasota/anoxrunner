@@ -48,6 +48,7 @@ namespace rkit
 	{
 	public:
 		typedef BaseStringView<TChar> View_t;
+		typedef BaseStringSliceView<TChar> SliceView_t;
 
 		BaseString();
 		BaseString(const BaseString &other);
@@ -57,9 +58,9 @@ namespace rkit
 		BaseString &operator=(const BaseString &other);
 		BaseString &operator=(BaseString &&other) noexcept;
 
-		Result Set(const BaseStringView<TChar> &strView);
+		Result Set(const SliceView_t &strView);
 		Result Set(const Span<const TChar> &strView);
-		Result Append(const BaseStringView<TChar> &strView);
+		Result Append(const SliceView_t &strView);
 		Result Append(const Span<const TChar> &span);
 		Result Append(TChar ch);
 
@@ -69,23 +70,24 @@ namespace rkit
 		Result MakeLower();
 		Result MakeUpper();
 
-		bool EndsWith(const BaseStringView<TChar> &strView) const;
+		bool EndsWith(const SliceView_t &strView) const;
 		bool EndsWith(const Span<const TChar> &span) const;
 		bool EndsWith(TChar ch) const;
 
 		operator View_t() const;
+		operator SliceView_t() const;
 
-		bool operator==(const BaseStringView<TChar> &other) const;
+		bool operator==(const SliceView_t &other) const;
 		bool operator==(const BaseString &other) const;
 
-		bool operator!=(const BaseStringView<TChar> &other) const;
+		bool operator!=(const SliceView_t &other) const;
 		bool operator!=(const BaseString &other) const;
 
 		const TChar &operator[](size_t index) const;
 
 		void Clear();
 
-		Span<const TChar> SubString(size_t start, size_t length) const;
+		SliceView_t SubString(size_t start, size_t length) const;
 		Span<const TChar> ToSpan() const;
 
 		const TChar *CStr() const;
@@ -336,15 +338,15 @@ void rkit::BaseString<TChar, TStaticSize>::Clear()
 
 
 template<class TChar, size_t TStaticSize>
-rkit::Span<const TChar> rkit::BaseString<TChar, TStaticSize>::SubString(size_t start, size_t length) const
+rkit::BaseStringSliceView<TChar> rkit::BaseString<TChar, TStaticSize>::SubString(size_t start, size_t length) const
 {
-	return rkit::BaseStringView<TChar>(*this).SubString(start, length);
+	return rkit::BaseStringSliceView<TChar>(*this).SubString(start, length);
 }
 
 template<class TChar, size_t TStaticSize>
 rkit::Span<const TChar> rkit::BaseString<TChar, TStaticSize>::ToSpan() const
 {
-	return rkit::BaseStringView<TChar>(*this).ToSpan();
+	return static_cast<SliceView_t>(*this).ToSpan();
 }
 
 template<class TChar, size_t TStaticSize>
@@ -354,7 +356,7 @@ bool rkit::BaseString<TChar, TStaticSize>::IsStaticString() const
 }
 
 template<class TChar, size_t TStaticSize>
-rkit::Result rkit::BaseString<TChar, TStaticSize>::Set(const BaseStringView<TChar> &strView)
+rkit::Result rkit::BaseString<TChar, TStaticSize>::Set(const BaseStringSliceView<TChar> &strView)
 {
 	return Set(strView.ToSpan());
 }
@@ -431,7 +433,7 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::Append(const Span<const TChar
 }
 
 template<class TChar, size_t TStaticSize>
-rkit::Result rkit::BaseString<TChar, TStaticSize>::Append(const BaseStringView<TChar> &strView)
+rkit::Result rkit::BaseString<TChar, TStaticSize>::Append(const BaseStringSliceView<TChar> &strView)
 {
 	return this->Append(strView.ToSpan());
 }
@@ -487,7 +489,7 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::MakeUpper()
 }
 
 template<class TChar, size_t TStaticSize>
-bool rkit::BaseString<TChar, TStaticSize>::EndsWith(const BaseStringView<TChar> &strView) const
+bool rkit::BaseString<TChar, TStaticSize>::EndsWith(const BaseStringSliceView<TChar> &strView) const
 {
 	return this->EndsWith(strView.ToSpan());
 }
@@ -510,23 +512,29 @@ bool rkit::BaseString<TChar, TStaticSize>::EndsWith(TChar ch) const
 template<class TChar, size_t TStaticSize>
 rkit::BaseString<TChar, TStaticSize>::operator View_t() const
 {
-	return BaseStringView<TChar>(m_chars, m_length);
+	return View_t(m_chars, m_length);
 }
 
 template<class TChar, size_t TStaticSize>
-bool rkit::BaseString<TChar, TStaticSize>::operator==(const BaseStringView<TChar> &other) const
+rkit::BaseString<TChar, TStaticSize>::operator SliceView_t() const
 {
-	return static_cast<BaseStringView<TChar>>(*this) == other;
+	return SliceView_t(m_chars, m_length);
+}
+
+template<class TChar, size_t TStaticSize>
+bool rkit::BaseString<TChar, TStaticSize>::operator==(const BaseStringSliceView<TChar> &other) const
+{
+	return static_cast<SliceView_t>(*this) == other;
 }
 
 template<class TChar, size_t TStaticSize>
 bool rkit::BaseString<TChar, TStaticSize>::operator==(const BaseString &other) const
 {
-	return (*this) == static_cast<rkit::BaseStringView<TChar> >(other);
+	return (*this) == static_cast<SliceView_t>(other);
 }
 
 template<class TChar, size_t TStaticSize>
-bool rkit::BaseString<TChar, TStaticSize>::operator!=(const BaseStringView<TChar> &other) const
+bool rkit::BaseString<TChar, TStaticSize>::operator!=(const BaseStringSliceView<TChar> &other) const
 {
 	return !((*this) == other);
 }

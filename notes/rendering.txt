@@ -32,6 +32,9 @@ Inlined sampler states are in HLSL in D3D12.  In Vulkan they are created with th
 descriptor set.
 
 
+
+
+
 D3D12 SRVs must be specified as one of:
 - Buffer, texture (array), potentially multisampled if 2D, acceleration structure
 

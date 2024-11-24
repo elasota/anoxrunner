@@ -469,6 +469,40 @@ namespace rkit::data
 			NumericHelper<T>::WriteConfigurableDefault,
 		};
 
+		template<class T>
+		struct RTTIAutoObjectPtr
+		{
+		private:
+			static const RenderRTTIObjectPtrType ms_type;
+
+		public:
+			static const RenderRTTITypeBase *GetRTTIType()
+			{
+				return &ms_type.m_base;
+			}
+
+		private:
+			static void Set(void *ptrLoc, const void *value)
+			{
+				*static_cast<const T **>(ptrLoc) = static_cast<const T *>(value);
+			}
+
+			static const void *Get(const void *ptrLoc)
+			{
+				return *static_cast<T *const*const>(ptrLoc);
+			}
+		};
+
+		template<class T>
+		const RenderRTTIObjectPtrType RTTIAutoObjectPtr<T>::ms_type =
+		{
+			{ RenderRTTIType::ObjectPtr },
+
+			RTTIResolver<T>::GetRTTIType,
+			RTTIAutoObjectPtr<T>::Set,
+			RTTIAutoObjectPtr<T>::Get,
+		};
+
 		template<>
 		struct RTTIResolver<bool> : public RTTIAutoNumber<bool, RenderRTTINumberBitSize::BitSize1, RenderRTTINumberRepresentation::UnsignedInt>
 		{
@@ -521,6 +555,11 @@ namespace rkit::data
 
 		template<>
 		struct RTTIResolver<int64_t> : public RTTIAutoNumber<int64_t, RenderRTTINumberBitSize::BitSize64, RenderRTTINumberRepresentation::SignedInt>
+		{
+		};
+
+		template<class T>
+		struct RTTIResolver<const T *> : public RTTIAutoObjectPtr<T>
 		{
 		};
 
@@ -643,6 +682,45 @@ namespace rkit::data
 			RTTI_STRUCT_FIELD(maxLod)
 			RTTI_STRUCT_FIELD(anisotropy)
 			RTTI_STRUCT_FIELD(compareFunction)
+		RTTI_STRUCT_END
+
+		RTTI_ENUM_BEGIN(DescriptorType)
+			RTTI_ENUM_OPTION(Sampler)
+
+			RTTI_ENUM_OPTION(StaticConstantBuffer)
+			RTTI_ENUM_OPTION(DynamicConstantBuffer)
+
+			RTTI_ENUM_OPTION(Buffer)
+			RTTI_ENUM_OPTION(RWBuffer)
+
+			RTTI_ENUM_OPTION(ByteAddressBuffer)
+			RTTI_ENUM_OPTION(RWByteAddressBuffer)
+
+			RTTI_ENUM_OPTION(Texture1D)
+			RTTI_ENUM_OPTION(Texture1DArray)
+			RTTI_ENUM_OPTION(Texture2D)
+			RTTI_ENUM_OPTION(Texture2DArray)
+			RTTI_ENUM_OPTION(Texture2DMS)
+			RTTI_ENUM_OPTION(Texture2DMSArray)
+			RTTI_ENUM_OPTION(Texture3D)
+			RTTI_ENUM_OPTION(TextureCube)
+			RTTI_ENUM_OPTION(TextureCubeArray)
+
+			RTTI_ENUM_OPTION(RWTexture1D)
+			RTTI_ENUM_OPTION(RWTexture1DArray)
+			RTTI_ENUM_OPTION(RWTexture2D)
+			RTTI_ENUM_OPTION(RWTexture2DArray)
+			RTTI_ENUM_OPTION(RWTexture3D)
+		RTTI_ENUM_END
+
+		RTTI_STRUCT_BEGIN(DescriptorDesc)
+			RTTI_STRUCT_FIELD_INVISIBLE(name)
+			RTTI_STRUCT_FIELD(visibility)
+			RTTI_STRUCT_FIELD(descriptorType)
+			RTTI_STRUCT_FIELD(arraySize)
+			RTTI_STRUCT_FIELD(globallyCoherent)
+			RTTI_STRUCT_FIELD(valueType)
+			RTTI_STRUCT_FIELD(staticSamplerDesc)
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN(PushConstantDesc)
@@ -934,5 +1012,15 @@ namespace rkit::data
 	const RenderRTTIEnumType *RenderDataHandler::GetVertexInputSteppingRTTI() const
 	{
 		return reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::VertexInputStepping>::GetRTTIType());
+	}
+
+	const RenderRTTIStructType *RenderDataHandler::GetDescriptorDescRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::DescriptorDesc>::GetRTTIType());
+	}
+
+	const RenderRTTIEnumType *RenderDataHandler::GetDescriptorTypeRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::DescriptorType>::GetRTTIType());
 	}
 }

@@ -11,5 +11,7 @@ namespace rkit::data
 		const RenderRTTIStructType *GetSamplerDescRTTI() const override;
 		const RenderRTTIStructType *GetPushConstantDescRTTI() const override;
 		const RenderRTTIEnumType *GetVertexInputSteppingRTTI() const override;
+		const RenderRTTIStructType *GetDescriptorDescRTTI() const override;
+		const RenderRTTIEnumType *GetDescriptorTypeRTTI() const override;
 	};
 }

@@ -8,6 +8,9 @@ namespace rkit
 	class BaseString;
 
 	template<class TChar>
+	class BaseStringSliceView;
+
+	template<class TChar>
 	class BaseStringView;
 
 	typedef BaseString<char, 16> String;
@@ -15,4 +18,7 @@ namespace rkit
 
 	typedef BaseStringView<char> StringView;
 	typedef BaseStringView<wchar_t> WStringView;
+
+	typedef BaseStringSliceView<char> StringSliceView;
+	typedef BaseStringSliceView<wchar_t> WStringSliceView;
 }

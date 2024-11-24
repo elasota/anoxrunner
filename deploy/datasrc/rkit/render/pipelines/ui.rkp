@@ -1,8 +1,12 @@
 include "rkit/render/bindings.rki"
 
-GraphicsPipelineDef GP_InterfaceSimple
+GraphicsPipeline GP_InterfaceSimple
 {
-	DescriptorLayout = DL_Interface
+	DescriptorLayouts =
+	{
+		DL_Interface
+	}
+
 	InputLayout = IL_InterfaceSimple
 
 	VertexShaderOutput =
@@ -12,7 +16,7 @@ GraphicsPipelineDef GP_InterfaceSimple
 	VertexShader = { Source = "ui.rkc", EntryPoint = "VertexMain" }
 	PixelShader = { Source = "ui.rkc", EntryPoint = "PixelMain" }
 
-	Topology = Triangle
+	PrimitiveTopology = TriangleList
 
 	RenderTargets =
 	{
@@ -28,5 +32,6 @@ GraphicsPipelineDef GP_InterfaceSimple
 	DepthTarget =
 	{
 		Format = Config(CFG_DepthStencilTargetFormat)
+		DepthCompareOp = Config(CFG_DepthCompareOp)
 	}
 }

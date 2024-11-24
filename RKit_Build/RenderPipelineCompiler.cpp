@@ -94,6 +94,21 @@ namespace rkit::buildsystem::rpc_interchange
 		render::InputLayoutDesc m_desc;
 		Vector<const render::InputLayoutVertexInputDesc *> m_vertexInputs;
 	};
+
+	class DescriptorLayoutEntity final : public Entity
+	{
+	public:
+		explicit DescriptorLayoutEntity() {}
+
+		render::DescriptorLayoutDesc &GetDesc() { return m_desc; }
+		Vector<const render::DescriptorDesc *> &GetDescriptorDescs() { return m_descriptorDescs; }
+
+		EntityType GetEntityType() const override { return EntityType::InputLayout; }
+
+	private:
+		render::DescriptorLayoutDesc m_desc;
+		Vector<const render::DescriptorDesc *> m_descriptorDescs;
+	};
 }
 
 namespace rkit::buildsystem::rpc_analyzer
@@ -174,6 +189,18 @@ namespace rkit::buildsystem::rpc_analyzer
 			uint32_t m_slot = 0;
 		};
 
+		enum class DescriptorTypeClassification
+		{
+			Unknown,
+
+			Sampler,
+			ConstantBuffer,
+			Buffer,
+			ByteAddressBuffer,
+			Texture,
+			RWTexture,
+		};
+
 		Result ScanTopStackItem(AnalyzerIncludeStack &item);
 		Result ParseTopStackItem(AnalyzerIncludeStack &item);
 		Result ParseDirective(const char *filePath, utils::ITextParser &parser, bool &outHaveDirective);
@@ -187,6 +214,7 @@ namespace rkit::buildsystem::rpc_analyzer
 		Result ParsePushConstants(const char *filePath, utils::ITextParser &parser, rpc_interchange::PushConstantsEntity &pc);
 		Result ParseStructDef(const char *filePath, utils::ITextParser &parser, rpc_interchange::StructDefEntity &pc);
 		Result ParseInputLayout(const char *filePath, utils::ITextParser &parser, rpc_interchange::InputLayoutEntity &il);
+		Result ParseDescriptorLayout(const char *filePath, utils::ITextParser &parser, rpc_interchange::DescriptorLayoutEntity &dl);
 
 		Result ResolveQuotedString(ShortTempToken &outToken, const Span<const char> &inToken);
 		Result ResolveInputLayoutVertexInputs(const char *filePath, size_t line, size_t col, render::TempStringIndex_t feedName, const Span<const char> &nameBase, Vector<const render::InputLayoutVertexInputDesc *> &descsVector, uint32_t &inOutOffset, render::ValueType inputSourcesType, uint32_t inputFeedSlot, render::VertexInputStepping stepping);
@@ -207,6 +235,8 @@ namespace rkit::buildsystem::rpc_analyzer
 		template<class T>
 		Result ParseDynamicStructMember(const char *blamePath, const Span<const char> &memberName, const data::RenderRTTIStructType *rtti, T &obj, utils::ITextParser &parser);
 
+		static bool IsTokenChars(const Span<const char> &span, const char *tokenStr, size_t tokenLength);
+
 		template<size_t TSize>
 		static bool IsToken(const Span<const char> &span, const char(&tokenChars)[TSize]);
 
@@ -215,6 +245,8 @@ namespace rkit::buildsystem::rpc_analyzer
 
 		Result IndexString(const Span<const char> &span, render::GlobalStringIndex_t &outStringIndex);
 		Result IndexString(const Span<const char> &span, render::TempStringIndex_t &outStringIndex);
+
+		static DescriptorTypeClassification ClassifyDescriptorType(render::DescriptorType descType);
 
 		void RemoveTopStackItem();
 
@@ -236,6 +268,7 @@ namespace rkit::buildsystem::rpc_analyzer
 		Vector<UniquePtr<render::PushConstantDesc>> m_pcDescs;
 		Vector<UniquePtr<render::StructureMemberDesc>> m_smDescs;
 		Vector<UniquePtr<render::InputLayoutVertexInputDesc>> m_vertexInputDescs;
+		Vector<UniquePtr<render::DescriptorDesc>> m_dDescs;
 
 		Vector<SimpleNumericTypeResolution> m_numericTypeResolutions;
 
@@ -483,6 +516,8 @@ namespace rkit::buildsystem::rpc_analyzer
 			parseResult = ParseEntity(path, parser, &Analyzer::ParseStructDef);
 		else if (IsToken(directiveToken, "InputLayout"))
 			parseResult = ParseEntity(path, parser, &Analyzer::ParseInputLayout);
+		else if (IsToken(directiveToken, "DescriptorLayout"))
+			parseResult = ParseEntity(path, parser, &Analyzer::ParseDescriptorLayout);
 		else
 		{
 			rkit::log::ErrorFmt("%s [%zu:%zu] Invalid directive", path, line, col);
@@ -503,13 +538,13 @@ namespace rkit::buildsystem::rpc_analyzer
 		size_t col = 0;
 		parser.GetLocation(line, col);
 
-		Span<const char> samplerNameSpan;
-		RKIT_CHECK(ExpectIdentifier(blamePath, samplerNameSpan, parser));
+		Span<const char> entityNameSpan;
+		RKIT_CHECK(ExpectIdentifier(blamePath, entityNameSpan, parser));
 
-		String samplerName;
-		RKIT_CHECK(samplerName.Set(samplerNameSpan));
+		String entityName;
+		RKIT_CHECK(entityName.Set(entityNameSpan));
 
-		if (m_entities.Find(samplerName) != m_entities.end())
+		if (m_entities.Find(entityName) != m_entities.end())
 		{
 			rkit::log::ErrorFmt("%s [%zu:%zu] Object with this name already exists", blamePath, line, col);
 			return ResultCode::kMalformedFile;
@@ -522,7 +557,7 @@ namespace rkit::buildsystem::rpc_analyzer
 
 		RKIT_CHECK((this->*parseFunc)(blamePath, parser, *obj));
 
-		RKIT_CHECK(m_entities.Set(samplerName, std::move(entity)));
+		RKIT_CHECK(m_entities.Set(entityName, std::move(entity)));
 
 		return ResultCode::kOK;
 	}
@@ -868,6 +903,219 @@ namespace rkit::buildsystem::rpc_analyzer
 		}
 
 		il.GetDesc().m_vertexFeeds = il.GetVertexInputs().ToSpan();
+
+		return ResultCode::kOK;
+	}
+
+	Result Analyzer::ParseDescriptorLayout(const char *filePath, utils::ITextParser &parser, rpc_interchange::DescriptorLayoutEntity &dl)
+	{
+		RKIT_CHECK(parser.ExpectToken("{"));
+
+		const data::RenderRTTIStructType *descRTTI = m_dataDriver->GetRenderDataHandler()->GetDescriptorDescRTTI();
+
+		for (;;)
+		{
+			Span<const char> token;
+			RKIT_CHECK(parser.RequireToken(token));
+
+			size_t line = 0;
+			size_t col = 0;
+			parser.GetLocation(line, col);
+
+			if (IsToken(token, "}"))
+				break;
+
+			render::TempStringIndex_t descNameIndex;
+			RKIT_CHECK(IndexString(token, descNameIndex));
+
+			for (const render::DescriptorDesc *existingDesc : dl.GetDescriptorDescs())
+			{
+				if (existingDesc->m_name == descNameIndex)
+				{
+					rkit::log::ErrorFmt("%s [%zu:%zu] Descriptor with that name already exists", filePath, line, col);
+					return ResultCode::kMalformedFile;
+				}
+			}
+
+			RKIT_CHECK(parser.ExpectToken("="));
+
+			UniquePtr<render::DescriptorDesc> descDesc;
+			RKIT_CHECK(New<render::DescriptorDesc>(descDesc));
+
+			RKIT_CHECK(parser.ExpectToken("{"));
+
+			RKIT_CHECK(parser.RequireToken(token));
+
+			bool typeWasSpecified = false;
+			for (;;)
+			{
+				parser.GetLocation(line, col);
+
+				if (IsToken(token, "}"))
+					break;
+
+				if (IsToken(token, "Type"))
+				{
+					if (typeWasSpecified)
+					{
+						rkit::log::ErrorFmt("%s [%zu:%zu] Type was already specified", filePath, line, col);
+						return ResultCode::kMalformedFile;
+					}
+
+					typeWasSpecified = true;
+
+					RKIT_CHECK(parser.ExpectToken("="));
+
+					parser.GetLocation(line, col);
+					RKIT_CHECK(parser.RequireToken(token));
+
+					const data::RenderRTTIEnumType *typeEnumType = m_dataDriver->GetRenderDataHandler()->GetDescriptorTypeRTTI();
+					render::DescriptorType descType = render::DescriptorType::Count;
+
+					for (size_t i = 0; i < typeEnumType->m_numOptions; i++)
+					{
+						const data::RenderRTTIEnumOption &option = typeEnumType->m_options[i];
+						if (IsTokenChars(token, option.m_name, option.m_nameLength))
+						{
+							descType = static_cast<render::DescriptorType>(option.m_value);
+							break;
+						}
+					}
+
+					if (descType == render::DescriptorType::Count)
+					{
+						rkit::log::ErrorFmt("%s [%zu:%zu] Invalid descriptor type", filePath, line, col);
+						return ResultCode::kMalformedFile;
+					}
+
+					descDesc->m_descriptorType = descType;
+
+					DescriptorTypeClassification classification = ClassifyDescriptorType(descType);
+
+					switch (classification)
+					{
+					case DescriptorTypeClassification::Texture:
+					case DescriptorTypeClassification::RWTexture:
+						RKIT_CHECK(parser.RequireToken(token));
+						if (IsToken(token, "<"))
+						{
+							parser.GetLocation(line, col);
+
+							RKIT_CHECK(parser.RequireToken(token));
+							RKIT_CHECK(ParseValueType(filePath, descDesc->m_valueType, token, parser));
+							RKIT_CHECK(parser.ExpectToken(">"));
+
+							if (descDesc->m_valueType.m_type != render::ValueTypeType::Numeric && descDesc->m_valueType.m_type != render::ValueTypeType::VectorNumeric)
+							{
+								rkit::log::ErrorFmt("%s [%zu:%zu] Invalid type for texture", filePath, line, col);
+								return ResultCode::kMalformedFile;
+							}
+
+							RKIT_CHECK(parser.RequireToken(token));
+						}
+						break;
+					case DescriptorTypeClassification::Buffer:
+					case DescriptorTypeClassification::ConstantBuffer:
+						RKIT_CHECK(parser.ExpectToken("<"));
+
+						parser.GetLocation(line, col);
+
+						RKIT_CHECK(parser.RequireToken(token));
+						RKIT_CHECK(ParseValueType(filePath, descDesc->m_valueType, token, parser));
+						RKIT_CHECK(parser.ExpectToken(">"));
+
+						RKIT_CHECK(parser.RequireToken(token));
+						break;
+					case DescriptorTypeClassification::ByteAddressBuffer:
+					case DescriptorTypeClassification::Sampler:
+						RKIT_CHECK(parser.RequireToken(token));
+						break;
+
+					default:
+						return ResultCode::kInternalError;
+					}
+
+					if (IsToken(token, "["))
+					{
+						parser.GetLocation(line, col);
+						RKIT_CHECK(parser.RequireToken(token));
+
+						if (IsToken(token, "]"))
+							descDesc->m_arraySize = 0;
+						else
+						{
+							uint64_t arraySize = 0;
+							RKIT_CHECK(ParseUIntConstant(filePath, line, col, token, std::numeric_limits<uint32_t>::max(), arraySize));
+
+							if (arraySize < 2)
+							{
+								rkit::log::ErrorFmt("%s [%zu:%zu] Invalid descriptor array size", filePath, line, col);
+								return ResultCode::kMalformedFile;
+							}
+
+							descDesc->m_arraySize = static_cast<uint32_t>(arraySize);
+
+							RKIT_CHECK(parser.RequireToken(token));
+						}
+					}
+				}
+				else if (IsToken(token, "Sampler"))
+				{
+					if (!typeWasSpecified)
+					{
+						rkit::log::ErrorFmt("%s [%zu:%zu] Static sampler must be after type", filePath, line, col);
+						return ResultCode::kMalformedFile;
+					}
+
+					DescriptorTypeClassification classification = ClassifyDescriptorType(descDesc->m_descriptorType);
+					if (classification != DescriptorTypeClassification::Texture)
+					{
+						rkit::log::ErrorFmt("%s [%zu:%zu] Static sampler is only valid for texture types", filePath, line, col);
+						return ResultCode::kMalformedFile;
+					}
+
+					RKIT_CHECK(parser.ExpectToken("="));
+
+					parser.GetLocation(line, col);
+
+					RKIT_CHECK(parser.RequireToken(token));
+
+					HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(BaseStringSliceView(token));
+					if (it == m_entities.end())
+					{
+						rkit::log::ErrorFmt("%s [%zu:%zu] Unknown static sampler", filePath, line, col);
+						return ResultCode::kMalformedFile;
+					}
+
+					if (it.Value()->GetEntityType() != rpc_interchange::EntityType::StaticSampler)
+					{
+						rkit::log::ErrorFmt("%s [%zu:%zu] Value wasn't a static sampler", filePath, line, col);
+						return ResultCode::kMalformedFile;
+					}
+
+					descDesc->m_staticSamplerDesc = &static_cast<const rpc_interchange::StaticSamplerEntity *>(it.Value().Get())->GetDesc();
+
+					RKIT_CHECK(parser.RequireToken(token));
+				}
+				else
+				{
+					rkit::log::ErrorFmt("%s [%zu:%zu] Invalid descriptor desc property", filePath, line, col);
+					return ResultCode::kMalformedFile;
+				}
+			}
+
+			if (!typeWasSpecified)
+			{
+				rkit::log::ErrorFmt("%s [%zu:%zu] Descriptor missing type", filePath, line, col);
+				return ResultCode::kMalformedFile;
+			}
+
+			descDesc->m_name = descNameIndex;
+
+			RKIT_CHECK(m_dDescs.Append(std::move(descDesc)));
+		}
+
+		dl.GetDesc().m_descriptors = dl.GetDescriptorDescs().ToSpan();
 
 		return ResultCode::kOK;
 	}
@@ -1439,10 +1687,15 @@ namespace rkit::buildsystem::rpc_analyzer
 	template<size_t TSize>
 	bool Analyzer::IsToken(const Span<const char> &span, const char(&tokenChars)[TSize])
 	{
-		if (span.Count() != TSize - 1)
+		return IsTokenChars(span, tokenChars, TSize - 1);
+	}
+
+	bool Analyzer::IsTokenChars(const Span<const char> &span, const char *tokenStr, size_t tokenLen)
+	{
+		if (span.Count() != tokenLen)
 			return false;
 
-		return !memcmp(span.Ptr(), tokenChars, TSize - 1);
+		return !memcmp(span.Ptr(), tokenStr, tokenLen);
 	}
 
 	template<class T>
@@ -1464,6 +1717,46 @@ namespace rkit::buildsystem::rpc_analyzer
 		RKIT_CHECK(instVector.Append(std::move(newInst)));
 
 		return ResultCode::kOK;
+	}
+
+	Analyzer::DescriptorTypeClassification Analyzer::ClassifyDescriptorType(render::DescriptorType descType)
+	{
+		switch (descType)
+		{
+		case render::DescriptorType::Sampler:
+			return DescriptorTypeClassification::Sampler;
+
+		case render::DescriptorType::StaticConstantBuffer:
+		case render::DescriptorType::DynamicConstantBuffer:
+			return DescriptorTypeClassification::ConstantBuffer;
+
+		case render::DescriptorType::Buffer:
+		case render::DescriptorType::RWBuffer:
+			return DescriptorTypeClassification::Buffer;
+
+		case render::DescriptorType::ByteAddressBuffer:
+		case render::DescriptorType::RWByteAddressBuffer:
+			return DescriptorTypeClassification::ByteAddressBuffer;
+
+		case render::DescriptorType::Texture1D:
+		case render::DescriptorType::Texture1DArray:
+		case render::DescriptorType::Texture2D:
+		case render::DescriptorType::Texture2DArray:
+		case render::DescriptorType::Texture2DMS:
+		case render::DescriptorType::Texture2DMSArray:
+		case render::DescriptorType::Texture3D:
+		case render::DescriptorType::TextureCube:
+		case render::DescriptorType::TextureCubeArray:
+		case render::DescriptorType::RWTexture1D:
+		case render::DescriptorType::RWTexture1DArray:
+		case render::DescriptorType::RWTexture2D:
+		case render::DescriptorType::RWTexture2DArray:
+		case render::DescriptorType::RWTexture3D:
+			return DescriptorTypeClassification::Texture;
+
+		default:
+			return DescriptorTypeClassification::Unknown;
+		}
 	}
 
 	void Analyzer::RemoveTopStackItem()

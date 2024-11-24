@@ -390,12 +390,6 @@ namespace rkit::render
 		Count,
 	};
 
-	struct GraphicsPipelineRenderTargetDesc
-	{
-		ReadWriteAccess m_colorAccess;
-
-	};
-
 	struct GraphicsPipelineDepthDesc
 	{
 		bool m_testEnable = false;
@@ -409,31 +403,12 @@ namespace rkit::render
 		bool m_depthClipEnable = true;
 	};
 
-	struct GraphicsPipelineStencilOpDesc
+	struct StencilOpDesc
 	{
 		StencilOp m_passOp = StencilOp::Keep;
 		StencilOp m_failOp = StencilOp::Keep;
 		StencilOp m_depthFailOp = StencilOp::Keep;
 		ComparisonFunction m_compareFunc = ComparisonFunction::Equal;
-	};
-
-	struct GraphicsPipelineStencilDesc
-	{
-		bool m_testEnable = false;
-		bool m_writeEnable = false;
-		ComparisonFunction m_comparisonFunction = ComparisonFunction::Less;
-		uint8_t m_compareMask = 0xffu;
-		uint8_t m_writeMask = 0xffu;
-		GraphicsPipelineStencilOpDesc m_frontOps;
-		GraphicsPipelineStencilOpDesc m_backOps;
-	};
-
-	enum class Topology
-	{
-		Triangle,
-		TriangleStrip,
-
-		Count,
 	};
 
 	enum class FillMode
@@ -480,22 +455,204 @@ namespace rkit::render
 		Span<const PushConstantDesc *> m_pushConstants;
 	};
 
+	enum class DescriptorType
+	{
+		Sampler,
+
+		StaticConstantBuffer,
+		DynamicConstantBuffer,
+
+		Buffer,
+		RWBuffer,
+
+		ByteAddressBuffer,
+		RWByteAddressBuffer,
+
+		Texture1D,
+		Texture1DArray,
+		Texture2D,
+		Texture2DArray,
+		Texture2DMS,
+		Texture2DMSArray,
+		Texture3D,
+		TextureCube,
+		TextureCubeArray,
+
+		RWTexture1D,
+		RWTexture1DArray,
+		RWTexture2D,
+		RWTexture2DArray,
+		RWTexture3D,
+
+		Count,
+	};
+
+	enum class PrimitiveTopology
+	{
+		PointList,
+		LineList,
+		LineStrip,
+		TriangleList,
+		TriangleStrip,
+
+		Count,
+	};
+
+	enum class IndexSize
+	{
+		UInt16,
+		UInt32,
+
+		Count,
+	};
+
+	enum class ColorBlendFactor
+	{
+		Zero,
+		One,
+		SrcColor,
+		InvSrcColor,
+		SrcAlpha,
+		InvSrcAlpha,
+		DstAlpha,
+		InvDstAlpha,
+		DstColor,
+		InvDstColor,
+		ConstantColor,
+		InvConstantColor,
+		ConstantAlpha,
+		InvConstantAlpha,
+
+		Count,
+	};
+
+	enum class BlendOp
+	{
+		Add,
+		Subtract,
+		ReverseSubtract,
+		Min,
+		Max,
+
+		Count,
+	};
+
+	enum class AlphaBlendFactor
+	{
+		Zero,
+		One,
+		SrcAlpha,
+		InvSrcAlpha,
+		DstAlpha,
+		InvDstAlpha,
+		ConstantAlpha,
+		InvConstantAlpha,
+
+		Count,
+	};
+
+	struct DescriptorDesc
+	{
+		TempStringIndex_t m_name;
+
+		StageVisibility m_visibility = StageVisibility::All;
+
+		DescriptorType m_descriptorType = DescriptorType::Texture2D;
+		uint32_t m_arraySize = 1;			// 0 = Unbounded
+		bool m_globallyCoherent = false;
+		ValueType m_valueType;
+
+		const SamplerDesc *m_staticSamplerDesc;
+	};
+
+	struct DescriptorLayoutDesc
+	{
+		Span<const DescriptorDesc *> m_descriptors;
+	};
+
+	struct ShaderDesc
+	{
+		TempStringIndex_t m_source;
+		TempStringIndex_t m_entryPoint;
+	};
+
+	struct RenderTargetDesc
+	{
+		TempStringIndex_t m_name;
+
+		const VectorNumericType *m_format;
+		ReadWriteAccess m_access;
+
+		ColorBlendFactor m_srcBlend = ColorBlendFactor::One;
+		ColorBlendFactor m_dstBlend = ColorBlendFactor::Zero;
+		BlendOp m_colorBlendOp = BlendOp::Add;
+
+		AlphaBlendFactor m_srcAlphaBlend = AlphaBlendFactor::One;
+		AlphaBlendFactor m_dstAlphaBlend = AlphaBlendFactor::Zero;
+		BlendOp m_alphaBlendOp = BlendOp::Add;
+
+		bool m_writeRed = true;
+		bool m_writeGreen = true;
+		bool m_writeBlue = true;
+		bool m_writeAlpha = true;
+	};
+
+	enum DepthStencilFormat
+	{
+		DepthFloat32,
+		DepthFloat32_Stencil8_Undefined24,
+		DepthUNorm24_Stencil8,
+		DepthUNorm16,
+
+		Count,
+	};
+
+	struct DepthStencilDesc
+	{
+		bool m_depthTest = false;
+		bool m_depthWrite = false;
+		ComparisonFunction m_depthCompareOp = ComparisonFunction::Always;
+		DepthStencilFormat m_depthStencilFormat = DepthStencilFormat::DepthUNorm16;
+
+		bool m_stencilTest = false;
+		bool m_stencilWrite = false;
+		ComparisonFunction m_stencilCompareOp = ComparisonFunction::Always;
+		uint8_t m_stencilCompareMask = 0xffu;
+		uint8_t m_stencilWriteMask = 0xffu;
+		StencilOpDesc m_stencilFrontOps;
+		StencilOpDesc m_stencilBackOps;
+	};
+
 	struct GraphicsPipelineDesc
 	{
-		size_t m_descriptorLayoutID;
-		size_t m_inputLayoutID;
-		size_t m_vertexShaderID;
-		size_t m_pixelShaderID;
+		const PushConstantsListDesc *m_pushConstants = nullptr;
 
-		Topology m_topology = Topology::Triangle;
+		Span<const DescriptorLayoutDesc *> m_descriptorLayouts;
+
+		const InputLayoutDesc *m_inputLayout = nullptr;
+		const StructureType *m_vertexShaderOutput = nullptr;
+
+		const ShaderDesc *m_vertexShader = nullptr;
+		const ShaderDesc *m_pixelShader = nullptr;
+
+		IndexSize m_indexSize = IndexSize::UInt32;
+		bool m_primitiveRestart = false;
+		PrimitiveTopology m_primitiveTopology = PrimitiveTopology::TriangleList;
+
+		Span<const RenderTargetDesc *> m_renderTargets;
+		const DepthStencilDesc *m_depthStencil = nullptr;
+
+		bool m_alphaToCoverage = false;
+
+		bool m_dynamicBlendConstants = false;
+
+		float m_blendConstantRed = 0.0f;
+		float m_blendConstantGreen = 0.0f;
+		float m_blendConstantBlue = 0.0f;
+		float m_blendConstantAlpha = 0.0f;
+
 		FillMode m_fillMode = FillMode::Solid;
 		CullMode m_cullMode = CullMode::Back;
-
-		Span<const GraphicsPipelineRenderTargetDesc> m_renderTargets;
-
-		GraphicsPipelineDepthDesc m_depthDesc;
-		GraphicsPipelineStencilDesc m_stencilDesc;
-		PushConstantsListDesc m_pushConstants;
 	};
 }
 

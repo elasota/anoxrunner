@@ -148,7 +148,7 @@ namespace rkit::buildsystem
 			}
 
 			constructedPath.Reset();
-			RKIT_CHECK(constructedPath.Append(identifier.SubString(0, baseDirEnd)));
+			RKIT_CHECK(constructedPath.Append(identifier.SubString(0, baseDirEnd).ToSpan()));
 
 			outOK = true;
 			return ResultCode::kOK;

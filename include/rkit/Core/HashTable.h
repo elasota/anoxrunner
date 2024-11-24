@@ -730,7 +730,7 @@ rkit::Result rkit::HashTableBase<TKey, TValue, TSize>::CreatePositionForNewEntry
 	}
 
 	TSize insertPosition = m_freePosScan;
-	while (insertPosition < m_count)
+	while (insertPosition < m_capacity)
 	{
 		if (!GetOccupancyAt(insertPosition))
 			break;
@@ -738,7 +738,7 @@ rkit::Result rkit::HashTableBase<TKey, TValue, TSize>::CreatePositionForNewEntry
 		insertPosition++;
 	}
 
-	if (insertPosition == m_count)
+	if (insertPosition == m_capacity)
 	{
 		RKIT_CHECK(Rehash(m_count + 1));
 		this->CreatePositionForNewEntryNoResize(newKeyHash, outPosition);
@@ -767,7 +767,7 @@ void rkit::HashTableBase<TKey, TValue, TSize>::CreatePositionForNewEntryNoResize
 	TSize insertPosition = mainPosition + 1;
 	for (;;)
 	{
-		if (insertPosition == m_count)
+		if (insertPosition == m_capacity)
 			insertPosition = 0;
 
 		RKIT_ASSERT(insertPosition != mainPosition);
@@ -810,17 +810,18 @@ void rkit::HashTableBase<TKey, TValue, TSize>::ReserveNonMainPosition(HashValue_
 		// and take the main position
 		this->m_values.RelocateValue(initialFreePosition, this->m_values, mainPosition);
 		new (m_keys + initialFreePosition) TKey(std::move(m_keys[mainPosition]));
+		m_keys[mainPosition].~TKey();
 
 		m_hashValues[initialFreePosition] = m_hashValues[mainPosition];
 		m_hashValues[mainPosition] = newKeyHash;
 
-		newFreePosition = initialFreePosition;
+		newFreePosition = mainPosition;
 	}
 
 	m_nextAndOccupancy[initialFreePosition].m_next = m_nextAndOccupancy[mainPosition].m_next;
 	m_nextAndOccupancy[mainPosition].m_next = initialFreePosition;
 
-	SetOccupancyAt(newFreePosition, true);
+	SetOccupancyAt(initialFreePosition, true);
 
 	outNewFreePosition = newFreePosition;
 
