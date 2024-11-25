@@ -17,6 +17,7 @@ namespace rkit::render
 	{
 	public:
 		typedef size_t IndexType_t;
+		static const int kPurpose = TPurpose;
 
 		StringIndex() : m_index(0) {}
 		explicit StringIndex(IndexType_t index) : m_index(index) {}
@@ -77,6 +78,7 @@ namespace rkit::render
 	template<class T>
 	union ConfigurableValueUnion
 	{
+		ConfigurableValueUnion();
 		ConfigurableValueUnion(const T &value);
 		ConfigurableValueUnion(T &&value);
 		ConfigurableValueUnion(const render::ConfigStringIndex_t &stringIndex);
@@ -333,7 +335,7 @@ namespace rkit::render
 		Span<const StructureMemberDesc *> m_members;
 	};
 
-	enum class VertexInputStepping
+	enum class InputLayoutVertexInputStepping
 	{
 		Vertex,
 		Instance,
@@ -348,7 +350,7 @@ namespace rkit::render
 		uint32_t m_inputSlot = 0;
 		uint32_t m_byteOffset = 0;
 		const VectorNumericType *m_numericType = nullptr;
-		VertexInputStepping m_stepping = VertexInputStepping::Vertex;
+		InputLayoutVertexInputStepping m_stepping = InputLayoutVertexInputStepping::Vertex;
 	};
 
 	struct InputLayoutDesc
@@ -405,10 +407,10 @@ namespace rkit::render
 
 	struct StencilOpDesc
 	{
-		StencilOp m_passOp = StencilOp::Keep;
-		StencilOp m_failOp = StencilOp::Keep;
-		StencilOp m_depthFailOp = StencilOp::Keep;
-		ComparisonFunction m_compareFunc = ComparisonFunction::Equal;
+		ConfigurableValue<StencilOp, StencilOp::Keep> m_passOp;
+		ConfigurableValue<StencilOp, StencilOp::Keep> m_failOp;
+		ConfigurableValue<StencilOp, StencilOp::Keep> m_depthFailOp;
+		ConfigurableValue<ComparisonFunction, ComparisonFunction::Equal> m_compareFunc;
 	};
 
 	enum class FillMode
@@ -450,7 +452,7 @@ namespace rkit::render
 		StageVisibility m_stageVisibility = StageVisibility::All;
 	};
 
-	struct PushConstantsListDesc
+	struct PushConstantListDesc
 	{
 		Span<const PushConstantDesc *> m_pushConstants;
 	};
@@ -570,17 +572,35 @@ namespace rkit::render
 		Span<const DescriptorDesc *> m_descriptors;
 	};
 
+	struct ContentKey
+	{
+		uint64_t m_key0 = 0;
+		uint64_t m_key1 = 0;
+		uint64_t m_key2 = 0;
+		uint64_t m_key3 = 0;
+	};
+
 	struct ShaderDesc
 	{
 		TempStringIndex_t m_source;
 		TempStringIndex_t m_entryPoint;
+
+		ContentKey m_contentKey;
+	};
+
+	enum class RenderTargetFormat
+	{
+		RGBA_UNorm8,
+		RGBA_UNorm8_sRGB,
+
+		Count,
 	};
 
 	struct RenderTargetDesc
 	{
 		TempStringIndex_t m_name;
 
-		const VectorNumericType *m_format;
+		ConfigurableValue<RenderTargetFormat, RenderTargetFormat::RGBA_UNorm8> m_format;
 		ReadWriteAccess m_access;
 
 		ColorBlendFactor m_srcBlend = ColorBlendFactor::One;
@@ -597,7 +617,7 @@ namespace rkit::render
 		bool m_writeAlpha = true;
 	};
 
-	enum DepthStencilFormat
+	enum class DepthStencilFormat
 	{
 		DepthFloat32,
 		DepthFloat32_Stencil8_Undefined24,
@@ -609,23 +629,26 @@ namespace rkit::render
 
 	struct DepthStencilDesc
 	{
-		bool m_depthTest = false;
-		bool m_depthWrite = false;
-		ComparisonFunction m_depthCompareOp = ComparisonFunction::Always;
-		DepthStencilFormat m_depthStencilFormat = DepthStencilFormat::DepthUNorm16;
+		ConfigurableValue<DepthStencilFormat, DepthStencilFormat::DepthUNorm16> m_format;
 
-		bool m_stencilTest = false;
-		bool m_stencilWrite = false;
-		ComparisonFunction m_stencilCompareOp = ComparisonFunction::Always;
-		uint8_t m_stencilCompareMask = 0xffu;
-		uint8_t m_stencilWriteMask = 0xffu;
+		ConfigurableValue<bool, false> m_depthTest;
+		ConfigurableValue<bool, false> m_depthWrite;
+		ConfigurableValue<ComparisonFunction, ComparisonFunction::Always> m_depthCompareOp;
+
+		ConfigurableValue<bool, false> m_stencilTest;
+		ConfigurableValue<bool, false> m_stencilWrite;
+		ConfigurableValue<ComparisonFunction, ComparisonFunction::Always> m_stencilCompareOp;
+
+		ConfigurableValue<uint8_t, 0xffu> m_stencilCompareMask;
+		ConfigurableValue<uint8_t, 0xffu> m_stencilWriteMask;
+
 		StencilOpDesc m_stencilFrontOps;
 		StencilOpDesc m_stencilBackOps;
 	};
 
 	struct GraphicsPipelineDesc
 	{
-		const PushConstantsListDesc *m_pushConstants = nullptr;
+		const PushConstantListDesc *m_pushConstants = nullptr;
 
 		Span<const DescriptorLayoutDesc *> m_descriptorLayouts;
 
@@ -795,6 +818,11 @@ namespace rkit::render
 	}
 
 	template<class T>
+	ConfigurableValueUnion<T>::ConfigurableValueUnion()
+	{
+	}
+
+	template<class T>
 	ConfigurableValueUnion<T>::ConfigurableValueUnion(const T &value)
 	{
 		new (&m_value) T(value);
@@ -838,7 +866,7 @@ namespace rkit::render
 		: m_state(other.m_state)
 	{
 		if (other.m_state == ConfigurableValueState::Configured)
-			new (&m_u.m_configName) StringView(other.m_u.m_configName);
+			new (&m_u.m_configName) ConfigStringIndex_t(other.m_u.m_configName);
 		else if (other.m_state == ConfigurableValueState::Explicit)
 			new (&m_u.m_value) T(other.m_u.m_value);
 	}
@@ -848,7 +876,7 @@ namespace rkit::render
 		: m_state(other.m_state)
 	{
 		if (other.m_state == ConfigurableValueState::Configured)
-			new (&m_u.m_configName) StringView(other.m_u.m_configName);
+			new (&m_u.m_configName) ConfigStringIndex_t(other.m_u.m_configName);
 		else if (other.m_state == ConfigurableValueState::Explicit)
 			new (&m_u.m_value) T(std::move(other.m_u.m_value));
 	}

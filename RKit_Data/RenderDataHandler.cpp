@@ -2,6 +2,8 @@
 
 #include "rkit/Render/RenderDefs.h"
 
+#include "rkit/Core/Vector.h"
+
 namespace rkit::data
 {
 #define RTTI_ENUM_BEGIN(name)	\
@@ -83,12 +85,13 @@ namespace rkit::data
 		};\
 	}
 
-#define RTTI_STRUCT_BEGIN(name)	\
+#define RTTI_STRUCT_BEGIN_WITH_INDEX(name, indexableStructType)	\
 	namespace render_rtti_ ## name\
 	{\
 		typedef render::name StructType_t;\
 		const RenderRTTIMainType g_mainType = RenderRTTIMainType::name;\
 		extern RenderRTTIStructType g_type;\
+		const RenderRTTIIndexableStructType g_indexableStructType = RenderRTTIIndexableStructType::indexableStructType;\
 	}\
 	template<> struct RTTIResolver<render_rtti_ ## name::StructType_t>\
 	{\
@@ -96,6 +99,7 @@ namespace rkit::data
 		{\
 			return &render_rtti_ ## name::g_type.m_base;\
 		}\
+		static const bool kIsIndexable = (RenderRTTIIndexableStructType::indexableStructType != RenderRTTIIndexableStructType::NotIndexable);\
 	};\
 	namespace render_rtti_ ## name\
 	{\
@@ -103,19 +107,27 @@ namespace rkit::data
 		RenderRTTIStructField g_fields[] =\
 		{
 
-#define RTTI_STRUCT_FIELD_WITH_VISIBILITY(name, visibility)	\
+#define RTTI_STRUCT_BEGIN(name) RTTI_STRUCT_BEGIN_WITH_INDEX(name, NotIndexable)
+
+#define RTTI_STRUCT_BEGIN_INDEXABLE(name) RTTI_STRUCT_BEGIN_WITH_INDEX(name, name)
+
+
+#define RTTI_STRUCT_FIELD_WITH_VISIBILITY_AND_NULLABILITY(name, visibility, nullability)	\
 	{\
 		#name,\
 		sizeof(#name) - 1,\
 		RTTIResolver<decltype(StructType_t::m_ ## name)>::GetRTTIType,\
 		visibility,\
 		RTTIConfigurableResolver<decltype(StructType_t::m_ ## name)>::kIsConfigurable,\
+		nullability,\
 		StructHelper<StructType_t>::GetMemberPtr<decltype(StructType_t::m_ ## name), &StructType_t::m_ ## name>,\
 	},
 
-#define RTTI_STRUCT_FIELD(name)	RTTI_STRUCT_FIELD_WITH_VISIBILITY(name, true)
+#define RTTI_STRUCT_FIELD(name)	RTTI_STRUCT_FIELD_WITH_VISIBILITY_AND_NULLABILITY(name, true, false)
 
-#define RTTI_STRUCT_FIELD_INVISIBLE(name)	RTTI_STRUCT_FIELD_WITH_VISIBILITY(name, false)
+#define RTTI_STRUCT_FIELD_INVISIBLE(name)	RTTI_STRUCT_FIELD_WITH_VISIBILITY_AND_NULLABILITY(name, false, false)
+
+#define RTTI_STRUCT_FIELD_NULLABLE(name)	RTTI_STRUCT_FIELD_WITH_VISIBILITY_AND_NULLABILITY(name, true, true)
 
 #define RTTI_STRUCT_END	\
 		};\
@@ -129,6 +141,7 @@ namespace rkit::data
 			},\
 			g_fields,\
 			sizeof(g_fields) / sizeof(RenderRTTIStructField),\
+			g_indexableStructType,\
 		};\
 	}
 
@@ -449,22 +462,31 @@ namespace rkit::data
 			TBitSize,
 			TRepresentation,
 
-			NumericHelper<T>::ReadValueFloat,
-			NumericHelper<T>::WriteValueFloatFunc,
-			NumericHelper<T>::ReadValueUInt,
-			NumericHelper<T>::WriteValueUInt,
-			NumericHelper<T>::ReadValueSInt,
-			NumericHelper<T>::WriteValueSInt,
+			{
+				NumericHelper<T>::ReadValueFloat,
+				NumericHelper<T>::WriteValueFloatFunc,
+
+				NumericHelper<T>::ReadValueUInt,
+				NumericHelper<T>::WriteValueUInt,
+
+				NumericHelper<T>::ReadValueSInt,
+				NumericHelper<T>::WriteValueSInt,
+			},
+			{
+				NumericHelper<T>::ReadConfigurableValueFloatFunc,
+				NumericHelper<T>::WriteConfigurableValueFloat,
+
+				NumericHelper<T>::ReadConfigurableValueUIntFunc,
+				NumericHelper<T>::WriteConfigurableValueUInt,
+
+				NumericHelper<T>::ReadConfigurableValueSIntFunc,
+				NumericHelper<T>::WriteConfigurableValueSInt,
+			},
+
 			NumericHelper<T>::GetConfigurableState,
 
-			NumericHelper<T>::ReadConfigurableValueFloatFunc,
-			NumericHelper<T>::ReadConfigurableValueUIntFunc,
-			NumericHelper<T>::ReadConfigurableValueSIntFunc,
 			NumericHelper<T>::ReadConfigurableName,
 
-			NumericHelper<T>::WriteConfigurableValueFloat,
-			NumericHelper<T>::WriteConfigurableValueUInt,
-			NumericHelper<T>::WriteConfigurableValueSInt,
 			NumericHelper<T>::WriteConfigurableName,
 			NumericHelper<T>::WriteConfigurableDefault,
 		};
@@ -484,12 +506,22 @@ namespace rkit::data
 		private:
 			static void Set(void *ptrLoc, const void *value)
 			{
+				static_assert(RTTIResolver<T>::kIsIndexable);
 				*static_cast<const T **>(ptrLoc) = static_cast<const T *>(value);
 			}
 
 			static const void *Get(const void *ptrLoc)
 			{
+				static_assert(RTTIResolver<T>::kIsIndexable);
 				return *static_cast<T *const*const>(ptrLoc);
+			}
+
+			static const RenderRTTIStructType *GetType()
+			{
+				const RenderRTTITypeBase *baseType = RTTIResolver<T>::GetRTTIType();
+
+				RKIT_ASSERT(baseType->m_type == RenderRTTIType::Structure);
+				return reinterpret_cast<const RenderRTTIStructType *>(baseType);
 			}
 		};
 
@@ -498,9 +530,56 @@ namespace rkit::data
 		{
 			{ RenderRTTIType::ObjectPtr },
 
-			RTTIResolver<T>::GetRTTIType,
+			RTTIAutoObjectPtr<T>::GetType,
 			RTTIAutoObjectPtr<T>::Set,
 			RTTIAutoObjectPtr<T>::Get,
+		};
+
+		template<class T>
+		struct RTTIAutoObjectPtrSpan
+		{
+		private:
+			static const RenderRTTIObjectPtrSpanType ms_type;
+
+		public:
+			static const RenderRTTITypeBase *GetRTTIType()
+			{
+				return &ms_type.m_base;
+			}
+
+		private:
+			static void Set(void *spanPtr, void *elements, size_t count)
+			{
+				static_assert(RTTIResolver<T>::kIsIndexable);
+				*static_cast<Span<const T *> *>(spanPtr) = Span<const T *>(static_cast<const T **>(elements), count);
+			}
+
+			static const void *Get(const void *spanPtr, void *&outElements, size_t &outCount)
+			{
+				static_assert(RTTIResolver<T>::kIsIndexable);
+
+				const Span<const T *> *span = static_cast<const Span<const T *>>(spanPtr);
+
+				outElements = span->Ptr();
+				outCount = span->Count();
+			}
+
+			static const RenderRTTIObjectPtrType *GetPtrType()
+			{
+				return reinterpret_cast<const RenderRTTIObjectPtrType *>(RTTIResolver<const T *>::GetRTTIType());
+			}
+		};
+
+		template<class T>
+		const RenderRTTIObjectPtrSpanType RTTIAutoObjectPtrSpan<T>::ms_type =
+		{
+			{ RenderRTTIType::ObjectPtrSpan },
+
+			sizeof(const T *),
+
+			RTTIAutoObjectPtrSpan<T>::GetPtrType,
+			RTTIAutoObjectPtrSpan<T>::Set,
+			RTTIAutoObjectPtrSpan<T>::Get,
 		};
 
 		template<>
@@ -563,6 +642,11 @@ namespace rkit::data
 		{
 		};
 
+		template<class T>
+		struct RTTIResolver<Span<const T *>> : public RTTIAutoObjectPtr<T>
+		{
+		};
+
 		struct RenderRTTIValueType
 		{
 		};
@@ -589,9 +673,86 @@ namespace rkit::data
 			sizeof("ValueType") - 1,
 		};
 
+		template<class T>
+		class RenderRTTIList final : public IRenderRTTIListBase
+		{
+		public:
+			Result Resize(size_t count) override
+			{
+				return m_vector.Resize(count);
+			}
+
+			size_t GetCount() const override
+			{
+				return m_vector.Count();
+			}
+
+			void *GetElementPtr(size_t index) override
+			{
+				return &m_vector[index];
+			}
+
+			const void *GetElementPtr(size_t index) const override
+			{
+				return &m_vector[index];
+			}
+
+			size_t GetElementSize() const override
+			{
+				return sizeof(T);
+			}
+
+		private:
+			Vector<T> m_vector;
+		};
+
 		RTTI_DEFINE_STRING_INDEX(Global)
 		RTTI_DEFINE_STRING_INDEX(Config)
 		RTTI_DEFINE_STRING_INDEX(Temp)
+
+		RTTI_ENUM_BEGIN(NumericType)
+			RTTI_ENUM_OPTION(Float16)
+			RTTI_ENUM_OPTION(Float32)
+			RTTI_ENUM_OPTION(Float64)
+
+			RTTI_ENUM_OPTION(SInt8)
+			RTTI_ENUM_OPTION(SInt16)
+			RTTI_ENUM_OPTION(SInt32)
+			RTTI_ENUM_OPTION(SInt64)
+
+			RTTI_ENUM_OPTION(UInt8)
+			RTTI_ENUM_OPTION(UInt16)
+			RTTI_ENUM_OPTION(UInt32)
+			RTTI_ENUM_OPTION(UInt64)
+
+			RTTI_ENUM_OPTION(Bool)
+
+			RTTI_ENUM_OPTION(SNorm8)
+			RTTI_ENUM_OPTION(SNorm16)
+			RTTI_ENUM_OPTION(SNorm32)
+
+			RTTI_ENUM_OPTION(UNorm8)
+			RTTI_ENUM_OPTION(UNorm16)
+			RTTI_ENUM_OPTION(UNorm32)
+		RTTI_ENUM_END
+
+		RTTI_ENUM_BEGIN(VectorDimension)
+			RTTI_ENUM_OPTION(Dimension1)
+			RTTI_ENUM_OPTION(Dimension2)
+			RTTI_ENUM_OPTION(Dimension3)
+			RTTI_ENUM_OPTION(Dimension4)
+		RTTI_ENUM_END
+
+		RTTI_STRUCT_BEGIN_INDEXABLE(VectorNumericType)
+			RTTI_STRUCT_FIELD(numericType)
+			RTTI_STRUCT_FIELD(cols)
+		RTTI_STRUCT_END
+
+		RTTI_STRUCT_BEGIN_INDEXABLE(CompoundNumericType)
+			RTTI_STRUCT_FIELD(numericType)
+			RTTI_STRUCT_FIELD(rows)
+			RTTI_STRUCT_FIELD(cols)
+		RTTI_STRUCT_END
 
 		RTTI_ENUM_BEGIN(Filter)
 			RTTI_ENUM_OPTION(Nearest)
@@ -637,28 +798,6 @@ namespace rkit::data
 			RTTI_ENUM_OPTION(OpaqueWhite)
 		RTTI_ENUM_END
 
-		RTTI_ENUM_BEGIN(VectorDimension)
-			RTTI_ENUM_OPTION(Dimension1)
-			RTTI_ENUM_OPTION(Dimension2)
-			RTTI_ENUM_OPTION(Dimension3)
-			RTTI_ENUM_OPTION(Dimension4)
-		RTTI_ENUM_END
-
-		RTTI_ENUM_BEGIN(NumericType)
-			RTTI_ENUM_OPTION(Float16)
-			RTTI_ENUM_OPTION(Float32)
-			RTTI_ENUM_OPTION(Float64)
-			RTTI_ENUM_OPTION(SInt8)
-			RTTI_ENUM_OPTION(SInt16)
-			RTTI_ENUM_OPTION(SInt32)
-			RTTI_ENUM_OPTION(SInt64)
-			RTTI_ENUM_OPTION(UInt8)
-			RTTI_ENUM_OPTION(UInt16)
-			RTTI_ENUM_OPTION(UInt32)
-			RTTI_ENUM_OPTION(UInt64)
-			RTTI_ENUM_OPTION(Bool)
-		RTTI_ENUM_END
-
 		RTTI_ENUM_BEGIN(StageVisibility)
 			RTTI_ENUM_OPTION(All)
 			RTTI_ENUM_OPTION(Vertex)
@@ -670,7 +809,7 @@ namespace rkit::data
 			RTTI_ENUM_OPTION(Mesh)
 		RTTI_ENUM_END
 
-		RTTI_STRUCT_BEGIN(SamplerDesc)
+		RTTI_STRUCT_BEGIN_INDEXABLE(SamplerDesc)
 			RTTI_STRUCT_FIELD(minFilter)
 			RTTI_STRUCT_FIELD(magFilter)
 			RTTI_STRUCT_FIELD(mipMapMode)
@@ -713,7 +852,7 @@ namespace rkit::data
 			RTTI_ENUM_OPTION(RWTexture3D)
 		RTTI_ENUM_END
 
-		RTTI_STRUCT_BEGIN(DescriptorDesc)
+		RTTI_STRUCT_BEGIN_INDEXABLE(DescriptorDesc)
 			RTTI_STRUCT_FIELD_INVISIBLE(name)
 			RTTI_STRUCT_FIELD(visibility)
 			RTTI_STRUCT_FIELD(descriptorType)
@@ -723,281 +862,230 @@ namespace rkit::data
 			RTTI_STRUCT_FIELD(staticSamplerDesc)
 		RTTI_STRUCT_END
 
-		RTTI_STRUCT_BEGIN(PushConstantDesc)
+		RTTI_STRUCT_BEGIN_INDEXABLE(PushConstantDesc)
 			RTTI_STRUCT_FIELD(type)
 			RTTI_STRUCT_FIELD(stageVisibility)
 			RTTI_STRUCT_FIELD_INVISIBLE(name)
 		RTTI_STRUCT_END
 
-		RTTI_STRUCT_BEGIN(StructureMemberDesc)
-			RTTI_STRUCT_FIELD(type)
-			RTTI_STRUCT_FIELD(name)
+		RTTI_STRUCT_BEGIN_INDEXABLE(PushConstantListDesc)
+			RTTI_STRUCT_FIELD(pushConstants)
 		RTTI_STRUCT_END
 
-		RTTI_ENUM_BEGIN(VertexInputStepping)
+		RTTI_ENUM_BEGIN(InputLayoutVertexInputStepping)
 			RTTI_ENUM_OPTION(Vertex)
 			RTTI_ENUM_OPTION(Instance)
 		RTTI_ENUM_END
 
-			/*
-	struct VectorNumericType
-	{
-		NumericType m_numericType = NumericType::Float32;
-		VectorDimension m_cols = VectorDimension::Dimension1;
-	};
+		RTTI_STRUCT_BEGIN_INDEXABLE(InputLayoutVertexInputDesc)
+			RTTI_STRUCT_FIELD(feedName)
+			RTTI_STRUCT_FIELD(memberName)
+			RTTI_STRUCT_FIELD(inputSlot)
+			RTTI_STRUCT_FIELD(byteOffset)
+			RTTI_STRUCT_FIELD(numericType)
+			RTTI_STRUCT_FIELD(stepping)
+		RTTI_STRUCT_END
 
-	struct CompoundNumericType
-	{
-		NumericType m_numericType = NumericType::Float32;
-		VectorDimension m_rows = VectorDimension::Dimension1;
-		VectorDimension m_cols = VectorDimension::Dimension1;
-	};
+		RTTI_STRUCT_BEGIN_INDEXABLE(InputLayoutDesc)
+			RTTI_STRUCT_FIELD(vertexFeeds)
+		RTTI_STRUCT_END
 
-	struct StructureType
-	{
-		Span<const StructureMemberDesc> m_members;
-	};
+		RTTI_STRUCT_BEGIN_INDEXABLE(StructureMemberDesc)
+			RTTI_STRUCT_FIELD(type)
+			RTTI_STRUCT_FIELD(name)
+		RTTI_STRUCT_END
 
-	enum class ValueTypeType
-	{
-		CompoundNumeric,
-		Structure,
+		RTTI_STRUCT_BEGIN_INDEXABLE(StructureType)
+			RTTI_STRUCT_FIELD(members)
+		RTTI_STRUCT_END
 
-		Count,
-	};
+		RTTI_STRUCT_BEGIN_INDEXABLE(DescriptorLayoutDesc)
+			RTTI_STRUCT_FIELD(descriptors)
+		RTTI_STRUCT_END
 
-	union ValueUnion
-	{
-		ValueUnion();
-		ValueUnion(CompoundNumericType compoundNumericType);
-		ValueUnion(StructureType structureType);
-		~ValueUnion();
+		RTTI_ENUM_BEGIN(IndexSize)
+			RTTI_ENUM_OPTION(UInt16)
+			RTTI_ENUM_OPTION(UInt32)
+		RTTI_ENUM_END
 
-		CompoundNumericType m_compoundNumericType;
-		StructureType m_structure;
-	};
+		RTTI_ENUM_BEGIN(PrimitiveTopology)
+			RTTI_ENUM_OPTION(PointList)
+			RTTI_ENUM_OPTION(LineList)
+			RTTI_ENUM_OPTION(LineStrip)
+			RTTI_ENUM_OPTION(TriangleList)
+			RTTI_ENUM_OPTION(TriangleStrip)
+		RTTI_ENUM_END
 
-	struct ValueType
-	{
-		ValueTypeType m_type = ValueTypeType::CompoundNumeric;
-		ValueUnion m_value = ValueUnion(CompoundNumericType());
-	};
+		RTTI_ENUM_BEGIN(FillMode)
+			RTTI_ENUM_OPTION(Wireframe)
+			RTTI_ENUM_OPTION(Solid)
+		RTTI_ENUM_END
 
-	struct StructMemberDesc
-	{
-		ValueType m_valueType;
-		StringView m_name;
-	};
+		RTTI_ENUM_BEGIN(CullMode)
+			RTTI_ENUM_OPTION(None)
+			RTTI_ENUM_OPTION(Front)
+			RTTI_ENUM_OPTION(Back)
+		RTTI_ENUM_END
 
-	enum class ReadWriteAccess
-	{
-		Read,
-		Write,
-		ReadWrite,
+		RTTI_ENUM_BEGIN(DepthStencilFormat)
+			RTTI_ENUM_OPTION(DepthFloat32)
+			RTTI_ENUM_OPTION(DepthFloat32_Stencil8_Undefined24)
+			RTTI_ENUM_OPTION(DepthUNorm24_Stencil8)
+			RTTI_ENUM_OPTION(DepthUNorm16)
+		RTTI_ENUM_END
 
-		Count,
-	};
+		RTTI_ENUM_BEGIN(StencilOp)
+			RTTI_ENUM_OPTION(Keep)
+			RTTI_ENUM_OPTION(Zero)
+			RTTI_ENUM_OPTION(Replace)
+			RTTI_ENUM_OPTION(IncrementSaturate)
+			RTTI_ENUM_OPTION(DecrementSaturate)
+			RTTI_ENUM_OPTION(Invert)
+			RTTI_ENUM_OPTION(Increment)
+			RTTI_ENUM_OPTION(Decrement)
+		RTTI_ENUM_END
 
-	enum class OptionalReadWriteAccess
-	{
-		None,
+		RTTI_STRUCT_BEGIN(StencilOpDesc)
+			RTTI_STRUCT_FIELD(passOp)
+			RTTI_STRUCT_FIELD(failOp)
+			RTTI_STRUCT_FIELD(depthFailOp)
+			RTTI_STRUCT_FIELD(compareFunc)
+		RTTI_STRUCT_END
 
-		Read,
-		Write,
-		ReadWrite,
+		RTTI_STRUCT_BEGIN_INDEXABLE(DepthStencilDesc)
+			RTTI_STRUCT_FIELD(depthTest)
+			RTTI_STRUCT_FIELD(depthWrite)
 
-		Count,
-	};
+			RTTI_STRUCT_FIELD(depthCompareOp)
+			RTTI_STRUCT_FIELD(format)
 
-	enum class StencilOp
-	{
-		Keep,
-		Zero,
-		Replace,
-		IncrementSaturate,
-		DecrementSaturate,
-		Invert,
-		Increment,
-		Decrement,
+			RTTI_STRUCT_FIELD(stencilTest)
+			RTTI_STRUCT_FIELD(stencilWrite)
 
-		Count,
-	};
+			RTTI_STRUCT_FIELD(stencilCompareOp)
 
-	struct GraphicsPipelineRenderTargetDesc
-	{
-		ReadWriteAccess m_colorAccess;
+			RTTI_STRUCT_FIELD(stencilCompareMask)
+			RTTI_STRUCT_FIELD(stencilWriteMask)
+			RTTI_STRUCT_FIELD(stencilFrontOps)
+			RTTI_STRUCT_FIELD(stencilBackOps)
+		RTTI_STRUCT_END
 
-	};
+		RTTI_STRUCT_BEGIN_INDEXABLE(GraphicsPipelineDesc)
+			RTTI_STRUCT_FIELD_INVISIBLE(pushConstants)
 
-	struct GraphicsPipelineDepthDesc
-	{
-		bool m_testEnable = false;
-		bool m_writeEnable = false;
-		ComparisonFunction m_comparisonFunction = ComparisonFunction::Less;
+			RTTI_STRUCT_FIELD_INVISIBLE(descriptorLayouts)
 
-		int32_t m_depthBias = 0;
-		float m_depthBiasClamp = 0.f;
-		float m_depthBiasSlopeScale = 0.f;
+			RTTI_STRUCT_FIELD_INVISIBLE(inputLayout)
+			RTTI_STRUCT_FIELD_INVISIBLE(vertexShaderOutput)
 
-		bool m_depthClipEnable = true;
-	};
+			RTTI_STRUCT_FIELD_INVISIBLE(vertexShader)
+			RTTI_STRUCT_FIELD_INVISIBLE(pixelShader)
 
-	struct GraphicsPipelineStencilOpDesc
-	{
-		StencilOp m_passOp = StencilOp::Keep;
-		StencilOp m_failOp = StencilOp::Keep;
-		StencilOp m_depthFailOp = StencilOp::Keep;
-		ComparisonFunction m_compareFunc = ComparisonFunction::Equal;
-	};
+			RTTI_STRUCT_FIELD(indexSize)
 
-	struct GraphicsPipelineStencilDesc
-	{
-		bool m_testEnable = false;
-		bool m_writeEnable = false;
-		ComparisonFunction m_comparisonFunction = ComparisonFunction::Less;
-		uint8_t m_compareMask = 0xffu;
-		uint8_t m_writeMask = 0xffu;
-		GraphicsPipelineStencilOpDesc m_frontOps;
-		GraphicsPipelineStencilOpDesc m_backOps;
-	};
+			RTTI_STRUCT_FIELD(primitiveRestart)
 
-	enum class Topology
-	{
-		Triangle,
-		TriangleStrip,
+			RTTI_STRUCT_FIELD(primitiveTopology)
 
-		Count,
-	};
+			RTTI_STRUCT_FIELD_INVISIBLE(renderTargets)
+			RTTI_STRUCT_FIELD(depthStencil)
 
-	enum class FillMode
-	{
-		Wireframe,
-		Solid,
+			RTTI_STRUCT_FIELD(alphaToCoverage)
 
-		Count,
-	};
+			RTTI_STRUCT_FIELD(dynamicBlendConstants)
 
-	enum class CullMode
-	{
-		None,
-		Front,
-		Back,
+			RTTI_STRUCT_FIELD(blendConstantRed)
+			RTTI_STRUCT_FIELD(blendConstantGreen)
+			RTTI_STRUCT_FIELD(blendConstantBlue)
+			RTTI_STRUCT_FIELD(blendConstantAlpha)
 
-		Count,
-	};
+			RTTI_STRUCT_FIELD(fillMode)
+			RTTI_STRUCT_FIELD(cullMode)
+		RTTI_STRUCT_END
 
-	struct GraphicsPipelineDesc
-	{
-		size_t m_descriptorLayoutID;
-		size_t m_inputLayoutID;
-		size_t m_vertexShaderID;
-		size_t m_pixelShaderID;
+		RTTI_ENUM_BEGIN(ReadWriteAccess)
+			RTTI_ENUM_OPTION(Read)
+			RTTI_ENUM_OPTION(Write)
+			RTTI_ENUM_OPTION(ReadWrite)
+		RTTI_ENUM_END
 
-		Topology m_topology = Topology::Triangle;
-		FillMode m_fillMode = FillMode::Solid;
-		CullMode m_cullMode = CullMode::Back;
+		RTTI_ENUM_BEGIN(ColorBlendFactor)
+			RTTI_ENUM_OPTION(Zero)
+			RTTI_ENUM_OPTION(One)
+			RTTI_ENUM_OPTION(SrcColor)
+			RTTI_ENUM_OPTION(InvSrcColor)
+			RTTI_ENUM_OPTION(SrcAlpha)
+			RTTI_ENUM_OPTION(InvSrcAlpha)
+			RTTI_ENUM_OPTION(DstAlpha)
+			RTTI_ENUM_OPTION(InvDstAlpha)
 
-		Span<const GraphicsPipelineRenderTargetDesc> m_renderTargets;
+			RTTI_ENUM_OPTION(DstColor)
+			RTTI_ENUM_OPTION(InvDstColor)
+			RTTI_ENUM_OPTION(ConstantColor)
+			RTTI_ENUM_OPTION(InvConstantColor)
+			RTTI_ENUM_OPTION(ConstantAlpha)
+			RTTI_ENUM_OPTION(InvConstantAlpha)
+		RTTI_ENUM_END
 
-		GraphicsPipelineDepthDesc m_depthDesc;
-		GraphicsPipelineStencilDesc m_stencilDesc;
-	};
+		RTTI_ENUM_BEGIN(AlphaBlendFactor)
+			RTTI_ENUM_OPTION(Zero)
+			RTTI_ENUM_OPTION(One)
 
-			*/
+			RTTI_ENUM_OPTION(SrcAlpha)
+			RTTI_ENUM_OPTION(InvSrcAlpha)
+			RTTI_ENUM_OPTION(DstAlpha)
+			RTTI_ENUM_OPTION(InvDstAlpha)
+			RTTI_ENUM_OPTION(ConstantAlpha)
+			RTTI_ENUM_OPTION(InvConstantAlpha)
+		RTTI_ENUM_END
+
+		RTTI_ENUM_BEGIN(BlendOp)
+			RTTI_ENUM_OPTION(Add)
+			RTTI_ENUM_OPTION(Subtract)
+			RTTI_ENUM_OPTION(ReverseSubtract)
+			RTTI_ENUM_OPTION(Min)
+			RTTI_ENUM_OPTION(Max)
+		RTTI_ENUM_END
+
+		RTTI_ENUM_BEGIN(RenderTargetFormat)
+			RTTI_ENUM_OPTION(RGBA_UNorm8)
+			RTTI_ENUM_OPTION(RGBA_UNorm8_sRGB)
+		RTTI_ENUM_END
+
+		RTTI_STRUCT_BEGIN_INDEXABLE(RenderTargetDesc)
+			RTTI_STRUCT_FIELD_INVISIBLE(name)
+
+			RTTI_STRUCT_FIELD(format)
+			RTTI_STRUCT_FIELD(access)
+
+			RTTI_STRUCT_FIELD(srcBlend)
+			RTTI_STRUCT_FIELD(dstBlend)
+			RTTI_STRUCT_FIELD(colorBlendOp)
+
+			RTTI_STRUCT_FIELD(srcAlphaBlend)
+			RTTI_STRUCT_FIELD(dstAlphaBlend)
+			RTTI_STRUCT_FIELD(alphaBlendOp)
+
+			RTTI_STRUCT_FIELD(writeRed)
+			RTTI_STRUCT_FIELD(writeGreen)
+			RTTI_STRUCT_FIELD(writeBlue)
+			RTTI_STRUCT_FIELD(writeAlpha)
+		RTTI_STRUCT_END
+
+		RTTI_STRUCT_BEGIN(ContentKey)
+			RTTI_STRUCT_FIELD(key0)
+			RTTI_STRUCT_FIELD(key1)
+			RTTI_STRUCT_FIELD(key2)
+			RTTI_STRUCT_FIELD(key3)
+		RTTI_STRUCT_END
+
+		RTTI_STRUCT_BEGIN_INDEXABLE(ShaderDesc)
+			RTTI_STRUCT_FIELD(source)
+			RTTI_STRUCT_FIELD(entryPoint)
+
+			RTTI_STRUCT_FIELD_INVISIBLE(contentKey)
+		RTTI_STRUCT_END
 	}
-
-
-	/*
-	enum class RenderRTTIType
-	{
-		Enum,
-		Structure,
-		Number,
-		Array,
-	};
-
-	struct RenderEnumOptions
-	{
-		const char *m_name;
-	};
-
-	struct RenderRTTITypeBase
-	{
-		RenderRTTIType m_type;
-	};
-
-	struct RenderRTTIEnumType
-	{
-		RenderRTTITypeBase m_base;
-
-		const char *m_name;
-		size_t m_nameLength;
-
-		const RenderEnumOptions *m_fields;
-		unsigned int m_numFields;
-
-		unsigned int (*m_readValueFunc)(const void *valuePtr);
-		void (*m_writeValueFunc)(void *valuePtr, unsigned int value);
-	};
-
-	struct RenderRTTIStructField
-	{
-		const char *m_name;
-		RenderRTTIType *m_type;
-	};
-
-	struct RenderRTTIStructType
-	{
-		RenderRTTITypeBase m_base;
-
-		const char *m_name;
-
-		const RenderRTTIStructField *m_fields;
-		size_t m_numFields;
-	};
-
-	enum class RenderRTTINumberBitSize
-	{
-		BitSize1,
-
-		BitSize8,
-		BitSize16,
-		BitSize32,
-		BitSize64,
-	};
-
-	enum class RenderRTTINumberRepresentation
-	{
-		Float,
-		SignedInt,
-		UnsignedInt,
-	};
-
-	struct RenderRTTINumberType
-	{
-		RenderRTTITypeBase m_base;
-
-		RenderRTTINumberBitSize m_bitSize;
-		RenderRTTINumberRepresentation m_representation;
-
-		double (*m_readValueFloatFunc)(const void *valuePtr);
-		void (*m_writeValueFloatFunc)(void *valuePtr, double value);
-
-		uint64_t(*m_readValueUIntFunc)(const void *valuePtr);
-		void (*m_writeValueUIntFunc)(void *valuePtr, uint64_t value);
-
-		int64_t(*m_readValueSIntFunc)(const void *valuePtr);
-		void (*m_writeValueSIntFunc)(void *valuePtr, int64_t value);
-	};
-
-	struct IRenderDataHandler
-	{
-		virtual ~IRenderDataHandler() {}
-
-		virtual const RenderRTTITypeBase *GetStaticSamplerRTTI() const = 0;
-	};
-	*/
-
 
 	const RenderRTTIStructType *RenderDataHandler::GetSamplerDescRTTI() const
 	{
@@ -1009,9 +1097,9 @@ namespace rkit::data
 		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::PushConstantDesc>::GetRTTIType());
 	}
 
-	const RenderRTTIEnumType *RenderDataHandler::GetVertexInputSteppingRTTI() const
+	const RenderRTTIEnumType *RenderDataHandler::GetInputLayoutVertexInputSteppingRTTI() const
 	{
-		return reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::VertexInputStepping>::GetRTTIType());
+		return reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::InputLayoutVertexInputStepping>::GetRTTIType());
 	}
 
 	const RenderRTTIStructType *RenderDataHandler::GetDescriptorDescRTTI() const
@@ -1022,5 +1110,79 @@ namespace rkit::data
 	const RenderRTTIEnumType *RenderDataHandler::GetDescriptorTypeRTTI() const
 	{
 		return reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::DescriptorType>::GetRTTIType());
+	}
+
+	const RenderRTTIStructType *RenderDataHandler::GetGraphicsPipelineDescRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::GraphicsPipelineDesc>::GetRTTIType());
+	}
+
+	const RenderRTTIStructType *RenderDataHandler::GetRenderTargetDescRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::RenderTargetDesc>::GetRTTIType());
+	}
+
+	const RenderRTTIStructType *RenderDataHandler::GetShaderDescRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::ShaderDesc>::GetRTTIType());
+	}
+
+	const RenderRTTIStructType *RenderDataHandler::GetDepthStencilDescRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::DepthStencilDesc>::GetRTTIType());
+	}
+
+	const RenderRTTIEnumType *RenderDataHandler::GetNumericTypeRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::NumericType>::GetRTTIType());
+	}
+
+	const RenderRTTIObjectPtrType *RenderDataHandler::GetVectorNumericTypePtrRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIObjectPtrType *>(render_rtti::RTTIResolver<const render::VectorNumericType *>::GetRTTIType());
+	}
+
+	const RenderRTTIObjectPtrType *RenderDataHandler::GetCompoundNumericTypePtrRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIObjectPtrType *>(render_rtti::RTTIResolver<const render::CompoundNumericType *>::GetRTTIType());
+	}
+
+	const RenderRTTIObjectPtrType *RenderDataHandler::GetStructureTypePtrRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIObjectPtrType *>(render_rtti::RTTIResolver<const render::StructureType *>::GetRTTIType());
+	}
+
+#define LINK_INDEXABLE_LIST_TYPE(type)	\
+	case RenderRTTIIndexableStructType::type:\
+		if (outList)\
+		{\
+			RKIT_CHECK(New<render_rtti::RenderRTTIList<render::type>>(*outList));\
+		}\
+		if (outRTTI)\
+			*outRTTI = reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::type>::GetRTTIType());\
+		return ResultCode::kOK;
+
+	Result RenderDataHandler::ProcessIndexable(RenderRTTIIndexableStructType indexableStructType, UniquePtr<IRenderRTTIListBase> *outList, const RenderRTTIStructType **outRTTI) const
+	{
+		switch (indexableStructType)
+		{
+		LINK_INDEXABLE_LIST_TYPE(DepthStencilDesc)
+		LINK_INDEXABLE_LIST_TYPE(GraphicsPipelineDesc)
+		LINK_INDEXABLE_LIST_TYPE(RenderTargetDesc)
+		LINK_INDEXABLE_LIST_TYPE(PushConstantDesc)
+		LINK_INDEXABLE_LIST_TYPE(PushConstantListDesc)
+		LINK_INDEXABLE_LIST_TYPE(ShaderDesc)
+		LINK_INDEXABLE_LIST_TYPE(StructureType)
+		LINK_INDEXABLE_LIST_TYPE(StructureMemberDesc)
+		LINK_INDEXABLE_LIST_TYPE(InputLayoutDesc)
+		LINK_INDEXABLE_LIST_TYPE(DescriptorLayoutDesc)
+		LINK_INDEXABLE_LIST_TYPE(DescriptorDesc)
+		LINK_INDEXABLE_LIST_TYPE(InputLayoutVertexInputDesc)
+		LINK_INDEXABLE_LIST_TYPE(VectorNumericType)
+		LINK_INDEXABLE_LIST_TYPE(SamplerDesc)
+
+		default:
+			return ResultCode::kInternalError;
+		}
 	}
 }

@@ -8,6 +8,11 @@
 namespace rkit
 {
 	struct Result;
+
+	template<class T>
+	class UniquePtr;
+
+	struct IWriteStream;
 }
 
 namespace rkit::data
@@ -23,9 +28,6 @@ namespace rkit::data
 		ConfigStringIndex,
 		TempStringIndex,
 
-		// Object indexes
-		StaticSamplerIndex,
-
 		// Enums
 		Filter,
 		MipMapMode,
@@ -36,8 +38,18 @@ namespace rkit::data
 		VectorDimension,
 		NumericType,
 		StageVisibility,
-		VertexInputStepping,
 		DescriptorType,
+		IndexSize,
+		PrimitiveTopology,
+		FillMode,
+		CullMode,
+		ReadWriteAccess,
+		ColorBlendFactor,
+		AlphaBlendFactor,
+		BlendOp,
+		InputLayoutVertexInputStepping,
+		DepthStencilFormat,
+		StencilOp,
 
 		// Structs
 		SamplerDesc,
@@ -46,8 +58,43 @@ namespace rkit::data
 		StructureMemberDesc,
 		StructureType,
 		DescriptorDesc,
+		RenderTargetFormat,
+		RenderTargetDesc,
+		DescriptorLayoutDesc,
+		GraphicsPipelineDesc,
+		InputLayoutVertexInputDesc,
+		InputLayoutDesc,
+		VectorNumericType,
+		CompoundNumericType,
+		ShaderDesc,
+		DepthStencilDesc,
+		StencilOpDesc,
+		ContentKey,
 
 		Count,
+	};
+
+	enum class RenderRTTIIndexableStructType
+	{
+		DepthStencilDesc,
+		GraphicsPipelineDesc,
+		RenderTargetDesc,
+		PushConstantDesc,
+		PushConstantListDesc,
+		ShaderDesc,
+		StructureType,
+		StructureMemberDesc,
+		InputLayoutDesc,
+		DescriptorLayoutDesc,
+		DescriptorDesc,
+		InputLayoutVertexInputDesc,
+		VectorNumericType,
+		CompoundNumericType,
+		SamplerDesc,
+
+		Count,
+
+		NotIndexable,
 	};
 
 	enum class RenderRTTIType
@@ -55,10 +102,10 @@ namespace rkit::data
 		Enum,
 		Structure,
 		Number,
-		Array,
 		ValueType,
 		StringIndex,
 		ObjectPtr,
+		ObjectPtrSpan,
 	};
 
 	struct RenderRTTIEnumOption
@@ -97,7 +144,7 @@ namespace rkit::data
 		const RenderRTTIEnumOption *m_options;
 		size_t m_numOptions;
 
-		unsigned int m_maxValue;
+		unsigned int m_maxValueExclusive;
 
 		unsigned int (*m_readValueFunc)(const void *valuePtr);
 		void (*m_writeValueFunc)(void *valuePtr, unsigned int value);
@@ -119,6 +166,7 @@ namespace rkit::data
 		const RenderRTTITypeBase *(*m_getTypeFunc)();
 		bool m_isVisible;
 		bool m_isConfigurable;
+		bool m_isNullable;
 
 		void *(*m_getMemberPtrFunc)(void *ptr);
 	};
@@ -129,6 +177,8 @@ namespace rkit::data
 
 		const RenderRTTIStructField *m_fields;
 		size_t m_numFields;
+
+		RenderRTTIIndexableStructType m_indexableType;
 	};
 
 	struct RenderRTTIStringIndexType
@@ -144,9 +194,20 @@ namespace rkit::data
 	{
 		RenderRTTITypeBase m_base;
 
-		const RenderRTTITypeBase *(*m_getTypeFunc)();
+		const RenderRTTIStructType *(*m_getTypeFunc)();
 		void (*m_writeFunc)(void *ptrLoc, const void *value);
 		const void *(*m_readFunc)(const void *ptrLoc);
+	};
+
+	struct RenderRTTIObjectPtrSpanType
+	{
+		RenderRTTITypeBase m_base;
+
+		size_t m_ptrSize;
+
+		const RenderRTTIObjectPtrType *(*m_getPtrTypeFunc)();
+		void (*m_setFunc)(void *spanPtr, void *elements, size_t count);
+		void (*m_getFunc)(const void *spanPtr, void *&outElements, size_t &outCount);
 	};
 
 	enum class RenderRTTINumberBitSize
@@ -166,14 +227,9 @@ namespace rkit::data
 		UnsignedInt,
 	};
 
-	struct RenderRTTINumberType
+	struct RenderRTTINumberTypeIOFunctions
 	{
-		RenderRTTITypeBase m_base;
-
-		RenderRTTINumberBitSize m_bitSize;
-		RenderRTTINumberRepresentation m_representation;
-
-		double (*m_readValueFloatFunc)(const void *valuePtr);
+		double (*m_readFloatFunc)(const void *valuePtr);
 		void (*m_writeValueFloatFunc)(void *valuePtr, double value);
 
 		uint64_t(*m_readValueUIntFunc)(const void *valuePtr);
@@ -181,19 +237,38 @@ namespace rkit::data
 
 		int64_t(*m_readValueSIntFunc)(const void *valuePtr);
 		void (*m_writeValueSIntFunc)(void *valuePtr, int64_t value);
+	};
+
+	struct RenderRTTINumberType
+	{
+		RenderRTTITypeBase m_base;
+
+		RenderRTTINumberBitSize m_bitSize;
+		RenderRTTINumberRepresentation m_representation;
+
+		RenderRTTINumberTypeIOFunctions m_valueFunctions;
+		RenderRTTINumberTypeIOFunctions m_configurableFunctions;
 
 		uint8_t(*m_getConfigurableStateFunc)(const void *configurablePtr);
 
-		double (*m_readConfigurableValueFloatFunc)(const void *configurablePtr);
-		uint64_t (*m_readConfigurableValueUIntFunc)(const void *configurablePtr);
-		int64_t (*m_readConfigurableValueSIntFunc)(const void *configurablePtr);
 		const render::ConfigStringIndex_t &(*m_readConfigurableNameFunc)(const void *configurablePtr);
 
-		void (*m_writeConfigurableValueFloatFunc)(void *configurablePtr, double value);
-		void (*m_writeConfigurableValueUIntFunc)(void *configurablePtr, uint64_t value);
-		void (*m_writeConfigurableValueSIntFunc)(void *configurablePtr, int64_t value);
 		void (*m_writeConfigurableNameFunc)(void *configurablePtr, const render::ConfigStringIndex_t &str);
 		void (*m_writeConfigurableDefaultFunc)(void *configurablePtr);
+	};
+
+	class IRenderRTTIListBase
+	{
+	public:
+		virtual ~IRenderRTTIListBase() {}
+
+		virtual Result Resize(size_t count) = 0;
+		virtual size_t GetCount() const = 0;
+
+		virtual void *GetElementPtr(size_t index) = 0;
+		virtual const void *GetElementPtr(size_t index) const = 0;
+
+		virtual size_t GetElementSize() const = 0;
 	};
 
 	struct IRenderDataHandler
@@ -202,8 +277,18 @@ namespace rkit::data
 
 		virtual const RenderRTTIStructType *GetSamplerDescRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetPushConstantDescRTTI() const = 0;
-		virtual const RenderRTTIEnumType *GetVertexInputSteppingRTTI() const = 0;
+		virtual const RenderRTTIEnumType *GetInputLayoutVertexInputSteppingRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetDescriptorDescRTTI() const = 0;
 		virtual const RenderRTTIEnumType *GetDescriptorTypeRTTI() const = 0;
+		virtual const RenderRTTIStructType *GetGraphicsPipelineDescRTTI() const = 0;
+		virtual const RenderRTTIStructType *GetRenderTargetDescRTTI() const = 0;
+		virtual const RenderRTTIStructType *GetShaderDescRTTI() const = 0;
+		virtual const RenderRTTIStructType *GetDepthStencilDescRTTI() const = 0;
+		virtual const RenderRTTIEnumType *GetNumericTypeRTTI() const = 0;
+		virtual const RenderRTTIObjectPtrType *GetVectorNumericTypePtrRTTI() const = 0;
+		virtual const RenderRTTIObjectPtrType *GetCompoundNumericTypePtrRTTI() const = 0;
+		virtual const RenderRTTIObjectPtrType *GetStructureTypePtrRTTI() const = 0;
+
+		virtual Result ProcessIndexable(RenderRTTIIndexableStructType indexableStructType, UniquePtr<IRenderRTTIListBase> *outList, const RenderRTTIStructType **outRTTI) const = 0;
 	};
 }

@@ -25,7 +25,7 @@ namespace rkit
 	};
 
 	template<class T>
-	struct Hasher : public DefaultHasher<T, std::is_arithmetic<T>::value || std::is_enum<T>::value>
+	struct Hasher : public DefaultHasher<T, std::is_arithmetic<T>::value || std::is_enum<T>::value || std::is_pointer<T>::value>
 	{
 	};
 

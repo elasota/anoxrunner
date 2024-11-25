@@ -9,12 +9,17 @@ GraphicsPipeline GP_InterfaceSimple
 
 	InputLayout = IL_InterfaceSimple
 
-	VertexShaderOutput =
+	VertexShader =
 	{
+		Source = "ui.rkc"
+		EntryPoint = "VertexMain"
 	}
 
-	VertexShader = { Source = "ui.rkc", EntryPoint = "VertexMain" }
-	PixelShader = { Source = "ui.rkc", EntryPoint = "PixelMain" }
+	PixelShader =
+	{
+		Source = "ui.rkc"
+		EntryPoint = "PixelMain"
+	}
 
 	PrimitiveTopology = TriangleList
 
@@ -22,14 +27,14 @@ GraphicsPipeline GP_InterfaceSimple
 	{
 		Color =
 		{
-			ColorAccess = ReadWrite
+			Access = ReadWrite
 			Format = Config(CFG_RenderTargetFormat)
 			SrcBlend = One
-			DstBlend = ZeroMinusSrcAlpha
+			DstBlend = InvSrcAlpha
 		}
 	}
 
-	DepthTarget =
+	DepthStencil =
 	{
 		Format = Config(CFG_DepthStencilTargetFormat)
 		DepthCompareOp = Config(CFG_DepthCompareOp)

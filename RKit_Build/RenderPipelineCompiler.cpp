@@ -23,6 +23,8 @@ namespace rkit::buildsystem::rpc_interchange
 		PushConstants,
 		StructDef,
 		InputLayout,
+		GraphicsPipeline,
+		DescriptorLayout,
 	};
 
 	class Entity : public NoCopy
@@ -51,14 +53,14 @@ namespace rkit::buildsystem::rpc_interchange
 	public:
 		explicit PushConstantsEntity() {}
 
-		render::PushConstantsListDesc &GetDesc() { return m_desc; }
+		render::PushConstantListDesc &GetDesc() { return m_desc; }
 
 		Vector<const render::PushConstantDesc *> &GetPushConstantsVector() { return m_pushConstants; }
 
 		EntityType GetEntityType() const override { return EntityType::PushConstants; }
 
 	private:
-		render::PushConstantsListDesc m_desc;
+		render::PushConstantListDesc m_desc;
 		Vector<const render::PushConstantDesc *> m_pushConstants;
 	};
 
@@ -103,11 +105,196 @@ namespace rkit::buildsystem::rpc_interchange
 		render::DescriptorLayoutDesc &GetDesc() { return m_desc; }
 		Vector<const render::DescriptorDesc *> &GetDescriptorDescs() { return m_descriptorDescs; }
 
-		EntityType GetEntityType() const override { return EntityType::InputLayout; }
+		EntityType GetEntityType() const override { return EntityType::DescriptorLayout; }
 
 	private:
 		render::DescriptorLayoutDesc m_desc;
 		Vector<const render::DescriptorDesc *> m_descriptorDescs;
+	};
+
+	class GraphicsPipelineEntity final : public Entity
+	{
+	public:
+		explicit GraphicsPipelineEntity() {}
+
+		render::GraphicsPipelineDesc &GetDesc() { return m_desc; }
+		Vector<const render::DescriptorLayoutDesc *> &GetDescriptorLayouts() { return m_descriptorLayouts; }
+		Vector<const render::RenderTargetDesc *> &GetRenderTargets() { return m_renderTargets; }
+
+		EntityType GetEntityType() const override { return EntityType::GraphicsPipeline; }
+
+	private:
+		render::GraphicsPipelineDesc m_desc;
+		Vector<const render::DescriptorLayoutDesc *> m_descriptorLayouts;
+		Vector<const render::RenderTargetDesc *> m_renderTargets;
+	};
+}
+
+namespace rkit::buildsystem::rpc_package
+{
+	class PackageBuilder;
+
+	struct IPackageObjectWriter
+	{
+		virtual Result WriteObject(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTITypeBase *rtti, IWriteStream &stream) const = 0;
+	};
+
+	struct IStringResolver
+	{
+		virtual StringSliceView ResolveGlobalString(size_t index) const = 0;
+		virtual StringSliceView ResolveConfigKey(size_t index, data::RenderRTTIMainType &outMainType) const = 0;
+		virtual StringSliceView ResolveTempString(size_t index) const = 0;
+	};
+
+	class BinaryBlob
+	{
+	public:
+		BinaryBlob();
+		explicit BinaryBlob(Vector<uint8_t> &&blob);
+
+		bool operator==(const BinaryBlob &other) const;
+		bool operator!=(const BinaryBlob &other) const;
+
+		Span<const uint8_t> GetBytes() const;
+
+		Result Append(const void *data, size_t size);
+
+	private:
+		Vector<uint8_t> m_blob;
+	};
+
+	class BinaryBlobRef : public NoCopy
+	{
+	public:
+		BinaryBlobRef(BinaryBlobRef &&other);
+
+		explicit BinaryBlobRef(UniquePtr<BinaryBlob> &&blob);
+
+		Span<const uint8_t> GetBytes() const;
+		const BinaryBlob *GetBlob() const;
+
+		bool operator==(const BinaryBlobRef &other) const;
+		bool operator!=(const BinaryBlobRef &other) const;
+
+	private:
+		BinaryBlobRef() = delete;
+
+		UniquePtr<BinaryBlob> m_blob;
+	};
+
+	class BinaryBlobBuilder final : public IWriteStream
+	{
+	public:
+		BinaryBlobBuilder();
+
+		Result WritePartial(const void *data, size_t count, size_t &outCountWritten) override;
+
+		BinaryBlobRef Finish();
+
+	private:
+		UniquePtr<BinaryBlob> m_blob;
+	};
+
+	class IndexableObjectBlobCollection : public NoCopy
+	{
+	public:
+		IndexableObjectBlobCollection();
+
+		Result IndexObject(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTIStructType *rtti, bool cached, size_t &outIndex);
+
+		void ClearObjectAddressCache();
+
+	private:
+		Vector<const BinaryBlob*> m_blobs;
+		HashMap<BinaryBlobRef, size_t> m_blobToIndex;
+		HashMap<const void *, size_t> m_cachedObjectToBlob;
+	};
+
+	class PackageBuilder
+	{
+	public:
+		explicit PackageBuilder(const data::IRenderDataHandler *dataHandler, const IPackageObjectWriter *writer, bool writeTempStrings);
+
+		Result IndexObject(const void *obj, const data::RenderRTTIStructType *rtti, bool cached, size_t &outIndex);
+		Result IndexString(const StringSliceView &str, size_t &outIndex);
+		Result IndexConfigKey(size_t globalStringIndex, data::RenderRTTIMainType mainType, size_t &outIndex);
+
+		const IStringResolver *GetStringResolver() const;
+		const data::IRenderDataHandler *GetDataHandler() const;
+		const IPackageObjectWriter *GetWriter() const;
+		bool IsWritingTempStrings() const;
+
+		void BeginSource(const IStringResolver *resolver);
+
+	private:
+		struct ConfigKey
+		{
+			size_t m_globalStringIndex = 0;
+			data::RenderRTTIMainType m_mainType = data::RenderRTTIMainType::Invalid;
+		};
+
+		PackageBuilder() = delete;
+
+		static const size_t kNumIndexables = static_cast<size_t>(data::RenderRTTIIndexableStructType::Count);
+
+		IndexableObjectBlobCollection m_indexables[kNumIndexables];
+
+		const data::IRenderDataHandler *m_dataHandler;
+		const IPackageObjectWriter *m_writer;
+		const IStringResolver *m_resolver;
+		bool m_writeTempStrings;
+
+		HashMap<String, size_t> m_stringToIndex;
+
+		HashMap<size_t, size_t> m_stringIndexToConfigKeyIndex;
+		Vector<ConfigKey> m_configKeys;
+	};
+
+	class PackageObjectWriter final : public IPackageObjectWriter
+	{
+	public:
+		Result WriteObject(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTITypeBase *rtti, IWriteStream &stream) const override;
+
+	private:
+		static Result StaticWriteObject(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTITypeBase *rtti, bool isConfigurable, bool isNullable, IWriteStream &stream);
+		static Result WriteEnum(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTIEnumType *rtti, bool isConfigurable, IWriteStream &stream);
+		static Result WriteStructure(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTIStructType *rtti, IWriteStream &stream);
+		static Result WriteNumber(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTINumberType *rtti, bool isConfigurable, IWriteStream &stream);
+		static Result WriteValueType(PackageBuilder &pkgBuilder, const void *obj, IWriteStream &stream);
+		static Result WriteStringIndex(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTIStringIndexType *rtti, IWriteStream &stream);
+		static Result WriteObjectPtr(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTIObjectPtrType *rtti, bool isNullable, IWriteStream &stream);
+		static Result WriteObjectPtrSpan(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTIObjectPtrSpanType *rtti, bool isNullable, IWriteStream &stream);
+
+		static Result WriteConfigurationKey(PackageBuilder &pkgBuilder, const render::ConfigStringIndex_t &str, data::RenderRTTIMainType mainType, IWriteStream &stream);
+
+		static Result WriteUIntForSize(uint64_t ui, uint64_t max, IWriteStream &stream);
+		static Result WriteCompactIndex(size_t index, IWriteStream &stream);
+
+		static Result WriteUInt8(uint8_t ui, IWriteStream &stream);
+		static Result WriteUInt16(uint16_t ui, IWriteStream &stream);
+		static Result WriteUInt32(uint32_t ui, IWriteStream &stream);
+		static Result WriteUInt64(uint64_t ui, IWriteStream &stream);
+
+		static Result WriteSInt8(int8_t i, IWriteStream &stream);
+		static Result WriteSInt16(int16_t i, IWriteStream &stream);
+		static Result WriteSInt32(int32_t i, IWriteStream &stream);
+		static Result WriteSInt64(int64_t i, IWriteStream &stream);
+
+		static Result WriteFloat32(float f, IWriteStream &stream);
+		static Result WriteFloat64(double f, IWriteStream &stream);
+	};
+}
+
+namespace rkit
+{
+	template<>
+	struct Hasher<rkit::buildsystem::rpc_package::BinaryBlobRef>
+		: public DefaultSpanHasher<rkit::buildsystem::rpc_package::BinaryBlobRef>
+	{
+		static HashValue_t ComputeHash(HashValue_t baseHash, const rkit::buildsystem::rpc_package::BinaryBlobRef &blob)
+		{
+			return Hasher<uint8_t>::ComputeHash(baseHash, blob.GetBytes());
+		}
 	};
 }
 
@@ -215,9 +402,10 @@ namespace rkit::buildsystem::rpc_analyzer
 		Result ParseStructDef(const char *filePath, utils::ITextParser &parser, rpc_interchange::StructDefEntity &pc);
 		Result ParseInputLayout(const char *filePath, utils::ITextParser &parser, rpc_interchange::InputLayoutEntity &il);
 		Result ParseDescriptorLayout(const char *filePath, utils::ITextParser &parser, rpc_interchange::DescriptorLayoutEntity &dl);
+		Result ParseGraphicsPipeline(const char *filePath, utils::ITextParser &parser, rpc_interchange::GraphicsPipelineEntity &gp);
 
 		Result ResolveQuotedString(ShortTempToken &outToken, const Span<const char> &inToken);
-		Result ResolveInputLayoutVertexInputs(const char *filePath, size_t line, size_t col, render::TempStringIndex_t feedName, const Span<const char> &nameBase, Vector<const render::InputLayoutVertexInputDesc *> &descsVector, uint32_t &inOutOffset, render::ValueType inputSourcesType, uint32_t inputFeedSlot, render::VertexInputStepping stepping);
+		Result ResolveInputLayoutVertexInputs(const char *filePath, size_t line, size_t col, render::TempStringIndex_t feedName, const Span<const char> &nameBase, Vector<const render::InputLayoutVertexInputDesc *> &descsVector, uint32_t &inOutOffset, render::ValueType inputSourcesType, uint32_t inputFeedSlot, render::InputLayoutVertexInputStepping stepping);
 		static uint32_t ResolveNumericTypeSize(render::NumericType numericType, render::VectorDimension dimension);
 
 		Result ExpectIdentifier(const char *blamePath, Span<const char> &outToken, utils::ITextParser &parser);
@@ -229,6 +417,7 @@ namespace rkit::buildsystem::rpc_analyzer
 		Result ParseValueType(const char *blamePath, render::ValueType &valueType, const Span<const char> &token, utils::ITextParser &parser);
 		Result ParseConfigurable(const char *blamePath, void *obj, data::RenderRTTIMainType mainType, void (*writeNameFunc)(void *, const render::ConfigStringIndex_t &), utils::ITextParser &parser);
 		Result ParseUIntConstant(const char *blamePath, size_t blameLine, size_t blameCol, const Span<const char> &token, uint64_t max, uint64_t &outValue);
+		Result ParseStringIndex(const char *blamePath, const data::RenderRTTIStringIndexType *rtti, void *obj, utils::ITextParser &parser);
 
 		Result ParseStructMember(const char *blamePath, const Span<const char> &memberName, const data::RenderRTTIStructType *rtti, void *obj, utils::ITextParser &parser);
 
@@ -246,9 +435,13 @@ namespace rkit::buildsystem::rpc_analyzer
 		Result IndexString(const Span<const char> &span, render::GlobalStringIndex_t &outStringIndex);
 		Result IndexString(const Span<const char> &span, render::TempStringIndex_t &outStringIndex);
 
+		Result IndexString(const render::GlobalStringIndex_t &globalIndex, render::TempStringIndex_t &outStringIndex);
+
 		static DescriptorTypeClassification ClassifyDescriptorType(render::DescriptorType descType);
 
 		void RemoveTopStackItem();
+
+		Result ExportPackage(IDependencyNode *depsNode) const;
 
 		data::IDataDriver *m_dataDriver = nullptr;
 
@@ -269,6 +462,11 @@ namespace rkit::buildsystem::rpc_analyzer
 		Vector<UniquePtr<render::StructureMemberDesc>> m_smDescs;
 		Vector<UniquePtr<render::InputLayoutVertexInputDesc>> m_vertexInputDescs;
 		Vector<UniquePtr<render::DescriptorDesc>> m_dDescs;
+		Vector<UniquePtr<render::RenderTargetDesc>> m_rtDescs;
+		Vector<UniquePtr<render::ShaderDesc>> m_shaderDescs;
+		Vector<UniquePtr<render::DepthStencilDesc>> m_depthStencilDescs;
+
+		Vector<const render::GraphicsPipelineDesc *> m_graphicsPipelines;
 
 		Vector<SimpleNumericTypeResolution> m_numericTypeResolutions;
 
@@ -287,6 +485,447 @@ namespace rkit
 			return key.ComputeHash(baseHash);
 		}
 	};
+}
+
+
+namespace rkit::buildsystem::rpc_package
+{
+	BinaryBlob::BinaryBlob()
+	{
+	}
+
+	BinaryBlob::BinaryBlob(Vector<uint8_t> &&blob)
+		: m_blob(std::move(blob))
+	{
+	}
+
+	bool BinaryBlob::operator==(const BinaryBlob &other) const
+	{
+		if (m_blob.Count() == other.m_blob.Count())
+			return false;
+
+		if (m_blob.Count() == 0)
+			return true;
+
+		return !memcmp(&m_blob[0], &other.m_blob[0], m_blob.Count());
+	}
+
+	bool BinaryBlob::operator!=(const BinaryBlob &other) const
+	{
+		return !((*this) == other);
+	}
+
+	Span<const uint8_t> BinaryBlob::GetBytes() const
+	{
+		return m_blob.ToSpan();
+	}
+
+	Result BinaryBlob::Append(const void *data, size_t size)
+	{
+		return m_blob.Append(Span<const uint8_t>(static_cast<const uint8_t *>(data), size));
+	}
+
+	BinaryBlobRef::BinaryBlobRef(BinaryBlobRef &&other)
+		: m_blob(std::move(other.m_blob))
+	{
+	}
+
+	BinaryBlobRef::BinaryBlobRef(UniquePtr<BinaryBlob> &&blob)
+		: m_blob(std::move(blob))
+	{
+	}
+
+	Span<const uint8_t> BinaryBlobRef::GetBytes() const
+	{
+		const BinaryBlob *blob = m_blob.Get();
+		if (!blob)
+			return Span<const uint8_t>();
+
+		return blob->GetBytes();
+	}
+
+	const BinaryBlob *BinaryBlobRef::GetBlob() const
+	{
+		return m_blob.Get();
+	}
+
+	bool BinaryBlobRef::operator==(const BinaryBlobRef &other) const
+	{
+		return (*m_blob) == *other.m_blob;
+	}
+
+	bool BinaryBlobRef::operator!=(const BinaryBlobRef &other) const
+	{
+		return !((*this) == other);
+	}
+
+	BinaryBlobBuilder::BinaryBlobBuilder()
+	{
+	}
+
+	Result BinaryBlobBuilder::WritePartial(const void *data, size_t count, size_t &outCountWritten)
+	{
+		if (!m_blob.Get())
+		{
+			RKIT_CHECK(New<BinaryBlob>(m_blob));
+		}
+
+		RKIT_CHECK(m_blob->Append(data, count));
+
+		return ResultCode::kOK;
+	}
+
+	BinaryBlobRef BinaryBlobBuilder::Finish()
+	{
+		return BinaryBlobRef(std::move(m_blob));
+	}
+
+	IndexableObjectBlobCollection::IndexableObjectBlobCollection()
+	{
+	}
+
+	Result IndexableObjectBlobCollection::IndexObject(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTIStructType *rtti, bool cached, size_t &outIndex)
+	{
+		if (cached)
+		{
+			HashMap<const void *, size_t>::ConstIterator_t checkIt = m_cachedObjectToBlob.Find(obj);
+			if (checkIt != m_cachedObjectToBlob.end())
+			{
+				outIndex = checkIt.Value();
+				return ResultCode::kOK;
+			}
+		}
+
+		const IPackageObjectWriter *writer = pkgBuilder.GetWriter();
+
+		BinaryBlobBuilder blobBuilder;
+		RKIT_CHECK(writer->WriteObject(pkgBuilder, obj, &rtti->m_base, blobBuilder));
+
+		BinaryBlobRef finishedBlob = blobBuilder.Finish();
+
+		HashMap<BinaryBlobRef, size_t>::ConstIterator_t blobCheckIt = m_blobToIndex.Find(finishedBlob);
+		if (blobCheckIt != m_blobToIndex.end())
+		{
+			size_t index = blobCheckIt.Value();
+			RKIT_CHECK(m_cachedObjectToBlob.Set(obj, index));
+
+			outIndex = blobCheckIt.Value();
+			return ResultCode::kOK;
+		}
+
+		size_t newIndex = m_blobs.Count();
+
+		RKIT_CHECK(m_blobs.Append(finishedBlob.GetBlob()));
+
+		RKIT_CHECK(m_blobToIndex.Set(std::move(finishedBlob), newIndex));
+
+		if (cached)
+		{
+			RKIT_CHECK(m_cachedObjectToBlob.Set(obj, newIndex));
+		}
+
+		outIndex = newIndex;
+		return ResultCode::kOK;
+	}
+
+	void IndexableObjectBlobCollection::ClearObjectAddressCache()
+	{
+		m_cachedObjectToBlob.Clear();
+	}
+
+	PackageBuilder::PackageBuilder(const data::IRenderDataHandler *dataHandler, const IPackageObjectWriter *writer, bool writeTempStrings)
+		: m_dataHandler(dataHandler)
+		, m_writer(writer)
+		, m_resolver(nullptr)
+		, m_writeTempStrings(writeTempStrings)
+	{
+	}
+
+	Result PackageBuilder::IndexObject(const void *obj, const data::RenderRTTIStructType *rtti, bool cached, size_t &outIndex)
+	{
+		RKIT_ASSERT(static_cast<size_t>(rtti->m_indexableType) < kNumIndexables);
+
+		return m_indexables[static_cast<size_t>(rtti->m_indexableType)].IndexObject(*this, obj, rtti, cached, outIndex);
+	}
+
+	Result PackageBuilder::IndexString(const StringSliceView &str, size_t &outIndex)
+	{
+		HashMap<String, size_t>::ConstIterator_t it = m_stringToIndex.Find(str);
+		if (it != m_stringToIndex.end())
+		{
+			outIndex = it.Value();
+			return ResultCode::kOK;
+		}
+
+		String newStr;
+		RKIT_CHECK(newStr.Set(str));
+
+		size_t newIndex = m_stringToIndex.Count();
+		RKIT_CHECK(m_stringToIndex.Set(std::move(newStr), newIndex));
+
+		RKIT_ASSERT(m_stringToIndex.Count() == newIndex + 1);
+
+		return ResultCode::kOK;
+	}
+
+	Result IndexConfigKey(size_t globalStringIndex, data::RenderRTTIMainType mainType, size_t &outIndex);
+
+	const IStringResolver *PackageBuilder::GetStringResolver() const
+	{
+		return m_resolver;
+	}
+
+	const data::IRenderDataHandler *PackageBuilder::GetDataHandler() const
+	{
+		return m_dataHandler;
+	}
+
+	const IPackageObjectWriter *PackageBuilder::GetWriter() const
+	{
+		return m_writer;
+	}
+
+	bool PackageBuilder::IsWritingTempStrings() const
+	{
+		return m_writeTempStrings;
+	}
+
+	void PackageBuilder::BeginSource(const IStringResolver *resolver)
+	{
+		m_resolver = resolver;
+
+		for (IndexableObjectBlobCollection &blobCollection : m_indexables)
+			blobCollection.ClearObjectAddressCache();
+	}
+
+	Result PackageObjectWriter::WriteObject(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTITypeBase *rtti, IWriteStream &stream) const
+	{
+		return StaticWriteObject(pkgBuilder, obj, rtti, false, false, stream);
+	}
+
+	Result PackageObjectWriter::StaticWriteObject(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTITypeBase *rtti, bool isConfigurable, bool isNullable, IWriteStream &stream)
+	{
+		switch (rtti->m_type)
+		{
+		case data::RenderRTTIType::Enum:
+			return WriteEnum(pkgBuilder, obj, reinterpret_cast<const data::RenderRTTIEnumType *>(rtti), isConfigurable, stream);
+		case data::RenderRTTIType::Structure:
+			RKIT_ASSERT(!isConfigurable);
+			return WriteStructure(pkgBuilder, obj, reinterpret_cast<const data::RenderRTTIStructType *>(rtti), stream);
+		case data::RenderRTTIType::Number:
+			return WriteNumber(pkgBuilder, obj, reinterpret_cast<const data::RenderRTTINumberType *>(rtti), isConfigurable, stream);
+		case data::RenderRTTIType::ValueType:
+			RKIT_ASSERT(!isConfigurable);
+			return WriteValueType(pkgBuilder, obj, stream);
+		case data::RenderRTTIType::StringIndex:
+			RKIT_ASSERT(!isConfigurable);
+			return WriteStringIndex(pkgBuilder, obj, reinterpret_cast<const data::RenderRTTIStringIndexType *>(rtti), stream);
+		case data::RenderRTTIType::ObjectPtr:
+			RKIT_ASSERT(!isConfigurable);
+			return WriteObjectPtr(pkgBuilder, obj, reinterpret_cast<const data::RenderRTTIObjectPtrType *>(rtti), isNullable, stream);
+		case data::RenderRTTIType::ObjectPtrSpan:
+			RKIT_ASSERT(!isConfigurable);
+			return WriteObjectPtrSpan(pkgBuilder, obj, reinterpret_cast<const data::RenderRTTIObjectPtrSpanType *>(rtti), isNullable, stream);
+		default:
+			return ResultCode::kInternalError;
+		}
+	}
+
+	Result PackageObjectWriter::WriteEnum(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTIEnumType *rtti, bool isConfigurable, IWriteStream &stream)
+	{
+		if (isConfigurable)
+		{
+			uint8_t state = rtti->m_getConfigurableStateFunc(obj);
+
+			RKIT_CHECK(WriteUInt8(state, stream));
+
+			switch (state)
+			{
+			case static_cast<uint8_t>(render::ConfigurableValueState::Default):
+				return ResultCode::kOK;
+			case static_cast<uint8_t>(render::ConfigurableValueState::Configured):
+				return WriteConfigurationKey(pkgBuilder, rtti->m_readConfigurableNameFunc(obj), rtti->m_base.m_mainType, stream);
+			case static_cast<uint8_t>(render::ConfigurableValueState::Explicit):
+				return WriteUIntForSize(rtti->m_readConfigurableValueFunc(obj), rtti->m_maxValueExclusive - 1, stream);
+			default:
+				return ResultCode::kInternalError;
+			}
+		}
+		else
+			return WriteUIntForSize(rtti->m_readValueFunc(obj), rtti->m_maxValueExclusive - 1, stream);
+	}
+
+	Result PackageObjectWriter::WriteStructure(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTIStructType *rtti, IWriteStream &stream)
+	{
+		for (size_t i = 0; i < rtti->m_numFields; i++)
+		{
+			const data::RenderRTTIStructField *field = rtti->m_fields + i;
+
+			void *memberPtr = field->m_getMemberPtrFunc(const_cast<void *>(obj));
+			const data::RenderRTTITypeBase *fieldRTTI = field->m_getTypeFunc();
+
+			RKIT_CHECK(StaticWriteObject(pkgBuilder, memberPtr, fieldRTTI, field->m_isConfigurable, field->m_isNullable, stream));
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result PackageObjectWriter::WriteNumber(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTINumberType *rtti, bool isConfigurable, IWriteStream &stream)
+	{
+		const data::RenderRTTINumberTypeIOFunctions *ioFuncs = nullptr;
+
+		if (isConfigurable)
+		{
+			uint8_t state = rtti->m_getConfigurableStateFunc(obj);
+
+			RKIT_CHECK(WriteUInt8(state, stream));
+
+			switch (state)
+			{
+			case static_cast<uint8_t>(render::ConfigurableValueState::Default):
+				return ResultCode::kOK;
+			case static_cast<uint8_t>(render::ConfigurableValueState::Configured):
+				return WriteConfigurationKey(pkgBuilder, rtti->m_readConfigurableNameFunc(obj), rtti->m_base.m_mainType, stream);
+			case static_cast<uint8_t>(render::ConfigurableValueState::Explicit):
+				ioFuncs = &rtti->m_configurableFunctions;
+				break;
+			default:
+				return ResultCode::kInternalError;
+			}
+		}
+		else
+			ioFuncs = &rtti->m_valueFunctions;
+
+		switch (rtti->m_representation)
+		{
+		case data::RenderRTTINumberRepresentation::Float:
+		{
+			double value = ioFuncs->m_readFloatFunc(obj);
+			if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize32)
+				return WriteFloat32(static_cast<float>(value), stream);
+			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize64)
+				return WriteFloat64(value, stream);
+			else
+				return ResultCode::kInternalError;
+		}
+		break;
+		case data::RenderRTTINumberRepresentation::SignedInt:
+		{
+			int64_t value = ioFuncs->m_readValueSIntFunc(obj);
+			if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize1 || rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize8)
+				return WriteSInt8(static_cast<int8_t>(value), stream);
+			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize16)
+				return WriteSInt16(static_cast<int16_t>(value), stream);
+			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize32)
+				return WriteSInt32(static_cast<int32_t>(value), stream);
+			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize64)
+				return WriteSInt64(value, stream);
+			else
+				return ResultCode::kInternalError;
+		}
+		case data::RenderRTTINumberRepresentation::UnsignedInt:
+		{
+			uint64_t value = ioFuncs->m_readValueUIntFunc(obj);
+			if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize1 || rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize8)
+				return WriteUInt8(static_cast<uint8_t>(value), stream);
+			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize16)
+				return WriteUInt16(static_cast<uint16_t>(value), stream);
+			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize32)
+				return WriteUInt32(static_cast<uint32_t>(value), stream);
+			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize64)
+				return WriteUInt64(value, stream);
+			else
+				return ResultCode::kInternalError;
+		}
+		default:
+			return ResultCode::kInternalError;
+		}
+	}
+
+	Result PackageObjectWriter::WriteValueType(PackageBuilder &pkgBuilder, const void *obj, IWriteStream &stream)
+	{
+		const render::ValueType *valueType = static_cast<const render::ValueType *>(obj);
+
+		RKIT_CHECK(WriteUInt8(static_cast<uint8_t>(valueType->m_type), stream));
+
+		switch (valueType->m_type)
+		{
+		case render::ValueTypeType::Numeric:
+			return WriteEnum(pkgBuilder, &valueType->m_value.m_numericType, pkgBuilder.GetDataHandler()->GetNumericTypeRTTI(), false, stream);
+		case render::ValueTypeType::VectorNumeric:
+			return WriteObjectPtr(pkgBuilder, &valueType->m_value.m_vectorNumericType, pkgBuilder.GetDataHandler()->GetVectorNumericTypePtrRTTI(), false, stream);
+		case render::ValueTypeType::CompoundNumeric:
+			return WriteObjectPtr(pkgBuilder, &valueType->m_value.m_compoundNumericType, pkgBuilder.GetDataHandler()->GetCompoundNumericTypePtrRTTI(), false, stream);
+		case render::ValueTypeType::Structure:
+			return WriteObjectPtr(pkgBuilder, &valueType->m_value.m_structureType, pkgBuilder.GetDataHandler()->GetStructureTypePtrRTTI(), false, stream);
+		default:
+			return ResultCode::kInternalError;
+		}
+	}
+
+	Result PackageObjectWriter::WriteStringIndex(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTIStringIndexType *rtti, IWriteStream &stream)
+	{
+		int purpose = rtti->m_getPurposeFunc();
+
+		StringSliceView str;
+		size_t index = 0;
+		if (purpose == render::TempStringIndex_t::kPurpose)
+		{
+			if (!pkgBuilder.IsWritingTempStrings())
+				return ResultCode::kOK;
+
+			str = pkgBuilder.GetStringResolver()->ResolveTempString(rtti->m_readStringIndexFunc(obj));
+		}
+		else if (purpose == render::GlobalStringIndex_t::kPurpose)
+			str = pkgBuilder.GetStringResolver()->ResolveGlobalString(rtti->m_readStringIndexFunc(obj));
+		else
+			return ResultCode::kInternalError;
+
+		RKIT_CHECK(pkgBuilder.IndexString(str, index));
+		RKIT_CHECK(WriteCompactIndex(index, stream));
+
+		return ResultCode::kOK;
+	}
+
+	Result PackageObjectWriter::WriteObjectPtr(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTIObjectPtrType *rtti, bool isNullable, IWriteStream &stream)
+	{
+		size_t index = 0;
+		const void *objPtr = rtti->m_readFunc(obj);
+
+		if (objPtr == nullptr)
+		{
+			if (!isNullable)
+				return ResultCode::kInternalError;
+		}
+		else
+		{
+			RKIT_CHECK(pkgBuilder.IndexObject(objPtr, rtti->m_getTypeFunc(), true, index));
+
+			if (isNullable)
+				index++;
+		}
+
+		return WriteCompactIndex(index, stream);
+	}
+
+	Result PackageObjectWriter::WriteObjectPtrSpan(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTIObjectPtrSpanType *rtti, bool isNullable, IWriteStream &stream)
+	{
+		void *currentElement = nullptr;
+		size_t count = 0;
+		size_t ptrSize = rtti->m_ptrSize;
+		const data::RenderRTTIObjectPtrType *ptrType = rtti->m_getPtrTypeFunc();
+
+		rtti->m_getFunc(obj, currentElement, count);
+
+		for (size_t i = 0; i < count; i++)
+		{
+			RKIT_CHECK(WriteObjectPtr(pkgBuilder, currentElement, ptrType, isNullable, stream));
+
+			currentElement = static_cast<uint8_t *>(currentElement) + ptrSize;
+		}
+
+		return ResultCode::kOK;
+	}
 }
 
 namespace rkit::buildsystem::rpc_analyzer
@@ -415,7 +1054,7 @@ namespace rkit::buildsystem::rpc_analyzer
 			}
 		}
 
-		return ResultCode::kOK;
+		return ExportPackage(depsNode);
 	}
 
 	Result Analyzer::ScanTopStackItem(AnalyzerIncludeStack &item)
@@ -518,6 +1157,8 @@ namespace rkit::buildsystem::rpc_analyzer
 			parseResult = ParseEntity(path, parser, &Analyzer::ParseInputLayout);
 		else if (IsToken(directiveToken, "DescriptorLayout"))
 			parseResult = ParseEntity(path, parser, &Analyzer::ParseDescriptorLayout);
+		else if (IsToken(directiveToken, "GraphicsPipeline"))
+			parseResult = ParseEntity(path, parser, &Analyzer::ParseGraphicsPipeline);
 		else
 		{
 			rkit::log::ErrorFmt("%s [%zu:%zu] Invalid directive", path, line, col);
@@ -529,7 +1170,6 @@ namespace rkit::buildsystem::rpc_analyzer
 
 		return parseResult;
 	}
-
 
 	template<class T>
 	Result Analyzer::ParseEntity(const char *blamePath, utils::ITextParser &parser, Result(Analyzer:: *parseFunc)(const char *, utils::ITextParser &, T &))
@@ -630,7 +1270,6 @@ namespace rkit::buildsystem::rpc_analyzer
 
 		return ResultCode::kOK;
 	}
-
 
 	Result Analyzer::ParseStructDef(const char *blamePath, utils::ITextParser &parser, rpc_interchange::StructDefEntity &sd)
 	{
@@ -807,7 +1446,7 @@ namespace rkit::buildsystem::rpc_analyzer
 					bool haveInputFeed = 0;
 					uint32_t inputFeedSlot = 0;
 
-					render::VertexInputStepping stepping = render::VertexInputStepping::Vertex;
+					render::InputLayoutVertexInputStepping stepping = render::InputLayoutVertexInputStepping::Vertex;
 
 					size_t defStartLine = 0;
 					size_t defStartCol = 0;
@@ -857,7 +1496,7 @@ namespace rkit::buildsystem::rpc_analyzer
 						{
 							RKIT_CHECK(parser.ExpectToken("="));
 
-							const data::RenderRTTIEnumType *steppingRTTI = m_dataDriver->GetRenderDataHandler()->GetVertexInputSteppingRTTI();
+							const data::RenderRTTIEnumType *steppingRTTI = m_dataDriver->GetRenderDataHandler()->GetInputLayoutVertexInputSteppingRTTI();
 
 							RKIT_CHECK(ParseEnum(blamePath, steppingRTTI, &stepping, false, parser));
 						}
@@ -1120,6 +1759,178 @@ namespace rkit::buildsystem::rpc_analyzer
 		return ResultCode::kOK;
 	}
 
+	Result Analyzer::ParseGraphicsPipeline(const char *filePath, utils::ITextParser &parser, rpc_interchange::GraphicsPipelineEntity &gp)
+	{
+		RKIT_CHECK(parser.ExpectToken("{"));
+
+		const data::RenderRTTIStructType *pipelineRTTI = m_dataDriver->GetRenderDataHandler()->GetGraphicsPipelineDescRTTI();
+		const data::RenderRTTIStructType *shaderDescRTTI = m_dataDriver->GetRenderDataHandler()->GetShaderDescRTTI();
+		const data::RenderRTTIStructType *depthStencilDescRTTI = m_dataDriver->GetRenderDataHandler()->GetDepthStencilDescRTTI();
+
+		for (;;)
+		{
+			Span<const char> token;
+			RKIT_CHECK(parser.RequireToken(token));
+
+			size_t line = 0;
+			size_t col = 0;
+			parser.GetLocation(line, col);
+
+			if (IsToken(token, "}"))
+				break;
+
+			if (IsToken(token, "DescriptorLayouts"))
+			{
+				RKIT_CHECK(parser.ExpectToken("="));
+				RKIT_CHECK(parser.ExpectToken("{"));
+
+				for (;;)
+				{
+					parser.GetLocation(line, col);
+
+					RKIT_CHECK(parser.RequireToken(token));
+
+					if (IsToken(token, "}"))
+						break;
+
+					HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(StringSliceView(token));
+
+					if (it == m_entities.end())
+					{
+						rkit::log::ErrorFmt("%s [%zu:%zu] Couldn't resolve descriptor layout", filePath, line, col);
+						return ResultCode::kMalformedFile;
+					}
+
+					if (it.Value()->GetEntityType() != rpc_interchange::EntityType::DescriptorLayout)
+					{
+						rkit::log::ErrorFmt("%s [%zu:%zu] Value wasn't a descriptor layout", filePath, line, col);
+						return ResultCode::kMalformedFile;
+					}
+
+					RKIT_CHECK(gp.GetDescriptorLayouts().Append(&static_cast<rpc_interchange::DescriptorLayoutEntity *>(it.Value().Get())->GetDesc()));
+				}
+			}
+			else if (IsToken(token, "RenderTargets"))
+			{
+				RKIT_CHECK(parser.ExpectToken("="));
+				RKIT_CHECK(parser.ExpectToken("{"));
+
+				for (;;)
+				{
+					parser.GetLocation(line, col);
+
+					RKIT_CHECK(parser.RequireToken(token));
+
+					if (IsToken(token, "}"))
+						break;
+
+					RKIT_CHECK(CheckValidIdentifier(filePath, token, parser));
+
+					render::TempStringIndex_t rtName;
+					RKIT_CHECK(IndexString(token, rtName));
+
+					for (const render::RenderTargetDesc *rtDesc : gp.GetRenderTargets())
+					{
+						if (rtDesc->m_name == rtName)
+						{
+							rkit::log::ErrorFmt("%s [%zu:%zu] Render target with that name already exists", filePath, line, col);
+							return ResultCode::kMalformedFile;
+						}
+					}
+
+					UniquePtr<render::RenderTargetDesc> rtDesc;
+					RKIT_CHECK(New<render::RenderTargetDesc>(rtDesc));
+
+					RKIT_CHECK(parser.ExpectToken("="));
+
+					RKIT_CHECK(gp.GetRenderTargets().Append(rtDesc.Get()));
+
+					RKIT_CHECK(ParseStruct(filePath, m_dataDriver->GetRenderDataHandler()->GetRenderTargetDescRTTI(), rtDesc.Get(), parser));
+
+					rtDesc->m_name = rtName;
+					RKIT_CHECK(m_rtDescs.Append(std::move(rtDesc)));
+				}
+			}
+			else if (IsToken(token, "PushConstants"))
+			{
+				return ResultCode::kNotYetImplemented;
+			}
+			else if (IsToken(token, "VertexShaderOutput"))
+			{
+				return ResultCode::kNotYetImplemented;
+			}
+			else if (IsToken(token, "InputLayout"))
+			{
+				RKIT_CHECK(parser.ExpectToken("="));
+
+				parser.GetLocation(line, col);
+				RKIT_CHECK(parser.RequireToken(token));
+
+				HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(StringSliceView(token));
+				if (it == m_entities.end())
+				{
+					rkit::log::ErrorFmt("%s [%zu:%zu] Unknown type identifier", filePath, line, col);
+					return ResultCode::kMalformedFile;
+				}
+
+				if (it.Value()->GetEntityType() != rpc_interchange::EntityType::InputLayout)
+				{
+					rkit::log::ErrorFmt("%s [%zu:%zu] Value wasn't an input layout", filePath, line, col);
+					return ResultCode::kMalformedFile;
+				}
+
+				gp.GetDesc().m_inputLayout = &static_cast<rpc_interchange::InputLayoutEntity *>(it.Value().Get())->GetDesc();
+			}
+			else if (IsToken(token, "VertexShader") || IsToken(token, "PixelShader"))
+			{
+				bool isVS = IsToken(token, "VertexShader");
+				bool isPS = IsToken(token, "PixelShader");
+
+				RKIT_CHECK(parser.ExpectToken("="));
+
+				UniquePtr<render::ShaderDesc> shaderDesc;
+				RKIT_CHECK(New<render::ShaderDesc>(shaderDesc));
+
+				RKIT_CHECK(ParseStruct(filePath, shaderDescRTTI, shaderDesc.Get(), parser));
+
+				if (isVS)
+					gp.GetDesc().m_vertexShader = shaderDesc.Get();
+
+				if (isPS)
+					gp.GetDesc().m_pixelShader = shaderDesc.Get();
+
+				RKIT_CHECK(m_shaderDescs.Append(std::move(shaderDesc)));
+			}
+			else if (IsToken(token, "DepthStencil"))
+			{
+				bool isVS = IsToken(token, "VertexShader");
+				bool isPS = IsToken(token, "PixelShader");
+
+				RKIT_CHECK(parser.ExpectToken("="));
+
+				UniquePtr<render::DepthStencilDesc> depthStencil;
+				RKIT_CHECK(New<render::DepthStencilDesc>(depthStencil));
+
+				RKIT_CHECK(ParseStruct(filePath, depthStencilDescRTTI, depthStencil.Get(), parser));
+
+				gp.GetDesc().m_depthStencil = depthStencil.Get();
+
+				RKIT_CHECK(m_depthStencilDescs.Append(std::move(depthStencil)));
+			}
+			else
+			{
+				RKIT_CHECK(ParseStructMember(filePath, token, pipelineRTTI, &gp.GetDesc(), parser));
+			}
+		}
+
+		gp.GetDesc().m_descriptorLayouts = gp.GetDescriptorLayouts().ToSpan();
+		gp.GetDesc().m_renderTargets = gp.GetRenderTargets().ToSpan();
+
+		RKIT_CHECK(m_graphicsPipelines.Append(&gp.GetDesc()));
+
+		return ResultCode::kOK;
+	}
+
 	Result Analyzer::ParseIncludeDirective(const char *blamePath, utils::ITextParser &parser)
 	{
 		size_t line = 0;
@@ -1164,7 +1975,7 @@ namespace rkit::buildsystem::rpc_analyzer
 		return ResultCode::kOK;
 	}
 
-	Result Analyzer::ResolveInputLayoutVertexInputs(const char *blamePath, size_t line, size_t col, render::TempStringIndex_t feedName, const Span<const char> &nameBase, Vector<const render::InputLayoutVertexInputDesc *> &descsVector, uint32_t &inOutOffset, render::ValueType inputSourcesType, uint32_t inputFeedSlot, render::VertexInputStepping stepping)
+	Result Analyzer::ResolveInputLayoutVertexInputs(const char *blamePath, size_t line, size_t col, render::TempStringIndex_t feedName, const Span<const char> &nameBase, Vector<const render::InputLayoutVertexInputDesc *> &descsVector, uint32_t &inOutOffset, render::ValueType inputSourcesType, uint32_t inputFeedSlot, render::InputLayoutVertexInputStepping stepping)
 	{
 		switch (inputSourcesType.m_type)
 		{
@@ -1350,6 +2161,10 @@ namespace rkit::buildsystem::rpc_analyzer
 
 				return ParseValueType(blamePath, *static_cast<render::ValueType *>(obj), token, parser);
 			}
+			break;
+		case data::RenderRTTIType::StringIndex:
+			RKIT_ASSERT(!isConfigurable);
+			return ParseStringIndex(blamePath, reinterpret_cast<const data::RenderRTTIStringIndexType *>(rtti), obj, parser);
 		default:
 			return ResultCode::kInternalError;
 		}
@@ -1414,10 +2229,7 @@ namespace rkit::buildsystem::rpc_analyzer
 			}
 		}
 
-		String nameStr;
-		RKIT_CHECK(nameStr.Set(token));
-
-		HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(nameStr);
+		HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(StringSliceView(token));
 		if (it == m_entities.end())
 		{
 			size_t line = 0;
@@ -1550,6 +2362,52 @@ namespace rkit::buildsystem::rpc_analyzer
 		}
 
 		outValue = result;
+
+		return ResultCode::kOK;
+	}
+
+	Result Analyzer::ParseStringIndex(const char *blamePath, const data::RenderRTTIStringIndexType *rtti, void *obj, utils::ITextParser &parser)
+	{
+		size_t line = 0;
+		size_t col = 0;
+
+		parser.GetLocation(line, col);
+
+		Span<const char> token;
+		RKIT_CHECK(parser.RequireToken(token));
+
+		if (token.Count() == 0 || token[0] != '\"')
+		{
+			rkit::log::ErrorFmt("%s [%zu:%zu] Expected string constant", blamePath, line, col);
+			return ResultCode::kMalformedFile;
+		}
+
+		rkit::IUtilitiesDriver *utils = GetDrivers().m_utilitiesDriver;
+
+		Vector<char> escapedStr;
+		RKIT_CHECK(escapedStr.Append(token));
+
+		size_t newLength = 0;
+		RKIT_CHECK(utils->EscapeCStringInPlace(escapedStr.ToSpan(), newLength));
+
+		RKIT_CHECK(escapedStr.Resize(newLength));
+
+		render::GlobalStringIndex_t globalIndex;
+		RKIT_CHECK(IndexString(escapedStr.ToSpan(), globalIndex));
+
+		int purpose = rtti->m_getPurposeFunc();
+
+		if (purpose == render::GlobalStringIndex_t::kPurpose)
+			rtti->m_writeStringIndexFunc(obj, globalIndex.GetIndex());
+		else if (purpose == render::TempStringIndex_t::kPurpose)
+		{
+			render::TempStringIndex_t tempIndex;
+			RKIT_CHECK(IndexString(globalIndex, tempIndex));
+
+			rtti->m_writeStringIndexFunc(obj, tempIndex.GetIndex());
+		}
+		else
+			return ResultCode::kInternalError;
 
 		return ResultCode::kOK;
 	}
@@ -1764,6 +2622,27 @@ namespace rkit::buildsystem::rpc_analyzer
 		m_includeStack.RemoveRange(m_includeStack.Count() - 1, 1);
 	}
 
+	Result Analyzer::ExportPackage(IDependencyNode *depsNode) const
+	{
+		data::IRenderDataHandler *dataHandler = m_dataDriver->GetRenderDataHandler();
+
+		rpc_package::PackageObjectWriter writer;
+
+		rpc_package::PackageBuilder pkgBuilder(dataHandler, &writer, true);
+
+		const data::RenderRTTIStructType *pipelineType = dataHandler->GetGraphicsPipelineDescRTTI();
+
+		RKIT_ASSERT(pipelineType->m_indexableType == data::RenderRTTIIndexableStructType::GraphicsPipelineDesc);
+
+		for (const render::GraphicsPipelineDesc *graphicsPipeline : m_graphicsPipelines)
+		{
+			size_t index = 0;
+			RKIT_CHECK(pkgBuilder.IndexObject(graphicsPipeline, pipelineType, true, index));
+		}
+
+		return ResultCode::kNotYetImplemented;
+	}
+
 	Result Analyzer::IndexString(const Span<const char> &span, render::GlobalStringIndex_t &outStringIndex)
 	{
 		String str;
@@ -1783,7 +2662,12 @@ namespace rkit::buildsystem::rpc_analyzer
 
 		RKIT_CHECK(IndexString(span, gsi));
 
-		HashMap<render::GlobalStringIndex_t, render::TempStringIndex_t>::ConstIterator_t it = m_globalStringToTempString.Find(gsi);
+		return IndexString(gsi, outStringIndex);
+	}
+
+	Result Analyzer::IndexString(const render::GlobalStringIndex_t &globalIndex, render::TempStringIndex_t &outStringIndex)
+	{
+		HashMap<render::GlobalStringIndex_t, render::TempStringIndex_t>::ConstIterator_t it = m_globalStringToTempString.Find(globalIndex);
 
 		if (it != m_globalStringToTempString.end())
 		{
@@ -1792,8 +2676,8 @@ namespace rkit::buildsystem::rpc_analyzer
 		}
 
 		render::TempStringIndex_t tsi(m_tempStrings.Count());
-		RKIT_CHECK(m_tempStrings.Append(gsi));
-		RKIT_CHECK(m_globalStringToTempString.Set(gsi, tsi));
+		RKIT_CHECK(m_tempStrings.Append(globalIndex));
+		RKIT_CHECK(m_globalStringToTempString.Set(globalIndex, tsi));
 
 		outStringIndex = tsi;
 

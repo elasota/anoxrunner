@@ -161,6 +161,8 @@ namespace rkit
 
 		void Clear();
 
+		size_t Count() const;
+
 		HashTableBase &operator=(HashTableBase<TKey, TValue, TSize> &&other);
 
 	protected:
@@ -557,6 +559,12 @@ void rkit::HashTableBase<TKey, TValue, TSize>::Clear()
 	m_capacity = 0;
 	m_count = 0;
 	m_freePosScan = 0;
+}
+
+template<class TKey, class TValue, class TSize>
+size_t rkit::HashTableBase<TKey, TValue, TSize>::Count() const
+{
+	return m_count;
 }
 
 template<class TKey, class TValue, class TSize>
@@ -1030,7 +1038,6 @@ rkit::HashMapConstIterator<TKey, TValue, TSize> rkit::HashMap<TKey, TValue, TSiz
 
 	return end();
 }
-
 
 template<class TTarget, class TOriginal>
 rkit::Result rkit::DefaultElementConstructor<TTarget, TOriginal>::Construct(void *memory, TOriginal &&original)

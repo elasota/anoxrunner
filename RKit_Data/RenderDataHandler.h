@@ -10,8 +10,18 @@ namespace rkit::data
 	public:
 		const RenderRTTIStructType *GetSamplerDescRTTI() const override;
 		const RenderRTTIStructType *GetPushConstantDescRTTI() const override;
-		const RenderRTTIEnumType *GetVertexInputSteppingRTTI() const override;
+		const RenderRTTIEnumType *GetInputLayoutVertexInputSteppingRTTI() const override;
 		const RenderRTTIStructType *GetDescriptorDescRTTI() const override;
 		const RenderRTTIEnumType *GetDescriptorTypeRTTI() const override;
+		const RenderRTTIStructType *GetGraphicsPipelineDescRTTI() const override;
+		const RenderRTTIStructType *GetRenderTargetDescRTTI() const override;
+		const RenderRTTIStructType *GetShaderDescRTTI() const override;
+		const RenderRTTIStructType *GetDepthStencilDescRTTI() const override;
+		const RenderRTTIEnumType *GetNumericTypeRTTI() const override;
+		const RenderRTTIObjectPtrType *GetVectorNumericTypePtrRTTI() const override;
+		const RenderRTTIObjectPtrType *GetCompoundNumericTypePtrRTTI() const override;
+		const RenderRTTIObjectPtrType *GetStructureTypePtrRTTI() const override;
+
+		virtual Result ProcessIndexable(RenderRTTIIndexableStructType indexableStructType, UniquePtr<IRenderRTTIListBase> *outList, const RenderRTTIStructType **outRTTI) const override;
 	};
 }
