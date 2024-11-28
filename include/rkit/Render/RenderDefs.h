@@ -677,6 +677,10 @@ namespace rkit::render
 		FillMode m_fillMode = FillMode::Solid;
 		CullMode m_cullMode = CullMode::Back;
 	};
+
+	struct Package
+	{
+	};
 }
 
 

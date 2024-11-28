@@ -2,6 +2,7 @@
 
 #include "rkit/Render/RenderDefs.h"
 
+#include "rkit/Core/FourCC.h"
 #include "rkit/Core/Vector.h"
 
 namespace rkit::data
@@ -124,6 +125,8 @@ namespace rkit::data
 	},
 
 #define RTTI_STRUCT_FIELD(name)	RTTI_STRUCT_FIELD_WITH_VISIBILITY_AND_NULLABILITY(name, true, false)
+
+#define RTTI_STRUCT_FIELD_INVISIBLE_NULLABLE(name)	RTTI_STRUCT_FIELD_WITH_VISIBILITY_AND_NULLABILITY(name, false, true)
 
 #define RTTI_STRUCT_FIELD_INVISIBLE(name)	RTTI_STRUCT_FIELD_WITH_VISIBILITY_AND_NULLABILITY(name, false, false)
 
@@ -554,11 +557,11 @@ namespace rkit::data
 				*static_cast<Span<const T *> *>(spanPtr) = Span<const T *>(static_cast<const T **>(elements), count);
 			}
 
-			static const void *Get(const void *spanPtr, void *&outElements, size_t &outCount)
+			static void Get(const void *spanPtr, void *&outElements, size_t &outCount)
 			{
 				static_assert(RTTIResolver<T>::kIsIndexable);
 
-				const Span<const T *> *span = static_cast<const Span<const T *>>(spanPtr);
+				const Span<const T *> *span = static_cast<const Span<const T *>*>(spanPtr);
 
 				outElements = span->Ptr();
 				outCount = span->Count();
@@ -643,7 +646,7 @@ namespace rkit::data
 		};
 
 		template<class T>
-		struct RTTIResolver<Span<const T *>> : public RTTIAutoObjectPtr<T>
+		struct RTTIResolver<Span<const T *>> : public RTTIAutoObjectPtrSpan<T>
 		{
 		};
 
@@ -971,12 +974,12 @@ namespace rkit::data
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(GraphicsPipelineDesc)
-			RTTI_STRUCT_FIELD_INVISIBLE(pushConstants)
+			RTTI_STRUCT_FIELD_INVISIBLE_NULLABLE(pushConstants)
 
 			RTTI_STRUCT_FIELD_INVISIBLE(descriptorLayouts)
 
 			RTTI_STRUCT_FIELD_INVISIBLE(inputLayout)
-			RTTI_STRUCT_FIELD_INVISIBLE(vertexShaderOutput)
+			RTTI_STRUCT_FIELD_INVISIBLE_NULLABLE(vertexShaderOutput)
 
 			RTTI_STRUCT_FIELD_INVISIBLE(vertexShader)
 			RTTI_STRUCT_FIELD_INVISIBLE(pixelShader)
@@ -1150,6 +1153,21 @@ namespace rkit::data
 	const RenderRTTIObjectPtrType *RenderDataHandler::GetStructureTypePtrRTTI() const
 	{
 		return reinterpret_cast<const RenderRTTIObjectPtrType *>(render_rtti::RTTIResolver<const render::StructureType *>::GetRTTIType());
+	}
+
+	uint32_t RenderDataHandler::GetPackageVersion() const
+	{
+		return 1;
+	}
+
+	uint32_t RenderDataHandler::GetPackageIdentifier() const
+	{
+		return RKIT_FOURCC('R', 'P', 'K', 'G');
+	}
+
+	Result RenderDataHandler::LoadPackage(IReadStream &stream, bool allowTempStrings, UniquePtr<IRenderDataPackage> &outPackage) const
+	{
+		return ResultCode::kNotYetImplemented;
 	}
 
 #define LINK_INDEXABLE_LIST_TYPE(type)	\

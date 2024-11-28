@@ -16,7 +16,7 @@ StaticSampler SS_MipMapped
 	MinFilter = Linear
 	MagFilter = Linear
 	MipMapMode = Linear
-	Anisotropy = Config(Anisotropy)
+	Anisotropy = Config(CFG_Anisotropy)
 }
 
 PushConstants PC_WorldSurface

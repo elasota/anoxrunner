@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "rkit/Render/RenderDefProtos.h"
+#include "rkit/Core/Vector.h"
 
 namespace rkit
 {
@@ -19,8 +20,6 @@ namespace rkit::data
 {
 	enum class RenderRTTIMainType
 	{
-		Invalid,
-
 		ValueType,
 
 		// String indexes
@@ -72,6 +71,8 @@ namespace rkit::data
 		ContentKey,
 
 		Count,
+
+		Invalid,
 	};
 
 	enum class RenderRTTIIndexableStructType
@@ -271,6 +272,23 @@ namespace rkit::data
 		virtual size_t GetElementSize() const = 0;
 	};
 
+	struct IRenderDataPackage
+	{
+		struct ConfigKey
+		{
+			size_t m_stringIndex = 0;
+			RenderRTTIMainType m_mainType = RenderRTTIMainType::Invalid;
+		};
+
+		static const size_t kNumIndexables = static_cast<size_t>(RenderRTTIIndexableStructType::Count);
+
+		virtual ~IRenderDataPackage() {}
+
+		virtual IRenderRTTIListBase *GetIndexable(RenderRTTIIndexableStructType indexable) const = 0;
+		virtual ConfigKey &GetConfigKey(size_t index) const = 0;
+		virtual StringView GetString(size_t stringIndex) const = 0;
+	};
+
 	struct IRenderDataHandler
 	{
 		virtual ~IRenderDataHandler() {}
@@ -290,5 +308,10 @@ namespace rkit::data
 		virtual const RenderRTTIObjectPtrType *GetStructureTypePtrRTTI() const = 0;
 
 		virtual Result ProcessIndexable(RenderRTTIIndexableStructType indexableStructType, UniquePtr<IRenderRTTIListBase> *outList, const RenderRTTIStructType **outRTTI) const = 0;
+
+		virtual uint32_t GetPackageVersion() const = 0;
+		virtual uint32_t GetPackageIdentifier() const = 0;
+
+		virtual Result LoadPackage(IReadStream &stream, bool allowTempStrings, UniquePtr<IRenderDataPackage> &outPackage) const = 0;
 	};
 }

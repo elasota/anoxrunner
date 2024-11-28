@@ -17,7 +17,7 @@ namespace rkit
 		StringPoolBuilder();
 
 		Result IndexString(const StringView &str, size_t &outIndex);
-		const StringView GetStringByIndex(size_t index);
+		const StringView GetStringByIndex(size_t index) const;
 
 	private:
 		Vector<UniquePtr<String>> m_strings;
@@ -64,7 +64,7 @@ inline rkit::Result rkit::StringPoolBuilder::IndexString(const StringView &str, 
 	return ResultCode::kOK;
 }
 
-const rkit::StringView rkit::StringPoolBuilder::GetStringByIndex(size_t index)
+const rkit::StringView rkit::StringPoolBuilder::GetStringByIndex(size_t index) const
 {
 	return *m_strings[index];
 }

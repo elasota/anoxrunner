@@ -106,30 +106,48 @@ namespace anox::utils
 	{
 		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
 
+		rkit::String tempPath;
+		rkit::StringView path = identifier;
+		rkit::FileLocation fileLocation = rkit::FileLocation::kGameDirectory;
+
 		if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kSourceDir)
 		{
-			// Try to import file from the root directory
-			rkit::FileAttributes attribs;
-			bool exists = false;
+			path = identifier;
+			fileLocation = rkit::FileLocation::kDataSourceDirectory;
+		}
+		else if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kIntermediateDir)
+		{
+			RKIT_CHECK(tempPath.Set(m_intermedDir));
+			RKIT_CHECK(tempPath.Append(sysDriver->GetPathSeparator()));
+			RKIT_CHECK(tempPath.Append(identifier));
 
-			RKIT_CHECK(sysDriver->GetFileAttributes(rkit::FileLocation::kDataSourceDirectory, identifier.GetChars(), exists, attribs));
+			path = tempPath;
+			fileLocation = rkit::FileLocation::kAbsolute;
+		}
+		else
+			return rkit::ResultCode::kNotYetImplemented;
 
-			if (exists)
-			{
-				if (attribs.m_isDirectory)
-					return rkit::ResultCode::kOK;
+		// Try to import file from the root directory
+		rkit::FileAttributes attribs;
+		bool exists = false;
 
-				rkit::buildsystem::FileStatusView fsView;
-				fsView.m_filePath = identifier;
-				fsView.m_fileSize = attribs.m_fileSize;
-				fsView.m_fileTime = attribs.m_fileTime;
-				fsView.m_location = inputFileLocation;
+		RKIT_CHECK(sysDriver->GetFileAttributes(fileLocation, path.GetChars(), exists, attribs));
 
-				return applyStatus(userdata, fsView);
-			}
+		if (exists)
+		{
+			if (attribs.m_isDirectory)
+				return rkit::ResultCode::kOK;
+
+			rkit::buildsystem::FileStatusView fsView;
+			fsView.m_filePath = identifier;
+			fsView.m_fileSize = attribs.m_fileSize;
+			fsView.m_fileTime = attribs.m_fileTime;
+			fsView.m_location = inputFileLocation;
+
+			return applyStatus(userdata, fsView);
 		}
 
-		return rkit::ResultCode::kNotYetImplemented;
+		return rkit::ResultCode::kOK;
 	}
 
 

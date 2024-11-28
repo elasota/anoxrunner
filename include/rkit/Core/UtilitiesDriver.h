@@ -5,6 +5,8 @@
 
 #include "rkit/Utilities/TextParserProtos.h"
 
+#include <stdarg.h>
+
 namespace rkit
 {
 	namespace utils
@@ -37,6 +39,8 @@ namespace rkit
 
 	struct IUtilitiesDriver
 	{
+		typedef Result(*AllocateDynamicStringCallback_t)(void *userdata, size_t numChars, void *&outBuffer);
+
 		virtual ~IUtilitiesDriver() {}
 
 		virtual Result CreateJsonDocument(UniquePtr<utils::IJsonDocument> &outDocument, IMallocDriver *alloc, IReadStream *readStream) const = 0;
@@ -61,5 +65,7 @@ namespace rkit
 		virtual Result EscapeCStringInPlace(const Span<char> &chars, size_t &outNewLength) const = 0;
 
 		virtual const utils::ISha256Calculator *GetSha256Calculator() const = 0;
+
+		virtual Result VFormatString(char *buffer, size_t bufferSize, void *oversizedUserdata, AllocateDynamicStringCallback_t oversizedCallback, size_t &outLength, const char *fmt, va_list list) const = 0;
 	};
 }

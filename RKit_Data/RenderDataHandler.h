@@ -22,6 +22,11 @@ namespace rkit::data
 		const RenderRTTIObjectPtrType *GetCompoundNumericTypePtrRTTI() const override;
 		const RenderRTTIObjectPtrType *GetStructureTypePtrRTTI() const override;
 
-		virtual Result ProcessIndexable(RenderRTTIIndexableStructType indexableStructType, UniquePtr<IRenderRTTIListBase> *outList, const RenderRTTIStructType **outRTTI) const override;
+		Result ProcessIndexable(RenderRTTIIndexableStructType indexableStructType, UniquePtr<IRenderRTTIListBase> *outList, const RenderRTTIStructType **outRTTI) const override;
+
+		uint32_t GetPackageVersion() const override;
+		uint32_t GetPackageIdentifier() const override;
+
+		Result LoadPackage(IReadStream &stream, bool allowTempStrings, UniquePtr<IRenderDataPackage> &outPackage) const override;
 	};
 }

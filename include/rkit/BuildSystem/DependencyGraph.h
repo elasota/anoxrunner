@@ -129,10 +129,12 @@ namespace rkit
 
 			virtual Result CheckInputExists(BuildFileLocation location, const StringView &path, bool &outExists) = 0;
 			virtual Result TryOpenInput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &inputFile) = 0;
-			virtual Result TryOpenOutput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outputFile) = 0;
+			virtual Result OpenOutput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outputFile) = 0;
 
 			virtual Result AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) = 0;
 			virtual bool FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const = 0;
+
+			virtual Result CheckFault() const = 0;
 		};
 
 		struct IDependencyNodeCompiler

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -138,13 +138,14 @@
     <ClInclude Include="..\include\rkit\BuildSystem\DependencyGraph.h" />
     <ClInclude Include="BuildSystemInstance.h" />
     <ClInclude Include="DepsNodeCompiler.h" />
-    <ClInclude Include="RenderPipelineCompiler.h" />
+    <ClInclude Include="RenderPipelineLibraryCompiler.h" />
+    <ClInclude Include="RenderShaderCompiler.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BuildSystem.cpp" />
     <ClCompile Include="BuildSystemInstance.cpp" />
     <ClCompile Include="DepsNodeCompiler.cpp" />
-    <ClCompile Include="RenderPipelineCompiler.cpp" />
+    <ClCompile Include="RenderPipelineLibraryCompiler.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

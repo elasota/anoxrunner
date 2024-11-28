@@ -1,7 +1,7 @@
 #include "BuildSystemInstance.h"
 
 #include "DepsNodeCompiler.h"
-#include "RenderPipelineCompiler.h"
+#include "RenderPipelineLibraryCompiler.h"
 
 #include "rkit/BuildSystem/DependencyGraph.h"
 
@@ -212,13 +212,17 @@ namespace rkit::buildsystem
 		CallbackSpan<FileDependencyInfoView, const IDependencyNode *> GetCompileFileDependencies() const override;
 		CallbackSpan<NodeDependencyInfo, const IDependencyNode *> GetNodeDependencies() const override;
 
-		Result AddProduct(const FileStatusView &fileInfo);
+		Result FindOrAddAnalysisProduct(BuildFileLocation location, const StringView &path, size_t &outIndex);
+		Result FindOrAddCompileProduct(BuildFileLocation location, const StringView &path, size_t &outIndex);
+
 		Result AddAnalysisFileDependency(const FileDependencyInfoView &fileInfo);
 		Result AddCompileFileDependency(const FileDependencyInfoView &fileInfo);
 		Result AddNodeDependency(const NodeDependencyInfo &nodeInfo);
 
 		Result Serialize(IWriteStream *stream) const override;
 		Result Deserialize(IReadStream *stream) override;
+
+		Result MarkProductFinished(bool isCompilePhase, size_t productIndex, const FileStatusView &fstatus);
 
 	private:
 		DependencyNode() = delete;
@@ -235,15 +239,49 @@ namespace rkit::buildsystem
 
 			Result CheckInputExists(BuildFileLocation location, const StringView &path, bool &outExists) override;
 			Result TryOpenInput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &inputFile) override;
-			Result TryOpenOutput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outputFile) override;
+			Result OpenOutput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outputFile) override;
 
 			Result AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) override;
 			bool FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const override;
 
+			void MarkOutputFileFinished(size_t productIndex, BuildFileLocation location, const StringView &path);
+
+			Result CheckFault() const;
+
 		private:
+			Result CheckedMarkOutputFileFinished(size_t productIndex, BuildFileLocation location, const StringView &path);
+
 			BuildSystemInstance *m_buildInstance;
+			IBuildFileSystem *m_fs;
 			DependencyNode *m_dependencyNode;
 			bool m_isCompilePhase;
+
+			Result m_fault;
+		};
+
+		class FeedbackWrapperStream final : public ISeekableReadWriteStream
+		{
+		public:
+			FeedbackWrapperStream(DependencyNodeCompilerFeedback &feedback, size_t productIndex, BuildFileLocation location, String &&path, UniquePtr<ISeekableReadWriteStream> &&stream);
+			~FeedbackWrapperStream();
+
+			Result ReadPartial(void *data, size_t count, size_t &outCountRead) override;
+			Result WritePartial(const void *data, size_t count, size_t &outCountWritten) override;
+
+			Result SeekStart(FilePos_t pos) override;
+			Result SeekCurrent(FileOffset_t pos) override;
+			Result SeekEnd(FileOffset_t pos) override;
+
+			FilePos_t Tell() const override;
+			FilePos_t GetSize() const override;
+
+		private:
+			DependencyNodeCompilerFeedback &m_feedback;
+
+			size_t m_productIndex;
+			BuildFileLocation m_location;
+			String m_path;
+			UniquePtr<ISeekableReadWriteStream> m_stream;
 		};
 
 		static FileStatusView GetAnalysisProductByIndex(const IDependencyNode *const& node, size_t index);
@@ -252,6 +290,7 @@ namespace rkit::buildsystem
 		static FileDependencyInfoView GetCompileFileDependencyByIndex(const IDependencyNode *const &node, size_t index);
 		static NodeDependencyInfo GetNodeDependencyByIndex(const IDependencyNode *const & node, size_t index);
 
+		static Result FindOrAddProduct(Vector<FileStatus> &products, BuildFileLocation location, const StringView &path, size_t &outIndex);
 		static Result AddFileDependency(Vector<FileDependencyInfo> &fileDependencies, const FileDependencyInfoView &fileInfo);
 
 		Vector<FileStatus> m_analysisProducts;
@@ -290,9 +329,10 @@ namespace rkit::buildsystem
 		Result CreateNode(uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation buildFileLocation, const StringView &identifier, UniquePtr<IDependencyNode> &outNode) const override;
 		Result RegisterNodeCompiler(uint32_t nodeNamespace, uint32_t nodeType, UniquePtr<IDependencyNodeCompiler> &&compiler) override;
 
-		Result ResolveFileStatus(BuildFileLocation location, const StringView &path, FileStatusView &outStatusView, bool &outExists);
+		Result ResolveFileStatus(BuildFileLocation location, const StringView &path, FileStatusView &outStatusView, bool cached, bool &outExists);
 
 		Result TryOpenFileRead(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &outFile);
+		Result OpenFileWrite(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outFile);
 
 		Result RegisterNodeTypeByExtension(const StringView &ext, uint32_t nodeNamespace, uint32_t nodeType) override;
 		bool FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const;
@@ -302,20 +342,6 @@ namespace rkit::buildsystem
 		{
 			bool m_exists = true;
 			FileStatus m_status;
-		};
-
-		class UpdateOnCloseWriteStreamWrapper final : public ISeekableReadWriteStream
-		{
-		public:
-			UpdateOnCloseWriteStreamWrapper(CachedFileStatus *cfs);
-			~UpdateOnCloseWriteStreamWrapper();
-
-			Result Initialize(BuildFileLocation location, const StringView &path);
-
-		private:
-			CachedFileStatus *m_cfs;
-			BuildFileLocation m_location;
-			String m_path;
 		};
 
 		Result AddNode(UniquePtr<DependencyNode> &&node);
@@ -328,7 +354,9 @@ namespace rkit::buildsystem
 
 		void ErrorBlameNode(DependencyNode *node, const StringView &msg);
 
-		Result AppendPathSeparator(String &str);
+		Result AppendPathSeparator(String &str) const;
+
+		Result ConstructIntermediatePath(String &outStr, FileLocation &outFileLocation, const StringView &path) const;
 
 		String m_targetName;
 		String m_srcDir;
@@ -524,9 +552,36 @@ namespace rkit::buildsystem
 		return CallbackSpan<NodeDependencyInfo, const IDependencyNode *>(GetNodeDependencyByIndex, this, m_nodeDependencies.Count());
 	}
 
-	Result DependencyNode::AddProduct(const FileStatusView &fileInfo)
+	Result DependencyNode::FindOrAddProduct(Vector<FileStatus> &products, BuildFileLocation location, const StringView &path, size_t &outIndex)
 	{
-		return ResultCode::kNotYetImplemented;
+		for (size_t i = 0; i < products.Count(); i++)
+		{
+			const FileStatus &fileStatus = products[i];
+			if (fileStatus.m_location == location && fileStatus.m_filePath == path)
+			{
+				outIndex = i;
+				return ResultCode::kOK;
+			}
+		}
+
+		FileStatus newStatus;
+		RKIT_CHECK(newStatus.m_filePath.Set(path));
+		newStatus.m_location = location;
+
+		outIndex = products.Count();
+		RKIT_CHECK(products.Append(std::move(newStatus)));
+
+		return ResultCode::kOK;
+	}
+
+	Result DependencyNode::FindOrAddAnalysisProduct(BuildFileLocation location, const StringView &path, size_t &outIndex)
+	{
+		return FindOrAddProduct(m_analysisProducts, location, path, outIndex);
+	}
+
+	Result DependencyNode::FindOrAddCompileProduct(BuildFileLocation location, const StringView &path, size_t &outIndex)
+	{
+		return FindOrAddProduct(m_analysisProducts, location, path, outIndex);
 	}
 
 	Result DependencyNode::AddAnalysisFileDependency(const FileDependencyInfoView &fileInfo)
@@ -581,6 +636,12 @@ namespace rkit::buildsystem
 		return ResultCode::kNotYetImplemented;
 	}
 
+	Result DependencyNode::MarkProductFinished(bool isCompilePhase, size_t productIndex, const FileStatusView &fstatus)
+	{
+		Vector<FileStatus> &products = (isCompilePhase ? m_compileProducts : m_analysisProducts);
+		return products[productIndex].Set(fstatus);
+	}
+
 	DependencyNode::DependencyNodeCompilerFeedback::DependencyNodeCompilerFeedback(BuildSystemInstance *instance, DependencyNode *node, bool isCompilePhase)
 		: m_buildInstance(instance)
 		, m_dependencyNode(node)
@@ -604,7 +665,7 @@ namespace rkit::buildsystem
 
 		FileStatusView newFStatusView;
 		bool exists = false;
-		RKIT_CHECK(m_buildInstance->ResolveFileStatus(location, path, newFStatusView, exists));
+		RKIT_CHECK(m_buildInstance->ResolveFileStatus(location, path, newFStatusView, true, exists));
 
 		FileDependencyInfoView newDepInfo;
 		newDepInfo.m_status = newFStatusView;
@@ -642,7 +703,7 @@ namespace rkit::buildsystem
 
 		FileStatusView newFStatusView;
 		bool exists = false;
-		RKIT_CHECK(m_buildInstance->ResolveFileStatus(location, path, newFStatusView, exists));
+		RKIT_CHECK(m_buildInstance->ResolveFileStatus(location, path, newFStatusView, true, exists));
 
 		FileDependencyInfoView newDepInfo;
 		newDepInfo.m_status = newFStatusView;
@@ -663,9 +724,27 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
-	Result DependencyNode::DependencyNodeCompilerFeedback::TryOpenOutput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outputFile)
+	Result DependencyNode::DependencyNodeCompilerFeedback::OpenOutput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outputFile)
 	{
-		return ResultCode::kNotYetImplemented;
+		size_t productIndex = 0;
+		if (m_isCompilePhase)
+		{
+			RKIT_CHECK(m_dependencyNode->FindOrAddCompileProduct(location, path, productIndex));
+		}
+		else
+		{
+			RKIT_CHECK(m_dependencyNode->FindOrAddAnalysisProduct(location, path, productIndex));
+		}
+
+		UniquePtr<ISeekableReadWriteStream> realFile;
+		RKIT_CHECK(m_buildInstance->OpenFileWrite(location, path, realFile));
+
+		String pathCopy;
+		RKIT_CHECK(pathCopy.Set(path));
+
+		RKIT_CHECK(New<FeedbackWrapperStream>(outputFile, *this, productIndex, location, std::move(pathCopy), std::move(realFile)));
+
+		return ResultCode::kOK;
 	}
 
 	Result DependencyNode::DependencyNodeCompilerFeedback::AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier)
@@ -684,6 +763,87 @@ namespace rkit::buildsystem
 	bool DependencyNode::DependencyNodeCompilerFeedback::FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const
 	{
 		return m_buildInstance->FindNodeTypeByFileExtension(ext, outNamespace, outType);
+	}
+
+	void DependencyNode::DependencyNodeCompilerFeedback::MarkOutputFileFinished(size_t productIndex, BuildFileLocation location, const StringView &path)
+	{
+		Result result = CheckedMarkOutputFileFinished(productIndex, location, path);
+
+		if (!result.IsOK())
+			m_fault = result;
+	}
+
+	Result DependencyNode::DependencyNodeCompilerFeedback::CheckFault() const
+	{
+		return m_fault;
+	}
+
+	Result DependencyNode::DependencyNodeCompilerFeedback::CheckedMarkOutputFileFinished(size_t productIndex, BuildFileLocation location, const StringView &path)
+	{
+		FileStatusView fileStatusView;
+		bool exists = false;
+		RKIT_CHECK(m_buildInstance->ResolveFileStatus(location, path, fileStatusView, false, exists));
+
+		if (!exists)
+		{
+			rkit::log::Error("A problem occurred refreshing the file status of an output");
+			return ResultCode::kFileOpenError;
+		}
+
+		RKIT_CHECK(m_dependencyNode->MarkProductFinished(m_isCompilePhase, productIndex, fileStatusView));
+
+		return ResultCode::kOK;
+	}
+
+	DependencyNode::FeedbackWrapperStream::FeedbackWrapperStream(DependencyNodeCompilerFeedback &feedback, size_t productIndex, BuildFileLocation location, String &&path, UniquePtr<ISeekableReadWriteStream> &&stream)
+		: m_feedback(feedback)
+		, m_productIndex(productIndex)
+		, m_location(location)
+		, m_path(std::move(path))
+		, m_stream(std::move(stream))
+	{
+	}
+
+	DependencyNode::FeedbackWrapperStream::~FeedbackWrapperStream()
+	{
+		m_stream.Reset();
+
+		m_feedback.MarkOutputFileFinished(m_productIndex, m_location, m_path);
+	}
+
+	Result DependencyNode::FeedbackWrapperStream::ReadPartial(void *data, size_t count, size_t &outCountRead)
+	{
+		return m_stream->ReadPartial(data, count, outCountRead);
+	}
+
+	Result DependencyNode::FeedbackWrapperStream::WritePartial(const void *data, size_t count, size_t &outCountWritten)
+	{
+		return m_stream->WritePartial(data, count, outCountWritten);
+	}
+
+	Result DependencyNode::FeedbackWrapperStream::SeekStart(FilePos_t pos)
+	{
+		return m_stream->SeekStart(pos);
+	}
+
+	Result DependencyNode::FeedbackWrapperStream::SeekCurrent(FileOffset_t pos)
+	{
+		return m_stream->SeekCurrent(pos);
+	}
+
+	Result DependencyNode::FeedbackWrapperStream::SeekEnd(FileOffset_t pos)
+	{
+		return m_stream->SeekEnd(pos);
+	}
+
+	FilePos_t DependencyNode::FeedbackWrapperStream::Tell() const
+	{
+		return m_stream->Tell();
+	}
+
+	FilePos_t DependencyNode::FeedbackWrapperStream::GetSize() const
+	{
+		return m_stream->GetSize();
 	}
 
 	FileStatusView DependencyNode::GetAnalysisProductByIndex(const IDependencyNode *const & node, size_t index)
@@ -746,14 +906,18 @@ namespace rkit::buildsystem
 		UniquePtr<IDependencyNodeCompiler> depsCompiler;
 		RKIT_CHECK(New<DepsNodeCompiler>(depsCompiler));
 
-		UniquePtr<IDependencyNodeCompiler> pipelineCompiler;
-		RKIT_CHECK(New<RenderPipelineCompiler>(pipelineCompiler));
+		UniquePtr<IDependencyNodeCompiler> pipelineLibraryCompiler;
+		RKIT_CHECK(New<RenderPipelineLibraryCompiler>(pipelineLibraryCompiler));
+
+		UniquePtr<IDependencyNodeCompiler> graphicsPipelineCompiler;
+		RKIT_CHECK(New<RenderPipelineCompiler>(graphicsPipelineCompiler, RenderPipelineCompiler::PipelineType::Graphics));
 
 		RKIT_CHECK(RegisterNodeCompiler(kDefaultNamespace, kDepsNodeID, std::move(depsCompiler)));
-		RKIT_CHECK(RegisterNodeCompiler(kDefaultNamespace, kRenderPipelineID, std::move(pipelineCompiler)));
+		RKIT_CHECK(RegisterNodeCompiler(kDefaultNamespace, kRenderPipelineLibraryID, std::move(pipelineLibraryCompiler)));
+		RKIT_CHECK(RegisterNodeCompiler(kDefaultNamespace, kRenderGraphicsPipelineID, std::move(graphicsPipelineCompiler)));
 
 		RKIT_CHECK(RegisterNodeTypeByExtension("deps", kDefaultNamespace, kDepsNodeID));
-		RKIT_CHECK(RegisterNodeTypeByExtension("rkp", kDefaultNamespace, kRenderPipelineID));
+		RKIT_CHECK(RegisterNodeTypeByExtension("rkp", kDefaultNamespace, kRenderPipelineLibraryID));
 
 		return ResultCode::kOK;
 	}
@@ -991,7 +1155,7 @@ namespace rkit::buildsystem
 
 				FileStatusView fileStatus;
 				bool exists = false;
-				RKIT_CHECK(ResolveFileStatus(fdiView.m_status.m_location, fdiView.m_status.m_filePath, fileStatus, exists));
+				RKIT_CHECK(ResolveFileStatus(fdiView.m_status.m_location, fdiView.m_status.m_filePath, fileStatus, true, exists));
 
 				if (exists != fdiView.m_fileExists)
 				{
@@ -1012,7 +1176,7 @@ namespace rkit::buildsystem
 				{
 					FileStatusView fileStatus;
 					bool exists = false;
-					RKIT_CHECK(ResolveFileStatus(productStatus.m_location, productStatus.m_filePath, fileStatus, exists));
+					RKIT_CHECK(ResolveFileStatus(productStatus.m_location, productStatus.m_filePath, fileStatus, true, exists));
 
 					if (!exists)
 					{
@@ -1078,9 +1242,10 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
-	Result BuildSystemInstance::ResolveFileStatus(BuildFileLocation location, const StringView &path, FileStatusView &outStatusView, bool &outExists)
+	Result BuildSystemInstance::ResolveFileStatus(BuildFileLocation location, const StringView &path, FileStatusView &outStatusView, bool cached, bool &outExists)
 	{
-		// Keep the behavior here in sync with ResolveFileStatus
+		// Keep the behavior here in sync with TryOpenFileRead
+		if (cached)
 		{
 			FileLocationKey lookupLocKey(location, path);
 
@@ -1140,6 +1305,31 @@ namespace rkit::buildsystem
 		return ResultCode::kNotYetImplemented;
 	}
 
+	Result BuildSystemInstance::OpenFileWrite(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outFile)
+	{
+		String fullPath;
+		FileLocation fileLocation = rkit::FileLocation::kAbsolute;
+
+		if (location == rkit::buildsystem::BuildFileLocation::kIntermediateDir)
+		{
+			RKIT_CHECK(ConstructIntermediatePath(fullPath, fileLocation, path));
+		}
+		else
+			return ResultCode::kFileOpenError;
+
+
+		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+		outFile = sysDriver->OpenFileReadWrite(fileLocation, fullPath.CStr(), true, true, true);
+
+		if (!outFile.Get())
+		{
+			rkit::log::ErrorFmt("Failed to open output file '%s'", fullPath.CStr());
+			return ResultCode::kFileOpenError;
+		}
+
+		return ResultCode::kOK;
+	}
+
 	Result BuildSystemInstance::RegisterNodeTypeByExtension(const StringView &ext, uint32_t nodeNamespace, uint32_t nodeType)
 	{
 		NodeTypeKey nodeTypeKey(nodeNamespace, nodeType);
@@ -1192,12 +1382,21 @@ namespace rkit::buildsystem
 		rkit::log::ErrorFmt("Node %s: %s", node->GetIdentifier().GetChars(), msg.GetChars());
 	}
 
-	Result BuildSystemInstance::AppendPathSeparator(String &str)
+	Result BuildSystemInstance::AppendPathSeparator(String &str) const
 	{
 		if (!str.EndsWith(m_pathSeparator))
 		{
 			RKIT_CHECK(str.Append(m_pathSeparator));
 		}
+
+		return ResultCode::kOK;
+	}
+
+	Result BuildSystemInstance::ConstructIntermediatePath(String &outStr, FileLocation &outFileLocation, const StringView &path) const
+	{
+		RKIT_CHECK(outStr.Set(m_intermedDir));
+		RKIT_CHECK(AppendPathSeparator(outStr));
+		RKIT_CHECK(outStr.Append(path));
 
 		return ResultCode::kOK;
 	}

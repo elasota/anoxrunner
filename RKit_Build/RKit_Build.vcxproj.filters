@@ -24,7 +24,10 @@
     <ClInclude Include="DepsNodeCompiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="RenderPipelineCompiler.h">
+    <ClInclude Include="RenderPipelineLibraryCompiler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderShaderCompiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -38,7 +41,7 @@
     <ClCompile Include="DepsNodeCompiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderPipelineCompiler.cpp">
+    <ClCompile Include="RenderPipelineLibraryCompiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

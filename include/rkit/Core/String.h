@@ -43,6 +43,24 @@ namespace rkit
 		IMallocDriver *m_alloc;
 	};
 
+	template<class TChar>
+	class BaseStringConstructionBuffer
+	{
+	public:
+		BaseStringConstructionBuffer();
+		~BaseStringConstructionBuffer();
+
+		Result Allocate(size_t numChars);
+
+		Span<TChar> GetSpan() const;
+
+		void Detach();
+
+	private:
+		TChar *m_chars;
+		size_t m_numChars;
+	};
+
 	template<class TChar, size_t TStaticSize>
 	class BaseString
 	{
@@ -53,10 +71,12 @@ namespace rkit
 		BaseString();
 		BaseString(const BaseString &other);
 		BaseString(BaseString &&other) noexcept;
+		BaseString(BaseStringConstructionBuffer<TChar> &&other) noexcept;
 		~BaseString();
 
 		BaseString &operator=(const BaseString &other);
 		BaseString &operator=(BaseString &&other) noexcept;
+		BaseString &operator=(BaseStringConstructionBuffer<TChar> &&other) noexcept;
 
 		Result Set(const SliceView_t &strView);
 		Result Set(const Span<const TChar> &strView);
@@ -93,13 +113,23 @@ namespace rkit
 		const TChar *CStr() const;
 		size_t Length() const;
 
+		Result Format(const TChar *fmt, ...);
+
 	private:
+		struct FormatOversizeHelper
+		{
+			BaseStringConstructionBuffer<TChar> m_constructionBuffer;
+			bool m_isOversized = false;
+		};
+
 		bool IsStaticString() const;
 		void CopyStaticStringFromOther(const BaseString &other);
 		void Evict();
 		void UnsafeReset();
 
 		static Result CreateAndReturnUninitializedSpan(BaseString &outStr, size_t numChars, Span<TChar> &outSpan);
+
+		static Result CreateStringConstructionBufferCallback(void *userdata, size_t numChars, void *&outBuffer);
 
 		const TChar *m_chars;
 		size_t m_length;
@@ -124,10 +154,12 @@ namespace rkit
 #include "Algorithm.h"
 #include "MallocDriver.h"
 #include "StringView.h"
+#include "UtilitiesDriver.h"
 #include "Result.h"
 
 #include <cstring>
 #include <limits>
+#include <cstdarg>
 
 
 template<class TChar>
@@ -197,6 +229,55 @@ size_t rkit::StringStorage<TChar>::ComputePaddedBaseSize()
 	return (residual == 0) ? baseSize : (baseSize + sizeof(TChar) - residual);
 }
 
+template<class TChar>
+rkit::BaseStringConstructionBuffer<TChar>::BaseStringConstructionBuffer()
+	: m_chars(nullptr)
+	, m_numChars(0)
+{
+}
+
+template<class TChar>
+rkit::BaseStringConstructionBuffer<TChar>::~BaseStringConstructionBuffer()
+{
+}
+
+template<class TChar>
+rkit::Result rkit::BaseStringConstructionBuffer<TChar>::Allocate(size_t numChars)
+{
+	if (numChars == std::numeric_limits<size_t>::max())
+		return ResultCode::kOutOfMemory;
+
+	size_t stringStorageObjSize = 0;
+	RKIT_CHECK(StringStorage<TChar>::ComputeSize(numChars + 1, stringStorageObjSize));
+
+	IMallocDriver *alloc = GetDrivers().m_mallocDriver;
+
+	void *stringStorageMem = alloc->Alloc(stringStorageObjSize);
+	if (!stringStorageMem)
+		return ResultCode::kOutOfMemory;
+
+	StringStorage<TChar> *stringStorage = new (stringStorageMem) StringStorage<TChar>(alloc);
+
+	m_chars = stringStorage->GetFirstCharAddress();
+	m_chars[numChars] = static_cast<TChar>(0);
+	m_numChars = numChars;
+
+	return ResultCode::kOK;
+}
+
+template<class TChar>
+rkit::Span<TChar> rkit::BaseStringConstructionBuffer<TChar>::GetSpan() const
+{
+	return Span<TChar>(m_chars, m_numChars);
+}
+
+template<class TChar>
+void rkit::BaseStringConstructionBuffer<TChar>::Detach()
+{
+	m_chars = nullptr;
+	m_numChars = 0;
+}
+
 
 template<class TChar, size_t TStaticSize>
 rkit::BaseString<TChar, TStaticSize>::BaseString()
@@ -238,6 +319,17 @@ rkit::BaseString<TChar, TStaticSize>::BaseString(BaseString &&other) noexcept
 		m_chars = other.m_chars;
 
 	other.UnsafeReset();
+}
+
+template<class TChar, size_t TStaticSize>
+rkit::BaseString<TChar, TStaticSize>::BaseString(BaseStringConstructionBuffer<TChar> &&other) noexcept
+	: m_chars(nullptr)
+	, m_length(0)
+{
+	m_staticString[0] = static_cast<TChar>(0);
+	m_chars = m_staticString;
+
+	(*this) = std::move(other);
 }
 
 template<class TChar, size_t TStaticSize>
@@ -318,9 +410,74 @@ rkit::BaseString<TChar, TStaticSize> &rkit::BaseString<TChar, TStaticSize>::oper
 }
 
 template<class TChar, size_t TStaticSize>
+rkit::BaseString<TChar, TStaticSize> &rkit::BaseString<TChar, TStaticSize>::operator=(BaseStringConstructionBuffer<TChar> &&other) noexcept
+{
+	Evict();
+
+	Span<TChar> span = other.GetSpan();
+	if (span.Count() < TStaticSize)
+	{
+		CopySpanNonOverlapping(Span<TChar>(m_staticString, span.Count()), Span<const TChar>(span));
+		m_staticString[span.Count()] = static_cast<TChar>(0);
+		m_chars = m_staticString;
+	}
+	else
+	{
+		m_chars = span.Ptr();
+		other.Detach();
+	}
+
+	m_length = span.Count();
+
+	return *this;
+}
+
+template<class TChar, size_t TStaticSize>
 size_t rkit::BaseString<TChar, TStaticSize>::Length() const
 {
 	return m_length;
+}
+
+template<class TChar, size_t TStaticSize>
+rkit::Result rkit::BaseString<TChar, TStaticSize>::Format(const TChar *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+
+	FormatOversizeHelper oversizeHelper;
+
+	size_t length = 0;
+	Result formatResult = GetDrivers().m_utilitiesDriver->VFormatString(m_staticString, TStaticSize, &oversizeHelper, CreateStringConstructionBufferCallback, length, fmt, args);
+
+	va_end(args);
+
+	RKIT_CHECK(formatResult);
+
+	if (oversizeHelper.m_isOversized)
+		(*this) = std::move(oversizeHelper.m_constructionBuffer);
+	else
+	{
+		Evict();
+		m_chars = m_staticString;
+	}
+
+	m_length = length;
+
+	return ResultCode::kOK;
+}
+
+template<class TChar, size_t TStaticSize>
+rkit::Result rkit::BaseString<TChar, TStaticSize>::CreateStringConstructionBufferCallback(void *userdata, size_t numChars, void *&outBuffer)
+{
+	FormatOversizeHelper *helper = static_cast<FormatOversizeHelper *>(userdata);
+	helper->m_isOversized = true;
+
+	RKIT_CHECK(helper->m_constructionBuffer.Allocate(numChars));
+
+	Span<TChar> span = helper->m_constructionBuffer.GetSpan();
+	outBuffer = span.Ptr();
+
+	return ResultCode::kOK;
 }
 
 template<class TChar, size_t TStaticSize>
@@ -568,27 +725,16 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::CreateAndReturnUninitializedS
 		return ResultCode::kOK;
 	}
 
-	if (numChars == std::numeric_limits<size_t>::max())
-		return ResultCode::kOutOfMemory;
+	BaseStringConstructionBuffer<TChar> constructionBuffer;
+	RKIT_CHECK(constructionBuffer.Allocate(numChars));
 
-	size_t stringStorageObjSize = 0;
-	RKIT_CHECK(StringStorage<TChar>::ComputeSize(numChars + 1, stringStorageObjSize));
+	Span<char> constructedSpan = constructionBuffer.GetSpan();
+	constructionBuffer.Detach();
 
-	IMallocDriver *alloc = GetDrivers().m_mallocDriver;
+	outStr.m_length = constructedSpan.Count();
+	outStr.m_chars = constructedSpan.Ptr();
 
-	void *stringStorageMem = alloc->Alloc(stringStorageObjSize);
-	if (!stringStorageMem)
-		return ResultCode::kOutOfMemory;
-
-	StringStorage<TChar> *stringStorage = new (stringStorageMem) StringStorage<TChar>(alloc);
-
-	TChar *firstCharAddr = stringStorage->GetFirstCharAddress();
-	firstCharAddr[numChars] = static_cast<TChar>(0);
-
-	outStr.m_length = numChars;
-	outStr.m_chars = firstCharAddr;
-
-	outSpan = Span<TChar>(firstCharAddr, numChars);
+	outSpan = constructedSpan;
 
 	return ResultCode::kOK;
 }

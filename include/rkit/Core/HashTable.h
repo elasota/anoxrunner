@@ -78,6 +78,8 @@ namespace rkit
 		const TKey &Key() const;
 		TValue &Value() const;
 
+		operator HashMapKeyValueView<TKey, const TValue>() const;
+
 	private:
 		HashMapKeyValueView() = delete;
 
@@ -404,6 +406,8 @@ void rkit::HashMapIterator<TKey, TValue, TSize>::Normalize()
 	{
 		if (m_hashMap.GetOccupancyAt(offset))
 			break;
+
+		offset++;
 	}
 
 	m_offset = offset;
@@ -485,6 +489,8 @@ void rkit::HashMapConstIterator<TKey, TValue, TSize>::Normalize()
 	{
 		if (m_hashMap.GetOccupancyAt(offset))
 			break;
+
+		offset++;
 	}
 
 	m_offset = offset;
@@ -1070,4 +1076,11 @@ template<class TKey, class TValue>
 TValue &rkit::HashMapKeyValueView<TKey, TValue>::Value() const
 {
 	return m_value;
+}
+
+
+template<class TKey, class TValue>
+rkit::HashMapKeyValueView<TKey, TValue>::operator HashMapKeyValueView<TKey, const TValue>() const
+{
+	return HashMapKeyValueView<TKey, const TValue>(m_key, m_value);
 }

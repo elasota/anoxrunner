@@ -48,6 +48,8 @@ namespace rkit
 
 		const utils::ISha256Calculator *GetSha256Calculator() const override;
 
+		Result VFormatString(char *buffer, size_t bufferSize, void *oversizedUserdata, AllocateDynamicStringCallback_t oversizedCallback, size_t &outLength, const char *fmt, va_list list) const override;
+
 	private:
 		static bool ValidateFilePathSlice(const Span<const char> &name);
 
@@ -357,6 +359,43 @@ namespace rkit
 	const utils::ISha256Calculator *UtilitiesDriver::GetSha256Calculator() const
 	{
 		return &m_sha256Calculator;
+	}
+
+	Result UtilitiesDriver::VFormatString(char *buffer, size_t bufferSize, void *oversizedUserdata, AllocateDynamicStringCallback_t oversizedCallback, size_t &outLength, const char *fmt, va_list list) const
+	{
+		if (bufferSize > std::numeric_limits<int>::max())
+			bufferSize = std::numeric_limits<int>::max();
+
+		va_list firstAttemptList;
+		va_copy(firstAttemptList, list);
+
+		int formattedLength = vsnprintf(buffer, bufferSize, fmt, firstAttemptList);
+		va_end(firstAttemptList);
+
+		if (formattedLength < 0 || formattedLength == std::numeric_limits<int>::max())
+			return ResultCode::kFormatError;
+
+		if (static_cast<size_t>(formattedLength) < bufferSize)
+		{
+			outLength = static_cast<size_t>(formattedLength);
+			return ResultCode::kOK;
+		}
+
+		void *newBuffer = nullptr;
+		RKIT_CHECK(oversizedCallback(oversizedUserdata, static_cast<size_t>(formattedLength), newBuffer));
+
+		va_list secondAttemptList;
+		va_copy(secondAttemptList, list);
+
+		int formattedLength2 = vsnprintf(static_cast<char *>(newBuffer), static_cast<size_t>(formattedLength) + 1, fmt, secondAttemptList);
+
+		va_end(secondAttemptList);
+
+		if (formattedLength2 != formattedLength)
+			return ResultCode::kInternalError;
+
+		outLength = static_cast<size_t>(formattedLength);
+		return ResultCode::kOK;
 	}
 }
 

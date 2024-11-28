@@ -40,6 +40,8 @@ namespace rkit
 
 		kOperationFailed,
 		kTextParsingFailed,
+
+		kFormatError,
 	};
 
 	struct RKIT_NODISCARD Result
