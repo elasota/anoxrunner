@@ -272,6 +272,18 @@ namespace rkit::data
 		virtual size_t GetElementSize() const = 0;
 	};
 
+
+	struct IRenderRTTIObjectPtrList
+	{
+		virtual ~IRenderRTTIObjectPtrList() {}
+
+		virtual Result Resize(size_t count) = 0;
+		virtual size_t GetCount() const = 0;
+		virtual const void *GetElementPtr(size_t index) const = 0;
+		virtual const void *GetElement(size_t index) const = 0;
+		virtual Result Append(const void *ptr) = 0;
+	};
+
 	struct IRenderDataPackage
 	{
 		struct ConfigKey
@@ -280,12 +292,10 @@ namespace rkit::data
 			RenderRTTIMainType m_mainType = RenderRTTIMainType::Invalid;
 		};
 
-		static const size_t kNumIndexables = static_cast<size_t>(RenderRTTIIndexableStructType::Count);
-
 		virtual ~IRenderDataPackage() {}
 
 		virtual IRenderRTTIListBase *GetIndexable(RenderRTTIIndexableStructType indexable) const = 0;
-		virtual ConfigKey &GetConfigKey(size_t index) const = 0;
+		virtual const ConfigKey &GetConfigKey(size_t index) const = 0;
 		virtual StringView GetString(size_t stringIndex) const = 0;
 	};
 
@@ -307,7 +317,7 @@ namespace rkit::data
 		virtual const RenderRTTIObjectPtrType *GetCompoundNumericTypePtrRTTI() const = 0;
 		virtual const RenderRTTIObjectPtrType *GetStructureTypePtrRTTI() const = 0;
 
-		virtual Result ProcessIndexable(RenderRTTIIndexableStructType indexableStructType, UniquePtr<IRenderRTTIListBase> *outList, const RenderRTTIStructType **outRTTI) const = 0;
+		virtual Result ProcessIndexable(RenderRTTIIndexableStructType indexableStructType, UniquePtr<IRenderRTTIListBase> *outList, UniquePtr<IRenderRTTIObjectPtrList> *outPtrList, const RenderRTTIStructType **outRTTI) const = 0;
 
 		virtual uint32_t GetPackageVersion() const = 0;
 		virtual uint32_t GetPackageIdentifier() const = 0;

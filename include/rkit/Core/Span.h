@@ -2,6 +2,8 @@
 
 #include <cstddef>
 
+#include "SpanProtos.h"
+
 namespace rkit
 {
 	template<class T>

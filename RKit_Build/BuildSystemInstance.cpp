@@ -986,6 +986,7 @@ namespace rkit::buildsystem
 			RKIT_CHECK(AddRelevantNode(node));
 		}
 
+		// May add more relevant nodes during this loop
 		for (size_t i = 0; i < m_relevantNodes.Count(); i++)
 		{
 			DependencyNode *node = m_relevantNodes[i];
@@ -999,8 +1000,10 @@ namespace rkit::buildsystem
 		}
 
 		// Step 2: Compile
-		for (DependencyNode *node : m_relevantNodes)
+		for (size_t ri = 0; ri < m_relevantNodes.Count(); ri++)
 		{
+			DependencyNode *node = m_relevantNodes[m_relevantNodes.Count() - 1 - ri];
+
 			RKIT_ASSERT(node->GetDependencyState() != DependencyState::NotAnalyzedOrCompiled);
 
 			if (node->GetDependencyState() == DependencyState::NotCompiled)
@@ -1081,6 +1084,12 @@ namespace rkit::buildsystem
 	{
 		DependencyNode *node = m_depCheckStack[m_depCheckStack.Count() - 1];
 
+		if (node->GetDependencyCheckPhase() == DependencyCheckPhase::Completed)
+		{
+			m_depCheckStack.RemoveRange(m_depCheckStack.Count() - 1, 1);
+			return ResultCode::kOK;
+		}
+
 		if (node->GetDependencyCheckPhase() == DependencyCheckPhase::CheckFiles)
 		{
 			// This may lower the state to NotAnalyzedOrCompiled or NotCompiled
@@ -1098,6 +1107,7 @@ namespace rkit::buildsystem
 			{
 				if (node->GetCompiler()->HasAnalysisStage())
 				{
+					rkit::log::LogInfoFmt("Build Analysis: %s", node->GetIdentifier().GetChars());
 					RKIT_CHECK(node->RunAnalysis(this));
 				}
 
@@ -1238,6 +1248,7 @@ namespace rkit::buildsystem
 		}
 
 		RKIT_CHECK(AddRelevantNode(nodeDepNode));
+		RKIT_CHECK(m_depCheckStack.Append(nodeDepNode));
 
 		return ResultCode::kOK;
 	}
@@ -1299,6 +1310,16 @@ namespace rkit::buildsystem
 		{
 			// Try to import file from the root directory
 			outFile = sysDriver->OpenFileRead(rkit::FileLocation::kDataSourceDirectory, path.GetChars());
+			return ResultCode::kOK;
+		}
+
+		if (location == rkit::buildsystem::BuildFileLocation::kIntermediateDir)
+		{
+			String fullPath;
+			FileLocation fileLocation = rkit::FileLocation::kAbsolute;
+			RKIT_CHECK(ConstructIntermediatePath(fullPath, fileLocation, path));
+
+			outFile = sysDriver->OpenFileRead(fileLocation, fullPath.CStr());
 			return ResultCode::kOK;
 		}
 

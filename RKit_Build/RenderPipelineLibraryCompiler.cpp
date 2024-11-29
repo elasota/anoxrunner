@@ -204,6 +204,7 @@ namespace rkit::buildsystem::rpc_package
 		IndexableObjectBlobCollection();
 
 		Result IndexObject(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTIStructType *rtti, bool cached, size_t &outIndex);
+		Result IndexBinaryBlob(PackageBuilder &pkgBuilder, BinaryBlobRef &&blob, const void *obj, bool cached, size_t &outIndex);
 
 		void ClearObjectAddressCache();
 
@@ -223,6 +224,7 @@ namespace rkit::buildsystem::rpc_package
 		Result IndexObject(const void *obj, const data::RenderRTTIStructType *rtti, bool cached, size_t &outIndex);
 		Result IndexString(const StringSliceView &str, size_t &outIndex);
 		Result IndexConfigKey(size_t globalStringIndex, data::RenderRTTIMainType mainType, size_t &outIndex);
+		Result IndexObjectList(data::RenderRTTIIndexableStructType indexableType, BinaryBlobRef &&blob, size_t &outIndex);
 
 		const IStringResolver *GetStringResolver() const;
 		const data::IRenderDataHandler *GetDataHandler() const;
@@ -245,6 +247,7 @@ namespace rkit::buildsystem::rpc_package
 		static const size_t kNumIndexables = static_cast<size_t>(data::RenderRTTIIndexableStructType::Count);
 
 		IndexableObjectBlobCollection m_indexables[kNumIndexables];
+		IndexableObjectBlobCollection m_objectSpans[kNumIndexables];
 
 		const data::IRenderDataHandler *m_dataHandler;
 		const IPackageObjectWriter *m_writer;
@@ -487,18 +490,6 @@ namespace rkit::buildsystem::rpc_analyzer
 		Vector<UniquePtr<render::CompoundNumericType>> m_compoundTypes;
 		Vector<UniquePtr<render::VectorNumericType>> m_vectorTypes;
 	};
-
-	class PipelineAnalyzer final
-	{
-	public:
-		explicit PipelineAnalyzer(data::IDataDriver *dataDriver, IDependencyNodeCompilerFeedback *feedback);
-
-		Result Run(IDependencyNode *depsNode);
-
-	private:
-		data::IDataDriver *m_dataDriver;
-		IDependencyNodeCompilerFeedback *m_feedback;
-	};
 }
 
 namespace rkit
@@ -629,23 +620,29 @@ namespace rkit::buildsystem::rpc_package
 		BinaryBlobBuilder blobBuilder;
 		RKIT_CHECK(writer->WriteObject(pkgBuilder, obj, &rtti->m_base, blobBuilder));
 
-		BinaryBlobRef finishedBlob = blobBuilder.Finish();
+		return IndexBinaryBlob(pkgBuilder, blobBuilder.Finish(), obj, cached, outIndex);
+	}
 
-		HashMap<BinaryBlobRef, size_t>::ConstIterator_t blobCheckIt = m_blobToIndex.Find(finishedBlob);
+	Result IndexableObjectBlobCollection::IndexBinaryBlob(PackageBuilder &pkgBuilder, BinaryBlobRef &&blob, const void *obj, bool cached, size_t &outIndex)
+	{
+		HashMap<BinaryBlobRef, size_t>::ConstIterator_t blobCheckIt = m_blobToIndex.Find(blob);
 		if (blobCheckIt != m_blobToIndex.end())
 		{
 			size_t index = blobCheckIt.Value();
-			RKIT_CHECK(m_cachedObjectToBlob.Set(obj, index));
+			if (cached)
+			{
+				RKIT_CHECK(m_cachedObjectToBlob.Set(obj, index));
+			}
 
-			outIndex = blobCheckIt.Value();
+			outIndex = index;
 			return ResultCode::kOK;
 		}
 
 		size_t newIndex = m_blobs.Count();
 
-		RKIT_CHECK(m_blobs.Append(finishedBlob.GetBlob()));
+		RKIT_CHECK(m_blobs.Append(blob.GetBlob()));
 
-		RKIT_CHECK(m_blobToIndex.Set(std::move(finishedBlob), newIndex));
+		RKIT_CHECK(m_blobToIndex.Set(std::move(blob), newIndex));
 
 		if (cached)
 		{
@@ -741,6 +738,13 @@ namespace rkit::buildsystem::rpc_package
 		return ResultCode::kOK;
 	}
 
+	Result PackageBuilder::IndexObjectList(data::RenderRTTIIndexableStructType indexableType, BinaryBlobRef &&blob, size_t &outIndex)
+	{
+		RKIT_ASSERT(static_cast<size_t>(indexableType) < kNumIndexables);
+
+		return m_objectSpans[static_cast<size_t>(indexableType)].IndexBinaryBlob(*this, std::move(blob), nullptr, false, outIndex);
+	}
+
 	const IStringResolver *PackageBuilder::GetStringResolver() const
 	{
 		return m_resolver;
@@ -806,8 +810,20 @@ namespace rkit::buildsystem::rpc_package
 
 		for (size_t i = 0; i < kNumIndexables; i++)
 		{
-			const IndexableObjectBlobCollection &indexable = m_indexables[i];
-			RKIT_CHECK(PackageObjectWriter::WriteCompactIndex(indexable.GetBlobs().Count(), stream));
+			RKIT_CHECK(PackageObjectWriter::WriteCompactIndex(m_objectSpans[i].GetBlobs().Count(), stream));
+			RKIT_CHECK(PackageObjectWriter::WriteCompactIndex(m_indexables[i].GetBlobs().Count(), stream));
+		}
+
+		for (size_t i = 0; i < kNumIndexables; i++)
+		{
+			const IndexableObjectBlobCollection &objectSpans = m_objectSpans[i];
+
+			for (const rpc_package::BinaryBlob *blob : objectSpans.GetBlobs())
+			{
+				Span<const uint8_t> blobBytes = blob->GetBytes();
+
+				RKIT_CHECK(stream.WriteAll(blobBytes.Ptr(), blobBytes.Count()));
+			}
 		}
 
 		for (size_t i = 0; i < kNumIndexables; i++)
@@ -942,7 +958,7 @@ namespace rkit::buildsystem::rpc_package
 		case data::RenderRTTINumberRepresentation::SignedInt:
 		{
 			int64_t value = ioFuncs->m_readValueSIntFunc(obj);
-			if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize1 || rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize8)
+			if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize8)
 				return WriteSInt8(static_cast<int8_t>(value), stream);
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize16)
 				return WriteSInt16(static_cast<int16_t>(value), stream);
@@ -1047,14 +1063,19 @@ namespace rkit::buildsystem::rpc_package
 
 		rtti->m_getFunc(obj, currentElement, count);
 
-		RKIT_CHECK(WriteCompactIndex(count, stream));
+		BinaryBlobBuilder spanBlobBuilder;
+		RKIT_CHECK(WriteCompactIndex(count, spanBlobBuilder));
 
 		for (size_t i = 0; i < count; i++)
 		{
-			RKIT_CHECK(WriteObjectPtr(pkgBuilder, currentElement, ptrType, isNullable, stream));
-
+			RKIT_CHECK(WriteObjectPtr(pkgBuilder, currentElement, ptrType, true, spanBlobBuilder));
 			currentElement = static_cast<uint8_t *>(currentElement) + ptrSize;
 		}
+
+		size_t objectListIndex = 0;
+		RKIT_CHECK(pkgBuilder.IndexObjectList(ptrType->m_getTypeFunc()->m_indexableType, spanBlobBuilder.Finish(), objectListIndex));
+
+		RKIT_CHECK(WriteCompactIndex(objectListIndex, stream));
 
 		return ResultCode::kOK;
 	}
@@ -2946,17 +2967,6 @@ namespace rkit::buildsystem::rpc_analyzer
 		return ResultCode::kOK;
 	}
 
-	PipelineAnalyzer::PipelineAnalyzer(data::IDataDriver *dataDriver, IDependencyNodeCompilerFeedback *feedback)
-		: m_dataDriver(dataDriver)
-		, m_feedback(feedback)
-	{
-	}
-
-	Result PipelineAnalyzer::Run(IDependencyNode *depsNode)
-	{
-		return ResultCode::kNotYetImplemented;
-	}
-
 	Result LibraryAnalyzer::IndexString(const Span<const char> &span, render::GlobalStringIndex_t &outStringIndex)
 	{
 		String str;
@@ -3056,25 +3066,43 @@ namespace rkit::buildsystem
 
 	bool RenderPipelineCompiler::HasAnalysisStage() const
 	{
-		return true;
+		return false;
 	}
 
 	Result RenderPipelineCompiler::RunAnalysis(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
 	{
-		data::IDataDriver *dataDriver = static_cast<data::IDataDriver *>(rkit::GetDrivers().FindDriver(IModuleDriver::kDefaultNamespace, "Data"));
-
-		UniquePtr<rpc_analyzer::PipelineAnalyzer> analyzer;
-		RKIT_CHECK(New<rpc_analyzer::PipelineAnalyzer>(analyzer, dataDriver, feedback));
-
-		RKIT_CHECK(analyzer->Run(depsNode));
-
-		RKIT_CHECK(feedback->CheckFault());
-
-		return ResultCode::kOK;
+		return ResultCode::kInternalError;
 	}
 
 	Result RenderPipelineCompiler::RunCompile(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
 	{
+		UniquePtr<ISeekableReadStream> packageStream;
+		RKIT_CHECK(feedback->TryOpenInput(BuildFileLocation::kIntermediateDir, depsNode->GetIdentifier(), packageStream));
+
+		if (!packageStream.IsValid())
+		{
+			rkit::log::Error("Failed to open pipeline input");
+			return rkit::ResultCode::kFileOpenError;
+		}
+
+		rkit::IModule *dataModule = rkit::GetDrivers().m_moduleDriver->LoadModule(IModuleDriver::kDefaultNamespace, "Data");
+		if (!dataModule)
+		{
+			rkit::log::Error("Couldn't load data module");
+			return rkit::ResultCode::kModuleLoadFailed;
+		}
+
+		RKIT_CHECK(dataModule->Init(nullptr));
+
+		data::IDataDriver *dataDriver = static_cast<data::IDataDriver *>(rkit::GetDrivers().FindDriver(IModuleDriver::kDefaultNamespace, "Data"));
+
+		data::IRenderDataHandler *dataHandler = dataDriver->GetRenderDataHandler();
+
+		UniquePtr<data::IRenderDataPackage> package;
+		RKIT_CHECK(dataHandler->LoadPackage(*packageStream, true, package));
+
+		RKIT_CHECK(feedback->CheckFault());
+
 		return ResultCode::kNotYetImplemented;
 	}
 
