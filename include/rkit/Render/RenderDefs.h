@@ -332,7 +332,7 @@ namespace rkit::render
 
 	struct StructureType
 	{
-		Span<const StructureMemberDesc *> m_members;
+		ConstSpan<const StructureMemberDesc *> m_members;
 	};
 
 	enum class InputLayoutVertexInputStepping
@@ -355,7 +355,7 @@ namespace rkit::render
 
 	struct InputLayoutDesc
 	{
-		Span<const InputLayoutVertexInputDesc *> m_vertexFeeds;
+		ConstSpan<const InputLayoutVertexInputDesc *> m_vertexFeeds;
 	};
 
 	enum class ReadWriteAccess
@@ -454,7 +454,7 @@ namespace rkit::render
 
 	struct PushConstantListDesc
 	{
-		Span<const PushConstantDesc *> m_pushConstants;
+		ConstSpan<const PushConstantDesc *> m_pushConstants;
 	};
 
 	enum class DescriptorType
@@ -569,7 +569,7 @@ namespace rkit::render
 
 	struct DescriptorLayoutDesc
 	{
-		Span<const DescriptorDesc *> m_descriptors;
+		ConstSpan<const DescriptorDesc *> m_descriptors;
 	};
 
 	struct ContentKey
@@ -578,14 +578,14 @@ namespace rkit::render
 		uint64_t m_key1 = 0;
 		uint64_t m_key2 = 0;
 		uint64_t m_key3 = 0;
+
+		TempStringIndex_t m_source;
 	};
 
 	struct ShaderDesc
 	{
 		TempStringIndex_t m_source;
 		TempStringIndex_t m_entryPoint;
-
-		ContentKey m_contentKey;
 	};
 
 	enum class RenderTargetFormat
@@ -650,7 +650,7 @@ namespace rkit::render
 	{
 		const PushConstantListDesc *m_pushConstants = nullptr;
 
-		Span<const DescriptorLayoutDesc *> m_descriptorLayouts;
+		ConstSpan<const DescriptorLayoutDesc *> m_descriptorLayouts;
 
 		const InputLayoutDesc *m_inputLayout = nullptr;
 		const StructureType *m_vertexShaderOutput = nullptr;
@@ -658,11 +658,13 @@ namespace rkit::render
 		const ShaderDesc *m_vertexShader = nullptr;
 		const ShaderDesc *m_pixelShader = nullptr;
 
+		ConstSpan<const ContentKey *> m_compiledContentKeys;
+
 		IndexSize m_indexSize = IndexSize::UInt32;
 		bool m_primitiveRestart = false;
 		PrimitiveTopology m_primitiveTopology = PrimitiveTopology::TriangleList;
 
-		Span<const RenderTargetDesc *> m_renderTargets;
+		ConstSpan<const RenderTargetDesc *> m_renderTargets;
 		const DepthStencilDesc *m_depthStencil = nullptr;
 
 		bool m_alphaToCoverage = false;

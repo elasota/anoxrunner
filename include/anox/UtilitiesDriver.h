@@ -2,6 +2,8 @@
 
 #include "rkit/Core/Drivers.h"
 
+#include "rkit/Render/BackendType.h"
+
 namespace rkit
 {
 	template<class T>
@@ -21,6 +23,6 @@ namespace anox
 	struct IUtilitiesDriver : public rkit::ICustomDriver
 	{
 		virtual rkit::Result OpenAFSArchive(rkit::UniquePtr<rkit::ISeekableReadStream> &&stream, rkit::UniquePtr<afs::IArchive> &outArchive) = 0;
-		virtual rkit::Result RunDataBuild(const rkit::StringView &targetName, const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir) = 0;
+		virtual rkit::Result RunDataBuild(const rkit::StringView &targetName, const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir, rkit::render::BackendType backendType) = 0;
 	};
 }

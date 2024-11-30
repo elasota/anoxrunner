@@ -5,6 +5,8 @@
 #include "rkit/Data/DataDriver.h"
 #include "rkit/Data/RenderDataHandler.h"
 
+#include "rkit/BuildSystem/BuildSystem.h"
+
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/HashTable.h"
@@ -1056,7 +1058,7 @@ namespace rkit::buildsystem::rpc_package
 
 	Result PackageObjectWriter::WriteObjectPtrSpan(PackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTIObjectPtrSpanType *rtti, bool isNullable, IWriteStream &stream)
 	{
-		void *currentElement = nullptr;
+		const void *currentElement = nullptr;
 		size_t count = 0;
 		size_t ptrSize = rtti->m_ptrSize;
 		const data::RenderRTTIObjectPtrType *ptrType = rtti->m_getPtrTypeFunc();
@@ -1069,7 +1071,7 @@ namespace rkit::buildsystem::rpc_package
 		for (size_t i = 0; i < count; i++)
 		{
 			RKIT_CHECK(WriteObjectPtr(pkgBuilder, currentElement, ptrType, true, spanBlobBuilder));
-			currentElement = static_cast<uint8_t *>(currentElement) + ptrSize;
+			currentElement = static_cast<const uint8_t *>(currentElement) + ptrSize;
 		}
 
 		size_t objectListIndex = 0;
@@ -2943,7 +2945,7 @@ namespace rkit::buildsystem::rpc_analyzer
 				RKIT_CHECK(pkgBuilder.WritePackage(*stream));
 			}
 
-			RKIT_CHECK(m_feedback->AddNodeDependency(IModuleDriver::kDefaultNamespace, kRenderGraphicsPipelineID, BuildFileLocation::kIntermediateDir, outPath));
+			RKIT_CHECK(m_feedback->AddNodeDependency(IModuleDriver::kDefaultNamespace, kRenderGraphicsPipelineNodeID, BuildFileLocation::kIntermediateDir, outPath));
 
 			pipelineIndex++;
 		}
@@ -3054,64 +3056,6 @@ namespace rkit::buildsystem
 	}
 
 	uint32_t RenderPipelineLibraryCompiler::GetVersion() const
-	{
-		return 1;
-	}
-
-
-	RenderPipelineCompiler::RenderPipelineCompiler(PipelineType pipelineType)
-		: m_pipelineType(pipelineType)
-	{
-	}
-
-	bool RenderPipelineCompiler::HasAnalysisStage() const
-	{
-		return false;
-	}
-
-	Result RenderPipelineCompiler::RunAnalysis(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
-	{
-		return ResultCode::kInternalError;
-	}
-
-	Result RenderPipelineCompiler::RunCompile(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
-	{
-		UniquePtr<ISeekableReadStream> packageStream;
-		RKIT_CHECK(feedback->TryOpenInput(BuildFileLocation::kIntermediateDir, depsNode->GetIdentifier(), packageStream));
-
-		if (!packageStream.IsValid())
-		{
-			rkit::log::Error("Failed to open pipeline input");
-			return rkit::ResultCode::kFileOpenError;
-		}
-
-		rkit::IModule *dataModule = rkit::GetDrivers().m_moduleDriver->LoadModule(IModuleDriver::kDefaultNamespace, "Data");
-		if (!dataModule)
-		{
-			rkit::log::Error("Couldn't load data module");
-			return rkit::ResultCode::kModuleLoadFailed;
-		}
-
-		RKIT_CHECK(dataModule->Init(nullptr));
-
-		data::IDataDriver *dataDriver = static_cast<data::IDataDriver *>(rkit::GetDrivers().FindDriver(IModuleDriver::kDefaultNamespace, "Data"));
-
-		data::IRenderDataHandler *dataHandler = dataDriver->GetRenderDataHandler();
-
-		UniquePtr<data::IRenderDataPackage> package;
-		RKIT_CHECK(dataHandler->LoadPackage(*packageStream, true, package));
-
-		RKIT_CHECK(feedback->CheckFault());
-
-		return ResultCode::kNotYetImplemented;
-	}
-
-	Result RenderPipelineCompiler::CreatePrivateData(UniquePtr<IDependencyNodePrivateData> &outPrivateData)
-	{
-		return ResultCode::kOK;
-	}
-
-	uint32_t RenderPipelineCompiler::GetVersion() const
 	{
 		return 1;
 	}

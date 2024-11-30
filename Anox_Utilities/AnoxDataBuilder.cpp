@@ -22,7 +22,7 @@ namespace anox::utils
 	public:
 		AnoxDataBuilder(anox::IUtilitiesDriver *utils);
 
-		rkit::Result Run(const rkit::StringView &targetName, const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir) override;
+		rkit::Result Run(const rkit::StringView &targetName, const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir, rkit::render::BackendType backendType) override;
 
 	private:
 		rkit::buildsystem::IBuildSystemDriver *m_bsDriver;
@@ -60,7 +60,7 @@ namespace anox::utils
 	{
 	}
 
-	rkit::Result AnoxDataBuilder::Run(const rkit::StringView &targetName, const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir)
+	rkit::Result AnoxDataBuilder::Run(const rkit::StringView &targetName, const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir, rkit::render::BackendType backendType)
 	{
 		rkit::IModule *buildModule = rkit::GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, "Build");
 		if (!buildModule)
@@ -85,6 +85,34 @@ namespace anox::utils
 		RKIT_CHECK(m_bsDriver->CreateBuildSystemInstance(instance));
 
 		RKIT_CHECK(instance->Initialize(targetName, sourceDir, intermedDir, dataDir));
+
+		rkit::StringView renderAddOnDriverName;
+		switch (backendType)
+		{
+		case rkit::render::BackendType::Vulkan:
+			renderAddOnDriverName = "Build_Vulkan";
+			break;
+		default:
+			return rkit::ResultCode::kInternalError;
+		}
+
+		rkit::IModule *renderBuildModule = rkit::GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, renderAddOnDriverName.GetChars());
+		if (!renderBuildModule)
+		{
+			rkit::log::Error("Couldn't load render build add-on module");
+			return rkit::ResultCode::kModuleLoadFailed;
+		}
+
+		RKIT_CHECK(renderBuildModule->Init(nullptr));
+
+		rkit::buildsystem::IBuildSystemAddOnDriver *addOnDriver = static_cast<rkit::buildsystem::IBuildSystemAddOnDriver *>(rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, renderAddOnDriverName));
+		if (!addOnDriver)
+		{
+			rkit::log::Error("Couldn't load render build add-on driver");
+			return rkit::ResultCode::kModuleLoadFailed;
+		}
+
+		RKIT_CHECK(addOnDriver->RegisterBuildSystemAddOn(instance.Get()));
 
 		rkit::buildsystem::IDependencyGraphFactory *graphFactory = instance->GetDependencyGraphFactory();
 

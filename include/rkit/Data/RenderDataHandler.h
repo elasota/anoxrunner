@@ -92,6 +92,7 @@ namespace rkit::data
 		VectorNumericType,
 		CompoundNumericType,
 		SamplerDesc,
+		ContentKey,
 
 		Count,
 
@@ -202,13 +203,16 @@ namespace rkit::data
 
 	struct RenderRTTIObjectPtrSpanType
 	{
+
+		typedef const void *ConstVoidPtr_t;
+
 		RenderRTTITypeBase m_base;
 
 		size_t m_ptrSize;
 
 		const RenderRTTIObjectPtrType *(*m_getPtrTypeFunc)();
-		void (*m_setFunc)(void *spanPtr, void *elements, size_t count);
-		void (*m_getFunc)(const void *spanPtr, void *&outElements, size_t &outCount);
+		void (*m_setFunc)(void *spanPtr, const void *elements, size_t count);
+		void (*m_getFunc)(const void *spanPtr, ConstVoidPtr_t &outElements, size_t &outCount);
 	};
 
 	enum class RenderRTTINumberBitSize

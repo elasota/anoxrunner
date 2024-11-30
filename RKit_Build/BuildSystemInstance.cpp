@@ -344,6 +344,15 @@ namespace rkit::buildsystem
 			FileStatus m_status;
 		};
 
+		struct PrintableFourCC
+		{
+			explicit PrintableFourCC(uint32_t fourCC);
+
+			const char *GetChars() const;
+
+			char m_chars[5];
+		};
+
 		Result AddNode(UniquePtr<DependencyNode> &&node);
 		Result AddRelevantNode(DependencyNode *node);
 		Result ProcessTopDepCheck();
@@ -357,6 +366,8 @@ namespace rkit::buildsystem
 		Result AppendPathSeparator(String &str) const;
 
 		Result ConstructIntermediatePath(String &outStr, FileLocation &outFileLocation, const StringView &path) const;
+
+		static PrintableFourCC FourCCToPrintable(uint32_t fourCC);
 
 		String m_targetName;
 		String m_srcDir;
@@ -909,15 +920,11 @@ namespace rkit::buildsystem
 		UniquePtr<IDependencyNodeCompiler> pipelineLibraryCompiler;
 		RKIT_CHECK(New<RenderPipelineLibraryCompiler>(pipelineLibraryCompiler));
 
-		UniquePtr<IDependencyNodeCompiler> graphicsPipelineCompiler;
-		RKIT_CHECK(New<RenderPipelineCompiler>(graphicsPipelineCompiler, RenderPipelineCompiler::PipelineType::Graphics));
-
 		RKIT_CHECK(RegisterNodeCompiler(kDefaultNamespace, kDepsNodeID, std::move(depsCompiler)));
-		RKIT_CHECK(RegisterNodeCompiler(kDefaultNamespace, kRenderPipelineLibraryID, std::move(pipelineLibraryCompiler)));
-		RKIT_CHECK(RegisterNodeCompiler(kDefaultNamespace, kRenderGraphicsPipelineID, std::move(graphicsPipelineCompiler)));
+		RKIT_CHECK(RegisterNodeCompiler(kDefaultNamespace, kRenderPipelineLibraryNodeID, std::move(pipelineLibraryCompiler)));
 
 		RKIT_CHECK(RegisterNodeTypeByExtension("deps", kDefaultNamespace, kDepsNodeID));
-		RKIT_CHECK(RegisterNodeTypeByExtension("rkp", kDefaultNamespace, kRenderPipelineLibraryID));
+		RKIT_CHECK(RegisterNodeTypeByExtension("rkp", kDefaultNamespace, kRenderPipelineLibraryNodeID));
 
 		return ResultCode::kOK;
 	}
@@ -1008,6 +1015,8 @@ namespace rkit::buildsystem
 
 			if (node->GetDependencyState() == DependencyState::NotCompiled)
 			{
+
+				rkit::log::LogInfoFmt("Build Compile : %s %s %s", FourCCToPrintable(node->GetDependencyNodeNamespace()).GetChars(), FourCCToPrintable(node->GetDependencyNodeType()).GetChars(), node->GetIdentifier().GetChars());
 				RKIT_CHECK(node->RunCompile(this));
 				node->SetState(DependencyState::UpToDate);
 			}
@@ -1107,7 +1116,7 @@ namespace rkit::buildsystem
 			{
 				if (node->GetCompiler()->HasAnalysisStage())
 				{
-					rkit::log::LogInfoFmt("Build Analysis: %s", node->GetIdentifier().GetChars());
+					rkit::log::LogInfoFmt("Build Analysis: %s %s %s", FourCCToPrintable(node->GetDependencyNodeNamespace()).GetChars(), FourCCToPrintable(node->GetDependencyNodeType()).GetChars(), node->GetIdentifier().GetChars());
 					RKIT_CHECK(node->RunAnalysis(this));
 				}
 
@@ -1420,5 +1429,21 @@ namespace rkit::buildsystem
 		RKIT_CHECK(outStr.Append(path));
 
 		return ResultCode::kOK;
+	}
+
+	BuildSystemInstance::PrintableFourCC BuildSystemInstance::FourCCToPrintable(uint32_t fourCC)
+	{
+		return BuildSystemInstance::PrintableFourCC(fourCC);
+	}
+
+	BuildSystemInstance::PrintableFourCC::PrintableFourCC(uint32_t fourCC)
+	{
+		rkit::utils::ExtractFourCC(fourCC, m_chars[0], m_chars[1], m_chars[2], m_chars[3]);
+		m_chars[4] = '\0';
+	}
+
+	const char *BuildSystemInstance::PrintableFourCC::GetChars() const
+	{
+		return m_chars;
 	}
 }

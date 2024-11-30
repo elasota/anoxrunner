@@ -50,6 +50,8 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 	rkit::StringView buildIntermediateDirectory;
 	rkit::StringView dataDirectory;
 
+	rkit::render::BackendType renderBackendType = rkit::render::BackendType::Vulkan;
+
 	for (size_t i = 0; i < args.Count(); i++)
 	{
 		const rkit::StringView &arg = args[i];
@@ -128,7 +130,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 
 		IUtilitiesDriver *utilsDriver = static_cast<IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, "Utilities"));
 
-		RKIT_CHECK(utilsDriver->RunDataBuild(buildTarget, buildSourceDirectory, buildIntermediateDirectory, dataDirectory));
+		RKIT_CHECK(utilsDriver->RunDataBuild(buildTarget, buildSourceDirectory, buildIntermediateDirectory, dataDirectory, renderBackendType));
 	}
 
 #if RKIT_IS_FINAL

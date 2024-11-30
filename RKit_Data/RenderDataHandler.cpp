@@ -554,17 +554,18 @@ namespace rkit::data
 			}
 
 		private:
-			static void Set(void *spanPtr, void *elements, size_t count)
+			static void Set(void *spanPtr, const void *elements, size_t count)
 			{
+
 				static_assert(RTTIResolver<T>::kIsIndexable);
-				*static_cast<Span<const T *> *>(spanPtr) = Span<const T *>(static_cast<const T **>(elements), count);
+				*static_cast<ConstSpan<const T *> *>(spanPtr) = ConstSpan<const T *>(static_cast<T const*const*>(elements), count);
 			}
 
-			static void Get(const void *spanPtr, void *&outElements, size_t &outCount)
+			static void Get(const void *spanPtr, const void *&outElements, size_t &outCount)
 			{
 				static_assert(RTTIResolver<T>::kIsIndexable);
 
-				const Span<const T *> *span = static_cast<const Span<const T *>*>(spanPtr);
+				const ConstSpan<const T *> *span = static_cast<const ConstSpan<const T *>*>(spanPtr);
 
 				outElements = span->Ptr();
 				outCount = span->Count();
@@ -649,7 +650,7 @@ namespace rkit::data
 		};
 
 		template<class T>
-		struct RTTIResolver<Span<const T *>> : public RTTIAutoObjectPtrSpan<T>
+		struct RTTIResolver<ConstSpan<const T *>> : public RTTIAutoObjectPtrSpan<T>
 		{
 		};
 
@@ -1020,6 +1021,8 @@ namespace rkit::data
 			RTTI_STRUCT_FIELD_INVISIBLE(vertexShader)
 			RTTI_STRUCT_FIELD_INVISIBLE(pixelShader)
 
+			RTTI_STRUCT_FIELD_INVISIBLE_NULLABLE(compiledContentKeys)
+
 			RTTI_STRUCT_FIELD(indexSize)
 
 			RTTI_STRUCT_FIELD(primitiveRestart)
@@ -1111,18 +1114,17 @@ namespace rkit::data
 			RTTI_STRUCT_FIELD(writeAlpha)
 		RTTI_STRUCT_END
 
-		RTTI_STRUCT_BEGIN(ContentKey)
+		RTTI_STRUCT_BEGIN_INDEXABLE(ContentKey)
 			RTTI_STRUCT_FIELD(key0)
 			RTTI_STRUCT_FIELD(key1)
 			RTTI_STRUCT_FIELD(key2)
 			RTTI_STRUCT_FIELD(key3)
+			RTTI_STRUCT_FIELD(source)
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(ShaderDesc)
 			RTTI_STRUCT_FIELD(source)
 			RTTI_STRUCT_FIELD(entryPoint)
-
-			RTTI_STRUCT_FIELD_INVISIBLE(contentKey)
 		RTTI_STRUCT_END
 	}
 
@@ -1180,6 +1182,9 @@ namespace rkit::data
 		Result ReadObjectPtrSpan(void *obj, const data::RenderRTTIObjectPtrSpanType *rtti, bool isNullable, IReadStream &stream) const;
 
 		Result ReadConfigurationKey(render::ConfigStringIndex_t &outCfgKey, IReadStream &stream) const;
+
+		Result ValidateStructureType(const render::StructureType *structType, const render::StructureType *upperLimit, size_t depth, size_t &complexity);
+		Result ValidateValueType(const render::ValueType &valueType, const render::StructureType *upperLimit, size_t depth, size_t &complexity);
 
 		static const size_t kNumIndexables = static_cast<size_t>(RenderRTTIIndexableStructType::Count);
 
@@ -1369,6 +1374,14 @@ namespace rkit::data
 
 				RKIT_CHECK(ReadStructure(elementData, structType, stream));
 			}
+		}
+
+		IRenderRTTIListBase *structList = GetIndexable(RenderRTTIIndexableStructType::StructureType);
+		size_t numStructs = structList->GetCount();
+		for (size_t i = 0; i < numStructs; i++)
+		{
+			size_t complexity = 0;
+			RKIT_CHECK(ValidateStructureType(static_cast<const render::StructureType *>(structList->GetElementPtr(i)), nullptr, 0, complexity));
 		}
 
 		return ResultCode::kOK;
@@ -1888,7 +1901,7 @@ namespace rkit::data
 			}
 		}
 
-		rtti->m_setFunc(obj, const_cast<void *>(ptrsDataStart), count);
+		rtti->m_setFunc(obj, ptrsDataStart, count);
 
 		return ResultCode::kOK;
 	}
@@ -1906,6 +1919,46 @@ namespace rkit::data
 
 		outCfgKey = render::ConfigStringIndex_t(index);
 		return ResultCode::kOK;
+	}
+
+	Result Package::ValidateStructureType(const render::StructureType *structType, const render::StructureType *upperLimit, size_t depth, size_t &complexity)
+	{
+		if (upperLimit != nullptr && structType >= upperLimit)
+		{
+			rkit::log::Error("Structure type was recursive");
+			return ResultCode::kMalformedFile;
+		}
+
+		const size_t complexityLimit = 4096;
+
+		if (structType->m_members.Count() >= complexityLimit || complexity + structType->m_members.Count() >= complexityLimit)
+		{
+			rkit::log::Error("Structure type has too many fields");
+			return ResultCode::kMalformedFile;
+		}
+
+		complexity += structType->m_members.Count();
+
+		if (depth > 16)
+		{
+			rkit::log::Error("Structure type tree is too deep");
+			return ResultCode::kMalformedFile;
+		}
+
+		for (const render::StructureMemberDesc *member : structType->m_members)
+		{
+			RKIT_CHECK(ValidateValueType(member->m_type, structType, depth + 1, complexity));
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result Package::ValidateValueType(const render::ValueType &valueType, const render::StructureType *upperLimit, size_t depth, size_t &complexity)
+	{
+		if (valueType.m_type == render::ValueTypeType::Structure)
+			return ValidateStructureType(valueType.m_value.m_structureType, upperLimit, depth, complexity);
+		else
+			return ResultCode::kOK;
 	}
 
 	const RenderRTTIStructType *RenderDataHandler::GetSamplerDescRTTI() const
@@ -2028,6 +2081,7 @@ namespace rkit::data
 		LINK_INDEXABLE_LIST_TYPE(CompoundNumericType)
 		LINK_INDEXABLE_LIST_TYPE(VectorNumericType)
 		LINK_INDEXABLE_LIST_TYPE(SamplerDesc)
+		LINK_INDEXABLE_LIST_TYPE(ContentKey)
 
 		default:
 			return ResultCode::kInternalError;

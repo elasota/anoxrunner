@@ -3,6 +3,7 @@
 #include "BuildFileLocation.h"
 
 #include "rkit/Core/Drivers.h"
+#include "rkit/Core/FourCC.h"
 
 namespace rkit
 {
@@ -13,8 +14,10 @@ namespace rkit
 
 	namespace buildsystem
 	{
-		static const uint32_t kDefaultNamespace = 0x74694b52;	// RKit
-		static const uint32_t kDepsNodeID = 0x53504544;			// DEPS
+		static const uint32_t kDefaultNamespace = RKIT_FOURCC('R', 'K', 'i', 't');
+		static const uint32_t kDepsNodeID = RKIT_FOURCC('D', 'E', 'P', 'S');
+		static const uint32_t kRenderGraphicsPipelineNodeID = RKIT_FOURCC('R', 'G', 'P', 'L');
+		static const uint32_t kRenderComputePipelineNodeID = RKIT_FOURCC('R', 'C', 'P', 'L');
 
 		struct IDependencyNode;
 		struct IDependencyGraphFactory;
@@ -53,6 +56,7 @@ namespace rkit
 
 		struct IBuildSystemAddOnDriver : public ICustomDriver
 		{
+			virtual Result RegisterBuildSystemAddOn(IBuildSystemInstance *instance) = 0;
 		};
 	}
 }
