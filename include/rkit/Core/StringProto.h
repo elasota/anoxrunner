@@ -13,6 +13,9 @@ namespace rkit
 	template<class TChar>
 	class BaseStringView;
 
+	template<class TChar>
+	class BaseStringPoolBuilder;
+
 	typedef BaseString<char, 16> String;
 	typedef BaseString<wchar_t, 16> WString;
 
@@ -21,4 +24,7 @@ namespace rkit
 
 	typedef BaseStringSliceView<char> StringSliceView;
 	typedef BaseStringSliceView<wchar_t> WStringSliceView;
+
+	typedef BaseStringPoolBuilder<char> StringPoolBuilder;
+	typedef BaseStringPoolBuilder<wchar_t> WStringPoolBuilder;
 }

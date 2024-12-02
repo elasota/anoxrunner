@@ -31,6 +31,8 @@ namespace rkit
 
 		virtual Result WritePartial(const void *data, size_t count, size_t &outCountWritten) = 0;
 		Result WriteAll(const void *data, size_t count);
+
+		virtual Result Flush() = 0;
 	};
 
 	struct ISeekableStream : public virtual IBaseStream
@@ -79,6 +81,7 @@ namespace rkit
 	{
 		virtual Result CreateWriteStream(UniquePtr<ISeekableWriteStream> &outStream) = 0;
 		virtual Result WritePartial(FilePos_t startPos, const void *data, size_t count, size_t &outCountWritten) = 0;
+		virtual Result Flush() = 0;
 	};
 
 	struct IMutexProtectedReadWriteStream : public virtual IMutexProtectedReadStream, public virtual IMutexProtectedWriteStream

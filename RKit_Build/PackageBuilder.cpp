@@ -33,6 +33,7 @@ namespace rkit::buildsystem
 		BinaryBlobBuilder();
 
 		Result WritePartial(const void *data, size_t count, size_t &outCountWritten) override;
+		Result Flush() override;
 
 		BinaryBlobRef Finish();
 
@@ -833,6 +834,11 @@ namespace rkit::buildsystem
 
 		outCountWritten = count;
 
+		return ResultCode::kOK;
+	}
+
+	Result BinaryBlobBuilder::Flush()
+	{
 		return ResultCode::kOK;
 	}
 

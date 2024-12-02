@@ -48,6 +48,12 @@ namespace rkit
 		bool operator==(const BaseStringSliceView<TChar> &other) const;
 		bool operator!=(const BaseStringSliceView<TChar> &other) const;
 
+		bool operator<(const BaseStringSliceView<TChar> &other) const;
+		bool operator<=(const BaseStringSliceView<TChar> &other) const;
+
+		bool operator>(const BaseStringSliceView<TChar> &other) const;
+		bool operator>=(const BaseStringSliceView<TChar> &other) const;
+
 	private:
 		Span<const TChar> m_span;
 	};
@@ -217,9 +223,44 @@ bool rkit::BaseStringSliceView<TChar>::operator!=(const BaseStringSliceView<TCha
 }
 
 template<class TChar>
+bool rkit::BaseStringSliceView<TChar>::operator<(const BaseStringSliceView<TChar> &other) const
+{
+	if (m_span.Count() != other.m_span.Count())
+		return m_span.Count() < other.m_span.Count();
+
+	const size_t length = m_span.Count();
+	const TChar *charsA = m_span.Ptr();
+	const TChar *charsB = other.m_span.Ptr();
+
+	for (size_t i = 0; i < length; i++)
+	{
+		if (charsA[i] != charsB[i])
+			return charsA[i] < charsB[i];
+	}
+
+	return false;
+}
+
+template<class TChar>
+bool rkit::BaseStringSliceView<TChar>::operator<=(const BaseStringSliceView<TChar> &other) const
+{
+	return !((*this) > other);
+}
+
+template<class TChar>
+bool rkit::BaseStringSliceView<TChar>::operator>(const BaseStringSliceView<TChar> &other) const
+{
+	return other < (*this);
+}
+
+template<class TChar>
+bool rkit::BaseStringSliceView<TChar>::operator>=(const BaseStringSliceView<TChar> &other) const
+{
+	return !((*this) < other);
+}
+
+template<class TChar>
 const TChar rkit::BaseStringPrivate::NullTerminatedStringHelper<TChar>::kDefaultNullTerminator = static_cast<TChar>(0);
-
-
 
 
 template<class TChar>

@@ -4,6 +4,11 @@
 
 #include "SpanProtos.h"
 
+namespace std
+{
+	struct random_access_iterator_tag;
+}
+
 namespace rkit
 {
 	template<class T>
@@ -13,6 +18,12 @@ namespace rkit
 	class SpanIterator
 	{
 	public:
+		typedef ptrdiff_t difference_type;
+		typedef T value_type;
+		typedef T &reference;
+		typedef T *pointer;
+		typedef std::random_access_iterator_tag iterator_category;
+
 		explicit SpanIterator(T *ptr);
 
 		SpanIterator &operator++();
@@ -41,7 +52,7 @@ namespace rkit
 		bool operator!=(const SpanIterator &other) const;
 		bool operator==(const SpanIterator &other) const;
 
-		SpanIterator &operator=(const SpanIterator &other) const;
+		SpanIterator &operator=(const SpanIterator &other);
 
 		operator SpanIterator<const T>() const;
 
@@ -262,7 +273,7 @@ bool rkit::SpanIterator<T>::operator==(const SpanIterator &other) const
 }
 
 template<class T>
-rkit::SpanIterator<T> &rkit::SpanIterator<T>::operator=(const SpanIterator &other) const
+rkit::SpanIterator<T> &rkit::SpanIterator<T>::operator=(const SpanIterator &other)
 {
 	m_ptr = other.m_ptr;
 	return *this;

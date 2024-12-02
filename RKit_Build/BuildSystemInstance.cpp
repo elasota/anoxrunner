@@ -7,12 +7,15 @@
 
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/LogDriver.h"
+#include "rkit/Core/BufferStream.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/String.h"
+#include "rkit/Core/StringPool.h"
 #include "rkit/Core/StringView.h"
 #include "rkit/Core/Vector.h"
 
+#include <algorithm>
 
 namespace rkit::buildsystem
 {
@@ -43,11 +46,15 @@ namespace rkit::buildsystem
 		bool operator==(const FileLocationKey &other) const;
 		bool operator!=(const FileLocationKey &other) const;
 
+		bool operator<(const FileLocationKey &other) const;
+
+		FileLocationKey &operator=(const FileLocationKey &other);
+
 		HashValue_t ComputeHash(HashValue_t baseHash) const;
 
 	private:
 		BuildFileLocation m_location;
-		const StringView &m_path;
+		StringView m_path;
 	};
 
 	class NodeKey
@@ -116,6 +123,22 @@ bool rkit::buildsystem::FileLocationKey::operator!=(const FileLocationKey &other
 	return !((*this) == other);
 }
 
+
+bool rkit::buildsystem::FileLocationKey::operator<(const FileLocationKey &other) const
+{
+	if (m_location != other.m_location)
+		return m_location < other.m_location;
+
+	return m_path < other.m_path;
+}
+
+rkit::buildsystem::FileLocationKey &rkit::buildsystem::FileLocationKey::operator=(const FileLocationKey &other)
+{
+	m_location = other.m_location;
+	m_path = other.m_path;
+	return *this;
+}
+
 rkit::HashValue_t rkit::buildsystem::FileLocationKey::ComputeHash(HashValue_t baseHash) const
 {
 	HashValue_t hash = baseHash;
@@ -176,6 +199,27 @@ namespace rkit::buildsystem
 		Completed,
 	};
 
+	namespace serializer
+	{
+		template<class T>
+		static Result SerializeVector(IWriteStream &stream, StringPoolBuilder &stringPool, const Vector<T> &vec);
+
+		template<class T>
+		static Result SerializeSpan(IWriteStream &stream, StringPoolBuilder &stringPool, const Span<const T> &span);
+
+		template<class T>
+		static Result SerializeEnum(IWriteStream &stream, const T &value);
+
+		static Result SerializeString(IWriteStream &stream, StringPoolBuilder &stringPool, const StringView &str);
+
+		static Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const FileStatus &fs);
+		static Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const FileDependencyInfo &fdi);
+		static Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const NodeDependencyInfo &ndi);
+		static Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, bool value);
+
+		static Result SerializeCompactSize(IWriteStream &stream, size_t sz);
+	}
+
 	class DependencyNode final : public IDependencyNode
 	{
 	public:
@@ -219,10 +263,13 @@ namespace rkit::buildsystem
 		Result AddCompileFileDependency(const FileDependencyInfoView &fileInfo);
 		Result AddNodeDependency(const NodeDependencyInfo &nodeInfo);
 
-		Result Serialize(IWriteStream *stream) const override;
-		Result Deserialize(IReadStream *stream) override;
+		Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool) const override;
+		Result Deserialize(IReadStream &stream) override;
 
 		Result MarkProductFinished(bool isCompilePhase, size_t productIndex, const FileStatusView &fstatus);
+
+		void SetSerializedIndex(size_t index);
+		size_t GetSerializedIndex() const;
 
 	private:
 		DependencyNode() = delete;
@@ -269,6 +316,7 @@ namespace rkit::buildsystem
 
 			Result ReadPartial(void *data, size_t count, size_t &outCountRead) override;
 			Result WritePartial(const void *data, size_t count, size_t &outCountWritten) override;
+			Result Flush() override;
 
 			Result SeekStart(FilePos_t pos) override;
 			Result SeekCurrent(FileOffset_t pos) override;
@@ -304,14 +352,35 @@ namespace rkit::buildsystem
 		DependencyState m_dependencyState;
 		size_t m_checkNodeIndex;
 
-		uint32_t m_nodeType;
 		uint32_t m_nodeNamespace;
+		uint32_t m_nodeType;
 		uint32_t m_lastCompilerVersion;
 		BuildFileLocation m_inputLocation;
 		String m_identifier;
 
 		bool m_isMarkedAsRoot;
 		DependencyCheckPhase m_depCheckPhase;
+
+		size_t m_serializedIndex;
+	};
+
+	struct BuildCacheInstanceInfo
+	{
+		uint64_t m_filePos = 0;
+		uint64_t m_size = 0;
+	};
+
+	struct BuildCacheFileHeader
+	{
+		static const uint32_t kCacheIdentifier = RKIT_FOURCC('B', 'S', 'C', 'F');
+		static const uint32_t kCacheVersion = 1;
+
+		uint32_t m_identifier = 0;
+		uint32_t m_version = 0;
+
+		BuildCacheInstanceInfo m_instances[2];
+
+		uint32_t m_activeInstance = 0;
 	};
 
 	class BuildSystemInstance final : public IBaseBuildSystemInstance, public IDependencyGraphFactory
@@ -371,6 +440,8 @@ namespace rkit::buildsystem
 
 		static PrintableFourCC FourCCToPrintable(uint32_t fourCC);
 
+		static StringView GetCacheFileName();
+
 		String m_targetName;
 		String m_srcDir;
 		String m_intermedDir;
@@ -419,6 +490,7 @@ namespace rkit::buildsystem
 		, m_isMarkedAsRoot(false)
 		, m_depCheckPhase(DependencyCheckPhase::None)
 		, m_lastCompilerVersion(0)
+		, m_serializedIndex(0)
 	{
 	}
 
@@ -626,6 +698,106 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
+	template<class T>
+	Result serializer::SerializeVector(IWriteStream &stream, StringPoolBuilder &stringPool, const Vector<T> &vec)
+	{
+		return SerializeSpan<T>(stream, stringPool, vec.ToSpan());
+	}
+
+	template<class T>
+	Result serializer::SerializeSpan(IWriteStream &stream, StringPoolBuilder &stringPool, const Span<const T> &span)
+	{
+		uint64_t count = span.Count();
+
+		RKIT_CHECK(stream.WriteAll(&count, sizeof(count)));
+
+		for (const T &item : span)
+		{
+			RKIT_CHECK(Serialize(stream, stringPool, item));
+		}
+
+		return ResultCode::kOK;
+	}
+
+	template<class T>
+	static Result serializer::SerializeEnum(IWriteStream &stream, const T &value)
+	{
+		return SerializeCompactSize(stream, static_cast<size_t>(value));
+	}
+
+	Result serializer::SerializeString(IWriteStream &stream, StringPoolBuilder &stringPool, const StringView &str)
+	{
+		size_t index = 0;
+		RKIT_CHECK(stringPool.IndexString(str, index));
+
+		return SerializeCompactSize(stream, index);
+	}
+
+	Result serializer::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const FileStatus &fs)
+	{
+		RKIT_CHECK(SerializeString(stream, stringPool, fs.m_filePath));
+		RKIT_CHECK(SerializeEnum(stream, fs.m_location));
+		RKIT_CHECK(stream.WriteAll(&fs.m_fileSize, sizeof(fs.m_fileSize)));
+		RKIT_CHECK(stream.WriteAll(&fs.m_fileTime, sizeof(fs.m_fileTime)));
+
+		return ResultCode::kOK;
+	}
+
+	Result serializer::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const FileDependencyInfo &fdi)
+	{
+		RKIT_CHECK(Serialize(stream, stringPool, fdi.m_status));
+		RKIT_CHECK(Serialize(stream, stringPool, fdi.m_fileExists));
+		RKIT_CHECK(Serialize(stream, stringPool, fdi.m_mustBeUpToDate));
+
+		return ResultCode::kOK;
+	}
+
+	Result serializer::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const NodeDependencyInfo &ndi)
+	{
+		RKIT_CHECK(SerializeCompactSize(stream, static_cast<DependencyNode *>(ndi.m_node)->GetSerializedIndex()));
+		RKIT_CHECK(Serialize(stream, stringPool, ndi.m_mustBeUpToDate));
+
+		return ResultCode::kOK;
+	}
+
+	Result serializer::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, bool value)
+	{
+		uint8_t valueByte = value ? 1 : 0;
+		return stream.WriteAll(&valueByte, 1);
+	}
+
+	Result serializer::SerializeCompactSize(IWriteStream &stream, size_t size)
+	{
+		uint64_t index64 = size;
+
+		if (index64 > 0x3fffffffffffffffu)
+			return ResultCode::kOutOfMemory;
+
+		uint8_t bytes[8];
+		bytes[0] = static_cast<uint8_t>((index64 << 2) & 0xffu);
+
+		for (int i = 1; i < 8; i++)
+			bytes[i] = static_cast<uint8_t>((index64 >> (i * 8 - 2)) & 0xffu);
+
+		size_t length = 8;
+		if (bytes[7] != 0 || bytes[6] != 0 || bytes[5] != 0 || bytes[4] != 0)
+			bytes[0] |= 3;
+		else if (bytes[3] != 0 || bytes[2] != 0)
+		{
+			bytes[0] |= 2;
+			length = 4;
+		}
+		else if (bytes[1] != 0)
+		{
+			bytes[0] |= 1;
+			length = 2;
+		}
+		else
+			length = 1;
+
+		return stream.WriteAll(bytes, length);
+	}
+
 	Result DependencyNode::AddNodeDependency(const NodeDependencyInfo &nodeInfo)
 	{
 		for (const NodeDependencyInfo &existingInfo : m_nodeDependencies)
@@ -639,12 +811,35 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
-	Result DependencyNode::Serialize(IWriteStream *stream) const
+	Result DependencyNode::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool) const
 	{
-		return ResultCode::kNotYetImplemented;
+		RKIT_CHECK(stream.WriteAll(&m_nodeNamespace, sizeof(m_nodeNamespace)));
+		RKIT_CHECK(stream.WriteAll(&m_nodeType, sizeof(m_nodeType)));
+		RKIT_CHECK(stream.WriteAll(&m_lastCompilerVersion, sizeof(m_lastCompilerVersion)));
+
+		RKIT_CHECK(serializer::SerializeEnum(stream, m_dependencyState));
+		RKIT_CHECK(serializer::SerializeEnum(stream, m_inputLocation));
+
+		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_analysisProducts));
+		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_compileProducts));
+		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_analysisFileDependencies));
+		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_compileFileDependencies));
+		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_nodeDependencies));
+
+		RKIT_CHECK(serializer::SerializeString(stream, stringPool, m_identifier));
+
+		RKIT_CHECK(serializer::Serialize(stream, stringPool, m_privateData.IsValid()));
+
+		if (m_privateData.IsValid())
+		{
+			RKIT_CHECK(m_privateData->Serialize(stream, stringPool));
+		}
+
+		// Intentionally not serialized: compiler, m_isMarkedAsRoot, m_checkNodeIndex, m_depCheckPhase, m_serializedIndex
+		return ResultCode::kOK;
 	}
 
-	Result DependencyNode::Deserialize(IReadStream *stream)
+	Result DependencyNode::Deserialize(IReadStream &stream)
 	{
 		return ResultCode::kNotYetImplemented;
 	}
@@ -653,6 +848,16 @@ namespace rkit::buildsystem
 	{
 		Vector<FileStatus> &products = (isCompilePhase ? m_compileProducts : m_analysisProducts);
 		return products[productIndex].Set(fstatus);
+	}
+
+	void DependencyNode::SetSerializedIndex(size_t index)
+	{
+		m_serializedIndex = index;
+	}
+
+	size_t DependencyNode::GetSerializedIndex() const
+	{
+		return m_serializedIndex;
 	}
 
 	DependencyNode::DependencyNodeCompilerFeedback::DependencyNodeCompilerFeedback(BuildSystemInstance *instance, DependencyNode *node, bool isCompilePhase)
@@ -848,6 +1053,11 @@ namespace rkit::buildsystem
 		return m_stream->WritePartial(data, count, outCountWritten);
 	}
 
+	Result DependencyNode::FeedbackWrapperStream::Flush()
+	{
+		return m_stream->Flush();
+	}
+
 	Result DependencyNode::FeedbackWrapperStream::SeekStart(FilePos_t pos)
 	{
 		return m_stream->SeekStart(pos);
@@ -1037,6 +1247,96 @@ namespace rkit::buildsystem
 				node->SetState(DependencyState::UpToDate);
 			}
 		}
+
+		// Step 3: Write updated state
+		rkit::BufferStream depsGraphNodesStream;
+		StringPoolBuilder stringPool;
+
+		size_t serializedIndex = 0;
+		for (DependencyNode *node : m_relevantNodes)
+		{
+			node->SetSerializedIndex(serializedIndex++);
+		}
+
+		RKIT_CHECK(serializer::SerializeCompactSize(depsGraphNodesStream, serializedIndex));
+		for (DependencyNode *node : m_relevantNodes)
+		{
+			RKIT_CHECK(node->Serialize(depsGraphNodesStream, stringPool));
+		}
+
+		rkit::BufferStream stringPoolStream;
+		size_t numStrings = stringPool.NumStrings();
+
+		RKIT_CHECK(serializer::SerializeCompactSize(stringPoolStream, numStrings));
+		for (size_t i = 0; i < numStrings; i++)
+		{
+			StringView str = stringPool.GetStringByIndex(i);
+			RKIT_CHECK(serializer::SerializeCompactSize(stringPoolStream, str.Length()));
+			RKIT_CHECK(stringPoolStream.WriteAll(str.GetChars(), str.Length()));
+		}
+
+		FilePos_t stringPoolSize = stringPoolStream.GetSize();
+		FilePos_t graphSize = depsGraphNodesStream.GetSize();
+
+		FilePos_t combinedSize = 0;
+		RKIT_CHECK(SafeAdd(combinedSize, stringPoolSize, graphSize));
+
+		String cacheFullPath;
+		FileLocation cacheFileLocation = rkit::FileLocation::kAbsolute;
+		RKIT_CHECK(ConstructIntermediatePath(cacheFullPath, cacheFileLocation, GetCacheFileName()));
+
+		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+		UniquePtr<ISeekableReadWriteStream> graphStream = sysDriver->OpenFileReadWrite(cacheFileLocation, cacheFullPath.CStr(), true, true, false);
+
+		bool headerOK = false;
+
+		BuildCacheFileHeader header;
+		if (graphStream->GetSize() >= sizeof(header))
+		{
+			RKIT_CHECK(graphStream->ReadAll(&header, sizeof(header)));
+
+			if (header.m_version == BuildCacheFileHeader::kCacheVersion && header.m_identifier == BuildCacheFileHeader::kCacheIdentifier && header.m_activeInstance < 2)
+				headerOK = true;
+		}
+
+		if (!headerOK)
+		{
+			header = BuildCacheFileHeader();
+			header.m_identifier = BuildCacheFileHeader::kCacheIdentifier;
+			header.m_version = BuildCacheFileHeader::kCacheVersion;
+			header.m_activeInstance = 1;
+
+			RKIT_CHECK(graphStream->SeekStart(0));
+			RKIT_CHECK(graphStream->WriteAll(&header, sizeof(header)));
+			RKIT_CHECK(graphStream->Flush());
+		}
+
+		const BuildCacheInstanceInfo &oldInst = header.m_instances[header.m_activeInstance];
+		BuildCacheInstanceInfo &newInst = header.m_instances[1 - header.m_activeInstance];
+
+		bool canWriteBeforeOldInst = false;
+		if (oldInst.m_filePos < sizeof(header) || (oldInst.m_filePos - sizeof(header)) >= combinedSize)
+			canWriteBeforeOldInst = true;
+
+		if (!canWriteBeforeOldInst)
+		{
+			RKIT_CHECK(graphStream->SeekEnd(0));
+		}
+
+		newInst.m_filePos = graphStream->Tell();
+		newInst.m_size = combinedSize;
+
+		Span<const uint8_t> stringPoolData = stringPoolStream.GetBuffer().ToSpan();
+		RKIT_CHECK(graphStream->WriteAll(stringPoolData.Ptr(), stringPoolData.Count()));
+
+		Span<const uint8_t> nodesData = depsGraphNodesStream.GetBuffer().ToSpan();
+		RKIT_CHECK(graphStream->WriteAll(nodesData.Ptr(), nodesData.Count()));
+		RKIT_CHECK(graphStream->Flush());
+
+		header.m_activeInstance = 1 - header.m_activeInstance;
+
+		RKIT_CHECK(graphStream->SeekStart(0));
+		RKIT_CHECK(graphStream->WriteAll(&header, sizeof(header)));
 
 		return ResultCode::kOK;
 	}
@@ -1450,6 +1750,11 @@ namespace rkit::buildsystem
 	BuildSystemInstance::PrintableFourCC BuildSystemInstance::FourCCToPrintable(uint32_t fourCC)
 	{
 		return BuildSystemInstance::PrintableFourCC(fourCC);
+	}
+
+	StringView BuildSystemInstance::GetCacheFileName()
+	{
+		return "buildsystem.cache";
 	}
 
 	BuildSystemInstance::PrintableFourCC::PrintableFourCC(uint32_t fourCC)

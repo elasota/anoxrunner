@@ -20,6 +20,7 @@ namespace rkit
 
 		Result ReadPartial(FilePos_t startPos, void *data, size_t count, size_t &outCountRead) override;
 		Result WritePartial(FilePos_t startPos, const void *data, size_t count, size_t &outCountWritten) override;
+		Result Flush() override;
 		FilePos_t GetSize() const override;
 
 		Result CreateReadStream(UniquePtr<ISeekableReadStream> &outStream) override;
@@ -45,6 +46,7 @@ namespace rkit
 
 		Result ReadPartial(void *data, size_t count, size_t &outCountRead) override;
 		Result WritePartial(const void *data, size_t count, size_t &outCountWritten) override;
+		Result Flush() override;
 		Result SeekStart(FilePos_t pos) override;
 		Result SeekCurrent(FileOffset_t pos) override;
 		Result SeekEnd(FileOffset_t pos) override;

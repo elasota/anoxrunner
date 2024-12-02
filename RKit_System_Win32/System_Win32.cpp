@@ -41,6 +41,8 @@ namespace rkit
 		~File_Win32();
 
 		Result WritePartial(const void *data, size_t count, size_t &outCountWritten) override;
+		Result Flush() override;
+
 		Result ReadPartial(void *data, size_t count, size_t &outCountRead) override;
 
 		Result SeekStart(FilePos_t pos) override;
@@ -227,6 +229,14 @@ namespace rkit
 		}
 
 		outCountWritten = countWritten;
+		return ResultCode::kOK;
+	}
+
+	Result File_Win32::Flush()
+	{
+		if (!FlushFileBuffers(m_hfile))
+			return ResultCode::kIOError;
+
 		return ResultCode::kOK;
 	}
 

@@ -94,8 +94,8 @@ namespace rkit
 		{
 			virtual ~IDependencyNodePrivateData() {}
 
-			virtual Result Serialize(IWriteStream *stream) const = 0;
-			virtual Result Deserialize(IReadStream *stream) = 0;
+			virtual Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool) const = 0;
+			virtual Result Deserialize(IReadStream &stream) = 0;
 		};
 
 		struct IDependencyNode
@@ -119,8 +119,8 @@ namespace rkit
 			virtual CallbackSpan<FileDependencyInfoView, const IDependencyNode *> GetCompileFileDependencies() const = 0;
 			virtual CallbackSpan<NodeDependencyInfo, const IDependencyNode *> GetNodeDependencies() const = 0;
 
-			virtual Result Serialize(IWriteStream *stream) const = 0;
-			virtual Result Deserialize(IReadStream *stream) = 0;
+			virtual Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool) const = 0;
+			virtual Result Deserialize(IReadStream &stream) = 0;
 		};
 
 		struct IDependencyNodeCompilerFeedback

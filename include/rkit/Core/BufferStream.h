@@ -14,6 +14,7 @@ namespace rkit
 	public:
 		Result ReadPartial(void *data, size_t count, size_t &outCountRead) override;
 		Result WritePartial(const void *data, size_t count, size_t &outCountWritten) override;
+		Result Flush() override;
 
 		Result SeekStart(FilePos_t pos) override;
 		Result SeekCurrent(FileOffset_t pos) override;
@@ -83,6 +84,11 @@ inline rkit::Result rkit::BufferStream::WritePartial(const void *data, size_t co
 		m_pos += count;
 	}
 
+	return ResultCode::kOK;
+}
+
+inline rkit::Result rkit::BufferStream::Flush()
+{
 	return ResultCode::kOK;
 }
 

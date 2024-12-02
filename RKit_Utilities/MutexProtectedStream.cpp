@@ -31,6 +31,13 @@ namespace rkit
 		return m_write->WritePartial(data, count, outCountWritten);
 	}
 
+	Result MutexProtectedStreamWrapper::Flush()
+	{
+		std::scoped_lock<std::mutex> lock(m_mutex);
+
+		return m_write->Flush();
+	}
+
 	FilePos_t MutexProtectedStreamWrapper::GetSize() const
 	{
 		std::scoped_lock<std::mutex> lock(m_mutex);
@@ -88,6 +95,11 @@ namespace rkit
 		m_filePos += static_cast<FilePos_t>(countWritten);
 
 		return ResultCode::kOK;
+	}
+
+	Result MutexProtectedStream::Flush()
+	{
+		return m_baseStream->Flush();
 	}
 
 	Result MutexProtectedStream::SeekStart(FilePos_t pos)

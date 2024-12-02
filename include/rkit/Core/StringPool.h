@@ -2,7 +2,7 @@
 
 #include "Vector.h"
 #include "HashTable.h"
-#include "StringView.h"
+#include "StringProto.h"
 #include "UniquePtr.h"
 
 #include <cstddef>
@@ -11,17 +11,21 @@ namespace rkit
 {
 	struct Result;
 
-	class StringPoolBuilder
+	template<class TChar>
+	class BaseStringPoolBuilder
 	{
 	public:
-		StringPoolBuilder();
+		BaseStringPoolBuilder();
 
-		Result IndexString(const StringView &str, size_t &outIndex);
-		const StringView GetStringByIndex(size_t index) const;
+		Result IndexString(const BaseStringView<TChar> &str, size_t &outIndex);
+		const BaseStringView<TChar> GetStringByIndex(size_t index) const;
+		size_t NumStrings() const;
 
 	private:
-		Vector<UniquePtr<String>> m_strings;
-		HashMap<StringView, size_t> m_stringToIndex;
+		typedef BaseString<TChar, 16> StringType_t;
+
+		Vector<UniquePtr<StringType_t>> m_strings;
+		HashMap<BaseStringView<TChar>, size_t> m_stringToIndex;
 	};
 }
 
@@ -29,22 +33,26 @@ namespace rkit
 #include "Result.h"
 #include "String.h"
 
-inline rkit::StringPoolBuilder::StringPoolBuilder()
+template<class TChar>
+inline rkit::BaseStringPoolBuilder<TChar>::BaseStringPoolBuilder()
 {
 }
 
-inline rkit::Result rkit::StringPoolBuilder::IndexString(const StringView &str, size_t &outIndex)
+template<class TChar>
+inline rkit::Result rkit::BaseStringPoolBuilder<TChar>::IndexString(const BaseStringView<TChar> &str, size_t &outIndex)
 {
-	HashMap<StringView, size_t>::ConstIterator_t it = m_stringToIndex.Find(str);
+	typedef HashMap<BaseStringView<TChar>, size_t>::ConstIterator_t MapConstIterator_t;
+
+	MapConstIterator_t it = m_stringToIndex.Find(str);
 	if (it == m_stringToIndex.end())
 	{
-		String strInstance;
+		StringType_t strInstance;
 		RKIT_CHECK(strInstance.Set(str));
 
-		UniquePtr<String> strPtr;
-		RKIT_CHECK(New<String>(strPtr, std::move(strInstance)));
+		UniquePtr<StringType_t> strPtr;
+		RKIT_CHECK(New<StringType_t>(strPtr, std::move(strInstance)));
 
-		StringView strPtrView = *strPtr.Get();
+		BaseStringView<TChar> strPtrView = *strPtr.Get();
 
 		size_t index = m_strings.Count();
 		RKIT_CHECK(m_strings.Append(std::move(strPtr)));
@@ -64,7 +72,14 @@ inline rkit::Result rkit::StringPoolBuilder::IndexString(const StringView &str, 
 	return ResultCode::kOK;
 }
 
-const rkit::StringView rkit::StringPoolBuilder::GetStringByIndex(size_t index) const
+template<class TChar>
+const rkit::BaseStringView<TChar> rkit::BaseStringPoolBuilder<TChar>::GetStringByIndex(size_t index) const
 {
 	return *m_strings[index];
+}
+
+template<class TChar>
+size_t rkit::BaseStringPoolBuilder<TChar>::NumStrings() const
+{
+	return m_strings.Count();
 }
