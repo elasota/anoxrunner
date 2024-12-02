@@ -42,6 +42,14 @@ namespace rkit
 			virtual Result ResolveFileStatusIfExists(BuildFileLocation inputFileLocation, const StringView &identifier, void *userdata, ApplyFileStatusCallback_t applyStatus) = 0;
 		};
 
+		struct IPipelineLibraryCombiner
+		{
+			virtual ~IPipelineLibraryCombiner() {}
+
+			virtual Result AddInput(IReadStream &stream) = 0;
+			virtual Result WritePackage(ISeekableWriteStream &stream) = 0;
+		};
+
 		struct IBuildSystemInstance
 		{
 			virtual ~IBuildSystemInstance() {}
@@ -64,6 +72,7 @@ namespace rkit
 			virtual Result CreateBuildSystemInstance(UniquePtr<IBuildSystemInstance> &outInstance) const = 0;
 			virtual Result CreatePackageObjectWriter(UniquePtr<IPackageObjectWriter> &outWriter) const = 0;
 			virtual Result CreatePackageBuilder(data::IRenderDataHandler *dataHandler, IPackageObjectWriter *objWriter, bool allowTempStrings, UniquePtr<IPackageBuilder> &outBuilder) const = 0;
+			virtual Result CreatePipelineLibraryCombiner(UniquePtr<IPipelineLibraryCombiner> &outCombiner) const = 0;
 		};
 
 		struct IBuildSystemAddOnDriver : public ICustomDriver
@@ -84,6 +93,6 @@ namespace rkit::buildsystem
 
 	inline StringView GetCompiledPipelineIntermediateBasePath()
 	{
-		return "rpllc_compiled/";
+		return "rpllc_c/";
 	}
 }

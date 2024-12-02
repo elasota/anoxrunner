@@ -2,6 +2,7 @@
 
 #include "BuildSystemInstance.h"
 #include "PackageBuilder.h"
+#include "RenderPipelineLibraryCompiler.h"
 
 #include "rkit/Core/DriverModuleStub.h"
 #include "rkit/Core/ModuleDriver.h"
@@ -23,6 +24,7 @@ namespace rkit::buildsystem
 		Result CreateBuildSystemInstance(UniquePtr<IBuildSystemInstance> &outInstance) const override;
 		Result CreatePackageObjectWriter(UniquePtr<IPackageObjectWriter> &outWriter) const override;
 		Result CreatePackageBuilder(data::IRenderDataHandler *dataHandler, IPackageObjectWriter *objWriter, bool allowTempStrings, UniquePtr<IPackageBuilder> &outBuilder) const override;
+		Result CreatePipelineLibraryCombiner(UniquePtr<IPipelineLibraryCombiner> &outCombiner) const override;
 	};
 
 	typedef rkit::CustomDriverModuleStub<BuildSystemDriver> BuildSystemModule;
@@ -49,6 +51,11 @@ namespace rkit::buildsystem
 	Result BuildSystemDriver::CreatePackageBuilder(data::IRenderDataHandler *dataHandler, IPackageObjectWriter *objWriter, bool allowTempStrings, UniquePtr<IPackageBuilder> &outBuilder) const
 	{
 		return PackageBuilderBase::Create(dataHandler, objWriter, allowTempStrings, outBuilder);
+	}
+
+	Result BuildSystemDriver::CreatePipelineLibraryCombiner(UniquePtr<IPipelineLibraryCombiner> &outCombiner) const
+	{
+		return PipelineLibraryCombinerBase::Create(outCombiner);
 	}
 }
 

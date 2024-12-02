@@ -389,7 +389,7 @@ namespace rkit::buildsystem::vulkan
 
 	StringSliceView RenderPipelineCompiler::BinaryInclusionIndexer::ResolveConfigKey(size_t index) const
 	{
-		return m_package->GetString(index);
+		return m_package->GetString(m_package->GetConfigKey(index).m_stringIndex);
 	}
 
 	StringSliceView RenderPipelineCompiler::BinaryInclusionIndexer::ResolveTempString(size_t index) const
@@ -951,7 +951,7 @@ namespace rkit::buildsystem::vulkan
 
 	Result PipelineCompilerBase::FormatGraphicsPipelineStageFilePath(String &str, const StringView &inPath, render::vulkan::GraphicPipelineStage stage)
 	{
-		return str.Format("vk_plc_g/%s_%i.spv", inPath.GetChars(), static_cast<int>(stage));
+		return str.Format("vk_plc_g_%i/%s", static_cast<int>(stage), inPath.GetChars());
 	}
 
 	Result PipelineCompilerBase::LoadDataDriver(data::IDataDriver **outDriver)

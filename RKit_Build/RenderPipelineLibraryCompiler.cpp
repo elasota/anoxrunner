@@ -332,14 +332,13 @@ namespace rkit::buildsystem::rpc_analyzer
 
 namespace rkit::buildsystem::rpc_combiner
 {
-	class LibraryCombiner final : public NoCopy
+	class LibraryCombiner final : public IPipelineLibraryCombiner, public NoCopy
 	{
 	public:
 		explicit LibraryCombiner(data::IDataDriver *dataDriver);
 
-		Result AddInput(IReadStream &stream);
-
-		Result WritePackage(ISeekableWriteStream &stream);
+		Result AddInput(IReadStream &stream) override;
+		Result WritePackage(ISeekableWriteStream &stream) override;
 
 	private:
 		class PackageInputResolver final : public IStringResolver, public NoCopy
@@ -2294,7 +2293,7 @@ namespace rkit::buildsystem::rpc_combiner
 
 	StringSliceView LibraryCombiner::PackageInputResolver::ResolveConfigKey(size_t index) const
 	{
-		return m_pkg.GetString(index);
+		return m_pkg.GetString(m_pkg.GetConfigKey(index).m_stringIndex);
 	}
 
 	StringSliceView LibraryCombiner::PackageInputResolver::ResolveTempString(size_t index) const
@@ -2442,5 +2441,21 @@ namespace rkit::buildsystem
 	uint32_t RenderPipelineLibraryCompiler::GetVersion() const
 	{
 		return 1;
+	}
+
+	Result PipelineLibraryCombinerBase::Create(UniquePtr<IPipelineLibraryCombiner> &outCombiner)
+	{
+		rkit::IModule *dataModule = rkit::GetDrivers().m_moduleDriver->LoadModule(IModuleDriver::kDefaultNamespace, "Data");
+		if (!dataModule)
+		{
+			rkit::log::Error("Couldn't load data module");
+			return rkit::ResultCode::kModuleLoadFailed;
+		}
+
+		RKIT_CHECK(dataModule->Init(nullptr));
+
+		data::IDataDriver *dataDriver = static_cast<data::IDataDriver *>(rkit::GetDrivers().FindDriver(IModuleDriver::kDefaultNamespace, "Data"));
+
+		return New<rpc_combiner::LibraryCombiner>(outCombiner, dataDriver);
 	}
 }

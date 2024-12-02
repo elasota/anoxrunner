@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rkit/BuildSystem/BuildSystem.h"
 #include "rkit/BuildSystem/DependencyGraph.h"
 #include "rkit/Render/RenderDefs.h"
 
@@ -21,5 +22,11 @@ namespace rkit::buildsystem
 		Result CreatePrivateData(UniquePtr<IDependencyNodePrivateData> &outPrivateData) override;
 
 		uint32_t GetVersion() const override;
+	};
+
+	class PipelineLibraryCombinerBase : public IPipelineLibraryCombiner
+	{
+	public:
+		static Result Create(UniquePtr<IPipelineLibraryCombiner> &outPackageObjectWriter);
 	};
 }
