@@ -1,6 +1,10 @@
 
 
-void VertexMain(out Outputs)
+void VertexMain()
 {
 	
+}
+
+void main()
+{
 }

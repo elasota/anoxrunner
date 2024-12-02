@@ -238,11 +238,14 @@ namespace rkit::buildsystem
 			explicit DependencyNodeCompilerFeedback(BuildSystemInstance *instance, DependencyNode *node, bool isCompilePhase);
 
 			Result CheckInputExists(BuildFileLocation location, const StringView &path, bool &outExists) override;
+			Result OpenInput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &inputFile) override;
 			Result TryOpenInput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &inputFile) override;
 			Result OpenOutput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outputFile) override;
 
 			Result AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) override;
 			bool FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const override;
+
+			IBuildSystemInstance *GetBuildSystemInstance() const override;
 
 			void MarkOutputFileFinished(size_t productIndex, BuildFileLocation location, const StringView &path);
 
@@ -252,7 +255,6 @@ namespace rkit::buildsystem
 			Result CheckedMarkOutputFileFinished(size_t productIndex, BuildFileLocation location, const StringView &path);
 
 			BuildSystemInstance *m_buildInstance;
-			IBuildFileSystem *m_fs;
 			DependencyNode *m_dependencyNode;
 			bool m_isCompilePhase;
 
@@ -592,7 +594,7 @@ namespace rkit::buildsystem
 
 	Result DependencyNode::FindOrAddCompileProduct(BuildFileLocation location, const StringView &path, size_t &outIndex)
 	{
-		return FindOrAddProduct(m_analysisProducts, location, path, outIndex);
+		return FindOrAddProduct(m_compileProducts, location, path, outIndex);
 	}
 
 	Result DependencyNode::AddAnalysisFileDependency(const FileDependencyInfoView &fileInfo)
@@ -626,9 +628,9 @@ namespace rkit::buildsystem
 
 	Result DependencyNode::AddNodeDependency(const NodeDependencyInfo &nodeInfo)
 	{
-		for (const NodeDependencyInfo &nodeInfo : m_nodeDependencies)
+		for (const NodeDependencyInfo &existingInfo : m_nodeDependencies)
 		{
-			if (nodeInfo.m_node == nodeInfo.m_node)
+			if (nodeInfo.m_node == existingInfo.m_node)
 				return ResultCode::kOK;
 		}
 
@@ -693,6 +695,15 @@ namespace rkit::buildsystem
 		}
 
 		outExists = exists;
+
+		return ResultCode::kOK;
+	}
+
+	Result DependencyNode::DependencyNodeCompilerFeedback::OpenInput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &inputFile)
+	{
+		RKIT_CHECK(TryOpenInput(location, path, inputFile));
+		if (!inputFile.IsValid())
+			return ResultCode::kFileOpenError;
 
 		return ResultCode::kOK;
 	}
@@ -774,6 +785,11 @@ namespace rkit::buildsystem
 	bool DependencyNode::DependencyNodeCompilerFeedback::FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const
 	{
 		return m_buildInstance->FindNodeTypeByFileExtension(ext, outNamespace, outType);
+	}
+
+	IBuildSystemInstance *DependencyNode::DependencyNodeCompilerFeedback::GetBuildSystemInstance() const
+	{
+		return m_buildInstance;
 	}
 
 	void DependencyNode::DependencyNodeCompilerFeedback::MarkOutputFileFinished(size_t productIndex, BuildFileLocation location, const StringView &path)

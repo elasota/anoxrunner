@@ -1,12 +1,15 @@
 #include "rkit/BuildSystem/BuildSystem.h"
 
 #include "rkit/Core/DriverModuleStub.h"
+#include "rkit/Core/LogDriver.h"
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/ModuleGlue.h"
 
 #include "rkit/Vulkan/GraphicsPipeline.h"
 
 #include "VulkanRenderPipelineCompiler.h"
+
+#include <glslang/Include/glslang_c_interface.h>
 
 namespace rkit::buildsystem
 {
@@ -22,17 +25,32 @@ namespace rkit::buildsystem
 
 		uint32_t GetDriverNamespaceID() const override { return rkit::IModuleDriver::kDefaultNamespace; }
 		rkit::StringView GetDriverName() const override { return "Build_Vulkan"; }
+
+		bool m_isGlslangInitialized = false;
 	};
 
 	typedef rkit::CustomDriverModuleStub<BuildVulkanDriver> BuildVulkanModule;
 
 	rkit::Result BuildVulkanDriver::InitDriver()
 	{
+		if (!glslang_initialize_process())
+		{
+			rkit::log::Error("glslang failed to init");
+			return rkit::ResultCode::kOperationFailed;
+		}
+
+		m_isGlslangInitialized = true;
+
 		return rkit::ResultCode::kOK;
 	}
 
 	void BuildVulkanDriver::ShutdownDriver()
 	{
+		if (m_isGlslangInitialized)
+		{
+			glslang_finalize_process();
+			m_isGlslangInitialized = false;
+		}
 	}
 
 	Result BuildVulkanDriver::RegisterBuildSystemAddOn(IBuildSystemInstance *instance)

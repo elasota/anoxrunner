@@ -32,6 +32,7 @@ namespace rkit
 
 		const TChar &operator[](size_t index) const;
 
+		BaseStringSliceView SubString(size_t start) const;
 		BaseStringSliceView SubString(size_t start, size_t length) const;
 
 		Span<const TChar> ToSpan() const;
@@ -107,6 +108,15 @@ template<class TChar>
 const TChar &rkit::BaseStringSliceView<TChar>::operator[](size_t index) const
 {
 	return m_span[index];
+}
+
+template<class TChar>
+rkit::BaseStringSliceView<TChar> rkit::BaseStringSliceView<TChar>::SubString(size_t start) const
+{
+	if (start > m_span.Count())
+		start = m_span.Count();
+
+	return BaseStringSliceView<TChar>(m_span.Ptr() + start, m_span.Count() - start);
 }
 
 template<class TChar>

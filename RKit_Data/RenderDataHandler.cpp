@@ -680,6 +680,28 @@ namespace rkit::data
 			sizeof("ValueType") - 1,
 		};
 
+		template<>
+		struct RTTIResolver<render::BinaryContent>
+		{
+			static const RenderRTTITypeBase *GetRTTIType()
+			{
+				return &ms_type;
+			}
+
+		private:
+			static RenderRTTITypeBase ms_type;
+		};
+
+		RenderRTTITypeBase RTTIResolver<render::BinaryContent>::ms_type =
+		{
+			RenderRTTIType::BinaryContent,
+
+			RenderRTTIMainType::BinaryContent,
+
+			"BinaryContent",
+			sizeof("BinaryContent") - 1,
+		};
+
 		template<class T>
 		class RenderRTTIList final : public IRenderRTTIListBase
 		{
@@ -1115,11 +1137,7 @@ namespace rkit::data
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(ContentKey)
-			RTTI_STRUCT_FIELD(key0)
-			RTTI_STRUCT_FIELD(key1)
-			RTTI_STRUCT_FIELD(key2)
-			RTTI_STRUCT_FIELD(key3)
-			RTTI_STRUCT_FIELD(source)
+			RTTI_STRUCT_FIELD_INVISIBLE(content)
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(ShaderDesc)
@@ -1136,6 +1154,9 @@ namespace rkit::data
 		IRenderRTTIListBase *GetIndexable(RenderRTTIIndexableStructType indexable) const override;
 		const ConfigKey &GetConfigKey(size_t index) const override;
 		StringView GetString(size_t stringIndex) const override;
+
+		size_t GetBinaryContentCount() const override;
+		size_t GetBinaryContentSize(size_t binaryContentIndex) const override;
 
 		Result Load(const IRenderDataHandler *handler, bool allowTempStrings, IReadStream &stream);
 
@@ -1178,6 +1199,7 @@ namespace rkit::data
 		Result ReadNumber(void *obj, const RenderRTTINumberType *rtti, bool isConfigurable, IReadStream &stream) const;
 		Result ReadValueType(void *obj, IReadStream &stream) const;
 		Result ReadStringIndex(void *obj, const data::RenderRTTIStringIndexType *rtti, IReadStream &stream) const;
+		Result ReadBinaryContent(void *obj, IReadStream &stream) const;
 		Result ReadObjectPtr(void *obj, const data::RenderRTTIObjectPtrType *rtti, bool isNullable, IReadStream &stream) const;
 		Result ReadObjectPtrSpan(void *obj, const data::RenderRTTIObjectPtrSpanType *rtti, bool isNullable, IReadStream &stream) const;
 
@@ -1191,6 +1213,7 @@ namespace rkit::data
 		Vector<ConfigKey> m_configKeys;
 		Vector<StringOffsetAndSize> m_strings;
 		Vector<char> m_stringChars;
+		Vector<size_t> m_binaryContentSizes;
 
 		bool m_hasTempStrings = false;
 
@@ -1223,6 +1246,16 @@ namespace rkit::data
 		return StringView(&m_stringChars[str.m_offset], str.m_size);
 	}
 
+	size_t Package::GetBinaryContentCount() const
+	{
+		return m_binaryContentSizes.Count();
+	}
+
+	size_t Package::GetBinaryContentSize(size_t binaryContentIndex) const
+	{
+		return m_binaryContentSizes[binaryContentIndex];
+	}
+
 	Result Package::Load(const IRenderDataHandler *handler, bool allowTempStrings, IReadStream &stream)
 	{
 		m_hasTempStrings = allowTempStrings;
@@ -1252,12 +1285,15 @@ namespace rkit::data
 
 		size_t numStrings = 0;
 		size_t numConfigKeys = 0;
+		size_t numBinaryContent = 0;
 
 		RKIT_CHECK(ReadCompactIndex(stream, numStrings));
 		RKIT_CHECK(ReadCompactIndex(stream, numConfigKeys));
+		RKIT_CHECK(ReadCompactIndex(stream, numBinaryContent));
 
 		RKIT_CHECK(m_strings.Resize(numStrings));
 		RKIT_CHECK(m_configKeys.Resize(numConfigKeys));
+		RKIT_CHECK(m_binaryContentSizes.Resize(numBinaryContent));
 
 		size_t numCharsTotal = 0;
 
@@ -1309,6 +1345,11 @@ namespace rkit::data
 				rkit::log::Error("Config key main type was invalid");
 				return ResultCode::kMalformedFile;
 			}
+		}
+
+		for (size_t &bcSize : m_binaryContentSizes)
+		{
+			RKIT_CHECK(ReadCompactIndex(stream, bcSize));
 		}
 
 		for (size_t i = 0; i < kNumIndexables; i++)
@@ -1562,6 +1603,9 @@ namespace rkit::data
 		case data::RenderRTTIType::ObjectPtrSpan:
 			RKIT_ASSERT(!isConfigurable);
 			return ReadObjectPtrSpan(obj, reinterpret_cast<const data::RenderRTTIObjectPtrSpanType *>(rtti), isNullable, stream);
+		case data::RenderRTTIType::BinaryContent:
+			RKIT_ASSERT(!isConfigurable);
+			return ReadBinaryContent(obj, stream);
 		default:
 			return ResultCode::kInternalError;
 		}
@@ -1825,6 +1869,16 @@ namespace rkit::data
 		return ResultCode::kOK;
 	}
 
+	Result Package::ReadBinaryContent(void *obj, IReadStream &stream) const
+	{
+		size_t binaryContentIndex = 0;
+		RKIT_CHECK(ReadCompactIndex(stream, binaryContentIndex));
+
+		static_cast<render::BinaryContent *>(obj)->m_contentIndex = binaryContentIndex;
+
+		return ResultCode::kOK;
+	}
+
 	Result Package::ReadObjectPtr(void *obj, const data::RenderRTTIObjectPtrType *rtti, bool isNullable, IReadStream &stream) const
 	{
 		size_t objectIndex = 0;
@@ -2036,15 +2090,34 @@ namespace rkit::data
 		return RKIT_FOURCC('R', 'P', 'K', 'G');
 	}
 
-	Result RenderDataHandler::LoadPackage(IReadStream &stream, bool allowTempStrings, UniquePtr<IRenderDataPackage> &outPackage) const
+	Result RenderDataHandler::LoadPackage(IReadStream &stream, bool allowTempStrings, UniquePtr<IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *outBinaryContent) const
 	{
 		UniquePtr<Package> package;
 		RKIT_CHECK(New<Package>(package));
 
 		RKIT_CHECK(package->Load(this, allowTempStrings, stream));
 
-		outPackage = std::move(package);
+		if (outBinaryContent)
+		{
+			size_t numBinaryContent = package->GetBinaryContentCount();
 
+			RKIT_CHECK(outBinaryContent->Resize(numBinaryContent));
+
+			for (size_t i = 0; i < numBinaryContent; i++)
+			{
+				Vector<uint8_t> &contentInstance = (*outBinaryContent)[i];
+
+				size_t contentSize = package->GetBinaryContentSize(i);
+				RKIT_CHECK(contentInstance.Resize(contentSize));
+
+				if (contentSize > 0)
+				{
+					RKIT_CHECK(stream.ReadAll(&contentInstance[0], contentSize));
+				}
+			}
+		}
+
+		outPackage = std::move(package);
 		return ResultCode::kOK;
 	}
 

@@ -572,14 +572,14 @@ namespace rkit::render
 		ConstSpan<const DescriptorDesc *> m_descriptors;
 	};
 
+	struct BinaryContent
+	{
+		size_t m_contentIndex = 0;
+	};
+
 	struct ContentKey
 	{
-		uint64_t m_key0 = 0;
-		uint64_t m_key1 = 0;
-		uint64_t m_key2 = 0;
-		uint64_t m_key3 = 0;
-
-		TempStringIndex_t m_source;
+		BinaryContent m_content;
 	};
 
 	struct ShaderDesc

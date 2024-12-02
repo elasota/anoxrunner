@@ -4,6 +4,7 @@
 
 #include "rkit/Core/Drivers.h"
 #include "rkit/Core/FourCC.h"
+#include "rkit/Core/StringProto.h"
 
 namespace rkit
 {
@@ -11,6 +12,11 @@ namespace rkit
 	class UniquePtr;
 
 	struct IReadStream;
+
+	namespace data
+	{
+		struct IRenderDataHandler;
+	}
 
 	namespace buildsystem
 	{
@@ -21,7 +27,11 @@ namespace rkit
 
 		struct IDependencyNode;
 		struct IDependencyGraphFactory;
+		struct IPackageBuilder;
+		struct IPackageObjectWriter;
 		struct FileStatusView;
+
+		StringView GetShaderSourceBasePath();
 
 		struct IBuildFileSystem
 		{
@@ -52,11 +62,28 @@ namespace rkit
 		struct IBuildSystemDriver : public ICustomDriver
 		{
 			virtual Result CreateBuildSystemInstance(UniquePtr<IBuildSystemInstance> &outInstance) const = 0;
+			virtual Result CreatePackageObjectWriter(UniquePtr<IPackageObjectWriter> &outWriter) const = 0;
+			virtual Result CreatePackageBuilder(data::IRenderDataHandler *dataHandler, IPackageObjectWriter *objWriter, bool allowTempStrings, UniquePtr<IPackageBuilder> &outBuilder) const = 0;
 		};
 
 		struct IBuildSystemAddOnDriver : public ICustomDriver
 		{
 			virtual Result RegisterBuildSystemAddOn(IBuildSystemInstance *instance) = 0;
 		};
+	}
+}
+
+#include "rkit/Core/StringView.h"
+
+namespace rkit::buildsystem
+{
+	inline StringView GetShaderSourceBasePath()
+	{
+		return "rkit/render/src/";
+	}
+
+	inline StringView GetCompiledPipelineIntermediateBasePath()
+	{
+		return "rpllc_compiled/";
 	}
 }

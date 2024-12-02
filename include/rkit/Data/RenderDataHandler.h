@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "rkit/Render/RenderDefProtos.h"
-#include "rkit/Core/Vector.h"
+#include "rkit/Core/StringProto.h"
 
 namespace rkit
 {
@@ -13,7 +13,11 @@ namespace rkit
 	template<class T>
 	class UniquePtr;
 
+	template<class T>
+	class Vector;
+
 	struct IWriteStream;
+	struct IReadStream;
 }
 
 namespace rkit::data
@@ -21,6 +25,8 @@ namespace rkit::data
 	enum class RenderRTTIMainType
 	{
 		ValueType,
+
+		BinaryContent,
 
 		// String indexes
 		GlobalStringIndex,
@@ -108,6 +114,7 @@ namespace rkit::data
 		StringIndex,
 		ObjectPtr,
 		ObjectPtrSpan,
+		BinaryContent,
 	};
 
 	struct RenderRTTIEnumOption
@@ -301,6 +308,8 @@ namespace rkit::data
 		virtual IRenderRTTIListBase *GetIndexable(RenderRTTIIndexableStructType indexable) const = 0;
 		virtual const ConfigKey &GetConfigKey(size_t index) const = 0;
 		virtual StringView GetString(size_t stringIndex) const = 0;
+		virtual size_t GetBinaryContentCount() const = 0;
+		virtual size_t GetBinaryContentSize(size_t binaryContentIndex) const = 0;
 	};
 
 	struct IRenderDataHandler
@@ -326,6 +335,6 @@ namespace rkit::data
 		virtual uint32_t GetPackageVersion() const = 0;
 		virtual uint32_t GetPackageIdentifier() const = 0;
 
-		virtual Result LoadPackage(IReadStream &stream, bool allowTempStrings, UniquePtr<IRenderDataPackage> &outPackage) const = 0;
+		virtual Result LoadPackage(IReadStream &stream, bool allowTempStrings, UniquePtr<IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *outBinaryContent) const = 0;
 	};
 }
