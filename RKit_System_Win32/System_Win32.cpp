@@ -797,7 +797,7 @@ namespace rkit
 		HANDLE fHandle = CreateFileW(fullPathW.GetBuffer(), access, shareMode, nullptr, disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
 
 		if (fHandle == INVALID_HANDLE_VALUE)
-			return ResultCode::kFileOpenError;
+			return Result::SoftFault(ResultCode::kFileOpenError);
 
 		LARGE_INTEGER fileSize;
 		if (!GetFileSizeEx(fHandle, &fileSize))

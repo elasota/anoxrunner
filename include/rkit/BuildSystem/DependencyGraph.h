@@ -90,12 +90,18 @@ namespace rkit
 			bool m_mustBeUpToDate = true;
 		};
 
+		struct IDeserializeResolver
+		{
+			virtual Result GetString(size_t index, StringView &outString) const = 0;
+			virtual Result GetDependencyNode(size_t index, IDependencyNode *&outNode) const = 0;
+		};
+
 		struct IDependencyNodePrivateData
 		{
 			virtual ~IDependencyNodePrivateData() {}
 
 			virtual Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool) const = 0;
-			virtual Result Deserialize(IReadStream &stream) = 0;
+			virtual Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver) = 0;
 		};
 
 		struct IDependencyNode
@@ -121,7 +127,7 @@ namespace rkit
 			virtual CallbackSpan<NodeDependencyInfo, const IDependencyNode *> GetNodeDependencies() const = 0;
 
 			virtual Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool) const = 0;
-			virtual Result Deserialize(IReadStream &stream) = 0;
+			virtual Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver) = 0;
 		};
 
 		struct IDependencyNodeCompilerFeedback

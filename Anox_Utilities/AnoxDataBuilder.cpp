@@ -115,6 +115,8 @@ namespace anox::utils
 
 		RKIT_CHECK(addOnDriver->RegisterBuildSystemAddOn(instance.Get()));
 
+		RKIT_CHECK(instance->LoadCache());
+
 		rkit::buildsystem::IDependencyGraphFactory *graphFactory = instance->GetDependencyGraphFactory();
 
 		rkit::buildsystem::IDependencyNode *rootDepsNode;

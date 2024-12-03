@@ -190,6 +190,7 @@ rkit::HashValue_t rkit::Hasher<rkit::buildsystem::NodeKey>::ComputeHash(HashValu
 namespace rkit::buildsystem
 {
 	class BuildSystemInstance;
+	class DependencyNode;
 
 	enum class DependencyCheckPhase
 	{
@@ -206,9 +207,6 @@ namespace rkit::buildsystem
 		static Result SerializeVector(IWriteStream &stream, StringPoolBuilder &stringPool, const Vector<T> &vec);
 
 		template<class T>
-		static Result SerializeSpan(IWriteStream &stream, StringPoolBuilder &stringPool, const Span<const T> &span);
-
-		template<class T>
 		static Result SerializeEnum(IWriteStream &stream, const T &value);
 
 		static Result SerializeString(IWriteStream &stream, StringPoolBuilder &stringPool, const StringView &str);
@@ -219,6 +217,34 @@ namespace rkit::buildsystem
 		static Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, bool value);
 
 		static Result SerializeCompactSize(IWriteStream &stream, size_t sz);
+
+		class DeserializeResolver final : public IDeserializeResolver
+		{
+		public:
+			DeserializeResolver(const Span<const UniquePtr<DependencyNode>> &nodes, const Span<const String> &strings);
+
+			Result GetString(size_t index, StringView &outString) const override;
+			Result GetDependencyNode(size_t index, IDependencyNode *&outNode) const override;
+
+		private:
+			Span<const UniquePtr<DependencyNode>> m_nodes;
+			Span<const String> m_strings;
+		};
+
+		template<class T>
+		static Result DeserializeVector(IReadStream &stream, const IDeserializeResolver &resolver, Vector<T> &vec);
+
+		template<class T>
+		static Result DeserializeEnum(IReadStream &stream, T &value);
+
+		static Result DeserializeString(IReadStream &stream, const IDeserializeResolver &resolver, String &str);
+
+		static Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, FileStatus &fs);
+		static Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, FileDependencyInfo &fdi);
+		static Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, NodeDependencyInfo &ndi);
+		static Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, bool &value);
+
+		static Result DeserializeCompactSize(IReadStream &stream, size_t &sz);
 	}
 
 	class DependencyNode final : public IDependencyNode
@@ -265,8 +291,11 @@ namespace rkit::buildsystem
 		Result AddCompileFileDependency(const FileDependencyInfoView &fileInfo);
 		Result AddNodeDependency(const NodeDependencyInfo &nodeInfo);
 
+		Result SerializeInitialState(IWriteStream &stream) const;
+		static Result DeserializeInitialState(IReadStream &stream, uint32_t &outNodeNamespace, uint32_t &outNodeType, BuildFileLocation &outInputLocation, uint32_t &outCompilerVersion);
+
 		Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool) const override;
-		Result Deserialize(IReadStream &stream) override;
+		Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver) override;
 
 		Result MarkProductFinished(bool isCompilePhase, size_t productIndex, const FileStatusView &fstatus);
 
@@ -395,6 +424,7 @@ namespace rkit::buildsystem
 		IDependencyNode *FindNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) const override;
 		Result FindOrCreateNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier, IDependencyNode *&outNode) override;
 		Result AddRootNode(IDependencyNode *node) override;
+		Result LoadCache() override;
 
 		Result Build(IBuildFileSystem *fs) override;
 
@@ -448,6 +478,9 @@ namespace rkit::buildsystem
 		static StringView GetCacheFileName();
 
 		static IDependencyNode *GetRelevantNodeByIndex(const IBuildSystemInstance * const& instance, size_t index);
+
+		Result SaveCache();
+		Result CheckedLoadCache(ISeekableReadStream &stream, FilePos_t pos);
 
 		String m_targetName;
 		String m_srcDir;
@@ -622,6 +655,7 @@ namespace rkit::buildsystem
 
 		RKIT_CHECK(m_compiler->RunCompile(this, &feedback));
 
+		m_lastCompilerVersion = m_compiler->GetVersion();
 		m_wasCompiled = true;
 		return ResultCode::kOK;
 	}
@@ -715,17 +749,11 @@ namespace rkit::buildsystem
 	template<class T>
 	Result serializer::SerializeVector(IWriteStream &stream, StringPoolBuilder &stringPool, const Vector<T> &vec)
 	{
-		return SerializeSpan<T>(stream, stringPool, vec.ToSpan());
-	}
+		size_t count = vec.Count();
 
-	template<class T>
-	Result serializer::SerializeSpan(IWriteStream &stream, StringPoolBuilder &stringPool, const Span<const T> &span)
-	{
-		uint64_t count = span.Count();
+		RKIT_CHECK(serializer::SerializeCompactSize(stream, count));
 
-		RKIT_CHECK(stream.WriteAll(&count, sizeof(count)));
-
-		for (const T &item : span)
+		for (const T &item : vec)
 		{
 			RKIT_CHECK(Serialize(stream, stringPool, item));
 		}
@@ -812,6 +840,144 @@ namespace rkit::buildsystem
 		return stream.WriteAll(bytes, length);
 	}
 
+	serializer::DeserializeResolver::DeserializeResolver(const Span<const UniquePtr<DependencyNode>> &nodes, const Span<const String> &strings)
+		: m_nodes(nodes)
+		, m_strings(strings)
+	{
+	}
+
+	Result serializer::DeserializeResolver::GetString(size_t index, StringView &outString) const
+	{
+		if (index >= m_strings.Count())
+			return ResultCode::kInvalidParameter;
+
+		outString = m_strings[index];
+		return ResultCode::kOK;
+	}
+
+	Result serializer::DeserializeResolver::GetDependencyNode(size_t index, IDependencyNode *&outNode) const
+	{
+		if (index >= m_nodes.Count())
+			return ResultCode::kInvalidParameter;
+
+		outNode = m_nodes[index].Get();
+		return ResultCode::kOK;
+	}
+
+
+	template<class T>
+	Result serializer::DeserializeVector(IReadStream &stream, const IDeserializeResolver &resolver, Vector<T> &vec)
+	{
+		size_t sz = 0;
+		RKIT_CHECK(DeserializeCompactSize(stream, sz));
+
+		RKIT_CHECK(vec.Resize(sz));
+		for (T &item : vec)
+		{
+			RKIT_CHECK(Deserialize(stream, resolver, item));
+		}
+
+		return ResultCode::kOK;
+	}
+
+	template<class T>
+	Result serializer::DeserializeEnum(IReadStream &stream, T &value)
+	{
+		size_t szValue = 0;
+		RKIT_CHECK(DeserializeCompactSize(stream, szValue));
+
+		value = static_cast<T>(szValue);
+		return ResultCode::kOK;
+	}
+
+	Result serializer::DeserializeString(IReadStream &stream, const IDeserializeResolver &resolver, String &str)
+	{
+		size_t index = 0;
+		RKIT_CHECK(DeserializeCompactSize(stream, index));
+
+		StringView strView;
+		RKIT_CHECK(resolver.GetString(index, strView));
+
+		RKIT_CHECK(str.Set(strView));
+
+		return ResultCode::kOK;
+	}
+
+	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, FileStatus &fs)
+	{
+		RKIT_CHECK(DeserializeString(stream, resolver, fs.m_filePath));
+		RKIT_CHECK(DeserializeEnum(stream, fs.m_location));
+		RKIT_CHECK(stream.ReadAll(&fs.m_fileSize, sizeof(fs.m_fileSize)));
+		RKIT_CHECK(stream.ReadAll(&fs.m_fileTime, sizeof(fs.m_fileTime)));
+
+		return ResultCode::kOK;
+	}
+
+	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, FileDependencyInfo &fdi)
+	{
+		RKIT_CHECK(Deserialize(stream, resolver, fdi.m_status));
+		RKIT_CHECK(Deserialize(stream, resolver, fdi.m_fileExists));
+		RKIT_CHECK(Deserialize(stream, resolver, fdi.m_mustBeUpToDate));
+
+		return ResultCode::kOK;
+	}
+
+	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, NodeDependencyInfo &ndi)
+	{
+		size_t nodeIndex = 0;
+		RKIT_CHECK(DeserializeCompactSize(stream, nodeIndex));
+
+		IDependencyNode *node = nullptr;
+		RKIT_CHECK(resolver.GetDependencyNode(nodeIndex, ndi.m_node));
+
+		RKIT_CHECK(Deserialize(stream, resolver, ndi.m_mustBeUpToDate));
+
+		return ResultCode::kOK;
+	}
+
+	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, bool &value)
+	{
+		uint8_t valueByte = 0;
+		RKIT_CHECK(stream.ReadAll(&valueByte, 1));
+
+		value = (valueByte != 0);
+		return ResultCode::kOK;
+	}
+
+	Result serializer::DeserializeCompactSize(IReadStream &stream, size_t &sz)
+	{
+		uint8_t bytes[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+
+		RKIT_CHECK(stream.ReadAll(bytes, 1));
+
+		switch (bytes[0] & 3)
+		{
+		case 0:
+			break;
+		case 1:
+			RKIT_CHECK(stream.ReadAll(bytes + 1, 1));
+			break;
+		case 2:
+			RKIT_CHECK(stream.ReadAll(bytes + 1, 3));
+			break;
+		case 3:
+			RKIT_CHECK(stream.ReadAll(bytes + 1, 7));
+			break;
+		default:
+			return ResultCode::kInternalError;
+		};
+
+		uint64_t u64 = static_cast<uint64_t>((bytes[0] >> 2) & 0x3f);
+		for (int i = 1; i < 8; i++)
+			u64 |= static_cast<uint64_t>(static_cast<uint64_t>(bytes[i]) << (i * 8 - 2));
+
+		if (u64 > std::numeric_limits<size_t>::max())
+			return ResultCode::kIntegerOverflow;
+
+		sz = static_cast<size_t>(u64);
+		return ResultCode::kOK;
+	}
+
 	Result DependencyNode::AddNodeDependency(const NodeDependencyInfo &nodeInfo)
 	{
 		for (const NodeDependencyInfo &existingInfo : m_nodeDependencies)
@@ -825,14 +991,36 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
-	Result DependencyNode::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool) const
+	Result DependencyNode::SerializeInitialState(IWriteStream &stream) const
 	{
 		RKIT_CHECK(stream.WriteAll(&m_nodeNamespace, sizeof(m_nodeNamespace)));
 		RKIT_CHECK(stream.WriteAll(&m_nodeType, sizeof(m_nodeType)));
+		RKIT_CHECK(serializer::SerializeEnum(stream, m_inputLocation));
 		RKIT_CHECK(stream.WriteAll(&m_lastCompilerVersion, sizeof(m_lastCompilerVersion)));
 
+		return ResultCode::kOK;
+	}
+
+	Result DependencyNode::DeserializeInitialState(IReadStream &stream, uint32_t &outNodeNamespace, uint32_t &outNodeType, BuildFileLocation &outInputLocation, uint32_t &outCompilerVersion)
+	{
+		RKIT_CHECK(stream.ReadAll(&outNodeNamespace, sizeof(outNodeNamespace)));
+		RKIT_CHECK(stream.ReadAll(&outNodeType, sizeof(outNodeType)));
+		RKIT_CHECK(serializer::DeserializeEnum(stream, outInputLocation));
+		RKIT_CHECK(stream.ReadAll(&outCompilerVersion, sizeof(outCompilerVersion)));
+
+		return ResultCode::kOK;
+	}
+
+	Result DependencyNode::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool) const
+	{
+		// Deserialize header
+		if (m_privateData.IsValid())
+		{
+			RKIT_CHECK(m_privateData->Serialize(stream, stringPool));
+		}
+
+		// Match with Deserialize
 		RKIT_CHECK(serializer::SerializeEnum(stream, m_dependencyState));
-		RKIT_CHECK(serializer::SerializeEnum(stream, m_inputLocation));
 
 		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_analysisProducts));
 		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_compileProducts));
@@ -842,20 +1030,31 @@ namespace rkit::buildsystem
 
 		RKIT_CHECK(serializer::SerializeString(stream, stringPool, m_identifier));
 
-		RKIT_CHECK(serializer::Serialize(stream, stringPool, m_privateData.IsValid()));
-
-		if (m_privateData.IsValid())
-		{
-			RKIT_CHECK(m_privateData->Serialize(stream, stringPool));
-		}
-
 		// Intentionally not serialized: compiler, m_isMarkedAsRoot, m_checkNodeIndex, m_depCheckPhase, m_serializedIndex
 		return ResultCode::kOK;
 	}
 
-	Result DependencyNode::Deserialize(IReadStream &stream)
+	Result DependencyNode::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver)
 	{
-		return ResultCode::kNotYetImplemented;
+		// Deserialize header
+		if (m_privateData.IsValid())
+		{
+			RKIT_CHECK(m_privateData->Deserialize(stream, resolver));
+		}
+
+		// Match with Deserialize
+		RKIT_CHECK(serializer::DeserializeEnum(stream, m_dependencyState));
+
+		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_analysisProducts));
+		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_compileProducts));
+		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_analysisFileDependencies));
+		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_compileFileDependencies));
+		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_nodeDependencies));
+
+		RKIT_CHECK(serializer::DeserializeString(stream, resolver, m_identifier));
+
+		// Intentionally not serialized: compiler, m_isMarkedAsRoot, m_checkNodeIndex, m_depCheckPhase, m_serializedIndex
+		return ResultCode::kOK;
 	}
 
 	Result DependencyNode::MarkProductFinished(bool isCompilePhase, size_t productIndex, const FileStatusView &fstatus)
@@ -1169,6 +1368,122 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
+	Result BuildSystemInstance::CheckedLoadCache(ISeekableReadStream &seekableStream, FilePos_t pos)
+	{
+		RKIT_CHECK(seekableStream.SeekStart(pos));
+
+		IReadStream &stream = seekableStream;
+
+		Vector<UniquePtr<DependencyNode>> nodesVector;
+		HashMap<NodeKey, DependencyNode *> nodeLookup;
+
+		Vector<String> stringsVector;
+
+		size_t numStrings = 0;
+		RKIT_CHECK(serializer::DeserializeCompactSize(stream, numStrings));
+
+		RKIT_CHECK(stringsVector.Resize(numStrings));
+
+		Span<const String> strings = stringsVector.ToSpan();
+
+		for (size_t i = 0; i < numStrings; i++)
+		{
+			size_t strLength = 0;
+			RKIT_CHECK(serializer::DeserializeCompactSize(stream, strLength));
+
+			StringConstructionBuffer strBuf;
+			RKIT_CHECK(strBuf.Allocate(strLength));
+
+			Span<char> chars = strBuf.GetSpan();
+			RKIT_CHECK(stream.ReadAll(chars.Ptr(), chars.Count()));
+
+			stringsVector[i] = String(std::move(strBuf));
+		}
+
+		size_t numNodes = 0;
+		RKIT_CHECK(serializer::DeserializeCompactSize(stream, numNodes));
+
+		RKIT_CHECK(nodesVector.Resize(numNodes));
+
+		Span<const UniquePtr<DependencyNode>> nodes = nodesVector.ToSpan();
+
+		for (size_t i = 0; i < numNodes; i++)
+		{
+			uint32_t nodeNamespace = 0;
+			uint32_t nodeType = 0;
+			BuildFileLocation inputLocation = BuildFileLocation::kInvalid;
+			uint32_t compilerVersion = 0;
+
+			RKIT_CHECK(DependencyNode::DeserializeInitialState(stream, nodeNamespace, nodeType, inputLocation, compilerVersion));
+
+			HashMap<NodeTypeKey, UniquePtr<IDependencyNodeCompiler>>::ConstIterator_t it = m_nodeCompilers.Find(NodeTypeKey(nodeNamespace, nodeType));
+			if (it == m_nodeCompilers.end())
+				return ResultCode::kOperationFailed;
+
+			IDependencyNodeCompiler *compiler = it.Value().Get();
+			if (compiler->GetVersion() != compilerVersion)
+				return ResultCode::kOperationFailed;
+
+			UniquePtr<IDependencyNodePrivateData> privateData;
+			RKIT_CHECK(compiler->CreatePrivateData(privateData));
+
+			RKIT_CHECK(New<DependencyNode>(nodesVector[i], compiler, nodeNamespace, nodeType, inputLocation, std::move(privateData)));
+		}
+
+		serializer::DeserializeResolver resolver(nodes, strings);
+		for (size_t i = 0; i < numNodes; i++)
+		{
+			RKIT_CHECK(nodes[i]->Deserialize(stream, resolver));
+		}
+
+		for (size_t i = 0; i < numNodes; i++)
+		{
+			DependencyNode *node = nodes[i].Get();
+			NodeKey nodeKey(NodeTypeKey(node->GetDependencyNodeNamespace(), node->GetDependencyNodeType()), node->GetInputFileLocation(), node->GetIdentifier());
+
+			RKIT_CHECK(nodeLookup.Set(nodeKey, node));
+		}
+
+		m_nodes = std::move(nodesVector);
+		m_nodeLookup = std::move(nodeLookup);
+
+		return ResultCode::kOK;
+	}
+
+	Result BuildSystemInstance::LoadCache()
+	{
+		if (m_nodes.Count() != 0)
+			return ResultCode::kOperationFailed;
+
+		String cacheFullPath;
+		FileLocation cacheFileLocation = rkit::FileLocation::kAbsolute;
+		RKIT_CHECK(ConstructIntermediatePath(cacheFullPath, cacheFileLocation, GetCacheFileName()));
+
+		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+		UniquePtr<ISeekableReadStream> graphStream = sysDriver->OpenFileRead(cacheFileLocation, cacheFullPath.CStr());
+
+		if (!graphStream.IsValid())
+			return ResultCode::kOK;
+
+		BuildCacheFileHeader header;
+		size_t countRead = 0;
+		if (!graphStream->ReadPartial(&header, sizeof(header), countRead).IsOK() || countRead != sizeof(header))
+			return ResultCode::kOK;
+
+		if (header.m_identifier != BuildCacheFileHeader::kCacheIdentifier || header.m_version != BuildCacheFileHeader::kCacheVersion || header.m_activeInstance >= 2)
+			return ResultCode::kOK;
+
+		const BuildCacheInstanceInfo &cacheInstance = header.m_instances[header.m_activeInstance];
+
+		if (!CheckedLoadCache(*graphStream, cacheInstance.m_filePos).IsOK())
+		{
+			m_nodeLookup.Clear();
+			m_nodes.Reset();
+		}
+
+		return ResultCode::kOK;
+	}
+
 	IDependencyNode *BuildSystemInstance::FindNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) const
 	{
 		return nullptr;
@@ -1263,6 +1578,13 @@ namespace rkit::buildsystem
 		}
 
 		// Step 3: Write updated state
+		RKIT_CHECK(SaveCache());
+
+		return ResultCode::kOK;
+	}
+
+	Result BuildSystemInstance::SaveCache()
+	{
 		rkit::BufferStream depsGraphNodesStream;
 		StringPoolBuilder stringPool;
 
@@ -1273,6 +1595,10 @@ namespace rkit::buildsystem
 		}
 
 		RKIT_CHECK(serializer::SerializeCompactSize(depsGraphNodesStream, serializedIndex));
+		for (DependencyNode *node : m_relevantNodes)
+		{
+			RKIT_CHECK(node->SerializeInitialState(depsGraphNodesStream));
+		}
 		for (DependencyNode *node : m_relevantNodes)
 		{
 			RKIT_CHECK(node->Serialize(depsGraphNodesStream, stringPool));

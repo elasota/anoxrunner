@@ -8,6 +8,7 @@ namespace rkit
 	struct RKIT_NODISCARD Result
 	{
 	public:
+
 		Result();
 		Result(ResultCode resultCode);
 
@@ -15,7 +16,13 @@ namespace rkit
 		int ToExitCode() const;
 		ResultCode GetResultCode() const;
 
+		static Result SoftFault(ResultCode resultCode);
+
 	private:
+		struct SoftFaultTag {};
+
+		Result(ResultCode resultCode, const SoftFaultTag &);
+
 #if RKIT_IS_DEBUG
 		void FirstChanceResultFailure() const;
 #endif
@@ -45,6 +52,11 @@ inline rkit::Result::Result(ResultCode resultCode)
 #endif
 }
 
+inline rkit::Result::Result(ResultCode resultCode, const SoftFaultTag &)
+	: m_resultCode(resultCode)
+{
+}
+
 inline bool rkit::Result::IsOK() const
 {
 	return m_resultCode == ResultCode::kOK;
@@ -60,3 +72,7 @@ inline rkit::ResultCode rkit::Result::GetResultCode() const
 	return m_resultCode;
 }
 
+inline rkit::Result rkit::Result::SoftFault(rkit::ResultCode resultCode)
+{
+	return Result(resultCode, SoftFaultTag());
+}

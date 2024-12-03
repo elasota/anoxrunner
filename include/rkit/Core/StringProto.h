@@ -16,6 +16,9 @@ namespace rkit
 	template<class TChar>
 	class BaseStringPoolBuilder;
 
+	template<class TChar>
+	class BaseStringConstructionBuffer;
+
 	typedef BaseString<char, 16> String;
 	typedef BaseString<wchar_t, 16> WString;
 
@@ -27,4 +30,7 @@ namespace rkit
 
 	typedef BaseStringPoolBuilder<char> StringPoolBuilder;
 	typedef BaseStringPoolBuilder<wchar_t> WStringPoolBuilder;
+
+	typedef BaseStringConstructionBuffer<char> StringConstructionBuffer;
+	typedef BaseStringConstructionBuffer<wchar_t> WStringConstructionBuffer;
 }
