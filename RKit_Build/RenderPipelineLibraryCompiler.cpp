@@ -398,17 +398,17 @@ namespace rkit::buildsystem::rpc_common
 {
 	Result LibraryCompilerBase::FormatGraphicPipelinePath(String &path, const StringView &identifier, size_t pipelineIndex)
 	{
-		return path.Format("rpllc/g_%zu/%s", pipelineIndex, identifier.GetChars());
+		return path.Format("rpll/g_%zu/%s", pipelineIndex, identifier.GetChars());
 	}
 
 	Result LibraryCompilerBase::FormatIndexPath(String &path, const StringView &identifier)
 	{
-		return path.Format("rpllc/index/%s", identifier.GetChars());
+		return path.Format("rpll/idx/%s", identifier.GetChars());
 	}
 
 	Result LibraryCompilerBase::FormatCombinedOutputPath(String &path, const StringView &identifier)
 	{
-		return path.Format("rpllc/output/%s", identifier.GetChars());
+		return path.Format("rpll/out/%s", identifier.GetChars());
 	}
 }
 

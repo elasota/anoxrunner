@@ -16,6 +16,10 @@ namespace rkit
 		ResultCode GetResultCode() const;
 
 	private:
+#if RKIT_IS_DEBUG
+		void FirstChanceResultFailure() const;
+#endif
+
 		ResultCode m_resultCode;
 	};
 }
@@ -27,12 +31,6 @@ namespace rkit
 		return RKIT_PP_CONCAT(exprResult_, __LINE__);\
 } while (false)
 
-
-#if RKIT_IS_DEBUG
-#include "Drivers.h"
-#include "SystemDriver.h"
-#endif
-
 inline rkit::Result::Result()
 	: m_resultCode(ResultCode::kOK)
 {
@@ -42,11 +40,8 @@ inline rkit::Result::Result(ResultCode resultCode)
 	: m_resultCode(resultCode)
 {
 #if RKIT_IS_DEBUG
-	if (!IsOK())
-	{
-		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
-		sysDriver->FirstChanceResultFailure(*this);
-	}
+	if (!this->IsOK())
+		this->FirstChanceResultFailure();
 #endif
 }
 

@@ -13,6 +13,7 @@
 #include "rkit/Core/String.h"
 #include "rkit/Core/StringPool.h"
 #include "rkit/Core/StringView.h"
+#include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/Vector.h"
 
 #include <algorithm>
@@ -236,6 +237,7 @@ namespace rkit::buildsystem
 		void SetState(DependencyState depState);
 
 		void MarkOutOfDate() override;
+		bool WasCompiled() const override;
 
 		StringView GetIdentifier() const override;
 		DependencyState GetDependencyState() const override;
@@ -362,6 +364,7 @@ namespace rkit::buildsystem
 		DependencyCheckPhase m_depCheckPhase;
 
 		size_t m_serializedIndex;
+		bool m_wasCompiled;
 	};
 
 	struct BuildCacheInstanceInfo
@@ -408,6 +411,8 @@ namespace rkit::buildsystem
 		Result RegisterNodeTypeByExtension(const StringView &ext, uint32_t nodeNamespace, uint32_t nodeType) override;
 		bool FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const;
 
+		CallbackSpan<IDependencyNode *, const IBuildSystemInstance *> GetBuildRelevantNodes() const override;
+
 	private:
 		struct CachedFileStatus
 		{
@@ -441,6 +446,8 @@ namespace rkit::buildsystem
 		static PrintableFourCC FourCCToPrintable(uint32_t fourCC);
 
 		static StringView GetCacheFileName();
+
+		static IDependencyNode *GetRelevantNodeByIndex(const IBuildSystemInstance * const& instance, size_t index);
 
 		String m_targetName;
 		String m_srcDir;
@@ -491,6 +498,7 @@ namespace rkit::buildsystem
 		, m_depCheckPhase(DependencyCheckPhase::None)
 		, m_lastCompilerVersion(0)
 		, m_serializedIndex(0)
+		, m_wasCompiled(false)
 	{
 	}
 
@@ -545,6 +553,11 @@ namespace rkit::buildsystem
 	void DependencyNode::MarkOutOfDate()
 	{
 		SetState(DependencyState::NotAnalyzedOrCompiled);
+	}
+
+	bool DependencyNode::WasCompiled() const
+	{
+		return m_wasCompiled;
 	}
 
 	StringView DependencyNode::GetIdentifier() const
@@ -609,6 +622,7 @@ namespace rkit::buildsystem
 
 		RKIT_CHECK(m_compiler->RunCompile(this, &feedback));
 
+		m_wasCompiled = true;
 		return ResultCode::kOK;
 	}
 
@@ -1706,6 +1720,11 @@ namespace rkit::buildsystem
 		return true;
 	}
 
+	CallbackSpan<IDependencyNode *, const IBuildSystemInstance *> BuildSystemInstance::GetBuildRelevantNodes() const
+	{
+		return CallbackSpan<IDependencyNode *, const IBuildSystemInstance *>(GetRelevantNodeByIndex, this, m_relevantNodes.Count());
+	}
+
 	Result BuildSystemInstance::ResolveCachedFileStatusCallback(void *userdata, const FileStatusView &status)
 	{
 		BuildSystemInstance::CachedFileStatus *cfs = static_cast<CachedFileStatus *>(userdata);
@@ -1755,6 +1774,11 @@ namespace rkit::buildsystem
 	StringView BuildSystemInstance::GetCacheFileName()
 	{
 		return "buildsystem.cache";
+	}
+
+	IDependencyNode *BuildSystemInstance::GetRelevantNodeByIndex(const IBuildSystemInstance *const &instance, size_t index)
+	{
+		return static_cast<const BuildSystemInstance *>(instance)->m_relevantNodes[index];
 	}
 
 	BuildSystemInstance::PrintableFourCC::PrintableFourCC(uint32_t fourCC)

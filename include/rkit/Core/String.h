@@ -2,6 +2,7 @@
 
 #include "Atomic.h"
 #include "NoCopy.h"
+#include "StringProto.h"
 
 #include <cstdint>
 #include <cstddef>

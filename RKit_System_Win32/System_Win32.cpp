@@ -526,12 +526,12 @@ namespace rkit
 
 	UniquePtr<ISeekableWriteStream> SystemDriver_Win32::OpenFileWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists)
 	{
-		return OpenFileGeneral(location, path, createDirectories, GENERIC_WRITE, 0, OpenFlagsToDisposition(createIfNotExists, truncateIfExists));
+		return OpenFileGeneral(location, path, createDirectories, GENERIC_WRITE, FILE_SHARE_READ, OpenFlagsToDisposition(createIfNotExists, truncateIfExists));
 	}
 
 	UniquePtr<ISeekableReadWriteStream> SystemDriver_Win32::OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists)
 	{
-		return OpenFileGeneral(location, path, createDirectories, GENERIC_READ | GENERIC_WRITE, 0, OpenFlagsToDisposition(createIfNotExists, truncateIfExists));
+		return OpenFileGeneral(location, path, createDirectories, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, OpenFlagsToDisposition(createIfNotExists, truncateIfExists));
 	}
 
 	Result SystemDriver_Win32::OpenDirectoryScan(FileLocation location, const char *path, UniquePtr<IDirectoryScan> &outDirectoryScan)

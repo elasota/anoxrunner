@@ -951,7 +951,7 @@ namespace rkit::buildsystem::vulkan
 
 	Result PipelineCompilerBase::FormatGraphicsPipelineStageFilePath(String &str, const StringView &inPath, render::vulkan::GraphicPipelineStage stage)
 	{
-		return str.Format("vk_plc_g_%i/%s", static_cast<int>(stage), inPath.GetChars());
+		return str.Format("vk_pl_g_%i/%s", static_cast<int>(stage), inPath.GetChars());
 	}
 
 	Result PipelineCompilerBase::LoadDataDriver(data::IDataDriver **outDriver)

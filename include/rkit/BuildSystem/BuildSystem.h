@@ -24,6 +24,7 @@ namespace rkit
 		static const uint32_t kDepsNodeID = RKIT_FOURCC('D', 'E', 'P', 'S');
 		static const uint32_t kRenderGraphicsPipelineNodeID = RKIT_FOURCC('R', 'G', 'P', 'L');
 		static const uint32_t kRenderComputePipelineNodeID = RKIT_FOURCC('R', 'C', 'P', 'L');
+		static const uint32_t kRenderPipelineLibraryNodeID = RKIT_FOURCC('R', 'P', 'L', 'L');
 
 		struct IDependencyNode;
 		struct IDependencyGraphFactory;
@@ -65,6 +66,8 @@ namespace rkit
 			virtual Result Build(IBuildFileSystem *fs) = 0;
 
 			virtual IDependencyGraphFactory *GetDependencyGraphFactory() const = 0;
+
+			virtual CallbackSpan<IDependencyNode *, const IBuildSystemInstance *> GetBuildRelevantNodes() const = 0;
 		};
 
 		struct IBuildSystemDriver : public ICustomDriver
@@ -93,6 +96,6 @@ namespace rkit::buildsystem
 
 	inline StringView GetCompiledPipelineIntermediateBasePath()
 	{
-		return "rpllc_c/";
+		return "rpll_c/";
 	}
 }

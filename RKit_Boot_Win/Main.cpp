@@ -2,6 +2,7 @@
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/MallocDriver.h"
 #include "rkit/Core/ModuleDriver.h"
+#include "rkit/Core/ModuleGlue.h"
 #include "rkit/Core/Module.h"
 #include "rkit/Core/ProgramDriver.h"
 
@@ -317,3 +318,5 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	return WinMainCommon(hInstance);
 }
 #endif
+
+RKIT_IMPLEMENT_PER_MODULE_FUNCTIONS

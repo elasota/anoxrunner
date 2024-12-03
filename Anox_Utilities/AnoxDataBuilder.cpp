@@ -14,6 +14,7 @@
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/Stream.h"
+#include "rkit/Core/SystemDriver.h"
 
 namespace anox::utils
 {
@@ -122,6 +123,22 @@ namespace anox::utils
 		RKIT_CHECK(instance->AddRootNode(rootDepsNode));
 
 		RKIT_CHECK(instance->Build(&fs));
+
+		bool rebuiltAnyPipelines = false;
+		for (rkit::buildsystem::IDependencyNode *node : instance->GetBuildRelevantNodes())
+		{
+			if (node->WasCompiled())
+			{
+				uint32_t nodeNamespace = node->GetDependencyNodeNamespace();
+				uint32_t nodeType = node->GetDependencyNodeType();
+
+				if (nodeNamespace == rkit::buildsystem::kDefaultNamespace && nodeType == rkit::buildsystem::kRenderPipelineLibraryNodeID)
+				{
+					rebuiltAnyPipelines = true;
+					break;
+				}
+			}
+		}
 
 		return rkit::ResultCode::kOK;
 	}

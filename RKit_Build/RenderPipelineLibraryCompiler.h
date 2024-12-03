@@ -8,8 +8,6 @@
 
 namespace rkit::buildsystem
 {
-	static const uint32_t kRenderPipelineLibraryNodeID = RKIT_FOURCC('R', 'P', 'L', 'L');
-
 	class RenderPipelineLibraryCompiler final : public IDependencyNodeCompiler
 	{
 	public:

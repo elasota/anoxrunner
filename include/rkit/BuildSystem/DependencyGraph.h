@@ -103,6 +103,7 @@ namespace rkit
 			virtual ~IDependencyNode() {}
 
 			virtual void MarkOutOfDate() = 0;
+			virtual bool WasCompiled() const = 0;
 
 			virtual StringView GetIdentifier() const = 0;
 			virtual DependencyState GetDependencyState() const = 0;
