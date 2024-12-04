@@ -292,7 +292,7 @@ namespace rkit::buildsystem
 		Result AddNodeDependency(const NodeDependencyInfo &nodeInfo);
 
 		Result SerializeInitialState(IWriteStream &stream) const;
-		static Result DeserializeInitialState(IReadStream &stream, uint32_t &outNodeNamespace, uint32_t &outNodeType, BuildFileLocation &outInputLocation, uint32_t &outCompilerVersion);
+		static Result DeserializeInitialState(IReadStream &stream, uint32_t &outNodeNamespace, uint32_t &outNodeType, BuildFileLocation &outInputLocation);
 
 		Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool) const override;
 		Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver) override;
@@ -644,6 +644,7 @@ namespace rkit::buildsystem
 	{
 		DependencyNodeCompilerFeedback feedback(static_cast<BuildSystemInstance *>(instance), this, false);
 
+		m_lastCompilerVersion = m_compiler->GetVersion();
 		RKIT_CHECK(m_compiler->RunAnalysis(this, &feedback));
 
 		return ResultCode::kOK;
@@ -653,9 +654,9 @@ namespace rkit::buildsystem
 	{
 		DependencyNodeCompilerFeedback feedback(static_cast<BuildSystemInstance *>(instance), this, true);
 
+		m_lastCompilerVersion = m_compiler->GetVersion();
 		RKIT_CHECK(m_compiler->RunCompile(this, &feedback));
 
-		m_lastCompilerVersion = m_compiler->GetVersion();
 		m_wasCompiled = true;
 		return ResultCode::kOK;
 	}
@@ -996,17 +997,15 @@ namespace rkit::buildsystem
 		RKIT_CHECK(stream.WriteAll(&m_nodeNamespace, sizeof(m_nodeNamespace)));
 		RKIT_CHECK(stream.WriteAll(&m_nodeType, sizeof(m_nodeType)));
 		RKIT_CHECK(serializer::SerializeEnum(stream, m_inputLocation));
-		RKIT_CHECK(stream.WriteAll(&m_lastCompilerVersion, sizeof(m_lastCompilerVersion)));
 
 		return ResultCode::kOK;
 	}
 
-	Result DependencyNode::DeserializeInitialState(IReadStream &stream, uint32_t &outNodeNamespace, uint32_t &outNodeType, BuildFileLocation &outInputLocation, uint32_t &outCompilerVersion)
+	Result DependencyNode::DeserializeInitialState(IReadStream &stream, uint32_t &outNodeNamespace, uint32_t &outNodeType, BuildFileLocation &outInputLocation)
 	{
 		RKIT_CHECK(stream.ReadAll(&outNodeNamespace, sizeof(outNodeNamespace)));
 		RKIT_CHECK(stream.ReadAll(&outNodeType, sizeof(outNodeType)));
 		RKIT_CHECK(serializer::DeserializeEnum(stream, outInputLocation));
-		RKIT_CHECK(stream.ReadAll(&outCompilerVersion, sizeof(outCompilerVersion)));
 
 		return ResultCode::kOK;
 	}
@@ -1030,6 +1029,8 @@ namespace rkit::buildsystem
 
 		RKIT_CHECK(serializer::SerializeString(stream, stringPool, m_identifier));
 
+		RKIT_CHECK(stream.WriteAll(&m_lastCompilerVersion, sizeof(m_lastCompilerVersion)));
+
 		// Intentionally not serialized: compiler, m_isMarkedAsRoot, m_checkNodeIndex, m_depCheckPhase, m_serializedIndex
 		return ResultCode::kOK;
 	}
@@ -1052,6 +1053,8 @@ namespace rkit::buildsystem
 		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_nodeDependencies));
 
 		RKIT_CHECK(serializer::DeserializeString(stream, resolver, m_identifier));
+
+		RKIT_CHECK(stream.ReadAll(&m_lastCompilerVersion, sizeof(m_lastCompilerVersion)));
 
 		// Intentionally not serialized: compiler, m_isMarkedAsRoot, m_checkNodeIndex, m_depCheckPhase, m_serializedIndex
 		return ResultCode::kOK;
@@ -1412,17 +1415,14 @@ namespace rkit::buildsystem
 			uint32_t nodeNamespace = 0;
 			uint32_t nodeType = 0;
 			BuildFileLocation inputLocation = BuildFileLocation::kInvalid;
-			uint32_t compilerVersion = 0;
 
-			RKIT_CHECK(DependencyNode::DeserializeInitialState(stream, nodeNamespace, nodeType, inputLocation, compilerVersion));
+			RKIT_CHECK(DependencyNode::DeserializeInitialState(stream, nodeNamespace, nodeType, inputLocation));
 
 			HashMap<NodeTypeKey, UniquePtr<IDependencyNodeCompiler>>::ConstIterator_t it = m_nodeCompilers.Find(NodeTypeKey(nodeNamespace, nodeType));
 			if (it == m_nodeCompilers.end())
 				return ResultCode::kOperationFailed;
 
 			IDependencyNodeCompiler *compiler = it.Value().Get();
-			if (compiler->GetVersion() != compilerVersion)
-				return ResultCode::kOperationFailed;
 
 			UniquePtr<IDependencyNodePrivateData> privateData;
 			RKIT_CHECK(compiler->CreatePrivateData(privateData));
@@ -1439,6 +1439,7 @@ namespace rkit::buildsystem
 		for (size_t i = 0; i < numNodes; i++)
 		{
 			DependencyNode *node = nodes[i].Get();
+
 			NodeKey nodeKey(NodeTypeKey(node->GetDependencyNodeNamespace(), node->GetDependencyNodeType()), node->GetInputFileLocation(), node->GetIdentifier());
 
 			RKIT_CHECK(nodeLookup.Set(nodeKey, node));
@@ -1486,7 +1487,15 @@ namespace rkit::buildsystem
 
 	IDependencyNode *BuildSystemInstance::FindNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) const
 	{
-		return nullptr;
+		NodeTypeKey ntk(nodeTypeNamespace, nodeTypeID);
+		NodeKey key(ntk, inputFileLocation, identifier);
+
+		HashMap<NodeKey, DependencyNode *>::ConstIterator_t it = m_nodeLookup.Find(key);
+
+		if (it == m_nodeLookup.end())
+			return nullptr;
+
+		return it.Value();
 	}
 
 	Result BuildSystemInstance::FindOrCreateNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier, IDependencyNode *&outNode)
@@ -1803,7 +1812,7 @@ namespace rkit::buildsystem
 		const int kCompilePhase = 0;
 		const int kAnalysisPhase = 1;
 
-		DependencyState resultState = DependencyState::UpToDate;
+		DependencyState resultState = node->GetDependencyState();
 
 		for (int phase = 0; phase < 2; phase++)
 		{
@@ -1893,6 +1902,15 @@ namespace rkit::buildsystem
 
 			m_depCheckStack.RemoveRange(m_depCheckStack.Count() - 1, 1);
 
+			for (const NodeDependencyInfo &nodeDep : node->GetNodeDependencies())
+			{
+				if (nodeDep.m_mustBeUpToDate && nodeDep.m_node->GetDependencyState() != DependencyState::UpToDate)
+				{
+					node->SetState(DependencyState::NotCompiled);
+					break;
+				}
+			}
+
 			return ResultCode::kOK;
 		}
 
@@ -1900,9 +1918,6 @@ namespace rkit::buildsystem
 			return ResultCode::kOK;
 
 		DependencyNode *nodeDepNode = static_cast<DependencyNode *>(nodeDep.m_node);
-		if (nodeDepNode->GetDependencyState() != DependencyState::UpToDate)
-			node->SetState(DependencyState::NotCompiled);
-
 		if (nodeDepNode->GetDependencyCheckPhase() == DependencyCheckPhase::Completed)
 			return ResultCode::kOK;
 
