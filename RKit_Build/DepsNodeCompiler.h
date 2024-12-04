@@ -24,8 +24,6 @@ namespace rkit::buildsystem
 		Result RunAnalysis(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback) override;
 		Result RunCompile(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback) override;
 
-		Result CreatePrivateData(UniquePtr<IDependencyNodePrivateData> &outPrivateData) override;
-
 		uint32_t GetVersion() const override;
 
 	private:

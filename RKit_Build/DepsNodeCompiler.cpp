@@ -123,11 +123,6 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
-	Result DepsNodeCompiler::CreatePrivateData(UniquePtr<IDependencyNodePrivateData> &outPrivateData)
-	{
-		return ResultCode::kOK;
-	}
-
 	uint32_t DepsNodeCompiler::GetVersion() const
 	{
 		return 1;

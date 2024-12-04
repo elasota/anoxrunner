@@ -96,14 +96,6 @@ namespace rkit
 			virtual Result GetDependencyNode(size_t index, IDependencyNode *&outNode) const = 0;
 		};
 
-		struct IDependencyNodePrivateData
-		{
-			virtual ~IDependencyNodePrivateData() {}
-
-			virtual Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool) const = 0;
-			virtual Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver) = 0;
-		};
-
 		struct IDependencyNode
 		{
 			virtual ~IDependencyNode() {}
@@ -154,8 +146,6 @@ namespace rkit
 			virtual bool HasAnalysisStage() const = 0;
 			virtual Result RunAnalysis(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback) = 0;
 			virtual Result RunCompile(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback) = 0;
-
-			virtual Result CreatePrivateData(UniquePtr<IDependencyNodePrivateData> &outPrivateData) = 0;
 
 			virtual uint32_t GetVersion() const = 0;
 		};

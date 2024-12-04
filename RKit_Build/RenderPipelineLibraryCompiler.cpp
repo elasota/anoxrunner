@@ -2433,11 +2433,6 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
-	Result RenderPipelineLibraryCompiler::CreatePrivateData(UniquePtr<IDependencyNodePrivateData> &outPrivateData)
-	{
-		return ResultCode::kOK;
-	}
-
 	uint32_t RenderPipelineLibraryCompiler::GetVersion() const
 	{
 		return 1;

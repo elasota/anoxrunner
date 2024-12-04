@@ -140,8 +140,6 @@ namespace rkit::buildsystem::vulkan
 		Result RunAnalysis(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback) override;
 		Result RunCompile(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback) override;
 
-		Result CreatePrivateData(UniquePtr<IDependencyNodePrivateData> &outPrivateData) override;
-
 		uint32_t GetVersion() const override;
 
 	private:
@@ -159,8 +157,6 @@ namespace rkit::buildsystem::vulkan
 		bool HasAnalysisStage() const override;
 		Result RunAnalysis(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback) override;
 		Result RunCompile(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback) override;
-
-		Result CreatePrivateData(UniquePtr<IDependencyNodePrivateData> &outPrivateData) override;
 
 		uint32_t GetVersion() const override;
 
@@ -265,11 +261,6 @@ namespace rkit::buildsystem::vulkan
 
 		RKIT_CHECK(feedback->CheckFault());
 
-		return ResultCode::kOK;
-	}
-
-	Result RenderPipelineCompiler::CreatePrivateData(UniquePtr<IDependencyNodePrivateData> &outPrivateData)
-	{
 		return ResultCode::kOK;
 	}
 
@@ -898,11 +889,6 @@ namespace rkit::buildsystem::vulkan
 		}
 
 		return ResultCode::kInternalError;
-	}
-
-	Result RenderPipelineStageCompiler::CreatePrivateData(UniquePtr<IDependencyNodePrivateData> &outPrivateData)
-	{
-		return ResultCode::kOK;
 	}
 
 	uint32_t RenderPipelineStageCompiler::GetVersion() const

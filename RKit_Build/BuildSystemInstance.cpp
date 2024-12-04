@@ -250,7 +250,7 @@ namespace rkit::buildsystem
 	class DependencyNode final : public IDependencyNode
 	{
 	public:
-		DependencyNode(IDependencyNodeCompiler *compiler, uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation inputLocation, UniquePtr<IDependencyNodePrivateData> &&privateData);
+		DependencyNode(IDependencyNodeCompiler *compiler, uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation inputLocation);
 
 		Result Initialize(const StringView &identifier);
 
@@ -307,7 +307,6 @@ namespace rkit::buildsystem
 
 	protected:
 		IDependencyNodeCompiler *m_compiler;
-		UniquePtr<IDependencyNodePrivateData> m_privateData;
 
 	private:
 		class DependencyNodeCompilerFeedback final : public IDependencyNodeCompilerFeedback
@@ -519,9 +518,8 @@ namespace rkit::buildsystem
 		return m_typeID;
 	}
 
-	DependencyNode::DependencyNode(IDependencyNodeCompiler *compiler, uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation inputLocation, UniquePtr<IDependencyNodePrivateData> &&privateData)
+	DependencyNode::DependencyNode(IDependencyNodeCompiler *compiler, uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation inputLocation)
 		: m_compiler(compiler)
-		, m_privateData(std::move(privateData))
 		, m_inputLocation(inputLocation)
 		, m_nodeType(nodeType)
 		, m_nodeNamespace(nodeNamespace)
@@ -1012,12 +1010,6 @@ namespace rkit::buildsystem
 
 	Result DependencyNode::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool) const
 	{
-		// Deserialize header
-		if (m_privateData.IsValid())
-		{
-			RKIT_CHECK(m_privateData->Serialize(stream, stringPool));
-		}
-
 		// Match with Deserialize
 		RKIT_CHECK(serializer::SerializeEnum(stream, m_dependencyState));
 
@@ -1037,13 +1029,7 @@ namespace rkit::buildsystem
 
 	Result DependencyNode::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver)
 	{
-		// Deserialize header
-		if (m_privateData.IsValid())
-		{
-			RKIT_CHECK(m_privateData->Deserialize(stream, resolver));
-		}
-
-		// Match with Deserialize
+		// Match with Serialize
 		RKIT_CHECK(serializer::DeserializeEnum(stream, m_dependencyState));
 
 		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_analysisProducts));
@@ -1424,9 +1410,6 @@ namespace rkit::buildsystem
 
 			IDependencyNodeCompiler *compiler = it.Value().Get();
 
-			UniquePtr<IDependencyNodePrivateData> privateData;
-			RKIT_CHECK(compiler->CreatePrivateData(privateData));
-
 			RKIT_CHECK(New<DependencyNode>(nodesVector[i], compiler, nodeNamespace, nodeType, inputLocation, std::move(privateData)));
 		}
 
@@ -1704,9 +1687,6 @@ namespace rkit::buildsystem
 			rkit::log::ErrorFmt("Unknown dependency node type %u / %u", static_cast<unsigned int>(nodeNamespace), static_cast<unsigned int>(nodeType));
 			return ResultCode::kInvalidParameter;
 		}
-
-		UniquePtr<IDependencyNodePrivateData> privateData;
-		RKIT_CHECK(compilerIt.Value()->CreatePrivateData(privateData));
 
 		UniquePtr<DependencyNode> depNode;
 		RKIT_CHECK(New<DependencyNode>(depNode, compilerIt.Value().Get(), nodeNamespace, nodeType, buildFileLocation, std::move(privateData)));
