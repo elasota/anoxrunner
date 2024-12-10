@@ -1,0 +1,6 @@
+
+
+void PixelMain(out PixelShaderOutput psOut)
+{
+	psOut.Color = float4(1, 0, 0.5, 1);
+}

@@ -1410,7 +1410,7 @@ namespace rkit::buildsystem
 
 			IDependencyNodeCompiler *compiler = it.Value().Get();
 
-			RKIT_CHECK(New<DependencyNode>(nodesVector[i], compiler, nodeNamespace, nodeType, inputLocation, std::move(privateData)));
+			RKIT_CHECK(New<DependencyNode>(nodesVector[i], compiler, nodeNamespace, nodeType, inputLocation));
 		}
 
 		serializer::DeserializeResolver resolver(nodes, strings);
@@ -1689,7 +1689,7 @@ namespace rkit::buildsystem
 		}
 
 		UniquePtr<DependencyNode> depNode;
-		RKIT_CHECK(New<DependencyNode>(depNode, compilerIt.Value().Get(), nodeNamespace, nodeType, buildFileLocation, std::move(privateData)));
+		RKIT_CHECK(New<DependencyNode>(depNode, compilerIt.Value().Get(), nodeNamespace, nodeType, buildFileLocation));
 
 		RKIT_CHECK(depNode->Initialize(identifier));
 

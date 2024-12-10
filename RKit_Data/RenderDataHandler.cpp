@@ -799,7 +799,6 @@ namespace rkit::data
 		RTTI_ENUM_END
 
 		RTTI_ENUM_BEGIN(VectorDimension)
-			RTTI_ENUM_OPTION(Dimension1)
 			RTTI_ENUM_OPTION(Dimension2)
 			RTTI_ENUM_OPTION(Dimension3)
 			RTTI_ENUM_OPTION(Dimension4)

@@ -1,0 +1,6 @@
+
+
+void VertexMain(out float4 position)
+{
+	position = float4(VertexInput_Load_VertexCoords_VertexCoord(), 0, 1);
+}

@@ -97,9 +97,6 @@ namespace rkit::render
 		ConfigurableValueBase(ConfigurableValueBase &&other) noexcept;
 		~ConfigurableValueBase();
 
-		static bool HasDefault();
-		static T GetDefault();
-
 		ConfigurableValueBase &operator=(const ConfigurableValueBase &other);
 		ConfigurableValueBase &operator=(ConfigurableValueBase &&other) noexcept;
 
@@ -223,7 +220,6 @@ namespace rkit::render
 
 	enum class VectorDimension
 	{
-		Dimension1,
 		Dimension2,
 		Dimension3,
 		Dimension4,
@@ -263,7 +259,7 @@ namespace rkit::render
 	struct VectorNumericType
 	{
 		NumericType m_numericType = NumericType::Float32;
-		VectorDimension m_cols = VectorDimension::Dimension1;
+		VectorDimension m_cols = VectorDimension::Dimension4;
 
 		bool operator==(const VectorNumericType &other) const;
 		bool operator!=(const VectorNumericType &other) const;
@@ -272,8 +268,8 @@ namespace rkit::render
 	struct CompoundNumericType
 	{
 		NumericType m_numericType = NumericType::Float32;
-		VectorDimension m_rows = VectorDimension::Dimension1;
-		VectorDimension m_cols = VectorDimension::Dimension1;
+		VectorDimension m_rows = VectorDimension::Dimension4;
+		VectorDimension m_cols = VectorDimension::Dimension4;
 
 		bool operator==(const CompoundNumericType &other) const;
 		bool operator!=(const CompoundNumericType &other) const;

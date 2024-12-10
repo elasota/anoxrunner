@@ -11,13 +11,13 @@ GraphicsPipeline GP_InterfaceSimple
 
 	VertexShader =
 	{
-		Source = "ui.rkc"
+		Source = "ui_vs.rkc"
 		EntryPoint = "VertexMain"
 	}
 
 	PixelShader =
 	{
-		Source = "ui.rkc"
+		Source = "ui_ps.rkc"
 		EntryPoint = "PixelMain"
 	}
 

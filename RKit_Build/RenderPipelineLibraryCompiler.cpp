@@ -1575,7 +1575,7 @@ namespace rkit::buildsystem::rpc_analyzer
 
 	uint32_t LibraryAnalyzer::ResolveNumericTypeSize(render::NumericType numericType, render::VectorDimension dimension)
 	{
-		uint8_t dimensionInt = static_cast<uint8_t>(dimension) - static_cast<uint8_t>(render::VectorDimension::Dimension1) + 1;
+		uint8_t dimensionInt = static_cast<uint8_t>(dimension) - static_cast<uint8_t>(render::VectorDimension::Dimension2) + 2;
 
 		switch (numericType)
 		{
@@ -1704,10 +1704,10 @@ namespace rkit::buildsystem::rpc_analyzer
 			else if (extraChars == 1)
 			{
 				char c0 = token[ntrLength];
-				if (c0 >= '1' && c0 <= '4')
+				if (c0 >= '2' && c0 <= '4')
 				{
 					render::VectorNumericType vectorType;
-					vectorType.m_cols = static_cast<render::VectorDimension>(static_cast<int>(render::VectorDimension::Dimension1) + (c0 - '1'));
+					vectorType.m_cols = static_cast<render::VectorDimension>(static_cast<int>(render::VectorDimension::Dimension2) + (c0 - '2'));
 					vectorType.m_numericType = ntr.m_numericType;
 
 					const render::VectorNumericType *deduplicated = nullptr;
@@ -1722,11 +1722,11 @@ namespace rkit::buildsystem::rpc_analyzer
 				char c0 = token[ntrLength];
 				char c1 = token[ntrLength + 1];
 				char c2 = token[ntrLength + 2];
-				if ((c0 >= '1' && c0 <= '4') && c1 == 'x' && (c2 >= '1' && c2 <= '4'))
+				if ((c0 >= '2' && c0 <= '4') && c1 == 'x' && (c2 >= '2' && c2 <= '4'))
 				{
 					render::CompoundNumericType compoundType;
-					compoundType.m_cols = static_cast<render::VectorDimension>(static_cast<int>(render::VectorDimension::Dimension1) + (c0 - '1'));
-					compoundType.m_rows = static_cast<render::VectorDimension>(static_cast<int>(render::VectorDimension::Dimension1) + (c2 - '1'));
+					compoundType.m_cols = static_cast<render::VectorDimension>(static_cast<int>(render::VectorDimension::Dimension2) + (c0 - '2'));
+					compoundType.m_rows = static_cast<render::VectorDimension>(static_cast<int>(render::VectorDimension::Dimension2) + (c2 - '2'));
 					compoundType.m_numericType = ntr.m_numericType;
 
 					const render::CompoundNumericType *deduplicated = nullptr;

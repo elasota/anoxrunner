@@ -101,8 +101,15 @@ namespace rkit::buildsystem::vulkan
 			String m_name;
 		};
 
-		static Result WriteString(IWriteStream &stream, const rkit::StringView &str);
 		static Result WriteString(IWriteStream &stream, const rkit::StringSliceView &str);
+		static Result WriteUIntString(IWriteStream &stream, uint64_t value);
+
+		static Result WriteRTFormat(IWriteStream &stream, const render::RenderTargetFormat &format);
+		static Result WriteVectorNumericType(IWriteStream &stream, const render::VectorNumericType &format);
+		static Result WriteNumericType(IWriteStream &stream, const render::NumericType numericType);
+		static Result WriteVectorDimension(IWriteStream &stream, const render::VectorDimension vectorDimension);
+		static Result WriteTextureDescriptorType(IWriteStream &stream, const render::DescriptorType descriptorType, const render::ValueType &valueType);
+		static Result WriteConfigurableRTFormat(IWriteStream &stream, const render::ConfigurableValueBase<render::RenderTargetFormat> &format);
 
 		Result NormalizePath(String &path) const;
 		Result TryInclude(String &&path, bool &outSucceeded, UniquePtr<IncludeResultBase> &outIncludeResult) const;
@@ -127,6 +134,7 @@ namespace rkit::buildsystem::vulkan
 		BufferStream m_suffixStream;
 		String m_shaderSourcePath;
 		glslang_stage_t m_glslangStage;
+		glslang_resource_t m_glslangResource;
 
 		Vector<unsigned int> m_resultSPV;
 	};
@@ -403,17 +411,22 @@ namespace rkit::buildsystem::vulkan
 		, m_pipelineType(pipelineType)
 		, m_glslangStage(GLSLANG_STAGE_COUNT)
 		, m_alloc(GetDrivers().m_mallocDriver)
+		, m_glslangResource{}
 	{
 	}
 
 	Result RenderPipelineStageBuildJob::RunGraphics(const data::IRenderDataPackage *package, const render::GraphicsPipelineDesc *pipeline, render::vulkan::GraphicPipelineStage stage)
 	{
+		render::StageVisibility requiredVisibility = render::StageVisibility::All;
+
 		switch (stage)
 		{
 		case render::vulkan::GraphicPipelineStage::Vertex:
+			requiredVisibility = render::StageVisibility::Vertex;
 			m_glslangStage = GLSLANG_STAGE_VERTEX;
 			break;
 		case render::vulkan::GraphicPipelineStage::Pixel:
+			requiredVisibility = render::StageVisibility::Pixel;
 			m_glslangStage = GLSLANG_STAGE_FRAGMENT;
 			break;
 		default:
@@ -423,9 +436,226 @@ namespace rkit::buildsystem::vulkan
 		GraphicsPipelineShaderField_t field;
 		RKIT_CHECK(GetGraphicsShaderPipelineShaderFieldForStage(stage, field));
 
-		render::TempStringIndex_t sourceFileIndex = (pipeline->*field)->m_source;
+		const render::ShaderDesc *shaderDesc = (pipeline->*field);
+		render::TempStringIndex_t sourceFileIndex = shaderDesc->m_source;
 
 		RKIT_CHECK(m_shaderSourcePath.Set(package->GetString(sourceFileIndex.GetIndex())));
+
+
+		RKIT_CHECK(WriteString(m_prefixStream, "#define float2 vec2\n"));
+		RKIT_CHECK(WriteString(m_prefixStream, "#define float3 vec3\n"));
+		RKIT_CHECK(WriteString(m_prefixStream, "#define float4 vec4\n"));
+		RKIT_CHECK(WriteString(m_prefixStream, "#define float2x2 mat2x2\n"));
+		RKIT_CHECK(WriteString(m_prefixStream, "#define float2x3 mat2x3\n"));
+		RKIT_CHECK(WriteString(m_prefixStream, "#define float2x4 mat2x4\n"));
+		RKIT_CHECK(WriteString(m_prefixStream, "#define float3x2 mat3x2\n"));
+		RKIT_CHECK(WriteString(m_prefixStream, "#define float3x3 mat3x3\n"));
+		RKIT_CHECK(WriteString(m_prefixStream, "#define float3x4 mat3x4\n"));
+		RKIT_CHECK(WriteString(m_prefixStream, "#define float4x2 mat4x2\n"));
+		RKIT_CHECK(WriteString(m_prefixStream, "#define float4x3 mat4x3\n"));
+		RKIT_CHECK(WriteString(m_prefixStream, "#define float4x4 mat4x4\n"));
+
+		if (pipeline->m_pushConstants)
+		{
+			return ResultCode::kNotYetImplemented;
+		}
+
+		if (stage == render::vulkan::GraphicPipelineStage::Vertex && pipeline->m_inputLayout != nullptr)
+		{
+			size_t inputIndex = 0;
+			for (const render::InputLayoutVertexInputDesc *vertexInput : pipeline->m_inputLayout->m_vertexFeeds)
+			{
+				RKIT_CHECK(WriteString(m_prefixStream, "layout(location = "));
+				RKIT_CHECK(WriteUIntString(m_prefixStream, inputIndex));
+				RKIT_CHECK(WriteString(m_prefixStream, ") in "));
+				RKIT_CHECK(WriteVectorNumericType(m_prefixStream, *vertexInput->m_numericType));
+				RKIT_CHECK(WriteString(m_prefixStream, " _vs_in_F"));
+				RKIT_CHECK(WriteUIntString(m_prefixStream, inputIndex));
+				RKIT_CHECK(WriteString(m_prefixStream, ";\n"));
+
+				RKIT_CHECK(WriteVectorNumericType(m_prefixStream, *vertexInput->m_numericType));
+				RKIT_CHECK(WriteString(m_prefixStream, " VertexInput_Load_"));
+				RKIT_CHECK(WriteString(m_prefixStream, package->GetString(vertexInput->m_feedName.GetIndex())));
+				RKIT_CHECK(WriteString(m_prefixStream, "_"));
+				RKIT_CHECK(WriteString(m_prefixStream, package->GetString(vertexInput->m_memberName.GetIndex())));
+				RKIT_CHECK(WriteString(m_prefixStream, "()\n"));
+				RKIT_CHECK(WriteString(m_prefixStream, "{\n"));
+				RKIT_CHECK(WriteString(m_prefixStream, "    return _vs_in_F"));
+				RKIT_CHECK(WriteUIntString(m_prefixStream, inputIndex));
+				RKIT_CHECK(WriteString(m_prefixStream, ";\n"));
+				RKIT_CHECK(WriteString(m_prefixStream, "}\n"));
+
+				inputIndex++;
+			}
+		}
+
+		if ((stage == render::vulkan::GraphicPipelineStage::Vertex || stage == render::vulkan::GraphicPipelineStage::Pixel) && pipeline->m_vertexShaderOutput != nullptr)
+		{
+			return ResultCode::kNotYetImplemented;
+		}
+
+		if (stage == render::vulkan::GraphicPipelineStage::Pixel)
+		{
+			for (size_t rtIndex = 0; rtIndex < pipeline->m_renderTargets.Count(); rtIndex++)
+			{
+				const render::RenderTargetDesc *rtDesc = pipeline->m_renderTargets[rtIndex];
+
+				RKIT_CHECK(WriteString(m_prefixStream, "layout(location = "));
+				RKIT_CHECK(WriteUIntString(m_prefixStream, rtIndex));
+				RKIT_CHECK(WriteString(m_prefixStream, ") out "));
+
+				RKIT_CHECK(WriteConfigurableRTFormat(m_prefixStream, rtDesc->m_format));
+
+				RKIT_CHECK(WriteString(m_prefixStream, " _ps_out_RT"));
+				RKIT_CHECK(WriteUIntString(m_prefixStream, rtIndex));
+				RKIT_CHECK(WriteString(m_prefixStream, ";\n"));
+			}
+
+			RKIT_CHECK(WriteString(m_prefixStream, "struct PixelShaderOutput\n"));
+			RKIT_CHECK(WriteString(m_prefixStream, "{\n"));
+
+			for (size_t rtIndex = 0; rtIndex < pipeline->m_renderTargets.Count(); rtIndex++)
+			{
+				const render::RenderTargetDesc *rtDesc = pipeline->m_renderTargets[rtIndex];
+
+				RKIT_CHECK(WriteString(m_prefixStream, "    "));
+				RKIT_CHECK(WriteConfigurableRTFormat(m_prefixStream, rtDesc->m_format));
+				RKIT_CHECK(WriteString(m_prefixStream, " "));
+				RKIT_CHECK(WriteString(m_prefixStream, package->GetString(rtDesc->m_name.GetIndex())));
+				RKIT_CHECK(WriteString(m_prefixStream, ";\n"));
+			}
+
+			RKIT_CHECK(WriteString(m_prefixStream, "};\n"));
+		}
+
+		for (size_t dlSlot = 0; dlSlot < pipeline->m_descriptorLayouts.Count(); dlSlot++)
+		{
+			const render::DescriptorLayoutDesc *dl = pipeline->m_descriptorLayouts[dlSlot];
+
+			for (size_t descSlot = 0; descSlot < dl->m_descriptors.Count(); descSlot++)
+			{
+				const render::DescriptorDesc *descriptor = dl->m_descriptors[descSlot];
+
+				if (descriptor->m_visibility != render::StageVisibility::All && descriptor->m_visibility != requiredVisibility)
+					continue;
+
+				RKIT_CHECK(WriteString(m_prefixStream, "layout(set = "));
+				RKIT_CHECK(WriteUIntString(m_prefixStream, dlSlot));
+				RKIT_CHECK(WriteString(m_prefixStream, ", binding = "));
+				RKIT_CHECK(WriteUIntString(m_prefixStream, descSlot));
+
+				switch (descriptor->m_descriptorType)
+				{
+				case render::DescriptorType::StaticConstantBuffer:
+				case render::DescriptorType::DynamicConstantBuffer:
+					RKIT_CHECK(WriteString(m_prefixStream, ", std140"));
+					break;
+				default:
+					break;
+				}
+
+				RKIT_CHECK(WriteString(m_prefixStream, ") "));
+
+				switch (descriptor->m_descriptorType)
+				{
+				case render::DescriptorType::Sampler:
+					RKIT_CHECK(WriteString(m_prefixStream, "sampler "));
+					break;
+
+				case render::DescriptorType::StaticConstantBuffer:
+				case render::DescriptorType::DynamicConstantBuffer:
+					RKIT_CHECK(WriteString(m_prefixStream, "uniform "));
+					break;
+
+				case render::DescriptorType::Buffer:
+				case render::DescriptorType::ByteAddressBuffer:
+					RKIT_CHECK(WriteString(m_prefixStream, "readonly buffer "));
+					break;
+
+				case render::DescriptorType::RWBuffer:
+				case render::DescriptorType::RWByteAddressBuffer:
+					RKIT_CHECK(WriteString(m_prefixStream, "buffer "));
+					break;
+
+				case render::DescriptorType::Texture1D:
+				case render::DescriptorType::Texture2D:
+				case render::DescriptorType::Texture2DArray:
+				case render::DescriptorType::Texture2DMS:
+				case render::DescriptorType::Texture2DMSArray:
+				case render::DescriptorType::Texture3D:
+				case render::DescriptorType::TextureCube:
+				case render::DescriptorType::TextureCubeArray:
+				case render::DescriptorType::RWTexture1D:
+				case render::DescriptorType::RWTexture1DArray:
+				case render::DescriptorType::RWTexture2D:
+				case render::DescriptorType::RWTexture2DArray:
+				case render::DescriptorType::RWTexture3D:
+					RKIT_CHECK(WriteTextureDescriptorType(m_prefixStream, descriptor->m_descriptorType, descriptor->m_valueType));
+					RKIT_CHECK(WriteString(m_prefixStream, " "));
+					break;
+				}
+
+				RKIT_CHECK(WriteString(m_prefixStream, package->GetString(descriptor->m_name.GetIndex())));
+				RKIT_CHECK(WriteString(m_prefixStream, ";\n"));
+			}
+		}
+
+		RKIT_CHECK(WriteString(m_suffixStream, "void main()\n"));
+		RKIT_CHECK(WriteString(m_suffixStream, "{\n"));
+
+		if (stage == render::vulkan::GraphicPipelineStage::Vertex)
+		{
+			RKIT_CHECK(WriteString(m_suffixStream, "    vec4 vPosition;\n"));
+		}
+
+		if (stage == render::vulkan::GraphicPipelineStage::Pixel)
+		{
+			RKIT_CHECK(WriteString(m_prefixStream, "PixelShaderOutput pOutput;\n"));
+		}
+
+		// Call entry point
+		RKIT_CHECK(WriteString(m_suffixStream, "    "));
+		RKIT_CHECK(WriteString(m_suffixStream, package->GetString(shaderDesc->m_entryPoint.GetIndex())));
+		RKIT_CHECK(WriteString(m_suffixStream, "("));
+
+		if (stage == render::vulkan::GraphicPipelineStage::Vertex)
+		{
+			RKIT_CHECK(WriteString(m_suffixStream, "vPosition"));
+		}
+
+		if (stage == render::vulkan::GraphicPipelineStage::Pixel)
+		{
+			RKIT_CHECK(WriteString(m_suffixStream, "pOutput"));
+		}
+
+		RKIT_CHECK(WriteString(m_suffixStream, ");\n"));
+
+		// Suffixes
+		if (stage == render::vulkan::GraphicPipelineStage::Vertex)
+		{
+			RKIT_CHECK(WriteString(m_suffixStream, "    gl_Position = vPosition;\n"));
+		}
+
+		if (stage == render::vulkan::GraphicPipelineStage::Pixel)
+		{
+			for (size_t rtIndex = 0; rtIndex < pipeline->m_renderTargets.Count(); rtIndex++)
+			{
+				const render::RenderTargetDesc *rtDesc = pipeline->m_renderTargets[rtIndex];
+
+				RKIT_CHECK(WriteString(m_suffixStream, "    _ps_out_RT"));
+				RKIT_CHECK(WriteUIntString(m_suffixStream, rtIndex));
+				RKIT_CHECK(WriteString(m_suffixStream, " = pOutput."));
+				RKIT_CHECK(WriteString(m_suffixStream, package->GetString(rtDesc->m_name.GetIndex())));
+				RKIT_CHECK(WriteString(m_suffixStream, ";\n"));
+			}
+		}
+
+		RKIT_CHECK(WriteString(m_suffixStream, "}\n"));
+
+		if (pipeline->m_renderTargets.Count() > static_cast<size_t>(std::numeric_limits<int>::max()))
+			return ResultCode::kIntegerOverflow;
+
+		m_glslangResource.max_draw_buffers = static_cast<int>(pipeline->m_renderTargets.Count());
 
 		return Compile();
 	}
@@ -434,13 +664,11 @@ namespace rkit::buildsystem::vulkan
 	{
 		String mainShaderContent;
 		RKIT_CHECK(mainShaderContent.Append("#extension GL_ARB_shading_language_include : enable\n"
-		                                    "#include <GlslShaderPrefix>\n"
-		                                    "#include \"./"));
+			"#include <GlslShaderPrefix>\n"
+			"#include \"./"));
 		RKIT_CHECK(mainShaderContent.Append(m_shaderSourcePath));
 		RKIT_CHECK(mainShaderContent.Append("\"\n"
-		                                    "#include <GlslShaderSuffix>\n"));
-
-		glslang_resource_t resource = {};
+			"#include <GlslShaderSuffix>\n"));
 
 		glslang_input_t input = {};
 		input.language = GLSLANG_SOURCE_GLSL;
@@ -457,7 +685,7 @@ namespace rkit::buildsystem::vulkan
 		input.callbacks.include_local = StaticIncludeLocalCallback;
 		input.callbacks.include_system = StaticIncludeSystemCallback;
 		input.callbacks_ctx = this;
-		input.resource = &resource;
+		input.resource = &m_glslangResource;
 
 		glslang_shader_t *shader = glslang_shader_create(&input);
 		if (!shader)
@@ -540,6 +768,205 @@ namespace rkit::buildsystem::vulkan
 
 		return stream.WriteAll(leDWords.GetBuffer(), leDWords.Count());
 	}
+
+	Result RenderPipelineStageBuildJob::WriteString(IWriteStream &stream, const rkit::StringSliceView &str)
+	{
+		Span<const char> span = str.ToSpan();
+		if (span.Count() == 0)
+			return ResultCode::kOK;
+
+		return stream.WriteAll(span.Ptr(), span.Count());
+	}
+
+	Result RenderPipelineStageBuildJob::WriteUIntString(IWriteStream &stream, uint64_t value)
+	{
+		const uint32_t kMaxDigits = 20;
+
+		char strBuffer[kMaxDigits + 1];
+		strBuffer[kMaxDigits] = '\0';
+
+		size_t numDigits = 0;
+		do
+		{
+			numDigits++;
+			strBuffer[kMaxDigits - numDigits] = static_cast<char>('0' + (value % 10u));
+			value /= 10u;
+		} while (value != 0u);
+
+		return WriteString(stream, StringView(strBuffer + (kMaxDigits - numDigits), numDigits));
+	}
+
+	Result RenderPipelineStageBuildJob::WriteRTFormat(IWriteStream &stream, const render::RenderTargetFormat &format)
+	{
+		return ResultCode::kNotYetImplemented;
+	}
+
+	Result RenderPipelineStageBuildJob::WriteVectorNumericType(IWriteStream &stream, const render::VectorNumericType &format)
+	{
+		RKIT_CHECK(WriteNumericType(stream, format.m_numericType));
+		RKIT_CHECK(WriteVectorDimension(stream, format.m_cols));
+
+		return ResultCode::kOK;
+	}
+
+	Result RenderPipelineStageBuildJob::WriteNumericType(IWriteStream &stream, const render::NumericType numericType)
+	{
+		switch (numericType)
+		{
+		case render::NumericType::Bool:
+			return WriteString(stream, "bool");
+		case render::NumericType::Float16:
+			return WriteString(stream, "half");
+		case render::NumericType::Float32:
+			return WriteString(stream, "float");
+		case render::NumericType::Float64:
+			return WriteString(stream, "double");
+		case render::NumericType::SInt8:
+			return WriteString(stream, "sbyte");
+		case render::NumericType::SInt16:
+			return WriteString(stream, "short");
+		case render::NumericType::SInt32:
+			return WriteString(stream, "int");
+		case render::NumericType::SInt64:
+			return WriteString(stream, "long");
+		case render::NumericType::UInt8:
+			return WriteString(stream, "byte");
+		case render::NumericType::UInt16:
+			return WriteString(stream, "ushort");
+		case render::NumericType::UInt32:
+			return WriteString(stream, "uint");
+		case render::NumericType::UInt64:
+			return WriteString(stream, "ulong");
+		default:
+			rkit::log::Error("A numeric type could not be written in the desired context");
+			return ResultCode::kOperationFailed;
+		}
+	}
+
+	Result RenderPipelineStageBuildJob::WriteVectorDimension(IWriteStream &stream, const render::VectorDimension vectorDimension)
+	{
+		switch (vectorDimension)
+		{
+		case render::VectorDimension::Dimension2:
+			return WriteString(stream, "2");
+		case render::VectorDimension::Dimension3:
+			return WriteString(stream, "3");
+		case render::VectorDimension::Dimension4:
+			return WriteString(stream, "4");
+		default:
+			return ResultCode::kInternalError;
+		}
+	}
+
+	Result RenderPipelineStageBuildJob::WriteConfigurableRTFormat(IWriteStream &stream, const render::ConfigurableValueBase<render::RenderTargetFormat> &format)
+	{
+		if (format.m_state == render::ConfigurableValueState::Explicit)
+			return WriteRTFormat(stream, format.m_u.m_value);
+		else
+			return WriteString(stream, "float4");
+	}
+
+	Result RenderPipelineStageBuildJob::WriteTextureDescriptorType(IWriteStream &stream, const render::DescriptorType descriptorType, const render::ValueType &valueType)
+	{
+		if (valueType.m_type == render::ValueTypeType::VectorNumeric)
+			return WriteTextureDescriptorType(stream, descriptorType, render::ValueType(valueType.m_value.m_vectorNumericType->m_numericType));
+
+		if (valueType.m_type != render::ValueTypeType::Numeric)
+		{
+			rkit::log::Error("Texture descriptor type was non-numeric");
+			return ResultCode::kOperationFailed;
+		}
+
+		const render::NumericType numericType = valueType.m_value.m_numericType;
+
+		switch (numericType)
+		{
+		case render::NumericType::SInt8:
+		case render::NumericType::SInt16:
+		case render::NumericType::SInt32:
+		case render::NumericType::SInt64:
+			RKIT_CHECK(WriteString(stream, "i"));
+			break;
+
+		case render::NumericType::UInt8:
+		case render::NumericType::UInt16:
+		case render::NumericType::UInt32:
+		case render::NumericType::UInt64:
+			RKIT_CHECK(WriteString(stream, "u"));
+			break;
+
+		default:
+			break;
+		}
+
+		RKIT_CHECK(WriteString(stream, "texture"));
+
+		switch (descriptorType)
+		{
+		case render::DescriptorType::Texture1D:
+		case render::DescriptorType::Texture1DArray:
+		case render::DescriptorType::RWTexture1D:
+		case render::DescriptorType::RWTexture1DArray:
+			RKIT_CHECK(WriteString(stream, "1D"));
+			break;
+
+		case render::DescriptorType::Texture2D:
+		case render::DescriptorType::Texture2DArray:
+		case render::DescriptorType::Texture2DMS:
+		case render::DescriptorType::Texture2DMSArray:
+		case render::DescriptorType::RWTexture2D:
+		case render::DescriptorType::RWTexture2DArray:
+			RKIT_CHECK(WriteString(stream, "2D"));
+			break;
+
+		case render::DescriptorType::Texture3D:
+		case render::DescriptorType::RWTexture3D:
+			RKIT_CHECK(WriteString(stream, "3D"));
+			break;
+
+		case render::DescriptorType::TextureCube:
+		case render::DescriptorType::TextureCubeArray:
+			RKIT_CHECK(WriteString(stream, "Cube"));
+			break;
+
+		default:
+			return ResultCode::kInternalError;
+		}
+
+		switch (descriptorType)
+		{
+		case render::DescriptorType::Texture1DArray:
+		case render::DescriptorType::RWTexture1DArray:
+		case render::DescriptorType::Texture2DArray:
+		case render::DescriptorType::TextureCubeArray:
+			RKIT_CHECK(WriteString(stream, "Array"));
+			break;
+
+		case render::DescriptorType::Texture2DMSArray:
+		case render::DescriptorType::RWTexture2DArray:
+			RKIT_CHECK(WriteString(stream, "MSArray"));
+			break;
+
+		case render::DescriptorType::Texture2DMS:
+			RKIT_CHECK(WriteString(stream, "MS"));
+			break;
+
+		case render::DescriptorType::Texture1D:
+		case render::DescriptorType::RWTexture1D:
+		case render::DescriptorType::Texture2D:
+		case render::DescriptorType::RWTexture2D:
+		case render::DescriptorType::Texture3D:
+		case render::DescriptorType::RWTexture3D:
+		case render::DescriptorType::TextureCube:
+			break;
+
+		default:
+			return ResultCode::kInternalError;
+		}
+
+		return ResultCode::kOK;
+	}
+
 
 	Result RenderPipelineStageBuildJob::NormalizePath(String &path) const
 	{
