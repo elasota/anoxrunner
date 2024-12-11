@@ -1377,8 +1377,6 @@ namespace rkit::buildsystem::vulkan
 			return rkit::ResultCode::kModuleLoadFailed;
 		}
 
-		RKIT_CHECK(dataModule->Init(nullptr));
-
 		*outDriver = static_cast<data::IDataDriver *>(rkit::GetDrivers().FindDriver(IModuleDriver::kDefaultNamespace, "Data"));
 
 		return ResultCode::kOK;

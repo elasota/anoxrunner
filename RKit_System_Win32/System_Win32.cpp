@@ -80,6 +80,20 @@ namespace rkit
 		bool m_haveItem;
 	};
 
+	class SystemLibrary_Win32 final : public ISystemLibrary, public NoCopy
+	{
+	public:
+		SystemLibrary_Win32();
+		~SystemLibrary_Win32();
+
+		void SetHModule(const HMODULE &hmodule);
+
+		bool GetFunction(void *fnPtr, const StringView &fnName) override;
+
+	private:
+		HMODULE m_hmodule;
+	};
+
 	class SystemDriver_Win32 final : public NoCopy, public ISystemDriver, public IWin32PlatformDriver
 	{
 	public:
@@ -107,6 +121,8 @@ namespace rkit
 		IPlatformDriver *GetPlatformDriver() const override;
 
 		HINSTANCE GetHInstance() const override;
+
+		Result OpenSystemLibrary(UniquePtr<ISystemLibrary> &outLibrary, SystemLibraryType libType) const override;
 
 	private:
 		static DWORD OpenFlagsToDisposition(bool createIfNotExists, bool truncateIfExists);
@@ -413,6 +429,32 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
+	SystemLibrary_Win32::SystemLibrary_Win32()
+		: m_hmodule(nullptr)
+	{
+	}
+
+	SystemLibrary_Win32::~SystemLibrary_Win32()
+	{
+		if (m_hmodule)
+			FreeLibrary(m_hmodule);
+	}
+
+	void SystemLibrary_Win32::SetHModule(const HMODULE &hmodule)
+	{
+		m_hmodule = hmodule;
+	}
+
+	bool SystemLibrary_Win32::GetFunction(void *fnPtr, const StringView &fnName)
+	{
+		void *procAddr = GetProcAddress(m_hmodule, fnName.GetChars());
+		if (!procAddr)
+			return false;
+
+		memcpy(fnPtr, &procAddr, sizeof(void *));
+		return true;
+	}
+
 	SystemDriver_Win32::SystemDriver_Win32(IMallocDriver *alloc, const SystemModuleInitParameters_Win32 &initParams)
 		: m_commandLine(alloc)
 		, m_argvW(nullptr)
@@ -622,6 +664,37 @@ namespace rkit
 	IPlatformDriver *SystemDriver_Win32::GetPlatformDriver() const
 	{
 		return const_cast<SystemDriver_Win32 *>(this);
+	}
+
+	Result SystemDriver_Win32::OpenSystemLibrary(UniquePtr<ISystemLibrary> &outLibrary, SystemLibraryType libType) const
+	{
+		IMallocDriver *alloc = GetDrivers().m_mallocDriver;
+
+		const wchar_t *libName = nullptr;
+
+		switch (libType)
+		{
+		case SystemLibraryType::kVulkan:
+			libName = L"vulkan-1.dll";
+			break;
+		default:
+			break;
+		}
+
+		if (!libName)
+			return ResultCode::kInvalidParameter;
+
+		UniquePtr<SystemLibrary_Win32> sysLibrary;
+		RKIT_CHECK(New<SystemLibrary_Win32>(sysLibrary));
+
+		HMODULE hmodule = LoadLibraryW(libName);
+		if (!hmodule)
+			return ResultCode::kFileOpenError;
+
+		sysLibrary->SetHModule(hmodule);
+		outLibrary = std::move(sysLibrary);
+
+		return ResultCode::kOK;
 	}
 
 	HINSTANCE SystemDriver_Win32::GetHInstance() const

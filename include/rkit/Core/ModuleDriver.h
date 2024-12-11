@@ -5,6 +5,7 @@
 namespace rkit
 {
 	struct IModule;
+	struct ModuleInitParameters;
 
 	struct IModuleDriver
 	{
@@ -12,6 +13,11 @@ namespace rkit
 
 		virtual ~IModuleDriver() {}
 
-		virtual IModule *LoadModule(uint32_t moduleNamespace, const char *moduleName) = 0;
+		virtual IModule *LoadModule(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams) = 0;
+
+		inline IModule *LoadModule(uint32_t moduleNamespace, const char *moduleName)
+		{
+			return this->LoadModule(moduleNamespace, moduleName, nullptr);
+		}
 	};
 }

@@ -35,8 +35,6 @@ rkit::Result anox::ExtractDATProgram::Run()
 	if (!anoxUtilsModule)
 		return rkit::ResultCode::kModuleLoadFailed;
 
-	RKIT_CHECK(anoxUtilsModule->Init(nullptr));
-
 	rkit::Span<const rkit::StringView> args = rkit::GetDrivers().m_systemDriver->GetCommandLine();
 
 	if (args.Count() != 2)

@@ -126,8 +126,6 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 			return rkit::ResultCode::kModuleLoadFailed;
 		}
 
-		RKIT_CHECK(utilsModule->Init(nullptr));
-
 		IUtilitiesDriver *utilsDriver = static_cast<IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, "Utilities"));
 
 		RKIT_CHECK(utilsDriver->RunDataBuild(buildTarget, buildSourceDirectory, buildIntermediateDirectory, dataDirectory, renderBackendType));
@@ -140,6 +138,8 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 	if (run)
 	{
 		RKIT_CHECK(IAnoxGame::Create(m_game));
+
+		RKIT_CHECK(m_game->Start());
 	}
 
 	return rkit::ResultCode::kOK;

@@ -70,8 +70,6 @@ namespace anox::utils
 			return rkit::ResultCode::kModuleLoadFailed;
 		}
 
-		RKIT_CHECK(buildModule->Init(nullptr));
-
 		m_bsDriver = static_cast<rkit::buildsystem::IBuildSystemDriver *>(rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, "BuildSystem"));
 		if (!m_bsDriver)
 		{
@@ -103,8 +101,6 @@ namespace anox::utils
 			rkit::log::Error("Couldn't load render build add-on module");
 			return rkit::ResultCode::kModuleLoadFailed;
 		}
-
-		RKIT_CHECK(renderBuildModule->Init(nullptr));
 
 		rkit::buildsystem::IBuildSystemAddOnDriver *addOnDriver = static_cast<rkit::buildsystem::IBuildSystemAddOnDriver *>(rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, renderAddOnDriverName));
 		if (!addOnDriver)

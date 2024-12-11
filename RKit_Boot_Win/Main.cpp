@@ -28,7 +28,7 @@ namespace rkit
 
 	struct ModuleDriver_Win32 final : public IModuleDriver
 	{
-		IModule *LoadModule(uint32_t moduleNamespace, const char *moduleName) override;
+		IModule *LoadModule(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams) override;
 	};
 
 	struct ConsoleLogDriver_Win32 final : public ILogDriver
@@ -103,7 +103,7 @@ namespace rkit
 		_ASSERTE(_CrtCheckMemory());
 	}
 
-	IModule *ModuleDriver_Win32::LoadModule(uint32_t moduleNamespace, const char *moduleName)
+	IModule *ModuleDriver_Win32::LoadModule(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams)
 	{
 		// Base module driver does no deduplication
 		IMallocDriver *mallocDriver = g_drivers_Win32.m_mallocDriver;
@@ -143,7 +143,16 @@ namespace rkit
 			return nullptr;
 		}
 
-		return new (moduleMemory) Module_Win32(hmodule, initFunc, mallocDriver);
+		IModule* module = new (moduleMemory) Module_Win32(hmodule, initFunc, mallocDriver);
+
+		Result initResult = module->Init(initParams);
+		if (!initResult.IsOK())
+		{
+			module->Unload();
+			return nullptr;
+		}
+
+		return module;
 	}
 
 	void ConsoleLogDriver_Win32::LogMessage(LogSeverity severity, const char *msg)
@@ -259,45 +268,33 @@ static int WinMainCommon(HINSTANCE hInstance)
 	drivers->m_logDriver.m_obj = &rkit::g_consoleLogDriver;
 #endif
 
-	rkit::IModule *systemModule = ::rkit::g_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "System_Win32");
+	rkit::SystemModuleInitParameters_Win32 systemParams(hInstance);
+
+	rkit::IModule *systemModule = ::rkit::g_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "System_Win32", &systemParams);
 	if (!systemModule)
 		return rkit::Result(rkit::ResultCode::kModuleLoadFailed).ToExitCode();
 
-	rkit::SystemModuleInitParameters_Win32 systemParams(hInstance);
-
-	rkit::Result systemInitResult = systemModule->Init(&systemParams);
-
-	if (!systemInitResult.IsOK())
-	{
-		systemModule->Unload();
-		return systemInitResult.ToExitCode();
-	}
-
-	rkit::IModule *programLauncherModule = ::rkit::g_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "ProgramLauncher");
+	rkit::IModule *programLauncherModule = ::rkit::g_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "ProgramLauncher", nullptr);
 	if (!programLauncherModule)
 	{
 		systemModule->Unload();
 		return rkit::Result(rkit::ResultCode::kModuleLoadFailed).ToExitCode();
 	}
 
-	rkit::Result result = programLauncherModule->Init(nullptr);
+	rkit::Result result = drivers->m_programDriver->InitProgram();
 	if (result.IsOK())
 	{
-		result = drivers->m_programDriver->InitProgram();
-		if (result.IsOK())
+		for (;;)
 		{
-			for (;;)
-			{
-				bool isExiting = false;
-				result = drivers->m_programDriver->RunFrame(isExiting);
+			bool isExiting = false;
+			result = drivers->m_programDriver->RunFrame(isExiting);
 
-				if (!result.IsOK() || isExiting)
-					break;
-			}
+			if (!result.IsOK() || isExiting)
+				break;
 		}
-
-		drivers->m_programDriver->ShutdownProgram();
 	}
+
+	drivers->m_programDriver->ShutdownProgram();
 
 	programLauncherModule->Unload();
 	systemModule->Unload();

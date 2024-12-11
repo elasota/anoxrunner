@@ -48,7 +48,7 @@ namespace rkit
 			if (!utilitiesModule)
 				return ResultCode::kModuleLoadFailed;
 
-			return utilitiesModule->Init(nullptr);
+			return ResultCode::kOK;
 		}
 
 		Result TryGetJsonObjectValue(const utils::JsonValue &objValue, const StringView &key, bool &outExists, utils::JsonValue &outValue)
@@ -301,7 +301,7 @@ namespace rkit
 			if (!programModule)
 				return ResultCode::kModuleLoadFailed;
 
-			return programModule->Init(nullptr);
+			return ResultCode::kOK;
 		}
 	}
 
@@ -314,7 +314,7 @@ namespace rkit
 
 		void UnloadAllTrackedModules();
 
-		IModule *LoadModule(uint32_t moduleNamespace, const char *moduleName) override;
+		IModule *LoadModule(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters* initParams) override;
 
 		void Uninstall();
 
@@ -375,7 +375,7 @@ namespace rkit
 			m_lastModule->Unload();
 	}
 
-	IModule *TrackedModuleDriver::LoadModule(uint32_t moduleNamespace, const char *moduleName)
+	IModule *TrackedModuleDriver::LoadModule(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams)
 	{
 		StringView moduleNameStringView = StringView(moduleName, strlen(moduleName));
 		TrackedModule *scanModule = m_firstModule;
@@ -399,7 +399,7 @@ namespace rkit
 		if (!moduleMem)
 			return nullptr;
 
-		IModule *module = m_moduleDriver->LoadModule(moduleNamespace, moduleName);
+		IModule *module = m_moduleDriver->LoadModule(moduleNamespace, moduleName, initParams);
 		if (!module)
 		{
 			mallocDriver->Free(moduleMem);
@@ -409,6 +409,7 @@ namespace rkit
 		TrackedModule *newModule = new (moduleMem) TrackedModule(module, m_lastModule, mallocDriver, moduleNamespace, std::move(nameStr), this);
 		if (!m_firstModule)
 			m_firstModule = newModule;
+
 		m_lastModule = newModule;
 
 		return newModule;

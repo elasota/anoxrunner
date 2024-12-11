@@ -19,10 +19,18 @@ namespace rkit
 	struct ISeekableReadWriteStream;
 	struct ISeekableWriteStream;
 	struct FileAttributes;
+	struct ISystemLibrary;
 
 	struct IPlatformDriver
 	{
 		virtual ~IPlatformDriver() {}
+	};
+
+	struct ISystemLibrary
+	{
+		virtual ~ISystemLibrary() {}
+
+		virtual bool GetFunction(void *fnPtrAddress, const StringView &fnName) = 0;
 	};
 
 	enum class FileLocation
@@ -30,6 +38,11 @@ namespace rkit
 		kDataSourceDirectory,
 		kGameDirectory,
 		kAbsolute,
+	};
+
+	enum class SystemLibraryType
+	{
+		kVulkan,
 	};
 
 	struct ISystemDriver
@@ -51,5 +64,7 @@ namespace rkit
 		virtual char GetPathSeparator() const = 0;
 
 		virtual IPlatformDriver *GetPlatformDriver() const = 0;
+
+		virtual Result OpenSystemLibrary(UniquePtr<ISystemLibrary> &outLibrary, SystemLibraryType libType) const = 0;
 	};
 }

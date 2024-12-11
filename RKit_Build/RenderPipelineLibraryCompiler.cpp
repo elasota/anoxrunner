@@ -2395,8 +2395,6 @@ namespace rkit::buildsystem
 			return rkit::ResultCode::kModuleLoadFailed;
 		}
 
-		RKIT_CHECK(dataModule->Init(nullptr));
-
 		data::IDataDriver *dataDriver = static_cast<data::IDataDriver *>(rkit::GetDrivers().FindDriver(IModuleDriver::kDefaultNamespace, "Data"));
 
 		UniquePtr<rpc_analyzer::LibraryAnalyzer> analyzer;
@@ -2417,8 +2415,6 @@ namespace rkit::buildsystem
 			rkit::log::Error("Couldn't load data module");
 			return rkit::ResultCode::kModuleLoadFailed;
 		}
-
-		RKIT_CHECK(dataModule->Init(nullptr));
 
 		data::IDataDriver *dataDriver = static_cast<data::IDataDriver *>(rkit::GetDrivers().FindDriver(IModuleDriver::kDefaultNamespace, "Data"));
 
@@ -2446,8 +2442,6 @@ namespace rkit::buildsystem
 			rkit::log::Error("Couldn't load data module");
 			return rkit::ResultCode::kModuleLoadFailed;
 		}
-
-		RKIT_CHECK(dataModule->Init(nullptr));
 
 		data::IDataDriver *dataDriver = static_cast<data::IDataDriver *>(rkit::GetDrivers().FindDriver(IModuleDriver::kDefaultNamespace, "Data"));
 
