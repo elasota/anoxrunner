@@ -8,9 +8,19 @@
 #include "rkit/Core/MallocDriver.h"
 
 #include "VulkanAPI.h"
+#include "VulkanCheck.h"
 
 namespace rkit::render::vulkan
 {
+	namespace results
+	{
+		Result FirstChanceVulkanFailure(VkResult result)
+		{
+			rkit::log::ErrorFmt("Vulkan error %x", static_cast<unsigned int>(result));
+			return ResultCode::kOperationFailed;
+		}
+	}
+
 	class VulkanAllocationCallbacks final : public NoCopy
 	{
 	public:
@@ -97,7 +107,7 @@ namespace rkit::render::vulkan
 		size_t paddingValueSize = (alignmentBits + 7) / 8;
 
 		paddedAddress -= paddingValueSize;
-		fullPaddingAmount -= paddingValueSize;
+		fullPaddingAmount += paddingValueSize;
 
 		size_t paddingAmount = 0;
 		for (size_t i = 0; i < paddingValueSize; i++)
@@ -189,7 +199,7 @@ namespace rkit::render::vulkan
 
 		size_t fullPadding = ComputeFullPaddingOffsetForAddress(reinterpret_cast<uintptr_t>(memBuffer), alignmentBits);
 
-		EncodePadding(memBuffer, alignmentBits, fullPadding);
+		EncodePadding(memBuffer + fullPadding, alignmentBits, fullPadding);
 
 		return memBuffer + fullPadding;
 	}
@@ -234,7 +244,7 @@ namespace rkit::render::vulkan
 		if (std::numeric_limits<size_t>::max() - newMaxPaddingAmount < size)
 			return nullptr;
 
-		uint8_t *newMem = static_cast<uint8_t *>(m_alloc->Realloc(originalMem, newMaxPaddingAmount + size));
+		uint8_t *newMem = static_cast<uint8_t *>(m_alloc->Realloc(originalMem - originalFullPadding, newMaxPaddingAmount + size));
 
 		size_t newFullPadding = ComputeFullPaddingOffsetForAddress(reinterpret_cast<uintptr_t>(newMem), newAlignmentBits);
 
@@ -244,7 +254,7 @@ namespace rkit::render::vulkan
 			memmove(newMem + newFullPadding, newMem + originalFullPadding, size);
 		}
 
-		EncodePadding(newMem, newAlignmentBits, newFullPadding);
+		EncodePadding(newMem + newFullPadding, newAlignmentBits, newFullPadding);
 		return newMem + newFullPadding;
 	}
 
@@ -278,11 +288,6 @@ namespace rkit::render::vulkan
 		return m_allocationCallbacks->GetCallbacks();
 	}
 
-	void VulkanAPI::TerminalResolveFunctionLoader(FunctionLoaderInfo &loaderInfo)
-	{
-		loaderInfo.m_nextCallback = nullptr;
-	}
-
 	Result RenderVulkanDriver::LoadVulkanAPI()
 	{
 		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
@@ -311,11 +316,34 @@ namespace rkit::render::vulkan
 	{
 		m_alloc = GetDrivers().m_mallocDriver;
 
+		IUtilitiesDriver *utils = GetDrivers().m_utilitiesDriver;
+
 		RKIT_CHECK(LoadVulkanAPI());
 
-		
-
 		RKIT_CHECK(NewWithAlloc<VulkanAllocationCallbacks>(m_allocationCallbacks, m_alloc, m_alloc));
+
+		VkApplicationInfo appInfo = {};
+		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+		appInfo.pApplicationName = utils->GetProgramName().GetChars();
+
+		uint32_t vMajor = 0;
+		uint32_t vMinor = 0;
+		uint32_t vPatch = 0;
+		utils->GetProgramVersion(vMajor, vMinor, vPatch);
+		appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+
+		utils->GetRKitVersion(vMajor, vMinor, vPatch);
+		appInfo.pEngineName = "Gale Force Games RKit";
+		appInfo.engineVersion = VK_MAKE_VERSION(vMajor, vMinor, vPatch);
+		appInfo.apiVersion = VK_API_VERSION_1_0;
+
+		VkInstanceCreateInfo instCreateInfo = {};
+		instCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+		instCreateInfo.pApplicationInfo = &appInfo;
+
+		RKIT_VK_CHECK(m_vkAPI.vkCreateInstance(&instCreateInfo, m_allocationCallbacks->GetCallbacks(), &m_vkInstance));
+
+		m_vkInstanceIsInitialized = true;
 
 		return rkit::ResultCode::kNotYetImplemented;
 	}

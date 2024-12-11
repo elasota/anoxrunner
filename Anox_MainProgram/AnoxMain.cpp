@@ -40,7 +40,12 @@ void anox::MainProgramDriver::ShutdownDriver()
 
 rkit::Result anox::MainProgramDriver::InitProgram()
 {
-	rkit::Span<const rkit::StringView> args = rkit::GetDrivers().m_systemDriver->GetCommandLine();
+	rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
+	rkit::IUtilitiesDriver *utilsDriver = rkit::GetDrivers().m_utilitiesDriver;
+
+	rkit::GetDrivers().m_utilitiesDriver->SetProgramName("Anox Runner");
+
+	rkit::Span<const rkit::StringView> args = sysDriver->GetCommandLine();
 
 	bool autoBuild = false;
 	bool run = false;

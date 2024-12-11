@@ -1,5 +1,5 @@
 #pragma once
 
-#define VK_NO_PROTOTYPES
+#include "IncludeVulkanDefs.h"
 
 #include <vulkan/vulkan.h>

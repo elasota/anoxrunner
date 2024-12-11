@@ -67,5 +67,13 @@ namespace rkit
 		virtual const utils::ISha256Calculator *GetSha256Calculator() const = 0;
 
 		virtual Result VFormatString(char *buffer, size_t bufferSize, void *oversizedUserdata, AllocateDynamicStringCallback_t oversizedCallback, size_t &outLength, const char *fmt, va_list list) const = 0;
+
+		virtual Result SetProgramName(const StringView &str) = 0;
+		virtual StringView GetProgramName() const = 0;
+
+		virtual void SetProgramVersion(uint32_t major, uint32_t minor, uint32_t patch) = 0;
+		virtual void GetProgramVersion(uint32_t &outMajor, uint32_t &outMinor, uint32_t &outPatch) const = 0;
+
+		virtual void GetRKitVersion(uint32_t &outMajor, uint32_t &outMinor, uint32_t &outPatch) const = 0;
 	};
 }

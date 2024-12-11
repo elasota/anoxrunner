@@ -29,5 +29,14 @@
     <ClInclude Include="IncludeVulkan.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="VulkanCheck.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="IncludeVulkanDefs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="IncludeVulkanCore.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

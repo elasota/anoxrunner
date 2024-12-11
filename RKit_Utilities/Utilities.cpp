@@ -22,6 +22,8 @@ namespace rkit
 	class UtilitiesDriver final : public IUtilitiesDriver
 	{
 	public:
+		UtilitiesDriver();
+
 		Result InitDriver();
 		void ShutdownDriver();
 
@@ -50,13 +52,30 @@ namespace rkit
 
 		Result VFormatString(char *buffer, size_t bufferSize, void *oversizedUserdata, AllocateDynamicStringCallback_t oversizedCallback, size_t &outLength, const char *fmt, va_list list) const override;
 
+		Result SetProgramName(const StringView &str) override;
+		StringView GetProgramName() const override;
+
+		void SetProgramVersion(uint32_t major, uint32_t minor, uint32_t patch) override;
+		void GetProgramVersion(uint32_t &outMajor, uint32_t &outMinor, uint32_t &outPatch) const override;
+
+		void GetRKitVersion(uint32_t &outMajor, uint32_t &outMinor, uint32_t &outPatch) const override;
+
 	private:
 		static bool ValidateFilePathSlice(const Span<const char> &name);
 
 		utils::Sha256Calculator m_sha256Calculator;
+
+		String m_programName;
+
+		uint32_t m_programVersion[3];
 	};
 
 	typedef DriverModuleStub<UtilitiesDriver, IUtilitiesDriver, &Drivers::m_utilitiesDriver> UtilitiesModule;
+
+	UtilitiesDriver::UtilitiesDriver()
+		: m_programVersion{ 1, 0, 0 }
+	{
+	}
 
 	Result UtilitiesDriver::InitDriver()
 	{
@@ -396,6 +415,37 @@ namespace rkit
 
 		outLength = static_cast<size_t>(formattedLength);
 		return ResultCode::kOK;
+	}
+
+	Result UtilitiesDriver::SetProgramName(const StringView &str)
+	{
+		return m_programName.Set(str);
+	}
+
+	StringView UtilitiesDriver::GetProgramName() const
+	{
+		return m_programName;
+	}
+
+	void UtilitiesDriver::SetProgramVersion(uint32_t major, uint32_t minor, uint32_t patch)
+	{
+		m_programVersion[0] = major;
+		m_programVersion[1] = minor;
+		m_programVersion[2] = patch;
+	}
+
+	void UtilitiesDriver::GetProgramVersion(uint32_t &outMajor, uint32_t &outMinor, uint32_t &outPatch) const
+	{
+		outMajor = m_programVersion[0];
+		outMinor = m_programVersion[1];
+		outPatch = m_programVersion[2];
+	}
+
+	void UtilitiesDriver::GetRKitVersion(uint32_t &outMajor, uint32_t &outMinor, uint32_t &outPatch) const
+	{
+		outMajor = 1;
+		outMinor = 0;
+		outPatch = 0;
 	}
 }
 
