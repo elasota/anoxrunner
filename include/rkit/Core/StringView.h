@@ -67,6 +67,8 @@ namespace rkit
 
 		template<size_t TLength>
 		BaseStringView(const TChar(&charsArray)[TLength]);
+
+		static BaseStringView FromCString(const TChar *chars);
 	};
 }
 
@@ -311,4 +313,17 @@ rkit::BaseStringView<TChar>::BaseStringView(const TChar(&charsArray)[TLength])
 	: BaseStringSliceView<TChar>(charsArray)
 {
 	RKIT_ASSERT(charsArray[TLength - 1] == static_cast<TChar>(0));
+}
+
+template<class TChar>
+rkit::BaseStringView<TChar> rkit::BaseStringView<TChar>::FromCString(const TChar *chars)
+{
+	if (chars == nullptr)
+		return BaseStringView<TChar>();
+
+	size_t length = 0;
+	while (chars[length] != static_cast<TChar>(0))
+		length++;
+
+	return BaseStringView<TChar>(chars, length);
 }

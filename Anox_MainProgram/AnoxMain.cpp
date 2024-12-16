@@ -15,8 +15,8 @@ namespace anox
 	class MainProgramDriver final : public rkit::IProgramDriver
 	{
 	public:
-		rkit::Result InitDriver();
-		void ShutdownDriver();
+		rkit::Result InitDriver(const rkit::DriverInitParameters *initParams) override;
+		void ShutdownDriver() override;
 
 		rkit::Result InitProgram() override;
 		rkit::Result RunFrame(bool &outIsExiting) override;
@@ -29,7 +29,7 @@ namespace anox
 	typedef rkit::DriverModuleStub<MainProgramDriver, rkit::IProgramDriver, &rkit::Drivers::m_programDriver> MainProgramModule;
 }
 
-rkit::Result anox::MainProgramDriver::InitDriver()
+rkit::Result anox::MainProgramDriver::InitDriver(const rkit::DriverInitParameters *initParams)
 {
 	return rkit::ResultCode::kOK;
 }
@@ -43,7 +43,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 	rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
 	rkit::IUtilitiesDriver *utilsDriver = rkit::GetDrivers().m_utilitiesDriver;
 
-	rkit::GetDrivers().m_utilitiesDriver->SetProgramName("Anox Runner");
+	RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->SetProgramName("Anox Runner"));
 
 	rkit::Span<const rkit::StringView> args = sysDriver->GetCommandLine();
 

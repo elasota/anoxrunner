@@ -14,7 +14,7 @@ namespace rkit::data
 	public:
 
 	private:
-		rkit::Result InitDriver() override;
+		rkit::Result InitDriver(const DriverInitParameters *initParams) override;
 		void ShutdownDriver() override;
 
 		uint32_t GetDriverNamespaceID() const override { return rkit::IModuleDriver::kDefaultNamespace; }
@@ -28,7 +28,7 @@ namespace rkit::data
 
 	typedef rkit::CustomDriverModuleStub<DataDriver> DataModule;
 
-	rkit::Result DataDriver::InitDriver()
+	rkit::Result DataDriver::InitDriver(const DriverInitParameters *initParams)
 	{
 		RKIT_CHECK(New<RenderDataHandler>(m_renderDataHandler));
 

@@ -39,6 +39,8 @@ namespace rkit
 		kOperationFailed,
 		kTextParsingFailed,
 
+		kGraphicsAPIException,
+
 		kFormatError,
 	};
 }

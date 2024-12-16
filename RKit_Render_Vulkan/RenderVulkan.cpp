@@ -1,14 +1,20 @@
 #include "rkit/Render/RenderDriver.h"
 
+#include "rkit/Core/Algorithm.h"
 #include "rkit/Core/DriverModuleStub.h"
 #include "rkit/Core/LogDriver.h"
+#include "rkit/Core/MallocDriver.h"
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/ModuleGlue.h"
 #include "rkit/Core/NoCopy.h"
-#include "rkit/Core/MallocDriver.h"
+#include "rkit/Core/RefCounted.h"
+#include "rkit/Core/Vector.h"
 
 #include "VulkanAPI.h"
 #include "VulkanCheck.h"
+#include "VulkanAutoObject.h"
+
+#include <cstring>
 
 namespace rkit::render::vulkan
 {
@@ -17,9 +23,11 @@ namespace rkit::render::vulkan
 		Result FirstChanceVulkanFailure(VkResult result)
 		{
 			rkit::log::ErrorFmt("Vulkan error %x", static_cast<unsigned int>(result));
-			return ResultCode::kOperationFailed;
+			return Result(ResultCode::kGraphicsAPIException, static_cast<uint32_t>(result));
 		}
 	}
+
+	class RenderVulkanDriver;
 
 	class VulkanAllocationCallbacks final : public NoCopy
 	{
@@ -53,10 +61,31 @@ namespace rkit::render::vulkan
 		VkAllocationCallbacks m_callbacks;
 	};
 
+	class RenderVulkanPhysicalDevice final : public RefCounted
+	{
+	public:
+		explicit RenderVulkanPhysicalDevice(VkPhysicalDevice physDevice);
+
+		Result InitPhysicalDevice(const RenderVulkanDriver &driver);
+
+	private:
+		VkPhysicalDevice m_physDevice;
+		VkPhysicalDeviceProperties m_props;
+	};
+
+	class RenderVulkanAdapter final : public IRenderAdapter
+	{
+	public:
+		explicit RenderVulkanAdapter(const RCPtr<RenderVulkanPhysicalDevice> &physDevice);
+
+	private:
+		RCPtr<RenderVulkanPhysicalDevice> m_physDevice;
+	};
+
 	class RenderVulkanDriver final : public rkit::render::IRenderDriver
 	{
 	public:
-		rkit::Result InitDriver() override;
+		rkit::Result InitDriver(const DriverInitParameters *initParams) override;
 		void ShutdownDriver() override;
 
 		uint32_t GetDriverNamespaceID() const override { return rkit::IModuleDriver::kDefaultNamespace; }
@@ -64,18 +93,62 @@ namespace rkit::render::vulkan
 
 		const VkAllocationCallbacks *GetAllocCallbacks() const;
 
+		bool IsInstanceExtensionEnabled(const StringView &extName) const;
+		bool IsExtensionEnabled(const char *layerName, const StringView &extName) const;
+
+		Result EnumerateAdapters(Vector<UniquePtr<IRenderAdapter>> &adapters) const override;
+		Result CreateDevice(IRenderAdapter &adapter) override;
+
+		const VulkanAPI &GetAPI() const;
+
 	private:
+		struct ExtensionEnumeration
+		{
+			const char *m_layerName = nullptr;
+			Vector<VkExtensionProperties> m_extensions;
+		};
+
+		struct ExtensionEnumerationFinal
+		{
+			const char *m_layerName = nullptr;
+			Vector<StringView> m_extensions;
+		};
+
+		struct QueryItem
+		{
+			QueryItem(const StringView &name, bool isRequired);
+
+			StringView m_name;
+			bool m_required = false;
+			bool m_isAvailable = false;
+		};
+
 		Result LoadVulkanAPI();
+		Result LoadVulkanExtensionAPIs();
+
+		Result EnumerateExtensions(const char *layerName, Vector<ExtensionEnumeration> &extProperties);
+		Result EnumerateLayers(Vector<VkLayerProperties> &layerProperties);
+
+		static VKAPI_ATTR VkBool32 VKAPI_CALL StaticDebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *data, void *userdata);
+		void DebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *data);
 
 		IMallocDriver *m_alloc = nullptr;
 
-		VkInstance m_vkInstance;
+		VkInstance m_vkInstance = nullptr;
 		bool m_vkInstanceIsInitialized = false;
 
 		VulkanAPI m_vkAPI;
 
 		UniquePtr<ISystemLibrary> m_vkLibrary;
 		UniquePtr<VulkanAllocationCallbacks> m_allocationCallbacks;
+
+		Vector<ExtensionEnumerationFinal> m_extensions;
+
+		ValidationLevel m_validationLevel = ValidationLevel::kNone;
+
+		AutoObjectOwnershipContext<VkInstance> m_instContext;
+
+		AutoDebugUtilsMessengerEXT_t m_debugUtils;
 	};
 
 	typedef rkit::CustomDriverModuleStub<RenderVulkanDriver> RenderVulkanModule;
@@ -288,6 +361,71 @@ namespace rkit::render::vulkan
 		return m_allocationCallbacks->GetCallbacks();
 	}
 
+	bool RenderVulkanDriver::IsExtensionEnabled(const char *layerName, const StringView &extName) const
+	{
+		for (const ExtensionEnumerationFinal &candidate : m_extensions)
+		{
+			bool isLayerMatch = false;
+			if (candidate.m_layerName == nullptr)
+				isLayerMatch = (layerName == nullptr);
+			else
+			{
+				if (layerName != nullptr)
+					isLayerMatch = !strcmp(layerName, candidate.m_layerName);
+			}
+
+			if (isLayerMatch)
+			{
+				for (const StringView &candidateExtName : candidate.m_extensions)
+				{
+					if (candidateExtName == extName)
+						return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	const VulkanAPI &RenderVulkanDriver::GetAPI() const
+	{
+		return m_vkAPI;
+	}
+
+	Result RenderVulkanDriver::EnumerateAdapters(Vector<UniquePtr<IRenderAdapter>> &adapters) const
+	{
+		if (!m_vkInstanceIsInitialized)
+			return ResultCode::kInternalError;
+
+		uint32_t physicalDeviceCount = 0;
+		RKIT_VK_CHECK(m_vkAPI.vkEnumeratePhysicalDevices(m_vkInstance, &physicalDeviceCount, nullptr));
+
+		Vector<UniquePtr<IRenderAdapter>> deviceHandles;
+		RKIT_CHECK(deviceHandles.Resize(physicalDeviceCount));
+
+		Vector<VkPhysicalDevice> physDevices;
+		RKIT_CHECK(physDevices.Resize(physicalDeviceCount));
+
+		RKIT_VK_CHECK(m_vkAPI.vkEnumeratePhysicalDevices(m_vkInstance, &physicalDeviceCount, physDevices.GetBuffer()));
+
+		for (size_t i = 0; i < physicalDeviceCount; i++)
+		{
+			RCPtr<RenderVulkanPhysicalDevice> physDevice;
+			RKIT_CHECK(NewWithAlloc<RenderVulkanPhysicalDevice>(physDevice, m_alloc, physDevices[i]));
+			RKIT_CHECK(physDevice->InitPhysicalDevice(*this));
+
+			UniquePtr<RenderVulkanAdapter> adapter;
+			RKIT_CHECK(NewWithAlloc<RenderVulkanAdapter>(adapter, m_alloc, physDevice));
+		}
+
+		return ResultCode::kOK;
+	}
+
+	bool RenderVulkanDriver::IsInstanceExtensionEnabled(const StringView &extName) const
+	{
+		return IsExtensionEnabled(nullptr, extName);
+	}
+
 	Result RenderVulkanDriver::LoadVulkanAPI()
 	{
 		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
@@ -299,6 +437,9 @@ namespace rkit::render::vulkan
 		while (loaderInfo.m_nextCallback != nullptr)
 		{
 			loaderInfo.m_nextCallback(&m_vkAPI, loaderInfo);
+
+			if (loaderInfo.m_requiredExtension != nullptr)
+				continue;
 
 			bool foundFunction = m_vkLibrary->GetFunction(loaderInfo.m_pfnAddress, loaderInfo.m_fnName);
 
@@ -312,13 +453,244 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result RenderVulkanDriver::InitDriver()
+	Result RenderVulkanDriver::LoadVulkanExtensionAPIs()
 	{
+		FunctionLoaderInfo loaderInfo;
+
+		loaderInfo.m_nextCallback = m_vkAPI.GetFirstResolveFunctionCallback();
+
+		while (loaderInfo.m_nextCallback != nullptr)
+		{
+			loaderInfo.m_nextCallback(&m_vkAPI, loaderInfo);
+
+			if (loaderInfo.m_requiredExtension == nullptr)
+				continue;
+
+			if (!IsExtensionEnabled(nullptr, StringView::FromCString(loaderInfo.m_requiredExtension)))
+			{
+				loaderInfo.m_copyVoidFunctionCallback(loaderInfo.m_pfnAddress, static_cast<PFN_vkVoidFunction>(nullptr));
+				continue;
+			}
+
+			PFN_vkVoidFunction func = m_vkAPI.vkGetInstanceProcAddr(m_vkInstance, loaderInfo.m_fnName.GetChars());
+			if (func == static_cast<PFN_vkVoidFunction>(nullptr))
+			{
+				if (!loaderInfo.m_isOptional)
+				{
+					rkit::log::ErrorFmt("Failed to find required Vulkan extension function %s", loaderInfo.m_fnName.GetChars());
+					return ResultCode::kModuleLoadFailed;
+				}
+				else
+					continue;
+			}
+
+			loaderInfo.m_copyVoidFunctionCallback(loaderInfo.m_pfnAddress, func);
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result RenderVulkanDriver::EnumerateExtensions(const char *layerName, Vector<ExtensionEnumeration> &extProperties)
+	{
+		uint32_t propertyCount = 0;
+		RKIT_VK_CHECK(m_vkAPI.vkEnumerateInstanceExtensionProperties(layerName, &propertyCount, nullptr));
+
+		ExtensionEnumeration extEnum;
+		extEnum.m_layerName = layerName;
+
+		if (propertyCount > 0)
+		{
+			RKIT_CHECK(extEnum.m_extensions.Resize(propertyCount));
+
+			if (propertyCount != 0)
+			{
+				RKIT_VK_CHECK(m_vkAPI.vkEnumerateInstanceExtensionProperties(layerName, &propertyCount, extEnum.m_extensions.GetBuffer()));
+			}
+
+			RKIT_CHECK(extProperties.Append(std::move(extEnum)));
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result RenderVulkanDriver::EnumerateLayers(Vector<VkLayerProperties> &layerProperties)
+	{
+		uint32_t layerCount = 0;
+		RKIT_VK_CHECK(m_vkAPI.vkEnumerateInstanceLayerProperties(&layerCount, nullptr));
+		RKIT_CHECK(layerProperties.Resize(layerCount));
+
+		if (layerCount != 0)
+		{
+			RKIT_VK_CHECK(m_vkAPI.vkEnumerateInstanceLayerProperties(&layerCount, layerProperties.GetBuffer()));
+		}
+
+		return ResultCode::kOK;
+	}
+
+	VkBool32 RenderVulkanDriver::StaticDebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *data, void *userdata)
+	{
+		static_cast<RenderVulkanDriver *>(userdata)->DebugMessage(severity, type, data);
+		return VK_FALSE;
+	}
+
+	void RenderVulkanDriver::DebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *data)
+	{
+		if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+			rkit::log::Error(data->pMessage);
+		else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+			rkit::log::Warning(data->pMessage);
+		else
+			rkit::log::LogInfo(data->pMessage);
+	}
+
+	RenderVulkanDriver::QueryItem::QueryItem(const StringView &name, bool isRequired)
+		: m_name(name)
+		, m_required(isRequired)
+		, m_isAvailable(false)
+	{
+	}
+
+	RenderVulkanPhysicalDevice::RenderVulkanPhysicalDevice(VkPhysicalDevice physDevice)
+		: m_physDevice(physDevice)
+		, m_props{}
+	{
+	}
+
+	Result RenderVulkanPhysicalDevice::InitPhysicalDevice(const RenderVulkanDriver &driver)
+	{
+		const VulkanAPI &vkAPI = driver.GetAPI();
+
+		vkAPI.vkGetPhysicalDeviceProperties(m_physDevice, &m_props);
+		return ResultCode::kOK;
+	}
+
+
+	RenderVulkanAdapter::RenderVulkanAdapter(const RCPtr<RenderVulkanPhysicalDevice> &physDevice)
+		: m_physDevice(physDevice)
+	{
+	}
+
+	Result RenderVulkanDriver::InitDriver(const DriverInitParameters *initParamsBase)
+	{
+		const RenderDriverInitProperties *initParams = static_cast<const RenderDriverInitProperties *>(initParamsBase);
+
+		m_validationLevel = initParams->m_validationLevel;
+
 		m_alloc = GetDrivers().m_mallocDriver;
 
 		IUtilitiesDriver *utils = GetDrivers().m_utilitiesDriver;
 
 		RKIT_CHECK(LoadVulkanAPI());
+
+		Vector<ExtensionEnumeration> availableExtensions;
+		RKIT_CHECK(EnumerateExtensions(nullptr, availableExtensions));
+
+		Vector<VkLayerProperties> availableLayers;
+		RKIT_CHECK(EnumerateLayers(availableLayers));
+
+		Vector<QueryItem> requestedLayers;
+		Vector<QueryItem> requestedExtensions;
+
+		// Determine required and optional extensions
+		if (initParams->m_validationLevel >= ValidationLevel::kSimple)
+		{
+			RKIT_CHECK(requestedLayers.Append(QueryItem("VK_LAYER_KHRONOS_validation", false)));
+			RKIT_CHECK(requestedExtensions.Append(QueryItem("VK_EXT_layer_settings", false)));
+		}
+
+		if (initParams->m_enableLogging)
+		{
+			RKIT_CHECK(requestedExtensions.Append(QueryItem("VK_EXT_debug_utils", false)));
+		}
+
+		Vector<const char *> layers;
+		Vector<const char *> extensions;
+
+		for (QueryItem &requestedLayer : requestedLayers)
+		{
+			for (const VkLayerProperties &availableLayer : availableLayers)
+			{
+				if (requestedLayer.m_name == StringView::FromCString(availableLayer.layerName))
+				{
+					requestedLayer.m_isAvailable = true;
+					break;
+				}
+			}
+
+			if (!requestedLayer.m_isAvailable)
+			{
+				if (requestedLayer.m_required)
+				{
+					rkit::log::ErrorFmt("Missing required Vulkan layer %s", requestedLayer.m_name.GetChars());
+					return ResultCode::kOperationFailed;
+				}
+				else
+					continue;
+			}
+
+			RKIT_CHECK(layers.Append(requestedLayer.m_name.GetChars()));
+		}
+
+		// Enumerate layer extensions
+		for (const char *layer : layers)
+		{
+			RKIT_CHECK(EnumerateExtensions(layer, availableExtensions));
+		}
+
+		// Find all extensions to actually request
+		for (QueryItem &requestedExtension : requestedExtensions)
+		{
+			for (const ExtensionEnumeration &layerExts : availableExtensions)
+			{
+				for (const VkExtensionProperties &availableExtension : layerExts.m_extensions)
+				{
+					if (requestedExtension.m_name == StringView::FromCString(availableExtension.extensionName))
+					{
+						requestedExtension.m_isAvailable = true;
+						break;
+					}
+				}
+			}
+
+			if (!requestedExtension.m_isAvailable)
+			{
+				if (requestedExtension.m_required)
+				{
+					rkit::log::ErrorFmt("Missing required Vulkan extension %s", requestedExtension.m_name.GetChars());
+					return ResultCode::kOperationFailed;
+				}
+				else
+					continue;
+			}
+
+			RKIT_CHECK(extensions.Append(requestedExtension.m_name.GetChars()));
+		}
+
+		// Build extension list
+		for (const ExtensionEnumeration &layerExts : availableExtensions)
+		{
+			ExtensionEnumerationFinal extEnumFinal;
+
+			extEnumFinal.m_layerName = layerExts.m_layerName;
+
+			for (const VkExtensionProperties &availableExtension : layerExts.m_extensions)
+			{
+				for (QueryItem &requestedExtension : requestedExtensions)
+				{
+					if (requestedExtension.m_name == StringView::FromCString(availableExtension.extensionName))
+					{
+						RKIT_CHECK(extEnumFinal.m_extensions.Append(requestedExtension.m_name));
+						break;
+					}
+				}
+			}
+
+			if (extEnumFinal.m_extensions.Count() > 0)
+			{
+				RKIT_CHECK(m_extensions.Append(std::move(extEnumFinal)));
+			}
+		}
+		
 
 		RKIT_CHECK(NewWithAlloc<VulkanAllocationCallbacks>(m_allocationCallbacks, m_alloc, m_alloc));
 
@@ -340,20 +712,85 @@ namespace rkit::render::vulkan
 		VkInstanceCreateInfo instCreateInfo = {};
 		instCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		instCreateInfo.pApplicationInfo = &appInfo;
+		instCreateInfo.enabledLayerCount = static_cast<uint32_t>(layers.Count());
+		if (layers.Count() > 0)
+			instCreateInfo.ppEnabledLayerNames = layers.GetBuffer();
+
+		instCreateInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.Count());
+		if (extensions.Count() > 0)
+			instCreateInfo.ppEnabledExtensionNames = extensions.GetBuffer();
+
+		const void **ppInstCreateNext = &instCreateInfo.pNext;
+
+		VkDebugUtilsMessengerCreateInfoEXT debugUtilsInfo = {};
+		if (initParams->m_enableLogging && IsInstanceExtensionEnabled("VK_EXT_debug_utils"))
+		{
+			debugUtilsInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+			debugUtilsInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT
+				| VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
+				;
+			debugUtilsInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+			debugUtilsInfo.pfnUserCallback = StaticDebugMessage;
+			debugUtilsInfo.pUserData = this;
+
+			*ppInstCreateNext = &debugUtilsInfo;
+			ppInstCreateNext = &debugUtilsInfo.pNext;
+		}
+
+		VkLayerSettingsCreateInfoEXT layerSettingsInfo = {};
+
+		Vector<VkLayerSettingEXT> layerSettings;
+		VkBool32 vkTrue = VK_TRUE;
+		VkBool32 vkFalse = VK_FALSE;
+		if (initParams->m_validationLevel >= ValidationLevel::kAggressive && IsExtensionEnabled("VK_LAYER_KHRONOS_validation", "VK_EXT_layer_settings"))
+		{
+			layerSettingsInfo.sType = VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT;
+
+			{
+				VkLayerSettingEXT layerSetting = {};
+				layerSetting.pLayerName = "VK_LAYER_KHRONOS_validation";
+
+				layerSetting.pSettingName = "validate_sync";
+				layerSetting.type = VK_LAYER_SETTING_TYPE_BOOL32_EXT;
+				layerSetting.pValues = &vkTrue;
+				layerSetting.valueCount = 1;
+
+				RKIT_CHECK(layerSettings.Append(layerSetting));
+
+				layerSetting.pSettingName = "thread_safety";
+				RKIT_CHECK(layerSettings.Append(layerSetting));
+			}
+
+			layerSettingsInfo.pSettings = layerSettings.GetBuffer();
+			layerSettingsInfo.settingCount = static_cast<uint32_t>(layerSettings.Count());
+
+			*ppInstCreateNext = &layerSettingsInfo;
+			ppInstCreateNext = &layerSettingsInfo.pNext;
+
+		}
 
 		RKIT_VK_CHECK(m_vkAPI.vkCreateInstance(&instCreateInfo, m_allocationCallbacks->GetCallbacks(), &m_vkInstance));
 
 		m_vkInstanceIsInitialized = true;
 
-		return rkit::ResultCode::kNotYetImplemented;
+		m_instContext.m_allocCallbacks = m_allocationCallbacks->GetCallbacks();
+		m_instContext.m_api = &m_vkAPI;
+		m_instContext.m_owner = m_vkInstance;
+
+		RKIT_CHECK(LoadVulkanExtensionAPIs());
+
+		return rkit::ResultCode::kOK;
 	}
 
 	void RenderVulkanDriver::ShutdownDriver()
 	{
+		m_debugUtils.Reset();
+
 		if (m_vkInstanceIsInitialized)
 			m_vkAPI.vkDestroyInstance(m_vkInstance, GetAllocCallbacks());
 
 		m_vkLibrary.Reset();
+		m_extensions.Reset();
 	}
 }
 

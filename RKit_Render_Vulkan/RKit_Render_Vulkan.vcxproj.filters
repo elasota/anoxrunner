@@ -38,5 +38,8 @@
     <ClInclude Include="IncludeVulkanCore.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="VulkanAutoObject.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

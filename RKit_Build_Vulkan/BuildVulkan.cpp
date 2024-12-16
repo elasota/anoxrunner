@@ -18,7 +18,7 @@ namespace rkit::buildsystem
 	public:
 
 	private:
-		rkit::Result InitDriver() override;
+		rkit::Result InitDriver(const DriverInitParameters *initParams) override;
 		void ShutdownDriver() override;
 
 		Result RegisterBuildSystemAddOn(IBuildSystemInstance *instance) override;
@@ -31,7 +31,7 @@ namespace rkit::buildsystem
 
 	typedef rkit::CustomDriverModuleStub<BuildVulkanDriver> BuildVulkanModule;
 
-	rkit::Result BuildVulkanDriver::InitDriver()
+	rkit::Result BuildVulkanDriver::InitDriver(const DriverInitParameters *initParams)
 	{
 		if (!glslang_initialize_process())
 		{

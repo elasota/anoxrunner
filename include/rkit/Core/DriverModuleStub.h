@@ -33,13 +33,14 @@ namespace rkit
 	};
 }
 
+#include "DriverModuleInitParams.h"
 #include "Result.h"
 #include "NewDelete.h"
 
 #include <utility>
 
 template<class TDriver, class TDriverInterface, ::rkit::SimpleObjectAllocation<TDriverInterface> rkit::Drivers:: *TDriverMember>
-rkit::Result rkit::DriverModuleStub<TDriver, TDriverInterface, TDriverMember>::Init(const ModuleInitParameters *)
+rkit::Result rkit::DriverModuleStub<TDriver, TDriverInterface, TDriverMember>::Init(const ModuleInitParameters *initParams)
 {
 	UniquePtr<TDriver> driver;
 	RKIT_CHECK(New<TDriver>(driver));
@@ -47,7 +48,11 @@ rkit::Result rkit::DriverModuleStub<TDriver, TDriverInterface, TDriverMember>::I
 	ms_driver = driver.Detach();
 	GetMutableDrivers().*TDriverMember = ms_driver;
 
-	Result initResult = ms_driver->InitDriver();
+	const DriverInitParameters *driverInitParams = nullptr;
+	if (initParams)
+		driverInitParams = static_cast<const DriverModuleInitParameters *>(initParams)->m_driverInitParams;
+
+	Result initResult = ms_driver->InitDriver(driverInitParams);
 	if (!initResult.IsOK())
 	{
 		SafeDelete(ms_driver);
@@ -72,7 +77,7 @@ template<class TDriver, class TDriverInterface, ::rkit::SimpleObjectAllocation<T
 rkit::SimpleObjectAllocation<TDriver> rkit::DriverModuleStub<TDriver, TDriverInterface, TDriverMember>::ms_driver;
 
 template<class TDriver>
-rkit::Result rkit::CustomDriverModuleStub<TDriver>::Init(const ModuleInitParameters *)
+rkit::Result rkit::CustomDriverModuleStub<TDriver>::Init(const ModuleInitParameters *initParams)
 {
 	UniquePtr<ICustomDriver> driver;
 	RKIT_CHECK(New<TDriver>(driver));
@@ -81,9 +86,13 @@ rkit::Result rkit::CustomDriverModuleStub<TDriver>::Init(const ModuleInitParamet
 
 	RKIT_CHECK(GetMutableDrivers().RegisterDriver(std::move(driver)));
 
+	const DriverInitParameters *driverInitParams = nullptr;
+	if (initParams)
+		driverInitParams = static_cast<const DriverModuleInitParameters *>(initParams)->m_driverInitParams;
+
 	ms_driver = driverPtr;
 
-	return driverPtr->InitDriver();
+	return driverPtr->InitDriver(driverInitParams);
 }
 
 template<class TDriver>

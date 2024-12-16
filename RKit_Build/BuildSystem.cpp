@@ -15,7 +15,7 @@ namespace rkit::buildsystem
 	public:
 
 	private:
-		rkit::Result InitDriver() override;
+		rkit::Result InitDriver(const DriverInitParameters *) override;
 		void ShutdownDriver() override;
 
 		uint32_t GetDriverNamespaceID() const override { return rkit::IModuleDriver::kDefaultNamespace; }
@@ -29,7 +29,7 @@ namespace rkit::buildsystem
 
 	typedef rkit::CustomDriverModuleStub<BuildSystemDriver> BuildSystemModule;
 
-	rkit::Result BuildSystemDriver::InitDriver()
+	rkit::Result BuildSystemDriver::InitDriver(const DriverInitParameters *)
 	{
 		return rkit::ResultCode::kOK;
 	}

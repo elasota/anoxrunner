@@ -147,6 +147,7 @@
     <ClInclude Include="IncludeVulkanCore.h" />
     <ClInclude Include="IncludeVulkanDefs.h" />
     <ClInclude Include="VulkanAPI.h" />
+    <ClInclude Include="VulkanAutoObject.h" />
     <ClInclude Include="VulkanCheck.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

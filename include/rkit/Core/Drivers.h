@@ -22,11 +22,15 @@ namespace rkit
 	template<class T>
 	class UniquePtr;
 
+	struct DriverInitParameters
+	{
+	};
+
 	struct ICustomDriver
 	{
 		virtual ~ICustomDriver() {}
 
-		virtual Result InitDriver() = 0;
+		virtual Result InitDriver(const DriverInitParameters *initParams) = 0;
 		virtual void ShutdownDriver() = 0;
 
 		virtual uint32_t GetDriverNamespaceID() const = 0;

@@ -22,7 +22,7 @@ namespace anox
 	public:
 
 	private:
-		rkit::Result InitDriver() override;
+		rkit::Result InitDriver(const rkit::DriverInitParameters *) override;
 		void ShutdownDriver() override;
 
 		uint32_t GetDriverNamespaceID() const override { return anox::kAnoxNamespaceID; }
@@ -60,7 +60,7 @@ rkit::Result anox::UtilitiesDriver::RunDataBuild(const rkit::StringView &targetN
 	return rkit::ResultCode::kOK;
 }
 
-rkit::Result anox::UtilitiesDriver::InitDriver()
+rkit::Result anox::UtilitiesDriver::InitDriver(const rkit::DriverInitParameters *)
 {
 	return rkit::ResultCode::kOK;
 }

@@ -17,8 +17,8 @@ namespace rkit
 	class ProgramStubDriver final : public rkit::IProgramDriver
 	{
 	public:
-		rkit::Result InitDriver();
-		void ShutdownDriver();
+		rkit::Result InitDriver(const DriverInitParameters *) override;
+		void ShutdownDriver() override;
 
 		Result InitProgram() override;
 		Result RunFrame(bool &outIsExiting) override;
@@ -37,7 +37,7 @@ namespace rkit
 #include "NewDelete.h"
 
 template<class TProgram>
-rkit::Result rkit::ProgramStubDriver<TProgram>::InitDriver()
+rkit::Result rkit::ProgramStubDriver<TProgram>::InitDriver(const DriverInitParameters *)
 {
 	UniquePtr<ISimpleProgram> program;
 	RKIT_CHECK(New<TProgram>(program));

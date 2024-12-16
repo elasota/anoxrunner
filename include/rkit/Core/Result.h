@@ -3,6 +3,8 @@
 #include "CoreDefs.h"
 #include "ResultCode.h"
 
+#include <cstdint>
+
 namespace rkit
 {
 	struct RKIT_NODISCARD Result
@@ -11,10 +13,12 @@ namespace rkit
 
 		Result();
 		Result(ResultCode resultCode);
+		explicit Result(ResultCode resultCode, uint32_t extCode);
 
 		bool IsOK() const;
 		int ToExitCode() const;
 		ResultCode GetResultCode() const;
+		uint32_t GetExtendedCode() const;
 
 		static Result SoftFault(ResultCode resultCode);
 
@@ -28,6 +32,7 @@ namespace rkit
 #endif
 
 		ResultCode m_resultCode;
+		uint32_t m_extCode;
 	};
 }
 
@@ -40,11 +45,18 @@ namespace rkit
 
 inline rkit::Result::Result()
 	: m_resultCode(ResultCode::kOK)
+	, m_extCode(0)
 {
 }
 
 inline rkit::Result::Result(ResultCode resultCode)
+	: Result(resultCode, static_cast<uint32_t>(0))
+{
+}
+
+inline rkit::Result::Result(ResultCode resultCode, uint32_t extCode)
 	: m_resultCode(resultCode)
+	, m_extCode(extCode)
 {
 #if RKIT_IS_DEBUG
 	if (!this->IsOK())
@@ -54,6 +66,7 @@ inline rkit::Result::Result(ResultCode resultCode)
 
 inline rkit::Result::Result(ResultCode resultCode, const SoftFaultTag &)
 	: m_resultCode(resultCode)
+	, m_extCode(0)
 {
 }
 
@@ -70,6 +83,12 @@ inline int rkit::Result::ToExitCode() const
 inline rkit::ResultCode rkit::Result::GetResultCode() const
 {
 	return m_resultCode;
+}
+
+
+inline uint32_t rkit::Result::GetExtendedCode() const
+{
+	return m_extCode;
 }
 
 inline rkit::Result rkit::Result::SoftFault(rkit::ResultCode resultCode)

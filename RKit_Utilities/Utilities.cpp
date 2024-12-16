@@ -24,7 +24,7 @@ namespace rkit
 	public:
 		UtilitiesDriver();
 
-		Result InitDriver();
+		Result InitDriver(const DriverInitParameters *);
 		void ShutdownDriver();
 
 		Result CreateJsonDocument(UniquePtr<utils::IJsonDocument> &outDocument, IMallocDriver *alloc, IReadStream *readStream) const override;
@@ -77,7 +77,7 @@ namespace rkit
 	{
 	}
 
-	Result UtilitiesDriver::InitDriver()
+	Result UtilitiesDriver::InitDriver(const DriverInitParameters *)
 	{
 		return ResultCode::kOK;
 	}
