@@ -10,6 +10,8 @@
 #include "rkit/Core/RefCounted.h"
 #include "rkit/Core/Vector.h"
 
+#include "VulkanPhysDevice.h"
+
 #include "VulkanAPI.h"
 #include "VulkanCheck.h"
 #include "VulkanAutoObject.h"
@@ -61,22 +63,12 @@ namespace rkit::render::vulkan
 		VkAllocationCallbacks m_callbacks;
 	};
 
-	class RenderVulkanPhysicalDevice final : public RefCounted
-	{
-	public:
-		explicit RenderVulkanPhysicalDevice(VkPhysicalDevice physDevice);
-
-		Result InitPhysicalDevice(const RenderVulkanDriver &driver);
-
-	private:
-		VkPhysicalDevice m_physDevice;
-		VkPhysicalDeviceProperties m_props;
-	};
-
 	class RenderVulkanAdapter final : public IRenderAdapter
 	{
 	public:
 		explicit RenderVulkanAdapter(const RCPtr<RenderVulkanPhysicalDevice> &physDevice);
+
+		const RenderVulkanPhysicalDevice &GetPhysicalDevice() const;
 
 	private:
 		RCPtr<RenderVulkanPhysicalDevice> m_physDevice;
@@ -99,9 +91,16 @@ namespace rkit::render::vulkan
 		Result EnumerateAdapters(Vector<UniquePtr<IRenderAdapter>> &adapters) const override;
 		Result CreateDevice(IRenderAdapter &adapter) override;
 
-		const VulkanAPI &GetAPI() const;
+		const VulkanGlobalAPI &GetGlobalAPI() const;
+		const VulkanInstanceAPI &GetInstanceAPI() const;
 
 	private:
+		struct IFunctionResolver
+		{
+			virtual bool ResolveProc(void *pfnAddr, const FunctionLoaderInfo &fli, const StringView &name) const = 0;
+			virtual bool IsExtensionEnabled(const StringView &ext) const = 0;
+		};
+
 		struct ExtensionEnumeration
 		{
 			const char *m_layerName = nullptr;
@@ -123,8 +122,9 @@ namespace rkit::render::vulkan
 			bool m_isAvailable = false;
 		};
 
-		Result LoadVulkanAPI();
-		Result LoadVulkanExtensionAPIs();
+		Result LoadVulkanGlobalAPI();
+		Result LoadVulkanInstanceAPI();
+		static Result LoadVulkanAPI(IVulkanAPI &api, const IFunctionResolver &resolver);
 
 		Result EnumerateExtensions(const char *layerName, Vector<ExtensionEnumeration> &extProperties);
 		Result EnumerateLayers(Vector<VkLayerProperties> &layerProperties);
@@ -137,7 +137,8 @@ namespace rkit::render::vulkan
 		VkInstance m_vkInstance = nullptr;
 		bool m_vkInstanceIsInitialized = false;
 
-		VulkanAPI m_vkAPI;
+		VulkanGlobalAPI m_vkg;
+		VulkanInstanceAPI m_vki;
 
 		UniquePtr<ISystemLibrary> m_vkLibrary;
 		UniquePtr<VulkanAllocationCallbacks> m_allocationCallbacks;
@@ -146,7 +147,7 @@ namespace rkit::render::vulkan
 
 		ValidationLevel m_validationLevel = ValidationLevel::kNone;
 
-		AutoObjectOwnershipContext<VkInstance> m_instContext;
+		AutoObjectOwnershipContext<VulkanInstanceAPI, VkInstance> m_instContext;
 
 		AutoDebugUtilsMessengerEXT_t m_debugUtils;
 	};
@@ -387,9 +388,14 @@ namespace rkit::render::vulkan
 		return false;
 	}
 
-	const VulkanAPI &RenderVulkanDriver::GetAPI() const
+	const VulkanGlobalAPI &RenderVulkanDriver::GetGlobalAPI() const
 	{
-		return m_vkAPI;
+		return m_vkg;
+	}
+
+	const VulkanInstanceAPI &RenderVulkanDriver::GetInstanceAPI() const
+	{
+		return m_vki;
 	}
 
 	Result RenderVulkanDriver::EnumerateAdapters(Vector<UniquePtr<IRenderAdapter>> &adapters) const
@@ -398,7 +404,7 @@ namespace rkit::render::vulkan
 			return ResultCode::kInternalError;
 
 		uint32_t physicalDeviceCount = 0;
-		RKIT_VK_CHECK(m_vkAPI.vkEnumeratePhysicalDevices(m_vkInstance, &physicalDeviceCount, nullptr));
+		RKIT_VK_CHECK(m_vki.vkEnumeratePhysicalDevices(m_vkInstance, &physicalDeviceCount, nullptr));
 
 		Vector<UniquePtr<IRenderAdapter>> deviceHandles;
 		RKIT_CHECK(deviceHandles.Resize(physicalDeviceCount));
@@ -406,19 +412,33 @@ namespace rkit::render::vulkan
 		Vector<VkPhysicalDevice> physDevices;
 		RKIT_CHECK(physDevices.Resize(physicalDeviceCount));
 
-		RKIT_VK_CHECK(m_vkAPI.vkEnumeratePhysicalDevices(m_vkInstance, &physicalDeviceCount, physDevices.GetBuffer()));
+		RKIT_VK_CHECK(m_vki.vkEnumeratePhysicalDevices(m_vkInstance, &physicalDeviceCount, physDevices.GetBuffer()));
+
+		RKIT_CHECK(adapters.Resize(physicalDeviceCount));
 
 		for (size_t i = 0; i < physicalDeviceCount; i++)
 		{
 			RCPtr<RenderVulkanPhysicalDevice> physDevice;
 			RKIT_CHECK(NewWithAlloc<RenderVulkanPhysicalDevice>(physDevice, m_alloc, physDevices[i]));
-			RKIT_CHECK(physDevice->InitPhysicalDevice(*this));
+			RKIT_CHECK(physDevice->InitPhysicalDevice(m_vki));
 
-			UniquePtr<RenderVulkanAdapter> adapter;
+			UniquePtr<IRenderAdapter> adapter;
 			RKIT_CHECK(NewWithAlloc<RenderVulkanAdapter>(adapter, m_alloc, physDevice));
+
+			adapters[i] = std::move(adapter);
 		}
 
 		return ResultCode::kOK;
+	}
+
+
+	Result RenderVulkanDriver::CreateDevice(IRenderAdapter &adapter)
+	{
+		RenderVulkanAdapter &vkAdapter = static_cast<RenderVulkanAdapter &>(adapter);
+
+		const RenderVulkanPhysicalDevice &physDevice = vkAdapter.GetPhysicalDevice();
+
+		return ResultCode::kNotYetImplemented;
 	}
 
 	bool RenderVulkanDriver::IsInstanceExtensionEnabled(const StringView &extName) const
@@ -426,22 +446,84 @@ namespace rkit::render::vulkan
 		return IsExtensionEnabled(nullptr, extName);
 	}
 
-	Result RenderVulkanDriver::LoadVulkanAPI()
+	Result RenderVulkanDriver::LoadVulkanGlobalAPI()
 	{
+		struct GlobalFunctionResolver final : public IFunctionResolver
+		{
+		public:
+			explicit GlobalFunctionResolver(RenderVulkanDriver &vkDriver, ISystemLibrary &lib) : m_vkDriver(vkDriver), m_lib(lib) {}
+
+			bool ResolveProc(void *pfnAddr, const FunctionLoaderInfo &fli, const StringView &name) const override
+			{
+				return this->m_lib.GetFunction(pfnAddr, name);
+			}
+
+			bool IsExtensionEnabled(const StringView &ext) const override
+			{
+				return m_vkDriver.IsExtensionEnabled(nullptr, ext);
+			}
+
+		private:
+			RenderVulkanDriver &m_vkDriver;
+			ISystemLibrary &m_lib;
+		};
+
 		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
 		RKIT_CHECK(sysDriver->OpenSystemLibrary(m_vkLibrary, SystemLibraryType::kVulkan));
 
+		GlobalFunctionResolver resolver(*this, *m_vkLibrary);
+
+		return LoadVulkanAPI(m_vkg, resolver);
+	}
+
+	Result RenderVulkanDriver::LoadVulkanInstanceAPI()
+	{
+		struct InstanceFunctionResolver final : public IFunctionResolver
+		{
+		public:
+			explicit InstanceFunctionResolver(RenderVulkanDriver &vkDriver, VkInstance inst) : m_vkDriver(vkDriver), m_inst(inst) {}
+
+			bool ResolveProc(void *pfnAddr, const FunctionLoaderInfo &fli, const StringView &name) const override
+			{
+				PFN_vkVoidFunction func = this->m_vkDriver.GetGlobalAPI().vkGetInstanceProcAddr(m_inst, name.GetChars());
+				fli.m_copyVoidFunctionCallback(pfnAddr, func);
+				return func != static_cast<PFN_vkVoidFunction>(nullptr);
+			}
+
+			bool IsExtensionEnabled(const StringView &ext) const override
+			{
+				return m_vkDriver.IsExtensionEnabled(nullptr, ext);
+			}
+
+		private:
+			RenderVulkanDriver &m_vkDriver;
+			VkInstance m_inst;
+		};
+
+		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+		RKIT_CHECK(sysDriver->OpenSystemLibrary(m_vkLibrary, SystemLibraryType::kVulkan));
+
+		InstanceFunctionResolver resolver(*this, m_vkInstance);
+
+		return LoadVulkanAPI(m_vki, resolver);
+	}
+
+	Result RenderVulkanDriver::LoadVulkanAPI(IVulkanAPI &api, const IFunctionResolver &resolver)
+	{
 		FunctionLoaderInfo loaderInfo;
-		loaderInfo.m_nextCallback = m_vkAPI.GetFirstResolveFunctionCallback();
+		loaderInfo.m_nextCallback = api.GetFirstResolveFunctionCallback();
 
 		while (loaderInfo.m_nextCallback != nullptr)
 		{
-			loaderInfo.m_nextCallback(&m_vkAPI, loaderInfo);
+			loaderInfo.m_nextCallback(&api, loaderInfo);
 
 			if (loaderInfo.m_requiredExtension != nullptr)
-				continue;
+			{
+				if (!resolver.IsExtensionEnabled(StringView::FromCString(loaderInfo.m_requiredExtension)))
+					continue;
+			}
 
-			bool foundFunction = m_vkLibrary->GetFunction(loaderInfo.m_pfnAddress, loaderInfo.m_fnName);
+			bool foundFunction = resolver.ResolveProc(loaderInfo.m_pfnAddress, loaderInfo, loaderInfo.m_fnName);
 
 			if (!foundFunction && !loaderInfo.m_isOptional)
 			{
@@ -453,47 +535,10 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result RenderVulkanDriver::LoadVulkanExtensionAPIs()
-	{
-		FunctionLoaderInfo loaderInfo;
-
-		loaderInfo.m_nextCallback = m_vkAPI.GetFirstResolveFunctionCallback();
-
-		while (loaderInfo.m_nextCallback != nullptr)
-		{
-			loaderInfo.m_nextCallback(&m_vkAPI, loaderInfo);
-
-			if (loaderInfo.m_requiredExtension == nullptr)
-				continue;
-
-			if (!IsExtensionEnabled(nullptr, StringView::FromCString(loaderInfo.m_requiredExtension)))
-			{
-				loaderInfo.m_copyVoidFunctionCallback(loaderInfo.m_pfnAddress, static_cast<PFN_vkVoidFunction>(nullptr));
-				continue;
-			}
-
-			PFN_vkVoidFunction func = m_vkAPI.vkGetInstanceProcAddr(m_vkInstance, loaderInfo.m_fnName.GetChars());
-			if (func == static_cast<PFN_vkVoidFunction>(nullptr))
-			{
-				if (!loaderInfo.m_isOptional)
-				{
-					rkit::log::ErrorFmt("Failed to find required Vulkan extension function %s", loaderInfo.m_fnName.GetChars());
-					return ResultCode::kModuleLoadFailed;
-				}
-				else
-					continue;
-			}
-
-			loaderInfo.m_copyVoidFunctionCallback(loaderInfo.m_pfnAddress, func);
-		}
-
-		return ResultCode::kOK;
-	}
-
 	Result RenderVulkanDriver::EnumerateExtensions(const char *layerName, Vector<ExtensionEnumeration> &extProperties)
 	{
 		uint32_t propertyCount = 0;
-		RKIT_VK_CHECK(m_vkAPI.vkEnumerateInstanceExtensionProperties(layerName, &propertyCount, nullptr));
+		RKIT_VK_CHECK(m_vkg.vkEnumerateInstanceExtensionProperties(layerName, &propertyCount, nullptr));
 
 		ExtensionEnumeration extEnum;
 		extEnum.m_layerName = layerName;
@@ -504,7 +549,7 @@ namespace rkit::render::vulkan
 
 			if (propertyCount != 0)
 			{
-				RKIT_VK_CHECK(m_vkAPI.vkEnumerateInstanceExtensionProperties(layerName, &propertyCount, extEnum.m_extensions.GetBuffer()));
+				RKIT_VK_CHECK(m_vkg.vkEnumerateInstanceExtensionProperties(layerName, &propertyCount, extEnum.m_extensions.GetBuffer()));
 			}
 
 			RKIT_CHECK(extProperties.Append(std::move(extEnum)));
@@ -516,12 +561,12 @@ namespace rkit::render::vulkan
 	Result RenderVulkanDriver::EnumerateLayers(Vector<VkLayerProperties> &layerProperties)
 	{
 		uint32_t layerCount = 0;
-		RKIT_VK_CHECK(m_vkAPI.vkEnumerateInstanceLayerProperties(&layerCount, nullptr));
+		RKIT_VK_CHECK(m_vkg.vkEnumerateInstanceLayerProperties(&layerCount, nullptr));
 		RKIT_CHECK(layerProperties.Resize(layerCount));
 
 		if (layerCount != 0)
 		{
-			RKIT_VK_CHECK(m_vkAPI.vkEnumerateInstanceLayerProperties(&layerCount, layerProperties.GetBuffer()));
+			RKIT_VK_CHECK(m_vkg.vkEnumerateInstanceLayerProperties(&layerCount, layerProperties.GetBuffer()));
 		}
 
 		return ResultCode::kOK;
@@ -550,24 +595,14 @@ namespace rkit::render::vulkan
 	{
 	}
 
-	RenderVulkanPhysicalDevice::RenderVulkanPhysicalDevice(VkPhysicalDevice physDevice)
-		: m_physDevice(physDevice)
-		, m_props{}
-	{
-	}
-
-	Result RenderVulkanPhysicalDevice::InitPhysicalDevice(const RenderVulkanDriver &driver)
-	{
-		const VulkanAPI &vkAPI = driver.GetAPI();
-
-		vkAPI.vkGetPhysicalDeviceProperties(m_physDevice, &m_props);
-		return ResultCode::kOK;
-	}
-
-
 	RenderVulkanAdapter::RenderVulkanAdapter(const RCPtr<RenderVulkanPhysicalDevice> &physDevice)
 		: m_physDevice(physDevice)
 	{
+	}
+
+	const RenderVulkanPhysicalDevice &RenderVulkanAdapter::GetPhysicalDevice() const
+	{
+		return *m_physDevice;
 	}
 
 	Result RenderVulkanDriver::InitDriver(const DriverInitParameters *initParamsBase)
@@ -580,7 +615,7 @@ namespace rkit::render::vulkan
 
 		IUtilitiesDriver *utils = GetDrivers().m_utilitiesDriver;
 
-		RKIT_CHECK(LoadVulkanAPI());
+		RKIT_CHECK(LoadVulkanGlobalAPI());
 
 		Vector<ExtensionEnumeration> availableExtensions;
 		RKIT_CHECK(EnumerateExtensions(nullptr, availableExtensions));
@@ -769,15 +804,15 @@ namespace rkit::render::vulkan
 
 		}
 
-		RKIT_VK_CHECK(m_vkAPI.vkCreateInstance(&instCreateInfo, m_allocationCallbacks->GetCallbacks(), &m_vkInstance));
+		RKIT_VK_CHECK(m_vkg.vkCreateInstance(&instCreateInfo, m_allocationCallbacks->GetCallbacks(), &m_vkInstance));
 
 		m_vkInstanceIsInitialized = true;
 
 		m_instContext.m_allocCallbacks = m_allocationCallbacks->GetCallbacks();
-		m_instContext.m_api = &m_vkAPI;
+		m_instContext.m_api = &m_vki;
 		m_instContext.m_owner = m_vkInstance;
 
-		RKIT_CHECK(LoadVulkanExtensionAPIs());
+		RKIT_CHECK(LoadVulkanInstanceAPI());
 
 		return rkit::ResultCode::kOK;
 	}
@@ -787,7 +822,7 @@ namespace rkit::render::vulkan
 		m_debugUtils.Reset();
 
 		if (m_vkInstanceIsInitialized)
-			m_vkAPI.vkDestroyInstance(m_vkInstance, GetAllocCallbacks());
+			m_vkg.vkDestroyInstance(m_vkInstance, GetAllocCallbacks());
 
 		m_vkLibrary.Reset();
 		m_extensions.Reset();

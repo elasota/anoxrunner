@@ -78,6 +78,7 @@ namespace rkit
 		RCPtr &operator=(T *other);
 
 		T *Get() const;
+		operator T *() const;
 		T *operator->() const;
 
 	private:
@@ -96,6 +97,7 @@ namespace rkit
 	Result New(RCPtr<TPtrType> &objPtr);
 }
 
+#include "Drivers.h"
 #include "MallocDriver.h"
 #include "Result.h"
 
@@ -137,7 +139,7 @@ namespace rkit
 		m_allocation.Clear();
 	}
 
-	void RefCounted::InitRefCounted(const SimpleObjectAllocation<RefCounted> &alloc)
+	inline void RefCounted::InitRefCounted(const SimpleObjectAllocation<RefCounted> &alloc)
 	{
 		m_allocation = alloc;
 	}
@@ -268,6 +270,12 @@ namespace rkit
 	}
 
 	template<class T>
+	inline RCPtr<T>::operator T *() const
+	{
+		return m_object;
+	}
+
+	template<class T>
 	inline T *RCPtr<T>::operator->() const
 	{
 		return m_object;
@@ -333,12 +341,12 @@ namespace rkit
 
 	namespace Private
 	{
-		void RefCountedInstantiator::InitRefCounted(RefCounted &refCounted, const SimpleObjectAllocation<RefCounted> &alloc)
+		inline void RefCountedInstantiator::InitRefCounted(RefCounted &refCounted, const SimpleObjectAllocation<RefCounted> &alloc)
 		{
 			refCounted.InitRefCounted(alloc);
 		}
 
-		RefCountedTracker *RefCountedInstantiator::GetTrackerFromObject(RefCounted *obj)
+		inline RefCountedTracker *RefCountedInstantiator::GetTrackerFromObject(RefCounted *obj)
 		{
 			return obj;
 		}

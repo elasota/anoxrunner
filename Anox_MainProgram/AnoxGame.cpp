@@ -60,6 +60,8 @@ namespace anox
 			return rkit::ResultCode::kOperationFailed;
 		}
 
+		RKIT_CHECK(renderDriver->CreateDevice(*adapters[0]));
+
 		return rkit::ResultCode::kNotYetImplemented;
 	}
 

@@ -50,6 +50,7 @@ namespace rkit::render
 		virtual ~IRenderDriver() {}
 
 		virtual Result EnumerateAdapters(Vector<UniquePtr<IRenderAdapter>> &devices) const = 0;
+		virtual Result CreateDevice(IRenderAdapter &adapter) = 0;
 	};
 }
 

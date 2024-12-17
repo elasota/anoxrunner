@@ -141,6 +141,8 @@
   <ItemGroup>
     <ClCompile Include="RenderVulkan.cpp" />
     <ClCompile Include="VulkanAPI.cpp" />
+    <ClCompile Include="VulkanDevice.cpp" />
+    <ClCompile Include="VulkanPhysDevice.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IncludeVulkan.h" />
@@ -149,6 +151,8 @@
     <ClInclude Include="VulkanAPI.h" />
     <ClInclude Include="VulkanAutoObject.h" />
     <ClInclude Include="VulkanCheck.h" />
+    <ClInclude Include="VulkanDevice.h" />
+    <ClInclude Include="VulkanPhysDevice.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

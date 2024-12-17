@@ -12,10 +12,15 @@ namespace rkit::render::vulkan
 	};
 
 	struct FunctionLoaderInfo;
-	struct VulkanAPI;
+	struct IVulkanAPI;
 
-	typedef void (*ResolveFunctionCallback_t)(VulkanAPI *ftable, FunctionLoaderInfo &loaderInfo);
+	typedef void (*ResolveFunctionCallback_t)(IVulkanAPI *ftable, FunctionLoaderInfo &loaderInfo);
 	typedef void (*CopyVoidFunctionCallback_t)(void *pfnAddress, PFN_vkVoidFunction voidFunction);
+
+	struct IVulkanAPI
+	{
+		virtual ResolveFunctionCallback_t GetFirstResolveFunctionCallback() const = 0;
+	};
 
 	struct FunctionLoaderInfo
 	{
@@ -23,22 +28,21 @@ namespace rkit::render::vulkan
 		CopyVoidFunctionCallback_t m_copyVoidFunctionCallback;
 		void *m_pfnAddress;
 		bool m_isOptional;
-		bool m_isInstance;
 		const char *m_requiredExtension;
 		StringView m_fnName;
 	};
 
-#define RKIT_VK_API_WITH_PROPERTIES(fn, isOptional, isInstance, requiredExtension)\
+#define RKIT_VK_API_WITH_PROPERTIES(fn, isOptional, requiredExtension)\
 	private:\
-	inline static void ResolveFunctionInfo_ ## fn(VulkanAPI *ftable, FunctionLoaderInfo& loaderInfo)\
+	inline static void ResolveFunctionInfo_ ## fn(IVulkanAPI *ftable, FunctionLoaderInfo& loaderInfo)\
 	{\
-		loaderInfo.m_pfnAddress = &ftable->fn;\
+		ThisType_t *ftableTyped = static_cast<ThisType_t*>(ftable);\
+		loaderInfo.m_pfnAddress = &ftableTyped->fn;\
 		loaderInfo.m_fnName = StringView(#fn);\
 		loaderInfo.m_isOptional = isOptional;\
-		loaderInfo.m_isInstance = isInstance;\
 		loaderInfo.m_requiredExtension = requiredExtension;\
 		loaderInfo.m_copyVoidFunctionCallback = WriteVoidFunctionTemplate<PFN_ ## fn>;\
-		VulkanAPI::ResolveFunctionLoaderForLine(FunctionLoaderLineTag<__LINE__ - 1>(), loaderInfo);\
+		ThisType_t::ResolveFunctionLoaderForLine(FunctionLoaderLineTag<__LINE__ - 1>(), loaderInfo);\
 	}\
 	inline static void ResolveFunctionLoaderForLine(const FunctionLoaderLineTag<__LINE__> &lineTag, FunctionLoaderInfo &loaderInfo)\
 	{\
@@ -47,47 +51,57 @@ namespace rkit::render::vulkan
 	public:\
 		PFN_ ## fn fn = static_cast<PFN_ ## fn>(nullptr)
 
-#define RKIT_VK_API_GLOBAL(fn) RKIT_VK_API_WITH_PROPERTIES(fn, false, false, nullptr)
-#define RKIT_VK_API(fn) RKIT_VK_API_WITH_PROPERTIES(fn, false, true, nullptr)
-#define RKIT_VK_API_EXT(fn, ext) RKIT_VK_API_WITH_PROPERTIES(fn, false, true, #ext)
+#define RKIT_VK_API(fn) RKIT_VK_API_WITH_PROPERTIES(fn, false, nullptr)
+#define RKIT_VK_API_EXT(fn, ext) RKIT_VK_API_WITH_PROPERTIES(fn, false, #ext)
 
-	struct VulkanAPI
+#define RKIT_VK_API_START(type)	\
+private:\
+	template<class T>\
+	inline static void WriteVoidFunctionTemplate(void *pfnAddress, PFN_vkVoidFunction voidFunction)\
+	{\
+		*static_cast<T *>(pfnAddress) = reinterpret_cast<T>(voidFunction);\
+	}\
+	inline static void TerminalResolveFunctionLoader(FunctionLoaderInfo &loaderInfo)\
+	{\
+		loaderInfo.m_nextCallback = nullptr;\
+	}\
+	inline static void ResolveFunctionLoaderForLine(const FunctionLoaderLineTag<__LINE__> &lineTag, FunctionLoaderInfo &loaderInfo)\
+	{\
+		return TerminalResolveFunctionLoader(loaderInfo);\
+	}\
+	typedef type ThisType_t
+
+#define RKIT_VK_API_END	\
+	inline static void InitialResolveFunctionLoader(FunctionLoaderInfo &loaderInfo)\
+	{\
+		ResolveFunctionLoaderForLine(FunctionLoaderLineTag<__LINE__ - 1>(), loaderInfo);\
+	}\
+public:\
+	inline ResolveFunctionCallback_t GetFirstResolveFunctionCallback() const override\
+	{\
+		FunctionLoaderInfo loaderInfo = {};\
+		InitialResolveFunctionLoader(loaderInfo);\
+		return loaderInfo.m_nextCallback;\
+	}
+
+	struct VulkanGlobalAPI : public IVulkanAPI
 	{
-	private:
-		template<class T>
-		inline static void WriteVoidFunctionTemplate(void *pfnAddress, PFN_vkVoidFunction voidFunction)
-		{
-			*static_cast<T *>(pfnAddress) = reinterpret_cast<T>(voidFunction);
-		}
+		RKIT_VK_API_START(VulkanGlobalAPI);
+		RKIT_VK_API(vkCreateInstance);
+		RKIT_VK_API(vkDestroyInstance);
+		RKIT_VK_API(vkEnumerateInstanceExtensionProperties);
+		RKIT_VK_API(vkEnumerateInstanceLayerProperties);
+		RKIT_VK_API(vkGetInstanceProcAddr);
+		RKIT_VK_API_END;
+	};
 
-		static void TerminalResolveFunctionLoader(FunctionLoaderInfo &loaderInfo);
-
-		inline static void ResolveFunctionLoaderForLine(const FunctionLoaderLineTag<__LINE__ + 4> &lineTag, FunctionLoaderInfo &loaderInfo)
-		{
-			return TerminalResolveFunctionLoader(loaderInfo);
-		}
-
-		RKIT_VK_API_GLOBAL(vkCreateInstance);
-		RKIT_VK_API_GLOBAL(vkDestroyInstance);
-		RKIT_VK_API_GLOBAL(vkEnumerateInstanceExtensionProperties);
-		RKIT_VK_API_GLOBAL(vkEnumerateInstanceLayerProperties);
-		RKIT_VK_API_GLOBAL(vkGetInstanceProcAddr);
+	struct VulkanInstanceAPI : public IVulkanAPI
+	{
+		RKIT_VK_API_START(VulkanInstanceAPI);
 		RKIT_VK_API(vkEnumeratePhysicalDevices);
 		RKIT_VK_API(vkGetPhysicalDeviceProperties);
 		RKIT_VK_API_EXT(vkCreateDebugUtilsMessengerEXT, VK_EXT_debug_utils);
 		RKIT_VK_API_EXT(vkDestroyDebugUtilsMessengerEXT, VK_EXT_debug_utils);
-
-		inline static void InitialResolveFunctionLoader(FunctionLoaderInfo &loaderInfo)
-		{
-			ResolveFunctionLoaderForLine(FunctionLoaderLineTag<__LINE__ - 4>(), loaderInfo);
-		}
-
-	public:
-		inline static ResolveFunctionCallback_t GetFirstResolveFunctionCallback()
-		{
-			FunctionLoaderInfo loaderInfo = {};
-			InitialResolveFunctionLoader(loaderInfo);
-			return loaderInfo.m_nextCallback;
-		}
+		RKIT_VK_API_END;
 	};
 }
