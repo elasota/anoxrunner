@@ -8,6 +8,7 @@
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/Vector.h"
 
+#include "rkit/Render/RenderDevice.h"
 #include "rkit/Render/RenderDriver.h"
 
 namespace anox
@@ -60,7 +61,25 @@ namespace anox
 			return rkit::ResultCode::kOperationFailed;
 		}
 
-		RKIT_CHECK(renderDriver->CreateDevice(*adapters[0]));
+		rkit::Vector<rkit::render::CommandQueueTypeRequest> queueRequests;
+
+		float fOne = 1.0f;
+		float fHalf = 0.5f;
+
+		{
+			rkit::render::CommandQueueTypeRequest rq;
+			rq.m_numQueues = 1;
+			rq.m_queuePriorities = &fOne;
+			rq.m_type = rkit::render::CommandQueueType::kGraphicsCompute;
+
+			RKIT_CHECK(queueRequests.Append(rq));
+
+			rq.m_type = rkit::render::CommandQueueType::kCopy;
+			RKIT_CHECK(queueRequests.Append(rq));
+		}
+
+		rkit::UniquePtr<rkit::render::IRenderDevice> device;
+		RKIT_CHECK(renderDriver->CreateDevice(device, queueRequests.ToSpan(), *adapters[0]));
 
 		return rkit::ResultCode::kNotYetImplemented;
 	}

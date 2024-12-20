@@ -24,11 +24,11 @@ namespace rkit::render::vulkan
 
 	struct FunctionLoaderInfo
 	{
-		ResolveFunctionCallback_t m_nextCallback;
-		CopyVoidFunctionCallback_t m_copyVoidFunctionCallback;
-		void *m_pfnAddress;
-		bool m_isOptional;
-		const char *m_requiredExtension;
+		ResolveFunctionCallback_t m_nextCallback = nullptr;
+		CopyVoidFunctionCallback_t m_copyVoidFunctionCallback = nullptr;
+		void *m_pfnAddress = nullptr;
+		bool m_isOptional = false;
+		const char *m_requiredExtension = nullptr;
 		StringView m_fnName;
 	};
 
@@ -100,8 +100,19 @@ public:\
 		RKIT_VK_API_START(VulkanInstanceAPI);
 		RKIT_VK_API(vkEnumeratePhysicalDevices);
 		RKIT_VK_API(vkGetPhysicalDeviceProperties);
+		RKIT_VK_API(vkGetPhysicalDeviceQueueFamilyProperties);
+		RKIT_VK_API(vkCreateDevice);
+		RKIT_VK_API(vkDestroyDevice);
+		RKIT_VK_API(vkGetDeviceProcAddr);
 		RKIT_VK_API_EXT(vkCreateDebugUtilsMessengerEXT, VK_EXT_debug_utils);
 		RKIT_VK_API_EXT(vkDestroyDebugUtilsMessengerEXT, VK_EXT_debug_utils);
+		RKIT_VK_API_END;
+	};
+
+	struct VulkanDeviceAPI : public IVulkanAPI
+	{
+		RKIT_VK_API_START(VulkanDeviceAPI);
+		RKIT_VK_API(vkGetDeviceQueue);
 		RKIT_VK_API_END;
 	};
 }

@@ -139,8 +139,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="QueueProxy.cpp" />
     <ClCompile Include="RenderVulkan.cpp" />
     <ClCompile Include="VulkanAPI.cpp" />
+    <ClCompile Include="VulkanAPILoader.cpp" />
+    <ClCompile Include="VulkanCommandList.cpp" />
     <ClCompile Include="VulkanDevice.cpp" />
     <ClCompile Include="VulkanPhysDevice.cpp" />
   </ItemGroup>
@@ -149,10 +152,13 @@
     <ClInclude Include="IncludeVulkanCore.h" />
     <ClInclude Include="IncludeVulkanDefs.h" />
     <ClInclude Include="VulkanAPI.h" />
+    <ClInclude Include="VulkanAPILoader.h" />
     <ClInclude Include="VulkanAutoObject.h" />
     <ClInclude Include="VulkanCheck.h" />
+    <ClInclude Include="VulkanCommandList.h" />
     <ClInclude Include="VulkanDevice.h" />
     <ClInclude Include="VulkanPhysDevice.h" />
+    <ClInclude Include="VulkanQueueProxy.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

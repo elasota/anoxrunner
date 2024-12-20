@@ -13,8 +13,10 @@
 #include "VulkanPhysDevice.h"
 
 #include "VulkanAPI.h"
+#include "VulkanAPILoader.h"
 #include "VulkanCheck.h"
 #include "VulkanAutoObject.h"
+#include "VulkanDevice.h"
 
 #include <cstring>
 
@@ -26,6 +28,27 @@ namespace rkit::render::vulkan
 		{
 			rkit::log::ErrorFmt("Vulkan error %x", static_cast<unsigned int>(result));
 			return Result(ResultCode::kGraphicsAPIException, static_cast<uint32_t>(result));
+		}
+	}
+
+	namespace priv
+	{
+		void AddSingleQueue(Optional<uint32_t> &outQueueIndex, const Optional<uint32_t> &inQueueFamily, uint32_t &inOutNumQueues, float priority, VkDeviceQueueCreateInfo *queues, float *queuePriorities)
+		{
+			if (!inQueueFamily.IsSet())
+				return;
+
+			VkDeviceQueueCreateInfo &queue = queues[inOutNumQueues];
+			queuePriorities[inOutNumQueues] = priority;
+
+			queue.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+			queue.queueCount = 1;
+			queue.queueFamilyIndex = inQueueFamily.Get();
+			queue.pQueuePriorities = queuePriorities + inOutNumQueues;
+
+			outQueueIndex = inOutNumQueues;
+
+			inOutNumQueues++;
 		}
 	}
 
@@ -68,6 +91,8 @@ namespace rkit::render::vulkan
 	public:
 		explicit RenderVulkanAdapter(const RCPtr<RenderVulkanPhysicalDevice> &physDevice);
 
+		size_t GetCommandQueueCount(CommandQueueType type) const override;
+
 		const RenderVulkanPhysicalDevice &GetPhysicalDevice() const;
 
 	private:
@@ -89,18 +114,12 @@ namespace rkit::render::vulkan
 		bool IsExtensionEnabled(const char *layerName, const StringView &extName) const;
 
 		Result EnumerateAdapters(Vector<UniquePtr<IRenderAdapter>> &adapters) const override;
-		Result CreateDevice(IRenderAdapter &adapter) override;
+		Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, IRenderAdapter &adapter) override;
 
 		const VulkanGlobalAPI &GetGlobalAPI() const;
 		const VulkanInstanceAPI &GetInstanceAPI() const;
 
 	private:
-		struct IFunctionResolver
-		{
-			virtual bool ResolveProc(void *pfnAddr, const FunctionLoaderInfo &fli, const StringView &name) const = 0;
-			virtual bool IsExtensionEnabled(const StringView &ext) const = 0;
-		};
-
 		struct ExtensionEnumeration
 		{
 			const char *m_layerName = nullptr;
@@ -124,7 +143,6 @@ namespace rkit::render::vulkan
 
 		Result LoadVulkanGlobalAPI();
 		Result LoadVulkanInstanceAPI();
-		static Result LoadVulkanAPI(IVulkanAPI &api, const IFunctionResolver &resolver);
 
 		Result EnumerateExtensions(const char *layerName, Vector<ExtensionEnumeration> &extProperties);
 		Result EnumerateLayers(Vector<VkLayerProperties> &layerProperties);
@@ -431,14 +449,84 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-
-	Result RenderVulkanDriver::CreateDevice(IRenderAdapter &adapter)
+	Result RenderVulkanDriver::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, IRenderAdapter &adapter)
 	{
 		RenderVulkanAdapter &vkAdapter = static_cast<RenderVulkanAdapter &>(adapter);
 
-		const RenderVulkanPhysicalDevice &physDevice = vkAdapter.GetPhysicalDevice();
+		const RenderVulkanPhysicalDevice &rPhysDevice = vkAdapter.GetPhysicalDevice();
 
-		return ResultCode::kNotYetImplemented;
+		VkPhysicalDevice physDevice = rPhysDevice.GetPhysDevice();
+
+		Vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+		VulkanDeviceBase::QueueFamilySpec queueFamilySpecs[static_cast<size_t>(CommandQueueType::kCount)];
+
+		bool haveRequestedQueue[static_cast<size_t>(CommandQueueType::kCount)] = {};
+
+		for (const CommandQueueTypeRequest &queueRequest : queueRequests)
+		{
+			CommandQueueType queueType = queueRequest.m_type;
+
+			if (queueRequest.m_numQueues == 0)
+			{
+				rkit::log::Error("Command queue request didn't request any queues");
+				return ResultCode::kInvalidParameter;
+			}
+
+			size_t queueTypeInt = static_cast<size_t>(queueType);
+
+			if (haveRequestedQueue[queueTypeInt])
+			{
+				rkit::log::Error("Queue type was requested multiple times");
+				return ResultCode::kInvalidParameter;
+			}
+
+			uint32_t queueFamilyIndex = 0;
+			uint32_t numQueuesAvailable = 0;
+			rPhysDevice.GetQueueTypeInfo(queueType, queueFamilyIndex, numQueuesAvailable);
+
+			if (queueRequest.m_numQueues > numQueuesAvailable)
+			{
+				rkit::log::Error("Too many queues requested");
+				return ResultCode::kInvalidParameter;
+			}
+
+			haveRequestedQueue[queueTypeInt] = true;
+
+			VkDeviceQueueCreateInfo queueCreateInfo = {};
+			queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+			queueCreateInfo.pQueuePriorities = queueRequest.m_queuePriorities;
+			queueCreateInfo.queueCount = static_cast<uint32_t>(queueRequest.m_numQueues);
+			queueCreateInfo.queueFamilyIndex = queueFamilyIndex;
+
+			if (queueRequest.m_numQueues == 0)
+			{
+				rkit::log::Error("Command queue request didn't request any queues");
+				return ResultCode::kInvalidParameter;
+			}
+
+			RKIT_CHECK(queueCreateInfos.Append(queueCreateInfo));
+
+			VulkanDeviceBase::QueueFamilySpec &spec = queueFamilySpecs[queueTypeInt];
+			spec.m_queueFamily = queueFamilyIndex;
+			spec.m_numQueues = static_cast<uint32_t>(queueRequest.m_numQueues);
+		}
+
+		VkDeviceCreateInfo devCreateInfo = {};
+		devCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		devCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.Count());
+		devCreateInfo.pQueueCreateInfos = queueCreateInfos.GetBuffer();
+
+		VkDevice device = VK_NULL_HANDLE;
+		RKIT_VK_CHECK(m_vki.vkCreateDevice(rPhysDevice.GetPhysDevice(), &devCreateInfo, GetAllocCallbacks(), &device));
+
+		Result wrapDeviceResult = VulkanDeviceBase::CreateDevice(outDevice, m_vkg, m_vki, m_vkInstance, device, queueFamilySpecs, GetAllocCallbacks());
+		if (!wrapDeviceResult.IsOK())
+		{
+			m_vki.vkDestroyDevice(device, GetAllocCallbacks());
+			return wrapDeviceResult;
+		}
+
+		return ResultCode::kOK;
 	}
 
 	bool RenderVulkanDriver::IsInstanceExtensionEnabled(const StringView &extName) const
@@ -508,33 +596,6 @@ namespace rkit::render::vulkan
 		return LoadVulkanAPI(m_vki, resolver);
 	}
 
-	Result RenderVulkanDriver::LoadVulkanAPI(IVulkanAPI &api, const IFunctionResolver &resolver)
-	{
-		FunctionLoaderInfo loaderInfo;
-		loaderInfo.m_nextCallback = api.GetFirstResolveFunctionCallback();
-
-		while (loaderInfo.m_nextCallback != nullptr)
-		{
-			loaderInfo.m_nextCallback(&api, loaderInfo);
-
-			if (loaderInfo.m_requiredExtension != nullptr)
-			{
-				if (!resolver.IsExtensionEnabled(StringView::FromCString(loaderInfo.m_requiredExtension)))
-					continue;
-			}
-
-			bool foundFunction = resolver.ResolveProc(loaderInfo.m_pfnAddress, loaderInfo, loaderInfo.m_fnName);
-
-			if (!foundFunction && !loaderInfo.m_isOptional)
-			{
-				rkit::log::ErrorFmt("Failed to find required Vulkan function %s", loaderInfo.m_fnName.GetChars());
-				return ResultCode::kModuleLoadFailed;
-			}
-		}
-
-		return ResultCode::kOK;
-	}
-
 	Result RenderVulkanDriver::EnumerateExtensions(const char *layerName, Vector<ExtensionEnumeration> &extProperties)
 	{
 		uint32_t propertyCount = 0;
@@ -598,6 +659,15 @@ namespace rkit::render::vulkan
 	RenderVulkanAdapter::RenderVulkanAdapter(const RCPtr<RenderVulkanPhysicalDevice> &physDevice)
 		: m_physDevice(physDevice)
 	{
+	}
+
+	size_t RenderVulkanAdapter::GetCommandQueueCount(CommandQueueType type) const
+	{
+		uint32_t familyIndex = 0;
+		uint32_t numQueues = 0;
+		m_physDevice->GetQueueTypeInfo(type, familyIndex, numQueues);
+
+		return numQueues;
 	}
 
 	const RenderVulkanPhysicalDevice &RenderVulkanAdapter::GetPhysicalDevice() const

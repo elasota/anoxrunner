@@ -156,6 +156,8 @@ namespace rkit
 		: m_object(ptr)
 		, m_tracker(Private::RefCountedInstantiator::GetTrackerFromObject(ptr))
 	{
+		if (m_tracker != nullptr)
+			m_tracker->RCTrackerAddRef();
 	}
 
 	template<class T>

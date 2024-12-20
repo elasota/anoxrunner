@@ -10,12 +10,24 @@ namespace rkit
 
 	template<class T>
 	class UniquePtr;
+
+	template<class T>
+	class Optional;
 }
 
 namespace rkit::render::vulkan
 {
+	struct VulkanGlobalAPI;
+	struct VulkanInstanceAPI;
+
 	struct VulkanDeviceBase : public IRenderDevice
 	{
-		static Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, VkInstance inst, VkDevice device);
+		struct QueueFamilySpec
+		{
+			uint32_t m_queueFamily = 0;
+			uint32_t m_numQueues = 0;
+		};
+
+		static Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const QueueFamilySpec (&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks);
 	};
 }
