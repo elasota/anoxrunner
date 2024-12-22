@@ -6,6 +6,7 @@
 
 #include "rkit/BuildSystem/BuildSystem.h"
 #include "rkit/BuildSystem/DependencyGraph.h"
+#include "rkit/BuildSystem/PackageBuilder.h"
 
 #include "rkit/Core/DirectoryScan.h"
 #include "rkit/Core/Drivers.h"
@@ -26,6 +27,20 @@ namespace anox::utils
 		rkit::Result Run(const rkit::StringView &targetName, const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir, rkit::render::BackendType backendType) override;
 
 	private:
+		class ExportPipelinesCheckRunner final : public rkit::buildsystem::IBuildSystemAction
+		{
+		public:
+			ExportPipelinesCheckRunner(AnoxDataBuilder &dataBuilder, rkit::buildsystem::IBuildSystemInstance &bsi);
+
+			rkit::Result Run() override;
+
+		private:
+			AnoxDataBuilder &m_dataBuilder;
+			rkit::buildsystem::IBuildSystemInstance &m_bsi;
+		};
+
+		rkit::Result ExportPipelineLibraries(rkit::buildsystem::IBuildSystemInstance &bsi);
+
 		rkit::buildsystem::IBuildSystemDriver *m_bsDriver;
 		anox::IUtilitiesDriver *m_utils;
 	};
@@ -59,6 +74,58 @@ namespace anox::utils
 		: m_bsDriver(nullptr)
 		, m_utils(utils)
 	{
+	}
+
+	rkit::Result AnoxDataBuilder::ExportPipelineLibraries(rkit::buildsystem::IBuildSystemInstance &bsi)
+	{
+		rkit::Vector<rkit::buildsystem::IDependencyNode *> rplNodes;
+
+		bool rebuiltAnyPipelines = false;
+		for (rkit::buildsystem::IDependencyNode *node : bsi.GetBuildRelevantNodes())
+		{
+			uint32_t nodeNamespace = node->GetDependencyNodeNamespace();
+			uint32_t nodeType = node->GetDependencyNodeType();
+
+			if (nodeNamespace == rkit::buildsystem::kDefaultNamespace && nodeType == rkit::buildsystem::kRenderPipelineLibraryNodeID)
+			{
+				RKIT_CHECK(rplNodes.Append(node));
+
+				if (node->WasCompiled())
+					rebuiltAnyPipelines = true;
+			}
+		}
+
+		if (!rebuiltAnyPipelines)
+			return rkit::ResultCode::kOK;
+
+		rkit::log::LogInfo("Combining pipeline libraries...");
+
+		rkit::UniquePtr<rkit::buildsystem::IPipelineLibraryCombiner> combiner;
+		RKIT_CHECK(m_bsDriver->CreatePipelineLibraryCombiner(combiner));
+
+		for (rkit::buildsystem::IDependencyNode *node : rplNodes)
+		{
+			for (const rkit::buildsystem::FileStatusView &product : node->GetCompileProducts())
+			{
+				rkit::UniquePtr<rkit::ISeekableReadStream> stream;
+				RKIT_CHECK(bsi.TryOpenFileRead(product.m_location, product.m_filePath, stream));
+
+				if (!stream.IsValid())
+				{
+					rkit::log::ErrorFmt("Failed to open pipeline '%s' for merge", product.m_filePath.GetChars());
+					return rkit::ResultCode::kOperationFailed;
+				}
+
+				RKIT_CHECK(combiner->AddInput(*stream));
+			}
+		}
+
+		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
+		RKIT_CHECK(bsi.OpenFileWrite(rkit::buildsystem::BuildFileLocation::kOutputDir, "pipelines_vk.rkp", outStream));
+
+		RKIT_CHECK(combiner->WritePackage(*outStream));
+
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result AnoxDataBuilder::Run(const rkit::StringView &targetName, const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir, rkit::render::BackendType backendType)
@@ -120,25 +187,23 @@ namespace anox::utils
 
 		RKIT_CHECK(instance->AddRootNode(rootDepsNode));
 
+		ExportPipelinesCheckRunner exportPipelinesCheck(*this, *instance);
+		RKIT_CHECK(instance->AddPostBuildAction(&exportPipelinesCheck));
+
 		RKIT_CHECK(instance->Build(&fs));
 
-		bool rebuiltAnyPipelines = false;
-		for (rkit::buildsystem::IDependencyNode *node : instance->GetBuildRelevantNodes())
-		{
-			if (node->WasCompiled())
-			{
-				uint32_t nodeNamespace = node->GetDependencyNodeNamespace();
-				uint32_t nodeType = node->GetDependencyNodeType();
-
-				if (nodeNamespace == rkit::buildsystem::kDefaultNamespace && nodeType == rkit::buildsystem::kRenderPipelineLibraryNodeID)
-				{
-					rebuiltAnyPipelines = true;
-					break;
-				}
-			}
-		}
-
 		return rkit::ResultCode::kOK;
+	}
+
+	AnoxDataBuilder::ExportPipelinesCheckRunner::ExportPipelinesCheckRunner(AnoxDataBuilder &dataBuilder, rkit::buildsystem::IBuildSystemInstance &bsi)
+		: m_dataBuilder(dataBuilder)
+		, m_bsi(bsi)
+	{
+	}
+
+	rkit::Result AnoxDataBuilder::ExportPipelinesCheckRunner::Run()
+	{
+		return m_dataBuilder.ExportPipelineLibraries(m_bsi);
 	}
 
 	AnoxFileSystem::AnoxFileSystem()

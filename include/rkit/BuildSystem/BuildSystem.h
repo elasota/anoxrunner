@@ -51,6 +51,11 @@ namespace rkit
 			virtual Result WritePackage(ISeekableWriteStream &stream) = 0;
 		};
 
+		struct IBuildSystemAction
+		{
+			virtual Result Run() = 0;
+		};
+
 		struct IBuildSystemInstance
 		{
 			virtual ~IBuildSystemInstance() {}
@@ -63,12 +68,16 @@ namespace rkit
 			virtual Result RegisterNodeTypeByExtension(const StringView &ext, uint32_t nodeNamespace, uint32_t nodeType) = 0;
 
 			virtual Result AddRootNode(IDependencyNode *node) = 0;
+			virtual Result AddPostBuildAction(IBuildSystemAction *action) = 0;
 
 			virtual Result Build(IBuildFileSystem *fs) = 0;
 
 			virtual IDependencyGraphFactory *GetDependencyGraphFactory() const = 0;
 
 			virtual CallbackSpan<IDependencyNode *, const IBuildSystemInstance *> GetBuildRelevantNodes() const = 0;
+
+			virtual Result TryOpenFileRead(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &outFile) = 0;
+			virtual Result OpenFileWrite(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outFile) = 0;
 		};
 
 		struct IBuildSystemDriver : public ICustomDriver

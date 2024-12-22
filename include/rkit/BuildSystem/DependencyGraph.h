@@ -86,7 +86,7 @@ namespace rkit
 
 		struct NodeDependencyInfo
 		{
-			IDependencyNode *m_node;
+			IDependencyNode *m_node = nullptr;
 			bool m_mustBeUpToDate = true;
 		};
 

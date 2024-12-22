@@ -375,6 +375,8 @@ namespace rkit::buildsystem::rpc_combiner
 		UniquePtr<IPackageBuilder> m_pkgBuilder;
 		UniquePtr<IPackageObjectWriter> m_pkgObjectWriter;
 
+		HashSet<String> m_graphicPipelineNames;
+
 		data::IDataDriver *m_dataDriver;
 	};
 }
@@ -2271,7 +2273,22 @@ namespace rkit::buildsystem::rpc_combiner
 
 		for (size_t i = 0; i < numGraphicPipelineLookups; i++)
 		{
-			const void *nameLookup = graphicPipelineLookups->GetElementPtr(i);
+			const render::GraphicsPipelineNameLookup *nameLookup = static_cast<const render::GraphicsPipelineNameLookup *>(graphicPipelineLookups->GetElementPtr(i));
+
+			StringView nameStrView = pkg->GetString(nameLookup->m_name.GetIndex());
+
+			if (m_graphicPipelineNames.Contains(nameStrView))
+			{
+				rkit::log::ErrorFmt("Duplicate graphic pipeline name '%s'", nameStrView.GetChars());
+				return ResultCode::kOperationFailed;
+			}
+			else
+			{
+				String nameStr;
+				RKIT_CHECK(nameStr.Set(nameStrView));
+
+				RKIT_CHECK(m_graphicPipelineNames.Add(std::move(nameStr)));
+			}
 
 			size_t index = 0;
 			RKIT_CHECK(m_pkgBuilder->IndexObject(nameLookup, m_dataDriver->GetRenderDataHandler()->GetGraphicsPipelineNameLookupRTTI(), true, index));

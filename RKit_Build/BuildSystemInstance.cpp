@@ -423,6 +423,8 @@ namespace rkit::buildsystem
 		IDependencyNode *FindNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) const override;
 		Result FindOrCreateNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier, IDependencyNode *&outNode) override;
 		Result AddRootNode(IDependencyNode *node) override;
+		Result AddPostBuildAction(IBuildSystemAction *action) override;
+
 		Result LoadCache() override;
 
 		Result Build(IBuildFileSystem *fs) override;
@@ -434,8 +436,8 @@ namespace rkit::buildsystem
 
 		Result ResolveFileStatus(BuildFileLocation location, const StringView &path, FileStatusView &outStatusView, bool cached, bool &outExists);
 
-		Result TryOpenFileRead(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &outFile);
-		Result OpenFileWrite(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outFile);
+		Result TryOpenFileRead(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &outFile) override;
+		Result OpenFileWrite(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outFile) override;
 
 		Result RegisterNodeTypeByExtension(const StringView &ext, uint32_t nodeNamespace, uint32_t nodeType) override;
 		bool FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const;
@@ -471,6 +473,7 @@ namespace rkit::buildsystem
 		Result AppendPathSeparator(String &str) const;
 
 		Result ConstructIntermediatePath(String &outStr, FileLocation &outFileLocation, const StringView &path) const;
+		Result ConstructOutputPath(String &outStr, FileLocation &outFileLocation, const StringView &path) const;
 
 		static PrintableFourCC FourCCToPrintable(uint32_t fourCC);
 
@@ -478,8 +481,8 @@ namespace rkit::buildsystem
 
 		static IDependencyNode *GetRelevantNodeByIndex(const IBuildSystemInstance * const& instance, size_t index);
 
-		Result SaveCache();
 		Result CheckedLoadCache(ISeekableReadStream &stream, FilePos_t pos);
+		Result SaveCache();
 
 		String m_targetName;
 		String m_srcDir;
@@ -495,6 +498,8 @@ namespace rkit::buildsystem
 
 		Vector<DependencyNode *> m_relevantNodes;
 		Vector<DependencyNode *> m_depCheckStack;
+
+		Vector<IBuildSystemAction *> m_postBuildActions;
 
 		HashMap<FileLocationKey, UniquePtr<CachedFileStatus> > m_cachedFileStatus;
 		HashMap<String, NodeTypeKey> m_nodeTypesByExtension;
@@ -1523,6 +1528,11 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
+	Result BuildSystemInstance::AddPostBuildAction(IBuildSystemAction *action)
+	{
+		return m_postBuildActions.Append(action);
+	}
+
 	Result BuildSystemInstance::Build(IBuildFileSystem *fs)
 	{
 		m_fs = fs;
@@ -1568,7 +1578,13 @@ namespace rkit::buildsystem
 			}
 		}
 
-		// Step 3: Write updated state
+		// Step 3: Run post-build actions
+		for (size_t i = 0; i < m_postBuildActions.Count(); i++)
+		{
+			RKIT_CHECK(m_postBuildActions[i]->Run());
+		}
+
+		// Step 4: Write updated state
 		RKIT_CHECK(SaveCache());
 
 		return ResultCode::kOK;
@@ -1994,6 +2010,10 @@ namespace rkit::buildsystem
 		{
 			RKIT_CHECK(ConstructIntermediatePath(fullPath, fileLocation, path));
 		}
+		else if (location == rkit::buildsystem::BuildFileLocation::kOutputDir)
+		{
+			RKIT_CHECK(ConstructOutputPath(fullPath, fileLocation, path));
+		}
 		else
 			return ResultCode::kFileOpenError;
 
@@ -2080,6 +2100,15 @@ namespace rkit::buildsystem
 	Result BuildSystemInstance::ConstructIntermediatePath(String &outStr, FileLocation &outFileLocation, const StringView &path) const
 	{
 		RKIT_CHECK(outStr.Set(m_intermedDir));
+		RKIT_CHECK(AppendPathSeparator(outStr));
+		RKIT_CHECK(outStr.Append(path));
+
+		return ResultCode::kOK;
+	}
+
+	Result BuildSystemInstance::ConstructOutputPath(String &outStr, FileLocation &outFileLocation, const StringView &path) const
+	{
+		RKIT_CHECK(outStr.Set(m_dataDir));
 		RKIT_CHECK(AppendPathSeparator(outStr));
 		RKIT_CHECK(outStr.Append(path));
 
