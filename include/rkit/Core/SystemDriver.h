@@ -12,6 +12,8 @@ namespace rkit
 	template<class T>
 	class UniquePtr;
 
+	class UniqueThreadRef;
+
 	struct FileAttributes;
 	struct Result;
 
@@ -20,7 +22,10 @@ namespace rkit
 	struct ISeekableReadWriteStream;
 	struct ISeekableWriteStream;
 	struct ISystemLibrary;
+	struct IEvent;
 	struct IMutex;
+	struct IThread;
+	struct IThreadContext;
 
 	struct IPlatformDriver
 	{
@@ -59,6 +64,7 @@ namespace rkit
 		virtual UniquePtr<ISeekableWriteStream> OpenFileWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) = 0;
 		virtual UniquePtr<ISeekableReadWriteStream> OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) = 0;
 
+		virtual Result CreateThread(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContext) = 0;
 		virtual Result CreateMutex(UniquePtr<IMutex> &outMutex) = 0;
 
 		virtual Result OpenDirectoryScan(FileLocation location, const char *path, UniquePtr<IDirectoryScan> &outDirectoryScan) = 0;

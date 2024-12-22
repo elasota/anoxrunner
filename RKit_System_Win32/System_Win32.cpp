@@ -9,6 +9,7 @@
 #include "rkit/Core/Span.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/String.h"
+#include "rkit/Core/Thread.h"
 #include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/UniquePtr.h"
 #include "rkit/Core/Vector.h"
@@ -109,6 +110,30 @@ namespace rkit
 		CRITICAL_SECTION m_critSection;
 	};
 
+	class Thread_Win32;
+
+	struct ThreadKickoffInfo_Win32
+	{
+		HANDLE m_hKickoffEvent;
+		Result *m_outResult;
+		UniquePtr<IThreadContext> m_threadContext;
+	};
+
+	class Thread_Win32 final : public IThread
+	{
+	public:
+		Thread_Win32();
+
+		void SetHandle(HANDLE hThread);
+		Result *GetResultPtr();
+
+		void Finalize(Result &outResult) override;
+
+	private:
+		HANDLE m_hThread;
+		Result m_result;
+	};
+
 	class SystemDriver_Win32 final : public NoCopy, public ISystemDriver, public IWin32PlatformDriver
 	{
 	public:
@@ -126,6 +151,7 @@ namespace rkit
 		UniquePtr<ISeekableWriteStream> OpenFileWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
 		UniquePtr<ISeekableReadWriteStream> OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
 
+		Result CreateThread(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContext) override;
 		Result CreateMutex(UniquePtr<IMutex> &mutex) override;
 
 		Result OpenDirectoryScan(FileLocation location, const char *path, UniquePtr<IDirectoryScan> &outDirectoryScan) override;
@@ -146,6 +172,8 @@ namespace rkit
 		UniquePtr<File_Win32> OpenFileGeneral(FileLocation location, const char *path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition);
 		Result OpenFileGeneralChecked(UniquePtr<File_Win32> &outFile, FileLocation location, const char *path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition);
 		static Result CheckCreateDirectories(Vector<wchar_t> &pathChars);
+
+		static DWORD WINAPI ThreadStartRoutine(LPVOID lpThreadParameter);
 
 		IMallocDriver *m_alloc;
 		Vector<Vector<char> > m_commandLineCharBuffers;
@@ -512,6 +540,33 @@ namespace rkit
 		LeaveCriticalSection(&m_critSection);
 	}
 
+	Thread_Win32::Thread_Win32()
+		: m_hThread(nullptr)
+	{
+	}
+
+	void Thread_Win32::SetHandle(HANDLE hThread)
+	{
+		m_hThread = hThread;
+	}
+
+	Result *Thread_Win32::GetResultPtr()
+	{
+		return &m_result;
+	}
+
+	void Thread_Win32::Finalize(Result &outResult)
+	{
+		if (m_hThread)
+		{
+			WaitForSingleObject(m_hThread, INFINITE);
+			::CloseHandle(m_hThread);
+			m_hThread = nullptr;
+		}
+
+		outResult = m_result;
+	}
+
 	SystemDriver_Win32::SystemDriver_Win32(IMallocDriver *alloc, const SystemModuleInitParameters_Win32 &initParams)
 		: m_commandLine(alloc)
 		, m_argvW(nullptr)
@@ -631,6 +686,46 @@ namespace rkit
 	UniquePtr<ISeekableReadWriteStream> SystemDriver_Win32::OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists)
 	{
 		return OpenFileGeneral(location, path, createDirectories, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, OpenFlagsToDisposition(createIfNotExists, truncateIfExists));
+	}
+
+	Result SystemDriver_Win32::CreateThread(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContextRef)
+	{
+		UniquePtr<IThreadContext> threadContext(std::move(threadContextRef));
+
+		HANDLE hKickoffEvent = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
+
+		if (!hKickoffEvent)
+			return ResultCode::kOperationFailed;
+
+		UniquePtr<Thread_Win32> thread;
+		Result createThreadResult = NewWithAlloc<Thread_Win32>(thread, m_alloc);
+
+		if (!createThreadResult.IsOK())
+		{
+			::CloseHandle(hKickoffEvent);
+			return createThreadResult;
+		}
+
+		ThreadKickoffInfo_Win32 kickoffInfo;
+		kickoffInfo.m_hKickoffEvent = hKickoffEvent;
+		kickoffInfo.m_outResult = thread->GetResultPtr();
+		kickoffInfo.m_threadContext = std::move(threadContext);
+
+		DWORD threadID = 0;
+		HANDLE hThread = ::CreateThread(nullptr, 0, ThreadStartRoutine, &kickoffInfo, 0, &threadID);
+
+		if (!hThread)
+		{
+			::CloseHandle(hKickoffEvent);
+			return ResultCode::kOperationFailed;
+		}
+
+		WaitForSingleObject(hKickoffEvent, INFINITE);
+		CloseHandle(hKickoffEvent);
+
+		outThread = UniqueThreadRef(UniquePtr<IThread>(std::move(thread)));
+
+		return ResultCode::kOK;
 	}
 
 	Result SystemDriver_Win32::CreateMutex(UniquePtr<IMutex> &outMutex)
@@ -827,6 +922,20 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
+	DWORD WINAPI SystemDriver_Win32::ThreadStartRoutine(LPVOID lpThreadParameter)
+	{
+		ThreadKickoffInfo_Win32 *kickoff = static_cast<ThreadKickoffInfo_Win32 *>(lpThreadParameter);
+
+		HANDLE hKickoffEvent = kickoff->m_hKickoffEvent;
+		Result *outResult = kickoff->m_outResult;
+		UniquePtr<IThreadContext> context = std::move(kickoff->m_threadContext);
+
+		::SetEvent(hKickoffEvent);
+
+		*outResult = context->Run();
+
+		return 0;
+	}
 
 	Result SystemDriver_Win32::ResolveFilePath(FileLocation location, const char *path, Vector<wchar_t> &outPath)
 	{
