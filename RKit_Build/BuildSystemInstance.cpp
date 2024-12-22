@@ -1562,7 +1562,6 @@ namespace rkit::buildsystem
 
 			if (node->GetDependencyState() == DependencyState::NotCompiled)
 			{
-
 				rkit::log::LogInfoFmt("Build Compile : %s %s %s", FourCCToPrintable(node->GetDependencyNodeNamespace()).GetChars(), FourCCToPrintable(node->GetDependencyNodeType()).GetChars(), node->GetIdentifier().GetChars());
 				RKIT_CHECK(node->RunCompile(this));
 				node->SetState(DependencyState::UpToDate);

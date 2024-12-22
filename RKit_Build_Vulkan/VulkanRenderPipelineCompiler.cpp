@@ -187,7 +187,7 @@ namespace rkit::buildsystem::vulkan
 
 		RenderPipelineCompiler() = delete;
 
-		static Result CompileGraphicsPipeline(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback, data::IRenderDataPackage *package, const Span<const Vector<uint8_t>> &pkgBinaryContent, render::GraphicsPipelineDesc *pipeline);
+		static Result CompileGraphicsPipeline(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback, data::IRenderDataPackage *package, const Span<const Vector<uint8_t>> &pkgBinaryContent, const render::GraphicsPipelineNameLookup *nameLookup);
 
 		static Result AddGraphicsAnalysisStage(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback, render::vulkan::GraphicPipelineStage stage);
 
@@ -253,16 +253,17 @@ namespace rkit::buildsystem::vulkan
 
 		if (m_pipelineType == PipelineType::Graphics)
 		{
-			data::IRenderRTTIListBase *list = package->GetIndexable(data::RenderRTTIIndexableStructType::GraphicsPipelineDesc);
-			if (list->GetCount() != 1)
+			data::IRenderRTTIListBase *nameLookupList = package->GetIndexable(data::RenderRTTIIndexableStructType::GraphicsPipelineNameLookup);
+			if (nameLookupList->GetCount() != 1)
 			{
-				rkit::log::Error("Pipeline package doesn't contain exactly one graphics pipeline");
+				rkit::log::Error("Pipeline package doesn't contain exactly one graphics pipeline name lookup");
 				return ResultCode::kMalformedFile;
 			}
 
-			const render::GraphicsPipelineDesc *pipelineDesc = static_cast<const render::GraphicsPipelineDesc *>(list->GetElementPtr(0));
 
-			RKIT_CHECK(CompileGraphicsPipeline(depsNode, feedback, package.Get(), binaryContent.ToSpan(), const_cast<render::GraphicsPipelineDesc *>(pipelineDesc)));
+			const render::GraphicsPipelineNameLookup *nameLookupDesc = static_cast<const render::GraphicsPipelineNameLookup *>(nameLookupList->GetElementPtr(0));
+
+			RKIT_CHECK(CompileGraphicsPipeline(depsNode, feedback, package.Get(), binaryContent.ToSpan(), nameLookupDesc));
 		}
 		else
 			return ResultCode::kInternalError;
@@ -277,8 +278,10 @@ namespace rkit::buildsystem::vulkan
 		return 1;
 	}
 
-	Result RenderPipelineCompiler::CompileGraphicsPipeline(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback, data::IRenderDataPackage *package, const Span<const Vector<uint8_t>> &pkgBinaryContent, render::GraphicsPipelineDesc *pipeline)
+	Result RenderPipelineCompiler::CompileGraphicsPipeline(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback, data::IRenderDataPackage *package, const Span<const Vector<uint8_t>> &pkgBinaryContent, const render::GraphicsPipelineNameLookup *nameLookup)
 	{
+		render::GraphicsPipelineDesc *pipeline = const_cast<render::GraphicsPipelineDesc *>(nameLookup->m_pipeline);
+
 		size_t numVKStages = static_cast<size_t>(render::vulkan::GraphicPipelineStage::Count);
 
 		Vector<Vector<uint8_t>> binaryContentData;
@@ -362,7 +365,7 @@ namespace rkit::buildsystem::vulkan
 		packageBuilder->BeginSource(&indexer);
 
 		size_t index = 0;
-		RKIT_CHECK(packageBuilder->IndexObject(pipeline, dataDriver->GetRenderDataHandler()->GetGraphicsPipelineDescRTTI(), false, index));
+		RKIT_CHECK(packageBuilder->IndexObject(nameLookup, dataDriver->GetRenderDataHandler()->GetGraphicsPipelineNameLookupRTTI(), false, index));
 
 		RKIT_CHECK(packageBuilder->WritePackage(*stream));
 

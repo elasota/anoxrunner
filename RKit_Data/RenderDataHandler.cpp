@@ -1066,6 +1066,11 @@ namespace rkit::data
 			RTTI_STRUCT_FIELD(cullMode)
 		RTTI_STRUCT_END
 
+		RTTI_STRUCT_BEGIN_INDEXABLE(GraphicsPipelineNameLookup)
+			RTTI_STRUCT_FIELD(name)
+			RTTI_STRUCT_FIELD(pipeline)
+		RTTI_STRUCT_END
+
 		RTTI_ENUM_BEGIN(ReadWriteAccess)
 			RTTI_ENUM_OPTION(Read)
 			RTTI_ENUM_OPTION(Write)
@@ -2044,6 +2049,11 @@ namespace rkit::data
 		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::GraphicsPipelineDesc>::GetRTTIType());
 	}
 
+	const RenderRTTIStructType *RenderDataHandler::GetGraphicsPipelineNameLookupRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::GraphicsPipelineNameLookup>::GetRTTIType());
+	}
+
 	const RenderRTTIStructType *RenderDataHandler::GetRenderTargetDescRTTI() const
 	{
 		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::RenderTargetDesc>::GetRTTIType());
@@ -2139,6 +2149,7 @@ namespace rkit::data
 		switch (indexableStructType)
 		{
 		LINK_INDEXABLE_LIST_TYPE(DepthStencilDesc)
+		LINK_INDEXABLE_LIST_TYPE(GraphicsPipelineNameLookup)
 		LINK_INDEXABLE_LIST_TYPE(GraphicsPipelineDesc)
 		LINK_INDEXABLE_LIST_TYPE(RenderTargetDesc)
 		LINK_INDEXABLE_LIST_TYPE(PushConstantDesc)

@@ -67,6 +67,7 @@ namespace rkit::data
 		RenderTargetDesc,
 		DescriptorLayoutDesc,
 		GraphicsPipelineDesc,
+		GraphicsPipelineNameLookup,
 		InputLayoutVertexInputDesc,
 		InputLayoutDesc,
 		VectorNumericType,
@@ -84,6 +85,7 @@ namespace rkit::data
 	enum class RenderRTTIIndexableStructType
 	{
 		DepthStencilDesc,
+		GraphicsPipelineNameLookup,
 		GraphicsPipelineDesc,
 		RenderTargetDesc,
 		PushConstantDesc,
@@ -322,6 +324,7 @@ namespace rkit::data
 		virtual const RenderRTTIStructType *GetDescriptorDescRTTI() const = 0;
 		virtual const RenderRTTIEnumType *GetDescriptorTypeRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetGraphicsPipelineDescRTTI() const = 0;
+		virtual const RenderRTTIStructType *GetGraphicsPipelineNameLookupRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetRenderTargetDescRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetShaderDescRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetDepthStencilDescRTTI() const = 0;

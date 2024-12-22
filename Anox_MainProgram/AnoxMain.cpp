@@ -104,7 +104,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 
 			if (i == args.Count())
 			{
-				rkit::log::Error("Expected path after -sdir");
+				rkit::log::Error("Expected build target after -build");
 				return rkit::ResultCode::kInvalidParameter;
 			}
 

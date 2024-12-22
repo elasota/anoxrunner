@@ -14,6 +14,7 @@ namespace rkit::data
 		const RenderRTTIStructType *GetDescriptorDescRTTI() const override;
 		const RenderRTTIEnumType *GetDescriptorTypeRTTI() const override;
 		const RenderRTTIStructType *GetGraphicsPipelineDescRTTI() const override;
+		const RenderRTTIStructType *GetGraphicsPipelineNameLookupRTTI() const override;
 		const RenderRTTIStructType *GetRenderTargetDescRTTI() const override;
 		const RenderRTTIStructType *GetShaderDescRTTI() const override;
 		const RenderRTTIStructType *GetDepthStencilDescRTTI() const override;

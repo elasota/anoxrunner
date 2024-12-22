@@ -675,6 +675,12 @@ namespace rkit::render
 		FillMode m_fillMode = FillMode::Solid;
 		CullMode m_cullMode = CullMode::Back;
 	};
+
+	struct GraphicsPipelineNameLookup
+	{
+		GlobalStringIndex_t m_name;
+		const GraphicsPipelineDesc *m_pipeline = nullptr;
+	};
 }
 
 

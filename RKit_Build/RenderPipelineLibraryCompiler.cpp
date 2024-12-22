@@ -36,6 +36,19 @@ namespace rkit::buildsystem::rpc_interchange
 		virtual ~Entity() {}
 
 		virtual EntityType GetEntityType() const = 0;
+
+		Result SetName(const StringView &str)
+		{
+			return m_name.Set(str);
+		}
+
+		const String &GetName() const
+		{
+			return m_name;
+		}
+
+	private:
+		String m_name;
 	};
 
 	class StaticSamplerEntity final : public Entity
@@ -321,7 +334,7 @@ namespace rkit::buildsystem::rpc_analyzer
 		Vector<UniquePtr<render::ShaderDesc>> m_shaderDescs;
 		Vector<UniquePtr<render::DepthStencilDesc>> m_depthStencilDescs;
 
-		Vector<const render::GraphicsPipelineDesc *> m_graphicsPipelines;
+		Vector<render::GraphicsPipelineNameLookup> m_graphicsPipelines;
 
 		Vector<SimpleNumericTypeResolution> m_numericTypeResolutions;
 
@@ -701,6 +714,8 @@ namespace rkit::buildsystem::rpc_analyzer
 
 		UniquePtr<rpc_interchange::Entity> entity;
 		RKIT_CHECK(New<T>(entity));
+
+		RKIT_CHECK(entity->SetName(entityName));
 
 		T *obj = static_cast<T *>(entity.Get());
 
@@ -1435,7 +1450,11 @@ namespace rkit::buildsystem::rpc_analyzer
 		gp.GetDesc().m_descriptorLayouts = gp.GetDescriptorLayouts().ToSpan();
 		gp.GetDesc().m_renderTargets = gp.GetRenderTargets().ToSpan();
 
-		RKIT_CHECK(m_graphicsPipelines.Append(&gp.GetDesc()));
+		render::GraphicsPipelineNameLookup nameLookup;
+		RKIT_CHECK(IndexString(gp.GetName().ToSpan(), nameLookup.m_name));
+		nameLookup.m_pipeline = &gp.GetDesc();
+
+		RKIT_CHECK(m_graphicsPipelines.Append(nameLookup));
 
 		return ResultCode::kOK;
 	}
@@ -2138,7 +2157,7 @@ namespace rkit::buildsystem::rpc_analyzer
 		data::IRenderDataHandler *dataHandler = m_dataDriver->GetRenderDataHandler();
 
 		size_t pipelineIndex = 0;
-		for (const render::GraphicsPipelineDesc *graphicsPipeline : m_graphicsPipelines)
+		for (const render::GraphicsPipelineNameLookup &graphicsPipeline : m_graphicsPipelines)
 		{
 			UniquePtr<IPackageObjectWriter> writer;
 			RKIT_CHECK(bsDriver->CreatePackageObjectWriter(writer));
@@ -2146,14 +2165,14 @@ namespace rkit::buildsystem::rpc_analyzer
 			UniquePtr<IPackageBuilder> pkgBuilder;
 			RKIT_CHECK(bsDriver->CreatePackageBuilder(dataHandler, writer.Get(), true, pkgBuilder));
 
-			const data::RenderRTTIStructType *pipelineType = dataHandler->GetGraphicsPipelineDescRTTI();
+			const data::RenderRTTIStructType *pipelineType = dataHandler->GetGraphicsPipelineNameLookupRTTI();
 
-			RKIT_ASSERT(pipelineType->m_indexableType == data::RenderRTTIIndexableStructType::GraphicsPipelineDesc);
+			RKIT_ASSERT(pipelineType->m_indexableType == data::RenderRTTIIndexableStructType::GraphicsPipelineNameLookup);
 
 			pkgBuilder->BeginSource(this);
 
 			size_t index = 0;
-			RKIT_CHECK(pkgBuilder->IndexObject(graphicsPipeline, pipelineType, true, index));
+			RKIT_CHECK(pkgBuilder->IndexObject(&graphicsPipeline, pipelineType, true, index));
 
 			String outPath;
 			RKIT_CHECK(FormatGraphicPipelinePath(outPath, depsNode->GetIdentifier(), pipelineIndex));
@@ -2246,16 +2265,16 @@ namespace rkit::buildsystem::rpc_combiner
 		PackageInputResolver resolver(*pkg, binaryContent.ToSpan());
 		m_pkgBuilder->BeginSource(&resolver);
 
-		data::IRenderRTTIListBase *graphicPipelines = pkg->GetIndexable(data::RenderRTTIIndexableStructType::GraphicsPipelineDesc);
+		data::IRenderRTTIListBase *graphicPipelineLookups = pkg->GetIndexable(data::RenderRTTIIndexableStructType::GraphicsPipelineNameLookup);
 
-		size_t numGraphicPipelines = graphicPipelines->GetCount();
+		size_t numGraphicPipelineLookups = graphicPipelineLookups->GetCount();
 
-		for (size_t i = 0; i < numGraphicPipelines; i++)
+		for (size_t i = 0; i < numGraphicPipelineLookups; i++)
 		{
-			const void *pipelineDesc = graphicPipelines->GetElementPtr(i);
+			const void *nameLookup = graphicPipelineLookups->GetElementPtr(i);
 
 			size_t index = 0;
-			RKIT_CHECK(m_pkgBuilder->IndexObject(pipelineDesc, m_dataDriver->GetRenderDataHandler()->GetGraphicsPipelineDescRTTI(), true, index));
+			RKIT_CHECK(m_pkgBuilder->IndexObject(nameLookup, m_dataDriver->GetRenderDataHandler()->GetGraphicsPipelineNameLookupRTTI(), true, index));
 		}
 
 		return ResultCode::kOK;

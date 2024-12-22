@@ -138,7 +138,8 @@ namespace rkit::render::vulkan
 
 			StringView m_name;
 			bool m_required = false;
-			bool m_isAvailable = false;
+			bool m_isAvailableInLayer = false;
+			bool m_isAvailableInBase = false;
 		};
 
 		Result LoadVulkanGlobalAPI();
@@ -652,7 +653,8 @@ namespace rkit::render::vulkan
 	RenderVulkanDriver::QueryItem::QueryItem(const StringView &name, bool isRequired)
 		: m_name(name)
 		, m_required(isRequired)
-		, m_isAvailable(false)
+		, m_isAvailableInLayer(false)
+		, m_isAvailableInBase(false)
 	{
 	}
 
@@ -717,12 +719,12 @@ namespace rkit::render::vulkan
 			{
 				if (requestedLayer.m_name == StringView::FromCString(availableLayer.layerName))
 				{
-					requestedLayer.m_isAvailable = true;
+					requestedLayer.m_isAvailableInBase = true;
 					break;
 				}
 			}
 
-			if (!requestedLayer.m_isAvailable)
+			if (!requestedLayer.m_isAvailableInBase)
 			{
 				if (requestedLayer.m_required)
 				{
@@ -751,13 +753,16 @@ namespace rkit::render::vulkan
 				{
 					if (requestedExtension.m_name == StringView::FromCString(availableExtension.extensionName))
 					{
-						requestedExtension.m_isAvailable = true;
+						if (layerExts.m_layerName)
+							requestedExtension.m_isAvailableInLayer = true;
+						else
+							requestedExtension.m_isAvailableInBase = true;
 						break;
 					}
 				}
 			}
 
-			if (!requestedExtension.m_isAvailable)
+			if (!requestedExtension.m_isAvailableInBase)
 			{
 				if (requestedExtension.m_required)
 				{
@@ -768,7 +773,10 @@ namespace rkit::render::vulkan
 					continue;
 			}
 
-			RKIT_CHECK(extensions.Append(requestedExtension.m_name.GetChars()));
+			if (requestedExtension.m_isAvailableInBase)
+			{
+				RKIT_CHECK(extensions.Append(requestedExtension.m_name.GetChars()));
+			}
 		}
 
 		// Build extension list
