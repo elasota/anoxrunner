@@ -14,33 +14,36 @@ namespace rkit::render
 	struct IComputeCommandList;
 	struct IGraphicsCommandList;
 	struct IGraphicsComputeCommandList;
+	struct ICPUWaitableFence;
 
 	struct IBaseCommandQueue
 	{
+		virtual Result QueueWaitForOtherQueue(IBaseCommandQueue &otherQueue) = 0;
+		virtual Result Submit(ICPUWaitableFence *cpuWaitableFence) = 0;
 	};
 
 	struct ICopyCommandQueue : public IBaseCommandQueue
 	{
-		virtual Result ExecuteCopy(const Span<ICopyCommandList*> &cmdLists) = 0;
-		Result ExecuteCopy(ICopyCommandList &cmdList);
+		virtual Result QueueCopy(const Span<ICopyCommandList*> &cmdLists) = 0;
+		Result QueueCopy(ICopyCommandList &cmdList);
 	};
 
 	struct IComputeCommandQueue : public virtual ICopyCommandQueue
 	{
-		virtual Result ExecuteCompute(const Span<IComputeCommandList *> &cmdLists) = 0;
-		Result ExecuteCompute(IComputeCommandList &cmdList);
+		virtual Result QueueCompute(const Span<IComputeCommandList *> &cmdLists) = 0;
+		Result QueueCompute(IComputeCommandList &cmdList);
 	};
 
 	struct IGraphicsCommandQueue : public virtual ICopyCommandQueue
 	{
-		virtual Result ExecuteCompute(const Span<IGraphicsCommandList *> &cmdLists) = 0;
-		Result ExecuteGraphics(IGraphicsCommandList &cmdList);
+		virtual Result QueueGraphics(const Span<IGraphicsCommandList *> &cmdLists) = 0;
+		Result QueueGraphics(IGraphicsCommandList &cmdList);
 	};
 
 	struct IGraphicsComputeCommandQueue : public IComputeCommandQueue, public IGraphicsCommandQueue
 	{
-		virtual Result ExecuteGraphicsCompute(const Span<IGraphicsComputeCommandList *> &cmdLists) = 0;
-		Result ExecuteGraphicsCompute(IGraphicsComputeCommandList &cmdList);
+		virtual Result QueueGraphicsCompute(const Span<IGraphicsComputeCommandList *> &cmdLists) = 0;
+		Result QueueGraphicsCompute(IGraphicsComputeCommandList &cmdList);
 	};
 }
 

@@ -8,6 +8,7 @@ namespace rkit::render
 	struct IComputeCommandQueue;
 	struct IGraphicsCommandQueue;
 	struct IGraphicsComputeCommandQueue;
+	struct ICPUWaitableFence;
 
 	struct IRenderDevice
 	{
@@ -17,5 +18,7 @@ namespace rkit::render
 		virtual IComputeCommandQueue *GetComputeQueue(size_t index) const = 0;
 		virtual IGraphicsCommandQueue *GetGraphicsQueue(size_t index) const = 0;
 		virtual IGraphicsComputeCommandQueue *GetGraphicsComputeQueue(size_t index) const = 0;
+
+		virtual Result CreateCPUWaitableFence(UniquePtr<ICPUWaitableFence> &outFence) = 0;
 	};
 }

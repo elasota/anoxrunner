@@ -1,9 +1,10 @@
 #include "rkit/Core/Algorithm.h"
 #include "rkit/Core/DirectoryScan.h"
 #include "rkit/Core/Drivers.h"
+#include "rkit/Core/MallocDriver.h"
 #include "rkit/Core/Module.h"
 #include "rkit/Core/ModuleGlue.h"
-#include "rkit/Core/MallocDriver.h"
+#include "rkit/Core/Mutex.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/Span.h"
 #include "rkit/Core/Stream.h"
@@ -94,6 +95,20 @@ namespace rkit
 		HMODULE m_hmodule;
 	};
 
+	class Mutex_Win32 final : public IMutex
+	{
+	public:
+		Mutex_Win32();
+		~Mutex_Win32();
+
+		void Lock() override;
+		bool TryLock(uint32_t maxMSec) override;
+		void Unlock() override;
+
+	private:
+		CRITICAL_SECTION m_critSection;
+	};
+
 	class SystemDriver_Win32 final : public NoCopy, public ISystemDriver, public IWin32PlatformDriver
 	{
 	public:
@@ -110,6 +125,8 @@ namespace rkit
 		UniquePtr<ISeekableReadStream> OpenFileRead(FileLocation location, const char *path) override;
 		UniquePtr<ISeekableWriteStream> OpenFileWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
 		UniquePtr<ISeekableReadWriteStream> OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
+
+		Result CreateMutex(UniquePtr<IMutex> &mutex) override;
 
 		Result OpenDirectoryScan(FileLocation location, const char *path, UniquePtr<IDirectoryScan> &outDirectoryScan) override;
 		Result GetFileAttributes(FileLocation location, const char *path, bool &outExists, FileAttributes &outAttribs) override;
@@ -455,6 +472,46 @@ namespace rkit
 		return true;
 	}
 
+	Mutex_Win32::Mutex_Win32()
+	{
+		InitializeCriticalSection(&m_critSection);
+	}
+
+	Mutex_Win32::~Mutex_Win32()
+	{
+		DeleteCriticalSection(&m_critSection);
+	}
+
+	void Mutex_Win32::Lock()
+	{
+		EnterCriticalSection(&m_critSection);
+	}
+
+	bool Mutex_Win32::TryLock(uint32_t maxMSec)
+	{
+		if (TryEnterCriticalSection(&m_critSection))
+			return true;
+
+		if (maxMSec > 0)
+		{
+			ULONGLONG baseTime = GetTickCount64();
+
+			do
+			{
+				Sleep(1);
+				if (TryEnterCriticalSection(&m_critSection))
+					return true;
+			} while ((GetTickCount64() - baseTime) < maxMSec);
+		}
+
+		return false;
+	}
+
+	void Mutex_Win32::Unlock()
+	{
+		LeaveCriticalSection(&m_critSection);
+	}
+
 	SystemDriver_Win32::SystemDriver_Win32(IMallocDriver *alloc, const SystemModuleInitParameters_Win32 &initParams)
 		: m_commandLine(alloc)
 		, m_argvW(nullptr)
@@ -574,6 +631,16 @@ namespace rkit
 	UniquePtr<ISeekableReadWriteStream> SystemDriver_Win32::OpenFileReadWrite(FileLocation location, const char *path, bool createIfNotExists, bool createDirectories, bool truncateIfExists)
 	{
 		return OpenFileGeneral(location, path, createDirectories, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, OpenFlagsToDisposition(createIfNotExists, truncateIfExists));
+	}
+
+	Result SystemDriver_Win32::CreateMutex(UniquePtr<IMutex> &outMutex)
+	{
+		UniquePtr<Mutex_Win32> mutex;
+		RKIT_CHECK(NewWithAlloc<Mutex_Win32>(mutex, m_alloc));
+
+		outMutex = std::move(mutex);
+
+		return ResultCode::kOK;
 	}
 
 	Result SystemDriver_Win32::OpenDirectoryScan(FileLocation location, const char *path, UniquePtr<IDirectoryScan> &outDirectoryScan)

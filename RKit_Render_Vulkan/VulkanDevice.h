@@ -28,6 +28,9 @@ namespace rkit::render::vulkan
 			uint32_t m_numQueues = 0;
 		};
 
+		virtual VkDevice GetDevice() const = 0;
+		virtual const VkAllocationCallbacks *GetAllocCallbacks() const = 0;
+
 		static Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const QueueFamilySpec (&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks);
 	};
 }

@@ -113,6 +113,10 @@ public:\
 	{
 		RKIT_VK_API_START(VulkanDeviceAPI);
 		RKIT_VK_API(vkGetDeviceQueue);
+		RKIT_VK_API(vkCreateSemaphore);
+		RKIT_VK_API(vkDestroySemaphore);
+		RKIT_VK_API(vkCreateFence);
+		RKIT_VK_API(vkDestroyFence);
 		RKIT_VK_API_END;
 	};
 }

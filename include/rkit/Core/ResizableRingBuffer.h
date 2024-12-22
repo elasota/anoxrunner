@@ -42,7 +42,8 @@ namespace rkit
 		static const size_t kMinimumInfoBlocks = 8;
 		static const AddrOffset_t kMaxAlignment = 16;
 
-		static void DestructContents(Addr_t addr, AddrOffset_t memorySize);
+		static void ActivateContents(ChunkAllocator_t alloc, Addr_t addr, AddrOffset_t memorySize);
+		static void DeactivateContents(ChunkAllocator_t alloc, Addr_t addr, AddrOffset_t memorySize);
 	};
 
 	template<class TTraits>
@@ -183,14 +184,13 @@ rkit::ResizableRingBuffer<TTraits>::~ResizableRingBuffer()
 		size_t numInfoBlocks = infoBlockChunk->m_numInfoBlocks;
 		size_t firstInfoBlock = infoBlockChunk->m_firstActiveInfoBlock;
 
-
 		for (size_t i = 0; i < numActiveInfoBlocks; i++)
 		{
 			size_t infoBlockIndex = (i + firstInfoBlock) % numInfoBlocks;
 			FlaggedInfoBlock &infoBlock = infoBlocks[infoBlockIndex];
 
 			if (infoBlock.m_isAllocated)
-				TTraits::DestructContents(infoBlock.m_memChunk->GetDataAtPosition(infoBlock.m_offset), infoBlock.m_size);
+				TTraits::DeactivateContents(m_chunkAllocator, infoBlock.m_memChunk->GetDataAtPosition(infoBlock.m_offset), infoBlock.m_size);
 		}
 
 		// Info blocks are POD so just delete them
@@ -376,6 +376,8 @@ rkit::Result rkit::ResizableRingBuffer<TTraits>::Allocate(AddrOffset_t size, Add
 	infoBlock.m_size = size;
 	infoBlock.m_offset = memBlockLoc;
 
+	TTraits::ActivateContents(m_chunkAllocator, infoBlock.m_memChunk->GetDataAtPosition(memBlockLoc), size);
+
 	LinkedMemChunk &memChunk = *m_lastMemChunk;
 
 	AddrOffset_t extendedTailAddress = memBlockLoc + size;
@@ -405,7 +407,7 @@ void rkit::ResizableRingBuffer<TTraits>::Dispose(const ResizableRingBufferHandle
 
 	deallocatedInfoBlock->m_isAllocated = false;
 
-	TTraits::DestructContents(deallocatedInfoBlock->m_memChunk->GetDataAtPosition(deallocatedInfoBlock->m_offset), deallocatedInfoBlock->m_size);
+	TTraits::DeactivateContents(m_chunkAllocator, deallocatedInfoBlock->m_memChunk->GetDataAtPosition(deallocatedInfoBlock->m_offset), deallocatedInfoBlock->m_size);
 
 	// Remove from info block chunk
 	for (;;)
@@ -482,6 +484,8 @@ void rkit::ResizableRingBuffer<TTraits>::Dispose(const ResizableRingBufferHandle
 
 inline rkit::ResizableRingBufferCPUMemChunk::ResizableRingBufferCPUMemChunk(IMallocDriver *alloc)
 	: m_alloc(alloc)
+	, m_alignedMemory(nullptr)
+	, m_baseAddr(nullptr)
 {
 }
 
@@ -512,7 +516,11 @@ inline void *rkit::ResizableRingBufferCPUMemChunk::GetDataAtPosition(size_t offs
 	return static_cast<char *>(m_alignedMemory) + offset;
 }
 
-inline void rkit::DefaultResizableRingBufferTraits::DestructContents(Addr_t addr, AddrOffset_t memorySize)
+inline void rkit::DefaultResizableRingBufferTraits::ActivateContents(ChunkAllocator_t alloc, Addr_t addr, AddrOffset_t memorySize)
+{
+}
+
+inline void rkit::DefaultResizableRingBufferTraits::DeactivateContents(ChunkAllocator_t alloc, Addr_t addr, AddrOffset_t memorySize)
 {
 }
 

@@ -33,9 +33,9 @@ namespace rkit::render
 
 	struct IGraphicsComputeCommandList : public IComputeCommandList, public IGraphicsCommandList
 	{
-		virtual IComputeCommandList *ToComputeCommandList() { return this; }
-		virtual IGraphicsCommandList *ToGraphicsCommandList() { return this; }
-		virtual IGraphicsComputeCommandList *ToGraphicsComputeCommandList() { return this; }
-		virtual ICopyCommandList *ToCopyCommandList() { return this; }
+		IComputeCommandList *ToComputeCommandList() override { return this; }
+		IGraphicsCommandList *ToGraphicsCommandList() override { return this; }
+		IGraphicsComputeCommandList *ToGraphicsComputeCommandList() override { return this; }
+		ICopyCommandList *ToCopyCommandList() override { return this; }
 	};
 }

@@ -1,4 +1,6 @@
+#include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/Result.h"
+#include "rkit/Core/Mutex.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/Optional.h"
 #include "rkit/Core/UniquePtr.h"
@@ -9,20 +11,28 @@
 #include "VulkanDevice.h"
 #include "VulkanQueueProxy.h"
 
+
 namespace rkit::render::vulkan
 {
-	class VulkanDevice final : public IRenderDevice
+	class VulkanDevice final : public VulkanDeviceBase
 	{
 	public:
-		VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks);
+		VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks, UniquePtr<IMutex> &&queueMutex);
 
 		ICopyCommandQueue *GetCopyQueue(size_t index) const override;
 		IComputeCommandQueue *GetComputeQueue(size_t index) const override;
 		IGraphicsCommandQueue *GetGraphicsQueue(size_t index) const override;
 		IGraphicsComputeCommandQueue *GetGraphicsComputeQueue(size_t index) const override;
 
+		VkDevice GetDevice() const override;
+		const VkAllocationCallbacks *GetAllocCallbacks() const override;
+
+		Result CreateCPUWaitableFence(UniquePtr<ICPUWaitableFence> &outFence) override;
+
 		Result LoadDeviceAPI();
-		Result ResolveQueues(CommandQueueType queueType, uint32_t queueFamily, uint32_t numQueues);
+		Result ResolveQueues(CommandQueueType queueType, size_t firstQueueID, uint32_t queueFamily, uint32_t numQueues);
+
+		IMutex &GetQueueMutex();
 
 	private:
 		class FunctionResolver final : public IFunctionResolver
@@ -47,7 +57,10 @@ namespace rkit::render::vulkan
 		VkDevice m_device;
 		const VkAllocationCallbacks *m_allocCallbacks;
 
-		Vector<QueueProxy> m_queueFamilies[kNumQueues];
+		Vector<UniquePtr<QueueProxy>> m_queueFamilies[kNumQueues];
+		Vector<QueueProxy *> m_allQueues;
+
+		UniquePtr<IMutex> m_queueMutex;
 	};
 
 	VulkanDevice::FunctionResolver::FunctionResolver(const VulkanInstanceAPI &vki, VkDevice device)
@@ -73,18 +86,21 @@ namespace rkit::render::vulkan
 		return false;
 	}
 
-	VulkanDevice::VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks)
+	VulkanDevice::VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks, UniquePtr<IMutex> &&queueMutex)
 		: m_vkg(vkg)
 		, m_vki(vki)
 		, m_inst(inst)
 		, m_device(device)
 		, m_allocCallbacks(allocCallbacks)
+		, m_queueMutex(std::move(queueMutex))
 	{
 	}
 
-	Result VulkanDevice::ResolveQueues(CommandQueueType queueType, uint32_t queueFamily, uint32_t numQueues)
+	Result VulkanDevice::ResolveQueues(CommandQueueType queueType, size_t firstQueueID, uint32_t queueFamily, uint32_t numQueues)
 	{
-		Vector<QueueProxy> &proxies = m_queueFamilies[static_cast<size_t>(queueType)];
+		IMallocDriver *alloc = GetDrivers().m_mallocDriver;
+
+		Vector<UniquePtr<QueueProxy>> &proxies = m_queueFamilies[static_cast<size_t>(queueType)];
 
 		RKIT_CHECK(proxies.Resize(numQueues));
 
@@ -92,7 +108,8 @@ namespace rkit::render::vulkan
 		{
 			VkQueue queue = VK_NULL_HANDLE;
 			m_vkd.vkGetDeviceQueue(m_device, queueFamily, i, &queue);
-			proxies[i].Init(queue, m_vkd);
+
+			RKIT_CHECK(New<QueueProxy>(proxies[i], alloc, *this, queue, m_vkd, firstQueueID + i));
 		}
 
 		return ResultCode::kOK;
@@ -100,24 +117,38 @@ namespace rkit::render::vulkan
 
 	ICopyCommandQueue *VulkanDevice::GetCopyQueue(size_t index) const
 	{
-		return const_cast<QueueProxy *>(&m_queueFamilies[static_cast<size_t>(CommandQueueType::kCopy)][index]);
+		return m_queueFamilies[static_cast<size_t>(CommandQueueType::kCopy)][index].Get();
 	}
 
 	IComputeCommandQueue *VulkanDevice::GetComputeQueue(size_t index) const
 	{
-		return const_cast<QueueProxy *>(&m_queueFamilies[static_cast<size_t>(CommandQueueType::kAsyncCompute)][index]);
+		return m_queueFamilies[static_cast<size_t>(CommandQueueType::kAsyncCompute)][index].Get();
 	}
 
 	IGraphicsCommandQueue *VulkanDevice::GetGraphicsQueue(size_t index) const
 	{
-		return const_cast<QueueProxy *>(&m_queueFamilies[static_cast<size_t>(CommandQueueType::kGraphics)][index]);
+		return m_queueFamilies[static_cast<size_t>(CommandQueueType::kGraphics)][index].Get();
 	}
 
 	IGraphicsComputeCommandQueue *VulkanDevice::GetGraphicsComputeQueue(size_t index) const
 	{
-		return const_cast<QueueProxy *>(&m_queueFamilies[static_cast<size_t>(CommandQueueType::kGraphicsCompute)][index]);
+		return m_queueFamilies[static_cast<size_t>(CommandQueueType::kGraphicsCompute)][index].Get();
 	}
 
+	VkDevice VulkanDevice::GetDevice() const
+	{
+		return m_device;
+	}
+
+	const VkAllocationCallbacks *VulkanDevice::GetAllocCallbacks() const
+	{
+		return m_allocCallbacks;
+	}
+
+	Result VulkanDevice::CreateCPUWaitableFence(UniquePtr<ICPUWaitableFence> &outFence)
+	{
+		return ResultCode::kOK;
+	}
 
 	Result VulkanDevice::LoadDeviceAPI()
 	{
@@ -132,11 +163,17 @@ namespace rkit::render::vulkan
 
 	Result VulkanDeviceBase::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const QueueFamilySpec(&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks)
 	{
+		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+
+		UniquePtr<IMutex> queueMutex;
+		RKIT_CHECK(sysDriver->CreateMutex(queueMutex));
+
 		UniquePtr<VulkanDevice> vkDevice;
-		RKIT_CHECK(New<VulkanDevice>(vkDevice, vkg, vki, inst, device, allocCallbacks));
+		RKIT_CHECK(New<VulkanDevice>(vkDevice, vkg, vki, inst, device, allocCallbacks, std::move(queueMutex)));
 
 		RKIT_CHECK(vkDevice->LoadDeviceAPI());
 
+		size_t firstQueueID = 0;
 		for (size_t i = 0; i < static_cast<size_t>(CommandQueueType::kCount); i++)
 		{
 			CommandQueueType queueType = static_cast<CommandQueueType>(i);
@@ -144,7 +181,9 @@ namespace rkit::render::vulkan
 
 			if (spec.m_numQueues > 0)
 			{
-				RKIT_CHECK(vkDevice->ResolveQueues(queueType, spec.m_queueFamily, spec.m_numQueues));
+				RKIT_CHECK(vkDevice->ResolveQueues(queueType, firstQueueID, spec.m_queueFamily, spec.m_numQueues));
+
+				firstQueueID += spec.m_numQueues;
 			}
 		}
 

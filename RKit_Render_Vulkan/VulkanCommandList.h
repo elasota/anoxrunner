@@ -14,6 +14,6 @@ namespace rkit::render::vulkan
 		const VkCommandBuffer &GetCommandBuffer() const;
 
 	private:
-		VkCommandBuffer m_cmdBuffer;
+		VkCommandBuffer m_cmdBuffer = VK_NULL_HANDLE;
 	};
 }
