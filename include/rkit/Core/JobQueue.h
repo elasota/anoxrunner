@@ -37,6 +37,11 @@ namespace rkit
 		virtual void Fault(const Result &result) = 0;
 
 		virtual Result CheckFault() = 0;
+
+		// Closes the job queue.  The shutdown procedure for the job queue should be:
+		// - Close the job queue
+		// - Wait for all participating threads to finish calling WaitForWork
+		// - Destroy the job queue
 		virtual Result Close() = 0;
 	};
 }

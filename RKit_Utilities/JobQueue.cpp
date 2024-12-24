@@ -20,11 +20,13 @@ namespace rkit::utils
 	public:
 		friend class JobQueue;
 
-		explicit JobImpl(JobQueue &jobQueue, UniquePtr<IJobRunner> &&jobRunner, size_t numDependencies);
+		explicit JobImpl(JobQueue &jobQueue, UniquePtr<IJobRunner> &&jobRunner, size_t numDependencies, JobType jobType);
 		~JobImpl();
 
 		Result ReserveDownstreamDependency();
 		RCPtr<JobImpl> *GetLastDownstreamDependency();
+
+		void Run() override;
 
 	private:
 		static const size_t kStaticDownstreamListSize = 8;
@@ -41,6 +43,8 @@ namespace rkit::utils
 
 		RCPtr<JobImpl> m_nextRunnableJob;
 		JobImpl *m_prevRunnableJob = nullptr;
+
+		JobType m_jobType;
 
 		bool m_isCompleted;
 	};
@@ -67,61 +71,56 @@ namespace rkit::utils
 		Result Init();
 
 	private:
-		static const size_t kNumJobCategories = static_cast<size_t>(rkit::JobType::kCount);
-		static const size_t kNumWaitableThreadCategories = kNumJobCategories + 1;
+		static const size_t kNumJobCategories = static_cast<size_t>(rkit::JobType::kCount) + 1;
 
 		void AddRunnableJob(const RCPtr<JobImpl> &job, size_t jobTypeIndex);
+		void JobDone(JobImpl *job);
+		void DependencyDone(const RCPtr<JobImpl> &job);
 
 		struct ParticipatingThreadInfo
 		{
 			ParticipatingThreadInfo *m_next = nullptr;
 			ParticipatingThreadInfo *m_prev = nullptr;
 
+			RCPtr<JobImpl> m_job;
+
 			bool m_isTerminating = false;
 
 			IEvent* m_wakeEvent = nullptr;
-			IEvent* m_terminatedEvent = nullptr;
+			IEvent* m_terminatedEvent;
 		};
 
-		struct ParticipatingThreadList
+		struct CategoryInfo
 		{
-			ParticipatingThreadInfo *m_first = nullptr;
-			ParticipatingThreadInfo *m_last = nullptr;
+			ParticipatingThreadInfo *m_firstWaitingThread = nullptr;
+			ParticipatingThreadInfo *m_lastWaitingThread = nullptr;
+
+			RCPtr<JobImpl> m_firstJob;
+			JobImpl *m_lastJob = nullptr;
 
 			bool m_isClosing = false;
-
-			UniquePtr<IMutex> m_mutex;
-		};
-
-		struct RunnableJobList
-		{
-			RCPtr<JobImpl> m_first;
-			JobImpl *m_last = nullptr;
-
-			bool m_isClosing = false;
-
-			UniquePtr<IMutex> m_mutex;
 		};
 
 		void PrivClose();
 
+		UniquePtr<IMutex> m_distributorMutex;
 		UniquePtr<IMutex> m_depGraphMutex;
 		UniquePtr<IMutex> m_resultMutex;
 
 		IMallocDriver *m_alloc;
 		Result m_result;
 
-		StaticArray<ParticipatingThreadList, kNumWaitableThreadCategories> m_waitingThreads;
-		StaticArray<RunnableJobList, kNumJobCategories> m_runnableJobs;
+		StaticArray<CategoryInfo, kNumJobCategories> m_categories;
 
 		bool m_isInitialized;
 	};
 
-	JobImpl::JobImpl(JobQueue &jobQueue, UniquePtr<IJobRunner> &&jobRunner, size_t numDependencies)
+	JobImpl::JobImpl(JobQueue &jobQueue, UniquePtr<IJobRunner> &&jobRunner, size_t numDependencies, JobType jobType)
 		: m_jobQueue(jobQueue)
 		, m_jobRunner(std::move(jobRunner))
 		, m_numWaitingDependencies(numDependencies)
 		, m_numStaticDownstream(0)
+		, m_jobType(jobType)
 	{
 	}
 
@@ -150,6 +149,17 @@ namespace rkit::utils
 		return &m_staticDownstreamList[m_numStaticDownstream - 1];
 	}
 
+	void JobImpl::Run()
+	{
+		Result result = m_jobRunner->Run();
+
+		if (!result.IsOK())
+			m_jobQueue.Fault(result);
+
+		m_jobRunner.Reset();
+		m_jobQueue.JobDone(this);
+	}
+
 	JobQueue::JobQueue(IMallocDriver *alloc)
 		: m_alloc(alloc)
 		, m_isInitialized(false)
@@ -160,9 +170,10 @@ namespace rkit::utils
 	{
 		if (m_isInitialized)
 		{
-			for (const ParticipatingThreadList &threadList : m_waitingThreads)
+			for (const CategoryInfo &catInfo : m_categories)
 			{
-				RKIT_ASSERT(threadList.m_first == nullptr);
+				RKIT_ASSERT(catInfo.m_firstWaitingThread == nullptr);
+				RKIT_ASSERT(catInfo.m_firstJob == nullptr);
 			}
 		}
 	}
@@ -171,37 +182,35 @@ namespace rkit::utils
 	{
 		if (m_isInitialized)
 		{
-			for (RunnableJobList &rjl : m_runnableJobs)
 			{
-				MutexLock lock(*rjl.m_mutex);
+				MutexLock lock(*m_distributorMutex);
 
-				rjl.m_isClosing = true;
-
-				while (rjl.m_first.IsValid())
+				for (CategoryInfo &ci : m_categories)
 				{
-					rjl.m_first = rjl.m_first->m_nextRunnableJob;
-				}
+					ci.m_isClosing = true;
 
-				rjl.m_last = nullptr;
+					ci.m_firstJob = nullptr;
+					ci.m_lastJob = nullptr;
+				}
 			}
 
-			for (ParticipatingThreadList &threadList : m_waitingThreads)
+			for (CategoryInfo &ci : m_categories)
 			{
 				for (;;)
 				{
 					ParticipatingThreadInfo *pti = nullptr;
 
 					{
-						MutexLock lock(*threadList.m_mutex);
+						MutexLock lock(*m_distributorMutex);
 
-						pti = threadList.m_first;
+						pti = ci.m_firstWaitingThread;
 
 						if (!pti)
 							break;
 
-						threadList.m_first = pti->m_next;
-						if (!threadList.m_first)
-							threadList.m_last = nullptr;
+						ci.m_firstWaitingThread = pti->m_next;
+						if (!ci.m_firstWaitingThread)
+							ci.m_lastWaitingThread = nullptr;
 
 						pti->m_prev = nullptr;
 						pti->m_next = nullptr;
@@ -209,8 +218,12 @@ namespace rkit::utils
 						pti->m_isTerminating = true;
 					}
 
+					IEvent *terminatedEvent = pti->m_terminatedEvent;
+
 					pti->m_wakeEvent->Signal();
-					pti->m_terminatedEvent->Wait();
+
+					// pti may not be valid at this point
+					terminatedEvent->Wait();
 				}
 			}
 		}
@@ -221,14 +234,14 @@ namespace rkit::utils
 		UniquePtr<IJobRunner> jobRunnerTemp(std::move(jobRunner));
 
 		RCPtr<JobImpl> resultJob;
-		RKIT_CHECK(NewWithAlloc<JobImpl>(resultJob, m_alloc, *this, std::move(jobRunnerTemp), dependencies.Count()));
+		RKIT_CHECK(NewWithAlloc<JobImpl>(resultJob, m_alloc, *this, std::move(jobRunnerTemp), dependencies.Count(), jobType));
 
-		RunnableJobList &ptl = m_runnableJobs[static_cast<size_t>(jobType)];
+		CategoryInfo &ci = m_categories[static_cast<size_t>(jobType)];
 
 		{
 			MutexLock lock(*m_depGraphMutex);
 
-			if (ptl.m_isClosing)
+			if (ci.m_isClosing)
 				return ResultCode::kOK;
 
 			for (Job *job : dependencies)
@@ -250,83 +263,100 @@ namespace rkit::utils
 		return ResultCode::kOK;
 	}
 
-
 	void JobQueue::AddRunnableJob(const RCPtr<JobImpl> &job, size_t jobTypeIndex)
 	{
-		RunnableJobList &rjl = m_runnableJobs[jobTypeIndex];
+		CategoryInfo &ci = m_categories[jobTypeIndex];
+		CategoryInfo &allCI = m_categories[static_cast<size_t>(JobType::kCount)];
 
+		CategoryInfo *ciThreadToKick = nullptr;
+
+		MutexLock lock(*m_distributorMutex);
+		if (ci.m_firstWaitingThread)
+			ciThreadToKick = &ci;
+		else if (allCI.m_firstWaitingThread)
+			ciThreadToKick = &allCI;
+
+		if (ciThreadToKick != nullptr)
 		{
-			MutexLock lock(*rjl.m_mutex);
+			ParticipatingThreadInfo *pti = ciThreadToKick->m_firstWaitingThread;
 
-			if (rjl.m_isClosing)
-				return;
+			ciThreadToKick->m_firstWaitingThread = pti->m_next;
+			if (!ciThreadToKick->m_firstWaitingThread)
+				ciThreadToKick->m_lastWaitingThread = nullptr;
 
-			job->m_prevRunnableJob = rjl.m_last;
-			job->m_nextRunnableJob = nullptr;
-
-			if (rjl.m_last)
-				rjl.m_last->m_nextRunnableJob = job;
-			else
-				rjl.m_first = job;
-
-			rjl.m_last = job;
-		}
-
-		ParticipatingThreadList &allPtl = m_waitingThreads[static_cast<size_t>(JobType::kAnyJob)];
-		ParticipatingThreadList &jobTypePtl = m_waitingThreads[jobTypeIndex];
-
-		MutexLock allLock(*allPtl.m_mutex);
-		MutexLock jobTypeLock(*jobTypePtl.m_mutex);
-
-		ParticipatingThreadList *ptlToKick = nullptr;
-
-		if (jobTypePtl.m_first)
-			ptlToKick = &jobTypePtl;
-		else if (allPtl.m_first)
-			ptlToKick = &allPtl;
-
-		if (ptlToKick && !ptlToKick->m_isClosing)
-		{
-			ParticipatingThreadInfo *pti = ptlToKick->m_first;
-
-			ptlToKick->m_first = pti->m_next;
-			if (!ptlToKick->m_first)
-				ptlToKick->m_last = nullptr;
-
-			pti->m_prev = nullptr;
 			pti->m_next = nullptr;
+			pti->m_prev = nullptr;
 
-			if (!pti->m_isTerminating)
-				pti->m_wakeEvent->Signal();
+			pti->m_job = job;
+
+			pti->m_wakeEvent->Signal();
+
+			return;
 		}
+
+		// Couldn't find a thread to give this job to, put it in the queue
+		if (ci.m_isClosing)
+			return;
+
+		job->m_prevRunnableJob = ci.m_lastJob;
+		job->m_nextRunnableJob = nullptr;
+
+		if (ci.m_lastJob)
+			ci.m_lastJob->m_nextRunnableJob = job;
+		else
+			ci.m_firstJob = job;
+
+		ci.m_lastJob = job;
+	}
+
+	void JobQueue::JobDone(JobImpl *job)
+	{
+		if (job->m_numStaticDownstream == 0)
+			return;
+
+		MutexLock lock(*m_depGraphMutex);
+
+		for (size_t i = 0; i < job->m_numStaticDownstream; i++)
+			DependencyDone(job->m_staticDownstreamList[i]);
+
+		for (const RCPtr<JobImpl> &dep : job->m_dynamicDownstream)
+			DependencyDone(dep);
+	}
+
+	void JobQueue::DependencyDone(const RCPtr<JobImpl> &job)
+	{
+		job->m_numWaitingDependencies--;
+		if (job->m_numWaitingDependencies == 0)
+			AddRunnableJob(job, static_cast<size_t>(job->m_jobType));
 	}
 
 	RCPtr<Job> JobQueue::WaitForWork(JobType jobType, bool waitIfDepleted, IEvent *wakeEvent, IEvent *terminatedEvent)
 	{
-		ParticipatingThreadList &ptl = m_waitingThreads[static_cast<size_t>(jobType)];
-
 		ParticipatingThreadInfo pti;
 		pti.m_wakeEvent = wakeEvent;
 		pti.m_terminatedEvent = terminatedEvent;
 
-		Span<RunnableJobList> runnableJobs = (jobType == JobType::kAnyJob) ? (m_runnableJobs.ToSpan()) : Span<RunnableJobList>(&m_runnableJobs[static_cast<size_t>(jobType)], 1);
+		Span<CategoryInfo> runnableCategories = (jobType == JobType::kAnyJob) ? (m_categories.ToSpan()) : Span<CategoryInfo>(&m_categories[static_cast<size_t>(jobType)], 1);
 
 		for (;;)
 		{
 			RCPtr<JobImpl> job;
 
-			for (RunnableJobList &jobList : runnableJobs)
-			{
-				MutexLock lock(*jobList.m_mutex);
+			MutexLock lock(*m_distributorMutex);
 
-				job = jobList.m_first;
+			for (CategoryInfo &jobList : runnableCategories)
+			{
+				if (jobList.m_isClosing)
+					return RCPtr<Job>();
+
+				job = jobList.m_firstJob;
 
 				if (job)
 				{
 					JobImpl *nextJob = job->m_nextRunnableJob;
-					jobList.m_first = nextJob;
-					if (!jobList.m_first)
-						jobList.m_last = nullptr;
+					jobList.m_firstJob = nextJob;
+					if (!jobList.m_firstJob)
+						jobList.m_lastJob = nullptr;
 
 					if (nextJob)
 						nextJob->m_prevRunnableJob = nullptr;
@@ -346,23 +376,36 @@ namespace rkit::utils
 			if (!waitIfDepleted)
 				break;
 
+			const size_t threadCIIndex = (jobType == JobType::kAnyJob) ? static_cast<size_t>(JobType::kCount) : static_cast<size_t>(jobType);
+
+			CategoryInfo &threadCI = m_categories[threadCIIndex];
 			{
-				MutexLock lock(*ptl.m_mutex);
-				if (ptl.m_isClosing)
+				MutexLock lock(*m_distributorMutex);
+
+				if (threadCI.m_isClosing)
 					break;
 
-				pti.m_prev = ptl.m_last;
+				pti.m_prev = threadCI.m_lastWaitingThread;
+				pti.m_next = nullptr;
 
-				if (ptl.m_last)
-					ptl.m_last->m_next = &pti;
+				if (threadCI.m_lastWaitingThread)
+					threadCI.m_lastWaitingThread->m_next = &pti;
 
-				ptl.m_last = &pti;
+				threadCI.m_lastWaitingThread = &pti;
 			}
 
 			pti.m_wakeEvent->Wait();
 
 			if (pti.m_isTerminating)
 				break;
+
+			if (pti.m_job.IsValid())
+			{
+				RCPtr<Job> job = std::move(pti.m_job);
+				pti.m_job.Reset();
+
+				return job;
+			}
 		}
 
 		if (terminatedEvent)
@@ -402,16 +445,7 @@ namespace rkit::utils
 
 		RKIT_CHECK(sysDriver->CreateMutex(m_depGraphMutex));
 		RKIT_CHECK(sysDriver->CreateMutex(m_resultMutex));
-
-		for (ParticipatingThreadList &ptl : m_waitingThreads)
-		{
-			RKIT_CHECK(sysDriver->CreateMutex(ptl.m_mutex));
-		}
-
-		for (RunnableJobList &rjl : m_runnableJobs)
-		{
-			RKIT_CHECK(sysDriver->CreateMutex(rjl.m_mutex));
-		}
+		RKIT_CHECK(sysDriver->CreateMutex(m_distributorMutex));
 
 		return ResultCode::kOK;
 	}

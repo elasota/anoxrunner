@@ -18,5 +18,7 @@ namespace rkit
 
 	class Job : public RefCounted
 	{
+	public:
+		virtual void Run() = 0;
 	};
 }
