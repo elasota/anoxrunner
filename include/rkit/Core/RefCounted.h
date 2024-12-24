@@ -61,11 +61,13 @@ namespace rkit
 	{
 	public:
 		RCPtr();
+		explicit RCPtr(std::nullptr_t);
 		explicit RCPtr(T *ptr);
 		RCPtr(const RCPtr<T> &other) noexcept;
 		RCPtr(RCPtr<T> &&other) noexcept;
 		template<class TOther>
 		RCPtr(RCPtr<TOther> &&other);
+
 		~RCPtr();
 
 		bool IsValid() const;
@@ -75,7 +77,15 @@ namespace rkit
 
 		RCPtr &operator=(const RCPtr &other) noexcept;
 		RCPtr &operator=(RCPtr &&other) noexcept;
+
+		template<class TOther>
+		RCPtr &operator=(const RCPtr<TOther> &other) noexcept;
+
+		template<class TOther>
+		RCPtr &operator=(RCPtr<TOther> &&other) noexcept;
+
 		RCPtr &operator=(T *other);
+		RCPtr &operator=(std::nullptr_t);
 
 		T *Get() const;
 		operator T *() const;
@@ -152,6 +162,13 @@ namespace rkit
 	}
 
 	template<class T>
+	inline RCPtr<T>::RCPtr(std::nullptr_t)
+		: m_object(nullptr)
+		, m_tracker(nullptr)
+	{
+	}
+
+	template<class T>
 	inline RCPtr<T>::RCPtr(T *ptr)
 		: m_object(ptr)
 		, m_tracker(Private::RefCountedInstantiator::GetTrackerFromObject(ptr))
@@ -208,8 +225,6 @@ namespace rkit
 
 		m_object = nullptr;
 		m_tracker = nullptr;
-
-
 	}
 
 	template<class T>
@@ -248,6 +263,28 @@ namespace rkit
 	}
 
 	template<class T>
+	template<class TOther>
+	inline RCPtr<T> &RCPtr<T>::operator=(const RCPtr<TOther> &other) noexcept
+	{
+		m_object = other.m_object;
+
+		if (m_tracker != other.m_tracker)
+		{
+			RefCountedTracker *oldTracker = m_tracker;
+
+			m_tracker = other.m_tracker;
+
+			if (m_tracker)
+				m_tracker->RCTrackerAddRef();
+
+			if (oldTracker)
+				oldTracker->RCTrackerDecRef();
+		}
+
+		return *this;
+	}
+
+	template<class T>
 	inline RCPtr<T> &RCPtr<T>::operator=(RCPtr<T> &&other) noexcept
 	{
 		RefCountedTracker *oldTracker = m_tracker;
@@ -261,6 +298,63 @@ namespace rkit
 
 		if (oldTracker)
 			oldTracker->RCTrackerDecRef();
+
+		return *this;
+	}
+
+	template<class T>
+	template<class TOther>
+	inline RCPtr<T> &RCPtr<T>::operator=(RCPtr<TOther> &&other) noexcept
+	{
+		RefCountedTracker *oldTracker = m_tracker;
+
+		RefCountedTracker *newTracker = nullptr;
+		TOther *newObj = nullptr;
+		other.Detach(newObj, newTracker);
+
+		m_object = newObj;
+		m_tracker = newTracker;
+
+		if (oldTracker)
+			oldTracker->RCTrackerDecRef();
+
+		return *this;
+	}
+
+	template<class T>
+	RCPtr<T> &RCPtr<T>::operator=(T *other)
+	{
+		if (other != m_object)
+		{
+			RefCountedTracker *oldTracker = m_tracker;
+
+			T *newObj = other;
+			RefCountedTracker *newTracker = Private::RefCountedInstantiator::GetTrackerFromObject(newObj);
+
+			m_object = newObj;
+			m_tracker = newTracker;
+
+			if (newTracker)
+				newTracker->RCTrackerAddRef();
+
+			if (oldTracker)
+				oldTracker->RCTrackerDecRef();
+		}
+
+		return *this;
+	}
+
+	template<class T>
+	RCPtr<T> &RCPtr<T>::operator=(std::nullptr_t)
+	{
+		if (m_object != nullptr)
+		{
+			if (m_tracker)
+				m_tracker->RCTrackerDecRef();
+
+			m_object = nullptr;
+			m_tracker = nullptr;
+		}
 
 		return *this;
 	}

@@ -34,6 +34,7 @@ namespace rkit
 	struct ISeekableReadWriteStream;
 	struct ISeekableReadStream;
 	struct ISeekableWriteStream;
+	struct IJobQueue;
 
 	struct Result;
 
@@ -44,6 +45,8 @@ namespace rkit
 		virtual ~IUtilitiesDriver() {}
 
 		virtual Result CreateJsonDocument(UniquePtr<utils::IJsonDocument> &outDocument, IMallocDriver *alloc, IReadStream *readStream) const = 0;
+
+		virtual Result CreateJobQueue(UniquePtr<IJobQueue> &outJobQueue, IMallocDriver *alloc) const = 0;
 
 		virtual Result CreateMutexProtectedReadWriteStream(SharedPtr<IMutexProtectedReadWriteStream> &outStream, UniquePtr<ISeekableReadWriteStream> &&stream) const = 0;
 		virtual Result CreateMutexProtectedReadStream(SharedPtr<IMutexProtectedReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream) const = 0;

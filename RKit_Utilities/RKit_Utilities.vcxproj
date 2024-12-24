@@ -81,6 +81,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="DeflateDecompressStream.cpp" />
+    <ClCompile Include="JobQueue.cpp" />
     <ClCompile Include="Json.cpp" />
     <ClCompile Include="MutexProtectedStream.cpp" />
     <ClCompile Include="RangeLimitedReadStream.cpp" />
@@ -126,6 +127,7 @@
     <ClInclude Include="..\include\rkit\Core\UtilitiesDriver.h" />
     <ClInclude Include="..\include\rkit\Core\Vector.h" />
     <ClInclude Include="DeflateDecompressStream.h" />
+    <ClInclude Include="JobQueue.h" />
     <ClInclude Include="Json.h" />
     <ClInclude Include="MutexProtectedStream.h" />
     <ClInclude Include="RangeLimitedReadStream.h" />

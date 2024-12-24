@@ -39,6 +39,9 @@
     <ClCompile Include="Sha2Calculator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="JobQueue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TextParser.h">
@@ -165,6 +168,9 @@
       <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="Sha2Calculator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="JobQueue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

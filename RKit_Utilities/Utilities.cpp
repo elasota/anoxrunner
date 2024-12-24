@@ -6,6 +6,7 @@
 #include "rkit/Core/Vector.h"
 
 #include "DeflateDecompressStream.h"
+#include "JobQueue.h"
 #include "Json.h"
 #include "MutexProtectedStream.h"
 #include "RangeLimitedReadStream.h"
@@ -28,6 +29,7 @@ namespace rkit
 		void ShutdownDriver();
 
 		Result CreateJsonDocument(UniquePtr<utils::IJsonDocument> &outDocument, IMallocDriver *alloc, IReadStream *readStream) const override;
+		Result CreateJobQueue(UniquePtr<IJobQueue> &outJobQueue, IMallocDriver *alloc) const override;
 
 		Result CreateMutexProtectedReadWriteStream(SharedPtr<IMutexProtectedReadWriteStream> &outStream, UniquePtr<ISeekableReadWriteStream> &&stream) const override;
 		Result CreateMutexProtectedReadStream(SharedPtr<IMutexProtectedReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream) const override;
@@ -89,6 +91,11 @@ namespace rkit
 	Result UtilitiesDriver::CreateJsonDocument(UniquePtr<utils::IJsonDocument> &outDocument, IMallocDriver *alloc, IReadStream *readStream) const
 	{
 		return utils::CreateJsonDocument(outDocument, alloc, readStream);
+	}
+
+	Result UtilitiesDriver::CreateJobQueue(UniquePtr<IJobQueue> &outJobQueue, IMallocDriver *alloc) const
+	{
+		return utils::CreateJobQueue(outJobQueue, alloc);
 	}
 
 	Result UtilitiesDriver::CreateMutexProtectedReadWriteStream(SharedPtr<IMutexProtectedReadWriteStream> &outStream, UniquePtr<ISeekableReadWriteStream> &&stream) const
