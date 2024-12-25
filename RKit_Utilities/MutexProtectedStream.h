@@ -4,19 +4,18 @@
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/UniquePtr.h"
 
-#include <mutex>
-
 namespace rkit
 {
 	struct ISeekableStream;
 	struct IReadStream;
 	struct IWriteStream;
 	struct IBaseStream;
+	struct IMutex;
 
 	class MutexProtectedStreamWrapper : public IMutexProtectedReadWriteStream
 	{
 	public:
-		MutexProtectedStreamWrapper(UniquePtr<IBaseStream> &&baseStream, ISeekableStream *seek, IReadStream *read, IWriteStream *write);
+		MutexProtectedStreamWrapper(UniquePtr<IBaseStream> &&baseStream, UniquePtr<IMutex> &&mutex, ISeekableStream *seek, IReadStream *read, IWriteStream *write);
 
 		Result ReadPartial(FilePos_t startPos, void *data, size_t count, size_t &outCountRead) override;
 		Result WritePartial(FilePos_t startPos, const void *data, size_t count, size_t &outCountWritten) override;
@@ -30,7 +29,7 @@ namespace rkit
 		void SetTracker(BaseRefCountTracker *tracker);
 
 	private:
-		mutable std::mutex m_mutex;
+		UniquePtr<IMutex> m_mutex;
 		UniquePtr<IBaseStream> m_baseStream;
 		ISeekableStream *m_seek;
 		IReadStream *m_read;

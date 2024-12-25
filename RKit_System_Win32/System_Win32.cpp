@@ -167,6 +167,8 @@ namespace rkit
 
 		Result OpenSystemLibrary(UniquePtr<ISystemLibrary> &outLibrary, SystemLibraryType libType) const override;
 
+		uint32_t GetProcessorCount() const override;
+
 	private:
 		static DWORD OpenFlagsToDisposition(bool createIfNotExists, bool truncateIfExists);
 		UniquePtr<File_Win32> OpenFileGeneral(FileLocation location, const char *path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition);
@@ -857,6 +859,14 @@ namespace rkit
 		outLibrary = std::move(sysLibrary);
 
 		return ResultCode::kOK;
+	}
+
+	uint32_t SystemDriver_Win32::GetProcessorCount() const
+	{
+		SYSTEM_INFO sysInfo;
+		GetSystemInfo(&sysInfo);
+
+		return sysInfo.dwNumberOfProcessors;
 	}
 
 	HINSTANCE SystemDriver_Win32::GetHInstance() const

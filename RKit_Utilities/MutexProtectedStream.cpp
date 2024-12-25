@@ -1,23 +1,26 @@
 #include "MutexProtectedStream.h"
 
 #include "rkit/Core/Algorithm.h"
+#include "rkit/Core/Mutex.h"
+#include "rkit/Core/MutexLock.h"
 
 #include <utility>
 
 namespace rkit
 {
-	MutexProtectedStreamWrapper::MutexProtectedStreamWrapper(UniquePtr<IBaseStream> &&baseStream, ISeekableStream *seek, IReadStream *read, IWriteStream *write)
+	MutexProtectedStreamWrapper::MutexProtectedStreamWrapper(UniquePtr<IBaseStream> &&baseStream, UniquePtr<IMutex> &&mutex, ISeekableStream *seek, IReadStream *read, IWriteStream *write)
 		: m_baseStream(std::move(baseStream))
 		, m_seek(seek)
 		, m_read(read)
 		, m_write(write)
 		, m_rcTracker(nullptr)
+		, m_mutex(std::move(mutex))
 	{
 	}
 
 	Result MutexProtectedStreamWrapper::ReadPartial(FilePos_t startPos, void *data, size_t count, size_t &outCountRead)
 	{
-		std::scoped_lock<std::mutex> lock(m_mutex);
+		MutexLock lock(*m_mutex);
 
 		RKIT_CHECK(m_seek->SeekStart(startPos));
 		return m_read->ReadPartial(data, count, outCountRead);
@@ -25,7 +28,7 @@ namespace rkit
 
 	Result MutexProtectedStreamWrapper::WritePartial(FilePos_t startPos, const void *data, size_t count, size_t &outCountWritten)
 	{
-		std::scoped_lock<std::mutex> lock(m_mutex);
+		MutexLock lock(*m_mutex);
 
 		RKIT_CHECK(m_seek->SeekStart(startPos));
 		return m_write->WritePartial(data, count, outCountWritten);
@@ -33,14 +36,14 @@ namespace rkit
 
 	Result MutexProtectedStreamWrapper::Flush()
 	{
-		std::scoped_lock<std::mutex> lock(m_mutex);
+		MutexLock lock(*m_mutex);
 
 		return m_write->Flush();
 	}
 
 	FilePos_t MutexProtectedStreamWrapper::GetSize() const
 	{
-		std::scoped_lock<std::mutex> lock(m_mutex);
+		MutexLock lock(*m_mutex);
 
 		return m_seek->GetSize();
 	}

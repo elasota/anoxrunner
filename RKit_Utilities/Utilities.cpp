@@ -3,6 +3,7 @@
 #include "rkit/Core/ModuleGlue.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/String.h"
+#include "rkit/Core/Mutex.h"
 #include "rkit/Core/Vector.h"
 
 #include "DeflateDecompressStream.h"
@@ -104,8 +105,11 @@ namespace rkit
 		IReadStream *read = stream.Get();
 		IWriteStream *write = stream.Get();
 
+		UniquePtr<IMutex> mutex;
+		RKIT_CHECK(GetDrivers().m_systemDriver->CreateMutex(mutex));
+
 		UniquePtr<MutexProtectedStreamWrapper> mpsWrapper;
-		RKIT_CHECK(New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), seek, read, write));
+		RKIT_CHECK(New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write));
 
 		SharedPtr<MutexProtectedStreamWrapper> sharedWrapper;
 		RKIT_CHECK(MakeShared(sharedWrapper, std::move(mpsWrapper)));
@@ -123,8 +127,11 @@ namespace rkit
 		IReadStream *read = stream.Get();
 		IWriteStream *write = nullptr;
 
+		UniquePtr<IMutex> mutex;
+		RKIT_CHECK(GetDrivers().m_systemDriver->CreateMutex(mutex));
+
 		UniquePtr<MutexProtectedStreamWrapper> mpsWrapper;
-		RKIT_CHECK(New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), seek, read, write));
+		RKIT_CHECK(New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write));
 
 		SharedPtr<MutexProtectedStreamWrapper> sharedWrapper;
 		RKIT_CHECK(MakeShared(sharedWrapper, std::move(mpsWrapper)));
@@ -142,8 +149,11 @@ namespace rkit
 		IReadStream *read = nullptr;
 		IWriteStream *write = stream.Get();
 
+		UniquePtr<IMutex> mutex;
+		RKIT_CHECK(GetDrivers().m_systemDriver->CreateMutex(mutex));
+
 		UniquePtr<MutexProtectedStreamWrapper> mpsWrapper;
-		RKIT_CHECK(New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), seek, read, write));
+		RKIT_CHECK(New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write));
 
 		SharedPtr<MutexProtectedStreamWrapper> sharedWrapper;
 		RKIT_CHECK(MakeShared(sharedWrapper, std::move(mpsWrapper)));

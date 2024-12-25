@@ -3,8 +3,6 @@
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/UniquePtr.h"
 
-#include <mutex>
-
 namespace rkit
 {
 	struct ISeekableStream;

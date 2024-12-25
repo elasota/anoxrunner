@@ -2,6 +2,7 @@
 
 #include "StringProto.h"
 
+#include <cstdint>
 #include <cstddef>
 
 namespace rkit
@@ -75,5 +76,7 @@ namespace rkit
 		virtual IPlatformDriver *GetPlatformDriver() const = 0;
 
 		virtual Result OpenSystemLibrary(UniquePtr<ISystemLibrary> &outLibrary, SystemLibraryType libType) const = 0;
+
+		virtual uint32_t GetProcessorCount() const = 0;
 	};
 }
