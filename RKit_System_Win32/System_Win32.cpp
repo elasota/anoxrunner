@@ -17,6 +17,9 @@
 #include "rkit/Win32/Win32PlatformDriver.h"
 #include "rkit/Win32/SystemModuleInitParameters_Win32.h"
 
+#include "Win32DisplayManager.h"
+#include "ConvUtil.h"
+
 #include <shellapi.h>
 #include <Shlwapi.h>
 #include <timezoneapi.h>
@@ -24,18 +27,6 @@
 
 namespace rkit
 {
-	class ConvUtil_Win32
-	{
-	public:
-		static Result UTF8ToUTF16(const char *str8, Vector<wchar_t> &outStr16);
-		static Result UTF16ToUTF8(const wchar_t *str16, Vector<char> &outStr16);
-
-		static UTCMSecTimestamp_t FileTimeToUTCMSec(const FILETIME &ftime);
-		static FILETIME UTCMSecToFileTime(UTCMSecTimestamp_t timestamp);
-
-		static const uint64_t kUnixEpochStartFT = 116444736000000000ULL;
-	};
-
 	class File_Win32 final : public ISeekableReadWriteStream
 	{
 	public:
@@ -169,6 +160,8 @@ namespace rkit
 
 		uint32_t GetProcessorCount() const override;
 
+		render::IDisplayManager *GetDisplayManager() const override;
+
 	private:
 		static DWORD OpenFlagsToDisposition(bool createIfNotExists, bool truncateIfExists);
 		UniquePtr<File_Win32> OpenFileGeneral(FileLocation location, const char *path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition);
@@ -180,6 +173,7 @@ namespace rkit
 		IMallocDriver *m_alloc;
 		Vector<Vector<char> > m_commandLineCharBuffers;
 		Vector<StringView> m_commandLine;
+		UniquePtr<render::DisplayManagerBase_Win32> m_displayManager;
 		LPWSTR *m_argvW;
 
 		HINSTANCE m_hInstance;
@@ -579,6 +573,8 @@ namespace rkit
 
 	SystemDriver_Win32::~SystemDriver_Win32()
 	{
+		m_displayManager.Reset();
+
 		if (m_argvW)
 			LocalFree(m_argvW);
 	}
@@ -606,6 +602,8 @@ namespace rkit
 
 			m_commandLine[i] = StringView(charBuffer.GetBuffer(), charBuffer.Count() - 1);
 		}
+
+		RKIT_CHECK(render::DisplayManagerBase_Win32::Create(m_displayManager, m_alloc, m_hInstance));
 
 		return ResultCode::kOK;
 	}
@@ -867,6 +865,11 @@ namespace rkit
 		GetSystemInfo(&sysInfo);
 
 		return sysInfo.dwNumberOfProcessors;
+	}
+
+	render::IDisplayManager *SystemDriver_Win32::GetDisplayManager() const
+	{
+		return m_displayManager.Get();
 	}
 
 	HINSTANCE SystemDriver_Win32::GetHInstance() const

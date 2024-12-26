@@ -6,7 +6,10 @@
 #include "rkit/Core/Module.h"
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/NewDelete.h"
+#include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/Vector.h"
+
+#include "rkit/Render/DisplayManager.h"
 
 #include "rkit/Render/RenderDevice.h"
 #include "rkit/Render/RenderDriver.h"
@@ -16,19 +19,38 @@ namespace anox
 	class AnoxGame final : public IAnoxGame
 	{
 	public:
+		~AnoxGame();
+
 		rkit::Result Start() override;
 		rkit::Result RunFrame() override;
 		bool IsExiting() const override;
 
 	private:
 		bool m_isExiting = false;
+
+		rkit::UniquePtr<rkit::render::IDisplay> m_mainDisplay;
 	};
 }
 
 namespace anox
 {
+	AnoxGame::~AnoxGame()
+	{
+	}
+
 	rkit::Result AnoxGame::Start()
 	{
+		// Create splash
+		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->GetDisplayManager()->CreateDisplay(m_mainDisplay, rkit::render::DisplayMode::kSplash));
+
+		rkit::render::IProgressMonitor *progressMonitor = m_mainDisplay->GetProgressMonitor();
+
+		if (progressMonitor)
+		{
+			// FIXME: Localize
+			progressMonitor->SetText("Starting graphics system...");
+		}
+
 		// Create render driver
 		rkit::render::RenderDriverInitProperties driverParams = {};
 
@@ -80,6 +102,8 @@ namespace anox
 
 		rkit::UniquePtr<rkit::render::IRenderDevice> device;
 		RKIT_CHECK(renderDriver->CreateDevice(device, queueRequests.ToSpan(), *adapters[0]));
+
+		progressMonitor->SetText("Starting up...");
 
 		return rkit::ResultCode::kNotYetImplemented;
 	}

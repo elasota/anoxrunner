@@ -18,12 +18,21 @@
     <ClCompile Include="System_Win32.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="DisplayManager_Win32.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\rkit\Win32\Win32PlatformDriver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rkit\Win32\Win32ModuleInitParameters.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Win32DisplayManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ConvUtil.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

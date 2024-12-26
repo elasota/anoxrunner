@@ -27,6 +27,12 @@ namespace rkit
 	struct IMutex;
 	struct IThread;
 	struct IThreadContext;
+	struct IDisplayManager;
+
+	namespace render
+	{
+		struct IDisplayManager;
+	}
 
 	struct IPlatformDriver
 	{
@@ -78,5 +84,7 @@ namespace rkit
 		virtual Result OpenSystemLibrary(UniquePtr<ISystemLibrary> &outLibrary, SystemLibraryType libType) const = 0;
 
 		virtual uint32_t GetProcessorCount() const = 0;
+
+		virtual render::IDisplayManager *GetDisplayManager() const = 0;
 	};
 }
