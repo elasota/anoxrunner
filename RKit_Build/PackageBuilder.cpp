@@ -8,6 +8,8 @@
 
 #include "rkit/Render/RenderDefs.h"
 
+#include "rkit/Utilities/Sha2.h"
+
 namespace rkit::buildsystem
 {
 	class BinaryBlob final : public IBinaryBlob
@@ -142,6 +144,35 @@ namespace rkit::buildsystem
 		static Result WriteConfigurationKey(IPackageBuilder &pkgBuilder, const render::ConfigStringIndex_t &str, data::RenderRTTIMainType mainType, IWriteStream &stream);
 
 		static Result WritePartialLEUInt64(uint64_t ui, uint8_t numBytes, IWriteStream &stream);
+	};
+
+	class Sha256Wrapper final : public ISeekableWriteStream
+	{
+	public:
+		explicit Sha256Wrapper(ISeekableWriteStream &stream, const utils::ISha256Calculator &calculator);
+		~Sha256Wrapper();
+
+		Result WritePartial(const void *data, size_t count, size_t &outCountWritten) override;
+
+		virtual Result Flush() override;
+
+		virtual Result SeekStart(FilePos_t pos) override;
+		virtual Result SeekCurrent(FileOffset_t pos) override;
+		virtual Result SeekEnd(FileOffset_t pos) override;
+
+		virtual FilePos_t Tell() const override;
+		virtual FilePos_t GetSize() const override;
+
+		void FinishSHA();
+		utils::Sha256DigestBytes GetDigest() const;
+
+	private:
+		ISeekableWriteStream &m_stream;
+		const utils::ISha256Calculator &m_sha;
+		utils::Sha256StreamingState m_state;
+
+		bool m_isFinishedWriting = false;
+		bool m_haveGeneratedDigest = false;
 	};
 
 
@@ -375,12 +406,22 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
-	Result PackageBuilder::WritePackage(ISeekableWriteStream &stream) const
+	Result PackageBuilder::WritePackage(ISeekableWriteStream &streamBase) const
 	{
 		uint32_t packageVersion = m_dataHandler->GetPackageVersion();
 
+		utils::Sha256DigestBytes shaDigest;
+
+		for (uint8_t &digestByte : shaDigest.m_data)
+			digestByte = 0;
+
+		const utils::ISha256Calculator *calculator = GetDrivers().m_utilitiesDriver->GetSha256Calculator();
+
+		Sha256Wrapper stream(streamBase, *calculator);
+
 		RKIT_CHECK(PackageObjectWriter::WriteUInt32(0, stream));
 		RKIT_CHECK(PackageObjectWriter::WriteUInt32(packageVersion, stream));
+		RKIT_CHECK(stream.WriteAll(&shaDigest, sizeof(shaDigest)));
 
 		size_t numStrings = m_stringToIndex.Count();
 		size_t numConfigKeys = m_configKeys.Count();
@@ -439,7 +480,15 @@ namespace rkit::buildsystem
 
 		RKIT_CHECK(WriteIndexableBlobCollection(m_binaryContent, stream));
 
+		RKIT_CHECK(stream.SeekStart(8));
+
+		stream.FinishSHA();
+		shaDigest = stream.GetDigest();
+
+		RKIT_CHECK(stream.WriteAll(&shaDigest, sizeof(shaDigest)));
+
 		RKIT_CHECK(stream.SeekStart(0));
+		RKIT_CHECK(stream.Flush());
 		RKIT_CHECK(PackageObjectWriter::WriteUInt32(m_dataHandler->GetPackageIdentifier(), stream));
 
 		return ResultCode::kOK;
@@ -814,6 +863,74 @@ namespace rkit::buildsystem
 		uint64_t ui = 0;
 		memcpy(&ui, &f, sizeof(f));
 		return WriteUInt64(ui, stream);
+	}
+
+	Sha256Wrapper::Sha256Wrapper(ISeekableWriteStream &stream, const utils::ISha256Calculator &calculator)
+		: m_stream(stream)
+		, m_sha(calculator)
+		, m_state(calculator.CreateStreamingState())
+	{
+	}
+
+	Sha256Wrapper::~Sha256Wrapper()
+	{
+	}
+
+	Result Sha256Wrapper::WritePartial(const void *data, size_t count, size_t &outCountWritten)
+	{
+		if (!m_isFinishedWriting)
+			m_sha.AppendStreamingState(m_state, data, count);
+
+		return m_stream.WritePartial(data, count, outCountWritten);
+	}
+
+	Result Sha256Wrapper::Flush()
+	{
+		m_isFinishedWriting = true;
+		return m_stream.Flush();
+	}
+
+	Result Sha256Wrapper::SeekStart(FilePos_t pos)
+	{
+		m_isFinishedWriting = true;
+		return m_stream.SeekStart(pos);
+	}
+
+	Result Sha256Wrapper::SeekCurrent(FileOffset_t pos)
+	{
+		m_isFinishedWriting = true;
+		return m_stream.SeekCurrent(pos);
+	}
+
+	Result Sha256Wrapper::SeekEnd(FileOffset_t pos)
+	{
+		m_isFinishedWriting = true;
+		return m_stream.SeekEnd(pos);
+	}
+
+	FilePos_t Sha256Wrapper::Tell() const
+	{
+		return m_stream.Tell();
+	}
+
+	FilePos_t Sha256Wrapper::GetSize() const
+	{
+		return m_stream.GetSize();
+	}
+
+	void Sha256Wrapper::FinishSHA()
+	{
+		if (!m_haveGeneratedDigest)
+		{
+			m_haveGeneratedDigest = true;
+			m_isFinishedWriting = true;
+			m_sha.FinalizeStreamingState(m_state);
+		}
+	}
+
+	utils::Sha256DigestBytes Sha256Wrapper::GetDigest() const
+	{
+		return m_sha.FlushToBytes(m_state.m_state);
 	}
 }
 

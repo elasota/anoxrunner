@@ -228,7 +228,7 @@ namespace rkit::render
 
 		if (progressRange != m_compactedProgressRange)
 		{
-			m_compactedProgressRange = progressRange;
+			m_compactedProgressRange = static_cast<uint32_t>(progressRange);
 
 			::SendMessageW(m_progressBar, PBM_SETRANGE, 0, MAKELPARAM(0, m_compactedProgressRange));
 		}

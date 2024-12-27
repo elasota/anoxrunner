@@ -8,6 +8,8 @@
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/Vector.h"
 
+#include "rkit/Utilities/Sha2.h"
+
 namespace rkit::data
 {
 #define RTTI_ENUM_BEGIN(name)	\
@@ -1272,8 +1274,11 @@ namespace rkit::data
 		uint32_t identifier = 0;
 		uint32_t packageVersion = 0;
 
+		utils::Sha256DigestBytes digest;
+
 		RKIT_CHECK(ReadUInt32(stream, identifier));
 		RKIT_CHECK(ReadUInt32(stream, packageVersion));
+		RKIT_CHECK(stream.ReadAll(&digest, sizeof(digest)));
 
 		if (identifier != handler->GetPackageIdentifier())
 		{

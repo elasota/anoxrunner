@@ -27,7 +27,6 @@ namespace rkit
 	struct IMutex;
 	struct IThread;
 	struct IThreadContext;
-	struct IDisplayManager;
 
 	namespace render
 	{

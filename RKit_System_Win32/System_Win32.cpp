@@ -273,7 +273,7 @@ namespace rkit
 			countWritten += actualAmount;
 
 			m_filePos += actualAmount;
-			if (m_fileSize > m_filePos)
+			if (m_fileSize < m_filePos)
 				m_fileSize = m_filePos;
 
 			data = static_cast<const void *>(static_cast<const char *>(data) + actualAmount);
