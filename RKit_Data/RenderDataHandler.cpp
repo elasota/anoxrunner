@@ -773,6 +773,7 @@ namespace rkit::data
 		RTTI_DEFINE_STRING_INDEX(Global)
 		RTTI_DEFINE_STRING_INDEX(Config)
 		RTTI_DEFINE_STRING_INDEX(Temp)
+		RTTI_DEFINE_STRING_INDEX(ShaderPermutation)
 
 		RTTI_ENUM_BEGIN(NumericType)
 			RTTI_ENUM_OPTION(Float16)
@@ -1031,6 +1032,17 @@ namespace rkit::data
 			RTTI_STRUCT_FIELD(stencilWriteMask)
 			RTTI_STRUCT_FIELD(stencilFrontOps)
 			RTTI_STRUCT_FIELD(stencilBackOps)
+		RTTI_STRUCT_END
+
+		RTTI_STRUCT_BEGIN_INDEXABLE(ShaderPermutationTreeBranch)
+			RTTI_STRUCT_FIELD(keyValue)
+			RTTI_STRUCT_FIELD(subTree)
+		RTTI_STRUCT_END
+
+		RTTI_STRUCT_BEGIN_INDEXABLE(ShaderPermutationTree)
+			RTTI_STRUCT_FIELD(width)
+			RTTI_STRUCT_FIELD(keyName)
+			RTTI_STRUCT_FIELD(branches)
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(GraphicsPipelineDesc)
@@ -2170,6 +2182,8 @@ namespace rkit::data
 		LINK_INDEXABLE_LIST_TYPE(VectorNumericType)
 		LINK_INDEXABLE_LIST_TYPE(SamplerDesc)
 		LINK_INDEXABLE_LIST_TYPE(ContentKey)
+		LINK_INDEXABLE_LIST_TYPE(ShaderPermutationTree)
+		LINK_INDEXABLE_LIST_TYPE(ShaderPermutationTreeBranch)
 
 		default:
 			return ResultCode::kInternalError;

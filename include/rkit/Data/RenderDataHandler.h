@@ -32,6 +32,7 @@ namespace rkit::data
 		GlobalStringIndex,
 		ConfigStringIndex,
 		TempStringIndex,
+		ShaderPermutationStringIndex,
 
 		// Enums
 		Filter,
@@ -76,6 +77,8 @@ namespace rkit::data
 		DepthStencilDesc,
 		StencilOpDesc,
 		ContentKey,
+		ShaderPermutationTree,
+		ShaderPermutationTreeBranch,
 
 		Count,
 
@@ -101,6 +104,8 @@ namespace rkit::data
 		CompoundNumericType,
 		SamplerDesc,
 		ContentKey,
+		ShaderPermutationTree,
+		ShaderPermutationTreeBranch,
 
 		Count,
 

@@ -578,6 +578,21 @@ namespace rkit::render
 		BinaryContent m_content;
 	};
 
+	struct ShaderPermutationTree;
+
+	struct ShaderPermutationTreeBranch
+	{
+		int32_t m_keyValue;
+		const ShaderPermutationTree *m_subTree;
+	};
+
+	struct ShaderPermutationTree
+	{
+		size_t m_width;
+		ShaderPermutationStringIndex_t m_keyName;
+		ConstSpan<const ShaderPermutationTreeBranch *> m_branches;
+	};
+
 	struct ShaderDesc
 	{
 		TempStringIndex_t m_source;
@@ -674,6 +689,8 @@ namespace rkit::render
 
 		FillMode m_fillMode = FillMode::Solid;
 		CullMode m_cullMode = CullMode::Back;
+
+		const ShaderPermutationTree *m_permutationTree;
 	};
 
 	struct GraphicsPipelineNameLookup
