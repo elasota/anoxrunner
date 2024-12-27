@@ -7,7 +7,9 @@ namespace rkit::utils
 {
 	struct Sha256DigestBytes
 	{
-		uint8_t m_data[32];
+		static const size_t kSize = 32;
+
+		uint8_t m_data[kSize];
 	};
 
 	struct Sha256State

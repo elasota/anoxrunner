@@ -133,7 +133,7 @@ namespace rkit::utils
 				AddInputChunk(state, inputChunk);
 
 				for (int wi = 0; wi < 16; wi++)
-					inputChunk.m_data[i] = 0;
+					inputChunk.m_data[wi] = 0;
 
 				length = 0;
 			}
