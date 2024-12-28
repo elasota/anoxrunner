@@ -113,7 +113,7 @@ namespace rkit
 
 		Result LoadModuleConfig(ModuleConfig &outConfig)
 		{
-			UniquePtr<ISeekableReadStream> configStream = GetDrivers().m_systemDriver->OpenFileRead(FileLocation::kGameDirectory, "RKitModuleConfig.json");
+			UniquePtr<ISeekableReadStream> configStream = GetDrivers().m_systemDriver->OpenFileRead(FileLocation::kConfigDirectory, "RKitModuleConfig.json");
 
 			if (!configStream.IsValid())
 				return ResultCode::kConfigMissing;

@@ -7,6 +7,16 @@ namespace rkit
 	struct Result;
 }
 
+namespace rkit::utils
+{
+	struct IThreadPool;
+}
+
+namespace rkit::data
+{
+	struct IDataDriver;
+}
+
 namespace anox
 {
 	enum class RenderBackend
@@ -23,6 +33,6 @@ namespace anox
 		virtual void SetDesiredDisplayMode(rkit::render::DisplayMode displayMode) = 0;
 		virtual rkit::Result TransitionDisplayState() = 0;
 
-		static rkit::Result Create(rkit::UniquePtr<IGraphicsSubsystem> &outSubsystem, anox::RenderBackend defaultBackend);
+		static rkit::Result Create(rkit::UniquePtr<IGraphicsSubsystem> &outSubsystem, rkit::data::IDataDriver &dataDriver, rkit::utils::IThreadPool &threadPool, anox::RenderBackend defaultBackend);
 	};
 }

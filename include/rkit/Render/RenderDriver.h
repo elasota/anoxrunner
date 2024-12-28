@@ -47,7 +47,7 @@ namespace rkit::render
 	struct CommandQueueTypeRequest
 	{
 		CommandQueueType m_type;
-		size_t m_numQueues;
+		size_t m_numQueues = 0;
 		const float *m_queuePriorities = nullptr;
 	};
 

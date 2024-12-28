@@ -355,6 +355,8 @@ namespace rkit::buildsystem
 			FilePos_t Tell() const override;
 			FilePos_t GetSize() const override;
 
+			bool Truncate(FilePos_t newSize) override;
+
 		private:
 			DependencyNodeCompilerFeedback &m_feedback;
 
@@ -1288,6 +1290,11 @@ namespace rkit::buildsystem
 	FilePos_t DependencyNode::FeedbackWrapperStream::GetSize() const
 	{
 		return m_stream->GetSize();
+	}
+
+	bool DependencyNode::FeedbackWrapperStream::Truncate(FilePos_t newSize)
+	{
+		return m_stream->Truncate(newSize);
 	}
 
 	FileStatusView DependencyNode::GetAnalysisProductByIndex(const IDependencyNode *const & node, size_t index)

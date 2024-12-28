@@ -6,6 +6,8 @@
 #include "rkit/Core/Mutex.h"
 #include "rkit/Core/Vector.h"
 
+#include "rkit/Utilities/ThreadPool.h"
+
 #include "DeflateDecompressStream.h"
 #include "JobQueue.h"
 #include "Json.h"
@@ -13,6 +15,7 @@
 #include "RangeLimitedReadStream.h"
 #include "Sha2Calculator.h"
 #include "TextParser.h"
+#include "ThreadPool.h"
 
 namespace rkit
 {
@@ -38,6 +41,8 @@ namespace rkit
 
 		Result CreateDeflateDecompressStream(UniquePtr<IReadStream> &outStream, UniquePtr<IReadStream> &&compressedStream) const override;
 		Result CreateRangeLimitedReadStream(UniquePtr<IReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream, FilePos_t startPos, FilePos_t size) const override;
+
+		Result CreateThreadPool(UniquePtr<utils::IThreadPool> &outThreadPool, uint32_t numThreads) const override;
 
 		HashValue_t ComputeHash(HashValue_t baseHash, const void *data, size_t size) const override;
 
@@ -104,12 +109,13 @@ namespace rkit
 		ISeekableStream *seek = stream.Get();
 		IReadStream *read = stream.Get();
 		IWriteStream *write = stream.Get();
+		ISeekableWriteStream *seekableWrite = stream.Get();
 
 		UniquePtr<IMutex> mutex;
 		RKIT_CHECK(GetDrivers().m_systemDriver->CreateMutex(mutex));
 
 		UniquePtr<MutexProtectedStreamWrapper> mpsWrapper;
-		RKIT_CHECK(New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write));
+		RKIT_CHECK(New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write, seekableWrite));
 
 		SharedPtr<MutexProtectedStreamWrapper> sharedWrapper;
 		RKIT_CHECK(MakeShared(sharedWrapper, std::move(mpsWrapper)));
@@ -126,12 +132,13 @@ namespace rkit
 		ISeekableStream *seek = stream.Get();
 		IReadStream *read = stream.Get();
 		IWriteStream *write = nullptr;
+		ISeekableWriteStream *seekableWrite = nullptr;
 
 		UniquePtr<IMutex> mutex;
 		RKIT_CHECK(GetDrivers().m_systemDriver->CreateMutex(mutex));
 
 		UniquePtr<MutexProtectedStreamWrapper> mpsWrapper;
-		RKIT_CHECK(New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write));
+		RKIT_CHECK(New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write, seekableWrite));
 
 		SharedPtr<MutexProtectedStreamWrapper> sharedWrapper;
 		RKIT_CHECK(MakeShared(sharedWrapper, std::move(mpsWrapper)));
@@ -148,12 +155,13 @@ namespace rkit
 		ISeekableStream *seek = stream.Get();
 		IReadStream *read = nullptr;
 		IWriteStream *write = stream.Get();
+		ISeekableWriteStream *seekableWrite = stream.Get();
 
 		UniquePtr<IMutex> mutex;
 		RKIT_CHECK(GetDrivers().m_systemDriver->CreateMutex(mutex));
 
 		UniquePtr<MutexProtectedStreamWrapper> mpsWrapper;
-		RKIT_CHECK(New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write));
+		RKIT_CHECK(New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write, seekableWrite));
 
 		SharedPtr<MutexProtectedStreamWrapper> sharedWrapper;
 		RKIT_CHECK(MakeShared(sharedWrapper, std::move(mpsWrapper)));
@@ -188,6 +196,15 @@ namespace rkit
 		return NewWithAlloc<RangeLimitedReadStream>(outStream, alloc, std::move(stream), startPos, size);
 	}
 
+	Result UtilitiesDriver::CreateThreadPool(UniquePtr<utils::IThreadPool> &outThreadPool, uint32_t numThreads) const
+	{
+		UniquePtr<utils::ThreadPoolBase> threadPool;
+		RKIT_CHECK(utils::ThreadPoolBase::Create(threadPool, *this, numThreads));
+
+		outThreadPool = std::move(threadPool);
+
+		return ResultCode::kOK;
+	}
 
 	HashValue_t UtilitiesDriver::ComputeHash(HashValue_t baseHash, const void *value, size_t size) const
 	{

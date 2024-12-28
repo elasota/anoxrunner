@@ -57,10 +57,10 @@ namespace rkit::utils
 		explicit JobQueue(IMallocDriver *alloc);
 		~JobQueue();
 
-		Result CreateJob(RCPtr<Job> &outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<Job *> &dependencies) override;
+		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<Job *> *dependencies) override;
 
 		// Waits for work from a job queue.
-		// If "waitIfDepleted" is set, then wakeEvent must be an auto-reset event and terminatedEvent must not be signalled
+		// If "waitIfDepleted" is set, then wakeEvent must be an auto-reset event and terminatedEvent must not be signaled
 		RCPtr<Job> WaitForWork(JobType jobType, bool waitIfDepleted, IEvent *wakeEvent, IEvent *terminatedEvent) override;
 
 		void Fault(const Result &result) override;
@@ -229,36 +229,41 @@ namespace rkit::utils
 		}
 	}
 
-	Result JobQueue::CreateJob(RCPtr<Job> &outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<Job *> &dependencies)
+	Result JobQueue::CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<Job *> *dependencies)
 	{
 		UniquePtr<IJobRunner> jobRunnerTemp(std::move(jobRunner));
 
+		size_t numDependencies = 0;
+		if (dependencies)
+			numDependencies = dependencies->Count();
+
 		RCPtr<JobImpl> resultJob;
-		RKIT_CHECK(NewWithAlloc<JobImpl>(resultJob, m_alloc, *this, std::move(jobRunnerTemp), dependencies.Count(), jobType));
+		RKIT_CHECK(NewWithAlloc<JobImpl>(resultJob, m_alloc, *this, std::move(jobRunnerTemp), numDependencies, jobType));
 
 		CategoryInfo &ci = m_categories[static_cast<size_t>(jobType)];
 
+		if (numDependencies > 0)
 		{
 			MutexLock lock(*m_depGraphMutex);
 
 			if (ci.m_isClosing)
 				return ResultCode::kOK;
 
-			for (Job *job : dependencies)
+			for (Job *job : *dependencies)
 			{
 				RKIT_CHECK(static_cast<JobImpl *>(job)->ReserveDownstreamDependency());
 			}
 
-			for (Job *job : dependencies)
+			for (Job *job : *dependencies)
 			{
 				*(static_cast<JobImpl *>(job)->GetLastDownstreamDependency()) = resultJob;
 			}
 		}
-
-		if (dependencies.Count() == 0)
+		else
 			AddRunnableJob(resultJob, static_cast<size_t>(jobType));
 
-		outJob = std::move(resultJob);
+		if (outJob)
+			*outJob = std::move(resultJob);
 
 		return ResultCode::kOK;
 	}
@@ -342,45 +347,44 @@ namespace rkit::utils
 		{
 			RCPtr<JobImpl> job;
 
-			MutexLock lock(*m_distributorMutex);
-
-			for (CategoryInfo &jobList : runnableCategories)
 			{
-				if (jobList.m_isClosing)
-					return RCPtr<Job>();
+				MutexLock lock(*m_distributorMutex);
 
-				job = jobList.m_firstJob;
+				for (CategoryInfo &jobList : runnableCategories)
+				{
+					if (jobList.m_isClosing)
+						return RCPtr<Job>();
+
+					job = jobList.m_firstJob;
+
+					if (job)
+					{
+						JobImpl *nextJob = job->m_nextRunnableJob;
+						jobList.m_firstJob = nextJob;
+						if (!jobList.m_firstJob)
+							jobList.m_lastJob = nullptr;
+
+						if (nextJob)
+							nextJob->m_prevRunnableJob = nullptr;
+
+						break;
+					}
+				}
 
 				if (job)
 				{
-					JobImpl *nextJob = job->m_nextRunnableJob;
-					jobList.m_firstJob = nextJob;
-					if (!jobList.m_firstJob)
-						jobList.m_lastJob = nullptr;
+					job->m_nextRunnableJob = nullptr;
+					job->m_prevRunnableJob = nullptr;
 
-					if (nextJob)
-						nextJob->m_prevRunnableJob = nullptr;
-
-					break;
+					return job;
 				}
-			}
 
-			if (job)
-			{
-				job->m_nextRunnableJob = nullptr;
-				job->m_prevRunnableJob = nullptr;
+				if (!waitIfDepleted)
+					break;
 
-				return job;
-			}
+				const size_t threadCIIndex = (jobType == JobType::kAnyJob) ? static_cast<size_t>(JobType::kCount) : static_cast<size_t>(jobType);
 
-			if (!waitIfDepleted)
-				break;
-
-			const size_t threadCIIndex = (jobType == JobType::kAnyJob) ? static_cast<size_t>(JobType::kCount) : static_cast<size_t>(jobType);
-
-			CategoryInfo &threadCI = m_categories[threadCIIndex];
-			{
-				MutexLock lock(*m_distributorMutex);
+				CategoryInfo &threadCI = m_categories[threadCIIndex];
 
 				if (threadCI.m_isClosing)
 					break;
@@ -392,6 +396,9 @@ namespace rkit::utils
 					threadCI.m_lastWaitingThread->m_next = &pti;
 
 				threadCI.m_lastWaitingThread = &pti;
+
+				if (!threadCI.m_firstWaitingThread)
+					threadCI.m_firstWaitingThread = &pti;
 			}
 
 			pti.m_wakeEvent->Wait();
@@ -446,6 +453,8 @@ namespace rkit::utils
 		RKIT_CHECK(sysDriver->CreateMutex(m_depGraphMutex));
 		RKIT_CHECK(sysDriver->CreateMutex(m_resultMutex));
 		RKIT_CHECK(sysDriver->CreateMutex(m_distributorMutex));
+
+		m_isInitialized = true;
 
 		return ResultCode::kOK;
 	}

@@ -57,12 +57,12 @@ namespace rkit
 
 	struct ISeekableWriteStream : public virtual IWriteStream, public virtual ISeekableStream
 	{
+		virtual bool Truncate(FilePos_t size) = 0;
 	};
 
 	struct ISeekableReadWriteStream : public virtual ISeekableReadStream, public virtual ISeekableWriteStream, public virtual IReadWriteStream
 	{
 	};
-
 
 	struct IMutexProtectedStream
 	{

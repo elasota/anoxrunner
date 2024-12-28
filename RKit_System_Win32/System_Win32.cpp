@@ -1,6 +1,7 @@
 #include "rkit/Core/Algorithm.h"
 #include "rkit/Core/DirectoryScan.h"
 #include "rkit/Core/Drivers.h"
+#include "rkit/Core/Event.h"
 #include "rkit/Core/MallocDriver.h"
 #include "rkit/Core/Module.h"
 #include "rkit/Core/ModuleGlue.h"
@@ -41,8 +42,11 @@ namespace rkit
 		Result SeekStart(FilePos_t pos) override;
 		Result SeekCurrent(FileOffset_t pos) override;
 		Result SeekEnd(FileOffset_t pos) override;
+
 		FilePos_t Tell() const override;
 		FilePos_t GetSize() const override;
+
+		bool Truncate(FilePos_t pos) override;
 
 	private:
 		HANDLE m_hfile;
@@ -101,6 +105,23 @@ namespace rkit
 		CRITICAL_SECTION m_critSection;
 	};
 
+	class Event_Win32 final : public IEvent
+	{
+	public:
+		Event_Win32();
+		~Event_Win32();
+
+		void Signal() override;
+		void Reset() override;
+		void Wait() override;
+		bool TimedWait(uint32_t msec) override;
+
+		Result Initialize(bool autoReset, bool startSignaled);
+
+	private:
+		HANDLE m_event = nullptr;
+	};
+
 	class Thread_Win32;
 
 	struct ThreadKickoffInfo_Win32
@@ -114,6 +135,7 @@ namespace rkit
 	{
 	public:
 		Thread_Win32();
+		~Thread_Win32();
 
 		void SetHandle(HANDLE hThread);
 		Result *GetResultPtr();
@@ -144,12 +166,15 @@ namespace rkit
 
 		Result CreateThread(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContext) override;
 		Result CreateMutex(UniquePtr<IMutex> &mutex) override;
+		Result CreateEvent(UniquePtr<IEvent> &outEvent, bool autoReset, bool startSignaled) override;
+		void SleepMSec(uint32_t msec) const override;
 
 		Result OpenDirectoryScan(FileLocation location, const char *path, UniquePtr<IDirectoryScan> &outDirectoryScan) override;
 		Result GetFileAttributes(FileLocation location, const char *path, bool &outExists, FileAttributes &outAttribs) override;
 
 		Result ResolveFilePath(FileLocation location, const char *path, Vector<wchar_t> &outPath);
 
+		Result SetGameDirectoryOverride(const StringView &path) override;
 		char GetPathSeparator() const override;
 
 		IPlatformDriver *GetPlatformDriver() const override;
@@ -175,6 +200,8 @@ namespace rkit
 		Vector<StringView> m_commandLine;
 		UniquePtr<render::DisplayManagerBase_Win32> m_displayManager;
 		LPWSTR *m_argvW;
+
+		String m_gameDirectoryOverride;
 
 		HINSTANCE m_hInstance;
 	};
@@ -381,6 +408,38 @@ namespace rkit
 		return m_fileSize;
 	}
 
+	bool File_Win32::Truncate(FilePos_t newSize)
+	{
+		if (m_fileSize == newSize)
+			return true;
+
+		if (m_fileSize < newSize)
+			return false;
+
+		FilePos_t oldFilePos = m_filePos;
+
+		if (newSize != m_filePos)
+		{
+			LARGE_INTEGER newPos;
+			newPos.QuadPart = static_cast<LONGLONG>(newSize);
+
+			if (!::SetFilePointerEx(m_hfile, newPos, nullptr, FILE_BEGIN))
+				return false;
+		}
+
+		BOOL succeeded = ::SetEndOfFile(m_hfile);
+
+		if (oldFilePos < newSize)
+		{
+			LARGE_INTEGER newPos;
+			newPos.QuadPart = static_cast<LONGLONG>(oldFilePos);
+
+			::SetFilePointerEx(m_hfile, newPos, nullptr, FILE_BEGIN);
+		}
+
+		return (succeeded != FALSE);
+	}
+
 
 	DirectoryScan_Win32::DirectoryScan_Win32()
 		: m_handle(INVALID_HANDLE_VALUE)
@@ -536,6 +595,51 @@ namespace rkit
 		LeaveCriticalSection(&m_critSection);
 	}
 
+	Event_Win32::Event_Win32()
+		: m_event(nullptr)
+	{
+	}
+
+	Event_Win32::~Event_Win32()
+	{
+		if (m_event)
+			::CloseHandle(m_event);
+	}
+
+	void Event_Win32::Signal()
+	{
+		::SetEvent(m_event);
+	}
+
+	void Event_Win32::Reset()
+	{
+		::ResetEvent(m_event);
+	}
+
+	void Event_Win32::Wait()
+	{
+		::WaitForSingleObject(m_event, INFINITE);
+	}
+
+	bool Event_Win32::TimedWait(uint32_t msec)
+	{
+		if (msec >= INFINITE)
+			msec = static_cast<DWORD>(INFINITE) - 1u;
+
+		DWORD waitResult = ::WaitForSingleObject(m_event, msec);
+
+		return (waitResult != WAIT_TIMEOUT);
+	}
+
+	Result Event_Win32::Initialize(bool autoReset, bool startSignaled)
+	{
+		m_event = ::CreateEventW(nullptr, autoReset ? FALSE : TRUE, startSignaled ? TRUE : FALSE, nullptr);
+		if (!m_event)
+			return ResultCode::kOperationFailed;
+
+		return ResultCode::kOK;
+	}
+
 	Thread_Win32::Thread_Win32()
 		: m_hThread(nullptr)
 	{
@@ -544,6 +648,16 @@ namespace rkit
 	void Thread_Win32::SetHandle(HANDLE hThread)
 	{
 		m_hThread = hThread;
+	}
+
+	Thread_Win32::~Thread_Win32()
+	{
+		if (m_hThread)
+		{
+			WaitForSingleObject(m_hThread, INFINITE);
+			::CloseHandle(m_hThread);
+			m_hThread = nullptr;
+		}
 	}
 
 	Result *Thread_Win32::GetResultPtr()
@@ -723,6 +837,8 @@ namespace rkit
 		WaitForSingleObject(hKickoffEvent, INFINITE);
 		CloseHandle(hKickoffEvent);
 
+		thread->SetHandle(hThread);
+
 		outThread = UniqueThreadRef(UniquePtr<IThread>(std::move(thread)));
 
 		return ResultCode::kOK;
@@ -736,6 +852,23 @@ namespace rkit
 		outMutex = std::move(mutex);
 
 		return ResultCode::kOK;
+	}
+
+	Result SystemDriver_Win32::CreateEvent(UniquePtr<IEvent> &outEvent, bool autoReset, bool startSignaled)
+	{
+		UniquePtr<Event_Win32> event;
+		RKIT_CHECK(NewWithAlloc<Event_Win32>(event, m_alloc));
+
+		RKIT_CHECK(event->Initialize(autoReset, startSignaled));
+
+		outEvent = std::move(event);
+
+		return ResultCode::kOK;
+	}
+
+	void SystemDriver_Win32::SleepMSec(uint32_t msec) const
+	{
+		::Sleep(msec);
 	}
 
 	Result SystemDriver_Win32::OpenDirectoryScan(FileLocation location, const char *path, UniquePtr<IDirectoryScan> &outDirectoryScan)
@@ -816,6 +949,11 @@ namespace rkit
 		outAttribs.m_isDirectory = false;
 
 		return ResultCode::kOK;
+	}
+
+	Result SystemDriver_Win32::SetGameDirectoryOverride(const StringView &path)
+	{
+		return m_gameDirectoryOverride.Set(path);
 	}
 
 	char SystemDriver_Win32::GetPathSeparator() const
@@ -961,52 +1099,65 @@ namespace rkit
 
 		switch (location)
 		{
-		case FileLocation::kGameDirectory:
-		{
-			DWORD cwdBufferSize = GetCurrentDirectoryW(0, nullptr);
-			if (cwdBufferSize == 0)
-				return ResultCode::kIOError;
+		case FileLocation::kConfigDirectory:
+			{
+				DWORD cwdBufferSize = GetCurrentDirectoryW(0, nullptr);
+				if (cwdBufferSize == 0)
+					return ResultCode::kIOError;
 
-			RKIT_CHECK(filePathWChars.Resize(cwdBufferSize + 1));
+				RKIT_CHECK(filePathWChars.Resize(cwdBufferSize + 1));
 
-			DWORD cwdLen = GetCurrentDirectoryW(cwdBufferSize, filePathWChars.GetBuffer());
-			if (cwdLen != cwdBufferSize - 1)
-				return ResultCode::kIOError;
+				DWORD cwdLen = GetCurrentDirectoryW(cwdBufferSize, filePathWChars.GetBuffer());
+				if (cwdLen != cwdBufferSize - 1)
+					return ResultCode::kIOError;
 
-			filePathWChars[cwdLen] = L'\\';
-			filePathWChars[cwdLen + 1] = L'\0';
-			baseW = filePathWChars.GetBuffer();
-		}
-		break;
+				filePathWChars[cwdLen] = L'\\';
+				filePathWChars[cwdLen + 1] = L'\0';
+				baseW = filePathWChars.GetBuffer();
+			}
+			break;
 
 		case FileLocation::kAbsolute:
 			baseW = L"";
 			break;
 
 		case FileLocation::kDataSourceDirectory:
-		{
-			const wchar_t *dataSrcDir = L"datasrc";
-			const size_t dataSrcDirLen = wcslen(dataSrcDir);
+			{
+				const wchar_t *dataSrcDir = L"datasrc";
+				const size_t dataSrcDirLen = wcslen(dataSrcDir);
 
-			DWORD cwdBufferSize = GetCurrentDirectoryW(0, nullptr);
-			if (cwdBufferSize == 0)
-				return ResultCode::kIOError;
+				DWORD cwdBufferSize = GetCurrentDirectoryW(0, nullptr);
+				if (cwdBufferSize == 0)
+					return ResultCode::kIOError;
 
-			RKIT_CHECK(filePathWChars.Resize(cwdBufferSize + 2 + dataSrcDirLen));
+				RKIT_CHECK(filePathWChars.Resize(cwdBufferSize + 2 + dataSrcDirLen));
 
-			DWORD cwdLen = GetCurrentDirectoryW(cwdBufferSize, filePathWChars.GetBuffer());
-			if (cwdLen != cwdBufferSize - 1)
-				return ResultCode::kIOError;
+				DWORD cwdLen = GetCurrentDirectoryW(cwdBufferSize, filePathWChars.GetBuffer());
+				if (cwdLen != cwdBufferSize - 1)
+					return ResultCode::kIOError;
 
-			filePathWChars[cwdLen] = L'\\';
-			filePathWChars[cwdLen + 1] = L'\0';
+				filePathWChars[cwdLen] = L'\\';
+				filePathWChars[cwdLen + 1] = L'\0';
 
-			wcscat(filePathWChars.GetBuffer(), dataSrcDir);
-			wcscat(filePathWChars.GetBuffer(), L"\\");
+				wcscat(filePathWChars.GetBuffer(), dataSrcDir);
+				wcscat(filePathWChars.GetBuffer(), L"\\");
 
-			baseW = filePathWChars.GetBuffer();
-		}
-		break;
+				baseW = filePathWChars.GetBuffer();
+			}
+			break;
+
+		case FileLocation::kGameDirectory:
+			{
+				if (m_gameDirectoryOverride.Length() == 0)
+					return ResultCode::kInvalidParameter;
+
+				RKIT_CHECK(ConvUtil_Win32::UTF8ToUTF16(m_gameDirectoryOverride.CStr(), filePathWChars));
+				filePathWChars[filePathWChars.Count() - 1] = L'\\';
+				RKIT_CHECK(filePathWChars.Append(L'\0'));
+
+				baseW = filePathWChars.GetBuffer();
+			}
+			break;
 
 		default:
 			return ResultCode::kInvalidParameter;

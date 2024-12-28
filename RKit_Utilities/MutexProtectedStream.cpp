@@ -8,11 +8,12 @@
 
 namespace rkit
 {
-	MutexProtectedStreamWrapper::MutexProtectedStreamWrapper(UniquePtr<IBaseStream> &&baseStream, UniquePtr<IMutex> &&mutex, ISeekableStream *seek, IReadStream *read, IWriteStream *write)
+	MutexProtectedStreamWrapper::MutexProtectedStreamWrapper(UniquePtr<IBaseStream> &&baseStream, UniquePtr<IMutex> &&mutex, ISeekableStream *seek, IReadStream *read, IWriteStream *write, ISeekableWriteStream *seekableWrite)
 		: m_baseStream(std::move(baseStream))
 		, m_seek(seek)
 		, m_read(read)
 		, m_write(write)
+		, m_seekableWrite(seekableWrite)
 		, m_rcTracker(nullptr)
 		, m_mutex(std::move(mutex))
 	{
@@ -46,6 +47,13 @@ namespace rkit
 		MutexLock lock(*m_mutex);
 
 		return m_seek->GetSize();
+	}
+
+	bool MutexProtectedStreamWrapper::Truncate(FilePos_t newSize)
+	{
+		MutexLock lock(*m_mutex);
+
+		return m_seekableWrite->Truncate(newSize);
 	}
 
 	Result MutexProtectedStreamWrapper::CreateReadStream(UniquePtr<ISeekableReadStream> &outStream)
@@ -119,7 +127,6 @@ namespace rkit
 
 	Result MutexProtectedStream::SeekCurrent(FileOffset_t offset)
 	{
-
 		if (offset < 0)
 		{
 			FilePos_t backwardDist = rkit::ToUnsignedAbs<FileOffset_t, FilePos_t>(offset);
@@ -169,5 +176,10 @@ namespace rkit
 	FilePos_t MutexProtectedStream::GetSize() const
 	{
 		return m_baseStream->GetSize();
+	}
+
+	bool MutexProtectedStream::Truncate(FilePos_t newSize)
+	{
+		return m_baseStream->Truncate(newSize);
 	}
 }

@@ -23,6 +23,8 @@ namespace rkit
 		FilePos_t Tell() const override;
 		FilePos_t GetSize() const override;
 
+		bool Truncate(FilePos_t newSize) override;
+
 		const Vector<uint8_t> &GetBuffer() const;
 		Vector<uint8_t> TakeBuffer();
 
@@ -162,12 +164,32 @@ inline rkit::FilePos_t rkit::BufferStream::GetSize() const
 	return static_cast<FilePos_t>(m_buffer.Count());
 }
 
+inline bool rkit::BufferStream::Truncate(FilePos_t newSize)
+{
+	if (m_buffer.Count() == newSize)
+		return true;
+
+	if (m_buffer.Count() < newSize)
+		return false;
+
+	size_t newSizeSz = static_cast<size_t>(newSize);
+
+	Result shrinkResult = m_buffer.Resize(newSizeSz);
+	if (!shrinkResult.IsOK())
+		return false;
+
+	if (m_pos > newSizeSz)
+		m_pos = newSizeSz;
+
+	return true;
+}
+
 inline const rkit::Vector<uint8_t> &rkit::BufferStream::GetBuffer() const
 {
 	return m_buffer;
 }
 
-rkit::Vector<uint8_t> rkit::BufferStream::TakeBuffer()
+inline rkit::Vector<uint8_t> rkit::BufferStream::TakeBuffer()
 {
 	m_pos = 0;
 

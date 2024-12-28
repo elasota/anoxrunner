@@ -18,6 +18,7 @@ namespace rkit::render::vulkan
 	{
 	public:
 		VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks, UniquePtr<IMutex> &&queueMutex);
+		~VulkanDevice();
 
 		ICopyCommandQueue *GetCopyQueue(size_t index) const override;
 		IComputeCommandQueue *GetComputeQueue(size_t index) const override;
@@ -94,6 +95,11 @@ namespace rkit::render::vulkan
 		, m_allocCallbacks(allocCallbacks)
 		, m_queueMutex(std::move(queueMutex))
 	{
+	}
+
+	VulkanDevice::~VulkanDevice()
+	{
+		m_vki.vkDestroyDevice(m_device, m_allocCallbacks);
 	}
 
 	Result VulkanDevice::ResolveQueues(CommandQueueType queueType, size_t firstQueueID, uint32_t queueFamily, uint32_t numQueues)

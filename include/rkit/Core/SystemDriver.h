@@ -48,6 +48,7 @@ namespace rkit
 	enum class FileLocation
 	{
 		kDataSourceDirectory,
+		kConfigDirectory,
 		kGameDirectory,
 		kAbsolute,
 	};
@@ -72,10 +73,13 @@ namespace rkit
 
 		virtual Result CreateThread(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContext) = 0;
 		virtual Result CreateMutex(UniquePtr<IMutex> &outMutex) = 0;
+		virtual Result CreateEvent(UniquePtr<IEvent> &outEvent, bool autoReset, bool startSignaled) = 0;
+		virtual void SleepMSec(uint32_t msec) const = 0;
 
 		virtual Result OpenDirectoryScan(FileLocation location, const char *path, UniquePtr<IDirectoryScan> &outDirectoryScan) = 0;
 		virtual Result GetFileAttributes(FileLocation location, const char *path, bool &outExists, FileAttributes &outAttribs) = 0;
 
+		virtual Result SetGameDirectoryOverride(const StringView &path) = 0;
 		virtual char GetPathSeparator() const = 0;
 
 		virtual IPlatformDriver *GetPlatformDriver() const = 0;

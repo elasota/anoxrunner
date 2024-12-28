@@ -154,14 +154,16 @@ namespace rkit::buildsystem
 
 		Result WritePartial(const void *data, size_t count, size_t &outCountWritten) override;
 
-		virtual Result Flush() override;
+		Result Flush() override;
 
-		virtual Result SeekStart(FilePos_t pos) override;
-		virtual Result SeekCurrent(FileOffset_t pos) override;
-		virtual Result SeekEnd(FileOffset_t pos) override;
+		Result SeekStart(FilePos_t pos) override;
+		Result SeekCurrent(FileOffset_t pos) override;
+		Result SeekEnd(FileOffset_t pos) override;
 
-		virtual FilePos_t Tell() const override;
-		virtual FilePos_t GetSize() const override;
+		FilePos_t Tell() const override;
+		FilePos_t GetSize() const override;
+
+		bool Truncate(FilePos_t newSize) override;
 
 		void FinishSHA();
 		utils::Sha256DigestBytes GetDigest() const;
@@ -916,6 +918,11 @@ namespace rkit::buildsystem
 	FilePos_t Sha256Wrapper::GetSize() const
 	{
 		return m_stream.GetSize();
+	}
+
+	bool Sha256Wrapper::Truncate(FilePos_t newSize)
+	{
+		return false;
 	}
 
 	void Sha256Wrapper::FinishSHA()

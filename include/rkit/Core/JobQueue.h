@@ -14,6 +14,7 @@ namespace rkit
 	template<class T>
 	struct ISpan;
 
+	struct IEvent;
 	struct IJobRunner;
 
 	enum class JobType
@@ -31,7 +32,7 @@ namespace rkit
 	{
 		virtual ~IJobQueue() {}
 
-		virtual Result CreateJob(RCPtr<Job> &outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<Job*> &dependencies) = 0;
+		virtual Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<Job *> *dependencies) = 0;
 
 		virtual RCPtr<Job> WaitForWork(JobType jobType, bool waitIfDepleted, IEvent *wakeEvent, IEvent *terminatedEvent) = 0;
 		virtual void Fault(const Result &result) = 0;

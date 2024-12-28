@@ -122,6 +122,11 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 #endif
 	}
 
+	if (dataDirectory.Length() > 0)
+	{
+		RKIT_CHECK(sysDriver->SetGameDirectoryOverride(dataDirectory));
+	}
+
 	if (autoBuild)
 	{
 		rkit::IModule *utilsModule = rkit::GetDrivers().m_moduleDriver->LoadModule(kAnoxNamespaceID, "Utilities");

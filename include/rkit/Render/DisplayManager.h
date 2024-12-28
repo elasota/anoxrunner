@@ -27,6 +27,7 @@ namespace rkit::render
 		virtual Result SetText(const StringView &text) = 0;
 		virtual Result SetRange(uint64_t minimum, uint64_t maximum) = 0;
 		virtual Result SetValue(uint64_t value) = 0;
+		virtual void FlushEvents() = 0;
 	};
 
 	struct IDisplay

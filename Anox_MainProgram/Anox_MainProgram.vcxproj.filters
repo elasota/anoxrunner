@@ -32,5 +32,8 @@
     <ClInclude Include="AnoxGraphicsResourceManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="AnoxGraphicsSettings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

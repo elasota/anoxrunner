@@ -13,6 +13,7 @@
 #undef GetCommandLine
 #undef CreateMutex
 #undef GetFileAttributes
+#undef CreateEvent
 
 #pragma pop_macro("WIN32_LEAN_AND_MEAN")
 #pragma pop_macro("NOMINMAX")

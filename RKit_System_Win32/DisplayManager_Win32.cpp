@@ -29,6 +29,7 @@ namespace rkit::render
 		Result SetText(const StringView &text) override;
 		Result SetRange(uint64_t minimum, uint64_t maximum) override;
 		Result SetValue(uint64_t value) override;
+		void FlushEvents() override;
 
 	private:
 		struct PrimaryMonitorSearchData
@@ -199,6 +200,8 @@ namespace rkit::render
 		::SendMessageW(m_label, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(wtext.GetBuffer()));
 
 		FlushWinMessageQueue();
+
+		return ResultCode::kOK;
 	}
 
 	Result SplashWindow_Win32::SetRange(uint64_t minimum, uint64_t maximum)
@@ -258,6 +261,11 @@ namespace rkit::render
 		FlushWinMessageQueue();
 
 		return ResultCode::kOK;
+	}
+
+	void SplashWindow_Win32::FlushEvents()
+	{
+		FlushWinMessageQueue();
 	}
 
 

@@ -18,6 +18,9 @@ namespace rkit
 		Result SeekStart(FilePos_t pos) override;
 		Result SeekCurrent(FileOffset_t pos) override;
 		Result SeekEnd(FileOffset_t pos) override;
+
+		bool Truncate(FilePos_t newSize) override;
+
 		FilePos_t Tell() const override;
 		FilePos_t GetSize() const override;
 
@@ -136,6 +139,11 @@ inline rkit::Result rkit::FixedSizeMemoryStream::SeekEnd(FileOffset_t pos)
 	m_pos = static_cast<size_t>(static_cast<FileOffset_t>(m_size) + pos);
 
 	return ResultCode::kOK;
+}
+
+inline bool rkit::FixedSizeMemoryStream::Truncate(FilePos_t newSize)
+{
+	return false;
 }
 
 inline rkit::FilePos_t rkit::FixedSizeMemoryStream::Tell() const

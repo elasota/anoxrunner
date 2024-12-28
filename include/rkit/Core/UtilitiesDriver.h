@@ -14,6 +14,7 @@ namespace rkit
 		struct IJsonDocument;
 		struct ITextParser;
 		struct ISha256Calculator;
+		struct IThreadPool;
 	}
 
 	template<class T>
@@ -54,6 +55,8 @@ namespace rkit
 
 		virtual Result CreateDeflateDecompressStream(UniquePtr<IReadStream> &outStream, UniquePtr<IReadStream> &&compressedStream) const = 0;
 		virtual Result CreateRangeLimitedReadStream(UniquePtr<IReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream, FilePos_t startPos, FilePos_t size) const = 0;
+
+		virtual Result CreateThreadPool(UniquePtr<utils::IThreadPool> &outThreadPool, uint32_t numThreads) const = 0;
 
 		virtual HashValue_t ComputeHash(HashValue_t baseHash, const void *value, size_t size) const = 0;
 

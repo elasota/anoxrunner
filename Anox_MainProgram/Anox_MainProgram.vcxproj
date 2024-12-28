@@ -142,6 +142,7 @@
   <ItemGroup>
     <ClInclude Include="..\include\anox\AnoxGraphicsSubsystem.h" />
     <ClInclude Include="AnoxGraphicsResourceManager.h" />
+    <ClInclude Include="AnoxGraphicsSettings.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -87,6 +87,7 @@
     <ClCompile Include="RangeLimitedReadStream.cpp" />
     <ClCompile Include="Sha2Calculator.cpp" />
     <ClCompile Include="TextParser.cpp" />
+    <ClCompile Include="ThreadPool.cpp" />
     <ClCompile Include="Utilities.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -126,6 +127,7 @@
     <ClInclude Include="..\include\rkit\Core\UniquePtr.h" />
     <ClInclude Include="..\include\rkit\Core\UtilitiesDriver.h" />
     <ClInclude Include="..\include\rkit\Core\Vector.h" />
+    <ClInclude Include="..\include\rkit\Utilities\IShadowFile.h" />
     <ClInclude Include="DeflateDecompressStream.h" />
     <ClInclude Include="JobQueue.h" />
     <ClInclude Include="Json.h" />
@@ -133,6 +135,7 @@
     <ClInclude Include="RangeLimitedReadStream.h" />
     <ClInclude Include="Sha2Calculator.h" />
     <ClInclude Include="TextParser.h" />
+    <ClInclude Include="ThreadPool.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\zlib\zlib.vcxproj">

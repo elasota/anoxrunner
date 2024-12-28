@@ -1,0 +1,64 @@
+Shadowfile format:
+
+Shadowfiles are a copy-on-write transacted file archive format.
+
+ShadowFileLocator
+{
+	uint32_t extentsSectorListSector
+	uint32_t extentsTableSize
+	uint32_t fsRootExtentsStart
+}
+
+ShadowFileHeader
+{
+	char identifier[4];	// RSFS
+	uint16_t version;	// 1
+	uint8_t activeLocator;	// 0 or 1
+	uint8_t sectorSizeBits;
+	ShadowFileLocator locators[2];
+}
+
+
+Fields in the locator:
+- extentsSectorListSector: The sector containing the list of sectors of the extents table
+- extentsTableSize: The number of extents table entries (used and unused)
+- fsRootExtentsStart: The extents table entry for the FS root
+
+Extents table format:
+ExtentsEntry
+{
+	uint32_t sector (0 if unused)
+	uint32_t nextExtents (loops back to start)
+}
+
+FS root format:
+FSRoot
+{
+	uint32_t fileTableExtentsStart
+	uint32_t numFileTableEntries
+}
+
+
+- fileTableExtentsStart: The first extents of the file table
+- numFileTableEntries: The number of file records
+
+The root directory is always file table entry 0
+
+
+FileTableEntry
+{
+	char name[256]
+	uint32_t flags
+	uint32_t extentsStart
+	uint64_t size
+
+	byte[sector size - 272]	initialData
+}
+
+- name: The name of the file, must be null-terminated
+- flags: Bitfield, 1 = is directory
+- extentsStart: First entry of the extents table, unused if size is (sector size - 272) or less
+- size: Data size
+- initialData: First bytes of file data
+
+In the case of directories, size is divisible by 4 and corresponds to a list of file table entries
