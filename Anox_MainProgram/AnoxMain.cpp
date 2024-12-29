@@ -127,6 +127,9 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 		RKIT_CHECK(sysDriver->SetGameDirectoryOverride(dataDirectory));
 	}
 
+	// FIXME: Move this to RKit Config
+	RKIT_CHECK(sysDriver->SetSettingsDirectory("AnoxRunner"));
+
 	if (autoBuild)
 	{
 		rkit::IModule *utilsModule = rkit::GetDrivers().m_moduleDriver->LoadModule(kAnoxNamespaceID, "Utilities");

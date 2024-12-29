@@ -9,6 +9,7 @@
 #include "VulkanAPI.h"
 #include "VulkanAPILoader.h"
 #include "VulkanDevice.h"
+#include "VulkanPipelineLibraryLoader.h"
 #include "VulkanQueueProxy.h"
 
 
@@ -29,6 +30,10 @@ namespace rkit::render::vulkan
 		const VkAllocationCallbacks *GetAllocCallbacks() const override;
 
 		Result CreateCPUWaitableFence(UniquePtr<ICPUWaitableFence> &outFence) override;
+
+		Result CreatePipelineLibraryLoader(UniquePtr<IPipelineLibraryLoader> &loader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
+			UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart,
+			UniquePtr<utils::IShadowFile> &&cacheShadowFile, UniquePtr<ISeekableReadWriteStream> &&cacheStream) override;
 
 		Result LoadDeviceAPI();
 		Result ResolveQueues(CommandQueueType queueType, size_t firstQueueID, uint32_t queueFamily, uint32_t numQueues);
@@ -153,6 +158,20 @@ namespace rkit::render::vulkan
 
 	Result VulkanDevice::CreateCPUWaitableFence(UniquePtr<ICPUWaitableFence> &outFence)
 	{
+		return ResultCode::kNotYetImplemented;
+	}
+
+
+	Result VulkanDevice::CreatePipelineLibraryLoader(UniquePtr<IPipelineLibraryLoader> &outLoader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
+		UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart,
+		UniquePtr<utils::IShadowFile> &&cacheShadowFile, UniquePtr<ISeekableReadWriteStream> &&cacheStream)
+	{
+		UniquePtr<PipelineLibraryLoaderBase> loader;
+		RKIT_CHECK(PipelineLibraryLoaderBase::Create(*this, loader, std::move(validator),
+			std::move(package), std::move(packageStream), packageBinaryContentStart, std::move(cacheShadowFile), std::move(cacheStream)));
+
+		outLoader = std::move(loader);
+
 		return ResultCode::kOK;
 	}
 

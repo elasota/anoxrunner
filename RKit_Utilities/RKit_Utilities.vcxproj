@@ -86,6 +86,7 @@
     <ClCompile Include="MutexProtectedStream.cpp" />
     <ClCompile Include="RangeLimitedReadStream.cpp" />
     <ClCompile Include="Sha2Calculator.cpp" />
+    <ClCompile Include="ShadowFile.cpp" />
     <ClCompile Include="TextParser.cpp" />
     <ClCompile Include="ThreadPool.cpp" />
     <ClCompile Include="Utilities.cpp" />
@@ -134,6 +135,7 @@
     <ClInclude Include="MutexProtectedStream.h" />
     <ClInclude Include="RangeLimitedReadStream.h" />
     <ClInclude Include="Sha2Calculator.h" />
+    <ClInclude Include="ShadowFile.h" />
     <ClInclude Include="TextParser.h" />
     <ClInclude Include="ThreadPool.h" />
   </ItemGroup>

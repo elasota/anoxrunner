@@ -139,6 +139,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="VulkanPipelineLibraryLoader.cpp" />
     <ClCompile Include="VulkanQueueProxy.cpp" />
     <ClCompile Include="RenderVulkan.cpp" />
     <ClCompile Include="VulkanAPI.cpp" />
@@ -158,6 +159,7 @@
     <ClInclude Include="VulkanCommandList.h" />
     <ClInclude Include="VulkanDevice.h" />
     <ClInclude Include="VulkanPhysDevice.h" />
+    <ClInclude Include="VulkanPipelineLibraryLoader.h" />
     <ClInclude Include="VulkanQueueProxy.h" />
     <ClInclude Include="VulkanSync.h" />
   </ItemGroup>

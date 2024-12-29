@@ -49,10 +49,8 @@ FileTableEntry
 {
 	char name[256]
 	uint32_t flags
-	uint32_t extentsStart
+	uint32_t extentsStart (only if size is not zero)
 	uint64_t size
-
-	byte[sector size - 272]	initialData
 }
 
 - name: The name of the file, must be null-terminated

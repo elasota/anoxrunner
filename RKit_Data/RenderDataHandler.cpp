@@ -465,7 +465,7 @@ namespace rkit::data
 		template<class T, RenderRTTINumberBitSize TBitSize, RenderRTTINumberRepresentation TRepresentation>
 		const RenderRTTINumberType RTTIAutoNumber<T, TBitSize, TRepresentation>::ms_type =
 		{
-			{ RenderRTTIType::Number },
+			{ RenderRTTIType::Number, RenderRTTIMainType::Invalid },
 
 			TBitSize,
 			TRepresentation,
@@ -1171,12 +1171,13 @@ namespace rkit::data
 
 		IRenderRTTIListBase *GetIndexable(RenderRTTIIndexableStructType indexable) const override;
 		const ConfigKey &GetConfigKey(size_t index) const override;
+		size_t GetConfigKeyCount() const override;
 		StringView GetString(size_t stringIndex) const override;
 
 		size_t GetBinaryContentCount() const override;
 		size_t GetBinaryContentSize(size_t binaryContentIndex) const override;
 
-		Result Load(const IRenderDataHandler *handler, bool allowTempStrings, IReadStream &stream);
+		Result Load(const IRenderDataHandler *handler, bool allowTempStrings, IRenderDataConfigurator *configurator, IReadStream &stream);
 
 	private:
 		struct StringOffsetAndSize
@@ -1211,11 +1212,11 @@ namespace rkit::data
 
 		static uint64_t DecodeUInt64(uint8_t (&bytes)[8]);
 
-		Result ReadStructure(void *obj, const RenderRTTIStructType *rtti, IReadStream &stream) const;
-		Result ReadObject(void *obj, const RenderRTTITypeBase *rtti, bool isConfigurable, bool isNullable, IReadStream &stream) const;
-		Result ReadEnum(void *obj, const RenderRTTIEnumType *rtti, bool isConfigurable, IReadStream &stream) const;
-		Result ReadNumber(void *obj, const RenderRTTINumberType *rtti, bool isConfigurable, IReadStream &stream) const;
-		Result ReadValueType(void *obj, IReadStream &stream) const;
+		Result ReadStructure(void *obj, const RenderRTTIStructType *rtti, IReadStream &stream, IRenderDataConfigurator *configurator) const;
+		Result ReadObject(void *obj, const RenderRTTITypeBase *rtti, bool isConfigurable, bool isNullable, IReadStream &stream, IRenderDataConfigurator *configurator) const;
+		Result ReadEnum(void *obj, const RenderRTTIEnumType *rtti, bool isConfigurable, IReadStream &stream, IRenderDataConfigurator *configurator) const;
+		Result ReadNumber(void *obj, const RenderRTTINumberType *rtti, bool isConfigurable, IReadStream &stream, IRenderDataConfigurator *configurator) const;
+		Result ReadValueType(void *obj, IReadStream &stream, IRenderDataConfigurator *configurator) const;
 		Result ReadStringIndex(void *obj, const data::RenderRTTIStringIndexType *rtti, IReadStream &stream) const;
 		Result ReadBinaryContent(void *obj, IReadStream &stream) const;
 		Result ReadObjectPtr(void *obj, const data::RenderRTTIObjectPtrType *rtti, bool isNullable, IReadStream &stream) const;
@@ -1257,6 +1258,11 @@ namespace rkit::data
 		return m_configKeys[index];
 	}
 
+	size_t Package::GetConfigKeyCount() const
+	{
+		return m_configKeys.Count();
+	}
+
 	StringView Package::GetString(size_t stringIndex) const
 	{
 		const StringOffsetAndSize &str = m_strings[stringIndex];
@@ -1274,7 +1280,7 @@ namespace rkit::data
 		return m_binaryContentSizes[binaryContentIndex];
 	}
 
-	Result Package::Load(const IRenderDataHandler *handler, bool allowTempStrings, IReadStream &stream)
+	Result Package::Load(const IRenderDataHandler *handler, bool allowTempStrings, IRenderDataConfigurator *configurator, IReadStream &stream)
 	{
 		m_hasTempStrings = allowTempStrings;
 
@@ -1434,7 +1440,7 @@ namespace rkit::data
 			{
 				void *elementData = objectList.GetElementPtr(j);
 
-				RKIT_CHECK(ReadStructure(elementData, structType, stream));
+				RKIT_CHECK(ReadStructure(elementData, structType, stream, configurator));
 			}
 		}
 
@@ -1586,7 +1592,7 @@ namespace rkit::data
 		return result;
 	}
 
-	Result Package::ReadStructure(void *obj, const RenderRTTIStructType *rtti, IReadStream &stream) const
+	Result Package::ReadStructure(void *obj, const RenderRTTIStructType *rtti, IReadStream &stream, IRenderDataConfigurator *configurator) const
 	{
 		for (size_t i = 0; i < rtti->m_numFields; i++)
 		{
@@ -1595,26 +1601,26 @@ namespace rkit::data
 			void *memberPtr = field->m_getMemberPtrFunc(obj);
 			const data::RenderRTTITypeBase *fieldRTTI = field->m_getTypeFunc();
 
-			RKIT_CHECK(ReadObject(memberPtr, fieldRTTI, field->m_isConfigurable, field->m_isNullable, stream));
+			RKIT_CHECK(ReadObject(memberPtr, fieldRTTI, field->m_isConfigurable, field->m_isNullable, stream, configurator));
 		}
 
 		return ResultCode::kOK;
 	}
 
-	Result Package::ReadObject(void *obj, const data::RenderRTTITypeBase *rtti, bool isConfigurable, bool isNullable, IReadStream &stream) const
+	Result Package::ReadObject(void *obj, const data::RenderRTTITypeBase *rtti, bool isConfigurable, bool isNullable, IReadStream &stream, IRenderDataConfigurator *configurator) const
 	{
 		switch (rtti->m_type)
 		{
 		case data::RenderRTTIType::Enum:
-			return ReadEnum(obj, reinterpret_cast<const data::RenderRTTIEnumType *>(rtti), isConfigurable, stream);
+			return ReadEnum(obj, reinterpret_cast<const data::RenderRTTIEnumType *>(rtti), isConfigurable, stream, configurator);
 		case data::RenderRTTIType::Structure:
 			RKIT_ASSERT(!isConfigurable);
-			return ReadStructure(obj, reinterpret_cast<const data::RenderRTTIStructType *>(rtti), stream);
+			return ReadStructure(obj, reinterpret_cast<const data::RenderRTTIStructType *>(rtti), stream, configurator);
 		case data::RenderRTTIType::Number:
-			return ReadNumber(obj, reinterpret_cast<const data::RenderRTTINumberType *>(rtti), isConfigurable, stream);
+			return ReadNumber(obj, reinterpret_cast<const data::RenderRTTINumberType *>(rtti), isConfigurable, stream, configurator);
 		case data::RenderRTTIType::ValueType:
 			RKIT_ASSERT(!isConfigurable);
-			return ReadValueType(obj, stream);
+			return ReadValueType(obj, stream, configurator);
 		case data::RenderRTTIType::StringIndex:
 			RKIT_ASSERT(!isConfigurable);
 			return ReadStringIndex(obj, reinterpret_cast<const data::RenderRTTIStringIndexType *>(rtti), stream);
@@ -1632,7 +1638,7 @@ namespace rkit::data
 		}
 	}
 
-	Result Package::ReadEnum(void *obj, const RenderRTTIEnumType *rtti, bool isConfigurable, IReadStream &stream) const
+	Result Package::ReadEnum(void *obj, const RenderRTTIEnumType *rtti, bool isConfigurable, IReadStream &stream, IRenderDataConfigurator *configurator) const
 	{
 		if (isConfigurable)
 		{
@@ -1649,7 +1655,16 @@ namespace rkit::data
 				{
 					render::ConfigStringIndex_t cfgKey;
 					RKIT_CHECK(ReadConfigurationKey(cfgKey, stream));
-					rtti->m_writeConfigurableNameFunc(obj, cfgKey);
+
+					bool isConfiguredValue = false;
+					unsigned int configuredValue = 0;
+					if (configurator)
+					{
+						RKIT_CHECK(configurator->GetEnumConfigKey(cfgKey.GetIndex(), this->GetString(m_configKeys[cfgKey.GetIndex()].m_stringIndex), rtti->m_base.m_mainType, configuredValue));
+						rtti->m_writeConfigurableValueFunc(obj, configuredValue);
+					}
+					else
+						rtti->m_writeConfigurableNameFunc(obj, cfgKey);
 				}
 				return ResultCode::kOK;
 			case static_cast<uint8_t>(render::ConfigurableValueState::Explicit):
@@ -1685,7 +1700,7 @@ namespace rkit::data
 		}
 	}
 
-	Result Package::ReadNumber(void *obj, const RenderRTTINumberType *rtti, bool isConfigurable, IReadStream &stream) const
+	Result Package::ReadNumber(void *obj, const RenderRTTINumberType *rtti, bool isConfigurable, IReadStream &stream, IRenderDataConfigurator *configurator) const
 	{
 		const data::RenderRTTINumberTypeIOFunctions *ioFuncs = nullptr;
 
@@ -1703,7 +1718,38 @@ namespace rkit::data
 				{
 					render::ConfigStringIndex_t cfgKey;
 					RKIT_CHECK(ReadConfigurationKey(cfgKey, stream));
-					rtti->m_writeConfigurableNameFunc(obj, cfgKey);
+
+					if (configurator)
+					{
+						StringView keyName = GetString(GetConfigKey(cfgKey.GetIndex()).m_stringIndex);
+
+						switch (rtti->m_representation)
+						{
+						case data::RenderRTTINumberRepresentation::Float:
+							{
+								double value = 0;
+								RKIT_CHECK(configurator->GetFloatConfigKey(cfgKey.GetIndex(), keyName, value));
+								rtti->m_configurableFunctions.m_writeValueFloatFunc(obj, value);
+							}
+							break;
+						case data::RenderRTTINumberRepresentation::SignedInt:
+							{
+								int64_t value = 0;
+								RKIT_CHECK(configurator->GetSIntConfigKey(cfgKey.GetIndex(), keyName, value));
+								rtti->m_configurableFunctions.m_writeValueSIntFunc(obj, value);
+							}
+							break;
+						case data::RenderRTTINumberRepresentation::UnsignedInt:
+							{
+								uint64_t value = 0;
+								RKIT_CHECK(configurator->GetUIntConfigKey(cfgKey.GetIndex(), keyName, value));
+								rtti->m_configurableFunctions.m_writeValueUIntFunc(obj, value);
+							}
+							break;
+						}
+					}
+					else
+						rtti->m_writeConfigurableNameFunc(obj, cfgKey);
 				}
 				return ResultCode::kOK;
 			case static_cast<uint8_t>(render::ConfigurableValueState::Explicit):
@@ -1826,7 +1872,7 @@ namespace rkit::data
 		}
 	}
 
-	Result Package::ReadValueType(void *obj, IReadStream &stream) const
+	Result Package::ReadValueType(void *obj, IReadStream &stream, IRenderDataConfigurator *configurator) const
 	{
 		render::ValueType *vt = static_cast<render::ValueType *>(obj);
 
@@ -1838,7 +1884,7 @@ namespace rkit::data
 		case static_cast<uint8_t>(render::ValueTypeType::Numeric):
 			{
 				render::NumericType nt = render::NumericType::UInt8;
-				RKIT_CHECK(ReadEnum(&nt, reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::NumericType>::GetRTTIType()), false, stream));
+				RKIT_CHECK(ReadEnum(&nt, reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::NumericType>::GetRTTIType()), false, stream, configurator));
 				*vt = render::ValueType(nt);
 			}
 			return ResultCode::kOK;
@@ -2116,12 +2162,12 @@ namespace rkit::data
 		return RKIT_FOURCC('R', 'P', 'K', 'G');
 	}
 
-	Result RenderDataHandler::LoadPackage(IReadStream &stream, bool allowTempStrings, UniquePtr<IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *outBinaryContent) const
+	Result RenderDataHandler::LoadPackage(IReadStream &stream, bool allowTempStrings, data::IRenderDataConfigurator *configurator, UniquePtr<IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *outBinaryContent) const
 	{
 		UniquePtr<Package> package;
 		RKIT_CHECK(New<Package>(package));
 
-		RKIT_CHECK(package->Load(this, allowTempStrings, stream));
+		RKIT_CHECK(package->Load(this, allowTempStrings, configurator, stream));
 
 		if (outBinaryContent)
 		{

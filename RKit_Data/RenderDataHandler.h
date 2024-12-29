@@ -28,6 +28,6 @@ namespace rkit::data
 		uint32_t GetPackageVersion() const override;
 		uint32_t GetPackageIdentifier() const override;
 
-		Result LoadPackage(IReadStream &stream, bool allowTempStrings, UniquePtr<IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *outBinaryContent) const override;
+		Result LoadPackage(IReadStream &stream, bool allowTempStrings, data::IRenderDataConfigurator *configurator, UniquePtr<IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *outBinaryContent) const override;
 	};
 }

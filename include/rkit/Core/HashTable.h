@@ -94,8 +94,8 @@ namespace rkit
 		friend class HashMapConstIterator<TKey, TValue, TSize>;
 
 	public:
-		HashMapIterator<TKey, TValue, TSize> operator++();
-		HashMapIterator<TKey, TValue, TSize>& operator++(int);
+		HashMapIterator<TKey, TValue, TSize> &operator++();
+		HashMapIterator<TKey, TValue, TSize> operator++(int);
 
 		bool operator==(const HashMapIterator<TKey, TValue, TSize> &other) const;
 		bool operator!=(const HashMapIterator<TKey, TValue, TSize> &other) const;
@@ -327,15 +327,15 @@ inline void rkit::HashMapValueContainer<void>::RelocateValue(size_t thisIndex, H
 
 // HashMapIterator
 template<class TKey, class TValue, class TSize>
-rkit::HashMapIterator<TKey, TValue, TSize> rkit::HashMapIterator<TKey, TValue, TSize>::operator++()
+rkit::HashMapIterator<TKey, TValue, TSize> &rkit::HashMapIterator<TKey, TValue, TSize>::operator++()
 {
-	m_offset++;
+	++m_offset;
 	this->Normalize();
 	return *this;
 }
 
 template<class TKey, class TValue, class TSize>
-rkit::HashMapIterator<TKey, TValue, TSize> &rkit::HashMapIterator<TKey, TValue, TSize>::operator++(int)
+rkit::HashMapIterator<TKey, TValue, TSize> rkit::HashMapIterator<TKey, TValue, TSize>::operator++(int)
 {
 	TSize oldOffset = m_offset;
 

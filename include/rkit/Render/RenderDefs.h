@@ -65,7 +65,7 @@ namespace rkit::render
 	struct NoDefault
 	{
 		static bool HasDefault() { return false; }
-		static T GetDefault() { T(); }
+		static T GetDefault() { return T(); }
 	};
 
 	enum class ConfigurableValueState : uint8_t

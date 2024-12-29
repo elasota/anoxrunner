@@ -2262,7 +2262,7 @@ namespace rkit::buildsystem::rpc_combiner
 		UniquePtr<data::IRenderDataPackage> pkg;
 		Vector<Vector<uint8_t>> binaryContent;
 
-		RKIT_CHECK(m_dataDriver->GetRenderDataHandler()->LoadPackage(stream, false, pkg, &binaryContent));
+		RKIT_CHECK(m_dataDriver->GetRenderDataHandler()->LoadPackage(stream, false, nullptr, pkg, &binaryContent));
 
 		PackageInputResolver resolver(*pkg, binaryContent.ToSpan());
 		m_pkgBuilder->BeginSource(&resolver);

@@ -45,6 +45,9 @@
     <ClCompile Include="ThreadPool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ShadowFile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TextParser.h">
@@ -181,6 +184,9 @@
     </ClInclude>
     <ClInclude Include="..\include\rkit\Utilities\IShadowFile.h">
       <Filter>Header Files\rkit</Filter>
+    </ClInclude>
+    <ClInclude Include="ShadowFile.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

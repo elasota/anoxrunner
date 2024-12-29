@@ -58,6 +58,7 @@ namespace rkit::utils
 		~JobQueue();
 
 		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<Job *> *dependencies) override;
+		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<RCPtr<Job> > &dependencies) override;
 
 		// Waits for work from a job queue.
 		// If "waitIfDepleted" is set, then wakeEvent must be an auto-reset event and terminatedEvent must not be signaled
@@ -266,6 +267,34 @@ namespace rkit::utils
 			*outJob = std::move(resultJob);
 
 		return ResultCode::kOK;
+	}
+
+	Result JobQueue::CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<RCPtr<Job> > &dependencies)
+	{
+		struct SpanConverter final : public rkit::ISpan<rkit::Job *>
+		{
+			explicit SpanConverter(const ISpan<RCPtr<Job> > &baseSpan)
+				: m_baseSpan(baseSpan)
+			{
+			}
+
+			size_t Count() const override
+			{
+				return m_baseSpan.Count();
+			}
+
+			rkit::Job *operator[](size_t index) const
+			{
+				return m_baseSpan[index].Get();
+			}
+
+		private:
+			const ISpan<RCPtr<Job> > &m_baseSpan;
+		};
+
+		SpanConverter spanConverter(dependencies);
+
+		return CreateJob(outJob, jobType, std::move(jobRunner), &spanConverter);
 	}
 
 	void JobQueue::AddRunnableJob(const RCPtr<JobImpl> &job, size_t jobTypeIndex)

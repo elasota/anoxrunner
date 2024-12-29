@@ -14,6 +14,7 @@
 #include "MutexProtectedStream.h"
 #include "RangeLimitedReadStream.h"
 #include "Sha2Calculator.h"
+#include "ShadowFile.h"
 #include "TextParser.h"
 #include "ThreadPool.h"
 
@@ -38,6 +39,10 @@ namespace rkit
 		Result CreateMutexProtectedReadWriteStream(SharedPtr<IMutexProtectedReadWriteStream> &outStream, UniquePtr<ISeekableReadWriteStream> &&stream) const override;
 		Result CreateMutexProtectedReadStream(SharedPtr<IMutexProtectedReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream) const override;
 		Result CreateMutexProtectedWriteStream(SharedPtr<IMutexProtectedWriteStream> &outStream, UniquePtr<ISeekableWriteStream> &&stream) const override;
+
+		Result OpenShadowFileRead(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadStream &stream) const override;
+		Result OpenShadowFileReadWrite(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadWriteStream &stream) const override;
+		Result InitializeShadowFile(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadWriteStream &stream) const override;
 
 		Result CreateDeflateDecompressStream(UniquePtr<IReadStream> &outStream, UniquePtr<IReadStream> &&compressedStream) const override;
 		Result CreateRangeLimitedReadStream(UniquePtr<IReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream, FilePos_t startPos, FilePos_t size) const override;
@@ -169,6 +174,42 @@ namespace rkit
 		sharedWrapper->SetTracker(sharedWrapper.GetTracker());
 
 		outStream = SharedPtr<IMutexProtectedWriteStream>(std::move(sharedWrapper));
+
+		return ResultCode::kOK;
+	}
+
+	Result UtilitiesDriver::OpenShadowFileRead(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadStream &stream) const
+	{
+		UniquePtr<utils::ShadowFileBase> shadowFile;
+		RKIT_CHECK(utils::ShadowFileBase::Create(shadowFile, stream, nullptr));
+
+		RKIT_CHECK(shadowFile->LoadShadowFile());
+
+		outShadowFile = std::move(shadowFile);
+
+		return ResultCode::kOK;
+	}
+
+	Result UtilitiesDriver::OpenShadowFileReadWrite(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadWriteStream &stream) const
+	{
+		UniquePtr<utils::ShadowFileBase> shadowFile;
+		RKIT_CHECK(utils::ShadowFileBase::Create(shadowFile, stream, &stream));
+
+		RKIT_CHECK(shadowFile->LoadShadowFile());
+
+		outShadowFile = std::move(shadowFile);
+
+		return ResultCode::kOK;
+	}
+
+	Result UtilitiesDriver::InitializeShadowFile(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadWriteStream &stream) const
+	{
+		UniquePtr<utils::ShadowFileBase> shadowFile;
+		RKIT_CHECK(utils::ShadowFileBase::Create(shadowFile, stream, &stream));
+
+		RKIT_CHECK(shadowFile->InitializeShadowFile());
+
+		outShadowFile = std::move(shadowFile);
 
 		return ResultCode::kOK;
 	}

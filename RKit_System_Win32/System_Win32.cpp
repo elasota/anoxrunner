@@ -22,8 +22,10 @@
 #include "ConvUtil.h"
 
 #include <shellapi.h>
+#include <ShlObj.h>
 #include <Shlwapi.h>
 #include <timezoneapi.h>
+#include <KnownFolders.h>
 
 
 namespace rkit
@@ -175,6 +177,7 @@ namespace rkit
 		Result ResolveFilePath(FileLocation location, const char *path, Vector<wchar_t> &outPath);
 
 		Result SetGameDirectoryOverride(const StringView &path) override;
+		Result SetSettingsDirectory(const StringView &path) override;
 		char GetPathSeparator() const override;
 
 		IPlatformDriver *GetPlatformDriver() const override;
@@ -201,7 +204,8 @@ namespace rkit
 		UniquePtr<render::DisplayManagerBase_Win32> m_displayManager;
 		LPWSTR *m_argvW;
 
-		String m_gameDirectoryOverride;
+		WString m_gameDirectoryOverride;
+		WString m_settingsDirectory;
 
 		HINSTANCE m_hInstance;
 	};
@@ -428,6 +432,9 @@ namespace rkit
 		}
 
 		BOOL succeeded = ::SetEndOfFile(m_hfile);
+
+		if (succeeded)
+			m_fileSize = newSize;
 
 		if (oldFilePos < newSize)
 		{
@@ -953,7 +960,42 @@ namespace rkit
 
 	Result SystemDriver_Win32::SetGameDirectoryOverride(const StringView &path)
 	{
-		return m_gameDirectoryOverride.Set(path);
+		Vector<wchar_t> str;
+		RKIT_CHECK(ConvUtil_Win32::UTF8ToUTF16(path.GetChars(), str));
+		str[str.Count() - 1] = L'\\';
+
+		return m_gameDirectoryOverride.Set(str.ToSpan());
+	}
+
+	Result SystemDriver_Win32::SetSettingsDirectory(const StringView &path)
+	{
+		Vector<wchar_t> fullPath;
+
+		wchar_t *docsPath = nullptr;
+		HRESULT hr = SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &docsPath);
+		if (!SUCCEEDED(hr))
+			return Result(ResultCode::kOperationFailed, static_cast<uint32_t>(hr));
+
+		Result resizeResult = fullPath.Resize(wcslen(docsPath) + 1);
+		if (!resizeResult.IsOK())
+		{
+			CoTaskMemFree(docsPath);
+			return resizeResult;
+		}
+		wcscpy(fullPath.GetBuffer(), docsPath);
+
+		CoTaskMemFree(docsPath);
+
+		fullPath[fullPath.Count() - 1] = L'\\';
+
+		Vector<wchar_t> convertedPath;
+		RKIT_CHECK(ConvUtil_Win32::UTF8ToUTF16(path.GetChars(), convertedPath));
+
+		RKIT_CHECK(fullPath.Append(convertedPath.ToSpan()));
+		fullPath[fullPath.Count() - 1] = L'\\';
+		RKIT_CHECK(fullPath.Append(L'\0'));
+
+		return m_settingsDirectory.Set(fullPath.ToSpan());
 	}
 
 	char SystemDriver_Win32::GetPathSeparator() const
@@ -1151,11 +1193,16 @@ namespace rkit
 				if (m_gameDirectoryOverride.Length() == 0)
 					return ResultCode::kInvalidParameter;
 
-				RKIT_CHECK(ConvUtil_Win32::UTF8ToUTF16(m_gameDirectoryOverride.CStr(), filePathWChars));
-				filePathWChars[filePathWChars.Count() - 1] = L'\\';
-				RKIT_CHECK(filePathWChars.Append(L'\0'));
+				baseW = m_gameDirectoryOverride.CStr();
+			}
+			break;
 
-				baseW = filePathWChars.GetBuffer();
+		case FileLocation::kUserSettingsDirectory:
+			{
+				if (m_settingsDirectory.Length() == 0)
+					return ResultCode::kInvalidParameter;
+
+				baseW = m_settingsDirectory.CStr();
 			}
 			break;
 

@@ -156,7 +156,19 @@ namespace rkit
 	bool CompareSpansEqual(const Span<const T> &dest, const Span<const T> &src);
 
 	template<class T, class TComparer = DefaultComparer<T>>
+	bool CompareSpansEqual(const Span<const T> &dest, const Span<T> &src);
+
+	template<class T, class TComparer = DefaultComparer<T>>
+	bool CompareSpansEqual(const Span<T> &dest, const Span<const T> &src);
+
+	template<class T, class TComparer = DefaultComparer<T>>
 	int CompareSpans(const Span<const T> &dest, const Span<const T> &src);
+
+	template<class T, class TComparer = DefaultComparer<T>>
+	int CompareSpans(const Span<T> &dest, const Span<const T> &src);
+
+	template<class T, class TComparer = DefaultComparer<T>>
+	int CompareSpans(const Span<const T> &dest, const Span<T> &src);
 }
 
 #include "CoreDefs.h"
@@ -625,6 +637,18 @@ bool rkit::CompareSpansEqual(const Span<const T> &srcA, const Span<const T> &src
 }
 
 template<class T, class TComparer>
+bool rkit::CompareSpansEqual(const Span<const T> &srcA, const Span<T> &srcB)
+{
+	return CompareSpansEqual(srcA, Span<const T>(srcB));
+}
+
+template<class T, class TComparer>
+bool rkit::CompareSpansEqual(const Span<T> &srcA, const Span<const T> &srcB)
+{
+	return CompareSpansEqual(Span<const T>(srcA), srcB);
+}
+
+template<class T, class TComparer>
 int rkit::CompareSpans(const Span<const T> &srcA, const Span<const T> &srcB)
 {
 	if (srcA.Count() > srcB.Count())
@@ -645,4 +669,16 @@ int rkit::CompareSpans(const Span<const T> &srcA, const Span<const T> &srcB)
 	}
 
 	return 0;
+}
+
+template<class T, class TComparer>
+int rkit::CompareSpans(const Span<const T> &srcA, const Span<T> &srcB)
+{
+	return CompareSpans(srcA, Span<const T>(srcB));
+}
+
+template<class T, class TComparer>
+int rkit::CompareSpans(const Span<T> &srcA, const Span<const T> &srcB)
+{
+	return CompareSpans(Span<const T>(srcA), srcB);
 }

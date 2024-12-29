@@ -54,7 +54,6 @@ namespace rkit
 		{
 			typedef typename THelper::Number_t Number_t;
 
-
 			SwappableNumber();
 			explicit SwappableNumber(Number_t value);
 			SwappableNumber(const SwappableNumber<THelper> &other) = default;

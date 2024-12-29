@@ -729,7 +729,7 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::CreateAndReturnUninitializedS
 	BaseStringConstructionBuffer<TChar> constructionBuffer;
 	RKIT_CHECK(constructionBuffer.Allocate(numChars));
 
-	Span<char> constructedSpan = constructionBuffer.GetSpan();
+	Span<TChar> constructedSpan = constructionBuffer.GetSpan();
 	constructionBuffer.Detach();
 
 	outStr.m_length = constructedSpan.Count();

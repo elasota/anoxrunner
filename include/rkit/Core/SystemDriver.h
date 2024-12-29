@@ -50,6 +50,7 @@ namespace rkit
 		kDataSourceDirectory,
 		kConfigDirectory,
 		kGameDirectory,
+		kUserSettingsDirectory,
 		kAbsolute,
 	};
 
@@ -80,6 +81,7 @@ namespace rkit
 		virtual Result GetFileAttributes(FileLocation location, const char *path, bool &outExists, FileAttributes &outAttribs) = 0;
 
 		virtual Result SetGameDirectoryOverride(const StringView &path) = 0;
+		virtual Result SetSettingsDirectory(const StringView &path) = 0;
 		virtual char GetPathSeparator() const = 0;
 
 		virtual IPlatformDriver *GetPlatformDriver() const = 0;

@@ -314,9 +314,20 @@ namespace rkit::data
 
 		virtual IRenderRTTIListBase *GetIndexable(RenderRTTIIndexableStructType indexable) const = 0;
 		virtual const ConfigKey &GetConfigKey(size_t index) const = 0;
+		virtual size_t GetConfigKeyCount() const = 0;
 		virtual StringView GetString(size_t stringIndex) const = 0;
 		virtual size_t GetBinaryContentCount() const = 0;
 		virtual size_t GetBinaryContentSize(size_t binaryContentIndex) const = 0;
+	};
+
+	struct IRenderDataConfigurator
+	{
+		virtual Result GetEnumConfigKey(size_t configKeyIndex, const rkit::StringView &keyName, RenderRTTIMainType expectedMainType, unsigned int &outValue) = 0;
+		virtual Result GetFloatConfigKey(size_t configKeyIndex, const rkit::StringView &keyName, double &outValue) = 0;
+		virtual Result GetSIntConfigKey(size_t configKeyIndex, const rkit::StringView &keyName, int64_t &outValue) = 0;
+		virtual Result GetUIntConfigKey(size_t configKeyIndex, const rkit::StringView &keyName, uint64_t &outValue) = 0;
+
+		virtual Result GetShaderStaticPermutation(size_t stringIndex, const rkit::StringView &permutationName, bool &outIsStatic, int &outStaticValue) = 0;
 	};
 
 	struct IRenderDataHandler
@@ -343,6 +354,6 @@ namespace rkit::data
 		virtual uint32_t GetPackageVersion() const = 0;
 		virtual uint32_t GetPackageIdentifier() const = 0;
 
-		virtual Result LoadPackage(IReadStream &stream, bool allowTempStrings, UniquePtr<IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *outBinaryContent) const = 0;
+		virtual Result LoadPackage(IReadStream &stream, bool allowTempStrings, IRenderDataConfigurator *configurator, UniquePtr<IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *outBinaryContent) const = 0;
 	};
 }

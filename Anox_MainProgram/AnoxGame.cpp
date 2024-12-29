@@ -44,6 +44,13 @@ namespace anox
 {
 	AnoxGame::~AnoxGame()
 	{
+		if (m_threadPool.IsValid())
+		{
+			// Flush all thread pool tasks before tearing down subsystems in case there are any leftover jobs
+			// from a subsystem
+			(void) m_threadPool->Close();
+		}
+
 		m_graphicsSubsystem.Reset();
 		m_threadPool.Reset();
 	}

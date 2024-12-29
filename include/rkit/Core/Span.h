@@ -15,6 +15,12 @@ namespace rkit
 	struct ISpan;
 
 	template<class T>
+	struct SpanToISpanValueWrapper;
+
+	template<class T>
+	struct SpanToISpanRefWrapper;
+
+	template<class T>
 	class SpanIterator
 	{
 	public:
@@ -83,6 +89,9 @@ namespace rkit
 
 		operator Span<const T>() const;
 
+		SpanToISpanRefWrapper<T> ToRefISpan() const;
+		SpanToISpanValueWrapper<T> ToValueISpan() const;
+
 	private:
 		T *m_arr;
 		size_t m_count;
@@ -119,6 +128,32 @@ namespace rkit
 
 		ISpanIterator<T> begin() const;
 		ISpanIterator<T> end() const;
+	};
+
+	template<class T>
+	struct SpanToISpanRefWrapper final : public ISpan<T&>
+	{
+		explicit SpanToISpanRefWrapper(T *arr, size_t count);
+
+		size_t Count() const override;
+		T &operator[](size_t index) const override;
+
+	private:
+		T *m_arr;
+		size_t m_count;
+	};
+
+	template<class T>
+	struct SpanToISpanValueWrapper final : public ISpan<T>
+	{
+		explicit SpanToISpanValueWrapper(T *arr, size_t count);
+
+		size_t Count() const override;
+		T operator[](size_t index) const override;
+
+	private:
+		T *m_arr;
+		size_t m_count;
 	};
 
 	template<class T, class TUserdata>
@@ -350,7 +385,17 @@ rkit::Span<T>::operator Span<const T>() const
 	return Span<const T>(m_arr, m_count);
 }
 
+template<class T>
+rkit::SpanToISpanRefWrapper<T> rkit::Span<T>::ToRefISpan() const
+{
+	return rkit::SpanToISpanRefWrapper<T>(m_arr, m_count);
+}
 
+template<class T>
+rkit::SpanToISpanValueWrapper<T> rkit::Span<T>::ToValueISpan() const
+{
+	return rkit::SpanToISpanValueWrapper<T>(m_arr, m_count);
+}
 
 template<class T>
 rkit::ISpanIterator<T>::ISpanIterator(const ISpan<T> &span, size_t index)
@@ -403,6 +448,47 @@ template<class T>
 rkit::ISpanIterator<T> rkit::ISpan<T>::end() const
 {
 	return ISpanIterator<T>(*this, this->Count());
+}
+
+
+template<class T>
+rkit::SpanToISpanRefWrapper<T>::SpanToISpanRefWrapper(T *arr, size_t count)
+	: m_arr(arr)
+	, m_count(count)
+{
+}
+
+template<class T>
+size_t rkit::SpanToISpanRefWrapper<T>::Count() const
+{
+	return m_count;
+}
+
+template<class T>
+T &rkit::SpanToISpanRefWrapper<T>::operator[](size_t index) const
+{
+	RKIT_ASSERT(index < m_count);
+	return m_arr[index];
+}
+
+template<class T>
+rkit::SpanToISpanValueWrapper<T>::SpanToISpanValueWrapper(T *arr, size_t count)
+	: m_arr(arr)
+	, m_count(count)
+{
+}
+
+template<class T>
+size_t rkit::SpanToISpanValueWrapper<T>::Count() const
+{
+	return m_count;
+}
+
+template<class T>
+T rkit::SpanToISpanValueWrapper<T>::operator[](size_t index) const
+{
+	RKIT_ASSERT(index < m_count);
+	return m_arr[index];
 }
 
 

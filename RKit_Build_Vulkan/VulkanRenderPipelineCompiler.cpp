@@ -1342,7 +1342,7 @@ namespace rkit::buildsystem::vulkan
 
 		data::IRenderDataHandler *dataHandler = dataDriver->GetRenderDataHandler();
 
-		RKIT_CHECK(dataHandler->LoadPackage(*packageStream, allowTempStrings, outPackage, binaryContent));
+		RKIT_CHECK(dataHandler->LoadPackage(*packageStream, allowTempStrings, nullptr, outPackage, binaryContent));
 
 		return ResultCode::kOK;
 	}
