@@ -12,7 +12,7 @@ namespace rkit
 	{
 	public:
 		StaticArray();
-		StaticArray(const StaticArray<T, TSize> &other);
+		StaticArray(const StaticArray<T, TSize> &other) = default;
 		StaticArray(StaticArray<T, TSize> &&other);
 		~StaticArray();
 
@@ -31,6 +31,10 @@ namespace rkit
 		const T *begin() const;
 		const T *end() const;
 
+		T *GetBuffer();
+		const T *GetBuffer() const;
+
+		static size_t Count();
 
 	private:
 		T m_elements[TSize];
@@ -47,12 +51,6 @@ namespace rkit
 	template<class T, size_t TSize>
 	StaticArray<T, TSize>::StaticArray()
 		: m_elements{}
-	{
-	}
-
-	template<class T, size_t TSize>
-	StaticArray<T, TSize>::StaticArray(const StaticArray<T, TSize> &other)
-		: m_elements(other.m_elements)
 	{
 	}
 
@@ -134,5 +132,23 @@ namespace rkit
 	const T *StaticArray<T, TSize>::end() const
 	{
 		return m_elements + TSize;
+	}
+
+	template<class T, size_t TSize>
+	T *StaticArray<T, TSize>::GetBuffer()
+	{
+		return m_elements;
+	}
+
+	template<class T, size_t TSize>
+	const T *StaticArray<T, TSize>::GetBuffer() const
+	{
+		return m_elements;
+	}
+
+	template<class T, size_t TSize>
+	size_t StaticArray<T, TSize>::Count()
+	{
+		return TSize;
 	}
 }

@@ -139,6 +139,8 @@
     <ClCompile Include="RenderDataHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\include\rkit\Data\DataDriver.h" />
+    <ClInclude Include="..\include\rkit\Data\RenderDataHandler.h" />
     <ClInclude Include="RenderDataHandler.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

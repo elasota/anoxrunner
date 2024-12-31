@@ -15,8 +15,14 @@ namespace rkit
 	class Optional;
 }
 
+namespace rkit::render
+{
+	class RenderDeviceCaps;
+}
+
 namespace rkit::render::vulkan
 {
+	struct VulkanDeviceAPI;
 	struct VulkanGlobalAPI;
 	struct VulkanInstanceAPI;
 
@@ -31,6 +37,10 @@ namespace rkit::render::vulkan
 		virtual VkDevice GetDevice() const = 0;
 		virtual const VkAllocationCallbacks *GetAllocCallbacks() const = 0;
 
-		static Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const QueueFamilySpec (&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks);
+		virtual const VulkanGlobalAPI &GetGlobalAPI() const = 0;
+		virtual const VulkanInstanceAPI &GetInstanceAPI() const = 0;
+		virtual const VulkanDeviceAPI &GetDeviceAPI() const = 0;
+
+		static Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const QueueFamilySpec (&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps);
 	};
 }

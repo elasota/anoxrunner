@@ -117,6 +117,9 @@ namespace rkit::render
 		ConfigurableValueWithDefault(const ConfigurableValueWithDefault &other) = default;
 		ConfigurableValueWithDefault(ConfigurableValueWithDefault &&other) = default;
 
+		void Set(const T &value);
+		void SetToDefault();
+
 		static bool HasDefault();
 		static T GetDefault();
 	};
@@ -181,13 +184,13 @@ namespace rkit::render
 		Disabled,
 
 		Never,
-		Less,
+		Always,
 		Equal,
+		NotEqual,
+		Less,
 		LessOrEqual,
 		Greater,
-		NotEqual,
 		GreaterOrEqual,
-		Always,
 
 		Count,
 	};
@@ -216,6 +219,16 @@ namespace rkit::render
 		ConfigurableValue<AnisotropicFiltering, AnisotropicFiltering::Anisotropic1> m_anisotropy;
 
 		ConfigurableValue<ComparisonFunction, ComparisonFunction::Disabled> m_compareFunction;
+	};
+
+	enum class VectorOrScalarDimension
+	{
+		Scalar,
+		Dimension2,
+		Dimension3,
+		Dimension4,
+
+		Count,
 	};
 
 	enum class VectorDimension
@@ -247,13 +260,20 @@ namespace rkit::render
 
 		SNorm8,
 		SNorm16,
-		SNorm32,
 
 		UNorm8,
 		UNorm16,
-		UNorm32,
 
 		Count,
+	};
+
+	struct VectorOrScalarNumericType
+	{
+		NumericType m_numericType = NumericType::Float32;
+		VectorOrScalarDimension m_cols = VectorOrScalarDimension::Scalar;
+
+		bool operator==(const VectorOrScalarNumericType &other) const;
+		bool operator!=(const VectorOrScalarNumericType &other) const;
 	};
 
 	struct VectorNumericType
@@ -339,19 +359,25 @@ namespace rkit::render
 		Count,
 	};
 
-	struct InputLayoutVertexInputDesc
+	struct InputLayoutVertexFeedDesc
 	{
 		TempStringIndex_t m_feedName;
-		TempStringIndex_t m_memberName;
 		uint32_t m_inputSlot = 0;
+		ConfigurableValue<uint32_t, 0> m_byteStride;
+		ConfigurableValue<InputLayoutVertexInputStepping, InputLayoutVertexInputStepping::Vertex> m_stepping;
+	};
+
+	struct InputLayoutVertexInputDesc
+	{
+		const InputLayoutVertexFeedDesc *m_inputFeed = nullptr;
+		TempStringIndex_t m_memberName;
 		uint32_t m_byteOffset = 0;
-		const VectorNumericType *m_numericType = nullptr;
-		InputLayoutVertexInputStepping m_stepping = InputLayoutVertexInputStepping::Vertex;
+		const VectorOrScalarNumericType *m_numericType = nullptr;
 	};
 
 	struct InputLayoutDesc
 	{
-		ConstSpan<const InputLayoutVertexInputDesc *> m_vertexFeeds;
+		ConstSpan<const InputLayoutVertexInputDesc *> m_vertexInputs;
 	};
 
 	enum class ReadWriteAccess
@@ -388,19 +414,6 @@ namespace rkit::render
 		Count,
 	};
 
-	struct GraphicsPipelineDepthDesc
-	{
-		bool m_testEnable = false;
-		bool m_writeEnable = false;
-		ComparisonFunction m_comparisonFunction = ComparisonFunction::Less;
-
-		int32_t m_depthBias = 0;
-		float m_depthBiasClamp = 0.f;
-		float m_depthBiasSlopeScale = 0.f;
-
-		bool m_depthClipEnable = true;
-	};
-
 	struct StencilOpDesc
 	{
 		ConfigurableValue<StencilOp, StencilOp::Keep> m_passOp;
@@ -431,12 +444,7 @@ namespace rkit::render
 		All,
 
 		Vertex,
-		Hull,
-		Domain,
-		Geometry,
 		Pixel,
-		Amplification,
-		Mesh,
 
 		Count,
 	};
@@ -568,6 +576,12 @@ namespace rkit::render
 		ConstSpan<const DescriptorDesc *> m_descriptors;
 	};
 
+	struct PipelineLayoutDesc
+	{
+		ConstSpan<const DescriptorLayoutDesc *> m_descriptorLayouts;
+		const PushConstantListDesc *m_pushConstantList = nullptr;
+	};
+
 	struct BinaryContent
 	{
 		size_t m_contentIndex = 0;
@@ -612,6 +626,10 @@ namespace rkit::render
 		TempStringIndex_t m_name;
 
 		ConfigurableValue<RenderTargetFormat, RenderTargetFormat::RGBA_UNorm8> m_format;
+	};
+
+	struct RenderOperationDesc
+	{
 		ReadWriteAccess m_access;
 
 		ColorBlendFactor m_srcBlend = ColorBlendFactor::One;
@@ -638,13 +656,15 @@ namespace rkit::render
 		Count,
 	};
 
-	struct DepthStencilDesc
+	struct DepthStencilOperationDesc
 	{
-		ConfigurableValue<DepthStencilFormat, DepthStencilFormat::DepthUNorm16> m_format;
-
 		ConfigurableValue<bool, false> m_depthTest;
 		ConfigurableValue<bool, false> m_depthWrite;
 		ConfigurableValue<ComparisonFunction, ComparisonFunction::Always> m_depthCompareOp;
+
+		ConfigurableValue<int32_t, 0> m_depthBias;
+		ConfigurableValueFloat<float, 0> m_depthBiasClamp;
+		ConfigurableValueFloat<float, 0> m_depthBiasSlopeScale;
 
 		ConfigurableValue<bool, false> m_stencilTest;
 		ConfigurableValue<bool, false> m_stencilWrite;
@@ -653,15 +673,34 @@ namespace rkit::render
 		ConfigurableValue<uint8_t, 0xffu> m_stencilCompareMask;
 		ConfigurableValue<uint8_t, 0xffu> m_stencilWriteMask;
 
+		ConfigurableValue<bool, true> m_dynamicStencilReference;
+		ConfigurableValue<uint32_t, 0> m_stencilReference;
+
 		StencilOpDesc m_stencilFrontOps;
 		StencilOpDesc m_stencilBackOps;
 	};
 
+	struct DepthStencilTargetDesc
+	{
+		ConfigurableValue<DepthStencilFormat, DepthStencilFormat::DepthUNorm16> m_format;
+	};
+
+	struct RenderPassDesc
+	{
+		GlobalStringIndex_t m_name;
+
+		const DepthStencilTargetDesc *m_depthStencilTarget;
+		ConstSpan<const RenderTargetDesc *> m_renderTargets;
+	};
+
 	struct GraphicsPipelineDesc
 	{
-		const PushConstantListDesc *m_pushConstants = nullptr;
+		const RenderPassDesc *m_executeInPass = nullptr;
 
-		ConstSpan<const DescriptorLayoutDesc *> m_descriptorLayouts;
+		const PipelineLayoutDesc *m_pipelineLayout = nullptr;
+
+		const DepthStencilOperationDesc *m_depthStencil = nullptr;
+		ConstSpan<const RenderOperationDesc *> m_renderTargets;
 
 		const InputLayoutDesc *m_inputLayout = nullptr;
 		const StructureType *m_vertexShaderOutput = nullptr;
@@ -674,9 +713,6 @@ namespace rkit::render
 		IndexSize m_indexSize = IndexSize::UInt32;
 		bool m_primitiveRestart = false;
 		PrimitiveTopology m_primitiveTopology = PrimitiveTopology::TriangleList;
-
-		ConstSpan<const RenderTargetDesc *> m_renderTargets;
-		const DepthStencilDesc *m_depthStencil = nullptr;
 
 		bool m_alphaToCoverage = false;
 
@@ -828,6 +864,16 @@ namespace rkit::render
 		return !((*this) == other);
 	}
 
+	inline bool VectorOrScalarNumericType::operator==(const VectorOrScalarNumericType &other) const
+	{
+		return m_cols == other.m_cols && m_numericType == other.m_numericType;
+	}
+
+	inline bool VectorOrScalarNumericType::operator!=(const VectorOrScalarNumericType &other) const
+	{
+		return !((*this) == other);
+	}
+
 	inline bool CompoundNumericType::operator==(const CompoundNumericType &other) const
 	{
 		return m_cols == other.m_cols && m_numericType == other.m_numericType && m_rows == other.m_rows;
@@ -948,6 +994,20 @@ namespace rkit::render
 			new (&m_u.m_value) T(std::move(other.m_u.m_value));
 
 		return *this;
+	}
+
+	template<class T, class TDefaultResolver>
+	void ConfigurableValueWithDefault<T, TDefaultResolver>::Set(const T &value)
+	{
+		ConfigurableValueBase<T> &base = *this;
+		base = ConfigurableValueBase<T>(value);
+	}
+
+	template<class T, class TDefaultResolver>
+	void ConfigurableValueWithDefault<T, TDefaultResolver>::SetToDefault()
+	{
+		ConfigurableValueBase<T> &base = *this;
+		base = ConfigurableValueBase<T>();
 	}
 
 	template<class T, class TDefaultResolver>

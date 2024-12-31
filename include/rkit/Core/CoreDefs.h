@@ -19,3 +19,9 @@
 #endif
 
 #define RKIT_STATIC_ASSERT(expr) static_assert((expr), #expr)
+
+
+#ifdef _MSC_VER
+#pragma warning(error:4715)	// Not all control paths return a value
+#pragma warning(error:4834)	// [[nodiscard]] discarded
+#endif

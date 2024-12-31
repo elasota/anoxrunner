@@ -2,6 +2,7 @@
 
 #include "anox/AnoxGraphicsSubsystem.h"
 
+#include "rkit/Render/DeviceCaps.h"
 #include "rkit/Render/DisplayManager.h"
 #include "rkit/Render/RenderDefs.h"
 #include "rkit/Render/RenderDriver.h"
@@ -696,8 +697,11 @@ namespace anox
 			RKIT_CHECK(queueRequests.Append(rq));
 		}
 
+		rkit::render::RenderDeviceCaps requiredCaps;
+		rkit::render::RenderDeviceCaps optionalCaps;
+
 		rkit::UniquePtr<rkit::render::IRenderDevice> device;
-		RKIT_CHECK(renderDriver->CreateDevice(device, queueRequests.ToSpan(), *adapters[0]));
+		RKIT_CHECK(renderDriver->CreateDevice(device, queueRequests.ToSpan(), requiredCaps, optionalCaps, *adapters[0]));
 
 		m_renderDevice = std::move(device);
 

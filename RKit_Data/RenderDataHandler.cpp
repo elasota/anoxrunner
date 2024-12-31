@@ -794,11 +794,16 @@ namespace rkit::data
 
 			RTTI_ENUM_OPTION(SNorm8)
 			RTTI_ENUM_OPTION(SNorm16)
-			RTTI_ENUM_OPTION(SNorm32)
 
 			RTTI_ENUM_OPTION(UNorm8)
 			RTTI_ENUM_OPTION(UNorm16)
-			RTTI_ENUM_OPTION(UNorm32)
+		RTTI_ENUM_END
+
+		RTTI_ENUM_BEGIN(VectorOrScalarDimension)
+			RTTI_ENUM_OPTION(Scalar)
+			RTTI_ENUM_OPTION(Dimension2)
+			RTTI_ENUM_OPTION(Dimension3)
+			RTTI_ENUM_OPTION(Dimension4)
 		RTTI_ENUM_END
 
 		RTTI_ENUM_BEGIN(VectorDimension)
@@ -806,6 +811,11 @@ namespace rkit::data
 			RTTI_ENUM_OPTION(Dimension3)
 			RTTI_ENUM_OPTION(Dimension4)
 		RTTI_ENUM_END
+
+		RTTI_STRUCT_BEGIN_INDEXABLE(VectorOrScalarNumericType)
+			RTTI_STRUCT_FIELD(numericType)
+			RTTI_STRUCT_FIELD(cols)
+		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(VectorNumericType)
 			RTTI_STRUCT_FIELD(numericType)
@@ -865,12 +875,7 @@ namespace rkit::data
 		RTTI_ENUM_BEGIN(StageVisibility)
 			RTTI_ENUM_OPTION(All)
 			RTTI_ENUM_OPTION(Vertex)
-			RTTI_ENUM_OPTION(Hull)
-			RTTI_ENUM_OPTION(Domain)
-			RTTI_ENUM_OPTION(Geometry)
 			RTTI_ENUM_OPTION(Pixel)
-			RTTI_ENUM_OPTION(Amplification)
-			RTTI_ENUM_OPTION(Mesh)
 		RTTI_ENUM_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(SamplerDesc)
@@ -941,17 +946,22 @@ namespace rkit::data
 			RTTI_ENUM_OPTION(Instance)
 		RTTI_ENUM_END
 
-		RTTI_STRUCT_BEGIN_INDEXABLE(InputLayoutVertexInputDesc)
+		RTTI_STRUCT_BEGIN_INDEXABLE(InputLayoutVertexFeedDesc)
 			RTTI_STRUCT_FIELD(feedName)
-			RTTI_STRUCT_FIELD(memberName)
 			RTTI_STRUCT_FIELD(inputSlot)
-			RTTI_STRUCT_FIELD(byteOffset)
-			RTTI_STRUCT_FIELD(numericType)
+			RTTI_STRUCT_FIELD(byteStride)
 			RTTI_STRUCT_FIELD(stepping)
 		RTTI_STRUCT_END
 
+		RTTI_STRUCT_BEGIN_INDEXABLE(InputLayoutVertexInputDesc)
+			RTTI_STRUCT_FIELD(inputFeed)
+			RTTI_STRUCT_FIELD(memberName)
+			RTTI_STRUCT_FIELD(byteOffset)
+			RTTI_STRUCT_FIELD(numericType)
+		RTTI_STRUCT_END
+
 		RTTI_STRUCT_BEGIN_INDEXABLE(InputLayoutDesc)
-			RTTI_STRUCT_FIELD(vertexFeeds)
+			RTTI_STRUCT_FIELD(vertexInputs)
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(StructureMemberDesc)
@@ -965,6 +975,11 @@ namespace rkit::data
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(DescriptorLayoutDesc)
 			RTTI_STRUCT_FIELD(descriptors)
+		RTTI_STRUCT_END
+
+		RTTI_STRUCT_BEGIN_INDEXABLE(PipelineLayoutDesc)
+			RTTI_STRUCT_FIELD(descriptorLayouts)
+			RTTI_STRUCT_FIELD_NULLABLE(pushConstantList)
 		RTTI_STRUCT_END
 
 		RTTI_ENUM_BEGIN(IndexSize)
@@ -1016,12 +1031,14 @@ namespace rkit::data
 			RTTI_STRUCT_FIELD(compareFunc)
 		RTTI_STRUCT_END
 
-		RTTI_STRUCT_BEGIN_INDEXABLE(DepthStencilDesc)
+		RTTI_STRUCT_BEGIN_INDEXABLE(DepthStencilOperationDesc)
 			RTTI_STRUCT_FIELD(depthTest)
 			RTTI_STRUCT_FIELD(depthWrite)
-
 			RTTI_STRUCT_FIELD(depthCompareOp)
-			RTTI_STRUCT_FIELD(format)
+
+			RTTI_STRUCT_FIELD(depthBias)
+			RTTI_STRUCT_FIELD(depthBiasClamp)
+			RTTI_STRUCT_FIELD(depthBiasSlopeScale)
 
 			RTTI_STRUCT_FIELD(stencilTest)
 			RTTI_STRUCT_FIELD(stencilWrite)
@@ -1032,6 +1049,9 @@ namespace rkit::data
 			RTTI_STRUCT_FIELD(stencilWriteMask)
 			RTTI_STRUCT_FIELD(stencilFrontOps)
 			RTTI_STRUCT_FIELD(stencilBackOps)
+
+			RTTI_STRUCT_FIELD(dynamicStencilReference)
+			RTTI_STRUCT_FIELD(stencilReference)
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(ShaderPermutationTreeBranch)
@@ -1045,10 +1065,20 @@ namespace rkit::data
 			RTTI_STRUCT_FIELD(branches)
 		RTTI_STRUCT_END
 
-		RTTI_STRUCT_BEGIN_INDEXABLE(GraphicsPipelineDesc)
-			RTTI_STRUCT_FIELD_INVISIBLE_NULLABLE(pushConstants)
+		RTTI_STRUCT_BEGIN_INDEXABLE(DepthStencilTargetDesc)
+			RTTI_STRUCT_FIELD(format)
+		RTTI_STRUCT_END
 
-			RTTI_STRUCT_FIELD_INVISIBLE(descriptorLayouts)
+		RTTI_STRUCT_BEGIN_INDEXABLE(RenderPassDesc)
+			RTTI_STRUCT_FIELD(name)
+
+			RTTI_STRUCT_FIELD_NULLABLE(depthStencilTarget)
+			RTTI_STRUCT_FIELD(renderTargets)
+		RTTI_STRUCT_END
+
+		RTTI_STRUCT_BEGIN_INDEXABLE(GraphicsPipelineDesc)
+			RTTI_STRUCT_FIELD(executeInPass)
+			RTTI_STRUCT_FIELD_INVISIBLE(pipelineLayout)
 
 			RTTI_STRUCT_FIELD_INVISIBLE(inputLayout)
 			RTTI_STRUCT_FIELD_INVISIBLE_NULLABLE(vertexShaderOutput)
@@ -1064,9 +1094,6 @@ namespace rkit::data
 
 			RTTI_STRUCT_FIELD(primitiveTopology)
 
-			RTTI_STRUCT_FIELD_INVISIBLE(renderTargets)
-			RTTI_STRUCT_FIELD(depthStencil)
-
 			RTTI_STRUCT_FIELD(alphaToCoverage)
 
 			RTTI_STRUCT_FIELD(dynamicBlendConstants)
@@ -1078,6 +1105,9 @@ namespace rkit::data
 
 			RTTI_STRUCT_FIELD(fillMode)
 			RTTI_STRUCT_FIELD(cullMode)
+
+			RTTI_STRUCT_FIELD_NULLABLE(depthStencil)
+			RTTI_STRUCT_FIELD(renderTargets)
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(GraphicsPipelineNameLookup)
@@ -1134,10 +1164,7 @@ namespace rkit::data
 			RTTI_ENUM_OPTION(RGBA_UNorm8_sRGB)
 		RTTI_ENUM_END
 
-		RTTI_STRUCT_BEGIN_INDEXABLE(RenderTargetDesc)
-			RTTI_STRUCT_FIELD_INVISIBLE(name)
-
-			RTTI_STRUCT_FIELD(format)
+		RTTI_STRUCT_BEGIN_INDEXABLE(RenderOperationDesc)
 			RTTI_STRUCT_FIELD(access)
 
 			RTTI_STRUCT_FIELD(srcBlend)
@@ -1152,6 +1179,12 @@ namespace rkit::data
 			RTTI_STRUCT_FIELD(writeGreen)
 			RTTI_STRUCT_FIELD(writeBlue)
 			RTTI_STRUCT_FIELD(writeAlpha)
+		RTTI_STRUCT_END
+
+		RTTI_STRUCT_BEGIN_INDEXABLE(RenderTargetDesc)
+			RTTI_STRUCT_FIELD_INVISIBLE(name)
+
+			RTTI_STRUCT_FIELD(format)
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(ContentKey)
@@ -2092,11 +2125,6 @@ namespace rkit::data
 		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::PushConstantDesc>::GetRTTIType());
 	}
 
-	const RenderRTTIEnumType *RenderDataHandler::GetInputLayoutVertexInputSteppingRTTI() const
-	{
-		return reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::InputLayoutVertexInputStepping>::GetRTTIType());
-	}
-
 	const RenderRTTIStructType *RenderDataHandler::GetDescriptorDescRTTI() const
 	{
 		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::DescriptorDesc>::GetRTTIType());
@@ -2122,19 +2150,29 @@ namespace rkit::data
 		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::RenderTargetDesc>::GetRTTIType());
 	}
 
+	const RenderRTTIStructType *RenderDataHandler::GetRenderOperationDescRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::RenderOperationDesc>::GetRTTIType());
+	}
+
 	const RenderRTTIStructType *RenderDataHandler::GetShaderDescRTTI() const
 	{
 		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::ShaderDesc>::GetRTTIType());
 	}
 
-	const RenderRTTIStructType *RenderDataHandler::GetDepthStencilDescRTTI() const
+	const RenderRTTIStructType *RenderDataHandler::GetDepthStencilOperationDescRTTI() const
 	{
-		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::DepthStencilDesc>::GetRTTIType());
+		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::DepthStencilOperationDesc>::GetRTTIType());
 	}
 
 	const RenderRTTIEnumType *RenderDataHandler::GetNumericTypeRTTI() const
 	{
 		return reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::NumericType>::GetRTTIType());
+	}
+
+	const RenderRTTIEnumType *RenderDataHandler::GetInputLayoutVertexInputSteppingRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::InputLayoutVertexInputStepping>::GetRTTIType());
 	}
 
 	const RenderRTTIObjectPtrType *RenderDataHandler::GetVectorNumericTypePtrRTTI() const
@@ -2150,6 +2188,16 @@ namespace rkit::data
 	const RenderRTTIObjectPtrType *RenderDataHandler::GetStructureTypePtrRTTI() const
 	{
 		return reinterpret_cast<const RenderRTTIObjectPtrType *>(render_rtti::RTTIResolver<const render::StructureType *>::GetRTTIType());
+	}
+
+	const RenderRTTIStructType *RenderDataHandler::GetRenderPassDescRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::RenderPassDesc>::GetRTTIType());
+	}
+
+	const RenderRTTIStructType *RenderDataHandler::GetDepthStencilTargetDescRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::DepthStencilTargetDesc>::GetRTTIType());
 	}
 
 	uint32_t RenderDataHandler::GetPackageVersion() const
@@ -2211,28 +2259,37 @@ namespace rkit::data
 	{
 		switch (indexableStructType)
 		{
-		LINK_INDEXABLE_LIST_TYPE(DepthStencilDesc)
+		LINK_INDEXABLE_LIST_TYPE(DepthStencilTargetDesc)
+		LINK_INDEXABLE_LIST_TYPE(DepthStencilOperationDesc)
 		LINK_INDEXABLE_LIST_TYPE(GraphicsPipelineNameLookup)
 		LINK_INDEXABLE_LIST_TYPE(GraphicsPipelineDesc)
 		LINK_INDEXABLE_LIST_TYPE(RenderTargetDesc)
+		LINK_INDEXABLE_LIST_TYPE(RenderOperationDesc)
 		LINK_INDEXABLE_LIST_TYPE(PushConstantDesc)
 		LINK_INDEXABLE_LIST_TYPE(PushConstantListDesc)
 		LINK_INDEXABLE_LIST_TYPE(ShaderDesc)
 		LINK_INDEXABLE_LIST_TYPE(StructureType)
 		LINK_INDEXABLE_LIST_TYPE(StructureMemberDesc)
 		LINK_INDEXABLE_LIST_TYPE(InputLayoutDesc)
+		LINK_INDEXABLE_LIST_TYPE(PipelineLayoutDesc)
 		LINK_INDEXABLE_LIST_TYPE(DescriptorLayoutDesc)
 		LINK_INDEXABLE_LIST_TYPE(DescriptorDesc)
+		LINK_INDEXABLE_LIST_TYPE(InputLayoutVertexFeedDesc)
 		LINK_INDEXABLE_LIST_TYPE(InputLayoutVertexInputDesc)
 		LINK_INDEXABLE_LIST_TYPE(CompoundNumericType)
 		LINK_INDEXABLE_LIST_TYPE(VectorNumericType)
+		LINK_INDEXABLE_LIST_TYPE(VectorOrScalarNumericType)
 		LINK_INDEXABLE_LIST_TYPE(SamplerDesc)
 		LINK_INDEXABLE_LIST_TYPE(ContentKey)
 		LINK_INDEXABLE_LIST_TYPE(ShaderPermutationTree)
 		LINK_INDEXABLE_LIST_TYPE(ShaderPermutationTreeBranch)
+		LINK_INDEXABLE_LIST_TYPE(RenderPassDesc)
 
 		default:
 			return ResultCode::kInternalError;
 		}
 	}
+#undef LINK_INDEXABLE_LIST_TYPE
+
 }
+

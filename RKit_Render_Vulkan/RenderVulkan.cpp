@@ -1,4 +1,5 @@
 #include "rkit/Render/RenderDriver.h"
+#include "rkit/Render/DeviceCaps.h"
 
 #include "rkit/Core/Algorithm.h"
 #include "rkit/Core/DriverModuleStub.h"
@@ -114,7 +115,7 @@ namespace rkit::render::vulkan
 		bool IsExtensionEnabled(const char *layerName, const StringView &extName) const;
 
 		Result EnumerateAdapters(Vector<UniquePtr<IRenderAdapter>> &adapters) const override;
-		Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, IRenderAdapter &adapter) override;
+		Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, const IRenderDeviceCaps &optionalCaps, const IRenderDeviceCaps &requiredCaps, IRenderAdapter &adapter) override;
 
 		const VulkanGlobalAPI &GetGlobalAPI() const;
 		const VulkanInstanceAPI &GetInstanceAPI() const;
@@ -141,6 +142,8 @@ namespace rkit::render::vulkan
 			bool m_isAvailableInLayer = false;
 			bool m_isAvailableInBase = false;
 		};
+
+		static void SyncOptionalCap(RenderDeviceCaps &availableCaps, RenderDeviceBoolCap cap, VkBool32 &featureFlag);
 
 		Result LoadVulkanGlobalAPI();
 		Result LoadVulkanInstanceAPI();
@@ -450,13 +453,29 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result RenderVulkanDriver::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, IRenderAdapter &adapter)
+	Result RenderVulkanDriver::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, const IRenderDeviceCaps &optionalCaps, const IRenderDeviceCaps &requiredCaps, IRenderAdapter &adapter)
 	{
+		render::RenderDeviceCaps enabledCaps;
+
+		enabledCaps.RaiseTo(optionalCaps);
+		enabledCaps.RaiseTo(requiredCaps);
+
 		RenderVulkanAdapter &vkAdapter = static_cast<RenderVulkanAdapter &>(adapter);
 
 		const RenderVulkanPhysicalDevice &rPhysDevice = vkAdapter.GetPhysicalDevice();
 
 		VkPhysicalDevice physDevice = rPhysDevice.GetPhysDevice();
+
+		VkPhysicalDeviceFeatures features = {};
+		m_vki.vkGetPhysicalDeviceFeatures(physDevice, &features);
+
+		SyncOptionalCap(enabledCaps, RenderDeviceBoolCap::kIndependentBlend, features.independentBlend);
+
+		if (!enabledCaps.MeetsOrExceeds(requiredCaps))
+		{
+			rkit::log::Error("Device failed to meet capability requirements");
+			return ResultCode::kOperationFailed;
+		}
 
 		Vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 		VulkanDeviceBase::QueueFamilySpec queueFamilySpecs[static_cast<size_t>(CommandQueueType::kCount)];
@@ -516,11 +535,12 @@ namespace rkit::render::vulkan
 		devCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		devCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.Count());
 		devCreateInfo.pQueueCreateInfos = queueCreateInfos.GetBuffer();
+		devCreateInfo.pEnabledFeatures = &features;
 
 		VkDevice device = VK_NULL_HANDLE;
 		RKIT_VK_CHECK(m_vki.vkCreateDevice(rPhysDevice.GetPhysDevice(), &devCreateInfo, GetAllocCallbacks(), &device));
 
-		Result wrapDeviceResult = VulkanDeviceBase::CreateDevice(outDevice, m_vkg, m_vki, m_vkInstance, device, queueFamilySpecs, GetAllocCallbacks());
+		Result wrapDeviceResult = VulkanDeviceBase::CreateDevice(outDevice, m_vkg, m_vki, m_vkInstance, device, queueFamilySpecs, GetAllocCallbacks(), enabledCaps);
 		if (!wrapDeviceResult.IsOK())
 		{
 			m_vki.vkDestroyDevice(device, GetAllocCallbacks());
@@ -533,6 +553,17 @@ namespace rkit::render::vulkan
 	bool RenderVulkanDriver::IsInstanceExtensionEnabled(const StringView &extName) const
 	{
 		return IsExtensionEnabled(nullptr, extName);
+	}
+
+	void RenderVulkanDriver::SyncOptionalCap(RenderDeviceCaps &availableCaps, RenderDeviceBoolCap cap, VkBool32 &featureFlag)
+	{
+		if (availableCaps.GetBoolCap(cap))
+		{
+			if (featureFlag == VK_FALSE)
+				availableCaps.SetBoolCap(cap, false);
+		}
+		else
+			featureFlag = VK_FALSE;
 	}
 
 	Result RenderVulkanDriver::LoadVulkanGlobalAPI()
@@ -885,6 +916,7 @@ namespace rkit::render::vulkan
 		RKIT_VK_CHECK(m_vkg.vkCreateInstance(&instCreateInfo, m_allocationCallbacks->GetCallbacks(), &m_vkInstance));
 
 		m_vkInstanceIsInitialized = true;
+		m_vki.vkDestroyInstance = nullptr;
 
 		m_instContext.m_allocCallbacks = m_allocationCallbacks->GetCallbacks();
 		m_instContext.m_api = &m_vki;
@@ -900,7 +932,10 @@ namespace rkit::render::vulkan
 		m_debugUtils.Reset();
 
 		if (m_vkInstanceIsInitialized)
-			m_vkg.vkDestroyInstance(m_vkInstance, GetAllocCallbacks());
+		{
+			if (m_vki.vkDestroyInstance != nullptr)
+				m_vki.vkDestroyInstance(m_vkInstance, GetAllocCallbacks());
+		}
 
 		m_vkLibrary.Reset();
 		m_extensions.Reset();

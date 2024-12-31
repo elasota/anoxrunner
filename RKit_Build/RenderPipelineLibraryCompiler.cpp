@@ -15,6 +15,7 @@
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/StringPool.h"
 #include "rkit/Core/Vector.h"
+#include "rkit/Core/Optional.h"
 
 #include <cstring>
 
@@ -28,6 +29,7 @@ namespace rkit::buildsystem::rpc_interchange
 		InputLayout,
 		GraphicsPipeline,
 		DescriptorLayout,
+		RenderPass,
 	};
 
 	class Entity : public NoCopy
@@ -134,15 +136,34 @@ namespace rkit::buildsystem::rpc_interchange
 		explicit GraphicsPipelineEntity() {}
 
 		render::GraphicsPipelineDesc &GetDesc() { return m_desc; }
+		render::PipelineLayoutDesc &GetPipelineLayout() { return m_pipelineLayout; }
+
 		Vector<const render::DescriptorLayoutDesc *> &GetDescriptorLayouts() { return m_descriptorLayouts; }
-		Vector<const render::RenderTargetDesc *> &GetRenderTargets() { return m_renderTargets; }
+		Vector<const render::RenderOperationDesc *> &GetRenderOperations() { return m_renderOperations; }
 
 		EntityType GetEntityType() const override { return EntityType::GraphicsPipeline; }
 
 	private:
 		render::GraphicsPipelineDesc m_desc;
+		render::PipelineLayoutDesc m_pipelineLayout;
 		Vector<const render::DescriptorLayoutDesc *> m_descriptorLayouts;
 		Vector<const render::RenderTargetDesc *> m_renderTargets;
+		Vector<const render::RenderOperationDesc *> m_renderOperations;
+	};
+
+	class RenderPassEntity final : public Entity
+	{
+	public:
+		explicit RenderPassEntity() {}
+
+		render::RenderPassDesc &GetDesc() { return m_desc; }
+		Vector<const render::RenderTargetDesc *> &GetRenderTargetDescs() { return m_rtDescs; }
+
+		EntityType GetEntityType() const override { return EntityType::RenderPass; }
+
+	private:
+		render::RenderPassDesc m_desc;
+		Vector<const render::RenderTargetDesc *> m_rtDescs;
 	};
 }
 
@@ -241,7 +262,10 @@ namespace rkit::buildsystem::rpc_analyzer
 		struct VertexInputFeedMapping
 		{
 			String m_name;
-			uint32_t m_slot = 0;
+			render::InputLayoutVertexFeedDesc *m_feedDesc = nullptr;
+
+			bool m_strideIsSetAutomatically = false;
+			bool m_strideIsSet = false;
 		};
 
 		enum class DescriptorTypeClassification
@@ -271,10 +295,18 @@ namespace rkit::buildsystem::rpc_analyzer
 		Result ParseInputLayout(const char *filePath, utils::ITextParser &parser, rpc_interchange::InputLayoutEntity &il);
 		Result ParseDescriptorLayout(const char *filePath, utils::ITextParser &parser, rpc_interchange::DescriptorLayoutEntity &dl);
 		Result ParseGraphicsPipeline(const char *filePath, utils::ITextParser &parser, rpc_interchange::GraphicsPipelineEntity &gp);
+		Result ParseRenderPass(const char *filePath, utils::ITextParser &parser, rpc_interchange::RenderPassEntity &gp);
 
 		Result ResolveQuotedString(ShortTempToken &outToken, const Span<const char> &inToken);
-		Result ResolveInputLayoutVertexInputs(const char *filePath, size_t line, size_t col, render::TempStringIndex_t feedName, const Span<const char> &nameBase, Vector<const render::InputLayoutVertexInputDesc *> &descsVector, uint32_t &inOutOffset, render::ValueType inputSourcesType, uint32_t inputFeedSlot, render::InputLayoutVertexInputStepping stepping);
-		static uint32_t ResolveNumericTypeSize(render::NumericType numericType, render::VectorDimension dimension);
+		Result ResolveInputLayoutVertexInputs(const char *filePath, size_t line, size_t col, render::TempStringIndex_t feedName, const Span<const char> &nameBase, Vector<const render::InputLayoutVertexInputDesc *> &descsVector, uint32_t &inOutOffset, const render::ValueType &inputSourcesType, render::InputLayoutVertexFeedDesc *inputFeed);
+		Result ResolveInputLayoutVertexInputs(const char *filePath, size_t line, size_t col, render::TempStringIndex_t feedName, const Span<const char> &nameBase, Vector<const render::InputLayoutVertexInputDesc *> &descsVector, uint32_t &inOutOffset, const render::VectorOrScalarNumericType &inputSourcesType, render::InputLayoutVertexFeedDesc *inputFeed);
+		static uint32_t ResolvePackedValueTypeSize(const render::ValueType &valueType);
+		static uint32_t ResolvePackedStructureTypeSize(const render::StructureType &structureType);
+		static uint32_t ResolveCompoundNumericTypeSize(render::NumericType numericType, render::VectorDimension rows, render::VectorDimension cols);
+		static uint32_t ResolveVectorOrScalarNumericTypeSize(render::NumericType numericType, render::VectorOrScalarDimension dimension);
+		static uint32_t ResolveVectorNumericTypeSize(render::NumericType numericType, render::VectorDimension dimension);
+		static uint32_t ResolveNumericTypeSize(render::NumericType numericType);
+		static render::VectorOrScalarDimension ConvertToMaybeScalar(render::VectorDimension dimension);
 
 		Result ExpectIdentifier(const char *blamePath, Span<const char> &outToken, utils::ITextParser &parser);
 		static Result CheckValidIdentifier(const char *blamePath, const Span<const char> &token, const utils::ITextParser &parser);
@@ -331,8 +363,10 @@ namespace rkit::buildsystem::rpc_analyzer
 		Vector<UniquePtr<render::InputLayoutVertexInputDesc>> m_vertexInputDescs;
 		Vector<UniquePtr<render::DescriptorDesc>> m_dDescs;
 		Vector<UniquePtr<render::RenderTargetDesc>> m_rtDescs;
+		Vector<UniquePtr<render::RenderOperationDesc>> m_roDescs;
 		Vector<UniquePtr<render::ShaderDesc>> m_shaderDescs;
-		Vector<UniquePtr<render::DepthStencilDesc>> m_depthStencilDescs;
+		Vector<UniquePtr<render::DepthStencilOperationDesc>> m_depthStencilOperationDescs;
+		Vector<UniquePtr<render::DepthStencilTargetDesc>> m_depthStencilTargetDescs;
 
 		Vector<render::GraphicsPipelineNameLookup> m_graphicsPipelines;
 
@@ -340,6 +374,9 @@ namespace rkit::buildsystem::rpc_analyzer
 
 		Vector<UniquePtr<render::CompoundNumericType>> m_compoundTypes;
 		Vector<UniquePtr<render::VectorNumericType>> m_vectorTypes;
+		Vector<UniquePtr<render::VectorOrScalarNumericType>> m_vectorOrScalarTypes;
+
+		Vector<UniquePtr<render::InputLayoutVertexFeedDesc>> m_vertexFeedDescs;
 	};
 }
 
@@ -527,11 +564,9 @@ namespace rkit::buildsystem::rpc_analyzer
 
 			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution("nbyte", render::NumericType::UNorm8)));
 			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution("nushort", render::NumericType::UNorm16)));
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution("nuint", render::NumericType::UNorm32)));
 
 			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution("nsbyte", render::NumericType::SNorm8)));
 			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution("nshort", render::NumericType::SNorm16)));
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution("nint", render::NumericType::SNorm32)));
 		}
 
 		String path;
@@ -683,6 +718,8 @@ namespace rkit::buildsystem::rpc_analyzer
 			parseResult = ParseEntity(path, parser, &LibraryAnalyzer::ParseDescriptorLayout);
 		else if (IsToken(directiveToken, "GraphicsPipeline"))
 			parseResult = ParseEntity(path, parser, &LibraryAnalyzer::ParseGraphicsPipeline);
+		else if (IsToken(directiveToken, "RenderPass"))
+			parseResult = ParseEntity(path, parser, &LibraryAnalyzer::ParseRenderPass);
 		else
 		{
 			rkit::log::ErrorFmt("%s [%zu:%zu] Invalid directive", path, line, col);
@@ -858,6 +895,9 @@ namespace rkit::buildsystem::rpc_analyzer
 
 		Vector<VertexInputFeedMapping> feedMappings;
 
+		size_t line = 0;
+		size_t col = 0;
+
 		bool hasNumberedMappings = false;
 		bool hasSequentialMappings = false;
 		for (;;)
@@ -865,8 +905,6 @@ namespace rkit::buildsystem::rpc_analyzer
 			Span<const char> token;
 			RKIT_CHECK(parser.RequireToken(token));
 
-			size_t line = 0;
-			size_t col = 0;
 			parser.GetLocation(line, col);
 
 			if (IsToken(token, "}"))
@@ -890,10 +928,70 @@ namespace rkit::buildsystem::rpc_analyzer
 					VertexInputFeedMapping feedMapping;
 					RKIT_CHECK(feedMapping.m_name.Set(token));
 
+					UniquePtr<render::InputLayoutVertexFeedDesc> feedDesc;
+					RKIT_CHECK(New<render::InputLayoutVertexFeedDesc>(feedDesc));
+
+					feedMapping.m_feedDesc = feedDesc.Get();
+					RKIT_CHECK(m_vertexFeedDescs.Append(std::move(feedDesc)));
+
+
+
 					parser.GetLocation(line, col);
 					RKIT_CHECK(parser.RequireToken(token));
 
+					bool isExplicitlyNumbered = false;
 					if (IsToken(token, "="))
+					{
+						RKIT_CHECK(parser.ExpectToken("{"));
+
+						for (;;)
+						{
+							parser.GetLocation(line, col);
+							RKIT_CHECK(parser.RequireToken(token));
+
+							if (IsToken(token, "InputSlot"))
+							{
+								RKIT_CHECK(parser.ExpectToken("="));
+								RKIT_CHECK(parser.RequireToken(token));
+
+								uint64_t value = 0;
+								RKIT_CHECK(ParseUIntConstant(blamePath, line, col, token, std::numeric_limits<uint32_t>::max(), value));
+
+								isExplicitlyNumbered = true;
+								feedMapping.m_feedDesc->m_inputSlot = static_cast<uint32_t>(value);
+							}
+							else if (IsToken(token, "Stride"))
+							{
+								RKIT_CHECK(parser.ExpectToken("="));
+								RKIT_CHECK(parser.RequireToken(token));
+
+								uint64_t value = 0;
+								RKIT_CHECK(ParseUIntConstant(blamePath, line, col, token, std::numeric_limits<uint32_t>::max(), value));
+
+								feedMapping.m_strideIsSet = true;
+								feedMapping.m_feedDesc->m_byteStride.Set(static_cast<uint32_t>(value));
+							}
+							else if (IsToken(token, "Stepping"))
+							{
+								RKIT_CHECK(parser.ExpectToken("="));
+
+								const data::RenderRTTIEnumType *enumType = m_dataDriver->GetRenderDataHandler()->GetInputLayoutVertexInputSteppingRTTI();
+								RKIT_CHECK(ParseEnum(blamePath, enumType, &feedMapping.m_feedDesc->m_stepping, true, parser));
+							}
+							else if (IsToken(token, "}"))
+								break;
+							else
+							{
+								rkit::log::ErrorFmt("%s [%zu:%zu] Unknown field for input feed", blamePath, line, col);
+								return ResultCode::kMalformedFile;
+							}
+						}
+
+						parser.GetLocation(line, col);
+						RKIT_CHECK(parser.RequireToken(token));
+					}
+
+					if (isExplicitlyNumbered)
 					{
 						if (hasSequentialMappings)
 						{
@@ -903,19 +1001,9 @@ namespace rkit::buildsystem::rpc_analyzer
 
 						hasNumberedMappings = true;
 
-						parser.GetLocation(line, col);
-						RKIT_CHECK(parser.RequireToken(token));
-
-						uint64_t value = 0;
-						RKIT_CHECK(ParseUIntConstant(blamePath, line, col, token, std::numeric_limits<uint32_t>::max(), value));
-
-						feedMapping.m_slot = static_cast<uint32_t>(value);
-
-						RKIT_CHECK(parser.RequireToken(token));
-
 						for (const VertexInputFeedMapping &existingMapping : feedMappings)
 						{
-							if (existingMapping.m_slot == feedMapping.m_slot)
+							if (existingMapping.m_feedDesc->m_inputSlot == feedMapping.m_feedDesc->m_inputSlot)
 							{
 								rkit::log::ErrorFmt("%s [%zu:%zu] Multiple feeds mapped to the same slot", blamePath, line, col);
 								return ResultCode::kMalformedFile;
@@ -924,7 +1012,7 @@ namespace rkit::buildsystem::rpc_analyzer
 					}
 					else
 					{
-						if (!IsToken(token, "}") && hasNumberedMappings)
+						if (hasNumberedMappings)
 						{
 							rkit::log::ErrorFmt("%s [%zu:%zu] Can't mix numbered and sequential input feed mappings", blamePath, line, col);
 							return ResultCode::kMalformedFile;
@@ -938,8 +1026,10 @@ namespace rkit::buildsystem::rpc_analyzer
 							return ResultCode::kMalformedFile;
 						}
 
-						feedMapping.m_slot = slotIndex++;
+						feedMapping.m_feedDesc->m_inputSlot = slotIndex++;
 					}
+
+					RKIT_CHECK(IndexString(feedMapping.m_name.ToSpan(), feedMapping.m_feedDesc->m_feedName));
 
 					RKIT_CHECK(feedMappings.Append(std::move(feedMapping)));
 				}
@@ -969,10 +1059,7 @@ namespace rkit::buildsystem::rpc_analyzer
 					render::ValueType inputSourcesType;
 					bool haveInputSourcesType = false;
 
-					bool haveInputFeed = 0;
-					uint32_t inputFeedSlot = 0;
-
-					render::InputLayoutVertexInputStepping stepping = render::InputLayoutVertexInputStepping::Vertex;
+					VertexInputFeedMapping *inputFeedMapping = nullptr;
 
 					size_t defStartLine = 0;
 					size_t defStartCol = 0;
@@ -993,17 +1080,16 @@ namespace rkit::buildsystem::rpc_analyzer
 							parser.GetLocation(line, col);
 							RKIT_CHECK(parser.RequireToken(token));
 
-							for (const VertexInputFeedMapping &feedMapping : feedMappings)
+							for (VertexInputFeedMapping &feedMapping : feedMappings)
 							{
 								if (CompareSpansEqual(feedMapping.m_name.ToSpan(), token))
 								{
-									haveInputFeed = true;
-									inputFeedSlot = feedMapping.m_slot;
+									inputFeedMapping = &feedMapping;
 									break;
 								}
 							}
 
-							if (!haveInputFeed)
+							if (!inputFeedMapping)
 							{
 								rkit::log::ErrorFmt("%s [%zu:%zu] Unknown input feed", blamePath, line, col);
 								return ResultCode::kMalformedFile;
@@ -1017,14 +1103,6 @@ namespace rkit::buildsystem::rpc_analyzer
 
 							RKIT_CHECK(ParseValueType(blamePath, inputSourcesType, token, parser));
 							haveInputSourcesType = true;
-						}
-						else if (IsToken(token, "Stepping"))
-						{
-							RKIT_CHECK(parser.ExpectToken("="));
-
-							const data::RenderRTTIEnumType *steppingRTTI = m_dataDriver->GetRenderDataHandler()->GetInputLayoutVertexInputSteppingRTTI();
-
-							RKIT_CHECK(ParseEnum(blamePath, steppingRTTI, &stepping, false, parser));
 						}
 						else if (IsToken(token, "BaseOffset"))
 						{
@@ -1040,12 +1118,12 @@ namespace rkit::buildsystem::rpc_analyzer
 						}
 						else
 						{
-							rkit::log::ErrorFmt("%s [%zu:%zu] Too many input slots", blamePath, line, col);
+							rkit::log::ErrorFmt("%s [%zu:%zu] Invalid field for vertex input", blamePath, line, col);
 							return ResultCode::kMalformedFile;
 						}
 					}
 
-					if (!haveInputFeed)
+					if (!inputFeedMapping)
 					{
 						rkit::log::ErrorFmt("%s [%zu:%zu] No input feeds were defined", blamePath, line, col);
 						return ResultCode::kMalformedFile;
@@ -1057,7 +1135,25 @@ namespace rkit::buildsystem::rpc_analyzer
 						return ResultCode::kMalformedFile;
 					}
 
-					RKIT_CHECK(ResolveInputLayoutVertexInputs(blamePath, defStartLine, defStartCol, inputNameStr, Span<const char>(), il.GetVertexInputs(), baseOffset, inputSourcesType, inputFeedSlot, stepping));
+					RKIT_CHECK(ResolveInputLayoutVertexInputs(blamePath, defStartLine, defStartCol, inputNameStr, Span<const char>(), il.GetVertexInputs(), baseOffset, inputSourcesType, inputFeedMapping->m_feedDesc));
+
+					if (!inputFeedMapping->m_strideIsSet || inputFeedMapping->m_strideIsSetAutomatically)
+					{
+						uint32_t autoStride = ResolvePackedValueTypeSize(inputSourcesType);
+
+						if (inputFeedMapping->m_strideIsSetAutomatically && autoStride != inputFeedMapping->m_feedDesc->m_byteStride.m_u.m_value)
+						{
+							rkit::log::ErrorFmt("%s [%zu:%zu] Automatic stride mismatch", blamePath, line, col);
+							return ResultCode::kMalformedFile;
+						}
+
+						if (!inputFeedMapping->m_strideIsSet)
+						{
+							inputFeedMapping->m_strideIsSet = true;
+							inputFeedMapping->m_strideIsSetAutomatically = true;
+							inputFeedMapping->m_feedDesc->m_byteStride.Set(autoStride);
+						}
+					}
 				}
 			}
 			else
@@ -1067,7 +1163,17 @@ namespace rkit::buildsystem::rpc_analyzer
 			}
 		}
 
-		il.GetDesc().m_vertexFeeds = il.GetVertexInputs().ToSpan();
+		for (const VertexInputFeedMapping &feedMapping : feedMappings)
+		{
+			if (!feedMapping.m_strideIsSet)
+			{
+				parser.GetLocation(line, col);
+				rkit::log::ErrorFmt("%s [%zu:%zu] Feed mapping '%s' had no stride", blamePath, line, col, feedMapping.m_name.CStr());
+				return ResultCode::kMalformedFile;
+			}
+		}
+
+		il.GetDesc().m_vertexInputs = il.GetVertexInputs().ToSpan();
 
 		return ResultCode::kOK;
 	}
@@ -1277,6 +1383,8 @@ namespace rkit::buildsystem::rpc_analyzer
 
 			descDesc->m_name = descNameIndex;
 
+			RKIT_CHECK(dl.GetDescriptorDescs().Append(descDesc.Get()));
+
 			RKIT_CHECK(m_dDescs.Append(std::move(descDesc)));
 		}
 
@@ -1291,7 +1399,9 @@ namespace rkit::buildsystem::rpc_analyzer
 
 		const data::RenderRTTIStructType *pipelineRTTI = m_dataDriver->GetRenderDataHandler()->GetGraphicsPipelineDescRTTI();
 		const data::RenderRTTIStructType *shaderDescRTTI = m_dataDriver->GetRenderDataHandler()->GetShaderDescRTTI();
-		const data::RenderRTTIStructType *depthStencilDescRTTI = m_dataDriver->GetRenderDataHandler()->GetDepthStencilDescRTTI();
+		const data::RenderRTTIStructType *depthStencilOperationDescRTTI = m_dataDriver->GetRenderDataHandler()->GetDepthStencilOperationDescRTTI();
+
+		HashMap<String, const render::RenderOperationDesc *> nameToRODesc;
 
 		for (;;)
 		{
@@ -1352,29 +1462,25 @@ namespace rkit::buildsystem::rpc_analyzer
 
 					RKIT_CHECK(CheckValidIdentifier(filePath, token, parser));
 
-					render::TempStringIndex_t rtName;
-					RKIT_CHECK(IndexString(token, rtName));
+					String rtName;
+					RKIT_CHECK(rtName.Set(token));
 
-					for (const render::RenderTargetDesc *rtDesc : gp.GetRenderTargets())
-					{
-						if (rtDesc->m_name == rtName)
-						{
-							rkit::log::ErrorFmt("%s [%zu:%zu] Render target with that name already exists", filePath, line, col);
-							return ResultCode::kMalformedFile;
-						}
-					}
-
-					UniquePtr<render::RenderTargetDesc> rtDesc;
-					RKIT_CHECK(New<render::RenderTargetDesc>(rtDesc));
+					UniquePtr<render::RenderOperationDesc> roDesc;
+					RKIT_CHECK(New<render::RenderOperationDesc>(roDesc));
 
 					RKIT_CHECK(parser.ExpectToken("="));
 
-					RKIT_CHECK(gp.GetRenderTargets().Append(rtDesc.Get()));
+					if (nameToRODesc.Find(rtName) != nameToRODesc.end())
+					{
+						rkit::log::ErrorFmt("%s [%zu:%zu] Render target '%s' was specified multiple times", filePath, line, col, rtName.CStr());
+						return ResultCode::kMalformedFile;
+					}
 
-					RKIT_CHECK(ParseStruct(filePath, m_dataDriver->GetRenderDataHandler()->GetRenderTargetDescRTTI(), rtDesc.Get(), parser));
+					RKIT_CHECK(ParseStruct(filePath, m_dataDriver->GetRenderDataHandler()->GetRenderOperationDescRTTI(), roDesc.Get(), parser));
 
-					rtDesc->m_name = rtName;
-					RKIT_CHECK(m_rtDescs.Append(std::move(rtDesc)));
+					RKIT_CHECK(nameToRODesc.Set(std::move(rtName), roDesc.Get()));
+
+					RKIT_CHECK(m_roDescs.Append(std::move(roDesc)));
 				}
 			}
 			else if (IsToken(token, "PushConstants"))
@@ -1395,7 +1501,7 @@ namespace rkit::buildsystem::rpc_analyzer
 				HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(StringSliceView(token));
 				if (it == m_entities.end())
 				{
-					rkit::log::ErrorFmt("%s [%zu:%zu] Unknown type identifier", filePath, line, col);
+					rkit::log::ErrorFmt("%s [%zu:%zu] Unknown input layout identifier", filePath, line, col);
 					return ResultCode::kMalformedFile;
 				}
 
@@ -1429,19 +1535,38 @@ namespace rkit::buildsystem::rpc_analyzer
 			}
 			else if (IsToken(token, "DepthStencil"))
 			{
-				bool isVS = IsToken(token, "VertexShader");
-				bool isPS = IsToken(token, "PixelShader");
-
 				RKIT_CHECK(parser.ExpectToken("="));
 
-				UniquePtr<render::DepthStencilDesc> depthStencil;
-				RKIT_CHECK(New<render::DepthStencilDesc>(depthStencil));
+				UniquePtr<render::DepthStencilOperationDesc> depthStencil;
+				RKIT_CHECK(New<render::DepthStencilOperationDesc>(depthStencil));
 
-				RKIT_CHECK(ParseStruct(filePath, depthStencilDescRTTI, depthStencil.Get(), parser));
+				RKIT_CHECK(ParseStruct(filePath, depthStencilOperationDescRTTI, depthStencil.Get(), parser));
 
 				gp.GetDesc().m_depthStencil = depthStencil.Get();
 
-				RKIT_CHECK(m_depthStencilDescs.Append(std::move(depthStencil)));
+				RKIT_CHECK(m_depthStencilOperationDescs.Append(std::move(depthStencil)));
+			}
+			else if (IsToken(token, "ExecuteInPass"))
+			{
+				RKIT_CHECK(parser.ExpectToken("="));
+
+				parser.GetLocation(line, col);
+				RKIT_CHECK(parser.RequireToken(token));
+
+				HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(StringSliceView(token));
+				if (it == m_entities.end())
+				{
+					rkit::log::ErrorFmt("%s [%zu:%zu] Unknown execute in pass identifier", filePath, line, col);
+					return ResultCode::kMalformedFile;
+				}
+
+				if (it.Value()->GetEntityType() != rpc_interchange::EntityType::RenderPass)
+				{
+					rkit::log::ErrorFmt("%s [%zu:%zu] Value wasn't a render pass", filePath, line, col);
+					return ResultCode::kMalformedFile;
+				}
+
+				gp.GetDesc().m_executeInPass = &static_cast<rpc_interchange::RenderPassEntity *>(it.Value().Get())->GetDesc();
 			}
 			else
 			{
@@ -1449,14 +1574,194 @@ namespace rkit::buildsystem::rpc_analyzer
 			}
 		}
 
-		gp.GetDesc().m_descriptorLayouts = gp.GetDescriptorLayouts().ToSpan();
-		gp.GetDesc().m_renderTargets = gp.GetRenderTargets().ToSpan();
+		gp.GetPipelineLayout().m_descriptorLayouts = gp.GetDescriptorLayouts().ToSpan();
+
+		gp.GetDesc().m_pipelineLayout = &gp.GetPipelineLayout();
+
+		const render::RenderPassDesc *renderPass = gp.GetDesc().m_executeInPass;
+
+		if (!renderPass)
+		{
+			size_t line = 0;
+			size_t col = 0;
+			parser.GetLocation(line, col);
+			rkit::log::ErrorFmt("%s [%zu:%zu] Pipeline did not specify ExecuteInPass", filePath, line, col);
+			return ResultCode::kMalformedFile;
+		}
+
+		if ((renderPass->m_depthStencilTarget == nullptr) && (gp.GetDesc().m_depthStencil != nullptr))
+		{
+			size_t line = 0;
+			size_t col = 0;
+			parser.GetLocation(line, col);
+			rkit::log::ErrorFmt("%s [%zu:%zu] Pipeline has depth/stencil operations but there is no depth/stencil in the corresponding render pass", filePath, line, col);
+			return ResultCode::kMalformedFile;
+		}
+
+		if ((renderPass->m_depthStencilTarget != nullptr) && (gp.GetDesc().m_depthStencil == nullptr))
+		{
+			UniquePtr<render::DepthStencilOperationDesc> depthStencilDesc;
+			RKIT_CHECK(New<render::DepthStencilOperationDesc>(depthStencilDesc));
+
+			depthStencilDesc->m_depthTest.Set(false);
+			depthStencilDesc->m_depthWrite.Set(false);
+
+			gp.GetDesc().m_depthStencil = depthStencilDesc.Get();
+
+			RKIT_CHECK(m_depthStencilOperationDescs.Append(std::move(depthStencilDesc)));
+		}
+
+		{
+			const ConstSpan<const render::RenderTargetDesc *> renderTargets = renderPass->m_renderTargets;
+
+			size_t numRenderTargets = renderTargets.Count();
+
+			Vector<bool> rtUsed;
+			RKIT_CHECK(rtUsed.Resize(numRenderTargets));
+
+			for (bool &b : rtUsed)
+				b = false;
+
+			RKIT_CHECK(gp.GetRenderOperations().Resize(numRenderTargets));
+
+			for (HashMapKeyValueView<String, const render::RenderOperationDesc *> kv : nameToRODesc)
+			{
+				render::TempStringIndex_t nameStr;
+				RKIT_CHECK(IndexString(kv.Key().ToSpan(), nameStr));
+
+				bool matched = false;
+				for (size_t rti = 0; rti < numRenderTargets; rti++)
+				{
+					if (renderTargets[rti]->m_name == nameStr)
+					{
+						rtUsed[rti] = true;
+						gp.GetRenderOperations()[rti] = kv.Value();
+						matched = true;
+						break;
+					}
+				}
+
+				if (!matched)
+				{
+					size_t line = 0;
+					size_t col = 0;
+					parser.GetLocation(line, col);
+					rkit::log::ErrorFmt("%s [%zu:%zu] Pipeline target '%s' didn't exist in the render pass", filePath, line, col, kv.Key().CStr());
+				}
+			}
+
+			const render::RenderOperationDesc *defaultRODesc = nullptr;
+
+			for (size_t i = 0; i < rtUsed.Count(); i++)
+			{
+				if (!rtUsed[i])
+				{
+					if (!defaultRODesc)
+					{
+						UniquePtr<render::RenderOperationDesc> defaultRODescNew;
+						RKIT_CHECK(New<render::RenderOperationDesc>(defaultRODescNew));
+
+						defaultRODescNew->m_access = render::ReadWriteAccess::Read;	// FIXME: None?
+						defaultRODescNew->m_srcBlend = render::ColorBlendFactor::Zero;
+						defaultRODescNew->m_dstBlend = render::ColorBlendFactor::One;
+						defaultRODescNew->m_srcAlphaBlend = render::AlphaBlendFactor::Zero;
+						defaultRODescNew->m_dstAlphaBlend = render::AlphaBlendFactor::One;
+						defaultRODescNew->m_writeAlpha = false;
+						defaultRODescNew->m_writeRed = false;
+						defaultRODescNew->m_writeGreen = false;
+						defaultRODescNew->m_writeBlue = false;
+
+						defaultRODesc = defaultRODescNew.Get();
+
+						RKIT_CHECK(this->m_roDescs.Append(std::move(defaultRODescNew)));
+					}
+
+					gp.GetRenderOperations()[i] = defaultRODesc;
+				}
+			}
+		}
+
+		gp.GetDesc().m_renderTargets = gp.GetRenderOperations().ToSpan();
 
 		render::GraphicsPipelineNameLookup nameLookup;
 		RKIT_CHECK(IndexString(gp.GetName().ToSpan(), nameLookup.m_name));
 		nameLookup.m_pipeline = &gp.GetDesc();
 
 		RKIT_CHECK(m_graphicsPipelines.Append(nameLookup));
+
+		return ResultCode::kOK;
+	}
+
+	Result LibraryAnalyzer::ParseRenderPass(const char *filePath, utils::ITextParser &parser, rpc_interchange::RenderPassEntity &rp)
+	{
+		RKIT_CHECK(parser.ExpectToken("{"));
+
+		const data::RenderRTTIStructType *renderPassDescRTTI = m_dataDriver->GetRenderDataHandler()->GetRenderPassDescRTTI();
+		const data::RenderRTTIStructType *renderTargetDescRTTI = m_dataDriver->GetRenderDataHandler()->GetRenderTargetDescRTTI();
+		const data::RenderRTTIStructType *depthStencilTargetDescRTTI = m_dataDriver->GetRenderDataHandler()->GetDepthStencilTargetDescRTTI();
+
+		for (;;)
+		{
+			Span<const char> token;
+			RKIT_CHECK(parser.RequireToken(token));
+
+			size_t line = 0;
+			size_t col = 0;
+			parser.GetLocation(line, col);
+
+			if (IsToken(token, "}"))
+				break;
+
+			if (IsToken(token, "RenderTargets"))
+			{
+				RKIT_CHECK(parser.ExpectToken("="));
+				RKIT_CHECK(parser.ExpectToken("{"));
+
+				for (;;)
+				{
+					parser.GetLocation(line, col);
+
+					RKIT_CHECK(parser.RequireToken(token));
+
+					if (IsToken(token, "}"))
+						break;
+
+					RKIT_CHECK(CheckValidIdentifier(filePath, token, parser));
+
+					UniquePtr<render::RenderTargetDesc> rtDesc;
+					RKIT_CHECK(New<render::RenderTargetDesc>(rtDesc));
+
+					RKIT_CHECK(IndexString(token, rtDesc->m_name));
+
+					RKIT_CHECK(parser.ExpectToken("="));
+
+					RKIT_CHECK(ParseStruct(filePath, renderTargetDescRTTI, rtDesc.Get(), parser));
+
+					RKIT_CHECK(rp.GetRenderTargetDescs().Append(rtDesc.Get()));
+
+					RKIT_CHECK(m_rtDescs.Append(std::move(rtDesc)));
+				}
+			}
+			else if (IsToken(token, "DepthStencil"))
+			{
+				RKIT_CHECK(parser.ExpectToken("="));
+
+				UniquePtr<render::DepthStencilTargetDesc> depthStencil;
+				RKIT_CHECK(New<render::DepthStencilTargetDesc>(depthStencil));
+
+				RKIT_CHECK(ParseStruct(filePath, depthStencilTargetDescRTTI, depthStencil.Get(), parser));
+
+				rp.GetDesc().m_depthStencilTarget = depthStencil.Get();
+
+				RKIT_CHECK(m_depthStencilTargetDescs.Append(std::move(depthStencil)));
+			}
+			else
+			{
+				RKIT_CHECK(ParseStructMember(filePath, token, renderPassDescRTTI, &rp.GetDesc(), parser));
+			}
+		}
+
+		rp.GetDesc().m_renderTargets = rp.GetRenderTargetDescs().ToSpan();
 
 		return ResultCode::kOK;
 	}
@@ -1505,7 +1810,40 @@ namespace rkit::buildsystem::rpc_analyzer
 		return ResultCode::kOK;
 	}
 
-	Result LibraryAnalyzer::ResolveInputLayoutVertexInputs(const char *blamePath, size_t line, size_t col, render::TempStringIndex_t feedName, const Span<const char> &nameBase, Vector<const render::InputLayoutVertexInputDesc *> &descsVector, uint32_t &inOutOffset, render::ValueType inputSourcesType, uint32_t inputFeedSlot, render::InputLayoutVertexInputStepping stepping)
+	Result LibraryAnalyzer::ResolveInputLayoutVertexInputs(const char *blamePath, size_t line, size_t col, render::TempStringIndex_t feedName, const Span<const char> &nameBase, Vector<const render::InputLayoutVertexInputDesc *> &descsVector, uint32_t &inOutOffset, const render::VectorOrScalarNumericType &inputSourcesType, render::InputLayoutVertexFeedDesc *inputFeed)
+	{
+		uint32_t sz = ResolveVectorOrScalarNumericTypeSize(inputSourcesType.m_numericType, inputSourcesType.m_cols);
+
+		render::TempStringIndex_t memberName;
+		if (nameBase.Count() == 0)
+		{
+			RKIT_CHECK(IndexString(StringView("Value").ToSpan(), memberName));
+		}
+		else
+		{
+			RKIT_CHECK(IndexString(nameBase, memberName));
+		}
+
+		const render::VectorOrScalarNumericType *deduplicated = nullptr;
+		RKIT_CHECK(Deduplicate(m_vectorOrScalarTypes, inputSourcesType, deduplicated));
+
+		UniquePtr<render::InputLayoutVertexInputDesc> vid;
+		RKIT_CHECK(New<render::InputLayoutVertexInputDesc>(vid));
+		vid->m_byteOffset = inOutOffset;
+		vid->m_inputFeed = inputFeed;
+		vid->m_memberName = memberName;
+		vid->m_numericType = deduplicated;
+
+		RKIT_CHECK(descsVector.Append(vid.Get()));
+
+		RKIT_CHECK(m_vertexInputDescs.Append(std::move(vid)));
+
+		inOutOffset += sz;
+
+		return ResultCode::kOK;
+	}
+
+	Result LibraryAnalyzer::ResolveInputLayoutVertexInputs(const char *blamePath, size_t line, size_t col, render::TempStringIndex_t feedName, const Span<const char> &nameBase, Vector<const render::InputLayoutVertexInputDesc *> &descsVector, uint32_t &inOutOffset, const render::ValueType &inputSourcesType, render::InputLayoutVertexFeedDesc *inputFeed)
 	{
 		switch (inputSourcesType.m_type)
 		{
@@ -1515,49 +1853,19 @@ namespace rkit::buildsystem::rpc_analyzer
 
 		case render::ValueTypeType::VectorNumeric:
 			{
-				const render::VectorNumericType *t = inputSourcesType.m_value.m_vectorNumericType;
-				uint32_t sz = ResolveNumericTypeSize(t->m_numericType, t->m_cols);
-
-				render::TempStringIndex_t memberName;
-				if (nameBase.Count() == 0)
-				{
-					RKIT_CHECK(IndexString(StringView("Value").ToSpan(), memberName));
-				}
-				else
-				{
-					RKIT_CHECK(IndexString(nameBase, memberName));
-				}
-
-
-				RKIT_CHECK(IndexString(nameBase, memberName));
-
-				UniquePtr<render::InputLayoutVertexInputDesc> vid;
-				RKIT_CHECK(New<render::InputLayoutVertexInputDesc>(vid));
-				vid->m_byteOffset = inOutOffset;
-				vid->m_feedName = feedName;
-				vid->m_inputSlot = inputFeedSlot;
-				vid->m_memberName = memberName;
-				vid->m_numericType = t;
-				vid->m_stepping = stepping;
-
-				RKIT_CHECK(descsVector.Append(vid.Get()));
-
-				RKIT_CHECK(m_vertexInputDescs.Append(std::move(vid)));
-
-				inOutOffset += sz;
+				render::VectorOrScalarNumericType converted;
+				converted.m_numericType = inputSourcesType.m_value.m_vectorNumericType->m_numericType;
+				converted.m_cols = ConvertToMaybeScalar(inputSourcesType.m_value.m_vectorNumericType->m_cols);
+				return ResolveInputLayoutVertexInputs(blamePath, line, col, feedName, nameBase, descsVector, inOutOffset, converted, inputFeed);
 			}
 			break;
 
 		case render::ValueTypeType::Numeric:
 			{
-				const render::VectorNumericType vt;
-
-				const render::VectorNumericType *deduplicated = nullptr;
-				RKIT_CHECK(Deduplicate(m_vectorTypes, vt, deduplicated));
-
-				render::ValueType valueType(deduplicated);
-
-				RKIT_CHECK(ResolveInputLayoutVertexInputs(blamePath, line, col, feedName, nameBase, descsVector, inOutOffset, valueType, inputFeedSlot, stepping));
+				render::VectorOrScalarNumericType converted;
+				converted.m_numericType = inputSourcesType.m_value.m_numericType;
+				converted.m_cols = render::VectorOrScalarDimension::Scalar;
+				return ResolveInputLayoutVertexInputs(blamePath, line, col, feedName, nameBase, descsVector, inOutOffset, converted, inputFeed);
 			}
 			break;
 
@@ -1577,11 +1885,11 @@ namespace rkit::buildsystem::rpc_analyzer
 						RKIT_CHECK(memberNameBaseChars.Append(memberNameBaseChars.ToSpan()));
 						RKIT_CHECK(memberNameBaseChars.Append('_'));
 
-						RKIT_CHECK(ResolveInputLayoutVertexInputs(blamePath, line, col, feedName, memberNameBaseChars.ToSpan(), descsVector, inOutOffset, memberType, inputFeedSlot, stepping));
+						RKIT_CHECK(ResolveInputLayoutVertexInputs(blamePath, line, col, feedName, memberNameBaseChars.ToSpan(), descsVector, inOutOffset, memberType, inputFeed));
 					}
 					else
 					{
-						RKIT_CHECK(ResolveInputLayoutVertexInputs(blamePath, line, col, feedName, memberName.ToSpan(), descsVector, inOutOffset, memberType, inputFeedSlot, stepping));
+						RKIT_CHECK(ResolveInputLayoutVertexInputs(blamePath, line, col, feedName, memberName.ToSpan(), descsVector, inOutOffset, memberType, inputFeed));
 					}
 				}
 			}
@@ -1594,39 +1902,21 @@ namespace rkit::buildsystem::rpc_analyzer
 		return ResultCode::kOK;
 	}
 
-	uint32_t LibraryAnalyzer::ResolveNumericTypeSize(render::NumericType numericType, render::VectorDimension dimension)
+	uint32_t LibraryAnalyzer::ResolvePackedValueTypeSize(const render::ValueType &valueType)
 	{
-		uint8_t dimensionInt = static_cast<uint8_t>(dimension) - static_cast<uint8_t>(render::VectorDimension::Dimension2) + 2;
-
-		switch (numericType)
+		switch (valueType.m_type)
 		{
-		case render::NumericType::SInt8:
-		case render::NumericType::UInt8:
-		case render::NumericType::SNorm8:
-		case render::NumericType::UNorm8:
-			return dimensionInt;
+		case render::ValueTypeType::Numeric:
+			return ResolveNumericTypeSize(valueType.m_value.m_numericType);
 
-		case render::NumericType::Float16:
-		case render::NumericType::SInt16:
-		case render::NumericType::UInt16:
-		case render::NumericType::SNorm16:
-		case render::NumericType::UNorm16:
-			return dimensionInt * 2;
+		case render::ValueTypeType::CompoundNumeric:
+			return ResolveCompoundNumericTypeSize(valueType.m_value.m_compoundNumericType->m_numericType, valueType.m_value.m_compoundNumericType->m_rows, valueType.m_value.m_compoundNumericType->m_cols);
 
-		case render::NumericType::Float32:
-		case render::NumericType::SInt32:
-		case render::NumericType::UInt32:
-		case render::NumericType::SNorm32:
-		case render::NumericType::UNorm32:
-			return dimensionInt * 4;
+		case render::ValueTypeType::VectorNumeric:
+			return ResolveVectorNumericTypeSize(valueType.m_value.m_vectorNumericType->m_numericType, valueType.m_value.m_vectorNumericType->m_cols);
 
-		case render::NumericType::Float64:
-		case render::NumericType::SInt64:
-		case render::NumericType::UInt64:
-			return dimensionInt * 8;
-
-		case render::NumericType::Bool:
-			return 1;
+		case render::ValueTypeType::Structure:
+			return ResolvePackedStructureTypeSize(*valueType.m_value.m_structureType);
 
 		default:
 			RKIT_ASSERT(false);
@@ -1634,6 +1924,86 @@ namespace rkit::buildsystem::rpc_analyzer
 		}
 	}
 
+	uint32_t LibraryAnalyzer::ResolvePackedStructureTypeSize(const render::StructureType &structureType)
+	{
+		uint32_t sz = 0;
+		for (const render::StructureMemberDesc *member : structureType.m_members)
+			sz += ResolvePackedValueTypeSize(member->m_type);
+
+		return sz;
+	}
+
+	uint32_t LibraryAnalyzer::ResolveCompoundNumericTypeSize(render::NumericType numericType, render::VectorDimension rows, render::VectorDimension cols)
+	{
+		uint8_t rowsDimensionInt = static_cast<uint8_t>(rows) - static_cast<uint8_t>(render::VectorDimension::Dimension2) + 2;
+		uint8_t colsDimensionInt = static_cast<uint8_t>(cols) - static_cast<uint8_t>(render::VectorDimension::Dimension2) + 2;
+
+		return ResolveNumericTypeSize(numericType) * rowsDimensionInt * colsDimensionInt;
+	}
+
+	uint32_t LibraryAnalyzer::ResolveVectorOrScalarNumericTypeSize(render::NumericType numericType, render::VectorOrScalarDimension dimension)
+	{
+		uint8_t dimensionInt = static_cast<uint8_t>(dimension) - static_cast<uint8_t>(render::VectorOrScalarDimension::Scalar) + 1;
+		return ResolveNumericTypeSize(numericType) * dimensionInt;
+	}
+
+	uint32_t LibraryAnalyzer::ResolveVectorNumericTypeSize(render::NumericType numericType, render::VectorDimension dimension)
+	{
+		uint8_t dimensionInt = static_cast<uint8_t>(dimension) - static_cast<uint8_t>(render::VectorDimension::Dimension2) + 2;
+		return ResolveNumericTypeSize(numericType) * dimensionInt;
+	}
+
+	uint32_t LibraryAnalyzer::ResolveNumericTypeSize(render::NumericType numericType)
+	{
+		switch (numericType)
+		{
+		case render::NumericType::SInt8:
+		case render::NumericType::UInt8:
+		case render::NumericType::SNorm8:
+		case render::NumericType::UNorm8:
+			return 1;
+
+		case render::NumericType::Float16:
+		case render::NumericType::SInt16:
+		case render::NumericType::UInt16:
+		case render::NumericType::SNorm16:
+		case render::NumericType::UNorm16:
+			return 2;
+
+		case render::NumericType::Float32:
+		case render::NumericType::SInt32:
+		case render::NumericType::UInt32:
+			return 4;
+
+		case render::NumericType::Float64:
+		case render::NumericType::SInt64:
+		case render::NumericType::UInt64:
+			return 8;
+
+		case render::NumericType::Bool:
+			return 1;	// FIXME: Need alternate packing rules
+
+		default:
+			RKIT_ASSERT(false);
+			return 0;
+		}
+	}
+
+	render::VectorOrScalarDimension LibraryAnalyzer::ConvertToMaybeScalar(render::VectorDimension dimension)
+	{
+		switch (dimension)
+		{
+		case render::VectorDimension::Dimension2:
+			return render::VectorOrScalarDimension::Dimension2;
+		case render::VectorDimension::Dimension3:
+			return render::VectorOrScalarDimension::Dimension3;
+		case render::VectorDimension::Dimension4:
+			return render::VectorOrScalarDimension::Dimension4;
+		default:
+			RKIT_ASSERT(false);
+			return render::VectorOrScalarDimension::Scalar;
+		}
+	}
 
 	Result LibraryAnalyzer::ExpectIdentifier(const char *blamePath, Span<const char> &outToken, utils::ITextParser &parser)
 	{
@@ -1877,6 +2247,12 @@ namespace rkit::buildsystem::rpc_analyzer
 			if (result >= maxBeforeMultiply)
 			{
 				rkit::log::ErrorFmt("%s [%zu:%zu] Integer constant overflow", blamePath, blameLine, blameCol);
+				return ResultCode::kMalformedFile;
+			}
+
+			if (digit >= base)
+			{
+				rkit::log::ErrorFmt("%s [%zu:%zu] Invalid digit in numeric constant", blamePath, blameLine, blameCol);
 				return ResultCode::kMalformedFile;
 			}
 

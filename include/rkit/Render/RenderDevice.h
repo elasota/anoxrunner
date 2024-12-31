@@ -23,6 +23,7 @@ namespace rkit::render
 	struct ICPUWaitableFence;
 	struct IPipelineLibraryLoader;
 	struct IPipelineLibraryConfigValidator;
+	struct IRenderDeviceCaps;
 
 	struct IRenderDevice
 	{
@@ -34,6 +35,8 @@ namespace rkit::render
 		virtual IGraphicsComputeCommandQueue *GetGraphicsComputeQueue(size_t index) const = 0;
 
 		virtual Result CreateCPUWaitableFence(UniquePtr<ICPUWaitableFence> &outFence) = 0;
+
+		virtual const IRenderDeviceCaps &GetCaps() const = 0;
 
 		virtual Result CreatePipelineLibraryLoader(UniquePtr<IPipelineLibraryLoader> &loader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
 			UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart,

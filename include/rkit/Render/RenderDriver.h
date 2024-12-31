@@ -19,6 +19,7 @@ namespace rkit
 namespace rkit::render
 {
 	struct IRenderDevice;
+	struct IRenderDeviceCaps;
 
 	enum class ValidationLevel
 	{
@@ -63,7 +64,7 @@ namespace rkit::render
 		virtual ~IRenderDriver() {}
 
 		virtual Result EnumerateAdapters(Vector<UniquePtr<IRenderAdapter>> &devices) const = 0;
-		virtual Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, IRenderAdapter &adapter) = 0;
+		virtual Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, const IRenderDeviceCaps &optionalCaps, const IRenderDeviceCaps &requiredCaps, IRenderAdapter &adapter) = 0;
 	};
 }
 

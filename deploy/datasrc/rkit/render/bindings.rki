@@ -57,7 +57,6 @@ InputLayout IL_WorldSurface
 		{
 			InputFeed = WorldSurfaceVertexData
 			InputSources = S_WorldSurfaceVertexData
-			Stepping = Vertex
 		}
 	}
 }
@@ -113,7 +112,6 @@ InputLayout IL_Model
 		{
 			InputFeed = ModelVertexData
 			InputSources = S_ModelVertexData
-			Stepping = Vertex
 		}
 	}
 }
@@ -221,8 +219,14 @@ InputLayout IL_InterfaceSimple
 {
 	VertexInputFeeds =
 	{
-		VertexCoords
-		ElementTransforms
+		VertexCoords =
+		{
+			Stepping = Vertex
+		}
+		ElementTransforms =
+		{
+			Stepping = Instance
+		}
 	}
 
 	VertexInputs =
@@ -231,13 +235,27 @@ InputLayout IL_InterfaceSimple
 		{
 			InputFeed = VertexCoords
 			InputSources = S_UIVertexCoordinate
-			Stepping = Vertex
 		}
 		ElementTransforms =
 		{
 			InputFeed = ElementTransforms
 			InputSources = S_UIElementTransformSimple
-			Stepping = Instance
 		}
+	}
+}
+
+RenderPass RP_Interface
+{
+	RenderTargets =
+	{
+		Color =
+		{
+			Format = Config(CFG_RenderTargetFormat)
+		}
+	}
+
+	DepthStencil =
+	{
+		Format = Config(CFG_DepthStencilTargetFormat)
 	}
 }

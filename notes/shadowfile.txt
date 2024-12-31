@@ -13,9 +13,9 @@ ShadowFileHeader
 {
 	char identifier[4];	// RSFS
 	uint16_t version;	// 1
-	uint8_t activeLocator;	// 0 or 1
 	uint8_t sectorSizeBits;
 	ShadowFileLocator locators[2];
+	uint8_t activeLocator;	// 1 or 2, 0 = incompletely-initialized
 }
 
 
@@ -49,8 +49,10 @@ FileTableEntry
 {
 	char name[256]
 	uint32_t flags
-	uint32_t extentsStart (only if size is not zero)
+	uint32_t extentsStart
 	uint64_t size
+
+	byte[sector size - 272]	initialData
 }
 
 - name: The name of the file, must be null-terminated

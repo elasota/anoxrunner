@@ -105,8 +105,10 @@ namespace rkit::buildsystem::vulkan
 		static Result WriteUIntString(IWriteStream &stream, uint64_t value);
 
 		static Result WriteRTFormat(IWriteStream &stream, const render::RenderTargetFormat &format);
+		static Result WriteVectorOrScalarNumericType(IWriteStream &stream, const render::VectorOrScalarNumericType &format);
 		static Result WriteVectorNumericType(IWriteStream &stream, const render::VectorNumericType &format);
 		static Result WriteNumericType(IWriteStream &stream, const render::NumericType numericType);
+		static Result WriteVectorOrScalarDimension(IWriteStream &stream, const render::VectorOrScalarDimension vectorOrScalarDimension);
 		static Result WriteVectorDimension(IWriteStream &stream, const render::VectorDimension vectorDimension);
 		static Result WriteTextureDescriptorType(IWriteStream &stream, const render::DescriptorType descriptorType, const render::ValueType &valueType);
 		static Result WriteConfigurableRTFormat(IWriteStream &stream, const render::ConfigurableValueBase<render::RenderTargetFormat> &format);
@@ -191,6 +193,8 @@ namespace rkit::buildsystem::vulkan
 
 		static Result AddGraphicsAnalysisStage(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback, render::vulkan::GraphicPipelineStage stage);
 
+		static Result ClearUnusedValues(data::IRenderDataPackage &package);
+
 		PipelineType m_pipelineType;
 	};
 
@@ -260,13 +264,14 @@ namespace rkit::buildsystem::vulkan
 				return ResultCode::kMalformedFile;
 			}
 
-
 			const render::GraphicsPipelineNameLookup *nameLookupDesc = static_cast<const render::GraphicsPipelineNameLookup *>(nameLookupList->GetElementPtr(0));
 
 			RKIT_CHECK(CompileGraphicsPipeline(depsNode, feedback, package.Get(), binaryContent.ToSpan(), nameLookupDesc));
 		}
 		else
 			return ResultCode::kInternalError;
+
+		RKIT_CHECK(ClearUnusedValues(*package.Get()));
 
 		RKIT_CHECK(feedback->CheckFault());
 
@@ -372,6 +377,25 @@ namespace rkit::buildsystem::vulkan
 		return ResultCode::kOK;
 	}
 
+	Result RenderPipelineCompiler::ClearUnusedValues(data::IRenderDataPackage &package)
+	{
+		const data::IRenderRTTIListBase *graphicsPipelines = package.GetIndexable(data::RenderRTTIIndexableStructType::GraphicsPipelineDesc);
+		for (size_t i = 0; i < graphicsPipelines->GetCount(); i++)
+		{
+			render::GraphicsPipelineDesc *pipelineDesc = const_cast<render::GraphicsPipelineDesc *>(static_cast<const render::GraphicsPipelineDesc *>(graphicsPipelines->GetElementPtr(i)));
+			pipelineDesc->m_vertexShaderOutput = nullptr;
+		}
+
+		const data::IRenderRTTIListBase *descriptorDescs = package.GetIndexable(data::RenderRTTIIndexableStructType::DescriptorDesc);
+		for (size_t i = 0; i < descriptorDescs->GetCount(); i++)
+		{
+			render::DescriptorDesc *descriptorDesc = const_cast<render::DescriptorDesc *>(static_cast<const render::DescriptorDesc *>(descriptorDescs->GetElementPtr(i)));
+			descriptorDesc->m_globallyCoherent = false;
+		}
+
+		return ResultCode::kOK;
+	}
+
 	Result RenderPipelineCompiler::AddGraphicsAnalysisStage(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback, render::vulkan::GraphicPipelineStage stage)
 	{
 		return feedback->AddNodeDependency(kDefaultNamespace, CreateNodeTypeIDForStage(stage), BuildFileLocation::kIntermediateDir, depsNode->GetIdentifier());
@@ -442,8 +466,9 @@ namespace rkit::buildsystem::vulkan
 		const render::ShaderDesc *shaderDesc = (pipeline->*field);
 		render::TempStringIndex_t sourceFileIndex = shaderDesc->m_source;
 
-		RKIT_CHECK(m_shaderSourcePath.Set(package->GetString(sourceFileIndex.GetIndex())));
+		const render::RenderPassDesc *rpDesc = pipeline->m_executeInPass;
 
+		RKIT_CHECK(m_shaderSourcePath.Set(package->GetString(sourceFileIndex.GetIndex())));
 
 		RKIT_CHECK(WriteString(m_prefixStream, "#define float2 vec2\n"));
 		RKIT_CHECK(WriteString(m_prefixStream, "#define float3 vec3\n"));
@@ -458,7 +483,7 @@ namespace rkit::buildsystem::vulkan
 		RKIT_CHECK(WriteString(m_prefixStream, "#define float4x3 mat4x3\n"));
 		RKIT_CHECK(WriteString(m_prefixStream, "#define float4x4 mat4x4\n"));
 
-		if (pipeline->m_pushConstants)
+		if (pipeline->m_pipelineLayout->m_pushConstantList)
 		{
 			return ResultCode::kNotYetImplemented;
 		}
@@ -466,19 +491,19 @@ namespace rkit::buildsystem::vulkan
 		if (stage == render::vulkan::GraphicPipelineStage::Vertex && pipeline->m_inputLayout != nullptr)
 		{
 			size_t inputIndex = 0;
-			for (const render::InputLayoutVertexInputDesc *vertexInput : pipeline->m_inputLayout->m_vertexFeeds)
+			for (const render::InputLayoutVertexInputDesc *vertexInput : pipeline->m_inputLayout->m_vertexInputs)
 			{
 				RKIT_CHECK(WriteString(m_prefixStream, "layout(location = "));
 				RKIT_CHECK(WriteUIntString(m_prefixStream, inputIndex));
 				RKIT_CHECK(WriteString(m_prefixStream, ") in "));
-				RKIT_CHECK(WriteVectorNumericType(m_prefixStream, *vertexInput->m_numericType));
+				RKIT_CHECK(WriteVectorOrScalarNumericType(m_prefixStream, *vertexInput->m_numericType));
 				RKIT_CHECK(WriteString(m_prefixStream, " _vs_in_F"));
 				RKIT_CHECK(WriteUIntString(m_prefixStream, inputIndex));
 				RKIT_CHECK(WriteString(m_prefixStream, ";\n"));
 
-				RKIT_CHECK(WriteVectorNumericType(m_prefixStream, *vertexInput->m_numericType));
+				RKIT_CHECK(WriteVectorOrScalarNumericType(m_prefixStream, *vertexInput->m_numericType));
 				RKIT_CHECK(WriteString(m_prefixStream, " VertexInput_Load_"));
-				RKIT_CHECK(WriteString(m_prefixStream, package->GetString(vertexInput->m_feedName.GetIndex())));
+				RKIT_CHECK(WriteString(m_prefixStream, package->GetString(vertexInput->m_inputFeed->m_feedName.GetIndex())));
 				RKIT_CHECK(WriteString(m_prefixStream, "_"));
 				RKIT_CHECK(WriteString(m_prefixStream, package->GetString(vertexInput->m_memberName.GetIndex())));
 				RKIT_CHECK(WriteString(m_prefixStream, "()\n"));
@@ -499,9 +524,9 @@ namespace rkit::buildsystem::vulkan
 
 		if (stage == render::vulkan::GraphicPipelineStage::Pixel)
 		{
-			for (size_t rtIndex = 0; rtIndex < pipeline->m_renderTargets.Count(); rtIndex++)
+			for (size_t rtIndex = 0; rtIndex < rpDesc->m_renderTargets.Count(); rtIndex++)
 			{
-				const render::RenderTargetDesc *rtDesc = pipeline->m_renderTargets[rtIndex];
+				const render::RenderTargetDesc *rtDesc = rpDesc->m_renderTargets[rtIndex];
 
 				RKIT_CHECK(WriteString(m_prefixStream, "layout(location = "));
 				RKIT_CHECK(WriteUIntString(m_prefixStream, rtIndex));
@@ -517,9 +542,9 @@ namespace rkit::buildsystem::vulkan
 			RKIT_CHECK(WriteString(m_prefixStream, "struct PixelShaderOutput\n"));
 			RKIT_CHECK(WriteString(m_prefixStream, "{\n"));
 
-			for (size_t rtIndex = 0; rtIndex < pipeline->m_renderTargets.Count(); rtIndex++)
+			for (size_t rtIndex = 0; rtIndex < rpDesc->m_renderTargets.Count(); rtIndex++)
 			{
-				const render::RenderTargetDesc *rtDesc = pipeline->m_renderTargets[rtIndex];
+				const render::RenderTargetDesc *rtDesc = rpDesc->m_renderTargets[rtIndex];
 
 				RKIT_CHECK(WriteString(m_prefixStream, "    "));
 				RKIT_CHECK(WriteConfigurableRTFormat(m_prefixStream, rtDesc->m_format));
@@ -531,9 +556,10 @@ namespace rkit::buildsystem::vulkan
 			RKIT_CHECK(WriteString(m_prefixStream, "};\n"));
 		}
 
-		for (size_t dlSlot = 0; dlSlot < pipeline->m_descriptorLayouts.Count(); dlSlot++)
+		ConstSpan<const render::DescriptorLayoutDesc *> descriptorLayouts = pipeline->m_pipelineLayout->m_descriptorLayouts;
+		for (size_t dlSlot = 0; dlSlot < descriptorLayouts.Count(); dlSlot++)
 		{
-			const render::DescriptorLayoutDesc *dl = pipeline->m_descriptorLayouts[dlSlot];
+			const render::DescriptorLayoutDesc *dl = descriptorLayouts[dlSlot];
 
 			for (size_t descSlot = 0; descSlot < dl->m_descriptors.Count(); descSlot++)
 			{
@@ -593,6 +619,7 @@ namespace rkit::buildsystem::vulkan
 				case render::DescriptorType::RWTexture2D:
 				case render::DescriptorType::RWTexture2DArray:
 				case render::DescriptorType::RWTexture3D:
+					RKIT_CHECK(WriteString(m_prefixStream, "uniform "));
 					RKIT_CHECK(WriteTextureDescriptorType(m_prefixStream, descriptor->m_descriptorType, descriptor->m_valueType));
 					RKIT_CHECK(WriteString(m_prefixStream, " "));
 					break;
@@ -641,9 +668,9 @@ namespace rkit::buildsystem::vulkan
 
 		if (stage == render::vulkan::GraphicPipelineStage::Pixel)
 		{
-			for (size_t rtIndex = 0; rtIndex < pipeline->m_renderTargets.Count(); rtIndex++)
+			for (size_t rtIndex = 0; rtIndex < rpDesc->m_renderTargets.Count(); rtIndex++)
 			{
-				const render::RenderTargetDesc *rtDesc = pipeline->m_renderTargets[rtIndex];
+				const render::RenderTargetDesc *rtDesc = rpDesc->m_renderTargets[rtIndex];
 
 				RKIT_CHECK(WriteString(m_suffixStream, "    _ps_out_RT"));
 				RKIT_CHECK(WriteUIntString(m_suffixStream, rtIndex));
@@ -655,10 +682,10 @@ namespace rkit::buildsystem::vulkan
 
 		RKIT_CHECK(WriteString(m_suffixStream, "}\n"));
 
-		if (pipeline->m_renderTargets.Count() > static_cast<size_t>(std::numeric_limits<int>::max()))
+		if (rpDesc->m_renderTargets.Count() > static_cast<size_t>(std::numeric_limits<int>::max()))
 			return ResultCode::kIntegerOverflow;
 
-		m_glslangResource.max_draw_buffers = static_cast<int>(pipeline->m_renderTargets.Count());
+		m_glslangResource.max_draw_buffers = static_cast<int>(rpDesc->m_renderTargets.Count());
 
 		return Compile();
 	}
@@ -804,6 +831,14 @@ namespace rkit::buildsystem::vulkan
 		return ResultCode::kNotYetImplemented;
 	}
 
+	Result RenderPipelineStageBuildJob::WriteVectorOrScalarNumericType(IWriteStream &stream, const render::VectorOrScalarNumericType &format)
+	{
+		RKIT_CHECK(WriteNumericType(stream, format.m_numericType));
+		RKIT_CHECK(WriteVectorOrScalarDimension(stream, format.m_cols));
+
+		return ResultCode::kOK;
+	}
+
 	Result RenderPipelineStageBuildJob::WriteVectorNumericType(IWriteStream &stream, const render::VectorNumericType &format)
 	{
 		RKIT_CHECK(WriteNumericType(stream, format.m_numericType));
@@ -843,6 +878,23 @@ namespace rkit::buildsystem::vulkan
 		default:
 			rkit::log::Error("A numeric type could not be written in the desired context");
 			return ResultCode::kOperationFailed;
+		}
+	}
+
+	Result RenderPipelineStageBuildJob::WriteVectorOrScalarDimension(IWriteStream &stream, const render::VectorOrScalarDimension vectorOrScalarDimension)
+	{
+		switch (vectorOrScalarDimension)
+		{
+		case render::VectorOrScalarDimension::Scalar:
+			return ResultCode::kOK;
+		case render::VectorOrScalarDimension::Dimension2:
+			return WriteString(stream, "2");
+		case render::VectorOrScalarDimension::Dimension3:
+			return WriteString(stream, "3");
+		case render::VectorOrScalarDimension::Dimension4:
+			return WriteString(stream, "4");
+		default:
+			return ResultCode::kInternalError;
 		}
 	}
 

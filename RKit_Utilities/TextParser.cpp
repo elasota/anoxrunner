@@ -73,10 +73,15 @@ namespace rkit::utils
 
 	private:
 		Result ReadCIdentifier();
-		Result ReadCDecimalNumber(bool mightBeOctal);
+		Result ReadCOctalNumber();
+		Result ReadCDecimalNumber();
 		Result ReadCHexOrOctalNumber();
 		Result ReadCHexNumber();
 		Result ReadCString();
+
+		static bool IsAlphaChar(char c);
+		static bool IsNumericChar(char c);
+		static bool IsIdentifierChar(char c);
 
 		utils::TextParserCommentType m_commentType;
 		utils::TextParserLexerType m_lexType;
@@ -256,6 +261,7 @@ namespace rkit::utils
 				if (c == '\r' || c == '\n')
 					m_isInLineComment = false;
 
+				(void)m_charReader.SkipOne();
 				continue;
 			}
 
@@ -358,7 +364,7 @@ namespace rkit::utils
 		}
 		else if (c >= '1' && c <= '9')
 		{
-			RKIT_CHECK(ReadCDecimalNumber(false));
+			RKIT_CHECK(ReadCDecimalNumber());
 		}
 		else if (c == '0')
 		{
@@ -527,6 +533,21 @@ namespace rkit::utils
 		return ResultCode::kOK;
 	}
 
+	bool TextParser::IsAlphaChar(char c)
+	{
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+	}
+
+	bool TextParser::IsNumericChar(char c)
+	{
+		return (c >= '0' && c <= '9');
+	}
+
+	bool TextParser::IsIdentifierChar(char c)
+	{
+		return IsAlphaChar(c) || IsNumericChar(c) || (c == '_');
+	}
+
 	Result TextParser::ReadCIdentifier()
 	{
 		for (;;)
@@ -547,9 +568,48 @@ namespace rkit::utils
 		return ResultCode::kOK;
 	}
 
-	Result TextParser::ReadCDecimalNumber(bool mightBeOctal)
+	Result TextParser::ReadCOctalNumber()
 	{
-		return ResultCode::kNotYetImplemented;
+		for (;;)
+		{
+			char c = '\0';
+			if (!m_charReader.PeekOne(c))
+				return ResultCode::kOK;
+
+			if (c >= '0' && c <= '7')
+			{
+				m_charReader.SkipOne();
+				continue;
+			}
+			else if (IsIdentifierChar(c))
+				return ResultCode::kTextParsingFailed;
+			else
+				break;
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result TextParser::ReadCDecimalNumber()
+	{
+		for (;;)
+		{
+			char c = '\0';
+			if (!m_charReader.PeekOne(c))
+				return ResultCode::kOK;
+
+			if (c >= '0' && c <= '9')
+			{
+				m_charReader.SkipOne();
+				continue;
+			}
+			else if (IsIdentifierChar(c))
+				return ResultCode::kTextParsingFailed;
+			else
+				break;
+		}
+
+		return ResultCode::kOK;
 	}
 
 	Result TextParser::ReadCHexOrOctalNumber()
@@ -564,7 +624,7 @@ namespace rkit::utils
 			return ReadCHexNumber();
 		}
 
-		return ReadCDecimalNumber(true);
+		return ReadCOctalNumber();
 	}
 
 	Result TextParser::ReadCString()

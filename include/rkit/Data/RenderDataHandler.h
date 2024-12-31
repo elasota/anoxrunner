@@ -42,6 +42,7 @@ namespace rkit::data
 		ComparisonFunction,
 		BorderColor,
 		VectorDimension,
+		VectorOrScalarDimension,
 		NumericType,
 		StageVisibility,
 		DescriptorType,
@@ -66,15 +67,22 @@ namespace rkit::data
 		DescriptorDesc,
 		RenderTargetFormat,
 		RenderTargetDesc,
+		RenderOperationDesc,
+		PipelineLayoutDesc,
 		DescriptorLayoutDesc,
+		DepthStencilTargetDesc,
+		RenderPassDesc,
 		GraphicsPipelineDesc,
 		GraphicsPipelineNameLookup,
+		InputLayoutVertexFeedDesc,
 		InputLayoutVertexInputDesc,
 		InputLayoutDesc,
 		VectorNumericType,
+		VectorOrScalarNumericType,
 		CompoundNumericType,
 		ShaderDesc,
 		DepthStencilDesc,
+		DepthStencilOperationDesc,
 		StencilOpDesc,
 		ContentKey,
 		ShaderPermutationTree,
@@ -87,25 +95,31 @@ namespace rkit::data
 
 	enum class RenderRTTIIndexableStructType
 	{
-		DepthStencilDesc,
+		DepthStencilTargetDesc,
+		DepthStencilOperationDesc,
 		GraphicsPipelineNameLookup,
 		GraphicsPipelineDesc,
 		RenderTargetDesc,
+		RenderOperationDesc,
 		PushConstantDesc,
 		PushConstantListDesc,
 		ShaderDesc,
 		StructureType,
 		StructureMemberDesc,
 		InputLayoutDesc,
+		PipelineLayoutDesc,
 		DescriptorLayoutDesc,
 		DescriptorDesc,
+		InputLayoutVertexFeedDesc,
 		InputLayoutVertexInputDesc,
+		VectorOrScalarNumericType,
 		VectorNumericType,
 		CompoundNumericType,
 		SamplerDesc,
 		ContentKey,
 		ShaderPermutationTree,
 		ShaderPermutationTreeBranch,
+		RenderPassDesc,
 
 		Count,
 
@@ -336,18 +350,21 @@ namespace rkit::data
 
 		virtual const RenderRTTIStructType *GetSamplerDescRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetPushConstantDescRTTI() const = 0;
-		virtual const RenderRTTIEnumType *GetInputLayoutVertexInputSteppingRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetDescriptorDescRTTI() const = 0;
 		virtual const RenderRTTIEnumType *GetDescriptorTypeRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetGraphicsPipelineDescRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetGraphicsPipelineNameLookupRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetRenderTargetDescRTTI() const = 0;
+		virtual const RenderRTTIStructType *GetRenderOperationDescRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetShaderDescRTTI() const = 0;
-		virtual const RenderRTTIStructType *GetDepthStencilDescRTTI() const = 0;
+		virtual const RenderRTTIStructType *GetDepthStencilOperationDescRTTI() const = 0;
 		virtual const RenderRTTIEnumType *GetNumericTypeRTTI() const = 0;
+		virtual const RenderRTTIEnumType *GetInputLayoutVertexInputSteppingRTTI() const = 0;
 		virtual const RenderRTTIObjectPtrType *GetVectorNumericTypePtrRTTI() const = 0;
 		virtual const RenderRTTIObjectPtrType *GetCompoundNumericTypePtrRTTI() const = 0;
 		virtual const RenderRTTIObjectPtrType *GetStructureTypePtrRTTI() const = 0;
+		virtual const RenderRTTIStructType *GetRenderPassDescRTTI() const = 0;
+		virtual const RenderRTTIStructType *GetDepthStencilTargetDescRTTI() const = 0;
 
 		virtual Result ProcessIndexable(RenderRTTIIndexableStructType indexableStructType, UniquePtr<IRenderRTTIListBase> *outList, UniquePtr<IRenderRTTIObjectPtrList> *outPtrList, const RenderRTTIStructType **outRTTI) const = 0;
 
