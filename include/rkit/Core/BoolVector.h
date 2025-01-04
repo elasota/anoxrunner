@@ -19,6 +19,9 @@ namespace rkit
 
 		typedef uint64_t Chunk_t;
 		static const size_t kBitsPerChunk = sizeof(Chunk_t) * 8;
+		static const size_t kLog2BitsPerChunk = 6;
+
+		static const Chunk_t kFullChunkBits = ((((static_cast<Chunk_t>(1) << (kBitsPerChunk - 1)) - 1u) << 1u) | 1u);
 
 		BoolVector();
 		BoolVector(BoolVector &&other);
@@ -88,7 +91,9 @@ namespace rkit
 namespace rkit
 {
 	inline BoolVector::BoolVector()
+		: m_size(0)
 	{
+		static_assert((1 << kLog2BitsPerChunk) == kBitsPerChunk);
 	}
 
 	inline BoolVector::BoolVector(BoolVector &&other)

@@ -48,7 +48,7 @@ namespace rkit
 		FilePos_t Tell() const override;
 		FilePos_t GetSize() const override;
 
-		bool Truncate(FilePos_t pos) override;
+		Result Truncate(FilePos_t pos) override;
 
 	private:
 		HANDLE m_hfile;
@@ -412,13 +412,13 @@ namespace rkit
 		return m_fileSize;
 	}
 
-	bool File_Win32::Truncate(FilePos_t newSize)
+	Result File_Win32::Truncate(FilePos_t newSize)
 	{
 		if (m_fileSize == newSize)
-			return true;
+			return ResultCode::kOK;
 
 		if (m_fileSize < newSize)
-			return false;
+			return ResultCode::kOperationFailed;
 
 		FilePos_t oldFilePos = m_filePos;
 
@@ -428,7 +428,7 @@ namespace rkit
 			newPos.QuadPart = static_cast<LONGLONG>(newSize);
 
 			if (!::SetFilePointerEx(m_hfile, newPos, nullptr, FILE_BEGIN))
-				return false;
+				return ResultCode::kOperationFailed;
 		}
 
 		BOOL succeeded = ::SetEndOfFile(m_hfile);
@@ -444,7 +444,10 @@ namespace rkit
 			::SetFilePointerEx(m_hfile, newPos, nullptr, FILE_BEGIN);
 		}
 
-		return (succeeded != FALSE);
+		if (succeeded)
+			return ResultCode::kOK;
+		else
+			return ResultCode::kOperationFailed;
 	}
 
 

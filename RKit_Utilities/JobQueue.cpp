@@ -46,7 +46,7 @@ namespace rkit::utils
 
 		JobType m_jobType;
 
-		bool m_isCompleted;
+		bool m_isCompleted = false;
 	};
 
 	class JobQueue final : public IJobQueue
@@ -243,7 +243,8 @@ namespace rkit::utils
 
 		CategoryInfo &ci = m_categories[static_cast<size_t>(jobType)];
 
-		if (numDependencies > 0)
+		bool isRunnableNow = true;
+		if (numDependencies > 0 && dependencies != nullptr)
 		{
 			MutexLock lock(*m_depGraphMutex);
 
@@ -252,15 +253,23 @@ namespace rkit::utils
 
 			for (Job *job : *dependencies)
 			{
-				RKIT_CHECK(static_cast<JobImpl *>(job)->ReserveDownstreamDependency());
+				if (!static_cast<JobImpl *>(job)->m_isCompleted)
+				{
+					isRunnableNow = false;
+					RKIT_CHECK(static_cast<JobImpl *>(job)->ReserveDownstreamDependency());
+				}
 			}
 
 			for (Job *job : *dependencies)
 			{
-				*(static_cast<JobImpl *>(job)->GetLastDownstreamDependency()) = resultJob;
+				if (!static_cast<JobImpl *>(job)->m_isCompleted)
+				{
+					*(static_cast<JobImpl *>(job)->GetLastDownstreamDependency()) = resultJob;
+				}
 			}
 		}
-		else
+
+		if (isRunnableNow && ! ci.m_isClosing)
 			AddRunnableJob(resultJob, static_cast<size_t>(jobType));
 
 		if (outJob)
@@ -345,10 +354,12 @@ namespace rkit::utils
 
 	void JobQueue::JobDone(JobImpl *job)
 	{
+		MutexLock lock(*m_depGraphMutex);
+
 		if (job->m_numStaticDownstream == 0)
 			return;
 
-		MutexLock lock(*m_depGraphMutex);
+		job->m_isCompleted = true;
 
 		for (size_t i = 0; i < job->m_numStaticDownstream; i++)
 			DependencyDone(job->m_staticDownstreamList[i]);

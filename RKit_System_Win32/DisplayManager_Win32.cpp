@@ -223,8 +223,8 @@ namespace rkit::render
 
 		if (m_compactedProgressValue != 0)
 		{
-			::SendMessageW(m_progressBar, PBM_SETPOS, m_compactedProgressValue, 0);
 			m_compactedProgressValue = 0;
+			::SendMessageW(m_progressBar, PBM_SETPOS, m_compactedProgressValue, 0);
 		}
 
 		m_progressBitsShift = bitsShift;

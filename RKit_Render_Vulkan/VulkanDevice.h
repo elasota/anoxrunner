@@ -13,6 +13,9 @@ namespace rkit
 
 	template<class T>
 	class Optional;
+
+	template<class T>
+	class RCPtr;
 }
 
 namespace rkit::render
@@ -25,6 +28,7 @@ namespace rkit::render::vulkan
 	struct VulkanDeviceAPI;
 	struct VulkanGlobalAPI;
 	struct VulkanInstanceAPI;
+	class RenderVulkanPhysicalDevice;
 
 	struct VulkanDeviceBase : public IRenderDevice
 	{
@@ -41,6 +45,8 @@ namespace rkit::render::vulkan
 		virtual const VulkanInstanceAPI &GetInstanceAPI() const = 0;
 		virtual const VulkanDeviceAPI &GetDeviceAPI() const = 0;
 
-		static Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const QueueFamilySpec (&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps);
+		virtual const RenderVulkanPhysicalDevice &GetPhysDevice() const = 0;
+
+		static Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const QueueFamilySpec (&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice);
 	};
 }

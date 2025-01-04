@@ -3,6 +3,7 @@
 #include "rkit/Core/ModuleGlue.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/String.h"
+#include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/Mutex.h"
 #include "rkit/Core/Vector.h"
 

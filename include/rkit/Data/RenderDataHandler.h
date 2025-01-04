@@ -20,6 +20,11 @@ namespace rkit
 	struct IReadStream;
 }
 
+namespace rkit::utils
+{
+	struct Sha256DigestBytes;
+}
+
 namespace rkit::data
 {
 	enum class RenderRTTIMainType
@@ -332,6 +337,7 @@ namespace rkit::data
 		virtual StringView GetString(size_t stringIndex) const = 0;
 		virtual size_t GetBinaryContentCount() const = 0;
 		virtual size_t GetBinaryContentSize(size_t binaryContentIndex) const = 0;
+		virtual const utils::Sha256DigestBytes &GetPackageUUID() const = 0;
 	};
 
 	struct IRenderDataConfigurator

@@ -7,6 +7,7 @@
 #include "rkit/Render/DeviceCaps.h"
 
 #include "rkit/Core/SystemDriver.h"
+#include "rkit/Core/RefCounted.h"
 #include "rkit/Core/Result.h"
 #include "rkit/Core/Mutex.h"
 #include "rkit/Core/NewDelete.h"
@@ -19,7 +20,7 @@ namespace rkit::render::vulkan
 	class VulkanDevice final : public VulkanDeviceBase
 	{
 	public:
-		VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, UniquePtr<IMutex> &&queueMutex);
+		VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, UniquePtr<IMutex> &&queueMutex);
 		~VulkanDevice();
 
 		ICopyCommandQueue *GetCopyQueue(size_t index) const override;
@@ -35,12 +36,13 @@ namespace rkit::render::vulkan
 		const IRenderDeviceCaps &GetCaps() const override;
 
 		Result CreatePipelineLibraryLoader(UniquePtr<IPipelineLibraryLoader> &loader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
-			UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart,
-			UniquePtr<utils::IShadowFile> &&cacheShadowFile, UniquePtr<ISeekableReadWriteStream> &&cacheStream) override;
+			UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart) override;
 
 		const VulkanGlobalAPI &GetGlobalAPI() const override;
 		const VulkanInstanceAPI &GetInstanceAPI() const override;
 		const VulkanDeviceAPI &GetDeviceAPI() const override;
+
+		const RenderVulkanPhysicalDevice &GetPhysDevice() const override;
 
 		Result LoadDeviceAPI();
 		Result ResolveQueues(CommandQueueType queueType, size_t firstQueueID, uint32_t queueFamily, uint32_t numQueues);
@@ -70,6 +72,7 @@ namespace rkit::render::vulkan
 		VkDevice m_device;
 		const VkAllocationCallbacks *m_allocCallbacks;
 		RenderDeviceCaps m_caps;
+		RCPtr<RenderVulkanPhysicalDevice> m_physDevice;
 
 		Vector<UniquePtr<QueueProxy>> m_queueFamilies[kNumQueues];
 		Vector<QueueProxy *> m_allQueues;
@@ -100,7 +103,7 @@ namespace rkit::render::vulkan
 		return false;
 	}
 
-	VulkanDevice::VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, UniquePtr<IMutex> &&queueMutex)
+	VulkanDevice::VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, UniquePtr<IMutex> &&queueMutex)
 		: m_vkg(vkg)
 		, m_vki(vki)
 		, m_inst(inst)
@@ -108,6 +111,7 @@ namespace rkit::render::vulkan
 		, m_allocCallbacks(allocCallbacks)
 		, m_queueMutex(std::move(queueMutex))
 		, m_caps(caps)
+		, m_physDevice(physDevice)
 	{
 	}
 
@@ -175,13 +179,13 @@ namespace rkit::render::vulkan
 		return m_caps;
 	}
 
-	Result VulkanDevice::CreatePipelineLibraryLoader(UniquePtr<IPipelineLibraryLoader> &outLoader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
-		UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart,
-		UniquePtr<utils::IShadowFile> &&cacheShadowFile, UniquePtr<ISeekableReadWriteStream> &&cacheStream)
+	Result VulkanDevice::CreatePipelineLibraryLoader(UniquePtr<IPipelineLibraryLoader> &outLoader,
+		UniquePtr<IPipelineLibraryConfigValidator> &&validator,
+		UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart)
 	{
 		UniquePtr<PipelineLibraryLoaderBase> loader;
 		RKIT_CHECK(PipelineLibraryLoaderBase::Create(*this, loader, std::move(validator),
-			std::move(package), std::move(packageStream), packageBinaryContentStart, std::move(cacheShadowFile), std::move(cacheStream)));
+			std::move(package), std::move(packageStream), packageBinaryContentStart));
 
 		outLoader = std::move(loader);
 
@@ -204,6 +208,11 @@ namespace rkit::render::vulkan
 		return m_vkd;
 	}
 
+	const RenderVulkanPhysicalDevice &VulkanDevice::GetPhysDevice() const
+	{
+		return *m_physDevice;
+	}
+
 	Result VulkanDevice::LoadDeviceAPI()
 	{
 		ResolveFunctionCallback_t resolveCB = m_vkd.GetFirstResolveFunctionCallback();
@@ -215,7 +224,7 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanDeviceBase::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const QueueFamilySpec(&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps)
+	Result VulkanDeviceBase::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const QueueFamilySpec(&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice)
 	{
 		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
 
@@ -223,7 +232,7 @@ namespace rkit::render::vulkan
 		RKIT_CHECK(sysDriver->CreateMutex(queueMutex));
 
 		UniquePtr<VulkanDevice> vkDevice;
-		RKIT_CHECK(New<VulkanDevice>(vkDevice, vkg, vki, inst, device, allocCallbacks, caps, std::move(queueMutex)));
+		RKIT_CHECK(New<VulkanDevice>(vkDevice, vkg, vki, inst, device, allocCallbacks, caps, physDevice, std::move(queueMutex)));
 
 		RKIT_CHECK(vkDevice->LoadDeviceAPI());
 

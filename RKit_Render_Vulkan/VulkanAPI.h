@@ -133,6 +133,8 @@ public:\
 		RKIT_VK_API(vkDestroyPipelineLayout);
 		RKIT_VK_API(vkCreateRenderPass);
 		RKIT_VK_API(vkDestroyRenderPass);
+		RKIT_VK_API(vkGetPipelineCacheData);
+		RKIT_VK_API(vkMergePipelineCaches);
 		RKIT_VK_API_END;
 	};
 }

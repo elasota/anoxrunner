@@ -49,7 +49,7 @@ namespace rkit
 		return m_seek->GetSize();
 	}
 
-	bool MutexProtectedStreamWrapper::Truncate(FilePos_t newSize)
+	Result MutexProtectedStreamWrapper::Truncate(FilePos_t newSize)
 	{
 		MutexLock lock(*m_mutex);
 
@@ -178,7 +178,7 @@ namespace rkit
 		return m_baseStream->GetSize();
 	}
 
-	bool MutexProtectedStream::Truncate(FilePos_t newSize)
+	Result MutexProtectedStream::Truncate(FilePos_t newSize)
 	{
 		return m_baseStream->Truncate(newSize);
 	}

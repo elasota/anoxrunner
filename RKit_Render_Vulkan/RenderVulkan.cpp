@@ -9,6 +9,7 @@
 #include "rkit/Core/ModuleGlue.h"
 #include "rkit/Core/NoCopy.h"
 #include "rkit/Core/RefCounted.h"
+#include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/Vector.h"
 
 #include "VulkanPhysDevice.h"
@@ -94,7 +95,7 @@ namespace rkit::render::vulkan
 
 		size_t GetCommandQueueCount(CommandQueueType type) const override;
 
-		const RenderVulkanPhysicalDevice &GetPhysicalDevice() const;
+		RenderVulkanPhysicalDevice &GetPhysicalDevice() const;
 
 	private:
 		RCPtr<RenderVulkanPhysicalDevice> m_physDevice;
@@ -462,9 +463,9 @@ namespace rkit::render::vulkan
 
 		RenderVulkanAdapter &vkAdapter = static_cast<RenderVulkanAdapter &>(adapter);
 
-		const RenderVulkanPhysicalDevice &rPhysDevice = vkAdapter.GetPhysicalDevice();
+		RCPtr<RenderVulkanPhysicalDevice> rPhysDevice(&vkAdapter.GetPhysicalDevice());
 
-		VkPhysicalDevice physDevice = rPhysDevice.GetPhysDevice();
+		VkPhysicalDevice physDevice = rPhysDevice->GetPhysDevice();
 
 		VkPhysicalDeviceFeatures features = {};
 		m_vki.vkGetPhysicalDeviceFeatures(physDevice, &features);
@@ -502,7 +503,7 @@ namespace rkit::render::vulkan
 
 			uint32_t queueFamilyIndex = 0;
 			uint32_t numQueuesAvailable = 0;
-			rPhysDevice.GetQueueTypeInfo(queueType, queueFamilyIndex, numQueuesAvailable);
+			rPhysDevice->GetQueueTypeInfo(queueType, queueFamilyIndex, numQueuesAvailable);
 
 			if (queueRequest.m_numQueues > numQueuesAvailable)
 			{
@@ -538,9 +539,9 @@ namespace rkit::render::vulkan
 		devCreateInfo.pEnabledFeatures = &features;
 
 		VkDevice device = VK_NULL_HANDLE;
-		RKIT_VK_CHECK(m_vki.vkCreateDevice(rPhysDevice.GetPhysDevice(), &devCreateInfo, GetAllocCallbacks(), &device));
+		RKIT_VK_CHECK(m_vki.vkCreateDevice(rPhysDevice->GetPhysDevice(), &devCreateInfo, GetAllocCallbacks(), &device));
 
-		Result wrapDeviceResult = VulkanDeviceBase::CreateDevice(outDevice, m_vkg, m_vki, m_vkInstance, device, queueFamilySpecs, GetAllocCallbacks(), enabledCaps);
+		Result wrapDeviceResult = VulkanDeviceBase::CreateDevice(outDevice, m_vkg, m_vki, m_vkInstance, device, queueFamilySpecs, GetAllocCallbacks(), enabledCaps, rPhysDevice);
 		if (!wrapDeviceResult.IsOK())
 		{
 			m_vki.vkDestroyDevice(device, GetAllocCallbacks());
@@ -703,7 +704,7 @@ namespace rkit::render::vulkan
 		return numQueues;
 	}
 
-	const RenderVulkanPhysicalDevice &RenderVulkanAdapter::GetPhysicalDevice() const
+	RenderVulkanPhysicalDevice &RenderVulkanAdapter::GetPhysicalDevice() const
 	{
 		return *m_physDevice;
 	}

@@ -57,6 +57,11 @@ namespace rkit::render::vulkan
 		return m_physDevice;
 	}
 
+	const VkPhysicalDeviceProperties &RenderVulkanPhysicalDevice::GetPhysDeviceProperties() const
+	{
+		return m_props;
+	}
+
 	void RenderVulkanPhysicalDevice::GetQueueTypeInfo(CommandQueueType queueType, uint32_t &outQueueFamilyIndex, uint32_t &outNumQueues) const
 	{
 		const QueueFamilyInfo &qfi = m_queueFamilyInfos[static_cast<size_t>(queueType)];

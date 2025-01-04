@@ -13,6 +13,7 @@
 #include "rkit/Core/ProgramStub.h"
 #include "rkit/Core/Result.h"
 #include "rkit/Core/Span.h"
+#include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/StringProto.h"
 #include "rkit/Core/String.h"
 

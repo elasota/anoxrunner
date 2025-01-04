@@ -5,6 +5,11 @@ namespace rkit
 	struct Result;
 	struct IReadStream;
 	struct IWriteStream;
+	struct ISeekableReadStream;
+	struct ISeekableReadWriteStream;
+
+	template<class T>
+	class UniquePtr;
 }
 
 namespace rkit::render
@@ -33,9 +38,10 @@ namespace rkit::render
 
 		virtual Result LoadObjectsFromPackage() = 0;
 
+		virtual void SetMergedLibraryStream(UniquePtr<ISeekableReadStream> &&cacheReadStream, ISeekableReadWriteStream *cacheWriteStream) = 0;
 		virtual Result OpenMergedLibrary() = 0;
 		virtual Result LoadGraphicsPipelineFromMergedLibrary(size_t pipelineIndex, size_t permutationIndex) = 0;
-		virtual void CloseMergedLibrary() = 0;
+		virtual void CloseMergedLibrary(bool unloadPipelines, bool unloadMergedCache) = 0;
 
 		virtual Result CompileUnmergedGraphicsPipeline(size_t pipelineIndex, size_t permutationIndex) = 0;
 		virtual Result AddMergedPipeline(size_t pipelineIndex, size_t permutationIndex) = 0;

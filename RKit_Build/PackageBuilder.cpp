@@ -163,7 +163,7 @@ namespace rkit::buildsystem
 		FilePos_t Tell() const override;
 		FilePos_t GetSize() const override;
 
-		bool Truncate(FilePos_t newSize) override;
+		Result Truncate(FilePos_t newSize) override;
 
 		void FinishSHA();
 		utils::Sha256DigestBytes GetDigest() const;
@@ -920,9 +920,12 @@ namespace rkit::buildsystem
 		return m_stream.GetSize();
 	}
 
-	bool Sha256Wrapper::Truncate(FilePos_t newSize)
+	Result Sha256Wrapper::Truncate(FilePos_t newSize)
 	{
-		return false;
+		if (newSize == m_stream.GetSize())
+			return ResultCode::kOK;
+
+		return ResultCode::kOperationFailed;
 	}
 
 	void Sha256Wrapper::FinishSHA()

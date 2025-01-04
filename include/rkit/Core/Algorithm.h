@@ -107,6 +107,17 @@ namespace rkit
 			static void CopySpan(const Span<T> &dest, const Span<const T> &src);
 			static void MoveSpan(const Span<T> &dest, const Span<T> &src);
 		};
+
+		template<class T, bool TIsUnsignedIntegral>
+		struct FindBitsHelper
+		{
+		};
+
+		template<class T>
+		struct FindBitsHelper<T, true>
+		{
+			static int FindLowestSetBit(T value);
+		};
 	}
 
 
@@ -169,6 +180,9 @@ namespace rkit
 
 	template<class T, class TComparer = DefaultComparer<T>>
 	int CompareSpans(const Span<const T> &dest, const Span<T> &src);
+
+	template<class T>
+	int FindLowestSetBit(T value);
 }
 
 #include "CoreDefs.h"
@@ -551,6 +565,19 @@ void rkit::Private::SpanOpsHelper<T, false>::MoveSpan(const Span<T> &dest, const
 
 
 template<class T>
+int rkit::Private::FindBitsHelper<T, true>::FindLowestSetBit(T value)
+{
+	if (value == 0)
+		return -1;
+
+	int result = 0;
+	while (((value >> result) & 1) == 0)
+		result++;
+
+	return result;
+}
+
+template<class T>
 void rkit::Private::SpanOpsHelper<T, true>::CopyConstructSpan(const Span<T> &dest, const Span<const T> &src)
 {
 	RKIT_ASSERT(dest.Count() == src.Count());
@@ -681,4 +708,10 @@ template<class T, class TComparer>
 int rkit::CompareSpans(const Span<T> &srcA, const Span<const T> &srcB)
 {
 	return CompareSpans(Span<const T>(srcA), srcB);
+}
+
+template<class T>
+int rkit::FindLowestSetBit(T value)
+{
+	return rkit::Private::FindBitsHelper<T, std::is_integral<T>::value &&std::is_unsigned<T>::value>::FindLowestSetBit(value);
 }

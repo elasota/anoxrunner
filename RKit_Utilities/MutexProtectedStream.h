@@ -27,7 +27,7 @@ namespace rkit
 		Result CreateWriteStream(UniquePtr<ISeekableWriteStream> &outStream) override;
 		Result CreateReadWriteStream(UniquePtr<ISeekableReadWriteStream> &outStream) override;
 
-		bool Truncate(FilePos_t newSize);
+		Result Truncate(FilePos_t newSize);
 
 		void SetTracker(BaseRefCountTracker *tracker);
 
@@ -58,7 +58,7 @@ namespace rkit
 		FilePos_t Tell() const override;
 		FilePos_t GetSize() const override;
 
-		bool Truncate(FilePos_t newSize) override;
+		Result Truncate(FilePos_t newSize) override;
 
 	private:
 		SharedPtr<MutexProtectedStreamWrapper> m_baseStream;

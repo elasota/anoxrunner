@@ -22,7 +22,7 @@ ShadowFileHeader
 Fields in the locator:
 - extentsSectorListSector: The sector containing the list of sectors of the extents table
 - extentsTableSize: The number of extents table entries (used and unused)
-- fsRootExtentsStart: The extents table entry for the FS root
+- numFileTableEntries: The number of file table entries
 
 Extents table format:
 ExtentsEntry
@@ -31,15 +31,11 @@ ExtentsEntry
 	uint32_t nextExtents (loops back to start)
 }
 
-FS root format:
-FSRoot
-{
-	uint32_t fileTableExtentsStart
-	uint32_t numFileTableEntries
-}
+The first extents table entry (0) is the file table.
 
+The first file table entry is the root directory.
 
-- fileTableExtentsStart: The first extents of the file table
+- fileTableExtentsStart: The base extents of the file table
 - numFileTableEntries: The number of file records
 
 The root directory is always file table entry 0
@@ -47,7 +43,8 @@ The root directory is always file table entry 0
 
 FileTableEntry
 {
-	char name[256]
+	uint8_t nameLength
+	uint8_t name[255]
 	uint32_t flags
 	uint32_t extentsStart
 	uint64_t size
@@ -61,4 +58,6 @@ FileTableEntry
 - size: Data size
 - initialData: First bytes of file data
 
-In the case of directories, size is divisible by 4 and corresponds to a list of file table entries
+In the case of directories, the contents are a min-max heap of file entries.
+The high-order bit of each entry is a flag indicating whether the lower (0) or
+higher (1) index in the list contains the larger value, for ordered traversal.

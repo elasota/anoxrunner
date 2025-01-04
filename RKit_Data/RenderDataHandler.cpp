@@ -1209,6 +1209,7 @@ namespace rkit::data
 
 		size_t GetBinaryContentCount() const override;
 		size_t GetBinaryContentSize(size_t binaryContentIndex) const override;
+		const utils::Sha256DigestBytes &GetPackageUUID() const override;
 
 		Result Load(const IRenderDataHandler *handler, bool allowTempStrings, IRenderDataConfigurator *configurator, IReadStream &stream);
 
@@ -1272,6 +1273,8 @@ namespace rkit::data
 		UniquePtr<IRenderRTTIListBase> m_indexables[kNumIndexables];
 		UniquePtr<IRenderRTTIObjectPtrList> m_objectPtrs[kNumIndexables];
 		Vector<ObjectSpanInfo> m_spanInfos[kNumIndexables];
+
+		utils::Sha256DigestBytes m_uuid = {};
 	};
 
 	Package::Package()
@@ -1313,6 +1316,11 @@ namespace rkit::data
 		return m_binaryContentSizes[binaryContentIndex];
 	}
 
+	const utils::Sha256DigestBytes &Package::GetPackageUUID() const
+	{
+		return m_uuid;
+	}
+
 	Result Package::Load(const IRenderDataHandler *handler, bool allowTempStrings, IRenderDataConfigurator *configurator, IReadStream &stream)
 	{
 		m_hasTempStrings = allowTempStrings;
@@ -1325,11 +1333,9 @@ namespace rkit::data
 		uint32_t identifier = 0;
 		uint32_t packageVersion = 0;
 
-		utils::Sha256DigestBytes digest;
-
 		RKIT_CHECK(ReadUInt32(stream, identifier));
 		RKIT_CHECK(ReadUInt32(stream, packageVersion));
-		RKIT_CHECK(stream.ReadAll(&digest, sizeof(digest)));
+		RKIT_CHECK(stream.ReadAll(&m_uuid, sizeof(m_uuid)));
 
 		if (identifier != handler->GetPackageIdentifier())
 		{

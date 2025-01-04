@@ -115,7 +115,7 @@ namespace rkit::utils
 	{
 		Sha256InputChunk inputChunk = stateRef.m_inputChunk;
 		Sha256State state = stateRef.m_state;
-		uint64_t length = 0;
+		uint64_t length = stateRef.m_length;
 
 		for (size_t i = 0; i < size; i++)
 		{

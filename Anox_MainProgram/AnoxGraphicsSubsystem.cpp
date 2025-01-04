@@ -9,7 +9,6 @@
 #include "rkit/Render/RenderDevice.h"
 #include "rkit/Render/PipelineLibraryLoader.h"
 
-#include "rkit/Utilities/ShadowFile.h"
 #include "rkit/Utilities/ThreadPool.h"
 
 #include "rkit/Data/DataDriver.h"
@@ -61,6 +60,8 @@ namespace anox
 		rkit::data::IDataDriver &GetDataDriver() const;
 		const anox::GraphicsSettings &GetGraphicsSettings() const;
 
+		void SetSplashProgress(uint64_t progress);
+
 	private:
 		template<class T>
 		struct PipelineConfigResolution
@@ -96,6 +97,15 @@ namespace anox
 
 			template<class T>
 			static rkit::Result AddConfigResolution(rkit::Vector<PipelineConfigResolution<T> > &resolutions, uint64_t keyIndex, const T &value);
+
+			static rkit::Result WriteValueToConfig(rkit::IWriteStream &stream, const TypedEnumValue &value);
+			static rkit::Result WriteValueToConfig(rkit::IWriteStream &stream, int64_t value);
+			static rkit::Result WriteValueToConfig(rkit::IWriteStream &stream, uint64_t value);
+			static rkit::Result WriteValueToConfig(rkit::IWriteStream &stream, double value);
+			static rkit::Result WriteValueToConfig(rkit::IWriteStream &stream, int value);
+
+			template<class T>
+			static rkit::Result WriteResolutionsToConfig(rkit::IWriteStream &stream, const rkit::Vector<PipelineConfigResolution<T>> &resolution);
 
 			const anox::RestartRequiringGraphicsSettings &m_gfxSettings;
 
@@ -136,6 +146,18 @@ namespace anox
 			bool m_canUpdateShadowFile;
 		};
 
+		class CreateNewIndividualCacheJob final : public rkit::IJobRunner
+		{
+		public:
+			explicit CreateNewIndividualCacheJob(GraphicsSubsystem &graphicsSubsystem, const rkit::StringView &pipelinesCacheFileName);
+
+			rkit::Result Run() override;
+
+		private:
+			GraphicsSubsystem &m_graphicsSubsystem;
+			rkit::StringView m_pipelinesCacheFileName;
+		};
+
 		class LoadOneGraphicsPipelineJob final : public rkit::IJobRunner
 		{
 		public:
@@ -171,6 +193,17 @@ namespace anox
 			GraphicsSubsystem &m_graphicsSubsystem;
 		};
 
+		class MergePipelineLibraryJob final : public rkit::IJobRunner
+		{
+		public:
+			explicit MergePipelineLibraryJob(GraphicsSubsystem &graphicsSubsystem);
+
+			rkit::Result Run() override;
+
+		private:
+			GraphicsSubsystem &m_graphicsSubsystem;
+		};
+
 		enum class DeviceSetupStep
 		{
 			kOpenPipelinePackage,
@@ -186,6 +219,7 @@ namespace anox
 		rkit::Result TransitionBackend();
 
 		rkit::Result KickOffNextSetupStep();
+		rkit::Result KickOffMergedPipelineLoad();
 
 		void SetPipelineLibraryLoader(rkit::UniquePtr<rkit::render::IPipelineLibraryLoader> &&loader, rkit::UniquePtr<LivePipelineSets> &&livePipelineSets, bool haveExistingMergedCache);
 
@@ -208,9 +242,11 @@ namespace anox
 
 		rkit::utils::IThreadPool &m_threadPool;
 
+		rkit::StringView m_pipelinesCacheFileName;
+
 		rkit::UniquePtr<rkit::IMutex> m_setupMutex;
 		DeviceSetupStep m_setupStep = DeviceSetupStep::kFinished;
-		uint64_t m_setupProgress;
+		uint64_t m_setupProgress = 0;
 
 		bool m_stepCompleted = false;
 		bool m_stepFailed = false;
@@ -253,53 +289,33 @@ namespace anox
 		rkit::UniquePtr<rkit::data::IRenderDataPackage> package;
 		RKIT_CHECK(rdh->LoadPackage(*pipelinesFile, false, configurator.Get(), package, nullptr));
 
-		rkit::UniquePtr<rkit::ISeekableReadWriteStream> shadowFileStream;
-		rkit::UniquePtr<rkit::utils::IShadowFile> pipelineShadowFile;
-
-		if (m_canUpdateShadowFile)
-		{
-			shadowFileStream = sysDriver->OpenFileReadWrite(rkit::FileLocation::kUserSettingsDirectory, m_pipelinesCacheFileName.GetChars(), true, true, false);
-
-			if (!shadowFileStream.IsValid())
-			{
-				rkit::log::Error("Failed to open pipeline cache file");
-				return rkit::ResultCode::kFileOpenError;
-			}
-
-			bool needToResetShadowFile = true;
-			if (shadowFileStream->GetSize() != 0)
-			{
-				rkit::Result openShadowResult = utilsDriver->OpenShadowFileReadWrite(pipelineShadowFile, *shadowFileStream);
-				if (openShadowResult.IsOK())
-					needToResetShadowFile = false;
-				else
-					rkit::log::Warning("There was a problem opening the pipeline cache shadowfile, resetting it");
-			}
-
-			if (needToResetShadowFile)
-			{
-				pipelineShadowFile.Reset();
-				RKIT_CHECK(utilsDriver->InitializeShadowFile(pipelineShadowFile, *shadowFileStream));
-			}
-		}
-
 		rkit::UniquePtr<LivePipelineSets> pipelineSets;
 
 		RKIT_CHECK(rkit::New<LivePipelineSets>(pipelineSets));
 		RKIT_CHECK(EvaluateLivePipelineSets(*package, *configurator, *pipelineSets));
 
+		rkit::UniquePtr<rkit::ISeekableReadStream> cacheReadStream;
+
+		// Try opening the cache itself
+		cacheReadStream = sysDriver->OpenFileRead(rkit::FileLocation::kUserSettingsDirectory, m_pipelinesCacheFileName.GetChars());
+
 		rkit::FilePos_t binaryContentStart = pipelinesFile->Tell();
 
 		rkit::UniquePtr<rkit::render::IPipelineLibraryLoader> loader;
-		RKIT_CHECK(m_graphicsSubsystem.GetDevice()->CreatePipelineLibraryLoader(loader, std::move(configurator), std::move(package), std::move(pipelinesFile), binaryContentStart, std::move(pipelineShadowFile), std::move(shadowFileStream)));
+		RKIT_CHECK(m_graphicsSubsystem.GetDevice()->CreatePipelineLibraryLoader(loader, std::move(configurator), std::move(package), std::move(pipelinesFile), binaryContentStart));
 
 		RKIT_CHECK(loader->LoadObjectsFromPackage());
+
+		loader->SetMergedLibraryStream(std::move(cacheReadStream), nullptr);
 
 		rkit::Result openMergedResult = loader->OpenMergedLibrary();
 
 		m_graphicsSubsystem.SetPipelineLibraryLoader(std::move(loader), std::move(pipelineSets), openMergedResult.IsOK());
 
-		m_graphicsSubsystem.MarkSetupStepCompleted();
+		if (openMergedResult.IsOK())
+			m_graphicsSubsystem.MarkSetupStepCompleted();
+		else
+			m_graphicsSubsystem.MarkSetupStepFailed();
 
 		return rkit::ResultCode::kOK;
 	}
@@ -412,6 +428,24 @@ namespace anox
 		}
 	}
 
+	GraphicsSubsystem::CreateNewIndividualCacheJob::CreateNewIndividualCacheJob(GraphicsSubsystem &graphicsSubsystem, const rkit::StringView &pipelinesCacheFileName)
+		: m_graphicsSubsystem(graphicsSubsystem)
+		, m_pipelinesCacheFileName(pipelinesCacheFileName)
+	{
+	}
+
+	rkit::Result GraphicsSubsystem::CreateNewIndividualCacheJob::Run()
+	{
+		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
+
+		rkit::UniquePtr<rkit::ISeekableReadWriteStream> pipelinesFile = sysDriver->OpenFileReadWrite(rkit::FileLocation::kUserSettingsDirectory, m_graphicsSubsystem.m_pipelinesCacheFileName.GetChars(), true, true, true);
+		rkit::ISeekableReadWriteStream *writeStream = pipelinesFile.Get();
+
+		m_graphicsSubsystem.m_pipelineLibraryLoader->SetMergedLibraryStream(std::move(pipelinesFile), writeStream);
+
+		return rkit::ResultCode::kOK;
+	}
+
 	GraphicsSubsystem::LoadOneGraphicsPipelineJob::LoadOneGraphicsPipelineJob(GraphicsSubsystem &graphicsSubsystem, size_t index)
 		: m_graphicsSubsystem(graphicsSubsystem)
 		, m_index(index)
@@ -422,7 +456,7 @@ namespace anox
 	{
 		if (m_index == m_graphicsSubsystem.m_livePipelineSets->m_graphicsPipelines.Count())
 		{
-			m_graphicsSubsystem.m_pipelineLibraryLoader->CloseMergedLibrary();
+			m_graphicsSubsystem.m_pipelineLibraryLoader->CloseMergedLibrary(false, true);
 			m_graphicsSubsystem.MarkSetupStepCompleted();
 			return rkit::ResultCode::kOK;
 		}
@@ -433,7 +467,7 @@ namespace anox
 
 		if (!loadPipelineResult.IsOK())
 		{
-			m_graphicsSubsystem.m_pipelineLibraryLoader->CloseMergedLibrary();
+			m_graphicsSubsystem.m_pipelineLibraryLoader->CloseMergedLibrary(true, true);
 			m_graphicsSubsystem.MarkSetupStepFailed();
 			return rkit::ResultCode::kOK;
 		}
@@ -470,7 +504,30 @@ namespace anox
 
 	rkit::Result GraphicsSubsystem::DoneCompilingPipelinesJob::Run()
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		m_graphicsSubsystem.MarkSetupStepCompleted();
+		return rkit::ResultCode::kOK;
+	}
+
+	GraphicsSubsystem::MergePipelineLibraryJob::MergePipelineLibraryJob(GraphicsSubsystem &graphicsSubsystem)
+		: m_graphicsSubsystem(graphicsSubsystem)
+	{
+	}
+
+	rkit::Result GraphicsSubsystem::MergePipelineLibraryJob::Run()
+	{
+		uint64_t numPipelinesCompiled = 0;
+		for (const LivePipelineSets::LivePipeline &lp : m_graphicsSubsystem.m_livePipelineSets->m_graphicsPipelines)
+		{
+			RKIT_CHECK(m_graphicsSubsystem.m_pipelineLibraryLoader->AddMergedPipeline(lp.m_pipelineIndex, lp.m_variationIndex));
+
+			m_graphicsSubsystem.SetSplashProgress(++numPipelinesCompiled);
+		}
+
+		RKIT_CHECK(m_graphicsSubsystem.m_pipelineLibraryLoader->SaveMergedPipeline());
+
+		m_graphicsSubsystem.MarkSetupStepCompleted();
+
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result GraphicsSubsystem::RenderDataConfigurator::GetEnumConfigKey(size_t configKeyIndex, const rkit::StringView &keyName, rkit::data::RenderRTTIMainType expectedMainType, unsigned int &outValue)
@@ -584,7 +641,13 @@ namespace anox
 
 	rkit::Result GraphicsSubsystem::RenderDataConfigurator::WriteConfig(rkit::IWriteStream &stream) const
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		RKIT_CHECK(WriteResolutionsToConfig(stream, m_configEnums));
+		RKIT_CHECK(WriteResolutionsToConfig(stream, m_configSInts));
+		RKIT_CHECK(WriteResolutionsToConfig(stream, m_configUInts));
+		RKIT_CHECK(WriteResolutionsToConfig(stream, m_configFloats));
+		RKIT_CHECK(WriteResolutionsToConfig(stream, m_permutations));
+
+		return rkit::ResultCode::kOK;
 	}
 
 	template<class T>
@@ -611,6 +674,45 @@ namespace anox
 
 		return resolutions.Append(resolution);
 	}
+
+	rkit::Result GraphicsSubsystem::RenderDataConfigurator::WriteValueToConfig(rkit::IWriteStream &stream, const TypedEnumValue &value)
+	{
+		// Don't need to write the type since it's only used for checks
+		return WriteValueToConfig(stream, static_cast<int>(value.m_value));
+	}
+
+	rkit::Result GraphicsSubsystem::RenderDataConfigurator::WriteValueToConfig(rkit::IWriteStream &stream, int64_t value)
+	{
+		return stream.WriteAll(&value, sizeof(value));
+	}
+
+	rkit::Result GraphicsSubsystem::RenderDataConfigurator::WriteValueToConfig(rkit::IWriteStream &stream, uint64_t value)
+	{
+		return stream.WriteAll(&value, sizeof(value));
+	}
+
+	rkit::Result GraphicsSubsystem::RenderDataConfigurator::WriteValueToConfig(rkit::IWriteStream &stream, double value)
+	{
+		return stream.WriteAll(&value, sizeof(value));
+	}
+
+	rkit::Result GraphicsSubsystem::RenderDataConfigurator::WriteValueToConfig(rkit::IWriteStream &stream, int value)
+	{
+		return stream.WriteAll(&value, sizeof(value));
+	}
+
+	template<class T>
+	rkit::Result GraphicsSubsystem::RenderDataConfigurator::WriteResolutionsToConfig(rkit::IWriteStream &stream, const rkit::Vector<PipelineConfigResolution<T>> &resolutions)
+	{
+		// We don't need to write key indexes because they're deterministic by package
+		for (const PipelineConfigResolution<T> &resolution : resolutions)
+		{
+			RKIT_CHECK(WriteValueToConfig(stream, resolution.m_resolution));
+		}
+
+		return rkit::ResultCode::kOK;
+	}
+
 
 	GraphicsSubsystem::GraphicsSubsystem(rkit::data::IDataDriver &dataDriver, rkit::utils::IThreadPool &threadPool, anox::RenderBackend desiredBackend)
 		: m_threadPool(threadPool)
@@ -707,6 +809,7 @@ namespace anox
 
 		RKIT_CHECK(progressMonitor->SetText("Loading shader package..."));
 
+		m_pipelinesCacheFileName = pipelinesCacheFile;
 		m_setupStep = DeviceSetupStep::kOpenPipelinePackage;
 		m_stepCompleted = false;
 
@@ -758,6 +861,25 @@ namespace anox
 		return CreateGameDisplayAndDevice(backendModule, pipelinesFile, pipelinesCacheFile, canUpdatePipelineCache);
 	}
 
+	rkit::Result GraphicsSubsystem::KickOffMergedPipelineLoad()
+	{
+		size_t totalPipelines = m_livePipelineSets->m_graphicsPipelines.Count();
+
+		rkit::render::IProgressMonitor *progressMonitor = m_mainDisplay->GetProgressMonitor();
+		if (progressMonitor)
+		{
+			RKIT_CHECK(progressMonitor->SetRange(0, totalPipelines));
+			m_setupProgress = 0;
+		}
+
+		rkit::UniquePtr<rkit::IJobRunner> jobRunner;
+		RKIT_CHECK(rkit::New<LoadOneGraphicsPipelineJob>(jobRunner, *this, 0));
+
+		RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kIO, std::move(jobRunner), nullptr));
+
+		return rkit::ResultCode::kOK;
+	}
+
 	rkit::Result GraphicsSubsystem::KickOffNextSetupStep()
 	{
 		if (m_setupStep == DeviceSetupStep::kOpenPipelinePackage)
@@ -766,19 +888,7 @@ namespace anox
 
 			if (m_haveExistingMergedCache)
 			{
-				size_t totalPipelines = m_livePipelineSets->m_graphicsPipelines.Count();
-
-				rkit::render::IProgressMonitor *progressMonitor = m_mainDisplay->GetProgressMonitor();
-				if (progressMonitor)
-				{
-					RKIT_CHECK(progressMonitor->SetRange(0, totalPipelines));
-					m_setupProgress = 0;
-				}
-
-				rkit::UniquePtr<rkit::IJobRunner> jobRunner;
-				RKIT_CHECK(rkit::New<LoadOneGraphicsPipelineJob>(jobRunner, *this, 0));
-
-				RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kIO, std::move(jobRunner), nullptr));
+				RKIT_CHECK(KickOffMergedPipelineLoad());
 				return rkit::ResultCode::kOK;
 			}
 			else
@@ -794,12 +904,22 @@ namespace anox
 		{
 			if (m_stepFailed)
 			{
+				m_setupStep = DeviceSetupStep::kCompilingPipelines;
 				m_setupProgress = 0;
 
 				rkit::render::IProgressMonitor *progressMonitor = m_mainDisplay->GetProgressMonitor();
 				if (progressMonitor)
 				{
 					RKIT_CHECK(progressMonitor->SetText("Optimizing shaders..."));
+				}
+
+				rkit::RCPtr<rkit::Job> initJobRC;
+
+				{
+					rkit::UniquePtr<rkit::IJobRunner> jobRunner;
+					RKIT_CHECK(rkit::New<CreateNewIndividualCacheJob>(jobRunner, *this, m_pipelinesCacheFileName));
+
+					RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(&initJobRC, rkit::JobType::kNormalPriority, std::move(jobRunner), nullptr));
 				}
 
 				rkit::Vector<rkit::RCPtr<rkit::Job>> jobs;
@@ -811,7 +931,7 @@ namespace anox
 
 					// FIXME: Change these to low-priority
 					rkit::RCPtr<rkit::Job> job;
-					RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(&job, rkit::JobType::kNormalPriority, std::move(jobRunner), nullptr));
+					RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(&job, rkit::JobType::kNormalPriority, std::move(jobRunner), rkit::Span<rkit::RCPtr<rkit::Job>>(&initJobRC, 1).ToValueISpan()));
 
 					RKIT_CHECK(jobs.Append(std::move(job)));
 				}
@@ -820,6 +940,75 @@ namespace anox
 				RKIT_CHECK(rkit::New<DoneCompilingPipelinesJob>(finishedJobRunner, *this));
 
 				RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(finishedJobRunner), jobs.ToSpan().ToValueISpan()));
+
+				return rkit::ResultCode::kOK;
+			}
+			else
+			{
+				m_setupStep = DeviceSetupStep::kSecondTryLoadingPipelines;
+				m_setupProgress = 0;
+
+				// Fall through
+			}
+		}
+
+		if (m_setupStep == DeviceSetupStep::kCompilingPipelines)
+		{
+			m_setupStep = DeviceSetupStep::kMergingPipelines;
+			m_setupProgress = 0;
+
+			const size_t numGraphicsPipelines = m_livePipelineSets->m_graphicsPipelines.Count();
+			const size_t numTotalPipelines = numGraphicsPipelines;
+
+			rkit::render::IProgressMonitor *progressMonitor = m_mainDisplay->GetProgressMonitor();
+			if (progressMonitor)
+			{
+				RKIT_CHECK(progressMonitor->SetText("Building shader cache..."));
+				RKIT_CHECK(progressMonitor->SetRange(0, numTotalPipelines));
+			}
+
+			rkit::UniquePtr<rkit::IJobRunner> jobRunner;
+			RKIT_CHECK(rkit::New<MergePipelineLibraryJob>(jobRunner, *this));
+
+			RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(jobRunner), nullptr));
+
+			return rkit::ResultCode::kOK;
+		}
+
+		if (m_setupStep == DeviceSetupStep::kMergingPipelines)
+		{
+			m_setupStep = DeviceSetupStep::kSecondTryLoadingPipelines;
+			m_setupProgress = 0;
+
+			m_haveExistingMergedCache = true;
+
+			rkit::render::IProgressMonitor *progressMonitor = m_mainDisplay->GetProgressMonitor();
+			if (progressMonitor)
+			{
+				RKIT_CHECK(progressMonitor->SetText("Reloading shaders..."));
+			}
+
+			RKIT_CHECK(KickOffMergedPipelineLoad());
+
+			return rkit::ResultCode::kOK;
+		}
+
+		if (m_setupStep == DeviceSetupStep::kSecondTryLoadingPipelines)
+		{
+			if (m_stepFailed)
+			{
+				return rkit::ResultCode::kOperationFailed;
+			}
+			else
+			{
+				m_setupStep = DeviceSetupStep::kLoadingResources;
+				m_setupProgress = 0;
+
+				rkit::render::IProgressMonitor *progressMonitor = m_mainDisplay->GetProgressMonitor();
+				if (progressMonitor)
+				{
+					RKIT_CHECK(progressMonitor->SetText("Loading resources..."));
+				}
 
 				return rkit::ResultCode::kOK;
 			}
@@ -852,7 +1041,16 @@ namespace anox
 
 			rkit::render::IProgressMonitor *progressMonitor = m_mainDisplay->GetProgressMonitor();
 			if (progressMonitor)
+			{
+				uint64_t progress = 0;
+				{
+					rkit::MutexLock lock(*m_setupMutex);
+					progress = m_setupProgress;
+				}
+
+				RKIT_CHECK(progressMonitor->SetValue(progress));
 				progressMonitor->FlushEvents();
+			}
 
 			RKIT_CHECK(m_threadPool.GetJobQueue()->CheckFault());
 
@@ -881,6 +1079,12 @@ namespace anox
 	const anox::GraphicsSettings &GraphicsSubsystem::GetGraphicsSettings() const
 	{
 		return m_graphicsSettings;
+	}
+
+	void GraphicsSubsystem::SetSplashProgress(uint64_t progress)
+	{
+		rkit::MutexLock lock(*m_setupMutex);
+		m_setupProgress = progress;
 	}
 
 

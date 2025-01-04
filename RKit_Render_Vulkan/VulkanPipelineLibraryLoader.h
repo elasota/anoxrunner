@@ -9,6 +9,7 @@ namespace rkit
 	class UniquePtr;
 
 	struct ISeekableReadStream;
+	struct ISeekableWriteStream;
 	struct ISeekableReadWriteStream;
 }
 
@@ -30,7 +31,6 @@ namespace rkit::render::vulkan
 	{
 	public:
 		static Result Create(VulkanDeviceBase &device, UniquePtr<PipelineLibraryLoaderBase> &loader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
-			UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart,
-			UniquePtr<utils::IShadowFile> &&cacheShadowFile, UniquePtr<ISeekableReadWriteStream> &&cacheStream);
+			UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart);
 	};
 }

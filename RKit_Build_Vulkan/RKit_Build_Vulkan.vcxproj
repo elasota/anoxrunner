@@ -69,6 +69,7 @@
     <Import Project="..\Common.props" />
     <Import Project="..\Release.props" />
     <Import Project="VulkanSDK.props" />
+    <Import Project="shaderc_release.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -82,6 +83,7 @@
     <Import Project="..\Common.props" />
     <Import Project="..\Release.props" />
     <Import Project="VulkanSDK.props" />
+    <Import Project="shaderc_release.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

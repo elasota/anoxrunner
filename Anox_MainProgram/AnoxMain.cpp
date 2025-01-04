@@ -9,6 +9,7 @@
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/ProgramStub.h"
 #include "rkit/Core/Stream.h"
+#include "rkit/Core/SystemDriver.h"
 
 namespace anox
 {

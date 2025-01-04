@@ -21,6 +21,7 @@ namespace rkit::render::vulkan
 		Result InitPhysicalDevice(const VulkanInstanceAPI &instAPI);
 
 		VkPhysicalDevice GetPhysDevice() const;
+		const VkPhysicalDeviceProperties &GetPhysDeviceProperties() const;
 
 		void GetQueueTypeInfo(CommandQueueType queueType, uint32_t &outQueueFamilyIndex, uint32_t &outNumQueues) const;
 

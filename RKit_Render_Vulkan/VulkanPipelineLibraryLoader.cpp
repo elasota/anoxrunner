@@ -1,3 +1,6 @@
+#include "VulkanPipelineLibraryLoader.h"
+
+#include "rkit/Utilities/Sha2.h"
 #include "rkit/Utilities/ShadowFile.h"
 
 #include "rkit/Render/RenderDefs.h"
@@ -5,44 +8,103 @@
 #include "rkit/Data/RenderDataHandler.h"
 
 #include "rkit/Core/Algorithm.h"
+#include "rkit/Core/Endian.h"
+#include "rkit/Core/FourCC.h"
 #include "rkit/Core/LogDriver.h"
+#include "rkit/Core/HashTable.h"
 #include "rkit/Core/Mutex.h"
 #include "rkit/Core/MutexLock.h"
 #include "rkit/Core/StaticArray.h"
 #include "rkit/Core/Stream.h"
+#include "rkit/Core/String.h"
 #include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/UniquePtr.h"
 #include "rkit/Core/Vector.h"
 
 #include "rkit/Vulkan/GraphicsPipeline.h"
 
+#include "VulkanAPI.h"
 #include "VulkanCheck.h"
 #include "VulkanDevice.h"
-#include "VulkanAPI.h"
-#include "VulkanPipelineLibraryLoader.h"
+#include "VulkanPhysDevice.h"
 
 namespace rkit::render::vulkan
 {
+	struct PipelineCacheHeader
+	{
+		enum class Phase : uint16_t
+		{
+			kEmpty,
+			kIndividual,
+			kMerged,
+		};
+
+		static const uint32_t kExpectedIdentifier = RKIT_FOURCC('R', 'V', 'P', 'C');
+		static const uint16_t kExpectedVersion = 1;
+
+		uint32_t m_identifier = kExpectedIdentifier;
+		uint16_t m_version = kExpectedVersion;
+		Phase m_phase = Phase::kEmpty;
+
+		utils::Sha256DigestBytes m_packageUUID;
+	};
+
 	class PipelineLibraryLoader final : public PipelineLibraryLoaderBase
 	{
 	public:
 		PipelineLibraryLoader(VulkanDeviceBase &device, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
-			UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart,
-			UniquePtr<utils::IShadowFile> &&cacheShadowFile, UniquePtr<ISeekableReadWriteStream> &&cacheStream);
+			UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart);
 		~PipelineLibraryLoader();
+
+		Result Initialize();
 
 		Result LoadObjectsFromPackage() override;
 
+		void SetMergedLibraryStream(UniquePtr<ISeekableReadStream> &&cacheReadStream, ISeekableReadWriteStream *cacheWriteStream) override;
 		Result OpenMergedLibrary() override;
 		Result LoadGraphicsPipelineFromMergedLibrary(size_t pipelineIndex, size_t permutationIndex) override;
-		void CloseMergedLibrary() override;
+		void CloseMergedLibrary(bool unloadPipelines, bool unloadMergedCache) override;
 
 		Result CompileUnmergedGraphicsPipeline(size_t pipelineIndex, size_t permutationIndex) override;
 		Result AddMergedPipeline(size_t pipelineIndex, size_t permutationIndex) override;
-
 		Result SaveMergedPipeline() override;
 
 	private:
+		class ConfigHashComputer final : public IWriteStream
+		{
+		public:
+			explicit ConfigHashComputer(const utils::ISha256Calculator *calculator);
+
+			Result WritePartial(const void *data, size_t count, size_t &outCountWritten) override;
+			Result Flush() override;
+
+			utils::Sha256DigestBytes FinishSHA();
+
+		private:
+			const utils::ISha256Calculator *m_calculator;
+			utils::Sha256StreamingState m_streamingState;
+		};
+
+		struct CompiledPipelineKey
+		{
+			size_t m_pipelineIndex = 0;
+			size_t m_permutationIndex = 0;
+
+			bool operator==(const CompiledPipelineKey &other) const;
+			bool operator!=(const CompiledPipelineKey &other) const;
+		};
+
+		struct CompiledPipelineKeyHasher
+		{
+			static HashValue_t ComputeHash(HashValue_t baseHash, const CompiledPipelineKey &value);
+		};
+
+		struct CompiledPipelineFileLocator
+		{
+			FilePos_t m_filePos = 0;
+			size_t m_size = 0;
+		};
+
 		struct BinaryContentData
 		{
 			FilePos_t m_filePos = 0;
@@ -93,14 +155,21 @@ namespace rkit::render::vulkan
 
 		Result CreateRenderPass(VkRenderPass &outRenderPass, const RenderPassDesc &rpDesc);
 
+		Result CheckedCreateGraphicsPipeline(VkPipelineCache &pipelineCache, CompiledPipeline &pipeline, size_t pipelineIndex, size_t permutationIndex);
 		Result CheckedCompileUnmergedGraphicsPipeline(VkPipelineCache &pipelineCache, CompiledPipeline &pipeline, size_t pipelineIndex, size_t permutationIndex);
 		Result LoadShaderModule(size_t binaryContentIndex);
+
+		static Result GetUnmergedCachePath(String &path, const utils::Sha256DigestBytes &configHash, size_t pipelineIndex, size_t permutationIndex);
 
 		template<class T, class TDefaultResolver>
 		static T ResolveConfigurable(const ConfigurableValueWithDefault<T, TDefaultResolver> &configurable);
 
 		UniquePtr<IMutex> m_packageStreamMutex;
+		UniquePtr<IMutex> m_cacheStreamMutex;
 		UniquePtr<IMutex> m_shaderModuleMutex;
+
+		// Protect under CacheStreamMutex
+		HashMap<CompiledPipelineKey, CompiledPipelineFileLocator> m_individualPipelineLocators;
 
 		VulkanDeviceBase &m_device;
 
@@ -109,8 +178,8 @@ namespace rkit::render::vulkan
 
 		FilePos_t m_packageBinaryContentStart;
 
-		UniquePtr<ISeekableReadWriteStream> m_cacheStream;
-		UniquePtr<utils::IShadowFile> m_cacheShadowFile;
+		UniquePtr<ISeekableReadStream> m_cacheReadStream;
+		ISeekableReadWriteStream *m_cacheWriteStream = nullptr;
 
 		UniquePtr<IPipelineLibraryConfigValidator> m_validator;
 
@@ -122,26 +191,71 @@ namespace rkit::render::vulkan
 		Vector<VkSampler> m_samplers;
 
 		Vector<BinaryContentData> m_binaryContents;
+
+		utils::Sha256DigestBytes m_configHashBytes;
+
+		Vector<VkPipelineCache> m_individualCaches;
+		VkPipelineCache m_mergedCache = VK_NULL_HANDLE;
 	};
 
+	PipelineLibraryLoader::ConfigHashComputer::ConfigHashComputer(const utils::ISha256Calculator *calculator)
+		: m_calculator(calculator)
+		, m_streamingState(calculator->CreateStreamingState())
+	{
+	}
+
+	Result PipelineLibraryLoader::ConfigHashComputer::WritePartial(const void *data, size_t count, size_t &outCountWritten)
+	{
+		m_calculator->AppendStreamingState(m_streamingState, data, count);
+		outCountWritten = count;
+		return ResultCode::kOK;
+	}
+
+	Result PipelineLibraryLoader::ConfigHashComputer::Flush()
+	{
+		return ResultCode::kOK;
+	}
+
+	utils::Sha256DigestBytes PipelineLibraryLoader::ConfigHashComputer::FinishSHA()
+	{
+		m_calculator->FinalizeStreamingState(m_streamingState);
+		return m_calculator->FlushToBytes(m_streamingState.m_state);
+	}
+
+
+	bool PipelineLibraryLoader::CompiledPipelineKey::operator==(const CompiledPipelineKey &other) const
+	{
+		return m_permutationIndex == other.m_permutationIndex && m_pipelineIndex == other.m_pipelineIndex;
+	}
+
+	bool PipelineLibraryLoader::CompiledPipelineKey::operator!=(const CompiledPipelineKey &other) const
+	{
+		return !((*this) == other);
+	}
+
+	HashValue_t PipelineLibraryLoader::CompiledPipelineKeyHasher::ComputeHash(HashValue_t hash, const CompiledPipelineKey &value)
+	{
+		hash = Hasher<size_t>::ComputeHash(hash, value.m_pipelineIndex);
+		hash = Hasher<size_t>::ComputeHash(hash, value.m_permutationIndex);
+
+		return hash;
+	}
 
 	PipelineLibraryLoader::PipelineLibraryLoader(VulkanDeviceBase &device, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
-		UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart,
-		UniquePtr<utils::IShadowFile> &&cacheShadowFile, UniquePtr<ISeekableReadWriteStream> &&cacheStream)
+		UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart)
 		: m_device(device)
 		, m_validator(std::move(validator))
 		, m_package(std::move(package))
 		, m_packageStream(std::move(packageStream))
 		, m_packageBinaryContentStart(packageBinaryContentStart)
-		, m_cacheStream(std::move(cacheStream))
-		, m_cacheShadowFile(std::move(cacheShadowFile))
+		, m_cacheWriteStream(nullptr)
 	{
 	}
 
 	PipelineLibraryLoader::~PipelineLibraryLoader()
 	{
-		m_cacheShadowFile.Reset();
-		m_cacheStream.Reset();
+		m_cacheReadStream.Reset();
+		m_cacheWriteStream = nullptr;
 
 		m_package.Reset();
 		m_packageStream.Reset();
@@ -187,16 +301,37 @@ namespace rkit::render::vulkan
 			if (rp != VK_NULL_HANDLE)
 				vkd.vkDestroyRenderPass(device, rp, allocCallbacks);
 		}
+
+		for (const VkPipelineCache &plc : m_individualCaches)
+		{
+			if (plc != VK_NULL_HANDLE)
+				vkd.vkDestroyPipelineCache(device, plc, allocCallbacks);
+		}
+
+		if (m_mergedCache != VK_NULL_HANDLE)
+			vkd.vkDestroyPipelineCache(device, m_mergedCache, allocCallbacks);
+	}
+
+	Result PipelineLibraryLoader::Initialize()
+	{
+		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+		IUtilitiesDriver *utilsDriver = GetDrivers().m_utilitiesDriver;
+
+		RKIT_CHECK(sysDriver->CreateMutex(m_packageStreamMutex));
+		RKIT_CHECK(sysDriver->CreateMutex(m_cacheStreamMutex));
+		RKIT_CHECK(sysDriver->CreateMutex(m_shaderModuleMutex));
+
+		ConfigHashComputer hashComputer(utilsDriver->GetSha256Calculator());
+		RKIT_CHECK(m_validator->WriteConfig(hashComputer));
+
+		m_configHashBytes = hashComputer.FinishSHA();
+
+		return ResultCode::kOK;
 	}
 
 	Result PipelineLibraryLoader::LoadObjectsFromPackage()
 	{
-		rkit::ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
-
 		const VulkanDeviceAPI &vkd = m_device.GetDeviceAPI();
-
-		RKIT_CHECK(sysDriver->CreateMutex(m_packageStreamMutex));
-		RKIT_CHECK(sysDriver->CreateMutex(m_shaderModuleMutex));
 
 		size_t totalPermutations = 0;
 
@@ -465,18 +600,121 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
+	void PipelineLibraryLoader::SetMergedLibraryStream(UniquePtr<ISeekableReadStream> &&cacheReadStream, ISeekableReadWriteStream *cacheWriteStream)
+	{
+		m_cacheReadStream = std::move(cacheReadStream);
+		m_cacheWriteStream = cacheWriteStream;
+	}
+
 	Result PipelineLibraryLoader::OpenMergedLibrary()
 	{
-		return ResultCode::kNotYetImplemented;
+		if (!m_cacheReadStream.IsValid())
+		{
+			return Result::SoftFault(ResultCode::kOperationFailed);
+		}
+
+		PipelineCacheHeader header = {};
+
+		RKIT_CHECK(m_cacheReadStream->SeekStart(0));
+		RKIT_CHECK(m_cacheReadStream->ReadAll(&header, sizeof(header)));
+
+		if (header.m_identifier != PipelineCacheHeader::kExpectedIdentifier
+			|| header.m_version != PipelineCacheHeader::kExpectedVersion
+			|| header.m_phase != PipelineCacheHeader::Phase::kMerged
+			|| memcmp(&header.m_packageUUID, &m_package->GetPackageUUID(), sizeof(header.m_packageUUID)))
+		{
+			return Result::SoftFault(ResultCode::kOperationFailed);
+		}
+
+		FilePos_t cacheSize = m_cacheReadStream->GetSize() - sizeof(header);
+
+		if (cacheSize < sizeof(VkPipelineCacheHeaderVersionOne))
+			return Result::SoftFault(ResultCode::kOperationFailed);
+
+		if (cacheSize > std::numeric_limits<size_t>::max())
+			return ResultCode::kOperationFailed;
+
+		Vector<uint8_t> mergedData;
+		RKIT_CHECK(mergedData.Resize(static_cast<size_t>(cacheSize)));
+
+		RKIT_CHECK(m_cacheReadStream->ReadAll(mergedData.GetBuffer(), mergedData.Count()));
+
+		rkit::endian::LittleUInt32_t headerFields[4];
+		memcpy(&headerFields, mergedData.GetBuffer(), 16);
+
+		VkPipelineCacheHeaderVersionOne vkCacheHeader;
+		vkCacheHeader.headerSize = headerFields[0].Get();
+		vkCacheHeader.headerVersion = static_cast<VkPipelineCacheHeaderVersion>(headerFields[1].Get());
+		vkCacheHeader.vendorID = headerFields[2].Get();
+		vkCacheHeader.deviceID = headerFields[3].Get();
+		memcpy(vkCacheHeader.pipelineCacheUUID, mergedData.GetBuffer() + 16, VK_UUID_SIZE);
+
+		// TODO: Pipeline compatibility check
+		const RenderVulkanPhysicalDevice &physDevice = m_device.GetPhysDevice();
+		const VkPhysicalDeviceProperties &deviceProps = physDevice.GetPhysDeviceProperties();
+
+		if (vkCacheHeader.headerVersion != VK_PIPELINE_CACHE_HEADER_VERSION_ONE
+			|| vkCacheHeader.headerSize != sizeof(VkPipelineCacheHeaderVersionOne)
+			|| vkCacheHeader.vendorID != deviceProps.vendorID
+			|| vkCacheHeader.deviceID != deviceProps.deviceID
+			|| memcmp(vkCacheHeader.pipelineCacheUUID, deviceProps.pipelineCacheUUID, VK_UUID_SIZE))
+		{
+			// Pipeline cache mismatch
+			return Result::SoftFault(ResultCode::kOperationFailed);
+		}
+
+		VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
+		pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+		pipelineCacheCreateInfo.pInitialData = mergedData.GetBuffer();
+		pipelineCacheCreateInfo.initialDataSize = mergedData.Count();
+
+		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreatePipelineCache(m_device.GetDevice(), &pipelineCacheCreateInfo, m_device.GetAllocCallbacks(), &m_mergedCache));
+
+		return ResultCode::kOK;
 	}
 
 	Result PipelineLibraryLoader::LoadGraphicsPipelineFromMergedLibrary(size_t pipelineIndex, size_t permutationIndex)
 	{
-		return ResultCode::kNotYetImplemented;
+		if (m_mergedCache == VK_NULL_HANDLE)
+			return ResultCode::kInternalError;
+
+		VkPipeline &outPipelineRef = m_allPipelines[m_graphicPipelinePermutationStarts[pipelineIndex] + permutationIndex];
+		if (outPipelineRef != VK_NULL_HANDLE)
+			return ResultCode::kInternalError;
+
+		CompiledPipeline compiledPipeline;
+		RKIT_CHECK(CheckedCreateGraphicsPipeline(m_mergedCache, compiledPipeline, pipelineIndex, permutationIndex));
+
+		outPipelineRef = compiledPipeline.m_pipeline;
+
+		return ResultCode::kOK;
 	}
 
-	void PipelineLibraryLoader::CloseMergedLibrary()
+	void PipelineLibraryLoader::CloseMergedLibrary(bool unloadPipelines, bool unloadMergedCache)
 	{
+		if (unloadPipelines)
+		{
+			for (VkPipeline &pipelineRef : m_allPipelines)
+			{
+				if (pipelineRef != VK_NULL_HANDLE)
+				{
+					m_device.GetDeviceAPI().vkDestroyPipeline(m_device.GetDevice(), pipelineRef, m_device.GetAllocCallbacks());
+					pipelineRef = VK_NULL_HANDLE;
+				}
+			}
+		}
+
+		if (unloadMergedCache)
+		{
+			if (m_mergedCache != VK_NULL_HANDLE)
+			{
+				m_device.GetDeviceAPI().vkDestroyPipelineCache(m_device.GetDevice(), m_mergedCache, m_device.GetAllocCallbacks());
+				m_mergedCache = VK_NULL_HANDLE;
+			}
+		}
+
+		m_cacheReadStream.Reset();
+		m_cacheWriteStream = nullptr;
 	}
 
 	Result PipelineLibraryLoader::CompileUnmergedGraphicsPipeline(size_t pipelineIndex, size_t permutationIndex)
@@ -488,10 +726,11 @@ namespace rkit::render::vulkan
 
 		const VulkanDeviceAPI &vkd = m_device.GetDeviceAPI();
 
-		if (pipelineCache != VK_NULL_HANDLE)
-			vkd.vkDestroyPipelineCache(m_device.GetDevice(), pipelineCache, m_device.GetAllocCallbacks());
 		if (pipeline.m_pipeline != VK_NULL_HANDLE)
 			vkd.vkDestroyPipeline(m_device.GetDevice(), pipeline.m_pipeline, m_device.GetAllocCallbacks());
+
+		if (pipelineCache != VK_NULL_HANDLE)
+			vkd.vkDestroyPipelineCache(m_device.GetDevice(), pipelineCache, m_device.GetAllocCallbacks());
 
 		return result;
 	}
@@ -1410,14 +1649,9 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result PipelineLibraryLoader::CheckedCompileUnmergedGraphicsPipeline(VkPipelineCache &pipelineCache, CompiledPipeline &pipeline, size_t pipelineIndex, size_t permutationIndex)
+	Result PipelineLibraryLoader::CheckedCreateGraphicsPipeline(VkPipelineCache &pipelineCache, CompiledPipeline &pipeline, size_t pipelineIndex, size_t permutationIndex)
 	{
 		const VulkanDeviceAPI &vkd = m_device.GetDeviceAPI();
-
-		VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
-		pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
-
-		RKIT_VK_CHECK(vkd.vkCreatePipelineCache(m_device.GetDevice(), &pipelineCacheCreateInfo, m_device.GetAllocCallbacks(), &pipelineCache));
 
 		const render::GraphicsPipelineDesc *pipelineDesc = static_cast<const render::GraphicsPipelineDesc *>(m_package->GetIndexable(data::RenderRTTIIndexableStructType::GraphicsPipelineDesc)->GetElementPtr(pipelineIndex));
 		const render::RenderPassDesc *renderPassDesc = pipelineDesc->m_executeInPass;
@@ -1720,7 +1954,76 @@ namespace rkit::render::vulkan
 
 		RKIT_VK_CHECK(vkd.vkCreateGraphicsPipelines(m_device.GetDevice(), pipelineCache, 1, &pipelineCreateInfo, m_device.GetAllocCallbacks(), &pipeline.m_pipeline));
 
-		return ResultCode::kNotYetImplemented;
+		return ResultCode::kOK;
+	}
+
+	Result PipelineLibraryLoader::CheckedCompileUnmergedGraphicsPipeline(VkPipelineCache &pipelineCache, CompiledPipeline &pipeline, size_t pipelineIndex, size_t permutationIndex)
+	{
+		const VulkanDeviceAPI &vkd = m_device.GetDeviceAPI();
+
+		VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
+		pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+
+		RKIT_VK_CHECK(vkd.vkCreatePipelineCache(m_device.GetDevice(), &pipelineCacheCreateInfo, m_device.GetAllocCallbacks(), &pipelineCache));
+
+		RKIT_CHECK(CheckedCreateGraphicsPipeline(pipelineCache, pipeline, pipelineIndex, permutationIndex));
+
+		if (pipeline.m_pipeline != VK_NULL_HANDLE)
+		{
+			vkd.vkDestroyPipeline(m_device.GetDevice(), pipeline.m_pipeline, m_device.GetAllocCallbacks());
+			pipeline.m_pipeline = VK_NULL_HANDLE;
+		}
+
+		size_t dataSize = 0;
+		RKIT_VK_CHECK(vkd.vkGetPipelineCacheData(m_device.GetDevice(), pipelineCache, &dataSize, nullptr));
+
+		Vector<uint8_t> pipelineCacheDataBuffer;
+		RKIT_CHECK(pipelineCacheDataBuffer.Resize(dataSize));
+		RKIT_VK_CHECK(vkd.vkGetPipelineCacheData(m_device.GetDevice(), pipelineCache, &dataSize, pipelineCacheDataBuffer.GetBuffer()));
+
+		// CAUTION: dataSize is overwritten at this point!
+
+		if (pipelineCache != VK_NULL_HANDLE)
+		{
+			vkd.vkDestroyPipelineCache(m_device.GetDevice(), pipelineCache, m_device.GetAllocCallbacks());
+			pipelineCache = VK_NULL_HANDLE;
+		}
+
+		// Write out to shadowfile
+		String path;
+		RKIT_CHECK(GetUnmergedCachePath(path, m_configHashBytes, pipelineIndex, permutationIndex));
+
+		{
+			MutexLock lock(*m_cacheStreamMutex);
+
+			if (m_individualPipelineLocators.Count() == 0)
+			{
+				RKIT_CHECK(m_cacheWriteStream->SeekStart(0));
+
+				PipelineCacheHeader header = {};
+				header.m_identifier = PipelineCacheHeader::kExpectedIdentifier;
+				header.m_version = PipelineCacheHeader::kExpectedVersion;
+				header.m_phase = PipelineCacheHeader::Phase::kIndividual;
+				header.m_packageUUID = m_package->GetPackageUUID();
+
+				RKIT_CHECK(m_cacheWriteStream->WriteAll(&header, sizeof(header)));
+				RKIT_CHECK(m_cacheWriteStream->Flush());
+			}
+
+			CompiledPipelineKey plKey;
+			plKey.m_pipelineIndex = pipelineIndex;
+			plKey.m_permutationIndex = permutationIndex;
+
+			CompiledPipelineFileLocator locator;
+			locator.m_filePos = m_cacheWriteStream->Tell();
+			locator.m_size = dataSize;
+
+			RKIT_CHECK((m_individualPipelineLocators.Set<CompiledPipelineKey, CompiledPipelineFileLocator, CompiledPipelineKeyHasher>(std::move(plKey), std::move(locator))));
+
+			RKIT_CHECK(m_cacheWriteStream->WriteAll(pipelineCacheDataBuffer.GetBuffer(), dataSize));
+		}
+
+		return ResultCode::kOK;
 	}
 
 	Result PipelineLibraryLoader::LoadShaderModule(size_t binaryContentIndex)
@@ -1786,6 +2089,45 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
+	Result PipelineLibraryLoader::GetUnmergedCachePath(String &path, const utils::Sha256DigestBytes &configHash, size_t pipelineIndex, size_t permutationIndex)
+	{
+		const size_t kNumTriplets = (utils::Sha256DigestBytes::kSize + 2) / 3;
+		const size_t kNumChars = kNumTriplets * 4;
+		StaticArray<char, kNumChars + 1> chars;
+
+		for (size_t i = 0; i < kNumTriplets; i++)
+		{
+			uint8_t bytes[3];
+
+			for (size_t bi = 0; bi < 3; bi++)
+			{
+				const size_t inputByteIndex = i * 3 + bi;
+				if (inputByteIndex < utils::Sha256DigestBytes::kSize)
+					bytes[bi] = configHash.m_data[inputByteIndex];
+				else
+					bytes[bi] = 0;
+			}
+
+			const size_t firstCharIndex = i / 4;
+
+			size_t charIndexes[4];
+			charIndexes[0] = (bytes[0] & 0x3f);
+			charIndexes[1] = ((bytes[0] >> 6) | (bytes[1] & 0xf) << 2);
+			charIndexes[2] = (((bytes[1] & 0xf0) >> 4) | (bytes[2] & 0x3) << 4);
+			charIndexes[3] = ((bytes[2] & 0xfc) >> 2);
+
+			for (size_t ci = 0; ci < 4; ci++)
+			{
+				size_t charIndex = charIndexes[ci];
+				chars[i * 4 + ci] = ("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-")[charIndex];
+			}
+		}
+
+		chars[kNumChars] = '\0';
+
+		return path.Format("%s/pl_%zu/p_%zu.bin", chars.GetBuffer(), pipelineIndex, permutationIndex);
+	}
+
 	template<class T, class TDefaultResolver>
 	T PipelineLibraryLoader::ResolveConfigurable(const ConfigurableValueWithDefault<T, TDefaultResolver> &configurable)
 	{
@@ -1804,22 +2146,99 @@ namespace rkit::render::vulkan
 
 	Result PipelineLibraryLoader::AddMergedPipeline(size_t pipelineIndex, size_t permutationIndex)
 	{
-		return ResultCode::kNotYetImplemented;
+		CompiledPipelineKey key = {};
+		key.m_pipelineIndex = pipelineIndex;
+		key.m_permutationIndex = permutationIndex;
+
+		HashMap<CompiledPipelineKey, CompiledPipelineFileLocator>::ConstIterator_t it = m_individualPipelineLocators.Find<CompiledPipelineKey, CompiledPipelineKeyHasher>(key);
+
+		if (it == m_individualPipelineLocators.end())
+			return ResultCode::kInternalError;
+
+		Vector<uint8_t> pipelineCacheData;
+		RKIT_CHECK(pipelineCacheData.Resize(it.Value().m_size));
+
+		{
+			MutexLock lock(*m_cacheStreamMutex);
+
+			RKIT_CHECK(m_cacheWriteStream->SeekStart(it.Value().m_filePos));
+			RKIT_CHECK(m_cacheWriteStream->ReadAll(pipelineCacheData.GetBuffer(), pipelineCacheData.Count()));
+		}
+
+		const VulkanDeviceAPI &vkd = m_device.GetDeviceAPI();
+
+		RKIT_CHECK(m_individualCaches.Append(VK_NULL_HANDLE));
+
+		VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
+		pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+		pipelineCacheCreateInfo.pInitialData = pipelineCacheData.GetBuffer();
+		pipelineCacheCreateInfo.initialDataSize = pipelineCacheData.Count();
+
+		RKIT_VK_CHECK(vkd.vkCreatePipelineCache(m_device.GetDevice(), &pipelineCacheCreateInfo, m_device.GetAllocCallbacks(), &m_individualCaches[m_individualCaches.Count() - 1]));
+
+		return ResultCode::kOK;
 	}
 
 	Result PipelineLibraryLoader::SaveMergedPipeline()
 	{
-		return ResultCode::kNotYetImplemented;
+		const VulkanDeviceAPI &vkd = m_device.GetDeviceAPI();
+
+		VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
+		pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+
+		RKIT_VK_CHECK(vkd.vkCreatePipelineCache(m_device.GetDevice(), &pipelineCacheCreateInfo, m_device.GetAllocCallbacks(), &m_mergedCache));
+
+		if (m_individualCaches.Count() > 0)
+		{
+			RKIT_VK_CHECK(vkd.vkMergePipelineCaches(m_device.GetDevice(), m_mergedCache, static_cast<uint32_t>(m_individualCaches.Count()), m_individualCaches.GetBuffer()));
+		}
+
+		for (VkPipelineCache &plc : m_individualCaches)
+		{
+			vkd.vkDestroyPipelineCache(m_device.GetDevice(), plc, m_device.GetAllocCallbacks());
+			plc = VK_NULL_HANDLE;
+		}
+
+		size_t dataSize = 0;
+		RKIT_VK_CHECK(vkd.vkGetPipelineCacheData(m_device.GetDevice(), m_mergedCache, &dataSize, nullptr));
+
+		Vector<uint8_t> pipelineCacheDataBuffer;
+		RKIT_CHECK(pipelineCacheDataBuffer.Resize(dataSize));
+		RKIT_VK_CHECK(vkd.vkGetPipelineCacheData(m_device.GetDevice(), m_mergedCache, &dataSize, pipelineCacheDataBuffer.GetBuffer()));
+
+		PipelineCacheHeader header = {};
+		header.m_identifier = PipelineCacheHeader::kExpectedIdentifier;
+		header.m_version = PipelineCacheHeader::kExpectedVersion;
+		header.m_phase = PipelineCacheHeader::Phase::kEmpty;
+		header.m_packageUUID = m_package->GetPackageUUID();
+
+		{
+			MutexLock lock(*m_cacheStreamMutex);
+			RKIT_CHECK(m_cacheWriteStream->SeekStart(0));
+			RKIT_CHECK(m_cacheWriteStream->WriteAll(&header, sizeof(header)));
+			RKIT_CHECK(m_cacheWriteStream->Flush());
+
+			RKIT_CHECK(m_cacheWriteStream->WriteAll(pipelineCacheDataBuffer.GetBuffer(), pipelineCacheDataBuffer.Count()));
+			RKIT_CHECK(m_cacheWriteStream->Truncate(m_cacheWriteStream->Tell()));
+
+			header.m_phase = PipelineCacheHeader::Phase::kMerged;
+
+			RKIT_CHECK(m_cacheWriteStream->SeekStart(0));
+			RKIT_CHECK(m_cacheWriteStream->WriteAll(&header, sizeof(header)));
+			RKIT_CHECK(m_cacheWriteStream->Flush());
+		}
+
+		return ResultCode::kOK;
 	}
 
 	Result PipelineLibraryLoaderBase::Create(VulkanDeviceBase &device, UniquePtr<PipelineLibraryLoaderBase> &outLoader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
-		UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart,
-		UniquePtr<utils::IShadowFile> &&cacheShadowFile, UniquePtr<ISeekableReadWriteStream> &&cacheStream)
+		UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart)
 	{
 		UniquePtr<PipelineLibraryLoader> loader;
 
-		RKIT_CHECK(New<PipelineLibraryLoader>(loader, device, std::move(validator), std::move(package), std::move(packageStream),
-			packageBinaryContentStart, std::move(cacheShadowFile), std::move(cacheStream)));
+		RKIT_CHECK(New<PipelineLibraryLoader>(loader, device, std::move(validator), std::move(package), std::move(packageStream), packageBinaryContentStart));
+
+		RKIT_CHECK(loader->Initialize());
 
 		outLoader = std::move(loader);
 
