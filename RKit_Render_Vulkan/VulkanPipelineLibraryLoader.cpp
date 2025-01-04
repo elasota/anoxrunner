@@ -47,6 +47,12 @@ namespace rkit::render::vulkan
 		Phase m_phase = Phase::kEmpty;
 
 		utils::Sha256DigestBytes m_packageUUID;
+		utils::Sha256DigestBytes m_configHashBytes;
+	};
+
+	class PipelineLibrary final : public IPipelineLibrary
+	{
+	public:
 	};
 
 	class PipelineLibraryLoader final : public PipelineLibraryLoaderBase
@@ -68,6 +74,8 @@ namespace rkit::render::vulkan
 		Result CompileUnmergedGraphicsPipeline(size_t pipelineIndex, size_t permutationIndex) override;
 		Result AddMergedPipeline(size_t pipelineIndex, size_t permutationIndex) override;
 		Result SaveMergedPipeline() override;
+
+		UniquePtr<IPipelineLibrary> GetFinishedPipeline() override;
 
 	private:
 		class ConfigHashComputer final : public IWriteStream
@@ -196,6 +204,8 @@ namespace rkit::render::vulkan
 
 		Vector<VkPipelineCache> m_individualCaches;
 		VkPipelineCache m_mergedCache = VK_NULL_HANDLE;
+
+		UniquePtr<PipelineLibrary> m_pipelineLibrary;
 	};
 
 	PipelineLibraryLoader::ConfigHashComputer::ConfigHashComputer(const utils::ISha256Calculator *calculator)
@@ -249,6 +259,7 @@ namespace rkit::render::vulkan
 		, m_packageStream(std::move(packageStream))
 		, m_packageBinaryContentStart(packageBinaryContentStart)
 		, m_cacheWriteStream(nullptr)
+		, m_configHashBytes{}
 	{
 	}
 
@@ -325,6 +336,8 @@ namespace rkit::render::vulkan
 		RKIT_CHECK(m_validator->WriteConfig(hashComputer));
 
 		m_configHashBytes = hashComputer.FinishSHA();
+
+		RKIT_CHECK(New<PipelineLibrary>(m_pipelineLibrary));
 
 		return ResultCode::kOK;
 	}
@@ -621,7 +634,9 @@ namespace rkit::render::vulkan
 		if (header.m_identifier != PipelineCacheHeader::kExpectedIdentifier
 			|| header.m_version != PipelineCacheHeader::kExpectedVersion
 			|| header.m_phase != PipelineCacheHeader::Phase::kMerged
-			|| memcmp(&header.m_packageUUID, &m_package->GetPackageUUID(), sizeof(header.m_packageUUID)))
+			|| memcmp(&header.m_packageUUID, &m_package->GetPackageUUID(), sizeof(header.m_packageUUID))
+			|| memcmp(&header.m_configHashBytes, &m_configHashBytes, sizeof(header.m_configHashBytes))
+			)
 		{
 			return Result::SoftFault(ResultCode::kOperationFailed);
 		}
@@ -2005,6 +2020,7 @@ namespace rkit::render::vulkan
 				header.m_version = PipelineCacheHeader::kExpectedVersion;
 				header.m_phase = PipelineCacheHeader::Phase::kIndividual;
 				header.m_packageUUID = m_package->GetPackageUUID();
+				header.m_configHashBytes = m_configHashBytes;
 
 				RKIT_CHECK(m_cacheWriteStream->WriteAll(&header, sizeof(header)));
 				RKIT_CHECK(m_cacheWriteStream->Flush());
@@ -2211,6 +2227,7 @@ namespace rkit::render::vulkan
 		header.m_version = PipelineCacheHeader::kExpectedVersion;
 		header.m_phase = PipelineCacheHeader::Phase::kEmpty;
 		header.m_packageUUID = m_package->GetPackageUUID();
+		header.m_configHashBytes = m_configHashBytes;
 
 		{
 			MutexLock lock(*m_cacheStreamMutex);
@@ -2229,6 +2246,11 @@ namespace rkit::render::vulkan
 		}
 
 		return ResultCode::kOK;
+	}
+
+	UniquePtr<IPipelineLibrary> PipelineLibraryLoader::GetFinishedPipeline()
+	{
+		return UniquePtr<IPipelineLibrary>(std::move(m_pipelineLibrary));
 	}
 
 	Result PipelineLibraryLoaderBase::Create(VulkanDeviceBase &device, UniquePtr<PipelineLibraryLoaderBase> &outLoader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,

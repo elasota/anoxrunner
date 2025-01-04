@@ -211,7 +211,6 @@ namespace anox
 			kCompilingPipelines,
 			kMergingPipelines,
 			kSecondTryLoadingPipelines,
-			kLoadingResources,
 			kFinished,
 		};
 
@@ -251,6 +250,7 @@ namespace anox
 		bool m_stepCompleted = false;
 		bool m_stepFailed = false;
 
+		rkit::UniquePtr<rkit::render::IPipelineLibrary> m_pipelineLibrary;
 		rkit::UniquePtr<rkit::render::IPipelineLibraryLoader> m_pipelineLibraryLoader;
 		rkit::UniquePtr<LivePipelineSets> m_livePipelineSets;
 		bool m_haveExistingMergedCache = false;
@@ -438,8 +438,13 @@ namespace anox
 	{
 		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
 
+		m_graphicsSubsystem.m_pipelineLibraryLoader->CloseMergedLibrary(true, true);
+
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> pipelinesFile = sysDriver->OpenFileReadWrite(rkit::FileLocation::kUserSettingsDirectory, m_graphicsSubsystem.m_pipelinesCacheFileName.GetChars(), true, true, true);
 		rkit::ISeekableReadWriteStream *writeStream = pipelinesFile.Get();
+
+		if (!pipelinesFile.IsValid())
+			return rkit::ResultCode::kOperationFailed;
 
 		m_graphicsSubsystem.m_pipelineLibraryLoader->SetMergedLibraryStream(std::move(pipelinesFile), writeStream);
 
@@ -807,6 +812,7 @@ namespace anox
 
 		m_renderDevice = std::move(device);
 
+		// FIXME: Localize
 		RKIT_CHECK(progressMonitor->SetText("Loading shader package..."));
 
 		m_pipelinesCacheFileName = pipelinesCacheFile;
@@ -1001,14 +1007,11 @@ namespace anox
 			}
 			else
 			{
-				m_setupStep = DeviceSetupStep::kLoadingResources;
+				m_setupStep = DeviceSetupStep::kFinished;
 				m_setupProgress = 0;
 
-				rkit::render::IProgressMonitor *progressMonitor = m_mainDisplay->GetProgressMonitor();
-				if (progressMonitor)
-				{
-					RKIT_CHECK(progressMonitor->SetText("Loading resources..."));
-				}
+				m_pipelineLibrary = m_pipelineLibraryLoader->GetFinishedPipeline();
+				m_pipelineLibraryLoader.Reset();
 
 				return rkit::ResultCode::kOK;
 			}

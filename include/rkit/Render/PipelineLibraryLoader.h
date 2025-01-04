@@ -47,5 +47,7 @@ namespace rkit::render
 		virtual Result AddMergedPipeline(size_t pipelineIndex, size_t permutationIndex) = 0;
 
 		virtual Result SaveMergedPipeline() = 0;
+
+		virtual UniquePtr<IPipelineLibrary> GetFinishedPipeline() = 0;
 	};
 }
