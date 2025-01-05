@@ -7,6 +7,10 @@
 namespace rkit
 {
 	struct ISeekableReadStream;
+	struct Result;
+
+	template<class T>
+	class UniquePtr;
 }
 
 namespace rkit::data
@@ -24,6 +28,8 @@ namespace rkit::render
 	struct IPipelineLibraryLoader;
 	struct IPipelineLibraryConfigValidator;
 	struct IRenderDeviceCaps;
+	struct ISwapChain;
+	struct IDisplay;
 
 	struct IRenderDevice
 	{
@@ -38,7 +44,9 @@ namespace rkit::render
 
 		virtual const IRenderDeviceCaps &GetCaps() const = 0;
 
-		virtual Result CreatePipelineLibraryLoader(UniquePtr<IPipelineLibraryLoader> &loader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
+		virtual Result CreatePipelineLibraryLoader(UniquePtr<IPipelineLibraryLoader> &outLoader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
 			UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart) = 0;
+
+		virtual Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, IDisplay &display, uint8_t numBackBuffers) = 0;
 	};
 }

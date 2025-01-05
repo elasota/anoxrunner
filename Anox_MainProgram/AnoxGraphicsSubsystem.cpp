@@ -34,6 +34,7 @@
 #include "rkit/Core/UtilitiesDriver.h"
 #include "rkit/Core/Vector.h"
 
+#include "AnoxRenderedWindow.h"
 #include "AnoxGraphicsSettings.h"
 
 
@@ -224,6 +225,8 @@ namespace anox
 
 		rkit::Result CreateGameDisplayAndDevice(const rkit::StringView &renderModule, const rkit::StringView &pipelinesFile, const rkit::StringView &pipelinesCacheFile, bool canUpdatePipelineCache);
 
+		void WaitForRenderingTasks();
+
 		rkit::Optional<rkit::render::DisplayMode> m_currentDisplayMode;
 		rkit::render::DisplayMode m_desiredDisplayMode = rkit::render::DisplayMode::kSplash;
 
@@ -233,7 +236,7 @@ namespace anox
 		anox::GraphicsSettings m_graphicsSettings;
 		rkit::Optional<anox::GraphicsSettings> m_desiredGraphicsSettings;
 
-		rkit::UniquePtr<rkit::render::IDisplay> m_mainDisplay;
+		rkit::UniquePtr<RenderedWindowBase> m_gameWindow;
 
 		rkit::UniquePtr<rkit::render::IRenderDevice> m_renderDevice;
 
@@ -728,7 +731,8 @@ namespace anox
 
 	GraphicsSubsystem::~GraphicsSubsystem()
 	{
-		m_mainDisplay.Reset();
+		WaitForRenderingTasks();
+		m_gameWindow.Reset();
 	}
 
 	rkit::Result GraphicsSubsystem::Initialize()
@@ -745,9 +749,13 @@ namespace anox
 		rkit::render::IDisplayManager *displayManager = rkit::GetDrivers().m_systemDriver->GetDisplayManager();
 
 		m_currentDisplayMode = rkit::render::DisplayMode::kSplash;
-		RKIT_CHECK(displayManager->CreateDisplay(m_mainDisplay, m_currentDisplayMode.Get()));
 
-		rkit::render::IProgressMonitor *progressMonitor = m_mainDisplay->GetProgressMonitor();
+		rkit::UniquePtr<rkit::render::IDisplay> display;
+		RKIT_CHECK(displayManager->CreateDisplay(display, m_currentDisplayMode.Get()));
+
+		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), nullptr, 0));
+
+		rkit::render::IProgressMonitor *progressMonitor = m_gameWindow->GetDisplay().GetProgressMonitor();
 
 		if (progressMonitor)
 		{
@@ -827,8 +835,27 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
+	void GraphicsSubsystem::WaitForRenderingTasks()
+	{
+	}
+
 	rkit::Result GraphicsSubsystem::TransitionDisplayMode()
 	{
+		if (m_currentDisplayMode.IsSet())
+		{
+			WaitForRenderingTasks();
+			m_gameWindow.Reset();
+		}
+
+		m_currentDisplayMode = m_desiredDisplayMode;
+
+		rkit::render::IDisplayManager *displayManager = rkit::GetDrivers().m_systemDriver->GetDisplayManager();
+
+		rkit::UniquePtr<rkit::render::IDisplay> display;
+		RKIT_CHECK(displayManager->CreateDisplay(display, m_currentDisplayMode.Get()));
+
+		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), m_renderDevice.Get(), 1));
+
 		return rkit::ResultCode::kNotYetImplemented;
 	}
 
@@ -838,11 +865,14 @@ namespace anox
 		if (m_resourceManager.IsValid())
 			m_resourceManager->UnloadAll();
 
-		if (m_renderDevice.IsValid())
-			m_renderDevice.Reset();
+		WaitForRenderingTasks();
 
-		if (m_mainDisplay.IsValid())
-			m_mainDisplay.Reset();
+		m_gameWindow.Reset();
+
+		m_renderDevice.Reset();
+
+		m_currentDisplayMode.Reset();
+		m_desiredDisplayMode = rkit::render::DisplayMode::kSplash;
 
 		m_backend = m_desiredBackend;
 
@@ -871,7 +901,7 @@ namespace anox
 	{
 		size_t totalPipelines = m_livePipelineSets->m_graphicsPipelines.Count();
 
-		rkit::render::IProgressMonitor *progressMonitor = m_mainDisplay->GetProgressMonitor();
+		rkit::render::IProgressMonitor *progressMonitor = m_gameWindow->GetDisplay().GetProgressMonitor();
 		if (progressMonitor)
 		{
 			RKIT_CHECK(progressMonitor->SetRange(0, totalPipelines));
@@ -913,7 +943,7 @@ namespace anox
 				m_setupStep = DeviceSetupStep::kCompilingPipelines;
 				m_setupProgress = 0;
 
-				rkit::render::IProgressMonitor *progressMonitor = m_mainDisplay->GetProgressMonitor();
+				rkit::render::IProgressMonitor *progressMonitor = m_gameWindow->GetDisplay().GetProgressMonitor();
 				if (progressMonitor)
 				{
 					RKIT_CHECK(progressMonitor->SetText("Optimizing shaders..."));
@@ -966,7 +996,7 @@ namespace anox
 			const size_t numGraphicsPipelines = m_livePipelineSets->m_graphicsPipelines.Count();
 			const size_t numTotalPipelines = numGraphicsPipelines;
 
-			rkit::render::IProgressMonitor *progressMonitor = m_mainDisplay->GetProgressMonitor();
+			rkit::render::IProgressMonitor *progressMonitor = m_gameWindow->GetDisplay().GetProgressMonitor();
 			if (progressMonitor)
 			{
 				RKIT_CHECK(progressMonitor->SetText("Building shader cache..."));
@@ -988,7 +1018,7 @@ namespace anox
 
 			m_haveExistingMergedCache = true;
 
-			rkit::render::IProgressMonitor *progressMonitor = m_mainDisplay->GetProgressMonitor();
+			rkit::render::IProgressMonitor *progressMonitor = m_gameWindow->GetDisplay().GetProgressMonitor();
 			if (progressMonitor)
 			{
 				RKIT_CHECK(progressMonitor->SetText("Reloading shaders..."));
@@ -1012,6 +1042,8 @@ namespace anox
 
 				m_pipelineLibrary = m_pipelineLibraryLoader->GetFinishedPipeline();
 				m_pipelineLibraryLoader.Reset();
+
+				m_desiredDisplayMode = rkit::render::DisplayMode::kBorderlessFullscreen;
 
 				return rkit::ResultCode::kOK;
 			}
@@ -1042,7 +1074,7 @@ namespace anox
 
 			rkit::GetDrivers().m_systemDriver->SleepMSec(1000u / 60u);
 
-			rkit::render::IProgressMonitor *progressMonitor = m_mainDisplay->GetProgressMonitor();
+			rkit::render::IProgressMonitor *progressMonitor = m_gameWindow->GetDisplay().GetProgressMonitor();
 			if (progressMonitor)
 			{
 				uint64_t progress = 0;

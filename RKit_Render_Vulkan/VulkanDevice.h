@@ -2,6 +2,8 @@
 
 #include "rkit/Render/RenderDevice.h"
 
+#include "rkit/Core/StringProto.h"
+
 #include "IncludeVulkan.h"
 
 namespace rkit
@@ -16,6 +18,9 @@ namespace rkit
 
 	template<class T>
 	class RCPtr;
+
+	template<class T>
+	class Vector;
 }
 
 namespace rkit::render
@@ -28,10 +33,16 @@ namespace rkit::render::vulkan
 	struct VulkanDeviceAPI;
 	struct VulkanGlobalAPI;
 	struct VulkanInstanceAPI;
+
+	struct VulkanGlobalPlatformAPI;
+	struct VulkanInstancePlatformAPI;
+	struct VulkanDevicePlatformAPI;
+
 	class RenderVulkanPhysicalDevice;
 
-	struct VulkanDeviceBase : public IRenderDevice
+	class VulkanDeviceBase : public IRenderDevice
 	{
+	public:
 		struct QueueFamilySpec
 		{
 			uint32_t m_queueFamily = 0;
@@ -39,14 +50,24 @@ namespace rkit::render::vulkan
 		};
 
 		virtual VkDevice GetDevice() const = 0;
+		virtual VkInstance GetInstance() const = 0;
 		virtual const VkAllocationCallbacks *GetAllocCallbacks() const = 0;
 
 		virtual const VulkanGlobalAPI &GetGlobalAPI() const = 0;
 		virtual const VulkanInstanceAPI &GetInstanceAPI() const = 0;
 		virtual const VulkanDeviceAPI &GetDeviceAPI() const = 0;
 
+		virtual const VulkanGlobalPlatformAPI &GetGlobalPlatformAPI() const = 0;
+		virtual const VulkanInstancePlatformAPI &GetInstancePlatformAPI() const = 0;
+		virtual const VulkanDevicePlatformAPI &GetDevicePlatformAPI() const = 0;
+
 		virtual const RenderVulkanPhysicalDevice &GetPhysDevice() const = 0;
 
-		static Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, VkInstance inst, VkDevice device, const QueueFamilySpec (&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice);
+		static Result CreateDevice(UniquePtr<IRenderDevice> &outDevice,
+			const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki,
+			const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p,
+			VkInstance inst, VkDevice device,
+			const QueueFamilySpec (&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks,
+			const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts);
 	};
 }

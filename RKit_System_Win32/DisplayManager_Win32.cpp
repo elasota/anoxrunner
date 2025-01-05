@@ -4,6 +4,7 @@
 
 #include "Win32DisplayManager.h"
 
+#include "rkit/Win32/Display_Win32.h"
 #include "rkit/Win32/IncludeWindows.h"
 
 #include "ConvUtil.h"
@@ -12,7 +13,7 @@
 
 namespace rkit::render
 {
-	class SplashWindow_Win32 : public IDisplay, public IProgressMonitor
+	class SplashWindow_Win32 : public IDisplay_Win32, public IProgressMonitor
 	{
 	public:
 		explicit SplashWindow_Win32(IMallocDriver *alloc, HINSTANCE hInst);
@@ -30,6 +31,9 @@ namespace rkit::render
 		Result SetRange(uint64_t minimum, uint64_t maximum) override;
 		Result SetValue(uint64_t value) override;
 		void FlushEvents() override;
+
+		HWND GetHWND() override;
+		HINSTANCE GetHINSTANCE() override;
 
 	private:
 		struct PrimaryMonitorSearchData
@@ -268,6 +272,15 @@ namespace rkit::render
 		FlushWinMessageQueue();
 	}
 
+	HWND SplashWindow_Win32::GetHWND()
+	{
+		return m_hWnd;
+	}
+
+	HINSTANCE SplashWindow_Win32::GetHINSTANCE()
+	{
+		return m_hInst;
+	}
 
 	Result SplashWindow_Win32::RegisterWndClass(ATOM &outAtom, HINSTANCE hInst)
 	{

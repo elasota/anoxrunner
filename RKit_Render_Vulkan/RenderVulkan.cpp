@@ -19,6 +19,8 @@
 #include "VulkanCheck.h"
 #include "VulkanAutoObject.h"
 #include "VulkanDevice.h"
+#include "VulkanPlatformAPI.h"
+#include "VulkanPlatformSpecific.h"
 
 #include <cstring>
 
@@ -113,7 +115,7 @@ namespace rkit::render::vulkan
 		const VkAllocationCallbacks *GetAllocCallbacks() const;
 
 		bool IsInstanceExtensionEnabled(const StringView &extName) const;
-		bool IsExtensionEnabled(const char *layerName, const StringView &extName) const;
+		bool IsInstanceExtensionEnabled(const char *layerName, const StringView &extName) const;
 
 		Result EnumerateAdapters(Vector<UniquePtr<IRenderAdapter>> &adapters) const override;
 		Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, const IRenderDeviceCaps &optionalCaps, const IRenderDeviceCaps &requiredCaps, IRenderAdapter &adapter) override;
@@ -144,6 +146,30 @@ namespace rkit::render::vulkan
 			bool m_isAvailableInBase = false;
 		};
 
+		class InstanceExtensionEnumerator final : public platform::IInstanceExtensionEnumerator
+		{
+		public:
+			InstanceExtensionEnumerator(Vector<QueryItem> &layers, Vector<QueryItem> &extensions);
+
+			Result AddExtension(const StringView &ext, bool required) override;
+			Result AddLayer(const StringView &layer, bool required) override;
+
+		private:
+			Vector<QueryItem> &m_layers;
+			Vector<QueryItem> &m_extensions;
+		};
+
+		class DeviceExtensionEnumerator final : public platform::IDeviceExtensionEnumerator
+		{
+		public:
+			explicit DeviceExtensionEnumerator(Vector<QueryItem> &extensions);
+
+			Result AddExtension(const StringView &ext, bool required) override;
+
+		private:
+			Vector<QueryItem> &m_extensions;
+		};
+
 		static void SyncOptionalCap(RenderDeviceCaps &availableCaps, RenderDeviceBoolCap cap, VkBool32 &featureFlag);
 
 		Result LoadVulkanGlobalAPI();
@@ -163,10 +189,13 @@ namespace rkit::render::vulkan
 		VulkanGlobalAPI m_vkg;
 		VulkanInstanceAPI m_vki;
 
+		VulkanGlobalPlatformAPI m_vkg_p;
+		VulkanInstancePlatformAPI m_vki_p;
+
 		UniquePtr<ISystemLibrary> m_vkLibrary;
 		UniquePtr<VulkanAllocationCallbacks> m_allocationCallbacks;
 
-		Vector<ExtensionEnumerationFinal> m_extensions;
+		Vector<ExtensionEnumerationFinal> m_instanceExtensions;
 
 		ValidationLevel m_validationLevel = ValidationLevel::kNone;
 
@@ -385,9 +414,9 @@ namespace rkit::render::vulkan
 		return m_allocationCallbacks->GetCallbacks();
 	}
 
-	bool RenderVulkanDriver::IsExtensionEnabled(const char *layerName, const StringView &extName) const
+	bool RenderVulkanDriver::IsInstanceExtensionEnabled(const char *layerName, const StringView &extName) const
 	{
-		for (const ExtensionEnumerationFinal &candidate : m_extensions)
+		for (const ExtensionEnumerationFinal &candidate : m_instanceExtensions)
 		{
 			bool isLayerMatch = false;
 			if (candidate.m_layerName == nullptr)
@@ -532,16 +561,71 @@ namespace rkit::render::vulkan
 			spec.m_numQueues = static_cast<uint32_t>(queueRequest.m_numQueues);
 		}
 
+		Vector<QueryItem> requestedDeviceExtensions;
+
+
+		RKIT_CHECK(requestedDeviceExtensions.Append(QueryItem("VK_KHR_swapchain", true)));
+
+		{
+			DeviceExtensionEnumerator enumerator(requestedDeviceExtensions);
+			RKIT_CHECK(platform::AddDeviceExtensions(enumerator));
+		}
+
+		Vector<const char *> exts;
+
+		uint32_t extCount = 0;
+		RKIT_VK_CHECK(m_vki.vkEnumerateDeviceExtensionProperties(physDevice, nullptr, &extCount, nullptr));
+
+		Vector<VkExtensionProperties> extProps;
+		RKIT_CHECK(extProps.Resize(extCount));
+
+		RKIT_VK_CHECK(m_vki.vkEnumerateDeviceExtensionProperties(physDevice, nullptr, &extCount, extProps.GetBuffer()));
+
+		for (const VkExtensionProperties &extProp : extProps)
+		{
+			StringView strView = StringView::FromCString(extProp.extensionName);
+
+			for (QueryItem &queryItem : requestedDeviceExtensions)
+			{
+				if (strView == queryItem.m_name)
+				{
+					queryItem.m_isAvailableInBase = true;
+					break;
+				}
+			}
+		}
+
+		Vector<StringView> enabledExts;
+
+		for (const QueryItem &queryItem : requestedDeviceExtensions)
+		{
+			if (queryItem.m_isAvailableInBase || queryItem.m_isAvailableInLayer)
+			{
+				RKIT_CHECK(exts.Append(queryItem.m_name.GetChars()));
+				RKIT_CHECK(enabledExts.Append(queryItem.m_name));
+			}
+			else
+			{
+				if (queryItem.m_required)
+				{
+					rkit::log::ErrorFmt("Missing required Vulkan device extension %s", queryItem.m_name.GetChars());
+					return ResultCode::kOperationFailed;
+				}
+			}
+		}
+
 		VkDeviceCreateInfo devCreateInfo = {};
 		devCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		devCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.Count());
 		devCreateInfo.pQueueCreateInfos = queueCreateInfos.GetBuffer();
 		devCreateInfo.pEnabledFeatures = &features;
+		devCreateInfo.enabledExtensionCount = static_cast<uint32_t>(exts.Count());
+		devCreateInfo.ppEnabledExtensionNames = exts.GetBuffer();
 
 		VkDevice device = VK_NULL_HANDLE;
 		RKIT_VK_CHECK(m_vki.vkCreateDevice(rPhysDevice->GetPhysDevice(), &devCreateInfo, GetAllocCallbacks(), &device));
 
-		Result wrapDeviceResult = VulkanDeviceBase::CreateDevice(outDevice, m_vkg, m_vki, m_vkInstance, device, queueFamilySpecs, GetAllocCallbacks(), enabledCaps, rPhysDevice);
+		Result wrapDeviceResult = VulkanDeviceBase::CreateDevice(outDevice, m_vkg, m_vki, m_vkg_p, m_vki_p, m_vkInstance, device, queueFamilySpecs, GetAllocCallbacks(), enabledCaps, rPhysDevice, std::move(enabledExts));
 		if (!wrapDeviceResult.IsOK())
 		{
 			m_vki.vkDestroyDevice(device, GetAllocCallbacks());
@@ -553,7 +637,7 @@ namespace rkit::render::vulkan
 
 	bool RenderVulkanDriver::IsInstanceExtensionEnabled(const StringView &extName) const
 	{
-		return IsExtensionEnabled(nullptr, extName);
+		return IsInstanceExtensionEnabled(nullptr, extName);
 	}
 
 	void RenderVulkanDriver::SyncOptionalCap(RenderDeviceCaps &availableCaps, RenderDeviceBoolCap cap, VkBool32 &featureFlag)
@@ -581,7 +665,7 @@ namespace rkit::render::vulkan
 
 			bool IsExtensionEnabled(const StringView &ext) const override
 			{
-				return m_vkDriver.IsExtensionEnabled(nullptr, ext);
+				return m_vkDriver.IsInstanceExtensionEnabled(nullptr, ext);
 			}
 
 		private:
@@ -594,7 +678,10 @@ namespace rkit::render::vulkan
 
 		GlobalFunctionResolver resolver(*this, *m_vkLibrary);
 
-		return LoadVulkanAPI(m_vkg, resolver);
+		RKIT_CHECK(LoadVulkanAPI(m_vkg, resolver));
+		RKIT_CHECK(LoadVulkanAPI(m_vkg_p, resolver));
+
+		return ResultCode::kOK;
 	}
 
 	Result RenderVulkanDriver::LoadVulkanInstanceAPI()
@@ -613,7 +700,7 @@ namespace rkit::render::vulkan
 
 			bool IsExtensionEnabled(const StringView &ext) const override
 			{
-				return m_vkDriver.IsExtensionEnabled(nullptr, ext);
+				return m_vkDriver.IsInstanceExtensionEnabled(nullptr, ext);
 			}
 
 		private:
@@ -626,7 +713,10 @@ namespace rkit::render::vulkan
 
 		InstanceFunctionResolver resolver(*this, m_vkInstance);
 
-		return LoadVulkanAPI(m_vki, resolver);
+		RKIT_CHECK(LoadVulkanAPI(m_vki, resolver));
+		RKIT_CHECK(LoadVulkanAPI(m_vki_p, resolver));
+
+		return ResultCode::kOK;
 	}
 
 	Result RenderVulkanDriver::EnumerateExtensions(const char *layerName, Vector<ExtensionEnumeration> &extProperties)
@@ -690,6 +780,65 @@ namespace rkit::render::vulkan
 	{
 	}
 
+	RenderVulkanDriver::InstanceExtensionEnumerator::InstanceExtensionEnumerator(Vector<QueryItem> &layers, Vector<QueryItem> &extensions)
+		: m_layers(layers)
+		, m_extensions(extensions)
+	{
+	}
+
+	Result RenderVulkanDriver::InstanceExtensionEnumerator::AddExtension(const StringView &ext, bool required)
+	{
+		for (QueryItem &item : m_extensions)
+		{
+			if (item.m_name == ext)
+			{
+				if (required && !item.m_required)
+					item.m_required = true;
+
+				return ResultCode::kOK;
+			}
+		}
+
+		return m_extensions.Append(QueryItem(ext, required));
+	}
+
+	Result RenderVulkanDriver::InstanceExtensionEnumerator::AddLayer(const StringView &layer, bool required)
+	{
+		for (QueryItem &item : m_layers)
+		{
+			if (item.m_name == layer)
+			{
+				if (required && !item.m_required)
+					item.m_required = true;
+
+				return ResultCode::kOK;
+			}
+		}
+
+		return m_layers.Append(QueryItem(layer, required));
+	}
+
+	RenderVulkanDriver::DeviceExtensionEnumerator::DeviceExtensionEnumerator(Vector<QueryItem> &extensions)
+		: m_extensions(extensions)
+	{
+	}
+
+	Result RenderVulkanDriver::DeviceExtensionEnumerator::AddExtension(const StringView &ext, bool required)
+	{
+		for (QueryItem &item : m_extensions)
+		{
+			if (item.m_name == ext)
+			{
+				if (required && !item.m_required)
+					item.m_required = true;
+
+				return ResultCode::kOK;
+			}
+		}
+
+		return m_extensions.Append(QueryItem(ext, required));
+	}
+
 	RenderVulkanAdapter::RenderVulkanAdapter(const RCPtr<RenderVulkanPhysicalDevice> &physDevice)
 		: m_physDevice(physDevice)
 	{
@@ -728,18 +877,27 @@ namespace rkit::render::vulkan
 		RKIT_CHECK(EnumerateLayers(availableLayers));
 
 		Vector<QueryItem> requestedLayers;
-		Vector<QueryItem> requestedExtensions;
+		Vector<QueryItem> requestedInstanceExtensions;
 
 		// Determine required and optional extensions
 		if (initParams->m_validationLevel >= ValidationLevel::kSimple)
 		{
 			RKIT_CHECK(requestedLayers.Append(QueryItem("VK_LAYER_KHRONOS_validation", false)));
-			RKIT_CHECK(requestedExtensions.Append(QueryItem("VK_EXT_layer_settings", false)));
+			RKIT_CHECK(requestedInstanceExtensions.Append(QueryItem("VK_EXT_layer_settings", false)));
 		}
 
 		if (initParams->m_enableLogging)
 		{
-			RKIT_CHECK(requestedExtensions.Append(QueryItem("VK_EXT_debug_utils", false)));
+			RKIT_CHECK(requestedInstanceExtensions.Append(QueryItem("VK_EXT_debug_utils", false)));
+		}
+
+		RKIT_CHECK(requestedInstanceExtensions.Append(QueryItem("VK_KHR_surface", true)));
+
+		// Add this after since the enumerator will deduplicate
+		{
+			InstanceExtensionEnumerator enumerator(requestedLayers, requestedInstanceExtensions);
+
+			RKIT_CHECK(platform::AddInstanceExtensions(enumerator));
 		}
 
 		Vector<const char *> layers;
@@ -777,7 +935,7 @@ namespace rkit::render::vulkan
 		}
 
 		// Find all extensions to actually request
-		for (QueryItem &requestedExtension : requestedExtensions)
+		for (QueryItem &requestedExtension : requestedInstanceExtensions)
 		{
 			for (const ExtensionEnumeration &layerExts : availableExtensions)
 			{
@@ -820,7 +978,7 @@ namespace rkit::render::vulkan
 
 			for (const VkExtensionProperties &availableExtension : layerExts.m_extensions)
 			{
-				for (QueryItem &requestedExtension : requestedExtensions)
+				for (QueryItem &requestedExtension : requestedInstanceExtensions)
 				{
 					if (requestedExtension.m_name == StringView::FromCString(availableExtension.extensionName))
 					{
@@ -832,7 +990,7 @@ namespace rkit::render::vulkan
 
 			if (extEnumFinal.m_extensions.Count() > 0)
 			{
-				RKIT_CHECK(m_extensions.Append(std::move(extEnumFinal)));
+				RKIT_CHECK(m_instanceExtensions.Append(std::move(extEnumFinal)));
 			}
 		}
 		
@@ -887,7 +1045,7 @@ namespace rkit::render::vulkan
 		Vector<VkLayerSettingEXT> layerSettings;
 		VkBool32 vkTrue = VK_TRUE;
 		VkBool32 vkFalse = VK_FALSE;
-		if (initParams->m_validationLevel >= ValidationLevel::kAggressive && IsExtensionEnabled("VK_LAYER_KHRONOS_validation", "VK_EXT_layer_settings"))
+		if (initParams->m_validationLevel >= ValidationLevel::kAggressive && IsInstanceExtensionEnabled("VK_LAYER_KHRONOS_validation", "VK_EXT_layer_settings"))
 		{
 			layerSettingsInfo.sType = VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT;
 
@@ -939,7 +1097,7 @@ namespace rkit::render::vulkan
 		}
 
 		m_vkLibrary.Reset();
-		m_extensions.Reset();
+		m_instanceExtensions.Reset();
 	}
 }
 

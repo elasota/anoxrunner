@@ -139,9 +139,11 @@
     <ClCompile Include="AnoxGraphicsSettings.cpp" />
     <ClCompile Include="AnoxGraphicsSubsystem.cpp" />
     <ClCompile Include="AnoxMain.cpp" />
+    <ClCompile Include="AnoxRenderedWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\anox\AnoxGraphicsSubsystem.h" />
+    <ClInclude Include="AnoxRenderedWindow.h" />
     <ClInclude Include="AnoxGraphicsResourceManager.h" />
     <ClInclude Include="AnoxGraphicsSettings.h" />
   </ItemGroup>

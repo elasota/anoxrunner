@@ -140,6 +140,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="VulkanPipelineLibraryLoader.cpp" />
+    <ClCompile Include="VulkanPlatformSpecific_Win32.cpp" />
     <ClCompile Include="VulkanQueueProxy.cpp" />
     <ClCompile Include="RenderVulkan.cpp" />
     <ClCompile Include="VulkanAPI.cpp" />
@@ -147,20 +148,26 @@
     <ClCompile Include="VulkanCommandList.cpp" />
     <ClCompile Include="VulkanDevice.cpp" />
     <ClCompile Include="VulkanPhysDevice.cpp" />
+    <ClCompile Include="VulkanSwapChain.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IncludeVulkan.h" />
     <ClInclude Include="IncludeVulkanCore.h" />
     <ClInclude Include="IncludeVulkanDefs.h" />
+    <ClInclude Include="IncludeVulkanPlatformSpecific.h" />
     <ClInclude Include="VulkanAPI.h" />
     <ClInclude Include="VulkanAPILoader.h" />
+    <ClInclude Include="VulkanAPI_Common.h" />
     <ClInclude Include="VulkanAutoObject.h" />
     <ClInclude Include="VulkanCheck.h" />
     <ClInclude Include="VulkanCommandList.h" />
     <ClInclude Include="VulkanDevice.h" />
     <ClInclude Include="VulkanPhysDevice.h" />
     <ClInclude Include="VulkanPipelineLibraryLoader.h" />
+    <ClInclude Include="VulkanPlatformAPI.h" />
+    <ClInclude Include="VulkanPlatformSpecific.h" />
     <ClInclude Include="VulkanQueueProxy.h" />
+    <ClInclude Include="VulkanSwapChain.h" />
     <ClInclude Include="VulkanSync.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

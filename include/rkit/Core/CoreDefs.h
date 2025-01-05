@@ -25,3 +25,6 @@
 #pragma warning(error:4715)	// Not all control paths return a value
 #pragma warning(error:4834)	// [[nodiscard]] discarded
 #endif
+
+
+#define RKIT_PLATFORM_WIN32	1

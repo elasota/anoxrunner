@@ -25,7 +25,7 @@ namespace rkit::utils
 
 namespace rkit::render::vulkan
 {
-	struct VulkanDeviceBase;
+	class VulkanDeviceBase;
 
 	class PipelineLibraryLoaderBase : public IPipelineLibraryLoader
 	{
