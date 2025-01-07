@@ -109,7 +109,7 @@ namespace rkit::render::vulkan::platform
 
 	Result AddInstanceExtensions(IInstanceExtensionEnumerator &enumerator)
 	{
-		RKIT_CHECK(enumerator.AddExtension("VK_KHR_win32_surface", true));
+		RKIT_CHECK(enumerator.AddExtension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME, true));
 
 		return ResultCode::kOK;
 	}

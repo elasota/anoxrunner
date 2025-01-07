@@ -564,7 +564,7 @@ namespace rkit::render::vulkan
 		Vector<QueryItem> requestedDeviceExtensions;
 
 
-		RKIT_CHECK(requestedDeviceExtensions.Append(QueryItem("VK_KHR_swapchain", true)));
+		RKIT_CHECK(requestedDeviceExtensions.Append(QueryItem(VK_KHR_SWAPCHAIN_EXTENSION_NAME, true)));
 
 		{
 			DeviceExtensionEnumerator enumerator(requestedDeviceExtensions);
@@ -883,15 +883,15 @@ namespace rkit::render::vulkan
 		if (initParams->m_validationLevel >= ValidationLevel::kSimple)
 		{
 			RKIT_CHECK(requestedLayers.Append(QueryItem("VK_LAYER_KHRONOS_validation", false)));
-			RKIT_CHECK(requestedInstanceExtensions.Append(QueryItem("VK_EXT_layer_settings", false)));
+			RKIT_CHECK(requestedInstanceExtensions.Append(QueryItem(VK_EXT_LAYER_SETTINGS_EXTENSION_NAME, false)));
 		}
 
 		if (initParams->m_enableLogging)
 		{
-			RKIT_CHECK(requestedInstanceExtensions.Append(QueryItem("VK_EXT_debug_utils", false)));
+			RKIT_CHECK(requestedInstanceExtensions.Append(QueryItem(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, false)));
 		}
 
-		RKIT_CHECK(requestedInstanceExtensions.Append(QueryItem("VK_KHR_surface", true)));
+		RKIT_CHECK(requestedInstanceExtensions.Append(QueryItem(VK_KHR_SURFACE_EXTENSION_NAME, true)));
 
 		// Add this after since the enumerator will deduplicate
 		{
@@ -1026,7 +1026,7 @@ namespace rkit::render::vulkan
 		const void **ppInstCreateNext = &instCreateInfo.pNext;
 
 		VkDebugUtilsMessengerCreateInfoEXT debugUtilsInfo = {};
-		if (initParams->m_enableLogging && IsInstanceExtensionEnabled("VK_EXT_debug_utils"))
+		if (initParams->m_enableLogging && IsInstanceExtensionEnabled(VK_EXT_DEBUG_UTILS_EXTENSION_NAME))
 		{
 			debugUtilsInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
 			debugUtilsInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT
@@ -1045,7 +1045,7 @@ namespace rkit::render::vulkan
 		Vector<VkLayerSettingEXT> layerSettings;
 		VkBool32 vkTrue = VK_TRUE;
 		VkBool32 vkFalse = VK_FALSE;
-		if (initParams->m_validationLevel >= ValidationLevel::kAggressive && IsInstanceExtensionEnabled("VK_LAYER_KHRONOS_validation", "VK_EXT_layer_settings"))
+		if (initParams->m_validationLevel >= ValidationLevel::kAggressive && IsInstanceExtensionEnabled("VK_LAYER_KHRONOS_validation", VK_EXT_LAYER_SETTINGS_EXTENSION_NAME))
 		{
 			layerSettingsInfo.sType = VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT;
 
