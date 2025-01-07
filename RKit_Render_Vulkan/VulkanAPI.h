@@ -29,6 +29,7 @@ namespace rkit::render::vulkan
 		RKIT_VK_API_EXT(vkCreateDebugUtilsMessengerEXT, VK_EXT_debug_utils);
 		RKIT_VK_API_EXT(vkDestroyDebugUtilsMessengerEXT, VK_EXT_debug_utils);
 		RKIT_VK_API_EXT(vkDestroySurfaceKHR, VK_KHR_surface);
+		RKIT_VK_API_EXT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR, VK_KHR_surface);
 		RKIT_VK_API(vkDestroyInstance);	// This must be last!
 		RKIT_VK_API_END;
 	};

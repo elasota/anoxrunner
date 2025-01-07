@@ -2,6 +2,8 @@
 
 #include "rkit/Core/StreamProtos.h"
 
+#include "rkit/Render/RenderEnums.h"
+
 #include "CommandQueueType.h"
 
 namespace rkit
@@ -11,6 +13,9 @@ namespace rkit
 
 	template<class T>
 	class UniquePtr;
+
+	template<class T>
+	struct ISpan;
 }
 
 namespace rkit::data
@@ -47,6 +52,6 @@ namespace rkit::render
 		virtual Result CreatePipelineLibraryLoader(UniquePtr<IPipelineLibraryLoader> &outLoader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
 			UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart) = 0;
 
-		virtual Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, IDisplay &display, uint8_t numBackBuffers) = 0;
+		virtual Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, IDisplay &display, uint8_t numBackBuffers, RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, const ISpan<CommandQueueType> &accessibleCommandQueues) = 0;
 	};
 }

@@ -19,7 +19,7 @@ namespace rkit
 		~ResizableRingBufferCPUMemChunk();
 
 		Result Initialize(size_t size, size_t alignment);
-		void *GetDataAtPosition(size_t offset);
+		void *GetDataAtPosition(size_t offset) const;
 
 	private:
 		void *m_alignedMemory;
@@ -63,6 +63,7 @@ namespace rkit
 	struct IResizableRingBuffer
 	{
 		typedef typename TTraits::AddrOffset_t AddrOffset_t;
+		typedef typename TTraits::MemChunk_t MemChunk_t;
 
 		virtual ~IResizableRingBuffer() {}
 
@@ -70,7 +71,7 @@ namespace rkit
 		{
 		};
 
-		virtual Result Allocate(AddrOffset_t size, AddrOffset_t alignment, ResizableRingBufferHandle<TTraits> &outHandle) = 0;
+		virtual Result Allocate(AddrOffset_t size, AddrOffset_t alignment, ResizableRingBufferHandle<TTraits> &outHandle, const MemChunk_t *&outMemChunk, AddrOffset_t &outAddrOffset) = 0;
 		virtual void Dispose(const ResizableRingBufferHandle<TTraits> &handle) = 0;
 	};
 
@@ -86,8 +87,8 @@ namespace rkit
 		explicit ResizableRingBuffer(IMallocDriver *alloc, const ChunkAllocator_t &allocator);
 		~ResizableRingBuffer();
 
-		Result Allocate(AddrOffset_t size, AddrOffset_t alignment, ResizableRingBufferHandle<TTraits> &outHandle);
-		void Dispose(const ResizableRingBufferHandle<TTraits> &handle);
+		Result Allocate(AddrOffset_t size, AddrOffset_t alignment, ResizableRingBufferHandle<TTraits> &outHandle, const MemChunk_t *&outMemChunk, AddrOffset_t &outAddrOffset) override;
+		void Dispose(const ResizableRingBufferHandle<TTraits> &handle) override;
 
 	private:
 		struct LinkedMemChunk final : private MemChunk_t
@@ -212,7 +213,7 @@ rkit::ResizableRingBuffer<TTraits>::~ResizableRingBuffer()
 }
 
 template<class TTraits>
-rkit::Result rkit::ResizableRingBuffer<TTraits>::Allocate(AddrOffset_t size, AddrOffset_t alignment, ResizableRingBufferHandle<TTraits> &outHandle)
+rkit::Result rkit::ResizableRingBuffer<TTraits>::Allocate(AddrOffset_t size, AddrOffset_t alignment, ResizableRingBufferHandle<TTraits> &outHandle, const MemChunk_t *&outMemChunk, AddrOffset_t &outAddrOffset)
 {
 	RKIT_ASSERT(alignment != 0);
 	RKIT_ASSERT(alignment <= TTraits::kMaxAlignment);
@@ -389,6 +390,9 @@ rkit::Result rkit::ResizableRingBuffer<TTraits>::Allocate(AddrOffset_t size, Add
 	memChunk.m_usedAddressSize = extendedTailAddress - memChunk.m_firstUsedAddress;
 	m_lastMemChunk->m_numActiveAllocations++;
 
+	outMemChunk = memChunk.GetMemChunk();
+	outAddrOffset = memBlockLoc;
+
 	outHandle = ResizableRingBufferHandle<TTraits>(m_lastInfoBlockChunk, infoBlockLoc);
 
 	return ResultCode::kOK;
@@ -511,7 +515,7 @@ inline rkit::Result rkit::ResizableRingBufferCPUMemChunk::Initialize(size_t size
 	return ResultCode::kOK;
 }
 
-inline void *rkit::ResizableRingBufferCPUMemChunk::GetDataAtPosition(size_t offset)
+inline void *rkit::ResizableRingBufferCPUMemChunk::GetDataAtPosition(size_t offset) const
 {
 	return static_cast<char *>(m_alignedMemory) + offset;
 }

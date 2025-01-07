@@ -856,7 +856,7 @@ namespace anox
 
 		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), m_renderDevice.Get(), 1));
 
-		return rkit::ResultCode::kNotYetImplemented;
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result GraphicsSubsystem::TransitionBackend()
@@ -1043,7 +1043,7 @@ namespace anox
 				m_pipelineLibrary = m_pipelineLibraryLoader->GetFinishedPipeline();
 				m_pipelineLibraryLoader.Reset();
 
-				m_desiredDisplayMode = rkit::render::DisplayMode::kBorderlessFullscreen;
+				m_desiredDisplayMode = rkit::render::DisplayMode::kWindowed;
 
 				return rkit::ResultCode::kOK;
 			}

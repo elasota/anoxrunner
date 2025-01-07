@@ -8,6 +8,7 @@
 #include "VulkanQueueProxy.h"
 #include "VulkanPlatformAPI.h"
 
+#include "VulkanPhysDevice.h"
 #include "VulkanPlatformSpecific.h"
 
 #include "rkit/Render/DeviceCaps.h"
@@ -55,7 +56,7 @@ namespace rkit::render::vulkan
 
 		const RenderVulkanPhysicalDevice &GetPhysDevice() const override;
 
-		Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, IDisplay &display, uint8_t numBackBuffers) override;
+		Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, IDisplay &display, uint8_t numBackBuffers, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, const ISpan<CommandQueueType> &accessibleQueueTypes) override;
 
 		Result LoadDeviceAPI();
 		Result ResolveQueues(CommandQueueType queueType, size_t firstQueueID, uint32_t queueFamily, uint32_t numQueues);
@@ -66,14 +67,14 @@ namespace rkit::render::vulkan
 		class FunctionResolver final : public IFunctionResolver
 		{
 		public:
-			explicit FunctionResolver(const VulkanInstanceAPI &vki, VkDevice device);
+			explicit FunctionResolver(const VulkanInstanceAPI &vki, const VulkanDevice &device);
 
 			bool ResolveProc(void *pfnAddr, const FunctionLoaderInfo &fli, const StringView &name) const override;
 			bool IsExtensionEnabled(const StringView &ext) const override;
 
 		private:
 			const VulkanInstanceAPI &m_vki;
-			VkDevice m_device;
+			const VulkanDevice &m_device;
 		};
 
 		static const size_t kNumQueues = static_cast<size_t>(CommandQueueType::kCount);
@@ -100,7 +101,7 @@ namespace rkit::render::vulkan
 		UniquePtr<IMutex> m_queueMutex;
 	};
 
-	VulkanDevice::FunctionResolver::FunctionResolver(const VulkanInstanceAPI &vki, VkDevice device)
+	VulkanDevice::FunctionResolver::FunctionResolver(const VulkanInstanceAPI &vki, const VulkanDevice &device)
 		: m_device(device)
 		, m_vki(vki)
 	{
@@ -108,7 +109,7 @@ namespace rkit::render::vulkan
 
 	bool VulkanDevice::FunctionResolver::ResolveProc(void *pfnAddr, const FunctionLoaderInfo &fli, const StringView &name) const
 	{
-		PFN_vkVoidFunction func = m_vki.vkGetDeviceProcAddr(m_device, name.GetChars());
+		PFN_vkVoidFunction func = m_vki.vkGetDeviceProcAddr(m_device.GetDevice(), name.GetChars());
 		if (func == nullptr)
 			return false;
 		else
@@ -120,6 +121,12 @@ namespace rkit::render::vulkan
 
 	bool VulkanDevice::FunctionResolver::IsExtensionEnabled(const StringView &ext) const
 	{
+		for (const StringView &enabledExt : m_device.m_deviceExtensions)
+		{
+			if (enabledExt == ext)
+				return true;
+		}
+
 		return false;
 	}
 
@@ -256,10 +263,24 @@ namespace rkit::render::vulkan
 		return *m_physDevice;
 	}
 
-	Result VulkanDevice::CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, IDisplay &display, uint8_t numBackBuffers)
+	Result VulkanDevice::CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, IDisplay &display, uint8_t numBackBuffers, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, const ISpan<CommandQueueType> &accessibleQueueTypes)
 	{
+		Vector<uint32_t> queueFamilies;
+
+		for (CommandQueueType commandQueueType : accessibleQueueTypes)
+		{
+			uint32_t queueFamily = 0;
+			uint32_t numQueues = 0;
+
+			m_physDevice->GetQueueTypeInfo(commandQueueType, queueFamily, numQueues);
+			if (numQueues > 0)
+			{
+				RKIT_CHECK(queueFamilies.Append(queueFamily));
+			}
+		}
+
 		UniquePtr<VulkanSwapChainBase> vkSwapChain;
-		RKIT_CHECK(VulkanSwapChainBase::Create(vkSwapChain, *this, display, numBackBuffers));
+		RKIT_CHECK(VulkanSwapChainBase::Create(vkSwapChain, *this, display, numBackBuffers, fmt, writeBehavior, queueFamilies.ToSpan()));
 
 		outSwapChain = std::move(vkSwapChain);
 
@@ -268,8 +289,8 @@ namespace rkit::render::vulkan
 
 	Result VulkanDevice::LoadDeviceAPI()
 	{
-		RKIT_CHECK(LoadVulkanAPI(m_vkd, FunctionResolver(m_vki, m_device)));
-		RKIT_CHECK(LoadVulkanAPI(m_vkd_p, FunctionResolver(m_vki, m_device)));
+		RKIT_CHECK(LoadVulkanAPI(m_vkd, FunctionResolver(m_vki, *this)));
+		RKIT_CHECK(LoadVulkanAPI(m_vkd_p, FunctionResolver(m_vki, *this)));
 
 		return ResultCode::kOK;
 	}

@@ -36,6 +36,9 @@ namespace rkit::render
 		virtual ~IDisplay() {}
 
 		virtual DisplayMode GetDisplayMode() const = 0;
+		virtual bool CanChangeToDisplayMode(DisplayMode mode) const = 0;
+		virtual Result ChangeToDisplayMode(DisplayMode mode) = 0;
+
 		virtual IProgressMonitor *GetProgressMonitor() = 0;
 	};
 
@@ -43,6 +46,7 @@ namespace rkit::render
 	{
 		virtual ~IDisplayManager() {}
 
+		virtual Result CreateDisplay(UniquePtr<IDisplay> &display, DisplayMode displayMode, uint32_t width, uint32_t height) = 0;
 		virtual Result CreateDisplay(UniquePtr<IDisplay> &display, DisplayMode displayMode) = 0;
 	};
 }

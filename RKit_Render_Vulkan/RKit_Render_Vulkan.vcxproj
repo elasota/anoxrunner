@@ -149,6 +149,7 @@
     <ClCompile Include="VulkanDevice.cpp" />
     <ClCompile Include="VulkanPhysDevice.cpp" />
     <ClCompile Include="VulkanSwapChain.cpp" />
+    <ClCompile Include="VulkanUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IncludeVulkan.h" />
@@ -169,6 +170,7 @@
     <ClInclude Include="VulkanQueueProxy.h" />
     <ClInclude Include="VulkanSwapChain.h" />
     <ClInclude Include="VulkanSync.h" />
+    <ClInclude Include="VulkanUtils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

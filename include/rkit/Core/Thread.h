@@ -28,6 +28,8 @@ namespace rkit
 
 		UniqueThreadRef &operator=(UniqueThreadRef &&other);
 
+		bool IsValid() const;
+
 		Result Finalize();
 
 	private:
@@ -75,6 +77,11 @@ namespace rkit
 		m_thread = std::move(other.m_thread);
 
 		return *this;
+	}
+
+	inline bool UniqueThreadRef::IsValid() const
+	{
+		return m_thread.IsValid();
 	}
 
 	inline Result UniqueThreadRef::Finalize()

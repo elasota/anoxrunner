@@ -27,6 +27,7 @@
 #include "VulkanCheck.h"
 #include "VulkanDevice.h"
 #include "VulkanPhysDevice.h"
+#include "VulkanUtils.h"
 
 namespace rkit::render::vulkan
 {
@@ -125,7 +126,6 @@ namespace rkit::render::vulkan
 		};
 
 		static Result ResolveVertexInputAttributeFormat(VkFormat &outVkFormat, const VectorOrScalarNumericType &vectorType);
-		static Result ResolveRenderTargetFormat(VkFormat &outVkFormat, RenderTargetFormat rtFormat);
 		static Result ResolveDepthStencilFormat(VkFormat &outVkFormat, DepthStencilFormat dsFormat);
 		static Result ResolveDepthStencilFormatHasStencil(bool &outHaveStencil, DepthStencilFormat dsFormat);
 
@@ -765,23 +765,6 @@ namespace rkit::render::vulkan
 		default:
 			return ResultCode::kInternalError;
 		}
-	}
-
-	Result PipelineLibraryLoader::ResolveRenderTargetFormat(VkFormat &outVkFormat, RenderTargetFormat rtFormat)
-	{
-		switch (rtFormat)
-		{
-		case RenderTargetFormat::RGBA_UNorm8:
-			outVkFormat = VK_FORMAT_R8G8B8A8_UNORM;
-			break;
-		case RenderTargetFormat::RGBA_UNorm8_sRGB:
-			outVkFormat = VK_FORMAT_R8G8B8A8_SRGB;
-			break;
-		default:
-			return ResultCode::kInternalError;
-		}
-
-		return ResultCode::kOK;
 	}
 
 	Result PipelineLibraryLoader::ResolveDepthStencilFormat(VkFormat &outVkFormat, DepthStencilFormat dsFormat)
@@ -1619,7 +1602,7 @@ namespace rkit::render::vulkan
 			VkAttachmentDescription caDesc = {};
 			const RenderTargetDesc *rtDesc = renderPassDesc.m_renderTargets[cai];
 
-			RKIT_CHECK(ResolveRenderTargetFormat(caDesc.format, ResolveConfigurable(rtDesc->m_format)));
+			RKIT_CHECK(VulkanUtils::ResolveRenderTargetFormat(caDesc.format, ResolveConfigurable(rtDesc->m_format)));
 			caDesc.samples = VK_SAMPLE_COUNT_1_BIT;
 
 			caDesc.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;

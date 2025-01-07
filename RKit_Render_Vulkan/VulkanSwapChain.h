@@ -2,6 +2,7 @@
 
 #include "IncludeVulkan.h"
 
+#include "rkit/Render/RenderDefs.h"
 #include "rkit/Render/SwapChain.h"
 
 #include <cstdint>
@@ -33,6 +34,7 @@ namespace rkit::render::vulkan
 	class VulkanSwapChainBase : public ISwapChain
 	{
 	public:
-		static Result Create(UniquePtr<VulkanSwapChainBase> &outSwapChain, VulkanDeviceBase &device, IDisplay &display, uint8_t numBackBuffers);
+		static Result Create(UniquePtr<VulkanSwapChainBase> &outSwapChain, VulkanDeviceBase &device, IDisplay &display, uint8_t numBackBuffers,
+			render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, const Span<uint32_t> &queueFamilies);
 	};
 }
