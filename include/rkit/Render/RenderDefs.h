@@ -153,7 +153,7 @@ namespace rkit::render
 		ConfigurableValueFloat<float, 0> m_minLod;
 		ConfigurableValueNoDefault<float> m_maxLod;
 
-		ConfigurableValue<AnisotropicFiltering, AnisotropicFiltering::Anisotropic1> m_anisotropy;
+		ConfigurableValue<AnisotropicFiltering, AnisotropicFiltering::Disabled> m_anisotropy;
 
 		ConfigurableValue<ComparisonFunction, ComparisonFunction::Disabled> m_compareFunction;
 	};

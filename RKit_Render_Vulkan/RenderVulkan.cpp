@@ -146,6 +146,19 @@ namespace rkit::render::vulkan
 			bool m_isAvailableInBase = false;
 		};
 
+		class FeatureSyncer
+		{
+		public:
+			FeatureSyncer(const RenderDeviceCaps &availableCaps, VkPhysicalDeviceFeatures &enabledFeatures, const VkPhysicalDeviceFeatures &supportedFeatures);
+
+			void SyncOptionalCap(RenderDeviceBoolCap cap, VkBool32 (VkPhysicalDeviceFeatures::*featureFlag)) const;
+
+		private:
+			const RenderDeviceCaps &m_availableCaps;
+			VkPhysicalDeviceFeatures &m_enabledFeatures;
+			const VkPhysicalDeviceFeatures &m_supportedFeatures;
+		};
+
 		class InstanceExtensionEnumerator final : public platform::IInstanceExtensionEnumerator
 		{
 		public:
@@ -169,8 +182,6 @@ namespace rkit::render::vulkan
 		private:
 			Vector<QueryItem> &m_extensions;
 		};
-
-		static void SyncOptionalCap(RenderDeviceCaps &availableCaps, RenderDeviceBoolCap cap, VkBool32 &featureFlag);
 
 		Result LoadVulkanGlobalAPI();
 		Result LoadVulkanInstanceAPI();
@@ -496,16 +507,21 @@ namespace rkit::render::vulkan
 
 		VkPhysicalDevice physDevice = rPhysDevice->GetPhysDevice();
 
-		VkPhysicalDeviceFeatures features = {};
-		m_vki.vkGetPhysicalDeviceFeatures(physDevice, &features);
+		VkPhysicalDeviceFeatures supportedFeatures = {};
+		m_vki.vkGetPhysicalDeviceFeatures(physDevice, &supportedFeatures);
 
-		SyncOptionalCap(enabledCaps, RenderDeviceBoolCap::kIndependentBlend, features.independentBlend);
+		VkPhysicalDeviceFeatures enabledFeatures = {};
 
 		if (!enabledCaps.MeetsOrExceeds(requiredCaps))
 		{
 			rkit::log::Error("Device failed to meet capability requirements");
 			return ResultCode::kOperationFailed;
 		}
+
+		FeatureSyncer syncer(enabledCaps, enabledFeatures, supportedFeatures);
+
+		syncer.SyncOptionalCap(RenderDeviceBoolCap::kIndependentBlend, &VkPhysicalDeviceFeatures::independentBlend);
+
 
 		Vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 		VulkanDeviceBase::QueueFamilySpec queueFamilySpecs[static_cast<size_t>(CommandQueueType::kCount)];
@@ -618,7 +634,7 @@ namespace rkit::render::vulkan
 		devCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		devCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.Count());
 		devCreateInfo.pQueueCreateInfos = queueCreateInfos.GetBuffer();
-		devCreateInfo.pEnabledFeatures = &features;
+		devCreateInfo.pEnabledFeatures = &enabledFeatures;
 		devCreateInfo.enabledExtensionCount = static_cast<uint32_t>(exts.Count());
 		devCreateInfo.ppEnabledExtensionNames = exts.GetBuffer();
 
@@ -638,17 +654,6 @@ namespace rkit::render::vulkan
 	bool RenderVulkanDriver::IsInstanceExtensionEnabled(const StringView &extName) const
 	{
 		return IsInstanceExtensionEnabled(nullptr, extName);
-	}
-
-	void RenderVulkanDriver::SyncOptionalCap(RenderDeviceCaps &availableCaps, RenderDeviceBoolCap cap, VkBool32 &featureFlag)
-	{
-		if (availableCaps.GetBoolCap(cap))
-		{
-			if (featureFlag == VK_FALSE)
-				availableCaps.SetBoolCap(cap, false);
-		}
-		else
-			featureFlag = VK_FALSE;
 	}
 
 	Result RenderVulkanDriver::LoadVulkanGlobalAPI()
@@ -778,6 +783,25 @@ namespace rkit::render::vulkan
 		, m_isAvailableInLayer(false)
 		, m_isAvailableInBase(false)
 	{
+	}
+
+	RenderVulkanDriver::FeatureSyncer::FeatureSyncer(const RenderDeviceCaps &availableCaps, VkPhysicalDeviceFeatures &enabledFeatures, const VkPhysicalDeviceFeatures &supportedFeatures)
+		: m_availableCaps(availableCaps)
+		, m_enabledFeatures(enabledFeatures)
+		, m_supportedFeatures(supportedFeatures)
+	{
+	}
+
+	void RenderVulkanDriver::FeatureSyncer::SyncOptionalCap(RenderDeviceBoolCap cap, VkBool32(VkPhysicalDeviceFeatures:: *featureFlag)) const
+	{
+		if (m_availableCaps.GetBoolCap(cap))
+		{
+			const VkBool32 *supportedLoc = &(m_supportedFeatures.*featureFlag);
+			VkBool32 *enabledLoc = &(m_enabledFeatures.*featureFlag);
+
+			if (*supportedLoc)
+				*enabledLoc = VK_TRUE;
+		}
 	}
 
 	RenderVulkanDriver::InstanceExtensionEnumerator::InstanceExtensionEnumerator(Vector<QueryItem> &layers, Vector<QueryItem> &extensions)

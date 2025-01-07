@@ -48,7 +48,8 @@ namespace rkit::render
 		DisplayMode GetDisplayMode() const override { return DisplayMode::kSplash; }
 		bool CanChangeToDisplayMode(DisplayMode mode) const override { return mode == GetDisplayMode(); }
 		Result ChangeToDisplayMode(DisplayMode mode) override { return ResultCode::kInternalError; }
-		void GetRenderAreaDimensions(uint32_t &outWidth, uint32_t &outHeight) const { outWidth = 0; outHeight = 0; }
+
+		uint32_t GetSimultaneousImageCount() const override { return 0; }
 
 		IProgressMonitor *GetProgressMonitor() override { return this; }
 
@@ -97,6 +98,8 @@ namespace rkit::render
 		DisplayMode GetDisplayMode() const override { return m_displayMode; }
 		bool CanChangeToDisplayMode(DisplayMode mode) const override;
 		Result ChangeToDisplayMode(DisplayMode mode) override;
+
+		uint32_t GetSimultaneousImageCount() const override;
 
 		IProgressMonitor *GetProgressMonitor() override { return nullptr; }
 
@@ -662,6 +665,11 @@ namespace rkit::render
 		}
 	}
 
+	uint32_t RenderWindow_Win32::GetSimultaneousImageCount() const
+	{
+		return 1;
+	}
+
 	Result RenderWindow_Win32::RegisterWndClass(ATOM &outAtom, HINSTANCE hInst)
 	{
 		WNDCLASSEXW wc = {};
@@ -670,7 +678,7 @@ namespace rkit::render
 		wc.style = CS_HREDRAW | CS_VREDRAW;
 		wc.lpfnWndProc = StaticWndProc;
 		wc.hInstance = hInst;
-		//wc.hCursor = m_arrowCursor;
+		wc.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(IDC_ARROW));
 		//wc.hIcon = m_osGlobals->m_hIcon;
 		//wc.hIconSm = m_osGlobals->m_hIconSm;
 		wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW);

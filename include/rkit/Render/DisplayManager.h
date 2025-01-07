@@ -39,6 +39,8 @@ namespace rkit::render
 		virtual bool CanChangeToDisplayMode(DisplayMode mode) const = 0;
 		virtual Result ChangeToDisplayMode(DisplayMode mode) = 0;
 
+		virtual uint32_t GetSimultaneousImageCount() const = 0;
+
 		virtual IProgressMonitor *GetProgressMonitor() = 0;
 	};
 

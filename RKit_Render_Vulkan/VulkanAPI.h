@@ -60,6 +60,7 @@ namespace rkit::render::vulkan
 		RKIT_VK_API(vkMergePipelineCaches);
 		RKIT_VK_API_EXT(vkCreateSwapchainKHR, VK_KHR_swapchain);
 		RKIT_VK_API_EXT(vkDestroySwapchainKHR, VK_KHR_swapchain);
+		RKIT_VK_API_EXT(vkGetSwapchainImagesKHR, VK_KHR_swapchain);
 		RKIT_VK_API_END;
 	};
 }

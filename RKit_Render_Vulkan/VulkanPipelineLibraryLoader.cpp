@@ -1766,12 +1766,12 @@ namespace rkit::render::vulkan
 
 		VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo = {};
 		rasterizationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+		rasterizationStateCreateInfo.lineWidth = 1;
 
 		switch (pipelineDesc->m_fillMode)
 		{
 		case FillMode::Wireframe:
 			rasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_LINE;
-			rasterizationStateCreateInfo.lineWidth = 1;
 			break;
 		case FillMode::Solid:
 			rasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
