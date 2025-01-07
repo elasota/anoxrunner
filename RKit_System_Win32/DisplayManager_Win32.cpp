@@ -1070,7 +1070,6 @@ namespace rkit::render
 
 	LRESULT RenderWindow_Win32::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
-		rkit::log::LogInfoFmt("WndProc: hwnd(%p) msg(%x) wparam(%zu) lparam(%zu)", hWnd, msg, wParam, lParam);
 		switch (msg)
 		{
 		case kKickThreadMsg:
