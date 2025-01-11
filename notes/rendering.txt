@@ -58,3 +58,16 @@ Data feeds map to input slots.  Slots can have 2 forms:
 - Complex form that takes a slot index
 
 The two can not be mixed
+
+
+
+Sync behavior in Vulkan 1.0:
+Each queue tracks the following information about itself:
+- Last semaphore submitted
+- Last semaphore queued
+
+It tracks the following information about each other queue
+- Last semaphore signaled to that thread
+- Last semaphore waited on from that thread
+
+When posting a cross-queue wait, 

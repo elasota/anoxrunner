@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Fence.h"
+
 namespace rkit
 {
 	struct Result;
@@ -15,11 +17,25 @@ namespace rkit::render
 	struct IGraphicsCommandList;
 	struct IGraphicsComputeCommandList;
 	struct ICPUWaitableFence;
+	struct IInternalCommandQueue;
+
+	struct IInternalCommandQueue
+	{
+		virtual ~IInternalCommandQueue() {}
+	};
 
 	struct IBaseCommandQueue
 	{
-		virtual Result QueueWaitForOtherQueue(IBaseCommandQueue &otherQueue) = 0;
-		virtual Result Submit(ICPUWaitableFence *cpuWaitableFence) = 0;
+		virtual Result QueueSignalGPUWaitable(GPUWaitableFence_t &outFence) = 0;
+		virtual Result QueueSignalCPUWaitable(CPUWaitableFence_t &outFence) = 0;
+		virtual Result QueueWaitFor(const GPUWaitableFence_t &gpuFence) = 0;
+
+		virtual IInternalCommandQueue *ToInternalCommandQueue() = 0;
+
+		inline const IInternalCommandQueue *ToInternalCommandQueue() const
+		{
+			return const_cast<IBaseCommandQueue *>(this)->ToInternalCommandQueue();
+		}
 	};
 
 	struct ICopyCommandQueue : public IBaseCommandQueue

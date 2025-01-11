@@ -33,6 +33,10 @@ namespace anox
 		virtual void SetDesiredDisplayMode(rkit::render::DisplayMode displayMode) = 0;
 		virtual rkit::Result TransitionDisplayState() = 0;
 
+		virtual rkit::Result BeginFrame() = 0;
+
+		virtual rkit::Result EndFrame() = 0;
+
 		static rkit::Result Create(rkit::UniquePtr<IGraphicsSubsystem> &outSubsystem, rkit::data::IDataDriver &dataDriver, rkit::utils::IThreadPool &threadPool, anox::RenderBackend defaultBackend);
 	};
 }

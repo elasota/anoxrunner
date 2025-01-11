@@ -2,6 +2,7 @@
 
 #include "anox/AnoxGraphicsSubsystem.h"
 
+#include "rkit/Render/CommandQueue.h"
 #include "rkit/Render/DeviceCaps.h"
 #include "rkit/Render/DisplayManager.h"
 #include "rkit/Render/RenderDefs.h"
@@ -54,12 +55,16 @@ namespace anox
 		void SetDesiredDisplayMode(rkit::render::DisplayMode displayMode) override;
 		rkit::Result TransitionDisplayState() override;
 
+		rkit::Result BeginFrame() override;
+		rkit::Result EndFrame() override;
+
 		void MarkSetupStepCompleted();
 		void MarkSetupStepFailed();
 
 		rkit::render::IRenderDevice *GetDevice() const;
 		rkit::data::IDataDriver &GetDataDriver() const;
 		const anox::GraphicsSettings &GetGraphicsSettings() const;
+
 
 		void SetSplashProgress(uint64_t progress);
 
@@ -753,7 +758,7 @@ namespace anox
 		rkit::UniquePtr<rkit::render::IDisplay> display;
 		RKIT_CHECK(displayManager->CreateDisplay(display, m_currentDisplayMode.Get()));
 
-		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), nullptr, 0));
+		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), m_renderDevice.Get(), nullptr, 0));
 
 		rkit::render::IProgressMonitor *progressMonitor = m_gameWindow->GetDisplay().GetProgressMonitor();
 
@@ -854,7 +859,27 @@ namespace anox
 		rkit::UniquePtr<rkit::render::IDisplay> display;
 		RKIT_CHECK(displayManager->CreateDisplay(display, m_currentDisplayMode.Get()));
 
-		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), m_renderDevice.Get(), 1));
+
+		rkit::render::IBaseCommandQueue *swapChainQueue = nullptr;
+
+		for (rkit::render::IBaseCommandQueue *queue : m_renderDevice->GetGraphicsComputeQueues())
+		{
+			swapChainQueue = queue;
+			break;
+		}
+
+		if (!swapChainQueue)
+		{
+			for (rkit::render::IBaseCommandQueue *queue : m_renderDevice->GetGraphicsQueues())
+			{
+				swapChainQueue = queue;
+				break;
+			}
+		}
+
+		RKIT_ASSERT(swapChainQueue != nullptr);
+
+		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), m_renderDevice.Get(), swapChainQueue, 2));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -1099,6 +1124,17 @@ namespace anox
 			return TransitionDisplayMode();
 
 		return rkit::ResultCode::kOK;
+	}
+
+
+	rkit::Result GraphicsSubsystem::BeginFrame()
+	{
+		return rkit::ResultCode::kNotYetImplemented;
+	}
+
+	rkit::Result GraphicsSubsystem::EndFrame()
+	{
+		return rkit::ResultCode::kNotYetImplemented;
 	}
 
 	rkit::render::IRenderDevice *GraphicsSubsystem::GetDevice() const

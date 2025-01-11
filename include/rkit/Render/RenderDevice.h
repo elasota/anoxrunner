@@ -16,6 +16,9 @@ namespace rkit
 
 	template<class T>
 	struct ISpan;
+
+	template<class T, class TUserdata>
+	class CallbackSpan;
 }
 
 namespace rkit::data
@@ -25,6 +28,7 @@ namespace rkit::data
 
 namespace rkit::render
 {
+	struct IBaseCommandQueue;
 	struct ICopyCommandQueue;
 	struct IComputeCommandQueue;
 	struct IGraphicsCommandQueue;
@@ -40,10 +44,10 @@ namespace rkit::render
 	{
 		virtual ~IRenderDevice() {}
 
-		virtual ICopyCommandQueue *GetCopyQueue(size_t index) const = 0;
-		virtual IComputeCommandQueue *GetComputeQueue(size_t index) const = 0;
-		virtual IGraphicsCommandQueue *GetGraphicsQueue(size_t index) const = 0;
-		virtual IGraphicsComputeCommandQueue *GetGraphicsComputeQueue(size_t index) const = 0;
+		virtual CallbackSpan<ICopyCommandQueue *, const void *> GetCopyQueues() const = 0;
+		virtual CallbackSpan<IComputeCommandQueue *, const void *> GetComputeQueues() const = 0;
+		virtual CallbackSpan<IGraphicsCommandQueue *, const void *> GetGraphicsQueues() const = 0;
+		virtual CallbackSpan<IGraphicsComputeCommandQueue *, const void *> GetGraphicsComputeQueues() const = 0;
 
 		virtual Result CreateCPUWaitableFence(UniquePtr<ICPUWaitableFence> &outFence) = 0;
 
@@ -52,6 +56,6 @@ namespace rkit::render
 		virtual Result CreatePipelineLibraryLoader(UniquePtr<IPipelineLibraryLoader> &outLoader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
 			UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart) = 0;
 
-		virtual Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, IDisplay &display, uint8_t numBackBuffers, RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, const ISpan<CommandQueueType> &accessibleCommandQueues) = 0;
+		virtual Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, IDisplay &display, uint8_t numBackBuffers, RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) = 0;
 	};
 }

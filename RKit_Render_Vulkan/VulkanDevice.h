@@ -40,6 +40,9 @@ namespace rkit::render::vulkan
 
 	class RenderVulkanPhysicalDevice;
 
+	template<class T>
+	struct IResourcePool;
+
 	class VulkanDeviceBase : public IRenderDevice
 	{
 	public:
@@ -62,6 +65,8 @@ namespace rkit::render::vulkan
 		virtual const VulkanDevicePlatformAPI &GetDevicePlatformAPI() const = 0;
 
 		virtual const RenderVulkanPhysicalDevice &GetPhysDevice() const = 0;
+
+		virtual IResourcePool<VkSemaphore> &GetBinarySemaPool() const = 0;
 
 		static Result CreateDevice(UniquePtr<IRenderDevice> &outDevice,
 			const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki,

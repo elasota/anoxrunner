@@ -2,23 +2,25 @@
 
 #include "VulkanAPI.h"
 #include "VulkanAPILoader.h"
+#include "VulkanCheck.h"
 #include "VulkanPipelineLibraryLoader.h"
 #include "VulkanPlatformAPI.h"
 #include "VulkanSwapChain.h"
 #include "VulkanQueueProxy.h"
 #include "VulkanPlatformAPI.h"
-
 #include "VulkanPhysDevice.h"
 #include "VulkanPlatformSpecific.h"
+#include "VulkanResourcePool.h"
 
 #include "rkit/Render/DeviceCaps.h"
 
 #include "rkit/Core/SystemDriver.h"
-#include "rkit/Core/RefCounted.h"
-#include "rkit/Core/Result.h"
 #include "rkit/Core/Mutex.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/Optional.h"
+#include "rkit/Core/RefCounted.h"
+#include "rkit/Core/Result.h"
+#include "rkit/Core/Span.h"
 #include "rkit/Core/UniquePtr.h"
 #include "rkit/Core/Vector.h"
 
@@ -30,10 +32,10 @@ namespace rkit::render::vulkan
 		VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts, UniquePtr<IMutex> &&queueMutex);
 		~VulkanDevice();
 
-		ICopyCommandQueue *GetCopyQueue(size_t index) const override;
-		IComputeCommandQueue *GetComputeQueue(size_t index) const override;
-		IGraphicsCommandQueue *GetGraphicsQueue(size_t index) const override;
-		IGraphicsComputeCommandQueue *GetGraphicsComputeQueue(size_t index) const override;
+		CallbackSpan<ICopyCommandQueue *, const void *> GetCopyQueues() const override;
+		CallbackSpan<IComputeCommandQueue *, const void *> GetComputeQueues() const override;
+		CallbackSpan<IGraphicsCommandQueue *, const void *> GetGraphicsQueues() const override;
+		CallbackSpan<IGraphicsComputeCommandQueue *, const void *> GetGraphicsComputeQueues() const override;
 
 		VkDevice GetDevice() const override;
 		VkInstance GetInstance() const override;
@@ -56,9 +58,12 @@ namespace rkit::render::vulkan
 
 		const RenderVulkanPhysicalDevice &GetPhysDevice() const override;
 
-		Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, IDisplay &display, uint8_t numBackBuffers, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, const ISpan<CommandQueueType> &accessibleQueueTypes) override;
+		IResourcePool<VkSemaphore> &GetBinarySemaPool() const override;
+
+		Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, IDisplay &display, uint8_t numBackBuffers, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) override;
 
 		Result LoadDeviceAPI();
+		Result CreatePools();
 		Result ResolveQueues(CommandQueueType queueType, size_t firstQueueID, uint32_t queueFamily, uint32_t numQueues);
 
 		IMutex &GetQueueMutex();
@@ -76,6 +81,30 @@ namespace rkit::render::vulkan
 			const VulkanInstanceAPI &m_vki;
 			const VulkanDevice &m_device;
 		};
+
+		class SemaFactory final : public IPooledResourceFactory<VkSemaphore>
+		{
+		public:
+			explicit SemaFactory(VulkanDevice &device);
+
+			void EmptyInitResource(VkSemaphore &outResource) const override;
+			void DestructResource(VkSemaphore &resource) const override;
+
+			Result InitResource(VkSemaphore &resource) const override;
+			void RetireResource(VkSemaphore &resource) const override;
+			Result UnretireResource(VkSemaphore &resource) const override;
+
+		private:
+			VulkanDevice &m_device;
+		};
+
+		typedef const void *ConstVoidPtr_t;
+
+		template<class T>
+		static CallbackSpan<T *, const void *> CreateCallbackSpanForQueueFamily(const Vector<UniquePtr<QueueProxy>> &queueFamily);
+
+		template<class T>
+		static T *QueueFamilySpanGetElement(const ConstVoidPtr_t &queueFamilyPtr, size_t index);
 
 		static const size_t kNumQueues = static_cast<size_t>(CommandQueueType::kCount);
 
@@ -99,6 +128,9 @@ namespace rkit::render::vulkan
 		Vector<StringView> m_deviceExtensions;
 
 		UniquePtr<IMutex> m_queueMutex;
+
+		SemaFactory m_semaFactory;
+		UniquePtr<IResourcePool<VkSemaphore>> m_semaPool;
 	};
 
 	VulkanDevice::FunctionResolver::FunctionResolver(const VulkanInstanceAPI &vki, const VulkanDevice &device)
@@ -130,6 +162,41 @@ namespace rkit::render::vulkan
 		return false;
 	}
 
+	VulkanDevice::SemaFactory::SemaFactory(VulkanDevice &device)
+		: m_device(device)
+	{
+	}
+
+	void VulkanDevice::SemaFactory::EmptyInitResource(VkSemaphore &outResource) const
+	{
+		outResource = VK_NULL_HANDLE;
+	}
+
+	void VulkanDevice::SemaFactory::DestructResource(VkSemaphore &resource) const
+	{
+		if (resource != VK_NULL_HANDLE)
+			m_device.GetDeviceAPI().vkDestroySemaphore(m_device.GetDevice(), resource, m_device.GetAllocCallbacks());
+	}
+
+	Result VulkanDevice::SemaFactory::InitResource(VkSemaphore &resource) const
+	{
+		VkSemaphoreCreateInfo semaCreateInfo = {};
+		semaCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateSemaphore(m_device.GetDevice(), &semaCreateInfo, m_device.GetAllocCallbacks(), &resource));
+
+		return ResultCode::kOK;
+	}
+
+	void VulkanDevice::SemaFactory::RetireResource(VkSemaphore &resource) const
+	{
+	}
+
+	Result VulkanDevice::SemaFactory::UnretireResource(VkSemaphore &resource) const
+	{
+		return ResultCode::kOK;
+	}
+
 	VulkanDevice::VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts, UniquePtr<IMutex> &&queueMutex)
 		: m_vkg(vkg)
 		, m_vki(vki)
@@ -142,6 +209,7 @@ namespace rkit::render::vulkan
 		, m_queueMutex(std::move(queueMutex))
 		, m_caps(caps)
 		, m_physDevice(physDevice)
+		, m_semaFactory(*this)
 	{
 	}
 
@@ -163,30 +231,43 @@ namespace rkit::render::vulkan
 			VkQueue queue = VK_NULL_HANDLE;
 			m_vkd.vkGetDeviceQueue(m_device, queueFamily, i, &queue);
 
-			RKIT_CHECK(New<QueueProxy>(proxies[i], alloc, *this, queue, m_vkd, firstQueueID + i));
+			RKIT_CHECK(New<QueueProxy>(proxies[i], alloc, *this, queue, queueFamily, m_vkd, static_cast<TimelineID_t>(firstQueueID + i)));
 		}
 
 		return ResultCode::kOK;
 	}
 
-	ICopyCommandQueue *VulkanDevice::GetCopyQueue(size_t index) const
+	template<class T>
+	CallbackSpan<T *, const void *> VulkanDevice::CreateCallbackSpanForQueueFamily(const Vector<UniquePtr<QueueProxy>> &queueFamily)
 	{
-		return m_queueFamilies[static_cast<size_t>(CommandQueueType::kCopy)][index].Get();
+		return CallbackSpan<T *, const void *>(QueueFamilySpanGetElement<T>, &queueFamily, queueFamily.Count());
 	}
 
-	IComputeCommandQueue *VulkanDevice::GetComputeQueue(size_t index) const
+	template<class T>
+	T *VulkanDevice::QueueFamilySpanGetElement(const ConstVoidPtr_t &queueFamilyPtr, size_t index)
 	{
-		return m_queueFamilies[static_cast<size_t>(CommandQueueType::kAsyncCompute)][index].Get();
+		const Vector<UniquePtr<QueueProxy>> *queueFamily = static_cast<const Vector<UniquePtr<QueueProxy>> *>(queueFamilyPtr);
+		return (*queueFamily)[index].Get();
 	}
 
-	IGraphicsCommandQueue *VulkanDevice::GetGraphicsQueue(size_t index) const
+	CallbackSpan<ICopyCommandQueue *, const void *> VulkanDevice::GetCopyQueues() const
 	{
-		return m_queueFamilies[static_cast<size_t>(CommandQueueType::kGraphics)][index].Get();
+		return CreateCallbackSpanForQueueFamily<ICopyCommandQueue>(m_queueFamilies[static_cast<size_t>(CommandQueueType::kCopy)]);
 	}
 
-	IGraphicsComputeCommandQueue *VulkanDevice::GetGraphicsComputeQueue(size_t index) const
+	CallbackSpan<IComputeCommandQueue *, const void *> VulkanDevice::GetComputeQueues() const
 	{
-		return m_queueFamilies[static_cast<size_t>(CommandQueueType::kGraphicsCompute)][index].Get();
+		return CreateCallbackSpanForQueueFamily<IComputeCommandQueue>(m_queueFamilies[static_cast<size_t>(CommandQueueType::kAsyncCompute)]);
+	}
+
+	CallbackSpan<IGraphicsCommandQueue *, const void *> VulkanDevice::GetGraphicsQueues() const
+	{
+		return CreateCallbackSpanForQueueFamily<IGraphicsCommandQueue>(m_queueFamilies[static_cast<size_t>(CommandQueueType::kGraphics)]);
+	}
+
+	CallbackSpan<IGraphicsComputeCommandQueue *, const void *> VulkanDevice::GetGraphicsComputeQueues() const
+	{
+		return CreateCallbackSpanForQueueFamily<IGraphicsComputeCommandQueue>(m_queueFamilies[static_cast<size_t>(CommandQueueType::kGraphicsCompute)]);
 	}
 
 	VkDevice VulkanDevice::GetDevice() const
@@ -263,24 +344,19 @@ namespace rkit::render::vulkan
 		return *m_physDevice;
 	}
 
-	Result VulkanDevice::CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, IDisplay &display, uint8_t numBackBuffers, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, const ISpan<CommandQueueType> &accessibleQueueTypes)
+	IResourcePool<VkSemaphore> &VulkanDevice::GetBinarySemaPool() const
 	{
-		Vector<uint32_t> queueFamilies;
+		return *m_semaPool;
+	}
 
-		for (CommandQueueType commandQueueType : accessibleQueueTypes)
-		{
-			uint32_t queueFamily = 0;
-			uint32_t numQueues = 0;
+	Result VulkanDevice::CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, IDisplay &display, uint8_t numBackBuffers, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue)
+	{
+		QueueProxy *queue = static_cast<QueueProxy *>(commandQueue.ToInternalCommandQueue());
 
-			m_physDevice->GetQueueTypeInfo(commandQueueType, queueFamily, numQueues);
-			if (numQueues > 0)
-			{
-				RKIT_CHECK(queueFamilies.Append(queueFamily));
-			}
-		}
+		uint32_t queueFamily = queue->GetQueueFamily();
 
 		UniquePtr<VulkanSwapChainBase> vkSwapChain;
-		RKIT_CHECK(VulkanSwapChainBase::Create(vkSwapChain, *this, display, numBackBuffers, fmt, writeBehavior, queueFamilies.ToSpan()));
+		RKIT_CHECK(VulkanSwapChainBase::Create(vkSwapChain, *this, display, numBackBuffers, fmt, writeBehavior, *queue));
 
 		outSwapChain = std::move(vkSwapChain);
 
@@ -295,6 +371,13 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
+	Result VulkanDevice::CreatePools()
+	{
+		RKIT_CHECK(CreateResourcePool<VkSemaphore>(m_semaPool, m_semaFactory, true));
+
+		return ResultCode::kOK;
+	}
+
 	Result VulkanDeviceBase::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const QueueFamilySpec(&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts)
 	{
 		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
@@ -304,8 +387,9 @@ namespace rkit::render::vulkan
 
 		UniquePtr<VulkanDevice> vkDevice;
 		RKIT_CHECK(New<VulkanDevice>(vkDevice, vkg, vki, vkg_p, vki_p, inst, device, allocCallbacks, caps, physDevice, std::move(enabledExts), std::move(queueMutex)));
-
+		
 		RKIT_CHECK(vkDevice->LoadDeviceAPI());
+		RKIT_CHECK(vkDevice->CreatePools());
 
 		size_t firstQueueID = 0;
 		for (size_t i = 0; i < static_cast<size_t>(CommandQueueType::kCount); i++)

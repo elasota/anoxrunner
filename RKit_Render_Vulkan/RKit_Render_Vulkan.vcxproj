@@ -148,6 +148,7 @@
     <ClCompile Include="VulkanCommandList.cpp" />
     <ClCompile Include="VulkanDevice.cpp" />
     <ClCompile Include="VulkanPhysDevice.cpp" />
+    <ClCompile Include="VulkanResourcePool.cpp" />
     <ClCompile Include="VulkanSwapChain.cpp" />
     <ClCompile Include="VulkanUtils.cpp" />
   </ItemGroup>
@@ -168,6 +169,7 @@
     <ClInclude Include="VulkanPlatformAPI.h" />
     <ClInclude Include="VulkanPlatformSpecific.h" />
     <ClInclude Include="VulkanQueueProxy.h" />
+    <ClInclude Include="VulkanResourcePool.h" />
     <ClInclude Include="VulkanSwapChain.h" />
     <ClInclude Include="VulkanSync.h" />
     <ClInclude Include="VulkanUtils.h" />

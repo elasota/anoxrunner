@@ -12,6 +12,7 @@ namespace rkit
 
 namespace rkit::render
 {
+	struct IBaseCommandQueue;
 	struct IRenderDevice;
 	struct ISwapChain;
 	struct IDisplay;
@@ -27,6 +28,6 @@ namespace anox
 		virtual rkit::render::IDisplay &GetDisplay() = 0;
 		virtual rkit::render::ISwapChain *GetSwapChain() = 0;
 
-		static rkit::Result Create(rkit::UniquePtr<RenderedWindowBase> &outWindow, rkit::UniquePtr<rkit::render::IDisplay> &&display, rkit::render::IRenderDevice *device, uint8_t numBackBuffers);
+		static rkit::Result Create(rkit::UniquePtr<RenderedWindowBase> &outWindow, rkit::UniquePtr<rkit::render::IDisplay> &&display, rkit::render::IRenderDevice *device, rkit::render::IBaseCommandQueue *swapChainQueue, uint8_t numBackBuffers);
 	};
 }

@@ -15,7 +15,7 @@ namespace anox
 		RenderedWindow(rkit::UniquePtr<rkit::render::IDisplay> &&display, rkit::render::IRenderDevice *device);
 		~RenderedWindow();
 
-		rkit::Result Initialize(uint8_t numBackBuffers);
+		rkit::Result Initialize(uint8_t numBackBuffers, rkit::render::IBaseCommandQueue *swapChainQueue);
 
 		rkit::render::IDisplay &GetDisplay() override;
 		rkit::render::ISwapChain *GetSwapChain() override;
@@ -38,18 +38,14 @@ namespace anox
 		m_display.Reset();
 	}
 
-	rkit::Result RenderedWindow::Initialize(uint8_t numBackBuffers)
+	rkit::Result RenderedWindow::Initialize(uint8_t numBackBuffers, rkit::render::IBaseCommandQueue *swapChainQueue)
 	{
 		if (m_device != nullptr)
 		{
 			if (numBackBuffers < 1)
 				return rkit::ResultCode::kInternalError;
 
-			rkit::Vector<rkit::render::CommandQueueType> accessibleQueueTypes;
-			RKIT_CHECK(accessibleQueueTypes.Append(rkit::render::CommandQueueType::kGraphics));
-			RKIT_CHECK(accessibleQueueTypes.Append(rkit::render::CommandQueueType::kGraphicsCompute));
-
-			RKIT_CHECK(m_device->CreateSwapChain(m_swapChain, *m_display, numBackBuffers, rkit::render::RenderTargetFormat::RGBA_UNorm8, rkit::render::SwapChainWriteBehavior::RenderTarget, accessibleQueueTypes.ToSpan().ToValueISpan()));
+			RKIT_CHECK(m_device->CreateSwapChain(m_swapChain, *m_display, numBackBuffers, rkit::render::RenderTargetFormat::RGBA_UNorm8, rkit::render::SwapChainWriteBehavior::RenderTarget, *swapChainQueue));
 		}
 
 		return rkit::ResultCode::kOK;
@@ -65,12 +61,12 @@ namespace anox
 		return m_swapChain.Get();
 	}
 
-	rkit::Result RenderedWindowBase::Create(rkit::UniquePtr<RenderedWindowBase> &outWindow, rkit::UniquePtr<rkit::render::IDisplay> &&display, rkit::render::IRenderDevice *device, uint8_t numBackBuffers)
+	rkit::Result RenderedWindowBase::Create(rkit::UniquePtr<RenderedWindowBase> &outWindow, rkit::UniquePtr<rkit::render::IDisplay> &&display, rkit::render::IRenderDevice *device, rkit::render::IBaseCommandQueue *swapChainQueue, uint8_t numBackBuffers)
 	{
 		rkit::UniquePtr<RenderedWindow> window;
 		RKIT_CHECK(rkit::New<RenderedWindow>(window, std::move(display), device));
 
-		RKIT_CHECK(window->Initialize(numBackBuffers));
+		RKIT_CHECK(window->Initialize(numBackBuffers, swapChainQueue));
 
 		outWindow = std::move(window);
 
