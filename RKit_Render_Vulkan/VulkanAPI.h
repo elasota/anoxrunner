@@ -30,6 +30,7 @@ namespace rkit::render::vulkan
 		RKIT_VK_API_EXT(vkDestroyDebugUtilsMessengerEXT, VK_EXT_debug_utils);
 		RKIT_VK_API_EXT(vkDestroySurfaceKHR, VK_KHR_surface);
 		RKIT_VK_API_EXT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR, VK_KHR_surface);
+		RKIT_VK_API_EXT(vkGetPhysicalDeviceSurfaceSupportKHR, VK_KHR_surface);
 		RKIT_VK_API(vkDestroyInstance);	// This must be last!
 		RKIT_VK_API_END;
 	};
@@ -37,6 +38,7 @@ namespace rkit::render::vulkan
 	struct VulkanDeviceAPI : public IVulkanAPI
 	{
 		RKIT_VK_API_START(VulkanDeviceAPI);
+		RKIT_VK_API(vkQueueSubmit);
 		RKIT_VK_API(vkGetDeviceQueue);
 		RKIT_VK_API(vkCreateSemaphore);
 		RKIT_VK_API(vkDestroySemaphore);
@@ -60,6 +62,14 @@ namespace rkit::render::vulkan
 		RKIT_VK_API(vkMergePipelineCaches);
 		RKIT_VK_API(vkDestroyImage);
 		RKIT_VK_API(vkDeviceWaitIdle);
+		RKIT_VK_API(vkWaitForFences);
+		RKIT_VK_API(vkResetFences);
+		RKIT_VK_API(vkAllocateCommandBuffers);
+		RKIT_VK_API(vkFreeCommandBuffers);
+		RKIT_VK_API(vkResetCommandBuffer);
+		RKIT_VK_API(vkCreateCommandPool);
+		RKIT_VK_API(vkDestroyCommandPool);
+		RKIT_VK_API(vkResetCommandPool);
 		RKIT_VK_API_EXT(vkCreateSwapchainKHR, VK_KHR_swapchain);
 		RKIT_VK_API_EXT(vkDestroySwapchainKHR, VK_KHR_swapchain);
 		RKIT_VK_API_EXT(vkGetSwapchainImagesKHR, VK_KHR_swapchain);

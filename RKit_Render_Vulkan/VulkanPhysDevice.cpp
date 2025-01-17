@@ -47,6 +47,10 @@ namespace rkit::render::vulkan
 				qfi.m_numQueues = qfProps.queueCount;
 				qfi.m_queueFamilyIndex = i;
 			}
+			else
+			{
+				RKIT_CHECK(m_unknownQueueFamilies.Append(i));
+			}
 		}
 
 		return ResultCode::kOK;

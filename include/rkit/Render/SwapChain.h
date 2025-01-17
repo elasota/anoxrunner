@@ -10,7 +10,15 @@ namespace rkit
 
 namespace rkit::render
 {
+	struct IBaseCommandQueue;
 	struct ISwapChainFrame;
+
+	struct ISwapChainPrototype
+	{
+		virtual ~ISwapChainPrototype() {}
+
+		virtual Result CheckQueueCompatibility(bool &outIsCompatible, const IBaseCommandQueue &commandQueue) const = 0;
+	};
 
 	struct ISwapChain
 	{

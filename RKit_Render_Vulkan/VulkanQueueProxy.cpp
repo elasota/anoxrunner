@@ -1,30 +1,103 @@
+#include "VulkanQueueProxy.h"
+
+#include "rkit/Core/MutexLock.h"
 #include "rkit/Core/Result.h"
 #include "rkit/Core/Span.h"
 
 #include "VulkanAPI.h"
+#include "VulkanCheck.h"
 #include "VulkanDevice.h"
 #include "VulkanCommandList.h"
-#include "VulkanQueueProxy.h"
+#include "VulkanFence.h"
+#include "VulkanUtils.h"
 
 #include <cstring>
 
 namespace rkit::render::vulkan
 {
-	QueueProxy::QueueProxy(IMallocDriver *alloc, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI, TimelineID_t timelineID)
+	class VulkanQueueProxy final : public VulkanQueueProxyBase
+	{
+	public:
+		VulkanQueueProxy(IMallocDriver *alloc, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI);
+		~VulkanQueueProxy();
+
+		Result QueueCopy(const Span<ICopyCommandList *> &cmdLists) override;
+		Result QueueCompute(const Span<IComputeCommandList *> &cmdLists) override;
+		Result QueueGraphics(const Span<IGraphicsCommandList *> &cmdLists) override;
+		Result QueueGraphicsCompute(const Span<IGraphicsComputeCommandList *> &cmdLists) override;
+
+		Result QueueSignalBinaryGPUWaitable(IBinaryGPUWaitableFence &fence) override;
+		Result QueueSignalBinaryCPUWaitable(IBinaryCPUWaitableFence &fence) override;
+		Result QueueWaitForBinaryGPUWaitable(IBinaryGPUWaitableFence &fence, const EnumMask<PipelineStage> &stagesToWaitFor) override;
+
+		IInternalCommandQueue *ToInternalCommandQueue() override;
+
+		Result Flush() override;
+		uint32_t GetQueueFamily() const override;
+
+		Result AddBinarySemaSignal(VkSemaphore sema) override;
+		Result AddBinarySemaWait(VkSemaphore sema, VkPipelineStageFlags stageFlags) override;
+		Result AddCommandList(VkCommandBuffer commandList) override;
+
+		VkQueue GetVkQueue() const override;
+
+		Result Initialize();
+
+	private:
+		enum class QueueAction
+		{
+			NonBatchable,
+			CommandList,
+			BinarySemaSignal,
+			BinarySemaWait,
+		};
+
+		static const size_t kMaxCommandLists = 128;
+		static const size_t kMaxSubmitInfos = 64;
+		static const size_t kMaxWaitSemas = 64;
+		static const size_t kMaxSignalSemas = 64;
+
+		Result QueueBase(IBaseCommandList &cmdList);
+
+		Result FlushWithFence(VkFence fence);
+
+		StaticArray<VkCommandBuffer, kMaxCommandLists> m_commandLists;
+
+		StaticArray<VkSemaphore, kMaxSignalSemas> m_signalSemas;
+
+		StaticArray<VkSemaphore, kMaxWaitSemas> m_waitSemas;
+		StaticArray<VkPipelineStageFlags, kMaxWaitSemas> m_waitSemaStageMasks;
+
+		StaticArray<VkSubmitInfo, kMaxSubmitInfos> m_submitInfos;
+
+		size_t m_numCommandLists = 0;
+		size_t m_numSubmitInfos = 0;
+		size_t m_numWaitSemas = 0;
+		size_t m_numSignalSemas = 0;
+
+		QueueAction m_lastQueueAction = QueueAction::NonBatchable;
+
+		IMallocDriver *m_alloc;
+		VulkanDeviceBase &m_device;
+		VkQueue m_queue;
+		uint32_t m_queueFamily;
+		const VulkanDeviceAPI &m_vkd;
+	};
+
+	VulkanQueueProxy::VulkanQueueProxy(IMallocDriver *alloc, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI)
 		: m_alloc(alloc)
 		, m_device(device)
 		, m_queue(queue)
 		, m_queueFamily(queueFamily)
 		, m_vkd(deviceAPI)
-		, m_timelineID(timelineID)
 	{
 	}
 
-	QueueProxy::~QueueProxy()
+	VulkanQueueProxy::~VulkanQueueProxy()
 	{
 	}
 
-	Result QueueProxy::QueueCopy(const Span<ICopyCommandList *> &cmdLists)
+	Result VulkanQueueProxy::QueueCopy(const Span<ICopyCommandList *> &cmdLists)
 	{
 		for (ICopyCommandList *cmdList : cmdLists)
 		{
@@ -34,7 +107,7 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result QueueProxy::QueueCompute(const Span<IComputeCommandList *> &cmdLists)
+	Result VulkanQueueProxy::QueueCompute(const Span<IComputeCommandList *> &cmdLists)
 	{
 		for (IComputeCommandList *cmdList : cmdLists)
 		{
@@ -44,7 +117,7 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result QueueProxy::QueueGraphics(const Span<IGraphicsCommandList *> &cmdLists)
+	Result VulkanQueueProxy::QueueGraphics(const Span<IGraphicsCommandList *> &cmdLists)
 	{
 		for (IGraphicsCommandList *cmdList : cmdLists)
 		{
@@ -54,7 +127,7 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result QueueProxy::QueueGraphicsCompute(const Span<IGraphicsComputeCommandList *> &cmdLists)
+	Result VulkanQueueProxy::QueueGraphicsCompute(const Span<IGraphicsComputeCommandList *> &cmdLists)
 	{
 		for (IGraphicsComputeCommandList *cmdList : cmdLists)
 		{
@@ -64,53 +137,260 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result QueueProxy::QueueSignalGPUWaitable(GPUWaitableFence_t &outFence)
+	Result VulkanQueueProxy::QueueSignalBinaryGPUWaitable(IBinaryGPUWaitableFence &fence)
 	{
-		return ResultCode::kNotYetImplemented;
+		return AddBinarySemaSignal(static_cast<VulkanBinaryGPUWaitableFence &>(fence).GetSemaphore());
 	}
 
-	Result QueueProxy::QueueSignalCPUWaitable(CPUWaitableFence_t &outFence)
+	Result VulkanQueueProxy::QueueSignalBinaryCPUWaitable(IBinaryCPUWaitableFence &fence)
 	{
-		return ResultCode::kNotYetImplemented;
+		return FlushWithFence(static_cast<VulkanBinaryCPUWaitableFence &>(fence).GetFence());
 	}
 
-	Result QueueProxy::QueueWaitFor(const GPUWaitableFence_t &gpuFence)
+	Result VulkanQueueProxy::QueueWaitForBinaryGPUWaitable(IBinaryGPUWaitableFence &fence, const EnumMask<PipelineStage> &stagesToWaitFor)
 	{
-		return ResultCode::kNotYetImplemented;
+		VkPipelineStageFlags stageFlags = 0;
+		RKIT_CHECK(VulkanUtils::ConvertPipelineStageBits(stageFlags, stagesToWaitFor));
+		return AddBinarySemaWait(static_cast<VulkanBinaryGPUWaitableFence &>(fence).GetSemaphore(), stageFlags);
 	}
 
-	IInternalCommandQueue *QueueProxy::ToInternalCommandQueue()
+	IInternalCommandQueue *VulkanQueueProxy::ToInternalCommandQueue()
 	{
 		return this;
 	}
 
-	Result QueueProxy::AddBinarySemaSignal(VkSemaphore sema, VkPipelineStageFlagBits stageFlags)
+	Result VulkanQueueProxy::AddBinarySemaSignal(VkSemaphore sema)
 	{
-		return ResultCode::kNotYetImplemented;
+		if (m_numSignalSemas == kMaxSignalSemas)
+		{
+			RKIT_CHECK(Flush());
+		}
+
+		switch (m_lastQueueAction)
+		{
+		case QueueAction::NonBatchable:
+			{
+				if (m_numSubmitInfos == kMaxSubmitInfos)
+				{
+					RKIT_CHECK(Flush());
+				}
+
+				VkSemaphore *pSemaphore = &m_signalSemas[m_numSignalSemas++];
+
+				VkSubmitInfo &submitInfo = m_submitInfos[m_numSubmitInfos++];
+				submitInfo = {};
+				submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+				submitInfo.waitSemaphoreCount = 0;
+				submitInfo.pWaitSemaphores = nullptr;
+				submitInfo.signalSemaphoreCount = 1;
+				submitInfo.pSignalSemaphores = pSemaphore;
+				submitInfo.pWaitDstStageMask = nullptr;
+				submitInfo.commandBufferCount = 0;
+				submitInfo.pCommandBuffers = 0;
+
+				*pSemaphore = sema;
+				m_lastQueueAction = QueueAction::BinarySemaSignal;
+			}
+			return ResultCode::kOK;
+		case QueueAction::CommandList:
+		case QueueAction::BinarySemaSignal:
+		case QueueAction::BinarySemaWait:
+			{
+				VkSubmitInfo &submitInfo = m_submitInfos[m_numSubmitInfos - 1];
+
+				VkSemaphore *pSemaphore = &m_signalSemas[m_numSignalSemas++];
+
+				if (submitInfo.signalSemaphoreCount == 0)
+					submitInfo.pSignalSemaphores = pSemaphore;
+
+				submitInfo.signalSemaphoreCount++;
+				*pSemaphore = sema;
+				m_lastQueueAction = QueueAction::BinarySemaSignal;
+			}
+			return ResultCode::kOK;
+		default:
+			return ResultCode::kInternalError;
+		}
 	}
 
-	Result QueueProxy::AddBinarySemaWait(VkSemaphore sema, VkPipelineStageFlagBits stageFlags)
+	Result VulkanQueueProxy::AddBinarySemaWait(VkSemaphore sema, VkPipelineStageFlags stageFlags)
 	{
-		return ResultCode::kNotYetImplemented;
+		if (m_numWaitSemas == kMaxWaitSemas)
+		{
+			RKIT_CHECK(Flush());
+		}
+
+		switch (m_lastQueueAction)
+		{
+		case QueueAction::NonBatchable:
+		case QueueAction::CommandList:
+		case QueueAction::BinarySemaSignal:
+			{
+				if (m_numSubmitInfos == kMaxSubmitInfos)
+				{
+					RKIT_CHECK(Flush());
+				}
+
+				VkSemaphore *pSemaphore = &m_waitSemas[m_numWaitSemas];
+				VkPipelineStageFlags *pStageFlags = &m_waitSemaStageMasks[m_numWaitSemas];
+
+				m_numWaitSemas++;
+
+				VkSubmitInfo &submitInfo = m_submitInfos[m_numSubmitInfos++];
+				submitInfo = {};
+				submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+				submitInfo.waitSemaphoreCount = 1;
+				submitInfo.pWaitSemaphores = pSemaphore;
+				submitInfo.pWaitDstStageMask = pStageFlags;
+				submitInfo.signalSemaphoreCount = 0;
+				submitInfo.pSignalSemaphores = nullptr;
+				submitInfo.commandBufferCount = 0;
+				submitInfo.pCommandBuffers = 0;
+
+				*pSemaphore = sema;
+				*pStageFlags = stageFlags;
+
+				m_lastQueueAction = QueueAction::BinarySemaWait;
+			}
+			return ResultCode::kOK;
+		case QueueAction::BinarySemaWait:
+			{
+				VkSubmitInfo &submitInfo = m_submitInfos[m_numSubmitInfos - 1];
+
+				VkSemaphore *pSemaphore = &m_waitSemas[m_numWaitSemas];
+				VkPipelineStageFlags *pStageFlags = &m_waitSemaStageMasks[m_numWaitSemas];
+
+				m_numWaitSemas++;
+
+				submitInfo.waitSemaphoreCount++;
+
+				*pSemaphore = sema;
+				*pStageFlags = stageFlags;
+			}
+			return ResultCode::kOK;
+		default:
+			return ResultCode::kInternalError;
+		}
 	}
 
-	Result QueueProxy::Flush()
+	Result VulkanQueueProxy::AddCommandList(VkCommandBuffer commandList)
 	{
-		return ResultCode::kNotYetImplemented;
+		if (m_numCommandLists == kMaxCommandLists)
+		{
+			RKIT_CHECK(Flush());
+		}
+
+		switch (m_lastQueueAction)
+		{
+		case QueueAction::NonBatchable:
+		case QueueAction::BinarySemaSignal:
+			{
+				if (m_numSubmitInfos == kMaxSubmitInfos)
+				{
+					RKIT_CHECK(Flush());
+				}
+
+				VkCommandBuffer *pCommandList = &m_commandLists[m_numCommandLists++];
+
+				VkSubmitInfo &submitInfo = m_submitInfos[m_numSubmitInfos++];
+				submitInfo = {};
+				submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+				submitInfo.waitSemaphoreCount = 0;
+				submitInfo.pWaitSemaphores = nullptr;
+				submitInfo.signalSemaphoreCount = 0;
+				submitInfo.pSignalSemaphores = nullptr;
+				submitInfo.pWaitDstStageMask = nullptr;
+				submitInfo.commandBufferCount = 0;
+				submitInfo.pCommandBuffers = 0;
+
+				*pCommandList = commandList;
+				m_lastQueueAction = QueueAction::CommandList;
+			}
+			return ResultCode::kOK;
+		case QueueAction::CommandList:
+		case QueueAction::BinarySemaWait:
+			{
+				VkSubmitInfo &submitInfo = m_submitInfos[m_numSubmitInfos - 1];
+
+				VkCommandBuffer *pCommandList = &m_commandLists[m_numCommandLists++];
+
+				if (submitInfo.commandBufferCount == 0)
+					submitInfo.pCommandBuffers = pCommandList;
+
+				submitInfo.commandBufferCount++;
+				*pCommandList = commandList;
+
+				m_lastQueueAction = QueueAction::CommandList;
+			}
+			return ResultCode::kOK;
+		default:
+			return ResultCode::kInternalError;
+		}
 	}
 
-	VkQueue QueueProxy::GetVkQueue() const
+	Result VulkanQueueProxy::Flush()
+	{
+		return FlushWithFence(VK_NULL_HANDLE);
+	}
+
+	Result VulkanQueueProxy::FlushWithFence(VkFence fence)
+	{
+		m_lastQueueAction = QueueAction::NonBatchable;
+
+		if (m_numSubmitInfos > 0)
+		{
+			RKIT_VK_CHECK(m_device.GetDeviceAPI().vkQueueSubmit(m_queue, static_cast<uint32_t>(m_numSubmitInfos), &m_submitInfos[0], fence));
+
+			m_numSubmitInfos = 0;
+			m_numSignalSemas = 0;
+			m_numWaitSemas = 0;
+			m_numCommandLists = 0;
+		}
+		else
+		{
+			RKIT_ASSERT(m_numSignalSemas == 0);
+			RKIT_ASSERT(m_numWaitSemas == 0);
+			RKIT_ASSERT(m_numCommandLists == 0);
+
+			if (fence != VK_NULL_HANDLE)
+			{
+				RKIT_VK_CHECK(m_device.GetDeviceAPI().vkQueueSubmit(m_queue, 0, nullptr, fence));
+			}
+		}
+
+		return ResultCode::kOK;
+	}
+
+	VkQueue VulkanQueueProxy::GetVkQueue() const
 	{
 		return m_queue;
 	}
 
-	uint32_t QueueProxy::GetQueueFamily() const
+	uint32_t VulkanQueueProxy::GetQueueFamily() const
 	{
 		return m_queueFamily;
 	}
 
-	Result QueueProxy::QueueBase(IBaseCommandList &cmdList)
+
+	Result VulkanQueueProxy::Initialize()
 	{
-		return ResultCode::kNotYetImplemented;
+		return ResultCode::kOK;
+	}
+
+	Result VulkanQueueProxy::QueueBase(IBaseCommandList &cmdList)
+	{
+		return AddCommandList(static_cast<VulkanCommandListBase *>(cmdList.ToInternalCommandList())->GetCommandBuffer());
+	}
+
+	Result VulkanQueueProxyBase::Create(UniquePtr<VulkanQueueProxyBase> &outQueueProxy, IMallocDriver *alloc, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI)
+	{
+		UniquePtr<VulkanQueueProxy> queueProxy;
+		RKIT_CHECK(New<VulkanQueueProxy>(queueProxy, alloc, device, queue, queueFamily, deviceAPI));
+
+		RKIT_CHECK(queueProxy->Initialize());
+
+		outQueueProxy = std::move(queueProxy);
+
+		return ResultCode::kOK;
 	}
 }

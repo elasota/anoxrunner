@@ -14,6 +14,7 @@
 #include "rkit/Render/SwapChainFrame.h"
 
 #include "rkit/Core/UniquePtr.h"
+#include "rkit/Core/LogDriver.h"
 #include "rkit/Core/Result.h"
 
 namespace rkit::render::vulkan
@@ -50,13 +51,32 @@ namespace rkit::render::vulkan
 		VkImage m_image = VK_NULL_HANDLE;
 	};
 
+	class VulkanSwapChainPrototype final : public VulkanSwapChainPrototypeBase
+	{
+	public:
+		VulkanSwapChainPrototype(VulkanDeviceBase &device, IDisplay &display);
+
+		Result Initialize();
+
+		Result CheckQueueCompatibility(bool &outIsCompatible, const IBaseCommandQueue &commandQueue) const override;
+		IDisplay &GetDisplay() const;
+
+		UniquePtr<IVulkanSurface> TakeSurface();
+
+	private:
+		VulkanDeviceBase &m_device;
+		IDisplay &m_display;
+
+		UniquePtr<IVulkanSurface> m_surface;
+	};
+
 	class VulkanSwapChain final : public VulkanSwapChainBase
 	{
 	public:
-		VulkanSwapChain(VulkanDeviceBase &device, IDisplay &display, uint8_t numBackBuffers, SwapChainWriteBehavior writeBehavior, QueueProxy &queue);
+		VulkanSwapChain(VulkanDeviceBase &device, IDisplay &display, uint8_t numBackBuffers, SwapChainWriteBehavior writeBehavior, VulkanQueueProxyBase &queue);
 		~VulkanSwapChain();
 
-		Result Initialize(render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, uint32_t queueFamily);
+		Result Initialize(VulkanSwapChainPrototype &prototype, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, uint32_t queueFamily);
 
 		void GetExtents(uint32_t &outWidth, uint32_t &outHeight) const override;
 
@@ -81,7 +101,7 @@ namespace rkit::render::vulkan
 		Vector<VulkanSwapChainSubframe> m_swapChainSubframes;
 
 		SwapChainWriteBehavior m_writeBehavior;
-		QueueProxy &m_queue;
+		VulkanQueueProxyBase &m_queue;
 
 		Optional<uint32_t> m_acquiredImage;
 	};
@@ -124,7 +144,42 @@ namespace rkit::render::vulkan
 		return &m_subframes[index];
 	}
 
-	VulkanSwapChain::VulkanSwapChain(VulkanDeviceBase &device, IDisplay &display, uint8_t numBackBuffers, SwapChainWriteBehavior writeBehavior, QueueProxy &queue)
+	VulkanSwapChainPrototype::VulkanSwapChainPrototype(VulkanDeviceBase &device, IDisplay &display)
+		: m_device(device)
+		, m_display(display)
+	{
+	}
+
+	Result VulkanSwapChainPrototype::Initialize()
+	{
+		RKIT_CHECK(platform::CreateSurfaceFromDisplay(m_surface, m_device, m_display));
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanSwapChainPrototype::CheckQueueCompatibility(bool &outIsCompatible, const IBaseCommandQueue &commandQueue) const
+	{
+		const VulkanQueueProxyBase *queueProxy = static_cast<const VulkanQueueProxyBase *>(commandQueue.ToInternalCommandQueue());
+
+		VkBool32 supported = VK_FALSE;
+		RKIT_VK_CHECK(m_device.GetInstanceAPI().vkGetPhysicalDeviceSurfaceSupportKHR(m_device.GetPhysDevice().GetPhysDevice(), queueProxy->GetQueueFamily(), m_surface->GetSurface(), &supported));
+
+		outIsCompatible = (supported != VK_FALSE);
+
+		return ResultCode::kOK;
+	}
+
+	IDisplay &VulkanSwapChainPrototype::GetDisplay() const
+	{
+		return m_display;
+	}
+
+	UniquePtr<IVulkanSurface> VulkanSwapChainPrototype::TakeSurface()
+	{
+		return UniquePtr<IVulkanSurface>(std::move(m_surface));
+	}
+
+	VulkanSwapChain::VulkanSwapChain(VulkanDeviceBase &device, IDisplay &display, uint8_t numBackBuffers, SwapChainWriteBehavior writeBehavior, VulkanQueueProxyBase &queue)
 		: m_device(device)
 		, m_display(display)
 		, m_numBuffers(static_cast<size_t>(numBackBuffers) + 1)
@@ -147,12 +202,23 @@ namespace rkit::render::vulkan
 		m_surface.Reset();
 	}
 
-	Result VulkanSwapChain::Initialize(render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, uint32_t queueFamily)
+	Result VulkanSwapChain::Initialize(VulkanSwapChainPrototype &prototype, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, uint32_t queueFamily)
 	{
 		const VulkanDeviceAPI &vkd = m_device.GetDeviceAPI();
 		const VulkanInstanceAPI &vki = m_device.GetInstanceAPI();
 
-		RKIT_CHECK(platform::CreateSurfaceFromDisplay(m_surface, m_device, m_display));
+		{
+			bool isCompatible = false;
+			RKIT_CHECK(prototype.CheckQueueCompatibility(isCompatible, m_queue));
+
+			if (!isCompatible)
+				return ResultCode::kInternalError;
+		}
+
+		m_surface = prototype.TakeSurface();
+
+		if (!m_surface.IsValid())
+			return ResultCode::kInternalError;
 
 		VkSurfaceCapabilitiesKHR surfaceCaps = {};
 		RKIT_VK_CHECK(vki.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_device.GetPhysDevice().GetPhysDevice(), m_surface->GetSurface(), &surfaceCaps));
@@ -246,8 +312,16 @@ namespace rkit::render::vulkan
 		UniqueResourceRef<VkSemaphore> acquireSema;
 		RKIT_CHECK(acquireSema.AcquireFrom(m_device.GetBinarySemaPool()));
 
+		UniqueResourceRef<VkFence> fence;
+		RKIT_CHECK(fence.AcquireFrom(m_device.GetFencePool()));
+
 		uint32_t imgIndex = 0;
-		RKIT_VK_CHECK(vkd.vkAcquireNextImageKHR(m_device.GetDevice(), m_swapChain, UINT64_MAX, acquireSema.GetResource(), VK_NULL_HANDLE, &imgIndex));
+		RKIT_VK_CHECK(vkd.vkAcquireNextImageKHR(m_device.GetDevice(), m_swapChain, UINT64_MAX, acquireSema.GetResource(), fence.GetResource(), &imgIndex));
+
+		RKIT_VK_CHECK(vkd.vkWaitForFences(m_device.GetDevice(), 1, &fence.GetResource(), VK_TRUE, UINT64_MAX));
+		RKIT_VK_CHECK(vkd.vkResetFences(m_device.GetDevice(), 1, &fence.GetResource()));
+
+		rkit::log::LogInfoFmt("Acquired image %u with sema %p", imgIndex, acquireSema.GetResource());
 
 		VkPipelineStageFlagBits stageFlags = static_cast<VkPipelineStageFlagBits>(0);
 		switch (m_writeBehavior)
@@ -260,6 +334,11 @@ namespace rkit::render::vulkan
 		}
 
 		RKIT_CHECK(m_queue.AddBinarySemaWait(acquireSema.GetResource(), stageFlags));
+
+		VulkanSwapChainFrame &frame = m_swapChainFrames[imgIndex];
+
+		if (true)
+			return ResultCode::kNotYetImplemented;
 
 		*m_swapChainFrames[imgIndex].GetStartedSemaRefPtr() = std::move(acquireSema);
 		m_swapChainFrames[imgIndex].GetDoneSemaRefPtr()->Reset();
@@ -278,23 +357,15 @@ namespace rkit::render::vulkan
 
 		uint32_t imageIndex = m_acquiredImage.Get();
 
-		UniqueResourceRef<VkSemaphore> *finishedSema = m_swapChainFrames[imageIndex].GetDoneSemaRefPtr();
+		VulkanSwapChainFrame &frame = m_swapChainFrames[imageIndex];
+
+		UniqueResourceRef<VkSemaphore> *finishedSema = frame.GetDoneSemaRefPtr();
 		if (!finishedSema->IsValid())
 		{
 			RKIT_CHECK(finishedSema->AcquireFrom(m_device.GetBinarySemaPool()));
 		}
 
-		VkPipelineStageFlagBits stageFlags = static_cast<VkPipelineStageFlagBits>(0);
-		switch (m_writeBehavior)
-		{
-		case SwapChainWriteBehavior::RenderTarget:
-			stageFlags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			break;
-		default:
-			return ResultCode::kNotYetImplemented;
-		}
-
-		RKIT_CHECK(m_queue.AddBinarySemaSignal(finishedSema->GetResource(), stageFlags));
+		RKIT_CHECK(m_queue.AddBinarySemaSignal(finishedSema->GetResource()));
 		RKIT_CHECK(m_queue.Flush());
 
 		VkSemaphore vkFinishedSema = finishedSema->GetResource();
@@ -309,21 +380,40 @@ namespace rkit::render::vulkan
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkQueuePresentKHR(m_queue.GetVkQueue(), &presentInfo));
 
+		if (true)
+			return ResultCode::kNotYetImplemented;
+
+		rkit::log::LogInfoFmt("Presented image %u with sema %p", imageIndex, vkFinishedSema);
+
 		m_acquiredImage.Reset();
 
 		return ResultCode::kOK;
 	}
 
-	Result VulkanSwapChainBase::Create(UniquePtr<VulkanSwapChainBase> &outSwapChain, VulkanDeviceBase &device, IDisplay &display, uint8_t numBackBuffers, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, QueueProxy &queue)
+	Result VulkanSwapChainBase::Create(UniquePtr<VulkanSwapChainBase> &outSwapChain, VulkanDeviceBase &device, VulkanSwapChainPrototypeBase &prototypeBase, uint8_t numBackBuffers, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, VulkanQueueProxyBase &queue)
 	{
+		VulkanSwapChainPrototype &prototype = static_cast<VulkanSwapChainPrototype &>(prototypeBase);
+
 		uint32_t queueFamily = queue.GetQueueFamily();
 
 		UniquePtr<VulkanSwapChain> swapChain;
-		RKIT_CHECK(New<VulkanSwapChain>(swapChain, device, display, numBackBuffers, writeBehavior, queue));
+		RKIT_CHECK(New<VulkanSwapChain>(swapChain, device, prototype.GetDisplay(), numBackBuffers, writeBehavior, queue));
 
-		RKIT_CHECK(swapChain->Initialize(fmt, writeBehavior, queueFamily));
+		RKIT_CHECK(swapChain->Initialize(prototype, fmt, writeBehavior, queueFamily));
 
 		outSwapChain = std::move(swapChain);
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanSwapChainPrototypeBase::Create(UniquePtr<VulkanSwapChainPrototypeBase> &outSwapChainPrototype, VulkanDeviceBase &device, IDisplay &display)
+	{
+		UniquePtr<VulkanSwapChainPrototype> swapChainPrototype;
+		RKIT_CHECK(New<VulkanSwapChainPrototype>(swapChainPrototype, device, display));
+
+		RKIT_CHECK(swapChainPrototype->Initialize());
+
+		outSwapChainPrototype = std::move(swapChainPrototype);
 
 		return ResultCode::kOK;
 	}

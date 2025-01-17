@@ -678,7 +678,7 @@ namespace rkit::render
 		wc.style = CS_HREDRAW | CS_VREDRAW;
 		wc.lpfnWndProc = StaticWndProc;
 		wc.hInstance = hInst;
-		wc.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(IDC_ARROW));
+		wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
 		//wc.hIcon = m_osGlobals->m_hIcon;
 		//wc.hIconSm = m_osGlobals->m_hIconSm;
 		wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW);

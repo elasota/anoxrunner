@@ -151,6 +151,8 @@ namespace rkit
 		ResizableRingBufferHandle();
 		ResizableRingBufferHandle(typename IResizableRingBuffer<TTraits>::InfoBlockChunk *infoBlockChunk, size_t infoBlockIndex);
 
+		void Clear();
+
 	private:
 		typename IResizableRingBuffer<TTraits>::InfoBlockChunk *m_infoBlockChunk;
 		size_t m_infoBlockIndex;
@@ -402,6 +404,10 @@ template<class TTraits>
 void rkit::ResizableRingBuffer<TTraits>::Dispose(const ResizableRingBufferHandle<TTraits> &handle)
 {
 	LinkedInfoBlockChunk *infoBlockChunk = static_cast<LinkedInfoBlockChunk *>(handle.m_infoBlockChunk);
+
+	if (!infoBlockChunk)
+		return;
+
 	size_t infoBlockIndex = handle.m_infoBlockIndex;
 
 	FlaggedInfoBlock *deallocatedInfoBlock = infoBlockChunk->m_infoBlocks + infoBlockIndex;

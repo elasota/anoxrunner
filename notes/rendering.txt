@@ -61,13 +61,22 @@ The two can not be mixed
 
 
 
-Sync behavior in Vulkan 1.0:
-Each queue tracks the following information about itself:
-- Last semaphore submitted
-- Last semaphore queued
+VkImage/D3D12 descriptor handling differences
 
-It tracks the following information about each other queue
-- Last semaphore signaled to that thread
-- Last semaphore waited on from that thread
+Vulkan:
+VkImage
+VkImageView
+VkFramebuffer
 
-When posting a cross-queue wait, 
+
+Descriptor and resource type equivalencies:
+
+ConstantBufferView -> Buffer
+ShaderResourceView ->
+UnorderedAccessView
+Sampler
+RenderTargetView
+DepthStencilView
+
+
+Vulkan needs a "framebuffer" which is a collection of render targets.                             

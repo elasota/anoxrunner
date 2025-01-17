@@ -5,10 +5,11 @@
 #include "rkit/Render/CommandQueue.h"
 #include "rkit/Render/DeviceCaps.h"
 #include "rkit/Render/DisplayManager.h"
+#include "rkit/Render/PipelineLibraryLoader.h"
 #include "rkit/Render/RenderDefs.h"
 #include "rkit/Render/RenderDriver.h"
 #include "rkit/Render/RenderDevice.h"
-#include "rkit/Render/PipelineLibraryLoader.h"
+#include "rkit/Render/SwapChain.h"
 
 #include "rkit/Utilities/ThreadPool.h"
 
@@ -758,7 +759,7 @@ namespace anox
 		rkit::UniquePtr<rkit::render::IDisplay> display;
 		RKIT_CHECK(displayManager->CreateDisplay(display, m_currentDisplayMode.Get()));
 
-		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), m_renderDevice.Get(), nullptr, 0));
+		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), nullptr, m_renderDevice.Get(), nullptr, 0));
 
 		rkit::render::IProgressMonitor *progressMonitor = m_gameWindow->GetDisplay().GetProgressMonitor();
 
@@ -879,7 +880,19 @@ namespace anox
 
 		RKIT_ASSERT(swapChainQueue != nullptr);
 
-		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), m_renderDevice.Get(), swapChainQueue, 2));
+		rkit::UniquePtr<rkit::render::ISwapChainPrototype> swapChainPrototype;
+		RKIT_CHECK(m_renderDevice->CreateSwapChainPrototype(swapChainPrototype, *display));
+
+		bool isCompatible = false;
+		RKIT_CHECK(swapChainPrototype->CheckQueueCompatibility(isCompatible, *swapChainQueue));
+
+		if (!isCompatible)
+		{
+			rkit::log::Error("Graphics queue doesn't support presentation on the requested display");
+			return rkit::ResultCode::kOperationFailed;
+		}
+
+		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), std::move(swapChainPrototype), m_renderDevice.Get(), swapChainQueue, 2));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -1129,12 +1142,16 @@ namespace anox
 
 	rkit::Result GraphicsSubsystem::BeginFrame()
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		RKIT_CHECK(m_gameWindow->BeginFrame());
+
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result GraphicsSubsystem::EndFrame()
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		RKIT_CHECK(m_gameWindow->EndFrame());
+
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::render::IRenderDevice *GraphicsSubsystem::GetDevice() const

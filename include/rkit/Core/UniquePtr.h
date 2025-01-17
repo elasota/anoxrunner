@@ -11,6 +11,7 @@ namespace rkit
 	{
 	public:
 		UniquePtr();
+		UniquePtr(std::nullptr_t);
 		UniquePtr(T *ptr, void *memAddr);
 		UniquePtr(T *ptr, void *memAddr, IMallocDriver *alloc);
 		UniquePtr(UniquePtr &&other) noexcept;
@@ -46,6 +47,12 @@ namespace rkit
 
 template<class T>
 inline rkit::UniquePtr<T>::UniquePtr()
+{
+	m_allocation.Clear();
+}
+
+template<class T>
+inline rkit::UniquePtr<T>::UniquePtr(std::nullptr_t)
 {
 	m_allocation.Clear();
 }

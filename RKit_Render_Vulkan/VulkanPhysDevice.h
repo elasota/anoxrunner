@@ -40,5 +40,6 @@ namespace rkit::render::vulkan
 		Vector<VkQueueFamilyProperties> m_queueFamilyProps;
 
 		QueueFamilyInfo m_queueFamilyInfos[kNumCommandQueueTypes];
+		Vector<uint32_t> m_unknownQueueFamilies;
 	};
 }

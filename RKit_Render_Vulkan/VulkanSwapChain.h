@@ -23,7 +23,7 @@ namespace rkit::render
 namespace rkit::render::vulkan
 {
 	class VulkanDeviceBase;
-	class QueueProxy;
+	class VulkanQueueProxyBase;
 
 	struct IVulkanSurface
 	{
@@ -32,10 +32,16 @@ namespace rkit::render::vulkan
 		virtual VkSurfaceKHR GetSurface() const = 0;
 	};
 
+	class VulkanSwapChainPrototypeBase : public ISwapChainPrototype
+	{
+	public:
+		static Result Create(UniquePtr<VulkanSwapChainPrototypeBase> &outSwapChainPrototype, VulkanDeviceBase &device, IDisplay &display);
+	};
+
 	class VulkanSwapChainBase : public ISwapChain
 	{
 	public:
-		static Result Create(UniquePtr<VulkanSwapChainBase> &outSwapChain, VulkanDeviceBase &device, IDisplay &display, uint8_t numBackBuffers,
-			render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, QueueProxy &queue);
+		static Result Create(UniquePtr<VulkanSwapChainBase> &outSwapChain, VulkanDeviceBase &device, VulkanSwapChainPrototypeBase &prototype, uint8_t numBackBuffers,
+			render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, VulkanQueueProxyBase &queue);
 	};
 }

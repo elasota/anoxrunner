@@ -139,6 +139,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="VulkanCommandAllocator.cpp" />
+    <ClCompile Include="VulkanFence.cpp" />
     <ClCompile Include="VulkanPipelineLibraryLoader.cpp" />
     <ClCompile Include="VulkanPlatformSpecific_Win32.cpp" />
     <ClCompile Include="VulkanQueueProxy.cpp" />
@@ -162,12 +164,15 @@
     <ClInclude Include="VulkanAPI_Common.h" />
     <ClInclude Include="VulkanAutoObject.h" />
     <ClInclude Include="VulkanCheck.h" />
+    <ClInclude Include="VulkanCommandAllocator.h" />
     <ClInclude Include="VulkanCommandList.h" />
     <ClInclude Include="VulkanDevice.h" />
+    <ClInclude Include="VulkanFence.h" />
     <ClInclude Include="VulkanPhysDevice.h" />
     <ClInclude Include="VulkanPipelineLibraryLoader.h" />
     <ClInclude Include="VulkanPlatformAPI.h" />
     <ClInclude Include="VulkanPlatformSpecific.h" />
+    <ClInclude Include="VulkanQueueMask.h" />
     <ClInclude Include="VulkanQueueProxy.h" />
     <ClInclude Include="VulkanResourcePool.h" />
     <ClInclude Include="VulkanSwapChain.h" />

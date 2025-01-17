@@ -2,7 +2,9 @@
 
 #include "VulkanAPI.h"
 #include "VulkanAPILoader.h"
+#include "VulkanCommandAllocator.h"
 #include "VulkanCheck.h"
+#include "VulkanFence.h"
 #include "VulkanPipelineLibraryLoader.h"
 #include "VulkanPlatformAPI.h"
 #include "VulkanSwapChain.h"
@@ -37,11 +39,12 @@ namespace rkit::render::vulkan
 		CallbackSpan<IGraphicsCommandQueue *, const void *> GetGraphicsQueues() const override;
 		CallbackSpan<IGraphicsComputeCommandQueue *, const void *> GetGraphicsComputeQueues() const override;
 
+		Result CreateBinaryCPUWaitableFence(UniquePtr<IBinaryCPUWaitableFence> &outFence, bool startSignaled) override;
+		Result CreateBinaryGPUWaitableFence(UniquePtr<IBinaryGPUWaitableFence> &outFence) override;
+
 		VkDevice GetDevice() const override;
 		VkInstance GetInstance() const override;
 		const VkAllocationCallbacks *GetAllocCallbacks() const override;
-
-		Result CreateCPUWaitableFence(UniquePtr<ICPUWaitableFence> &outFence) override;
 
 		const IRenderDeviceCaps &GetCaps() const override;
 
@@ -59,14 +62,29 @@ namespace rkit::render::vulkan
 		const RenderVulkanPhysicalDevice &GetPhysDevice() const override;
 
 		IResourcePool<VkSemaphore> &GetBinarySemaPool() const override;
+		IResourcePool<VkFence> &GetFencePool() const override;
 
-		Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, IDisplay &display, uint8_t numBackBuffers, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) override;
+		VulkanQueueProxyBase &GetQueueByID(size_t queueID) override;
+		size_t GetQueueCount() const override;
+
+		Result CreateSwapChainPrototype(UniquePtr<ISwapChainPrototype> &outSwapChainPrototype, IDisplay &display) override;
+
+		Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, UniquePtr<ISwapChainPrototype> &&prototype, uint8_t numBackBuffers, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) override;
+
+		Result CreateCopyCommandAllocator(UniquePtr<ICopyCommandAllocator> &outCommandAllocator) override;
+		Result CreateComputeCommandAllocator(UniquePtr<IComputeCommandAllocator> &outCommandAllocator) override;
+		Result CreateGraphicsCommandAllocator(UniquePtr<IGraphicsCommandAllocator> &outCommandAllocator) override;
+		Result CreateGraphicsComputeCommandAllocator(UniquePtr<IGraphicsComputeCommandAllocator> &outCommandAllocator) override;
+
+		template<class TCommandListType>
+		Result CreateTypedCommandAllocator(UniquePtr<TCommandListType> &outCommandList, CommandQueueType queueType);
+
+		Result CreateCommandAllocator(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, CommandQueueType queueType);
 
 		Result LoadDeviceAPI();
 		Result CreatePools();
 		Result ResolveQueues(CommandQueueType queueType, size_t firstQueueID, uint32_t queueFamily, uint32_t numQueues);
-
-		IMutex &GetQueueMutex();
+		Result FinalizeQueueList();
 
 	private:
 		class FunctionResolver final : public IFunctionResolver
@@ -98,10 +116,32 @@ namespace rkit::render::vulkan
 			VulkanDevice &m_device;
 		};
 
+		class FenceFactory final : public IPooledResourceFactory<VkFence>
+		{
+		public:
+			explicit FenceFactory(VulkanDevice &device);
+
+			void EmptyInitResource(VkFence &outResource) const override;
+			void DestructResource(VkFence &resource) const override;
+
+			Result InitResource(VkFence &resource) const override;
+			void RetireResource(VkFence &resource) const override;
+			Result UnretireResource(VkFence &resource) const override;
+
+		private:
+			VulkanDevice &m_device;
+		};
+
+		struct QueueFamily
+		{
+			Vector<UniquePtr<VulkanQueueProxyBase>> m_queues;
+			uint32_t m_vkQueueFamily = 0;
+		};
+
 		typedef const void *ConstVoidPtr_t;
 
 		template<class T>
-		static CallbackSpan<T *, const void *> CreateCallbackSpanForQueueFamily(const Vector<UniquePtr<QueueProxy>> &queueFamily);
+		static CallbackSpan<T *, const void *> CreateCallbackSpanForQueueFamily(const QueueFamily &queueFamily);
 
 		template<class T>
 		static T *QueueFamilySpanGetElement(const ConstVoidPtr_t &queueFamilyPtr, size_t index);
@@ -122,8 +162,8 @@ namespace rkit::render::vulkan
 		RenderDeviceCaps m_caps;
 		RCPtr<RenderVulkanPhysicalDevice> m_physDevice;
 
-		Vector<UniquePtr<QueueProxy>> m_queueFamilies[kNumQueues];
-		Vector<QueueProxy *> m_allQueues;
+		StaticArray<QueueFamily, kNumQueues> m_queueFamilies;
+		Vector<VulkanQueueProxyBase *> m_allQueues;
 
 		Vector<StringView> m_deviceExtensions;
 
@@ -131,6 +171,9 @@ namespace rkit::render::vulkan
 
 		SemaFactory m_semaFactory;
 		UniquePtr<IResourcePool<VkSemaphore>> m_semaPool;
+
+		FenceFactory m_fenceFactory;
+		UniquePtr<IResourcePool<VkFence>> m_fencePool;
 	};
 
 	VulkanDevice::FunctionResolver::FunctionResolver(const VulkanInstanceAPI &vki, const VulkanDevice &device)
@@ -197,6 +240,41 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
+	VulkanDevice::FenceFactory::FenceFactory(VulkanDevice &device)
+		: m_device(device)
+	{
+	}
+
+	void VulkanDevice::FenceFactory::EmptyInitResource(VkFence &outResource) const
+	{
+		outResource = VK_NULL_HANDLE;
+	}
+
+	void VulkanDevice::FenceFactory::DestructResource(VkFence &resource) const
+	{
+		if (resource != VK_NULL_HANDLE)
+			m_device.GetDeviceAPI().vkDestroyFence(m_device.GetDevice(), resource, m_device.GetAllocCallbacks());
+	}
+
+	Result VulkanDevice::FenceFactory::InitResource(VkFence &resource) const
+	{
+		VkFenceCreateInfo fenceCreateInfo = {};
+		fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+
+		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateFence(m_device.GetDevice(), &fenceCreateInfo, m_device.GetAllocCallbacks(), &resource));
+
+		return ResultCode::kOK;
+	}
+
+	void VulkanDevice::FenceFactory::RetireResource(VkFence &resource) const
+	{
+	}
+
+	Result VulkanDevice::FenceFactory::UnretireResource(VkFence &resource) const
+	{
+		return ResultCode::kOK;
+	}
+
 	VulkanDevice::VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts, UniquePtr<IMutex> &&queueMutex)
 		: m_vkg(vkg)
 		, m_vki(vki)
@@ -210,6 +288,7 @@ namespace rkit::render::vulkan
 		, m_caps(caps)
 		, m_physDevice(physDevice)
 		, m_semaFactory(*this)
+		, m_fenceFactory(*this)
 	{
 	}
 
@@ -218,36 +297,58 @@ namespace rkit::render::vulkan
 		m_vki.vkDestroyDevice(m_device, m_allocCallbacks);
 	}
 
-	Result VulkanDevice::ResolveQueues(CommandQueueType queueType, size_t firstQueueID, uint32_t queueFamily, uint32_t numQueues)
+	Result VulkanDevice::ResolveQueues(CommandQueueType queueType, size_t firstQueueID, uint32_t queueFamilyIndex, uint32_t numQueues)
 	{
 		IMallocDriver *alloc = GetDrivers().m_mallocDriver;
 
-		Vector<UniquePtr<QueueProxy>> &proxies = m_queueFamilies[static_cast<size_t>(queueType)];
-
-		RKIT_CHECK(proxies.Resize(numQueues));
+		QueueFamily &queueFamily = m_queueFamilies[static_cast<size_t>(queueType)];
+		queueFamily.m_vkQueueFamily = queueFamilyIndex;
+		
+		RKIT_CHECK(queueFamily.m_queues.Resize(numQueues));
 
 		for (uint32_t i = 0; i < numQueues; i++)
 		{
 			VkQueue queue = VK_NULL_HANDLE;
-			m_vkd.vkGetDeviceQueue(m_device, queueFamily, i, &queue);
+			m_vkd.vkGetDeviceQueue(m_device, queueFamilyIndex, i, &queue);
 
-			RKIT_CHECK(New<QueueProxy>(proxies[i], alloc, *this, queue, queueFamily, m_vkd, static_cast<TimelineID_t>(firstQueueID + i)));
+			RKIT_CHECK(VulkanQueueProxyBase::Create(queueFamily.m_queues[i], alloc, *this, queue, queueFamilyIndex, m_vkd));
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanDevice::FinalizeQueueList()
+	{
+		size_t numQueues = 0;
+		for (const QueueFamily &queueFamily : m_queueFamilies)
+			numQueues += queueFamily.m_queues.Count();
+
+		RKIT_CHECK(m_allQueues.Resize(numQueues));
+
+		size_t insertIndex = 0;
+		for (const QueueFamily &queueFamily : m_queueFamilies)
+		{
+			for (const UniquePtr<VulkanQueueProxyBase> &queuePtr : queueFamily.m_queues)
+			{
+				m_allQueues[insertIndex] = queuePtr.Get();
+				insertIndex++;
+			}
 		}
 
 		return ResultCode::kOK;
 	}
 
 	template<class T>
-	CallbackSpan<T *, const void *> VulkanDevice::CreateCallbackSpanForQueueFamily(const Vector<UniquePtr<QueueProxy>> &queueFamily)
+	CallbackSpan<T *, const void *> VulkanDevice::CreateCallbackSpanForQueueFamily(const QueueFamily &queueFamily)
 	{
-		return CallbackSpan<T *, const void *>(QueueFamilySpanGetElement<T>, &queueFamily, queueFamily.Count());
+		return CallbackSpan<T *, const void *>(QueueFamilySpanGetElement<T>, &queueFamily, queueFamily.m_queues.Count());
 	}
 
 	template<class T>
 	T *VulkanDevice::QueueFamilySpanGetElement(const ConstVoidPtr_t &queueFamilyPtr, size_t index)
 	{
-		const Vector<UniquePtr<QueueProxy>> *queueFamily = static_cast<const Vector<UniquePtr<QueueProxy>> *>(queueFamilyPtr);
-		return (*queueFamily)[index].Get();
+		const QueueFamily *queueFamily = static_cast<const QueueFamily *>(queueFamilyPtr);
+		return queueFamily->m_queues[index].Get();
 	}
 
 	CallbackSpan<ICopyCommandQueue *, const void *> VulkanDevice::GetCopyQueues() const
@@ -275,6 +376,30 @@ namespace rkit::render::vulkan
 		return m_device;
 	}
 
+	Result VulkanDevice::CreateBinaryCPUWaitableFence(UniquePtr<IBinaryCPUWaitableFence> &outFence, bool startSignaled)
+	{
+		UniquePtr<VulkanBinaryCPUWaitableFence> fence;
+		RKIT_CHECK(New<VulkanBinaryCPUWaitableFence>(fence, *this));
+
+		RKIT_CHECK(fence->Initialize(startSignaled));
+
+		outFence = std::move(fence);
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanDevice::CreateBinaryGPUWaitableFence(UniquePtr<IBinaryGPUWaitableFence> &outFence)
+	{
+		UniquePtr<VulkanBinaryGPUWaitableFence> fence;
+		RKIT_CHECK(New<VulkanBinaryGPUWaitableFence>(fence, *this));
+
+		RKIT_CHECK(fence->Initialize());
+
+		outFence = std::move(fence);
+
+		return ResultCode::kOK;
+	}
+
 	VkInstance VulkanDevice::GetInstance() const
 	{
 		return m_inst;
@@ -283,11 +408,6 @@ namespace rkit::render::vulkan
 	const VkAllocationCallbacks *VulkanDevice::GetAllocCallbacks() const
 	{
 		return m_allocCallbacks;
-	}
-
-	Result VulkanDevice::CreateCPUWaitableFence(UniquePtr<ICPUWaitableFence> &outFence)
-	{
-		return ResultCode::kNotYetImplemented;
 	}
 
 	const IRenderDeviceCaps &VulkanDevice::GetCaps() const
@@ -349,16 +469,91 @@ namespace rkit::render::vulkan
 		return *m_semaPool;
 	}
 
-	Result VulkanDevice::CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, IDisplay &display, uint8_t numBackBuffers, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue)
+	IResourcePool<VkFence> &VulkanDevice::GetFencePool() const
 	{
-		QueueProxy *queue = static_cast<QueueProxy *>(commandQueue.ToInternalCommandQueue());
+		return *m_fencePool;
+	}
+
+	VulkanQueueProxyBase &VulkanDevice::GetQueueByID(size_t queueID)
+	{
+		return *m_allQueues[queueID];
+	}
+
+	size_t VulkanDevice::GetQueueCount() const
+	{
+		return m_allQueues.Count();
+	}
+
+	Result VulkanDevice::CreateSwapChainPrototype(UniquePtr<ISwapChainPrototype> &outSwapChainPrototype, IDisplay &display)
+	{
+		UniquePtr<VulkanSwapChainPrototypeBase> vkSwapChainPrototype;
+		RKIT_CHECK(VulkanSwapChainPrototypeBase::Create(vkSwapChainPrototype, *this, display));
+
+		outSwapChainPrototype = std::move(vkSwapChainPrototype);
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanDevice::CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, UniquePtr<ISwapChainPrototype> &&prototypeRef, uint8_t numBackBuffers, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue)
+	{
+		if (!prototypeRef.IsValid())
+			return ResultCode::kInternalError;
+
+		UniquePtr<ISwapChainPrototype> prototype = std::move(prototypeRef);
+
+		VulkanQueueProxyBase *queue = static_cast<VulkanQueueProxyBase *>(commandQueue.ToInternalCommandQueue());
 
 		uint32_t queueFamily = queue->GetQueueFamily();
 
 		UniquePtr<VulkanSwapChainBase> vkSwapChain;
-		RKIT_CHECK(VulkanSwapChainBase::Create(vkSwapChain, *this, display, numBackBuffers, fmt, writeBehavior, *queue));
+		RKIT_CHECK(VulkanSwapChainBase::Create(vkSwapChain, *this, *static_cast<VulkanSwapChainPrototypeBase *>(prototype.Get()), numBackBuffers, fmt, writeBehavior, *queue));
 
 		outSwapChain = std::move(vkSwapChain);
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanDevice::CreateCopyCommandAllocator(UniquePtr<ICopyCommandAllocator> &outCommandAllocator)
+	{
+		return CreateTypedCommandAllocator(outCommandAllocator, CommandQueueType::kCopy);
+	}
+
+	Result VulkanDevice::CreateComputeCommandAllocator(UniquePtr<IComputeCommandAllocator> &outCommandAllocator)
+	{
+		return CreateTypedCommandAllocator(outCommandAllocator, CommandQueueType::kAsyncCompute);
+	}
+
+	Result VulkanDevice::CreateGraphicsCommandAllocator(UniquePtr<IGraphicsCommandAllocator> &outCommandAllocator)
+	{
+		return CreateTypedCommandAllocator(outCommandAllocator, CommandQueueType::kGraphics);
+	}
+
+	Result VulkanDevice::CreateGraphicsComputeCommandAllocator(UniquePtr<IGraphicsComputeCommandAllocator> &outCommandAllocator)
+	{
+		return CreateTypedCommandAllocator(outCommandAllocator, CommandQueueType::kGraphicsCompute);
+	}
+
+	template<class TCommandListType>
+	Result VulkanDevice::CreateTypedCommandAllocator(UniquePtr<TCommandListType> &outCommandAllocator, CommandQueueType queueType)
+	{
+		UniquePtr<VulkanCommandAllocatorBase> cmdAllocator;
+		RKIT_CHECK(CreateCommandAllocator(cmdAllocator, queueType));
+
+		outCommandAllocator = cmdAllocator.StaticCast<TCommandListType>();
+
+		return ResultCode::kOK;
+	}
+
+
+	Result VulkanDevice::CreateCommandAllocator(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, CommandQueueType queueType)
+	{
+		UniquePtr<VulkanCommandAllocatorBase> vkCommandAllocator;
+
+		const QueueFamily &queueFamily = m_queueFamilies[static_cast<size_t>(queueType)];
+
+		RKIT_CHECK(VulkanCommandAllocatorBase::Create(vkCommandAllocator, *this, queueType, queueFamily.m_vkQueueFamily));
+
+		outCommandAllocator = std::move(vkCommandAllocator);
 
 		return ResultCode::kOK;
 	}
@@ -374,6 +569,7 @@ namespace rkit::render::vulkan
 	Result VulkanDevice::CreatePools()
 	{
 		RKIT_CHECK(CreateResourcePool<VkSemaphore>(m_semaPool, m_semaFactory, true));
+		RKIT_CHECK(CreateResourcePool<VkFence>(m_fencePool, m_fenceFactory, true));
 
 		return ResultCode::kOK;
 	}
@@ -391,7 +587,7 @@ namespace rkit::render::vulkan
 		RKIT_CHECK(vkDevice->LoadDeviceAPI());
 		RKIT_CHECK(vkDevice->CreatePools());
 
-		size_t firstQueueID = 0;
+		size_t numQueues = 0;
 		for (size_t i = 0; i < static_cast<size_t>(CommandQueueType::kCount); i++)
 		{
 			CommandQueueType queueType = static_cast<CommandQueueType>(i);
@@ -399,11 +595,13 @@ namespace rkit::render::vulkan
 
 			if (spec.m_numQueues > 0)
 			{
-				RKIT_CHECK(vkDevice->ResolveQueues(queueType, firstQueueID, spec.m_queueFamily, spec.m_numQueues));
+				RKIT_CHECK(vkDevice->ResolveQueues(queueType, numQueues, spec.m_queueFamily, spec.m_numQueues));
 
-				firstQueueID += spec.m_numQueues;
+				numQueues += spec.m_numQueues;
 			}
 		}
+
+		RKIT_CHECK(vkDevice->FinalizeQueueList());
 
 		outDevice = std::move(vkDevice);
 

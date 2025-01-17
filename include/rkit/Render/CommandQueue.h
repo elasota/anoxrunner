@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Fence.h"
+#include "PipelineStage.h"
 
 namespace rkit
 {
@@ -8,6 +9,9 @@ namespace rkit
 
 	template<class T>
 	class Span;
+
+	template<class T>
+	class EnumMask;
 }
 
 namespace rkit::render
@@ -18,6 +22,8 @@ namespace rkit::render
 	struct IGraphicsComputeCommandList;
 	struct ICPUWaitableFence;
 	struct IInternalCommandQueue;
+	struct IBinaryGPUWaitableFence;
+	struct IBinaryCPUWaitableFence;
 
 	struct IInternalCommandQueue
 	{
@@ -26,9 +32,11 @@ namespace rkit::render
 
 	struct IBaseCommandQueue
 	{
-		virtual Result QueueSignalGPUWaitable(GPUWaitableFence_t &outFence) = 0;
-		virtual Result QueueSignalCPUWaitable(CPUWaitableFence_t &outFence) = 0;
-		virtual Result QueueWaitFor(const GPUWaitableFence_t &gpuFence) = 0;
+		virtual Result QueueSignalBinaryGPUWaitable(IBinaryGPUWaitableFence &fence) = 0;
+		virtual Result QueueSignalBinaryCPUWaitable(IBinaryCPUWaitableFence &fence) = 0;
+		virtual Result QueueWaitForBinaryGPUWaitable(IBinaryGPUWaitableFence &fence, const EnumMask<PipelineStage> &stagesToWaitFor) = 0;
+
+		virtual Result Flush() = 0;
 
 		virtual IInternalCommandQueue *ToInternalCommandQueue() = 0;
 

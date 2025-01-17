@@ -8,6 +8,7 @@
 
 namespace rkit
 {
+	struct IMutex;
 	struct Result;
 
 	template<class T>
@@ -39,6 +40,7 @@ namespace rkit::render::vulkan
 	struct VulkanDevicePlatformAPI;
 
 	class RenderVulkanPhysicalDevice;
+	class VulkanQueueProxyBase;
 
 	template<class T>
 	struct IResourcePool;
@@ -67,6 +69,10 @@ namespace rkit::render::vulkan
 		virtual const RenderVulkanPhysicalDevice &GetPhysDevice() const = 0;
 
 		virtual IResourcePool<VkSemaphore> &GetBinarySemaPool() const = 0;
+		virtual IResourcePool<VkFence> &GetFencePool() const = 0;
+
+		virtual VulkanQueueProxyBase &GetQueueByID(size_t queueID) = 0;
+		virtual size_t GetQueueCount() const = 0;
 
 		static Result CreateDevice(UniquePtr<IRenderDevice> &outDevice,
 			const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki,

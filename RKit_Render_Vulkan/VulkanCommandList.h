@@ -1,19 +1,27 @@
 #pragma once
 
 #include "rkit/Render/CommandList.h"
+#include "rkit/Render/CommandQueueType.h"
 
 #include "IncludeVulkan.h"
 
+namespace rkit
+{
+	struct Result;
+
+	template<class T>
+	class UniquePtr;
+}
+
 namespace rkit::render::vulkan
 {
-	class CommandListProxy final : public IGraphicsComputeCommandList
+	class VulkanDeviceBase;
+
+	class VulkanCommandListBase : public IGraphicsComputeCommandList, public IInternalCommandList
 	{
 	public:
-		CommandListProxy();
+		virtual VkCommandBuffer GetCommandBuffer() const = 0;
 
-		const VkCommandBuffer &GetCommandBuffer() const;
-
-	private:
-		VkCommandBuffer m_cmdBuffer = VK_NULL_HANDLE;
+		static Result Create(UniquePtr<VulkanCommandListBase> &outCommandList, VulkanDeviceBase &device, VkCommandPool commandPool, CommandQueueType queueType, bool isBundle);
 	};
 }
