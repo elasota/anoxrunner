@@ -1,13 +1,18 @@
 #pragma once
 
+#include <cstddef>
+
 namespace rkit::render
 {
 	struct ISwapChainSubframe
 	{
 	};
 
-	struct ISwapChainFrame
+	struct ISwapChainSyncPoint
 	{
-		virtual ISwapChainSubframe *GetSubframe(size_t index) const = 0;
+		virtual ~ISwapChainSyncPoint() {}
+
+		virtual ISwapChainSubframe *GetSubframe(size_t subframeIndex) = 0;
+		virtual Result WaitForCompletion() = 0;
 	};
 }

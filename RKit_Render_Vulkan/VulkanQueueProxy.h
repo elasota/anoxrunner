@@ -5,7 +5,6 @@
 #include "rkit/Core/ResizableRingBuffer.h"
 #include "rkit/Core/Optional.h"
 #include "rkit/Core/StaticArray.h"
-#include "rkit/Core/ResizableRingBuffer.h"
 #include "rkit/Core/Vector.h"
 
 #include "VulkanResourcePool.h"

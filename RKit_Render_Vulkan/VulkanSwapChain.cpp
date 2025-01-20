@@ -31,24 +31,39 @@ namespace rkit::render::vulkan
 		uint32_t m_imageLayer = 0;
 	};
 
-	class VulkanSwapChainFrame final : public ISwapChainFrame
+	class VulkanSwapChainSyncPoint final : public VulkanSwapChainSyncPointBase
 	{
 	public:
-		VulkanSwapChainFrame();
+		explicit VulkanSwapChainSyncPoint(VulkanDeviceBase &device);
+		~VulkanSwapChainSyncPoint();
 
-		Result Initialize(const Span<VulkanSwapChainSubframe> &subframes, VkImage image);
+		Result Initialize();
 
-		UniqueResourceRef<VkSemaphore> *GetDoneSemaRefPtr();
-		UniqueResourceRef<VkSemaphore> *GetStartedSemaRefPtr();
+		ISwapChainSubframe *GetSubframe(size_t subframeIndex) override;
+		Result WaitForCompletion() override;
+
+		Result AcquireFrame(VkSwapchainKHR swapChain, const Span<VkImage> &span, const Span<VulkanSwapChainSubframe> &subframes, uint32_t simultaneousImageCount);
+		Result Present(VulkanQueueProxyBase &queue, VkSwapchainKHR swapChain);
 
 	private:
-		ISwapChainSubframe *GetSubframe(size_t index) const override;
+		enum class State
+		{
+			kIdle,
+			kAcquired,
+			kWaiting,
+			kPresenting,
+		};
 
-		UniqueResourceRef<VkSemaphore> m_doneSema;
-		UniqueResourceRef<VkSemaphore> m_startedSema;
+		VulkanDeviceBase &m_device;
 
-		Span<VulkanSwapChainSubframe> m_subframes;
-		VkImage m_image = VK_NULL_HANDLE;
+		VkSemaphore m_acquireSema = VK_NULL_HANDLE;
+		VkSemaphore m_presentSema = VK_NULL_HANDLE;
+		VkFence m_postPresentFence = VK_NULL_HANDLE;
+
+		State m_state = State::kIdle;
+		uint32_t m_imageIndex = 0;
+
+		Span<VulkanSwapChainSubframe> m_subframeSpan;
 	};
 
 	class VulkanSwapChainPrototype final : public VulkanSwapChainPrototypeBase
@@ -80,8 +95,8 @@ namespace rkit::render::vulkan
 
 		void GetExtents(uint32_t &outWidth, uint32_t &outHeight) const override;
 
-		Result AcquireFrame(ISwapChainFrame *&outFrame) override;
-		Result Present() override;
+		Result AcquireFrame(ISwapChainSyncPoint &syncPoint) override;
+		Result Present(ISwapChainSyncPoint &syncPoint) override;
 
 	private:
 		VulkanDeviceBase &m_device;
@@ -92,12 +107,12 @@ namespace rkit::render::vulkan
 
 		uint32_t m_width = 0;
 		uint32_t m_height = 0;
+		uint32_t m_simultaneousImageCount = 0;
 
 		size_t m_numBuffers = 0;
 		size_t m_nextSyncIndex = 0;
 
 		Vector<VkImage> m_images;
-		Vector<VulkanSwapChainFrame> m_swapChainFrames;
 		Vector<VulkanSwapChainSubframe> m_swapChainSubframes;
 
 		SwapChainWriteBehavior m_writeBehavior;
@@ -118,31 +133,92 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	VulkanSwapChainFrame::VulkanSwapChainFrame()
+	VulkanSwapChainSyncPoint::VulkanSwapChainSyncPoint(VulkanDeviceBase &device)
+		: m_device(device)
 	{
 	}
 
-	Result VulkanSwapChainFrame::Initialize(const Span<VulkanSwapChainSubframe> &subframes, VkImage image)
+	VulkanSwapChainSyncPoint::~VulkanSwapChainSyncPoint()
 	{
-		m_subframes = subframes;
+		if (m_acquireSema != VK_NULL_HANDLE)
+			m_device.GetDeviceAPI().vkDestroySemaphore(m_device.GetDevice(), m_acquireSema, m_device.GetAllocCallbacks());
+		if (m_presentSema != VK_NULL_HANDLE)
+			m_device.GetDeviceAPI().vkDestroySemaphore(m_device.GetDevice(), m_presentSema, m_device.GetAllocCallbacks());
+		if (m_postPresentFence != VK_NULL_HANDLE)
+			m_device.GetDeviceAPI().vkDestroyFence(m_device.GetDevice(), m_postPresentFence, m_device.GetAllocCallbacks());
+	}
+
+	Result VulkanSwapChainSyncPoint::Initialize()
+	{
+		const VkDevice device = m_device.GetDevice();
+		const VulkanDeviceAPI &vkd = m_device.GetDeviceAPI();
+		const VkAllocationCallbacks *callbacks = m_device.GetAllocCallbacks();
+
+		VkSemaphoreCreateInfo semaCreateInfo = {};
+		semaCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+		RKIT_VK_CHECK(vkd.vkCreateSemaphore(device, &semaCreateInfo, callbacks, &m_acquireSema));
+		RKIT_VK_CHECK(vkd.vkCreateSemaphore(device, &semaCreateInfo, callbacks, &m_presentSema));
+
+		VkFenceCreateInfo fenceCreateInfo = {};
+		fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+
+		RKIT_VK_CHECK(vkd.vkCreateFence(device, &fenceCreateInfo, callbacks, &m_postPresentFence));
 
 		return ResultCode::kOK;
 	}
 
-	UniqueResourceRef<VkSemaphore> *VulkanSwapChainFrame::GetDoneSemaRefPtr()
+	ISwapChainSubframe *VulkanSwapChainSyncPoint::GetSubframe(size_t subframeIndex)
 	{
-		return &m_doneSema;
+		return &m_subframeSpan[subframeIndex];
 	}
 
-	UniqueResourceRef<VkSemaphore> *VulkanSwapChainFrame::GetStartedSemaRefPtr()
+	Result VulkanSwapChainSyncPoint::WaitForCompletion()
 	{
-		return &m_startedSema;
+		if (m_state != State::kPresenting)
+			return ResultCode::kInternalError;
+
+		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkWaitForFences(m_device.GetDevice(), 1, &m_postPresentFence, VK_TRUE, UINT64_MAX));
+		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkResetFences(m_device.GetDevice(), 1, &m_postPresentFence));
+
+		m_state = State::kIdle;
+
+		return ResultCode::kOK;
 	}
 
-	ISwapChainSubframe *VulkanSwapChainFrame::GetSubframe(size_t index) const
+	Result VulkanSwapChainSyncPoint::AcquireFrame(VkSwapchainKHR swapChain, const Span<VkImage> &span, const Span<VulkanSwapChainSubframe> &subframes, uint32_t simultaneousImageCount)
 	{
-		return &m_subframes[index];
+		if (m_state != State::kIdle)
+			return ResultCode::kInternalError;
+
+		// TODO: Handle suboptimal
+		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkAcquireNextImageKHR(m_device.GetDevice(), swapChain, UINT64_MAX, m_acquireSema, VK_NULL_HANDLE, &m_imageIndex));
+
+		m_subframeSpan = subframes.SubSpan(m_imageIndex * simultaneousImageCount, simultaneousImageCount);
+
+		return ResultCode::kOK;
 	}
+
+	Result VulkanSwapChainSyncPoint::Present(VulkanQueueProxyBase &queue, VkSwapchainKHR swapChain)
+	{
+		if (m_state != State::kWaiting)
+			return ResultCode::kInternalError;
+
+		VkPresentInfoKHR presentInfo = {};
+		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		presentInfo.waitSemaphoreCount = 1;
+		presentInfo.pWaitSemaphores = &m_presentSema;
+		presentInfo.swapchainCount = 1;
+		presentInfo.pSwapchains = &swapChain;
+		presentInfo.pImageIndices = &m_imageIndex;
+
+		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkQueuePresentKHR(queue.GetVkQueue(), &presentInfo));
+
+		m_state = State::kPresenting;
+
+		return ResultCode::kOK;
+	}
+
 
 	VulkanSwapChainPrototype::VulkanSwapChainPrototype(VulkanDeviceBase &device, IDisplay &display)
 		: m_device(device)
@@ -185,6 +261,7 @@ namespace rkit::render::vulkan
 		, m_numBuffers(static_cast<size_t>(numBackBuffers) + 1)
 		, m_writeBehavior(writeBehavior)
 		, m_queue(queue)
+		, m_simultaneousImageCount(display.GetSimultaneousImageCount())
 	{
 	}
 
@@ -275,7 +352,6 @@ namespace rkit::render::vulkan
 		for (VkImage &img : m_images)
 			img = VK_NULL_HANDLE;
 
-		RKIT_CHECK(m_swapChainFrames.Resize(imageCount));
 		RKIT_CHECK(m_swapChainSubframes.Resize(imageCount * simultaneousImageCount));
 
 		for (uint32_t fi = 0; fi < imageCount; fi++)
@@ -288,11 +364,6 @@ namespace rkit::render::vulkan
 
 		RKIT_VK_CHECK(vkd.vkGetSwapchainImagesKHR(m_device.GetDevice(), m_swapChain, &imageCount, m_images.GetBuffer()));
 
-		for (uint32_t i = 0; i < imageCount; i++)
-		{
-			RKIT_CHECK(m_swapChainFrames[i].Initialize(m_swapChainSubframes.ToSpan().SubSpan(i * simultaneousImageCount, simultaneousImageCount), m_images[i]));
-		}
-
 		return ResultCode::kOK;
 	}
 
@@ -302,92 +373,14 @@ namespace rkit::render::vulkan
 		outHeight = m_height;
 	}
 
-	Result VulkanSwapChain::AcquireFrame(ISwapChainFrame *&outFrame)
+	Result VulkanSwapChain::AcquireFrame(ISwapChainSyncPoint &syncPointBase)
 	{
-		const VulkanDeviceAPI &vkd = m_device.GetDeviceAPI();
-
-		if (m_acquiredImage.IsSet())
-			return ResultCode::kInternalError;
-
-		UniqueResourceRef<VkSemaphore> acquireSema;
-		RKIT_CHECK(acquireSema.AcquireFrom(m_device.GetBinarySemaPool()));
-
-		UniqueResourceRef<VkFence> fence;
-		RKIT_CHECK(fence.AcquireFrom(m_device.GetFencePool()));
-
-		uint32_t imgIndex = 0;
-		RKIT_VK_CHECK(vkd.vkAcquireNextImageKHR(m_device.GetDevice(), m_swapChain, UINT64_MAX, acquireSema.GetResource(), fence.GetResource(), &imgIndex));
-
-		RKIT_VK_CHECK(vkd.vkWaitForFences(m_device.GetDevice(), 1, &fence.GetResource(), VK_TRUE, UINT64_MAX));
-		RKIT_VK_CHECK(vkd.vkResetFences(m_device.GetDevice(), 1, &fence.GetResource()));
-
-		rkit::log::LogInfoFmt("Acquired image %u with sema %p", imgIndex, acquireSema.GetResource());
-
-		VkPipelineStageFlagBits stageFlags = static_cast<VkPipelineStageFlagBits>(0);
-		switch (m_writeBehavior)
-		{
-		case SwapChainWriteBehavior::RenderTarget:
-			stageFlags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			break;
-		default:
-			return ResultCode::kNotYetImplemented;
-		}
-
-		RKIT_CHECK(m_queue.AddBinarySemaWait(acquireSema.GetResource(), stageFlags));
-
-		VulkanSwapChainFrame &frame = m_swapChainFrames[imgIndex];
-
-		if (true)
-			return ResultCode::kNotYetImplemented;
-
-		*m_swapChainFrames[imgIndex].GetStartedSemaRefPtr() = std::move(acquireSema);
-		m_swapChainFrames[imgIndex].GetDoneSemaRefPtr()->Reset();
-
-		m_acquiredImage = imgIndex;
-
-		outFrame = &m_swapChainFrames[imgIndex];
-
-		return ResultCode::kOK;
+		return static_cast<VulkanSwapChainSyncPoint &>(syncPointBase).AcquireFrame(m_swapChain, m_images.ToSpan(), m_swapChainSubframes.ToSpan(), m_simultaneousImageCount);
 	}
 
-	Result VulkanSwapChain::Present()
+	Result VulkanSwapChain::Present(ISwapChainSyncPoint &syncPointBase)
 	{
-		if (!m_acquiredImage.IsSet())
-			return ResultCode::kInternalError;
-
-		uint32_t imageIndex = m_acquiredImage.Get();
-
-		VulkanSwapChainFrame &frame = m_swapChainFrames[imageIndex];
-
-		UniqueResourceRef<VkSemaphore> *finishedSema = frame.GetDoneSemaRefPtr();
-		if (!finishedSema->IsValid())
-		{
-			RKIT_CHECK(finishedSema->AcquireFrom(m_device.GetBinarySemaPool()));
-		}
-
-		RKIT_CHECK(m_queue.AddBinarySemaSignal(finishedSema->GetResource()));
-		RKIT_CHECK(m_queue.Flush());
-
-		VkSemaphore vkFinishedSema = finishedSema->GetResource();
-
-		VkPresentInfoKHR presentInfo = {};
-		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = &vkFinishedSema;
-		presentInfo.swapchainCount = 1;
-		presentInfo.pSwapchains = &m_swapChain;
-		presentInfo.pImageIndices = &imageIndex;
-
-		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkQueuePresentKHR(m_queue.GetVkQueue(), &presentInfo));
-
-		if (true)
-			return ResultCode::kNotYetImplemented;
-
-		rkit::log::LogInfoFmt("Presented image %u with sema %p", imageIndex, vkFinishedSema);
-
-		m_acquiredImage.Reset();
-
-		return ResultCode::kOK;
+		return static_cast<VulkanSwapChainSyncPoint &>(syncPointBase).Present(m_queue, m_swapChain);
 	}
 
 	Result VulkanSwapChainBase::Create(UniquePtr<VulkanSwapChainBase> &outSwapChain, VulkanDeviceBase &device, VulkanSwapChainPrototypeBase &prototypeBase, uint8_t numBackBuffers, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, VulkanQueueProxyBase &queue)
@@ -414,6 +407,18 @@ namespace rkit::render::vulkan
 		RKIT_CHECK(swapChainPrototype->Initialize());
 
 		outSwapChainPrototype = std::move(swapChainPrototype);
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanSwapChainSyncPointBase::Create(UniquePtr<VulkanSwapChainSyncPointBase> &outSyncPoint, VulkanDeviceBase &device)
+	{
+		UniquePtr<VulkanSwapChainSyncPoint> syncPoint;
+		RKIT_CHECK(New<VulkanSwapChainSyncPoint>(syncPoint, device));
+
+		RKIT_CHECK(syncPoint->Initialize());
+
+		outSyncPoint = std::move(syncPoint);
 
 		return ResultCode::kOK;
 	}

@@ -28,7 +28,7 @@ namespace anox
 		rkit::UniquePtr<rkit::render::ISwapChain> m_swapChain;
 		rkit::render::IRenderDevice *m_device;
 
-		rkit::render::ISwapChainFrame *m_frame = nullptr;
+		//rkit::render::ISwapChainFrame *m_frame = nullptr;
 	};
 
 	RenderedWindow::RenderedWindow(rkit::UniquePtr<rkit::render::IDisplay> &&display, rkit::render::IRenderDevice *device)
@@ -73,12 +73,12 @@ namespace anox
 		if (!m_device)
 			return rkit::ResultCode::kOK;
 
-		if (m_frame != nullptr)
-			return rkit::ResultCode::kInternalError;
+		//if (m_frame != nullptr)
+		//	return rkit::ResultCode::kInternalError;
 
-		RKIT_CHECK(m_swapChain->AcquireFrame(m_frame));
+		//RKIT_CHECK(m_swapChain->AcquireFrame(m_frame));
 
-		return rkit::ResultCode::kOK;
+		return rkit::ResultCode::kNotYetImplemented;
 	}
 
 	rkit::Result RenderedWindow::EndFrame()
@@ -86,14 +86,14 @@ namespace anox
 		if (!m_device)
 			return rkit::ResultCode::kOK;
 
-		if (m_frame == nullptr)
-			return rkit::ResultCode::kInternalError;
+		//if (m_frame == nullptr)
+		//	return rkit::ResultCode::kInternalError;
 
-		RKIT_CHECK(m_swapChain->Present());
+		//RKIT_CHECK(m_swapChain->Present());
 
-		m_frame = nullptr;
+		//m_frame = nullptr;
 
-		return rkit::ResultCode::kOK;
+		return rkit::ResultCode::kNotYetImplemented;
 	}
 
 	rkit::Result RenderedWindowBase::Create(rkit::UniquePtr<RenderedWindowBase> &outWindow, rkit::UniquePtr<rkit::render::IDisplay> &&displayRef, rkit::UniquePtr<rkit::render::ISwapChainPrototype> &&prototypeRef, rkit::render::IRenderDevice *device, rkit::render::IBaseCommandQueue *swapChainQueue, uint8_t numBackBuffers)

@@ -9,7 +9,6 @@
 #include "VulkanPlatformAPI.h"
 #include "VulkanSwapChain.h"
 #include "VulkanQueueProxy.h"
-#include "VulkanPlatformAPI.h"
 #include "VulkanPhysDevice.h"
 #include "VulkanPlatformSpecific.h"
 #include "VulkanResourcePool.h"
@@ -41,6 +40,7 @@ namespace rkit::render::vulkan
 
 		Result CreateBinaryCPUWaitableFence(UniquePtr<IBinaryCPUWaitableFence> &outFence, bool startSignaled) override;
 		Result CreateBinaryGPUWaitableFence(UniquePtr<IBinaryGPUWaitableFence> &outFence) override;
+		Result CreateSwapChainSyncPoint(UniquePtr<ISwapChainSyncPoint> &outSyncPoint) override;
 
 		VkDevice GetDevice() const override;
 		VkInstance GetInstance() const override;
@@ -396,6 +396,16 @@ namespace rkit::render::vulkan
 		RKIT_CHECK(fence->Initialize());
 
 		outFence = std::move(fence);
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanDevice::CreateSwapChainSyncPoint(UniquePtr<ISwapChainSyncPoint> &outSyncPoint)
+	{
+		UniquePtr<VulkanSwapChainSyncPointBase> syncPoint;
+		RKIT_CHECK(VulkanSwapChainSyncPointBase::Create(syncPoint, *this));
+
+		outSyncPoint = std::move(syncPoint);
 
 		return ResultCode::kOK;
 	}

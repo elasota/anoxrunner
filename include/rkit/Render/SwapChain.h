@@ -11,7 +11,7 @@ namespace rkit
 namespace rkit::render
 {
 	struct IBaseCommandQueue;
-	struct ISwapChainFrame;
+	struct ISwapChainSyncPoint;
 
 	struct ISwapChainPrototype
 	{
@@ -25,7 +25,7 @@ namespace rkit::render
 		virtual ~ISwapChain() {}
 
 		virtual void GetExtents(uint32_t &outWidth, uint32_t &outHeight) const = 0;
-		virtual Result AcquireFrame(ISwapChainFrame *&outFrame) = 0;
-		virtual Result Present() = 0;
+		virtual Result AcquireFrame(ISwapChainSyncPoint &syncPoint) = 0;
+		virtual Result Present(ISwapChainSyncPoint &syncPoint) = 0;
 	};
 }

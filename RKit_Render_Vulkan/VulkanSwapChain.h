@@ -4,6 +4,7 @@
 
 #include "rkit/Render/RenderDefs.h"
 #include "rkit/Render/SwapChain.h"
+#include "rkit/Render/SwapChainFrame.h"
 
 #include <cstdint>
 
@@ -30,6 +31,12 @@ namespace rkit::render::vulkan
 		virtual ~IVulkanSurface() {}
 
 		virtual VkSurfaceKHR GetSurface() const = 0;
+	};
+
+	class VulkanSwapChainSyncPointBase : public ISwapChainSyncPoint
+	{
+	public:
+		static Result Create(UniquePtr<VulkanSwapChainSyncPointBase> &outSyncPoint, VulkanDeviceBase &device);
 	};
 
 	class VulkanSwapChainPrototypeBase : public ISwapChainPrototype

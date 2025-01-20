@@ -47,6 +47,7 @@ namespace rkit::render
 	struct IComputeCommandAllocator;
 	struct IGraphicsCommandAllocator;
 	struct IGraphicsComputeCommandAllocator;
+	struct ISwapChainSyncPoint;
 
 	struct IRenderDevice
 	{
@@ -59,6 +60,7 @@ namespace rkit::render
 
 		virtual Result CreateBinaryCPUWaitableFence(UniquePtr<IBinaryCPUWaitableFence> &outFence, bool startSignaled) = 0;
 		virtual Result CreateBinaryGPUWaitableFence(UniquePtr<IBinaryGPUWaitableFence> &outFence) = 0;
+		virtual Result CreateSwapChainSyncPoint(UniquePtr<ISwapChainSyncPoint> &outSyncPoint) = 0;
 
 		virtual const IRenderDeviceCaps &GetCaps() const = 0;
 

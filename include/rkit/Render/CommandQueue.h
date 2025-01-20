@@ -24,6 +24,7 @@ namespace rkit::render
 	struct IInternalCommandQueue;
 	struct IBinaryGPUWaitableFence;
 	struct IBinaryCPUWaitableFence;
+	struct ISwapChainSyncPoint;
 
 	struct IInternalCommandQueue
 	{
@@ -62,6 +63,9 @@ namespace rkit::render
 	{
 		virtual Result QueueGraphics(const Span<IGraphicsCommandList *> &cmdLists) = 0;
 		Result QueueGraphics(IGraphicsCommandList &cmdList);
+
+		virtual Result QueueWaitForSwapChainWriteReady(ISwapChainSyncPoint &syncPoint) = 0;
+		virtual Result QueueWaitForSwapChainPresentReady(ISwapChainSyncPoint &syncPoint) = 0;
 	};
 
 	struct IGraphicsComputeCommandQueue : public IComputeCommandQueue, public IGraphicsCommandQueue

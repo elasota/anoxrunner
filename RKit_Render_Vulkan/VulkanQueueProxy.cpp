@@ -24,6 +24,9 @@ namespace rkit::render::vulkan
 		Result QueueCopy(const Span<ICopyCommandList *> &cmdLists) override;
 		Result QueueCompute(const Span<IComputeCommandList *> &cmdLists) override;
 		Result QueueGraphics(const Span<IGraphicsCommandList *> &cmdLists) override;
+		Result QueueWaitForSwapChainWriteReady(ISwapChainSyncPoint &syncPoint) override;
+		Result QueueWaitForSwapChainPresentReady(ISwapChainSyncPoint &syncPoint) override;
+
 		Result QueueGraphicsCompute(const Span<IGraphicsComputeCommandList *> &cmdLists) override;
 
 		Result QueueSignalBinaryGPUWaitable(IBinaryGPUWaitableFence &fence) override;
@@ -125,6 +128,16 @@ namespace rkit::render::vulkan
 		}
 
 		return ResultCode::kOK;
+	}
+
+	Result VulkanQueueProxy::QueueWaitForSwapChainWriteReady(ISwapChainSyncPoint &syncPoint)
+	{
+		return ResultCode::kNotYetImplemented;
+	}
+
+	Result VulkanQueueProxy::QueueWaitForSwapChainPresentReady(ISwapChainSyncPoint &syncPoint)
+	{
+		return ResultCode::kNotYetImplemented;
 	}
 
 	Result VulkanQueueProxy::QueueGraphicsCompute(const Span<IGraphicsComputeCommandList *> &cmdLists)
