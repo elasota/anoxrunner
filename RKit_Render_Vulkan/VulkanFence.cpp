@@ -30,6 +30,23 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
+	Result VulkanBinaryCPUWaitableFence::WaitFor()
+	{
+		return this->WaitForTimed(std::numeric_limits<uint64_t>::max());
+	}
+
+	Result VulkanBinaryCPUWaitableFence::WaitForTimed(uint64_t timeoutMSec)
+	{
+		IBinaryCPUWaitableFence *fence = this;
+		return m_device.WaitForBinaryFencesTimed(Span<IBinaryCPUWaitableFence *>(&fence, 1).ToValueISpan(), false, timeoutMSec);
+	}
+
+	Result VulkanBinaryCPUWaitableFence::ResetFence()
+	{
+		IBinaryCPUWaitableFence *fence = this;
+		return m_device.ResetBinaryFences(Span<IBinaryCPUWaitableFence *>(&fence, 1).ToValueISpan());
+	}
+
 	VulkanBinaryGPUWaitableFence::VulkanBinaryGPUWaitableFence(VulkanDeviceBase &device)
 		: m_device(device)
 		, m_sema(VK_NULL_HANDLE)

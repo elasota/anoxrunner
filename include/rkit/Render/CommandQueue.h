@@ -20,7 +20,6 @@ namespace rkit::render
 	struct IComputeCommandList;
 	struct IGraphicsCommandList;
 	struct IGraphicsComputeCommandList;
-	struct ICPUWaitableFence;
 	struct IInternalCommandQueue;
 	struct IBinaryGPUWaitableFence;
 	struct IBinaryCPUWaitableFence;

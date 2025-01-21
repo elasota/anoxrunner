@@ -40,27 +40,16 @@ namespace rkit::render::vulkan
 		Result Initialize();
 
 		ISwapChainSubframe *GetSubframe(size_t subframeIndex) override;
-		Result WaitForCompletion() override;
 
 		Result AcquireFrame(VkSwapchainKHR swapChain, const Span<VkImage> &span, const Span<VulkanSwapChainSubframe> &subframes, uint32_t simultaneousImageCount);
 		Result Present(VulkanQueueProxyBase &queue, VkSwapchainKHR swapChain);
 
 	private:
-		enum class State
-		{
-			kIdle,
-			kAcquired,
-			kWaiting,
-			kPresenting,
-		};
-
 		VulkanDeviceBase &m_device;
 
 		VkSemaphore m_acquireSema = VK_NULL_HANDLE;
 		VkSemaphore m_presentSema = VK_NULL_HANDLE;
-		VkFence m_postPresentFence = VK_NULL_HANDLE;
 
-		State m_state = State::kIdle;
 		uint32_t m_imageIndex = 0;
 
 		Span<VulkanSwapChainSubframe> m_subframeSpan;
@@ -144,8 +133,6 @@ namespace rkit::render::vulkan
 			m_device.GetDeviceAPI().vkDestroySemaphore(m_device.GetDevice(), m_acquireSema, m_device.GetAllocCallbacks());
 		if (m_presentSema != VK_NULL_HANDLE)
 			m_device.GetDeviceAPI().vkDestroySemaphore(m_device.GetDevice(), m_presentSema, m_device.GetAllocCallbacks());
-		if (m_postPresentFence != VK_NULL_HANDLE)
-			m_device.GetDeviceAPI().vkDestroyFence(m_device.GetDevice(), m_postPresentFence, m_device.GetAllocCallbacks());
 	}
 
 	Result VulkanSwapChainSyncPoint::Initialize()
@@ -160,11 +147,6 @@ namespace rkit::render::vulkan
 		RKIT_VK_CHECK(vkd.vkCreateSemaphore(device, &semaCreateInfo, callbacks, &m_acquireSema));
 		RKIT_VK_CHECK(vkd.vkCreateSemaphore(device, &semaCreateInfo, callbacks, &m_presentSema));
 
-		VkFenceCreateInfo fenceCreateInfo = {};
-		fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-
-		RKIT_VK_CHECK(vkd.vkCreateFence(device, &fenceCreateInfo, callbacks, &m_postPresentFence));
-
 		return ResultCode::kOK;
 	}
 
@@ -173,24 +155,8 @@ namespace rkit::render::vulkan
 		return &m_subframeSpan[subframeIndex];
 	}
 
-	Result VulkanSwapChainSyncPoint::WaitForCompletion()
-	{
-		if (m_state != State::kPresenting)
-			return ResultCode::kInternalError;
-
-		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkWaitForFences(m_device.GetDevice(), 1, &m_postPresentFence, VK_TRUE, UINT64_MAX));
-		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkResetFences(m_device.GetDevice(), 1, &m_postPresentFence));
-
-		m_state = State::kIdle;
-
-		return ResultCode::kOK;
-	}
-
 	Result VulkanSwapChainSyncPoint::AcquireFrame(VkSwapchainKHR swapChain, const Span<VkImage> &span, const Span<VulkanSwapChainSubframe> &subframes, uint32_t simultaneousImageCount)
 	{
-		if (m_state != State::kIdle)
-			return ResultCode::kInternalError;
-
 		// TODO: Handle suboptimal
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkAcquireNextImageKHR(m_device.GetDevice(), swapChain, UINT64_MAX, m_acquireSema, VK_NULL_HANDLE, &m_imageIndex));
 
@@ -201,9 +167,6 @@ namespace rkit::render::vulkan
 
 	Result VulkanSwapChainSyncPoint::Present(VulkanQueueProxyBase &queue, VkSwapchainKHR swapChain)
 	{
-		if (m_state != State::kWaiting)
-			return ResultCode::kInternalError;
-
 		VkPresentInfoKHR presentInfo = {};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 		presentInfo.waitSemaphoreCount = 1;
@@ -214,11 +177,8 @@ namespace rkit::render::vulkan
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkQueuePresentKHR(queue.GetVkQueue(), &presentInfo));
 
-		m_state = State::kPresenting;
-
 		return ResultCode::kOK;
 	}
-
 
 	VulkanSwapChainPrototype::VulkanSwapChainPrototype(VulkanDeviceBase &device, IDisplay &display)
 		: m_device(device)

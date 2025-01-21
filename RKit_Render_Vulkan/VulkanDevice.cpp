@@ -42,6 +42,10 @@ namespace rkit::render::vulkan
 		Result CreateBinaryGPUWaitableFence(UniquePtr<IBinaryGPUWaitableFence> &outFence) override;
 		Result CreateSwapChainSyncPoint(UniquePtr<ISwapChainSyncPoint> &outSyncPoint) override;
 
+		Result ResetBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences) override;
+		Result WaitForBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll) override;
+		Result WaitForBinaryFencesTimed(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll, uint64_t timeoutMSec) override;
+
 		VkDevice GetDevice() const override;
 		VkInstance GetInstance() const override;
 		const VkAllocationCallbacks *GetAllocCallbacks() const override;
@@ -406,6 +410,66 @@ namespace rkit::render::vulkan
 		RKIT_CHECK(VulkanSwapChainSyncPointBase::Create(syncPoint, *this));
 
 		outSyncPoint = std::move(syncPoint);
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanDevice::ResetBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences)
+	{
+		const size_t kMaxStaticFences = 16;
+
+		size_t numFences = fences.Count();
+
+		StaticArray<VkFence, kMaxStaticFences> staticFences;
+		for (size_t firstFence = 0; firstFence < numFences; firstFence += kMaxStaticFences)
+		{
+			size_t fencesThisRound = numFences - firstFence;
+			if (fencesThisRound > kMaxStaticFences)
+				fencesThisRound = kMaxStaticFences;
+
+			for (size_t i = 0; i < fencesThisRound; i++)
+				staticFences[i] = static_cast<VulkanBinaryCPUWaitableFence *>(fences[i + firstFence])->GetFence();
+
+			RKIT_VK_CHECK(m_vkd.vkResetFences(m_device, static_cast<uint32_t>(fencesThisRound), staticFences.GetBuffer()));
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanDevice::WaitForBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll)
+	{
+		return WaitForBinaryFencesTimed(fences, std::numeric_limits<uint64_t>::max(), waitForAll);
+	}
+
+	Result VulkanDevice::WaitForBinaryFencesTimed(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll, uint64_t timeoutMSec)
+	{
+		const size_t kMaxStaticFences = 16;
+
+		size_t numFences = fences.Count();
+		if (numFences <= kMaxStaticFences || (waitForAll && timeoutMSec == std::numeric_limits<uint64_t>::max()))
+		{
+			StaticArray<VkFence, kMaxStaticFences> staticFences;
+			for (size_t firstFence = 0; firstFence < numFences; firstFence += kMaxStaticFences)
+			{
+				size_t fencesThisRound = numFences - firstFence;
+				if (fencesThisRound > kMaxStaticFences)
+					fencesThisRound = kMaxStaticFences;
+
+				for (size_t i = 0; i < fencesThisRound; i++)
+					staticFences[i] = static_cast<VulkanBinaryCPUWaitableFence *>(fences[i + firstFence])->GetFence();
+
+				RKIT_VK_CHECK(m_vkd.vkWaitForFences(m_device, static_cast<uint32_t>(fencesThisRound), staticFences.GetBuffer(), waitForAll ? VK_TRUE : VK_FALSE, timeoutMSec));
+			}
+		}
+		else
+		{
+			Vector<VkFence> dynFences;
+			RKIT_CHECK(dynFences.Resize(numFences));
+			for (size_t i = 0; i < numFences; i++)
+				dynFences[i] = static_cast<VulkanBinaryCPUWaitableFence *>(fences[i])->GetFence();
+
+			RKIT_VK_CHECK(m_vkd.vkWaitForFences(m_device, static_cast<uint32_t>(numFences), dynFences.GetBuffer(), waitForAll ? VK_TRUE : VK_FALSE, timeoutMSec));
+		}
 
 		return ResultCode::kOK;
 	}

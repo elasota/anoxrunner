@@ -66,7 +66,6 @@ namespace anox
 		rkit::data::IDataDriver &GetDataDriver() const;
 		const anox::GraphicsSettings &GetGraphicsSettings() const;
 
-
 		void SetSplashProgress(uint64_t progress);
 
 	private:
@@ -265,6 +264,11 @@ namespace anox
 		bool m_haveExistingMergedCache = false;
 
 		rkit::data::IDataDriver &m_dataDriver;
+
+		uint8_t m_numSyncPoints = 3;
+		uint8_t m_currentSyncPoint = 0;
+		rkit::render::IBaseCommandQueue *m_swapChainQueue = nullptr;
+		rkit::Vector<rkit::UniquePtr<rkit::render::IBinaryCPUWaitableFence>> m_syncPointFences;
 	};
 
 
@@ -759,7 +763,7 @@ namespace anox
 		rkit::UniquePtr<rkit::render::IDisplay> display;
 		RKIT_CHECK(displayManager->CreateDisplay(display, m_currentDisplayMode.Get()));
 
-		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), nullptr, m_renderDevice.Get(), nullptr, 0));
+		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), nullptr, m_renderDevice.Get(), nullptr, 0, 0));
 
 		rkit::render::IProgressMonitor *progressMonitor = m_gameWindow->GetDisplay().GetProgressMonitor();
 
@@ -826,6 +830,14 @@ namespace anox
 
 		m_renderDevice = std::move(device);
 
+		m_syncPointFences.Reset();
+
+		RKIT_CHECK(m_syncPointFences.Resize(m_numSyncPoints));
+		for (size_t i = 0; i < m_numSyncPoints; i++)
+		{
+			RKIT_CHECK(m_renderDevice->CreateBinaryCPUWaitableFence(m_syncPointFences[i], true));
+		}
+
 		// FIXME: Localize
 		RKIT_CHECK(progressMonitor->SetText("Loading shader package..."));
 
@@ -880,6 +892,8 @@ namespace anox
 
 		RKIT_ASSERT(swapChainQueue != nullptr);
 
+		m_swapChainQueue = swapChainQueue;
+
 		rkit::UniquePtr<rkit::render::ISwapChainPrototype> swapChainPrototype;
 		RKIT_CHECK(m_renderDevice->CreateSwapChainPrototype(swapChainPrototype, *display));
 
@@ -892,7 +906,7 @@ namespace anox
 			return rkit::ResultCode::kOperationFailed;
 		}
 
-		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), std::move(swapChainPrototype), m_renderDevice.Get(), swapChainQueue, 2));
+		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), std::move(swapChainPrototype), m_renderDevice.Get(), swapChainQueue, 2, m_numSyncPoints));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -1142,6 +1156,8 @@ namespace anox
 
 	rkit::Result GraphicsSubsystem::BeginFrame()
 	{
+		RKIT_CHECK(m_syncPointFences[m_currentSyncPoint]->WaitFor());
+
 		RKIT_CHECK(m_gameWindow->BeginFrame());
 
 		return rkit::ResultCode::kOK;
@@ -1150,6 +1166,17 @@ namespace anox
 	rkit::Result GraphicsSubsystem::EndFrame()
 	{
 		RKIT_CHECK(m_gameWindow->EndFrame());
+
+		rkit::render::IBinaryCPUWaitableFence &fence = *m_syncPointFences[m_currentSyncPoint];
+
+		RKIT_CHECK(fence.ResetFence());
+		RKIT_CHECK(m_swapChainQueue->QueueSignalBinaryCPUWaitable(*m_syncPointFences[m_numSyncPoints]));
+		RKIT_CHECK(m_swapChainQueue->Flush());
+
+		m_currentSyncPoint++;
+
+		if (m_currentSyncPoint == m_numSyncPoints)
+			m_currentSyncPoint = 0;
 
 		return rkit::ResultCode::kOK;
 	}

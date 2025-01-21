@@ -13,6 +13,5 @@ namespace rkit::render
 		virtual ~ISwapChainSyncPoint() {}
 
 		virtual ISwapChainSubframe *GetSubframe(size_t subframeIndex) = 0;
-		virtual Result WaitForCompletion() = 0;
 	};
 }
