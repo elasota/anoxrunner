@@ -4,15 +4,12 @@
 #define RKIT_ASSERT(n) ((void)0)
 #else
 
-namespace rkit
+namespace rkit::priv
 {
-	namespace Private
-	{
-		inline void AssertionCheckFunc(bool expr, const char *exprStr, const char *file, unsigned int line);
-	}
+	inline void AssertionCheckFunc(bool expr, const char *exprStr, const char *file, unsigned int line);
 }
 
-#define RKIT_ASSERT(expr)	(::rkit::Private::AssertionCheckFunc(!!(expr), #expr, __FILE__, __LINE__))
+#define RKIT_ASSERT(expr)	(::rkit::priv::AssertionCheckFunc(!!(expr), #expr, __FILE__, __LINE__))
 
 #endif
 

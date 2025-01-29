@@ -380,8 +380,6 @@ namespace rkit::utils
 		{
 			lock.Unlock();
 
-			job->m_jobWasQueued = true;
-			job->m_jobWasStarted = true;
 			JobDone(job.Get(), false);
 			return;
 		}

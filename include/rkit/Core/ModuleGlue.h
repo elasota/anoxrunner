@@ -17,7 +17,7 @@
 #include <cassert>
 
 #define RKIT_IMPLEMENT_ASSERTION_CHECK_FUNC	\
-	void rkit::Private::AssertionCheckFunc(bool expr, const char *exprStr, const char *file, unsigned int line)\
+	void rkit::priv::AssertionCheckFunc(bool expr, const char *exprStr, const char *file, unsigned int line)\
 	{\
 		if (!expr)\
 		{\

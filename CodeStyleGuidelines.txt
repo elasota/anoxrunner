@@ -1,0 +1,26 @@
+Hard tabs, width 4.
+
+Unix line breaks (LF only)
+
+Allman indentation style (start braces on line after conditions, same indent as
+condition).
+
+Braced blocks of code after a "case" are indented 1 level past the case label.
+
+RKIT_CHECK must always be inside braces.  In any other cases, do not use braces
+for single lines of code.
+
+Starting braces on empty line.
+
+No "auto" except for lambdas
+
+Do not put headers or prototypes in preprocessor blocks that depend on
+RKIT_IS_DEBUG or NDEBUG.
+If you absolutely must do something that depends on a debug define, add it to
+RKIT_IMPLEMENT_PER_MODULE_FUNCTIONS.
+
+Do not use malloc/free.  Use IMallocDriver.
+Do not use new/delete.  Use New/Delete from NewDelete.h.
+Do not use new[]/delete[], use vectors.
+
+Private helper functions and templates go in rkit::priv

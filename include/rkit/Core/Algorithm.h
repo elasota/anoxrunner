@@ -16,7 +16,7 @@ namespace rkit
 		static bool CompareEqual(const T &a, const T &b);
 	};
 
-	namespace Private
+	namespace priv
 	{
 		template<class T, bool TIsIntegral, bool TIsSigned>
 		struct SafeMathHelper
@@ -196,46 +196,46 @@ namespace rkit
 template<class T>
 rkit::Result rkit::SafeAdd(T &result, const T &a, const T &b)
 {
-	return Private::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::Add(result, a, b);
+	return priv::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::Add(result, a, b);
 }
 
 template<class T>
 rkit::Result rkit::SafeSub(T &result, const T &a, const T &b)
 {
-	return Private::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::Sub(result, a, b);
+	return priv::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::Sub(result, a, b);
 }
 
 template<class T>
 rkit::Result rkit::SafeMul(T &result, const T &a, const T &b)
 {
-	return Private::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::Mul(result, a, b);
+	return priv::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::Mul(result, a, b);
 }
 
 template<class T>
 rkit::Result rkit::SafeDiv(T &result, const T &a, const T &b)
 {
 	T modResult;
-	return Private::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::Div(result, modResult, a, b);
+	return priv::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::Div(result, modResult, a, b);
 }
 
 template<class T>
 rkit::Result rkit::SafeMod(T &result, const T &a, const T &b)
 {
 	T divResult;
-	return Private::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::Div(divResult, result, a, b);
+	return priv::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::Div(divResult, result, a, b);
 }
 
 template<class T>
 rkit::Result rkit::SafeDivMod(T &divResult, T &modResult, const T &a, const T &b)
 {
-	return Private::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::Div(divResult, modResult, a, b);
+	return priv::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::Div(divResult, modResult, a, b);
 }
 
 
 template<class TSigned, class TUnsigned>
 inline TUnsigned rkit::ToUnsignedAbs(TSigned v)
 {
-	return Private::ToUnsignedAbs<TSigned, TUnsigned>(v);
+	return priv::ToUnsignedAbs<TSigned, TUnsigned>(v);
 }
 
 
@@ -273,7 +273,7 @@ bool rkit::DefaultComparer<T>::CompareEqual(const T &a, const T &b)
 
 // Signed integers
 template<class T>
-rkit::Result rkit::Private::SafeMathHelper<T, true, true>::Add(T &result, T a, T b)
+rkit::Result rkit::priv::SafeMathHelper<T, true, true>::Add(T &result, T a, T b)
 {
 	if (a == 0 || b == 0)
 	{
@@ -306,7 +306,7 @@ rkit::Result rkit::Private::SafeMathHelper<T, true, true>::Add(T &result, T a, T
 }
 
 template<class T>
-rkit::Result rkit::Private::SafeMathHelper<T, true, true>::Sub(T &result, T a, T b)
+rkit::Result rkit::priv::SafeMathHelper<T, true, true>::Sub(T &result, T a, T b)
 {
 	if (b == 0)
 	{
@@ -349,7 +349,7 @@ rkit::Result rkit::Private::SafeMathHelper<T, true, true>::Sub(T &result, T a, T
 }
 
 template<class T>
-rkit::Result rkit::Private::SafeMathHelper<T, true, true>::Mul(T &result, T a, T b)
+rkit::Result rkit::priv::SafeMathHelper<T, true, true>::Mul(T &result, T a, T b)
 {
 	typedef typename std::make_unsigned<T>::type UnsignedT_t;
 
@@ -376,7 +376,7 @@ rkit::Result rkit::Private::SafeMathHelper<T, true, true>::Mul(T &result, T a, T
 }
 
 template<class T>
-rkit::Result rkit::Private::SafeMathHelper<T, true, true>::DivMod(T &divResult, T &modResult, T a, T b)
+rkit::Result rkit::priv::SafeMathHelper<T, true, true>::DivMod(T &divResult, T &modResult, T a, T b)
 {
 	if (b == 0)
 		return ResultCode::kDivisionByZero;
@@ -391,7 +391,7 @@ rkit::Result rkit::Private::SafeMathHelper<T, true, true>::DivMod(T &divResult, 
 
 // Unsigned integers
 template<class T>
-rkit::Result rkit::Private::SafeMathHelper<T, true, false>::Add(T &result, T a, T b)
+rkit::Result rkit::priv::SafeMathHelper<T, true, false>::Add(T &result, T a, T b)
 {
 	if (b > std::numeric_limits<T>::max() - a)
 		return ResultCode::kIntegerOverflow;
@@ -401,7 +401,7 @@ rkit::Result rkit::Private::SafeMathHelper<T, true, false>::Add(T &result, T a, 
 }
 
 template<class T>
-rkit::Result rkit::Private::SafeMathHelper<T, true, false>::Sub(T &result, T a, T b)
+rkit::Result rkit::priv::SafeMathHelper<T, true, false>::Sub(T &result, T a, T b)
 {
 	if (b > a)
 		return ResultCode::kIntegerOverflow;
@@ -411,7 +411,7 @@ rkit::Result rkit::Private::SafeMathHelper<T, true, false>::Sub(T &result, T a, 
 }
 
 template<class T>
-rkit::Result rkit::Private::SafeMathHelper<T, true, false>::Mul(T &result, T a, T b)
+rkit::Result rkit::priv::SafeMathHelper<T, true, false>::Mul(T &result, T a, T b)
 {
 	if (a != 0 && b != 0)
 	{
@@ -424,7 +424,7 @@ rkit::Result rkit::Private::SafeMathHelper<T, true, false>::Mul(T &result, T a, 
 }
 
 template<class T>
-rkit::Result rkit::Private::SafeMathHelper<T, true, false>::DivMod(T &divResult, T &modResult, T a, T b)
+rkit::Result rkit::priv::SafeMathHelper<T, true, false>::DivMod(T &divResult, T &modResult, T a, T b)
 {
 	if (b == 0)
 		return ResultCode::kDivisionByZero;
@@ -436,7 +436,7 @@ rkit::Result rkit::Private::SafeMathHelper<T, true, false>::DivMod(T &divResult,
 
 
 template<class TSigned, class TUnsigned>
-TUnsigned rkit::Private::ToUnsignedAbs(TSigned v)
+TUnsigned rkit::priv::ToUnsignedAbs(TSigned v)
 {
 	if (v >= 0)
 		return static_cast<TUnsigned>(v);
@@ -453,32 +453,32 @@ TUnsigned rkit::Private::ToUnsignedAbs(TSigned v)
 }
 
 template<class T>
-void rkit::Private::AssignSpanOp<T>::Apply(T *dest, const T *src)
+void rkit::priv::AssignSpanOp<T>::Apply(T *dest, const T *src)
 {
 	*dest = *src;
 }
 
 template<class T>
-void rkit::Private::MoveAssignSpanOp<T>::Apply(T *dest, T *src)
+void rkit::priv::MoveAssignSpanOp<T>::Apply(T *dest, T *src)
 {
 	*dest = static_cast<T &&>(*src);
 }
 
 template<class T>
-void rkit::Private::CopyConstructSpanOp<T>::Apply(T *dest, const T *src)
+void rkit::priv::CopyConstructSpanOp<T>::Apply(T *dest, const T *src)
 {
 	new (dest) T(*src);
 }
 
 template<class T>
-void rkit::Private::MoveConstructSpanOp<T>::Apply(T *dest, T *src)
+void rkit::priv::MoveConstructSpanOp<T>::Apply(T *dest, T *src)
 {
 	new (dest) T(static_cast<T &&>(*src));
 }
 
 
 template<class T, class TSrc, class TOperator>
-void rkit::Private::ApplyToSpanNonOverlapping(const Span<T> &dest, const Span<TSrc> &src)
+void rkit::priv::ApplyToSpanNonOverlapping(const Span<T> &dest, const Span<TSrc> &src)
 {
 	RKIT_STATIC_ASSERT(TOperator::kMayOverlap);
 
@@ -496,7 +496,7 @@ void rkit::Private::ApplyToSpanNonOverlapping(const Span<T> &dest, const Span<TS
 }
 
 template<class T, class TSrc, class TOperator>
-void rkit::Private::ApplyToSpan(const Span<T> &dest, const Span<TSrc> &src)
+void rkit::priv::ApplyToSpan(const Span<T> &dest, const Span<TSrc> &src)
 {
 	RKIT_ASSERT(dest.Count() == src.Count());
 
@@ -534,38 +534,38 @@ void rkit::Private::ApplyToSpan(const Span<T> &dest, const Span<TSrc> &src)
 }
 
 template<class T>
-void rkit::Private::SpanOpsHelper<T, false>::CopyConstructSpan(const Span<T> &dest, const Span<const T> &src)
+void rkit::priv::SpanOpsHelper<T, false>::CopyConstructSpan(const Span<T> &dest, const Span<const T> &src)
 {
-	return Private::ApplyToSpanNonOverlapping<T, const T, Private::CopyConstructSpanOp<T> >(dest, src);
+	return priv::ApplyToSpanNonOverlapping<T, const T, priv::CopyConstructSpanOp<T> >(dest, src);
 }
 
 template<class T>
-void rkit::Private::SpanOpsHelper<T, false>::MoveConstructSpan(const Span<T> &dest, const Span<T> &src)
+void rkit::priv::SpanOpsHelper<T, false>::MoveConstructSpan(const Span<T> &dest, const Span<T> &src)
 {
-	return Private::ApplyToSpanNonOverlapping<T, T, Private::MoveConstructSpanOp<T> >(dest, src);
+	return priv::ApplyToSpanNonOverlapping<T, T, priv::MoveConstructSpanOp<T> >(dest, src);
 }
 
 template<class T>
-void rkit::Private::SpanOpsHelper<T, false>::CopySpanNonOverlapping(const Span<T> &dest, const Span<const T> &src)
+void rkit::priv::SpanOpsHelper<T, false>::CopySpanNonOverlapping(const Span<T> &dest, const Span<const T> &src)
 {
-	return Private::ApplyToSpanNonOverlapping<T, const T, Private::AssignSpanOp<T> >(dest, src);
+	return priv::ApplyToSpanNonOverlapping<T, const T, priv::AssignSpanOp<T> >(dest, src);
 }
 
 template<class T>
-void rkit::Private::SpanOpsHelper<T, false>::CopySpan(const Span<T> &dest, const Span<const T> &src)
+void rkit::priv::SpanOpsHelper<T, false>::CopySpan(const Span<T> &dest, const Span<const T> &src)
 {
-	return Private::ApplyToSpan<T, const T, Private::AssignSpanOp<T> >(dest, src);
+	return priv::ApplyToSpan<T, const T, priv::AssignSpanOp<T> >(dest, src);
 }
 
 template<class T>
-void rkit::Private::SpanOpsHelper<T, false>::MoveSpan(const Span<T> &dest, const Span<T> &src)
+void rkit::priv::SpanOpsHelper<T, false>::MoveSpan(const Span<T> &dest, const Span<T> &src)
 {
-	return Private::ApplyToSpanNonOverlapping<T, T, Private::MoveAssignSpanOp<T> >(dest, src);
+	return priv::ApplyToSpanNonOverlapping<T, T, priv::MoveAssignSpanOp<T> >(dest, src);
 }
 
 
 template<class T>
-int rkit::Private::FindBitsHelper<T, true>::FindLowestSetBit(T value)
+int rkit::priv::FindBitsHelper<T, true>::FindLowestSetBit(T value)
 {
 	if (value == 0)
 		return -1;
@@ -578,35 +578,35 @@ int rkit::Private::FindBitsHelper<T, true>::FindLowestSetBit(T value)
 }
 
 template<class T>
-void rkit::Private::SpanOpsHelper<T, true>::CopyConstructSpan(const Span<T> &dest, const Span<const T> &src)
+void rkit::priv::SpanOpsHelper<T, true>::CopyConstructSpan(const Span<T> &dest, const Span<const T> &src)
 {
 	RKIT_ASSERT(dest.Count() == src.Count());
 	memcpy(dest.Ptr(), src.Ptr(), dest.Count() * sizeof(T));
 }
 
 template<class T>
-void rkit::Private::SpanOpsHelper<T, true>::MoveConstructSpan(const Span<T> &dest, const Span<T> &src)
+void rkit::priv::SpanOpsHelper<T, true>::MoveConstructSpan(const Span<T> &dest, const Span<T> &src)
 {
 	RKIT_ASSERT(dest.Count() == src.Count());
 	memcpy(dest.Ptr(), src.Ptr(), dest.Count() * sizeof(T));
 }
 
 template<class T>
-void rkit::Private::SpanOpsHelper<T, true>::CopySpanNonOverlapping(const Span<T> &dest, const Span<const T> &src)
+void rkit::priv::SpanOpsHelper<T, true>::CopySpanNonOverlapping(const Span<T> &dest, const Span<const T> &src)
 {
 	RKIT_ASSERT(dest.Count() == src.Count());
 	memcpy(dest.Ptr(), src.Ptr(), dest.Count() * sizeof(T));
 }
 
 template<class T>
-void rkit::Private::SpanOpsHelper<T, true>::CopySpan(const Span<T> &dest, const Span<const T> &src)
+void rkit::priv::SpanOpsHelper<T, true>::CopySpan(const Span<T> &dest, const Span<const T> &src)
 {
 	RKIT_ASSERT(dest.Count() == src.Count());
 	memmove(dest.Ptr(), src.Ptr(), dest.Count() * sizeof(T));
 }
 
 template<class T>
-void rkit::Private::SpanOpsHelper<T, true>::MoveSpan(const Span<T> &dest, const Span<T> &src)
+void rkit::priv::SpanOpsHelper<T, true>::MoveSpan(const Span<T> &dest, const Span<T> &src)
 {
 	RKIT_ASSERT(dest.Count() == src.Count());
 	memmove(dest.Ptr(), src.Ptr(), dest.Count() * sizeof(T));
@@ -617,31 +617,31 @@ void rkit::Private::SpanOpsHelper<T, true>::MoveSpan(const Span<T> &dest, const 
 template<class T>
 void rkit::CopyConstructSpan(const Span<T> &dest, const Span<const T> &src)
 {
-	return Private::SpanOpsHelper<T, std::is_trivially_copyable<T>::value>::CopyConstructSpan(dest, src);
+	return priv::SpanOpsHelper<T, std::is_trivially_copyable<T>::value>::CopyConstructSpan(dest, src);
 }
 
 template<class T>
 void rkit::MoveConstructSpan(const Span<T> &dest, const Span<T> &src)
 {
-	return Private::SpanOpsHelper<T, std::is_trivially_copyable<T>::value>::MoveConstructSpan(dest, src);
+	return priv::SpanOpsHelper<T, std::is_trivially_copyable<T>::value>::MoveConstructSpan(dest, src);
 }
 
 template<class T>
 void rkit::CopySpanNonOverlapping(const Span<T> &dest, const Span<const T> &src)
 {
-	return Private::SpanOpsHelper<T, std::is_trivially_copyable<T>::value>::CopySpanNonOverlapping(dest, src);
+	return priv::SpanOpsHelper<T, std::is_trivially_copyable<T>::value>::CopySpanNonOverlapping(dest, src);
 }
 
 template<class T>
 void rkit::CopySpan(const Span<T> &dest, const Span<const T> &src)
 {
-	return Private::SpanOpsHelper<T, std::is_trivially_copyable<T>::value>::CopySpan(dest, src);
+	return priv::SpanOpsHelper<T, std::is_trivially_copyable<T>::value>::CopySpan(dest, src);
 }
 
 template<class T>
 void rkit::MoveSpan(const Span<T> &dest, const Span<T> &src)
 {
-	return Private::SpanOpsHelper<T, std::is_trivially_copyable<T>::value>::MoveSpan(dest, src);
+	return priv::SpanOpsHelper<T, std::is_trivially_copyable<T>::value>::MoveSpan(dest, src);
 }
 
 template<class T, class TComparer>
@@ -713,5 +713,5 @@ int rkit::CompareSpans(const Span<T> &srcA, const Span<const T> &srcB)
 template<class T>
 int rkit::FindLowestSetBit(T value)
 {
-	return rkit::Private::FindBitsHelper<T, std::is_integral<T>::value &&std::is_unsigned<T>::value>::FindLowestSetBit(value);
+	return rkit::priv::FindBitsHelper<T, std::is_integral<T>::value &&std::is_unsigned<T>::value>::FindLowestSetBit(value);
 }
