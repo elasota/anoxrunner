@@ -7,6 +7,7 @@
 #include "rkit/Core/Module.h"
 #include "rkit/Core/ModuleGlue.h"
 #include "rkit/Core/ModuleDriver.h"
+#include "rkit/Core/Optional.h"
 #include "rkit/Core/ProgramStub.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/SystemDriver.h"
@@ -57,6 +58,8 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 	rkit::StringView dataDirectory;
 
 	rkit::render::BackendType renderBackendType = rkit::render::BackendType::Vulkan;
+
+	rkit::Optional<uint16_t> numThreads;
 
 	for (size_t i = 0; i < args.Count(); i++)
 	{
@@ -115,6 +118,25 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 		}
 		else if (arg == "-run")
 			run = true;
+		else if (arg == "-threads")
+		{
+			i++;
+
+			if (i == args.Count())
+			{
+				rkit::log::Error("Expected build target after -build");
+				return rkit::ResultCode::kInvalidParameter;
+			}
+
+			long numThreadsArg = atol(args[i].GetChars());
+			if (numThreadsArg < 1 || numThreadsArg > 512)
+			{
+				rkit::log::Error("Invalid thread count for -threads");
+				return rkit::ResultCode::kInvalidParameter;
+			}
+
+			numThreads = static_cast<uint16_t>(numThreadsArg);
+		}
 		else
 		{
 			rkit::log::ErrorFmt("Unknown argument %s", arg.GetChars());
@@ -151,7 +173,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 
 	if (run)
 	{
-		RKIT_CHECK(IAnoxGame::Create(m_game));
+		RKIT_CHECK(IAnoxGame::Create(m_game, numThreads));
 
 		RKIT_CHECK(m_game->Start());
 	}

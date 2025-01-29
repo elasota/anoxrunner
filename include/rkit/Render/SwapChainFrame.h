@@ -8,10 +8,15 @@ namespace rkit::render
 	{
 	};
 
+	struct ISwapChainFrame
+	{
+		virtual ISwapChainSubframe *GetSubframe(size_t subframeIndex) const = 0;
+	};
+
 	struct ISwapChainSyncPoint
 	{
 		virtual ~ISwapChainSyncPoint() {}
 
-		virtual ISwapChainSubframe *GetSubframe(size_t subframeIndex) = 0;
+		virtual size_t GetFrameIndex() const = 0;
 	};
 }

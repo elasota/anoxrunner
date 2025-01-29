@@ -2,6 +2,7 @@
 
 #include "anox/AnoxGraphicsSubsystem.h"
 
+#include "rkit/Render/CommandAllocator.h"
 #include "rkit/Render/CommandQueue.h"
 #include "rkit/Render/DeviceCaps.h"
 #include "rkit/Render/DisplayManager.h"
@@ -21,6 +22,7 @@
 #include "rkit/Core/BufferStream.h"
 #include "rkit/Core/DriverModuleInitParams.h"
 #include "rkit/Core/Endian.h"
+#include "rkit/Core/Event.h"
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/Job.h"
 #include "rkit/Core/LogDriver.h"
@@ -220,6 +222,17 @@ namespace anox
 			kFinished,
 		};
 
+		struct FrameSyncPoint
+		{
+			rkit::UniquePtr<rkit::render::IBinaryCPUWaitableFence> m_frameEndFence;
+
+			rkit::UniquePtr<rkit::render::ICopyCommandAllocator> m_dmaCmdAlloc;
+			rkit::UniquePtr<rkit::render::IGraphicsCommandAllocator> m_graphicsCmdAlloc;
+
+			rkit::UniquePtr<rkit::Job> m_refillDmaCommandJob;
+			rkit::UniquePtr<rkit::Job> m_refillGraphicsCommandJob;
+		};
+
 		rkit::Result TransitionDisplayMode();
 		rkit::Result TransitionBackend();
 
@@ -268,7 +281,10 @@ namespace anox
 		uint8_t m_numSyncPoints = 3;
 		uint8_t m_currentSyncPoint = 0;
 		rkit::render::IBaseCommandQueue *m_swapChainQueue = nullptr;
-		rkit::Vector<rkit::UniquePtr<rkit::render::IBinaryCPUWaitableFence>> m_syncPointFences;
+		rkit::Vector<FrameSyncPoint> m_syncPoints;
+
+		rkit::UniquePtr<rkit::IEvent> m_shutdownJoinEvent;
+		rkit::UniquePtr<rkit::IEvent> m_shutdownTerminateEvent;
 	};
 
 
@@ -750,6 +766,8 @@ namespace anox
 		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
 
 		RKIT_CHECK(sysDriver->CreateMutex(m_setupMutex));
+		RKIT_CHECK(sysDriver->CreateEvent(m_shutdownJoinEvent, true, false));
+		RKIT_CHECK(sysDriver->CreateEvent(m_shutdownTerminateEvent, true, false));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -830,12 +848,14 @@ namespace anox
 
 		m_renderDevice = std::move(device);
 
-		m_syncPointFences.Reset();
+		m_syncPoints.Reset();
 
-		RKIT_CHECK(m_syncPointFences.Resize(m_numSyncPoints));
+		RKIT_CHECK(m_syncPoints.Resize(m_numSyncPoints));
+		m_currentSyncPoint = 0;
+
 		for (size_t i = 0; i < m_numSyncPoints; i++)
 		{
-			RKIT_CHECK(m_renderDevice->CreateBinaryCPUWaitableFence(m_syncPointFences[i], true));
+			RKIT_CHECK(m_renderDevice->CreateBinaryCPUWaitableFence(m_syncPoints[i].m_frameEndFence, true));
 		}
 
 		// FIXME: Localize
@@ -1126,6 +1146,12 @@ namespace anox
 
 			rkit::GetDrivers().m_systemDriver->SleepMSec(1000u / 60u);
 
+			{
+				rkit::RCPtr<rkit::Job> jobToRun = m_threadPool.GetJobQueue()->WaitForWork(m_threadPool.GetMainThreadJobTypes(), false, nullptr, nullptr);
+				if (jobToRun.IsValid())
+					jobToRun->Run();
+			}
+
 			rkit::render::IProgressMonitor *progressMonitor = m_gameWindow->GetDisplay().GetProgressMonitor();
 			if (progressMonitor)
 			{
@@ -1156,27 +1182,44 @@ namespace anox
 
 	rkit::Result GraphicsSubsystem::BeginFrame()
 	{
-		RKIT_CHECK(m_syncPointFences[m_currentSyncPoint]->WaitFor());
+		if (!m_currentDisplayMode.IsSet() || m_currentDisplayMode.Get() == rkit::render::DisplayMode::kSplash)
+			return rkit::ResultCode::kOK;
 
-		RKIT_CHECK(m_gameWindow->BeginFrame());
+		RKIT_CHECK(m_syncPoints[m_currentSyncPoint].m_frameEndFence->WaitFor());
+
+		RKIT_CHECK(m_gameWindow->BeginFrame(*this));
 
 		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result GraphicsSubsystem::EndFrame()
 	{
+		if (!m_currentDisplayMode.IsSet() || m_currentDisplayMode.Get() == rkit::render::DisplayMode::kSplash)
+			return rkit::ResultCode::kOK;
+
+		// Finish rendering
+		if (m_swapChainQueue)
+		{
+		}
+
+		// Present all windows
 		RKIT_CHECK(m_gameWindow->EndFrame());
 
-		rkit::render::IBinaryCPUWaitableFence &fence = *m_syncPointFences[m_currentSyncPoint];
+		// Post completion fence
+		if (m_swapChainQueue)
+		{
+			rkit::render::IBinaryCPUWaitableFence &fence = *m_syncPoints[m_currentSyncPoint].m_frameEndFence;
 
-		RKIT_CHECK(fence.ResetFence());
-		RKIT_CHECK(m_swapChainQueue->QueueSignalBinaryCPUWaitable(*m_syncPointFences[m_numSyncPoints]));
-		RKIT_CHECK(m_swapChainQueue->Flush());
+			RKIT_CHECK(fence.ResetFence());
 
-		m_currentSyncPoint++;
+			RKIT_CHECK(m_swapChainQueue->QueueSignalBinaryCPUWaitable(fence));
+			RKIT_CHECK(m_swapChainQueue->Flush());
 
-		if (m_currentSyncPoint == m_numSyncPoints)
-			m_currentSyncPoint = 0;
+			m_currentSyncPoint++;
+
+			if (m_currentSyncPoint == m_numSyncPoints)
+				m_currentSyncPoint = 0;
+		}
 
 		return rkit::ResultCode::kOK;
 	}

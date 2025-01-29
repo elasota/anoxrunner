@@ -1,6 +1,7 @@
 #include "rkit/Core/Event.h"
 #include "rkit/Core/Job.h"
 #include "rkit/Core/JobQueue.h"
+#include "rkit/Core/JobTypeList.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/RefCounted.h"
 #include "rkit/Core/Vector.h"
@@ -21,12 +22,19 @@ namespace rkit::utils
 
 		Result Close() override;
 		IJobQueue *GetJobQueue() const override;
-		JobType GetMainThreadJobType() const override;
+		const ISpan<JobType> &GetMainThreadJobTypes() const override;
+		const ISpan<JobType> &GetAllJobTypes() const override;
 
 	private:
 		struct ThreadData
 		{
 			UniqueThreadRef m_thread;
+		};
+
+		struct AllJobTypesSpan : public ISpan<JobType>
+		{
+			size_t Count() const override;
+			JobType operator[](size_t index) const override;
 		};
 
 		Result PrivClose();
@@ -37,22 +45,35 @@ namespace rkit::utils
 
 		UniquePtr<IJobQueue> m_jobQueue;
 		Vector<ThreadData> m_threads;
+
+		AllJobTypesSpan m_allJobsSpan;
+		JobTypeList<JobType::kNormalPriority> m_normalJobsSpan;
 	};
 
 	class ThreadPoolThreadContext final : public IThreadContext
 	{
 	public:
-		explicit ThreadPoolThreadContext(ThreadPool &pool, JobType jobType, UniquePtr<IEvent> &&wakeEvent, UniquePtr<IEvent> &&terminateEvent);
+		explicit ThreadPoolThreadContext(ThreadPool &pool, Vector<JobType> &&jobTypes, UniquePtr<IEvent> &&wakeEvent, UniquePtr<IEvent> &&terminateEvent);
 
 	private:
 		Result Run() override;
 
 		ThreadPool &m_pool;
-		JobType m_jobType;
+		Vector<JobType> m_jobTypes;
 
 		UniquePtr<IEvent> m_wakeEvent;
 		UniquePtr<IEvent> m_terminateEvent;
 	};
+
+	size_t ThreadPool::AllJobTypesSpan::Count() const
+	{
+		return static_cast<size_t>(JobType::kCount);
+	}
+
+	JobType ThreadPool::AllJobTypesSpan::operator[](size_t index) const
+	{
+		return static_cast<JobType>(index);
+	}
 
 	ThreadPool::ThreadPool(const IUtilitiesDriver &utils, uint32_t numThreads)
 		: m_numThreads(numThreads)
@@ -70,14 +91,18 @@ namespace rkit::utils
 		return m_jobQueue.Get();
 	}
 
-	JobType ThreadPool::GetMainThreadJobType() const
+	const ISpan<JobType> &ThreadPool::GetMainThreadJobTypes() const
 	{
 		if (m_numThreads > 0)
-			return JobType::kNormalPriority;
+			return m_normalJobsSpan;
 		else
-			return JobType::kAnyJob;
+			return m_allJobsSpan;
 	}
 
+	const ISpan<JobType> &ThreadPool::GetAllJobTypes() const
+	{
+		return m_allJobsSpan;
+	}
 
 	ThreadPool::~ThreadPool()
 	{
@@ -125,6 +150,9 @@ namespace rkit::utils
 			if (i == 0)
 				jobType = JobType::kIO;
 
+			Vector<JobType> jobTypes;
+			RKIT_CHECK(jobTypes.Append(jobType));
+
 			ThreadData &td = m_threads[i];
 
 			UniquePtr<IEvent> wakeEvent;
@@ -134,7 +162,7 @@ namespace rkit::utils
 			RKIT_CHECK(sysDriver->CreateEvent(terminateEvent, true, false));
 
 			UniquePtr<IThreadContext> context;
-			RKIT_CHECK(New<ThreadPoolThreadContext>(context, *this, jobType, std::move(wakeEvent), std::move(terminateEvent)));
+			RKIT_CHECK(New<ThreadPoolThreadContext>(context, *this, std::move(jobTypes), std::move(wakeEvent), std::move(terminateEvent)));
 
 			RKIT_CHECK(GetDrivers().m_systemDriver->CreateThread(td.m_thread, std::move(context)));
 		}
@@ -142,9 +170,9 @@ namespace rkit::utils
 		return ResultCode::kOK;
 	}
 
-	ThreadPoolThreadContext::ThreadPoolThreadContext(ThreadPool &pool, JobType jobType, UniquePtr<IEvent> &&wakeEvent, UniquePtr<IEvent> &&terminateEvent)
+	ThreadPoolThreadContext::ThreadPoolThreadContext(ThreadPool &pool, Vector<JobType> &&jobTypes, UniquePtr<IEvent> &&wakeEvent, UniquePtr<IEvent> &&terminateEvent)
 		: m_pool(pool)
-		, m_jobType(jobType)
+		, m_jobTypes(std::move(jobTypes))
 		, m_wakeEvent(std::move(wakeEvent))
 		, m_terminateEvent(std::move(terminateEvent))
 	{
@@ -154,7 +182,7 @@ namespace rkit::utils
 	{
 		for (;;)
 		{
-			RCPtr<Job> job = m_pool.GetJobQueue()->WaitForWork(m_jobType, true, m_wakeEvent.Get(), m_terminateEvent.Get());
+			RCPtr<Job> job = m_pool.GetJobQueue()->WaitForWork(m_jobTypes.ToSpan().ToValueISpan(), true, m_wakeEvent.Get(), m_terminateEvent.Get());
 			if (!job)
 				break;
 

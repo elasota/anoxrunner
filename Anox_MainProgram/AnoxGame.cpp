@@ -9,6 +9,7 @@
 #include "rkit/Core/Module.h"
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/NewDelete.h"
+#include "rkit/Core/Optional.h"
 #include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/Vector.h"
 
@@ -24,6 +25,7 @@ namespace anox
 	class AnoxGame final : public IAnoxGame
 	{
 	public:
+		explicit AnoxGame(const rkit::Optional<uint16_t> &numThreads);
 		~AnoxGame();
 
 		rkit::Result Start() override;
@@ -37,11 +39,18 @@ namespace anox
 		rkit::UniquePtr<IGraphicsSubsystem> m_graphicsSubsystem;
 
 		rkit::data::IDataDriver *m_dataDriver = nullptr;
+
+		rkit::Optional<uint16_t> m_numThreadsOverride;
 	};
 }
 
 namespace anox
 {
+	AnoxGame::AnoxGame(const rkit::Optional<uint16_t> &numThreads)
+		: m_numThreadsOverride(numThreads)
+	{
+	}
+
 	AnoxGame::~AnoxGame()
 	{
 		if (m_threadPool.IsValid())
@@ -74,6 +83,9 @@ namespace anox
 
 		uint32_t numWorkThreads = rkit::GetDrivers().m_systemDriver->GetProcessorCount() - 1;
 
+		if (m_numThreadsOverride.IsSet())
+			numWorkThreads = m_numThreadsOverride.Get() - 1;
+
 		RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->CreateThreadPool(m_threadPool, numWorkThreads));
 		RKIT_CHECK(IGraphicsSubsystem::Create(m_graphicsSubsystem, *m_dataDriver, *m_threadPool, anox::RenderBackend::kVulkan));
 
@@ -96,8 +108,8 @@ namespace anox
 		return m_isExiting;
 	}
 
-	rkit::Result anox::IAnoxGame::Create(rkit::UniquePtr<IAnoxGame> &outGame)
+	rkit::Result anox::IAnoxGame::Create(rkit::UniquePtr<IAnoxGame> &outGame, const rkit::Optional<uint16_t> &numThreads)
 	{
-		return rkit::New<AnoxGame>(outGame);
+		return rkit::New<AnoxGame>(outGame, numThreads);
 	}
 }

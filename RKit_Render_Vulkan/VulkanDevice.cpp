@@ -73,7 +73,7 @@ namespace rkit::render::vulkan
 
 		Result CreateSwapChainPrototype(UniquePtr<ISwapChainPrototype> &outSwapChainPrototype, IDisplay &display) override;
 
-		Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, UniquePtr<ISwapChainPrototype> &&prototype, uint8_t numBackBuffers, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) override;
+		Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, UniquePtr<ISwapChainPrototype> &&prototype, uint8_t numImages, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) override;
 
 		Result CreateCopyCommandAllocator(UniquePtr<ICopyCommandAllocator> &outCommandAllocator) override;
 		Result CreateComputeCommandAllocator(UniquePtr<IComputeCommandAllocator> &outCommandAllocator) override;
@@ -568,7 +568,7 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanDevice::CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, UniquePtr<ISwapChainPrototype> &&prototypeRef, uint8_t numBackBuffers, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue)
+	Result VulkanDevice::CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, UniquePtr<ISwapChainPrototype> &&prototypeRef, uint8_t numImages, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue)
 	{
 		if (!prototypeRef.IsValid())
 			return ResultCode::kInternalError;
@@ -580,7 +580,8 @@ namespace rkit::render::vulkan
 		uint32_t queueFamily = queue->GetQueueFamily();
 
 		UniquePtr<VulkanSwapChainBase> vkSwapChain;
-		RKIT_CHECK(VulkanSwapChainBase::Create(vkSwapChain, *this, *static_cast<VulkanSwapChainPrototypeBase *>(prototype.Get()), numBackBuffers, fmt, writeBehavior, *queue));
+		RKIT_CHECK(VulkanSwapChainBase::Create(vkSwapChain, *this, *static_cast<VulkanSwapChainPrototypeBase *>(prototype.Get()), numImages, fmt, writeBehavior, *queue));
+
 
 		outSwapChain = std::move(vkSwapChain);
 

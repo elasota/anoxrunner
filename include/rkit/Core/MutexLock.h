@@ -13,13 +13,15 @@ namespace rkit
 		explicit BaseMutexLock(T &mutex);
 		~BaseMutexLock();
 
+		void Unlock();
+
 	private:
-		T &m_mutex;
+		T *m_mutex;
 	};
 
 	template<class T>
 	BaseMutexLock<T>::BaseMutexLock(T &mutex)
-		: m_mutex(mutex)
+		: m_mutex(&mutex)
 	{
 		mutex.Lock();
 	}
@@ -27,7 +29,17 @@ namespace rkit
 	template<class T>
 	BaseMutexLock<T>::~BaseMutexLock()
 	{
-		m_mutex.Unlock();
+		this->Unlock();
+	}
+
+	template<class T>
+	void BaseMutexLock<T>::Unlock()
+	{
+		if (m_mutex)
+		{
+			m_mutex->Unlock();
+			m_mutex = nullptr;
+		}
 	}
 
 	typedef BaseMutexLock<IMutex> MutexLock;

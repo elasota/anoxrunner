@@ -9,6 +9,10 @@ namespace rkit
 	template<class T>
 	class RCPtr;
 
+	struct IJobContext
+	{
+	};
+
 	struct IJobRunner
 	{
 		virtual ~IJobRunner() {}

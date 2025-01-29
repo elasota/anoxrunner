@@ -48,7 +48,7 @@ namespace rkit::render::vulkan
 	class VulkanSwapChainBase : public ISwapChain
 	{
 	public:
-		static Result Create(UniquePtr<VulkanSwapChainBase> &outSwapChain, VulkanDeviceBase &device, VulkanSwapChainPrototypeBase &prototype, uint8_t numBackBuffers,
+		static Result Create(UniquePtr<VulkanSwapChainBase> &outSwapChain, VulkanDeviceBase &device, VulkanSwapChainPrototypeBase &prototype, uint8_t numImages,
 			render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, VulkanQueueProxyBase &queue);
 	};
 }

@@ -31,6 +31,17 @@ namespace rkit::render::vulkan
 		uint32_t m_imageLayer = 0;
 	};
 
+	class VulkanSwapChainFrame final : public ISwapChainFrame
+	{
+	public:
+		Result Initialize(const Span<VulkanSwapChainSubframe> &subframes);
+
+		ISwapChainSubframe *GetSubframe(size_t subframeIndex) const override;
+
+	private:
+		Span<VulkanSwapChainSubframe> m_subframes;
+	};
+
 	class VulkanSwapChainSyncPoint final : public VulkanSwapChainSyncPointBase
 	{
 	public:
@@ -39,9 +50,9 @@ namespace rkit::render::vulkan
 
 		Result Initialize();
 
-		ISwapChainSubframe *GetSubframe(size_t subframeIndex) override;
+		size_t GetFrameIndex() const override;
 
-		Result AcquireFrame(VkSwapchainKHR swapChain, const Span<VkImage> &span, const Span<VulkanSwapChainSubframe> &subframes, uint32_t simultaneousImageCount);
+		Result AcquireFrame(VkSwapchainKHR swapChain, const Span<VkImage> &images, const Span<VulkanSwapChainFrame> &frames);
 		Result Present(VulkanQueueProxyBase &queue, VkSwapchainKHR swapChain);
 
 	private:
@@ -51,8 +62,6 @@ namespace rkit::render::vulkan
 		VkSemaphore m_presentSema = VK_NULL_HANDLE;
 
 		uint32_t m_imageIndex = 0;
-
-		Span<VulkanSwapChainSubframe> m_subframeSpan;
 	};
 
 	class VulkanSwapChainPrototype final : public VulkanSwapChainPrototypeBase
@@ -77,7 +86,7 @@ namespace rkit::render::vulkan
 	class VulkanSwapChain final : public VulkanSwapChainBase
 	{
 	public:
-		VulkanSwapChain(VulkanDeviceBase &device, IDisplay &display, uint8_t numBackBuffers, SwapChainWriteBehavior writeBehavior, VulkanQueueProxyBase &queue);
+		VulkanSwapChain(VulkanDeviceBase &device, IDisplay &display, uint8_t numImages, SwapChainWriteBehavior writeBehavior, VulkanQueueProxyBase &queue);
 		~VulkanSwapChain();
 
 		Result Initialize(VulkanSwapChainPrototype &prototype, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, uint32_t queueFamily);
@@ -102,6 +111,7 @@ namespace rkit::render::vulkan
 		size_t m_nextSyncIndex = 0;
 
 		Vector<VkImage> m_images;
+		Vector<VulkanSwapChainFrame> m_swapChainFrames;
 		Vector<VulkanSwapChainSubframe> m_swapChainSubframes;
 
 		SwapChainWriteBehavior m_writeBehavior;
@@ -120,6 +130,18 @@ namespace rkit::render::vulkan
 		m_imageLayer = imageLayer;
 
 		return ResultCode::kOK;
+	}
+
+	Result VulkanSwapChainFrame::Initialize(const Span<VulkanSwapChainSubframe> &subframes)
+	{
+		m_subframes = subframes;
+
+		return ResultCode::kOK;
+	}
+
+	ISwapChainSubframe *VulkanSwapChainFrame::GetSubframe(size_t subframeIndex) const
+	{
+		return &m_subframes[subframeIndex];
 	}
 
 	VulkanSwapChainSyncPoint::VulkanSwapChainSyncPoint(VulkanDeviceBase &device)
@@ -150,17 +172,15 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	ISwapChainSubframe *VulkanSwapChainSyncPoint::GetSubframe(size_t subframeIndex)
+	size_t VulkanSwapChainSyncPoint::GetFrameIndex() const
 	{
-		return &m_subframeSpan[subframeIndex];
+		return m_imageIndex;
 	}
 
-	Result VulkanSwapChainSyncPoint::AcquireFrame(VkSwapchainKHR swapChain, const Span<VkImage> &span, const Span<VulkanSwapChainSubframe> &subframes, uint32_t simultaneousImageCount)
+	Result VulkanSwapChainSyncPoint::AcquireFrame(VkSwapchainKHR swapChain, const Span<VkImage> &images, const Span<VulkanSwapChainFrame> &frames)
 	{
 		// TODO: Handle suboptimal
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkAcquireNextImageKHR(m_device.GetDevice(), swapChain, UINT64_MAX, m_acquireSema, VK_NULL_HANDLE, &m_imageIndex));
-
-		m_subframeSpan = subframes.SubSpan(m_imageIndex * simultaneousImageCount, simultaneousImageCount);
 
 		return ResultCode::kOK;
 	}
@@ -215,10 +235,10 @@ namespace rkit::render::vulkan
 		return UniquePtr<IVulkanSurface>(std::move(m_surface));
 	}
 
-	VulkanSwapChain::VulkanSwapChain(VulkanDeviceBase &device, IDisplay &display, uint8_t numBackBuffers, SwapChainWriteBehavior writeBehavior, VulkanQueueProxyBase &queue)
+	VulkanSwapChain::VulkanSwapChain(VulkanDeviceBase &device, IDisplay &display, uint8_t numImages, SwapChainWriteBehavior writeBehavior, VulkanQueueProxyBase &queue)
 		: m_device(device)
 		, m_display(display)
-		, m_numBuffers(static_cast<size_t>(numBackBuffers) + 1)
+		, m_numBuffers(numImages)
 		, m_writeBehavior(writeBehavior)
 		, m_queue(queue)
 		, m_simultaneousImageCount(display.GetSimultaneousImageCount())
@@ -313,6 +333,7 @@ namespace rkit::render::vulkan
 			img = VK_NULL_HANDLE;
 
 		RKIT_CHECK(m_swapChainSubframes.Resize(imageCount * simultaneousImageCount));
+		RKIT_CHECK(m_swapChainFrames.Resize(imageCount));
 
 		for (uint32_t fi = 0; fi < imageCount; fi++)
 		{
@@ -320,6 +341,8 @@ namespace rkit::render::vulkan
 			{
 				RKIT_CHECK(m_swapChainSubframes[fi * simultaneousImageCount + sfi].Initialize(fi, sfi));
 			}
+
+			RKIT_CHECK(m_swapChainFrames[fi].Initialize(m_swapChainSubframes.ToSpan().SubSpan(fi * simultaneousImageCount, simultaneousImageCount)));
 		}
 
 		RKIT_VK_CHECK(vkd.vkGetSwapchainImagesKHR(m_device.GetDevice(), m_swapChain, &imageCount, m_images.GetBuffer()));
@@ -335,7 +358,7 @@ namespace rkit::render::vulkan
 
 	Result VulkanSwapChain::AcquireFrame(ISwapChainSyncPoint &syncPointBase)
 	{
-		return static_cast<VulkanSwapChainSyncPoint &>(syncPointBase).AcquireFrame(m_swapChain, m_images.ToSpan(), m_swapChainSubframes.ToSpan(), m_simultaneousImageCount);
+		return static_cast<VulkanSwapChainSyncPoint &>(syncPointBase).AcquireFrame(m_swapChain, m_images.ToSpan(), m_swapChainFrames.ToSpan());
 	}
 
 	Result VulkanSwapChain::Present(ISwapChainSyncPoint &syncPointBase)
@@ -343,14 +366,14 @@ namespace rkit::render::vulkan
 		return static_cast<VulkanSwapChainSyncPoint &>(syncPointBase).Present(m_queue, m_swapChain);
 	}
 
-	Result VulkanSwapChainBase::Create(UniquePtr<VulkanSwapChainBase> &outSwapChain, VulkanDeviceBase &device, VulkanSwapChainPrototypeBase &prototypeBase, uint8_t numBackBuffers, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, VulkanQueueProxyBase &queue)
+	Result VulkanSwapChainBase::Create(UniquePtr<VulkanSwapChainBase> &outSwapChain, VulkanDeviceBase &device, VulkanSwapChainPrototypeBase &prototypeBase, uint8_t numImages, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, VulkanQueueProxyBase &queue)
 	{
 		VulkanSwapChainPrototype &prototype = static_cast<VulkanSwapChainPrototype &>(prototypeBase);
 
 		uint32_t queueFamily = queue.GetQueueFamily();
 
 		UniquePtr<VulkanSwapChain> swapChain;
-		RKIT_CHECK(New<VulkanSwapChain>(swapChain, device, prototype.GetDisplay(), numBackBuffers, writeBehavior, queue));
+		RKIT_CHECK(New<VulkanSwapChain>(swapChain, device, prototype.GetDisplay(), numImages, writeBehavior, queue));
 
 		RKIT_CHECK(swapChain->Initialize(prototype, fmt, writeBehavior, queueFamily));
 

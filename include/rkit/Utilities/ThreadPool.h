@@ -11,6 +11,9 @@ namespace rkit
 	template<class T>
 	class UniquePtr;
 
+	template<class T>
+	struct ISpan;
+
 	struct IJobQueue;
 }
 
@@ -22,6 +25,7 @@ namespace rkit::utils
 
 		virtual Result Close() = 0;
 		virtual IJobQueue *GetJobQueue() const = 0;
-		virtual JobType GetMainThreadJobType() const = 0;
+		virtual const ISpan<JobType> &GetMainThreadJobTypes() const = 0;
+		virtual const ISpan<JobType> &GetAllJobTypes() const = 0;
 	};
 }
