@@ -12,6 +12,9 @@ namespace rkit::render::vulkan
 	class VulkanCommandAllocatorBase : public IGraphicsComputeCommandAllocator
 	{
 	public:
-		static Result Create(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, VulkanDeviceBase &device, CommandQueueType queueType, uint32_t queueFamily);
+		virtual CommandQueueType GetQueueType() const = 0;
+		virtual bool IsBundle() const = 0;
+
+		static Result Create(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, VulkanDeviceBase &device, CommandQueueType queueType, bool isBundle, uint32_t queueFamily);
 	};
 }

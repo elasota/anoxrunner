@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CommandQueueType.h"
 #include "Fence.h"
 #include "PipelineStage.h"
 
@@ -35,6 +36,8 @@ namespace rkit::render
 		virtual Result QueueSignalBinaryGPUWaitable(IBinaryGPUWaitableFence &fence) = 0;
 		virtual Result QueueSignalBinaryCPUWaitable(IBinaryCPUWaitableFence &fence) = 0;
 		virtual Result QueueWaitForBinaryGPUWaitable(IBinaryGPUWaitableFence &fence, const EnumMask<PipelineStage> &stagesToWaitFor) = 0;
+
+		virtual CommandQueueType GetCommandQueueType() const = 0;
 
 		virtual Result Flush() = 0;
 

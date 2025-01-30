@@ -16,12 +16,26 @@ namespace rkit
 namespace rkit::render::vulkan
 {
 	class VulkanDeviceBase;
+	class VulkanCommandAllocatorBase;
 
-	class VulkanCommandListBase : public IGraphicsComputeCommandList, public IInternalCommandList
+	class VulkanCommandList final : public IGraphicsComputeCommandList, public IInternalCommandList
 	{
 	public:
-		virtual VkCommandBuffer GetCommandBuffer() const = 0;
+		VulkanCommandList(VulkanDeviceBase &device, VkCommandBuffer commandBuffer, VulkanCommandAllocatorBase &allocator);
+		~VulkanCommandList();
 
-		static Result Create(UniquePtr<VulkanCommandListBase> &outCommandList, VulkanDeviceBase &device, VkCommandPool commandPool, CommandQueueType queueType, bool isBundle);
+		IComputeCommandList *ToComputeCommandList() override;
+		IGraphicsCommandList *ToGraphicsCommandList() override;
+		IGraphicsComputeCommandList *ToGraphicsComputeCommandList() override;
+		ICopyCommandList *ToCopyCommandList() override;
+
+		IInternalCommandList *ToInternalCommandList() override;
+
+		VkCommandBuffer GetCommandBuffer() const;
+
+	private:
+		VulkanDeviceBase &m_device;
+		VulkanCommandAllocatorBase &m_allocator;
+		VkCommandBuffer m_cmdBuffer = VK_NULL_HANDLE;
 	};
 }

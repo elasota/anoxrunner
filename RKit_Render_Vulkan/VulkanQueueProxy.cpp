@@ -18,7 +18,7 @@ namespace rkit::render::vulkan
 	class VulkanQueueProxy final : public VulkanQueueProxyBase
 	{
 	public:
-		VulkanQueueProxy(IMallocDriver *alloc, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI);
+		VulkanQueueProxy(IMallocDriver *alloc, CommandQueueType queueType, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI);
 		~VulkanQueueProxy();
 
 		Result QueueCopy(const Span<ICopyCommandList *> &cmdLists) override;
@@ -32,6 +32,8 @@ namespace rkit::render::vulkan
 		Result QueueSignalBinaryGPUWaitable(IBinaryGPUWaitableFence &fence) override;
 		Result QueueSignalBinaryCPUWaitable(IBinaryCPUWaitableFence &fence) override;
 		Result QueueWaitForBinaryGPUWaitable(IBinaryGPUWaitableFence &fence, const EnumMask<PipelineStage> &stagesToWaitFor) override;
+
+		CommandQueueType GetCommandQueueType() const override;
 
 		IInternalCommandQueue *ToInternalCommandQueue() override;
 
@@ -81,14 +83,16 @@ namespace rkit::render::vulkan
 		QueueAction m_lastQueueAction = QueueAction::NonBatchable;
 
 		IMallocDriver *m_alloc;
+		CommandQueueType m_queueType;
 		VulkanDeviceBase &m_device;
 		VkQueue m_queue;
 		uint32_t m_queueFamily;
 		const VulkanDeviceAPI &m_vkd;
 	};
 
-	VulkanQueueProxy::VulkanQueueProxy(IMallocDriver *alloc, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI)
+	VulkanQueueProxy::VulkanQueueProxy(IMallocDriver *alloc, CommandQueueType queueType, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI)
 		: m_alloc(alloc)
+		, m_queueType(queueType)
 		, m_device(device)
 		, m_queue(queue)
 		, m_queueFamily(queueFamily)
@@ -165,6 +169,11 @@ namespace rkit::render::vulkan
 		VkPipelineStageFlags stageFlags = 0;
 		RKIT_CHECK(VulkanUtils::ConvertPipelineStageBits(stageFlags, stagesToWaitFor));
 		return AddBinarySemaWait(static_cast<VulkanBinaryGPUWaitableFence &>(fence).GetSemaphore(), stageFlags);
+	}
+
+	CommandQueueType VulkanQueueProxy::GetCommandQueueType() const
+	{
+		return m_queueType;
 	}
 
 	IInternalCommandQueue *VulkanQueueProxy::ToInternalCommandQueue()
@@ -384,7 +393,6 @@ namespace rkit::render::vulkan
 		return m_queueFamily;
 	}
 
-
 	Result VulkanQueueProxy::Initialize()
 	{
 		return ResultCode::kOK;
@@ -392,13 +400,13 @@ namespace rkit::render::vulkan
 
 	Result VulkanQueueProxy::QueueBase(IBaseCommandList &cmdList)
 	{
-		return AddCommandList(static_cast<VulkanCommandListBase *>(cmdList.ToInternalCommandList())->GetCommandBuffer());
+		return AddCommandList(static_cast<VulkanCommandList *>(cmdList.ToInternalCommandList())->GetCommandBuffer());
 	}
 
-	Result VulkanQueueProxyBase::Create(UniquePtr<VulkanQueueProxyBase> &outQueueProxy, IMallocDriver *alloc, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI)
+	Result VulkanQueueProxyBase::Create(UniquePtr<VulkanQueueProxyBase> &outQueueProxy, IMallocDriver *alloc, CommandQueueType queueType, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI)
 	{
 		UniquePtr<VulkanQueueProxy> queueProxy;
-		RKIT_CHECK(New<VulkanQueueProxy>(queueProxy, alloc, device, queue, queueFamily, deviceAPI));
+		RKIT_CHECK(New<VulkanQueueProxy>(queueProxy, alloc, queueType, device, queue, queueFamily, deviceAPI));
 
 		RKIT_CHECK(queueProxy->Initialize());
 

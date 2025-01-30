@@ -176,7 +176,7 @@ namespace rkit::utils
 	{
 		bool jobSucceeded = true;
 
-		if (!m_jobDependencyFailed)
+		if (m_jobDependencyFailed)
 			jobSucceeded = false;
 		else
 		{

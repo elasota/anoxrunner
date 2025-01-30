@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 namespace rkit
 {
 	struct Result;
@@ -7,14 +9,19 @@ namespace rkit
 
 namespace rkit::render
 {
-	struct IBaseCommandList;
+	struct BaseCommandListRef;
 	struct ICopyCommandList;
 	struct IComputeCommandList;
 	struct IGraphicsCommandList;
 	struct IGraphicsComputeCommandList;
 
+	struct IBaseCommandList;
+	struct IInternalCommandAllocator;
+
 	struct IInternalCommandList
 	{
+	protected:
+		virtual ~IInternalCommandList() {}
 	};
 
 	struct IBaseCommandList
@@ -26,9 +33,8 @@ namespace rkit::render
 
 		virtual IInternalCommandList *ToInternalCommandList() = 0;
 
-		virtual bool IsBundle() const = 0;
-
-		virtual Result ResetCommandList() = 0;
+	protected:
+		virtual ~IBaseCommandList() {}
 	};
 
 	struct ICopyCommandList : public virtual IBaseCommandList

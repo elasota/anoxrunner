@@ -35,6 +35,6 @@ namespace rkit::render::vulkan
 
 		virtual VkQueue GetVkQueue() const = 0;
 
-		static Result Create(UniquePtr<VulkanQueueProxyBase> &outQueueProxy, IMallocDriver *alloc, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI);
+		static Result Create(UniquePtr<VulkanQueueProxyBase> &outQueueProxy, IMallocDriver *alloc, CommandQueueType queueType, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI);
 	};
 }
