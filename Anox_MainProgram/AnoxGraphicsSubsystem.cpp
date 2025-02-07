@@ -1,5 +1,10 @@
 #include "AnoxGraphicsResourceManager.h"
 
+#include "AnoxLogicalQueue.h"
+#include "AnoxFrameDrawer.h"
+#include "AnoxPeriodicResources.h"
+#include "AnoxRecordJobRunner.h"
+
 #include "anox/AnoxGraphicsSubsystem.h"
 
 #include "rkit/Render/CommandAllocator.h"
@@ -22,6 +27,7 @@
 #include "rkit/Core/BufferStream.h"
 #include "rkit/Core/DriverModuleInitParams.h"
 #include "rkit/Core/Endian.h"
+#include "rkit/Core/EnumEnumerator.h"
 #include "rkit/Core/Event.h"
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/Job.h"
@@ -32,6 +38,7 @@
 #include "rkit/Core/NoCopy.h"
 #include "rkit/Core/Optional.h"
 #include "rkit/Core/Result.h"
+#include "rkit/Core/StaticBoolVector.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/UniquePtr.h"
@@ -58,9 +65,15 @@ namespace anox
 		void SetDesiredDisplayMode(rkit::render::DisplayMode displayMode) override;
 		rkit::Result TransitionDisplayState() override;
 
-		rkit::Result BeginFrame() override;
+		rkit::Result RetireOldestFrame() override;
 		rkit::Result StartRendering() override;
+		rkit::Result DrawFrame() override;
 		rkit::Result EndFrame() override;
+
+		rkit::Result CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner) override;
+		rkit::Result CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::ISpan<rkit::Job *> &dependencies) override;
+		rkit::Result CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<rkit::IJobRunner> &&jobRunner) override;
+		rkit::Result CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<rkit::IJobRunner> &&jobRunner, const rkit::ISpan<rkit::Job *> &dependencies) override;
 
 		void MarkSetupStepCompleted();
 		void MarkSetupStepFailed();
@@ -135,6 +148,11 @@ namespace anox
 			};
 
 			rkit::Vector<LivePipeline> m_graphicsPipelines;
+		};
+
+		struct FrameSyncPointCommandListHandler
+		{
+			rkit::UniquePtr<rkit::render::IBaseCommandAllocator> m_commandAllocator;
 		};
 
 		class CheckPipelinesJob final : public rkit::IJobRunner
@@ -213,6 +231,41 @@ namespace anox
 			GraphicsSubsystem &m_graphicsSubsystem;
 		};
 
+		class ResetCommandAllocatorJob final : public rkit::IJobRunner
+		{
+		public:
+			explicit ResetCommandAllocatorJob(FrameSyncPointCommandListHandler &cmdListHandler);
+
+			rkit::Result Run() override;
+
+		private:
+			FrameSyncPointCommandListHandler &m_cmdListHandler;
+		};
+
+		class PostCompletionFenceJob final : public rkit::IJobRunner
+		{
+		public:
+			explicit PostCompletionFenceJob(GraphicsSubsystem &graphicsSubsystem, const rkit::RCPtr<PerFrameResources> &resources);
+
+			rkit::Result Run() override;
+
+		private:
+			GraphicsSubsystem &m_graphicsSubsystem;
+			rkit::RCPtr<PerFrameResources> m_resources;
+		};
+
+		class RunRecordJobRunner final : public rkit::IJobRunner
+		{
+		public:
+			explicit RunRecordJobRunner(rkit::UniquePtr<IRecordJobRunner> &&recordJob, rkit::render::IBaseCommandAllocator &cmdAlloc);
+
+			rkit::Result Run() override;
+
+		private:
+			rkit::UniquePtr<IRecordJobRunner> m_recordJob;
+			rkit::render::IBaseCommandAllocator &m_cmdAlloc;
+		};
+
 		enum class DeviceSetupStep
 		{
 			kOpenPipelinePackage,
@@ -223,17 +276,22 @@ namespace anox
 			kFinished,
 		};
 
-		struct QueueSyncPointBase
+		static const size_t kNumLogicalQueueTypes = static_cast<size_t>(LogicalQueueType::kCount);
+
+		struct LogicalQueueBase
 		{
 			rkit::render::IBaseCommandQueue *m_commandQueue = nullptr;
-			rkit::UniquePtr<rkit::render::IBaseCommandAllocator> m_commandAllocator;
 
-			rkit::UniquePtr<rkit::Job> m_lastRecordJob;
-			rkit::UniquePtr<rkit::Job> m_lastSubmitJob;
+			rkit::RCPtr<rkit::Job> m_lastRecordJob;
+			rkit::RCPtr<rkit::Job> m_lastSubmitJob;
+
+			virtual rkit::Result CreateCommandAllocator(rkit::render::IRenderDevice &renderDevice, rkit::UniquePtr<rkit::render::IBaseCommandAllocator> &cmdAlloc, bool isBundle) = 0;
 		};
 
-		template<class TCommandQueueType, class TCommandAllocatorType>
-		struct QueueSyncPoint : public QueueSyncPointBase
+		template<class TCommandQueueType, class TCommandAllocatorType,
+			rkit::Result (rkit::render::IRenderDevice::*TCommandAllocCreationMethod)(rkit::UniquePtr<TCommandAllocatorType>&, bool)
+		>
+		struct LogicalQueue : public LogicalQueueBase
 		{
 			inline TCommandQueueType *GetCommandQueue() const
 			{
@@ -244,15 +302,29 @@ namespace anox
 			{
 				return static_cast<TCommandAllocatorType *>(this->m_commandAllocator.Get());
 			}
+
+			rkit::Result CreateCommandAllocator(rkit::render::IRenderDevice &renderDevice, rkit::UniquePtr<rkit::render::IBaseCommandAllocator> &cmdAlloc, bool isBundle) override
+			{
+				rkit::UniquePtr<TCommandAllocatorType> alloc;
+				RKIT_CHECK((renderDevice.*TCommandAllocCreationMethod)(alloc, isBundle));
+
+				cmdAlloc = std::move(alloc);
+
+				return rkit::ResultCode::kOK;
+			}
 		};
 
 		struct FrameSyncPoint
 		{
 			rkit::UniquePtr<rkit::render::IBinaryCPUWaitableFence> m_frameEndFence;
+			rkit::RCPtr<rkit::Job> m_frameEndJob;
 
-			QueueSyncPoint<rkit::render::ICopyCommandQueue, rkit::render::ICopyCommandAllocator> m_dmaQueueSync;
-			QueueSyncPoint<rkit::render::IGraphicsCommandQueue, rkit::render::IGraphicsCommandAllocator> m_graphicsQueueSync;
+			rkit::StaticArray<FrameSyncPointCommandListHandler, static_cast<size_t>(rkit::render::CommandQueueType::kCount)> m_commandListHandlers;
+
+			void Reset();
 		};
+
+		rkit::Result CreateAndQueueJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<rkit::IJobRunner> &&jobRunner, const rkit::ISpan<rkit::Job *> &dependencies, rkit::RCPtr<rkit::Job> (LogicalQueueBase::*queueMember));
 
 		rkit::Result TransitionDisplayMode();
 		rkit::Result TransitionBackend();
@@ -264,7 +336,7 @@ namespace anox
 
 		rkit::Result CreateGameDisplayAndDevice(const rkit::StringView &renderModule, const rkit::StringView &pipelinesFile, const rkit::StringView &pipelinesCacheFile, bool canUpdatePipelineCache);
 
-		void WaitForRenderingTasks();
+		rkit::Result WaitForRenderingTasks();
 
 		rkit::Optional<rkit::render::DisplayMode> m_currentDisplayMode;
 		rkit::render::DisplayMode m_desiredDisplayMode = rkit::render::DisplayMode::kSplash;
@@ -301,13 +373,32 @@ namespace anox
 
 		uint8_t m_numSyncPoints = 3;
 		uint8_t m_currentSyncPoint = 0;
-		rkit::render::IBaseCommandQueue *m_swapChainQueue = nullptr;
+
+		rkit::render::IGraphicsCommandQueue *m_graphicsQueue = nullptr;
+		rkit::render::IGraphicsComputeCommandQueue *m_graphicsComputeQueue = nullptr;
+		rkit::render::IComputeCommandQueue *m_asyncComputeQueue = nullptr;
+		rkit::render::ICopyCommandQueue *m_dmaQueue = nullptr;
+
 		rkit::Vector<FrameSyncPoint> m_syncPoints;
+
+		LogicalQueue<rkit::render::ICopyCommandQueue, rkit::render::ICopyCommandAllocator, &rkit::render::IRenderDevice::CreateCopyCommandAllocator> m_dmaLogicalQueue;
+		LogicalQueue<rkit::render::IGraphicsComputeCommandQueue, rkit::render::IGraphicsComputeCommandAllocator, &rkit::render::IRenderDevice::CreateGraphicsComputeCommandAllocator> m_graphicsComputeLogicalQueue;
+		LogicalQueue<rkit::render::IGraphicsCommandQueue, rkit::render::IGraphicsCommandAllocator, &rkit::render::IRenderDevice::CreateGraphicsCommandAllocator> m_graphicsLogicalQueue;
+		LogicalQueue<rkit::render::IComputeCommandQueue, rkit::render::IComputeCommandAllocator, &rkit::render::IRenderDevice::CreateComputeCommandAllocator> m_asyncComputeLogicalQueue;
+
+		rkit::StaticArray<LogicalQueueBase*, kNumLogicalQueueTypes> m_logicalQueues;
+
+		rkit::RCPtr<PerFrameResources> m_currentFrameResources;
 
 		rkit::UniquePtr<rkit::IEvent> m_shutdownJoinEvent;
 		rkit::UniquePtr<rkit::IEvent> m_shutdownTerminateEvent;
-	};
 
+		rkit::UniquePtr<rkit::IEvent> m_prevFrameWaitWakeEvent;
+		rkit::UniquePtr<rkit::IEvent> m_prevFrameWaitTerminateEvent;
+		rkit::UniquePtr<rkit::IEvent> m_prevFrameWaitSpecificEvent;
+
+		rkit::UniquePtr<IFrameDrawer> m_frameDrawer;
+	};
 
 	GraphicsSubsystem::CheckPipelinesJob::CheckPipelinesJob(GraphicsSubsystem &graphicsSubsystem, const rkit::StringView &pipelinesFileName, const rkit::StringView &pipelinesCacheFileName, bool canUpdateShadowFile)
 		: m_graphicsSubsystem(graphicsSubsystem)
@@ -585,6 +676,40 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
+	GraphicsSubsystem::ResetCommandAllocatorJob::ResetCommandAllocatorJob(FrameSyncPointCommandListHandler &cmdListHandler)
+		: m_cmdListHandler(cmdListHandler)
+	{
+	}
+
+	rkit::Result GraphicsSubsystem::ResetCommandAllocatorJob::Run()
+	{
+		RKIT_CHECK(m_cmdListHandler.m_commandAllocator->ResetCommandAllocator(false));
+
+		return rkit::ResultCode::kOK;
+	}
+
+	GraphicsSubsystem::PostCompletionFenceJob::PostCompletionFenceJob(GraphicsSubsystem &graphicsSubsystem, const rkit::RCPtr<PerFrameResources> &resources)
+		: m_graphicsSubsystem(graphicsSubsystem)
+		, m_resources(resources)
+	{
+	}
+
+	rkit::Result GraphicsSubsystem::PostCompletionFenceJob::Run()
+	{
+		return rkit::ResultCode::kNotYetImplemented;
+	}
+
+	GraphicsSubsystem::RunRecordJobRunner::RunRecordJobRunner(rkit::UniquePtr<IRecordJobRunner> &&recordJob, rkit::render::IBaseCommandAllocator &cmdAlloc)
+		: m_recordJob(std::move(recordJob))
+		, m_cmdAlloc(cmdAlloc)
+	{
+	}
+
+	rkit::Result GraphicsSubsystem::RunRecordJobRunner::Run()
+	{
+		return m_recordJob->RunBase(m_cmdAlloc);
+	}
+
 	rkit::Result GraphicsSubsystem::RenderDataConfigurator::GetEnumConfigKey(size_t configKeyIndex, const rkit::StringView &keyName, rkit::data::RenderRTTIMainType expectedMainType, unsigned int &outValue)
 	{
 		TypedEnumValue resolution;
@@ -769,16 +894,29 @@ namespace anox
 	}
 
 
+	void GraphicsSubsystem::FrameSyncPoint::Reset()
+	{
+		for (FrameSyncPointCommandListHandler &cmdListHandler : m_commandListHandlers)
+		{
+			cmdListHandler.m_commandAllocator.Reset();
+		}
+
+		this->m_frameEndFence.Reset();
+	}
+
 	GraphicsSubsystem::GraphicsSubsystem(rkit::data::IDataDriver &dataDriver, rkit::utils::IThreadPool &threadPool, anox::RenderBackend desiredBackend)
 		: m_threadPool(threadPool)
 		, m_dataDriver(dataDriver)
 		, m_desiredBackend(desiredBackend)
 	{
+		for (LogicalQueueBase *&logicalQueue : m_logicalQueues)
+			logicalQueue = nullptr;
 	}
 
 	GraphicsSubsystem::~GraphicsSubsystem()
 	{
-		WaitForRenderingTasks();
+		(void)m_renderDevice->WaitForDeviceIdle();
+
 		m_gameWindow.Reset();
 	}
 
@@ -789,6 +927,11 @@ namespace anox
 		RKIT_CHECK(sysDriver->CreateMutex(m_setupMutex));
 		RKIT_CHECK(sysDriver->CreateEvent(m_shutdownJoinEvent, true, false));
 		RKIT_CHECK(sysDriver->CreateEvent(m_shutdownTerminateEvent, true, false));
+		RKIT_CHECK(sysDriver->CreateEvent(m_prevFrameWaitWakeEvent, true, false));
+		RKIT_CHECK(sysDriver->CreateEvent(m_prevFrameWaitTerminateEvent, true, false));
+		RKIT_CHECK(sysDriver->CreateEvent(m_prevFrameWaitSpecificEvent, true, false));
+
+		RKIT_CHECK(IFrameDrawer::Create(m_frameDrawer));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -876,7 +1019,7 @@ namespace anox
 
 		for (size_t i = 0; i < m_numSyncPoints; i++)
 		{
-			RKIT_CHECK(m_renderDevice->CreateBinaryCPUWaitableFence(m_syncPoints[i].m_frameEndFence, true));
+			RKIT_CHECK(m_renderDevice->CreateBinaryCPUWaitableFence(m_syncPoints[i].m_frameEndFence, false));
 		}
 
 		// FIXME: Localize
@@ -894,15 +1037,75 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	void GraphicsSubsystem::WaitForRenderingTasks()
+	rkit::Result GraphicsSubsystem::WaitForRenderingTasks()
 	{
+		if (m_renderDevice.IsValid())
+		{
+			RKIT_CHECK(m_renderDevice->WaitForDeviceIdle());
+		}
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result GraphicsSubsystem::CreateAndQueueJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<rkit::IJobRunner> &&jobRunnerRef, const rkit::ISpan<rkit::Job *> &dependencies, rkit::RCPtr<rkit::Job>(LogicalQueueBase:: *queueMember))
+	{
+		rkit::UniquePtr<rkit::IJobRunner> jobRunner = std::move(jobRunnerRef);
+
+		LogicalQueueBase *logicalQueue = m_logicalQueues[static_cast<size_t>(queueType)];
+
+		rkit::RCPtr<rkit::Job> &jobRef = (logicalQueue->*queueMember);
+
+		rkit::Job *job = jobRef.Get();
+
+		rkit::Span<rkit::Job *> jobSpan;
+		rkit::SpanToISpanValueWrapper<rkit::Job *> jobISpan;
+
+		const rkit::ISpan<rkit::Job *> *jobSpansArray[2] = {};
+
+		rkit::Span<const rkit::ISpan<rkit::Job *> *> jobSpans;
+
+		rkit::ConcatenatedSpanISpan<rkit::Job *> concatenatedSpan;
+
+		const rkit::ISpan<rkit::Job *> *spanToPass = nullptr;
+
+		if (jobRef.IsValid())
+		{
+			jobSpan = rkit::Span<rkit::Job *>(&job, 1);
+			jobISpan = jobSpan.ToValueISpan();
+
+			if (dependencies.Count() > 0)
+			{
+				jobSpansArray[0] = &jobISpan;
+				jobSpansArray[1] = &dependencies;
+
+				jobSpans = rkit::Span<const rkit::ISpan<rkit::Job *> *>(jobSpansArray, 2);
+				concatenatedSpan = rkit::ConcatenatedSpanISpan<rkit::Job *>(jobSpans);
+
+				spanToPass = &concatenatedSpan;
+			}
+			else
+				spanToPass = &jobISpan;
+		}
+		else
+			spanToPass = &dependencies;
+
+		rkit::RCPtr<rkit::Job> newJob;
+		RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(&newJob, rkit::JobType::kNormalPriority, std::move(jobRunner), spanToPass));
+
+
+		jobRef = newJob;
+
+		if (outJob)
+			*outJob = newJob;
+
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result GraphicsSubsystem::TransitionDisplayMode()
 	{
 		if (m_currentDisplayMode.IsSet())
 		{
-			WaitForRenderingTasks();
+			RKIT_CHECK(WaitForRenderingTasks());
 			m_gameWindow.Reset();
 		}
 
@@ -913,54 +1116,104 @@ namespace anox
 		rkit::UniquePtr<rkit::render::IDisplay> display;
 		RKIT_CHECK(displayManager->CreateDisplay(display, m_currentDisplayMode.Get()));
 
-
 		rkit::render::IBaseCommandQueue *swapChainQueue = nullptr;
 
-		for (rkit::render::IBaseCommandQueue *queue : m_renderDevice->GetGraphicsComputeQueues())
+		for (rkit::render::IGraphicsComputeCommandQueue *queue : m_renderDevice->GetGraphicsComputeQueues())
 		{
-			swapChainQueue = queue;
+			m_graphicsComputeQueue = queue;
 			break;
 		}
 
-		if (!swapChainQueue)
+		for (rkit::render::IGraphicsCommandQueue *queue : m_renderDevice->GetGraphicsQueues())
 		{
-			for (rkit::render::IBaseCommandQueue *queue : m_renderDevice->GetGraphicsQueues())
-			{
-				swapChainQueue = queue;
-				break;
-			}
+			m_graphicsQueue = queue;
+			break;
 		}
 
-		RKIT_ASSERT(swapChainQueue != nullptr);
+		for (rkit::render::ICopyCommandQueue *queue : m_renderDevice->GetCopyQueues())
+		{
+			m_dmaQueue = queue;
+			break;
+		}
 
-		m_swapChainQueue = swapChainQueue;
+		for (rkit::render::IComputeCommandQueue *queue : m_renderDevice->GetComputeQueues())
+		{
+			m_asyncComputeQueue = queue;
+			break;
+		}
+
+		if (m_graphicsComputeQueue)
+		{
+			m_graphicsComputeLogicalQueue.m_commandQueue = m_graphicsComputeQueue;
+			m_logicalQueues[static_cast<size_t>(LogicalQueueType::kGraphics)] = &m_graphicsComputeLogicalQueue;
+			m_logicalQueues[static_cast<size_t>(LogicalQueueType::kPrimaryCompute)] = &m_graphicsComputeLogicalQueue;
+			m_logicalQueues[static_cast<size_t>(LogicalQueueType::kAsyncCompute)] = &m_graphicsComputeLogicalQueue;
+		}
+
+		if (m_graphicsQueue)
+		{
+			m_graphicsLogicalQueue.m_commandQueue = m_graphicsQueue;
+			m_logicalQueues[static_cast<size_t>(LogicalQueueType::kGraphics)] = &m_graphicsLogicalQueue;
+		}
+
+		if (m_asyncComputeQueue)
+		{
+			m_asyncComputeLogicalQueue.m_commandQueue = m_asyncComputeQueue;
+			m_logicalQueues[static_cast<size_t>(LogicalQueueType::kAsyncCompute)] = &m_asyncComputeLogicalQueue;
+
+			if (!m_graphicsComputeQueue)
+				m_logicalQueues[static_cast<size_t>(LogicalQueueType::kPrimaryCompute)] = &m_asyncComputeLogicalQueue;
+		}
+
+		if (m_dmaQueue)
+		{
+			m_dmaLogicalQueue.m_commandQueue = m_dmaQueue;
+			m_logicalQueues[static_cast<size_t>(LogicalQueueType::kDMA)] = &m_dmaLogicalQueue;
+		}
+
+		if (!m_dmaQueue || !m_logicalQueues[static_cast<size_t>(LogicalQueueType::kGraphics)])
+		{
+			rkit::log::Error("Missing a required graphics API queue type");
+			return rkit::ResultCode::kOperationFailed;
+		}
 
 		rkit::UniquePtr<rkit::render::ISwapChainPrototype> swapChainPrototype;
 		RKIT_CHECK(m_renderDevice->CreateSwapChainPrototype(swapChainPrototype, *display));
 
-		bool isCompatible = false;
-		RKIT_CHECK(swapChainPrototype->CheckQueueCompatibility(isCompatible, *swapChainQueue));
+		LogicalQueueBase *graphicsLogicalQueue = m_logicalQueues[static_cast<size_t>(LogicalQueueType::kGraphics)];
 
-		if (!isCompatible)
+		bool isGraphicsQueueCompatible = false;
+		RKIT_CHECK(swapChainPrototype->CheckQueueCompatibility(isGraphicsQueueCompatible, *graphicsLogicalQueue->m_commandQueue));
+
+		if (!isGraphicsQueueCompatible)
 		{
-			rkit::log::Error("Graphics queue doesn't support presentation on the requested display");
+			rkit::log::Error("Graphics queue wasn't capable of presenting to the desired display");
 			return rkit::ResultCode::kOperationFailed;
 		}
 
-		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), std::move(swapChainPrototype), m_renderDevice.Get(), swapChainQueue, 2, m_numSyncPoints));
+		LogicalQueueBase *&presentationLogicalQueueRef = m_logicalQueues[static_cast<size_t>(LogicalQueueType::kPresentation)];
+
+		presentationLogicalQueueRef = graphicsLogicalQueue;
+
+		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), std::move(swapChainPrototype), m_renderDevice.Get(), presentationLogicalQueueRef->m_commandQueue, 2, m_numSyncPoints));
 
 		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result GraphicsSubsystem::TransitionBackend()
 	{
-		// TODO: Wait for all tasks to complete
 		if (m_resourceManager.IsValid())
 			m_resourceManager->UnloadAll();
 
-		WaitForRenderingTasks();
+		RKIT_CHECK(WaitForRenderingTasks());
 
 		m_gameWindow.Reset();
+
+		for (LogicalQueueBase *&logicalQueue : m_logicalQueues)
+			logicalQueue = nullptr;
+
+		for (FrameSyncPoint &frameSyncPoint : m_syncPoints)
+			frameSyncPoint.Reset();
 
 		m_renderDevice.Reset();
 
@@ -1201,44 +1454,52 @@ namespace anox
 	}
 
 
-	rkit::Result GraphicsSubsystem::BeginFrame()
+	rkit::Result GraphicsSubsystem::RetireOldestFrame()
 	{
 		if (!m_currentDisplayMode.IsSet() || m_currentDisplayMode.Get() == rkit::render::DisplayMode::kSplash)
 			return rkit::ResultCode::kOK;
 
 		FrameSyncPoint &syncPoint = m_syncPoints[m_currentSyncPoint];
-		RKIT_CHECK(syncPoint.m_frameEndFence->WaitFor());
 
-		if (syncPoint.m_dmaQueueSync.m_commandQueue == nullptr)
+		if (syncPoint.m_frameEndJob.IsValid())
 		{
-			syncPoint.m_dmaQueueSync.m_commandQueue = m_renderDevice->GetCopyQueues()[0];
+			m_threadPool.GetJobQueue()->WaitForJob(*syncPoint.m_frameEndJob, m_threadPool.GetMainThreadJobTypes(), m_prevFrameWaitWakeEvent.Get(), m_prevFrameWaitTerminateEvent.Get(), m_prevFrameWaitSpecificEvent.Get());
+			RKIT_CHECK(m_threadPool.GetJobQueue()->CheckFault());
 
-			rkit::UniquePtr<rkit::render::ICopyCommandAllocator> cmdAllocator;
-			RKIT_CHECK(m_renderDevice->CreateCopyCommandAllocator(cmdAllocator, false));
 
-			syncPoint.m_dmaQueueSync.m_commandAllocator = std::move(cmdAllocator);
+			RKIT_CHECK(syncPoint.m_frameEndFence->WaitFor());
+			RKIT_CHECK(syncPoint.m_frameEndFence->ResetFence());
 		}
 
-		if (syncPoint.m_graphicsQueueSync.m_commandQueue == nullptr)
+		rkit::StaticBoolVector<static_cast<size_t>(rkit::render::CommandQueueType::kCount)> cmdQueueReset;
+
+		for (size_t logicalQueueTypeInt = 0; logicalQueueTypeInt < kNumLogicalQueueTypes; logicalQueueTypeInt++)
 		{
-			syncPoint.m_graphicsQueueSync.m_commandQueue = m_swapChainQueue;
+			LogicalQueueType logicalQueueType = static_cast<LogicalQueueType>(logicalQueueTypeInt);
+			LogicalQueueBase *logicalQueue = m_logicalQueues[logicalQueueTypeInt];
 
-			if (m_swapChainQueue->GetCommandQueueType() == rkit::render::CommandQueueType::kGraphicsCompute)
+			if (!logicalQueue)
+				continue;
+
+			rkit::render::CommandQueueType queueType = logicalQueue->m_commandQueue->GetCommandQueueType();
+
+			FrameSyncPointCommandListHandler &cmdListHandler = syncPoint.m_commandListHandlers[static_cast<size_t>(queueType)];
+
+			if (!cmdListHandler.m_commandAllocator.IsValid())
 			{
-				rkit::UniquePtr<rkit::render::IGraphicsComputeCommandAllocator> cmdAllocator;
-				RKIT_CHECK(m_renderDevice->CreateGraphicsComputeCommandAllocator(cmdAllocator, false));
-
-				syncPoint.m_graphicsQueueSync.m_commandAllocator = std::move(cmdAllocator);
+				RKIT_CHECK(logicalQueue->CreateCommandAllocator(*m_renderDevice, cmdListHandler.m_commandAllocator, false));
 			}
-			else if (m_swapChainQueue->GetCommandQueueType() == rkit::render::CommandQueueType::kGraphicsCompute)
+
+			if (!cmdQueueReset.Get(static_cast<size_t>(queueType)))
 			{
-				rkit::UniquePtr<rkit::render::IGraphicsCommandAllocator> cmdAllocator;
-				RKIT_CHECK(m_renderDevice->CreateGraphicsCommandAllocator(cmdAllocator, false));
+				// Queue a command allocator reset on each record queue
+				rkit::UniquePtr<rkit::IJobRunner> resetJobRunner;
+				RKIT_CHECK(rkit::New<ResetCommandAllocatorJob>(resetJobRunner, cmdListHandler));
 
-				syncPoint.m_graphicsQueueSync.m_commandAllocator = std::move(cmdAllocator);
+				RKIT_CHECK(CreateAndQueueJob(nullptr, logicalQueueType, std::move(resetJobRunner), rkit::Span<rkit::Job *>().ToValueISpan(), &LogicalQueueBase::m_lastRecordJob));
 			}
-			else
-				return rkit::ResultCode::kInternalError;
+
+			cmdQueueReset.Set(static_cast<size_t>(queueType), true);
 		}
 
 		return rkit::ResultCode::kOK;
@@ -1246,7 +1507,23 @@ namespace anox
 
 	rkit::Result GraphicsSubsystem::StartRendering()
 	{
+		FrameSyncPoint &syncPoint = m_syncPoints[m_currentSyncPoint];
+
+		RKIT_CHECK(rkit::New<PerFrameResources>(m_currentFrameResources));
+
+		m_currentFrameResources->m_frameEndFence = syncPoint.m_frameEndFence.Get();
+
 		RKIT_CHECK(m_gameWindow->BeginFrame(*this));
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result GraphicsSubsystem::DrawFrame()
+	{
+		if (!m_currentDisplayMode.IsSet() || m_currentDisplayMode.Get() == rkit::render::DisplayMode::kSplash)
+			return rkit::ResultCode::kOK;
+
+		RKIT_CHECK(m_frameDrawer->DrawFrame(*this, m_currentFrameResources, m_gameWindow->GetCurrentFrameResources()));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -1256,29 +1533,21 @@ namespace anox
 		if (!m_currentDisplayMode.IsSet() || m_currentDisplayMode.Get() == rkit::render::DisplayMode::kSplash)
 			return rkit::ResultCode::kOK;
 
-		// Finish rendering
-		if (m_swapChainQueue)
-		{
-		}
-
-		// Present all windows
-		RKIT_CHECK(m_gameWindow->EndFrame());
+		RKIT_CHECK(m_gameWindow->EndFrame(*this));
 
 		// Post completion fence
-		if (m_swapChainQueue)
-		{
-			rkit::render::IBinaryCPUWaitableFence &fence = *m_syncPoints[m_currentSyncPoint].m_frameEndFence;
+		rkit::UniquePtr<rkit::IJobRunner> completionFenceJobRunner;
+		RKIT_CHECK(rkit::New<PostCompletionFenceJob>(completionFenceJobRunner, *this, m_currentFrameResources));
 
-			RKIT_CHECK(fence.ResetFence());
+		rkit::RCPtr<rkit::Job> completionFenceJob;
+		RKIT_CHECK(CreateAndQueueSubmitJob(&completionFenceJob, LogicalQueueType::kGraphics, std::move(completionFenceJobRunner)));
 
-			RKIT_CHECK(m_swapChainQueue->QueueSignalBinaryCPUWaitable(fence));
-			RKIT_CHECK(m_swapChainQueue->Flush());
+		m_syncPoints[m_currentSyncPoint].m_frameEndJob = completionFenceJob;
 
-			m_currentSyncPoint++;
+		m_currentSyncPoint++;
 
-			if (m_currentSyncPoint == m_numSyncPoints)
-				m_currentSyncPoint = 0;
-		}
+		if (m_currentSyncPoint == m_numSyncPoints)
+			m_currentSyncPoint = 0;
 
 		return rkit::ResultCode::kOK;
 	}
@@ -1311,6 +1580,37 @@ namespace anox
 		m_pipelineLibraryLoader = std::move(loader);
 		m_livePipelineSets = std::move(livePipelineSets);
 		m_haveExistingMergedCache = haveExistingMergedCache;
+	}
+
+	rkit::Result GraphicsSubsystem::CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner)
+	{
+		return this->CreateAndQueueRecordJob(outJob, queueType, std::move(jobRunner), rkit::Span<rkit::Job *>().ToValueISpan());
+	}
+
+	rkit::Result GraphicsSubsystem::CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::ISpan<rkit::Job *> &dependencies)
+	{
+		FrameSyncPoint &syncPoint = m_syncPoints[m_currentSyncPoint];
+
+		rkit::render::CommandQueueType cmdQueueType = m_logicalQueues[static_cast<size_t>(queueType)]->m_commandQueue->GetCommandQueueType();
+
+		FrameSyncPointCommandListHandler &cmdListHandler = syncPoint.m_commandListHandlers[static_cast<size_t>(cmdQueueType)];
+
+		rkit::render::IBaseCommandAllocator *cmdAllocator = cmdListHandler.m_commandAllocator.Get();
+
+		rkit::UniquePtr<RunRecordJobRunner> runRecordJobRunner;
+		RKIT_CHECK(rkit::New<RunRecordJobRunner>(runRecordJobRunner, std::move(jobRunner), *cmdAllocator));
+
+		return this->CreateAndQueueJob(outJob, queueType, std::move(runRecordJobRunner), dependencies, &LogicalQueueBase::m_lastRecordJob);
+	}
+
+	rkit::Result GraphicsSubsystem::CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<rkit::IJobRunner> &&jobRunner)
+	{
+		return this->CreateAndQueueJob(outJob, queueType, std::move(jobRunner), rkit::Span<rkit::Job *>().ToValueISpan(), &LogicalQueueBase::m_lastSubmitJob);
+	}
+
+	rkit::Result GraphicsSubsystem::CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<rkit::IJobRunner> &&jobRunner, const rkit::ISpan<rkit::Job *> &dependencies)
+	{
+		return this->CreateAndQueueJob(outJob, queueType, std::move(jobRunner), dependencies, &LogicalQueueBase::m_lastSubmitJob);
 	}
 
 	void GraphicsSubsystem::MarkSetupStepCompleted()

@@ -19,11 +19,21 @@ namespace rkit::render
 	struct IInternalCommandAllocator;
 	struct IInternalCommandList;
 
+	struct ICopyCommandAllocator;
+	struct IGraphicsCommandAllocator;
+	struct IComputeCommandAllocator;
+	struct IGraphicsComputeCommandAllocator;
+
 	struct CommandListHandle;
 
 	struct IBaseCommandAllocator
 	{
 		virtual ~IBaseCommandAllocator() {}
+
+		virtual ICopyCommandAllocator *ToCopyCommandAllocator() = 0;
+		virtual IGraphicsCommandAllocator *ToGraphicsCommandAllocator() = 0;
+		virtual IComputeCommandAllocator *ToComputeCommandAllocator() = 0;
+		virtual IGraphicsComputeCommandAllocator *ToGraphicsComputeCommandAllocator() = 0;
 
 		virtual Result ResetCommandAllocator(bool clearResources) = 0;
 	};

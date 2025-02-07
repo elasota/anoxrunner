@@ -146,6 +146,7 @@ namespace rkit
 	template<class T>
 	struct SpanToISpanValueWrapper final : public ISpan<T>
 	{
+		SpanToISpanValueWrapper();
 		explicit SpanToISpanValueWrapper(T *arr, size_t count);
 
 		size_t Count() const override;
@@ -172,6 +173,38 @@ namespace rkit
 		GetElementFunc_t m_callback;
 		TUserdata m_userdata;
 		size_t m_count;
+	};
+
+	template<class T>
+	class ConcatenatedISpanISpan final : public ISpan<T>
+	{
+	public:
+		ConcatenatedISpanISpan();
+		ConcatenatedISpanISpan(const ISpan<const ISpan<T> *> &spans);
+
+		size_t Count() const override;
+		T operator[](size_t index) const override;
+
+	private:
+		const ISpan<const ISpan<T> *> *m_spans = nullptr;
+		size_t m_numSpans = 0;
+		size_t m_count = 0;
+	};
+
+	template<class T>
+	class ConcatenatedSpanISpan final : public ISpan<T>
+	{
+	public:
+		ConcatenatedSpanISpan();
+		ConcatenatedSpanISpan(const Span<const ISpan<T> *> &spans);
+
+		size_t Count() const override;
+		T operator[](size_t index) const override;
+
+	private:
+		Span<const ISpan<T> *> m_spans;
+		size_t m_numSpans = 0;
+		size_t m_count = 0;
 	};
 }
 
@@ -471,6 +504,14 @@ T &rkit::SpanToISpanRefWrapper<T>::operator[](size_t index) const
 	return m_arr[index];
 }
 
+
+template<class T>
+rkit::SpanToISpanValueWrapper<T>::SpanToISpanValueWrapper()
+	: m_arr(nullptr)
+	, m_count(0)
+{
+}
+
 template<class T>
 rkit::SpanToISpanValueWrapper<T>::SpanToISpanValueWrapper(T *arr, size_t count)
 	: m_arr(arr)
@@ -518,4 +559,99 @@ template<class T, class TUserdata>
 T rkit::CallbackSpan<T, TUserdata>::operator[](size_t index) const
 {
 	return m_callback(m_userdata, index);
+}
+
+
+template<class T>
+rkit::ConcatenatedISpanISpan<T>::ConcatenatedISpanISpan()
+	: m_spans(nullptr)
+	, m_count(0)
+	, m_numSpans(0)
+{
+}
+
+template<class T>
+rkit::ConcatenatedISpanISpan<T>::ConcatenatedISpanISpan(const ISpan<const ISpan<T> *> &spans)
+	: m_spans(&spans)
+	, m_count(0)
+	, m_numSpans(0)
+{
+	size_t count = 0;
+	for (const ISpan<T> *subSpan : spans)
+		count += subSpan->Count();
+
+	m_count = count;
+	m_numSpans = spans.Count();
+}
+
+template<class T>
+size_t rkit::ConcatenatedISpanISpan<T>::Count() const
+{
+	return m_count;
+}
+
+template<class T>
+T rkit::ConcatenatedISpanISpan<T>::operator[](size_t index) const
+{
+	RKIT_ASSERT(index < m_count);
+
+	for (size_t i = 1; i < m_numSpans; i++)
+	{
+		const ISpan<T> &span = *(*m_spans)[i - 1];
+		const size_t count = span.Count();
+		if (index < count)
+			return span[index];
+
+		index -= count;
+	}
+
+	const ISpan<T> &lastSpan = *(*m_spans)[m_numSpans - 1];
+	return lastSpan[index];
+}
+
+template<class T>
+rkit::ConcatenatedSpanISpan<T>::ConcatenatedSpanISpan()
+	: m_count(0)
+	, m_numSpans(0)
+{
+}
+
+template<class T>
+rkit::ConcatenatedSpanISpan<T>::ConcatenatedSpanISpan(const Span<const ISpan<T> *> &spans)
+	: m_spans(spans)
+	, m_count(0)
+	, m_numSpans(0)
+{
+	size_t count = 0;
+	for (const ISpan<T> *subSpan : spans)
+		count += subSpan->Count();
+
+	m_count = count;
+	m_numSpans = spans.Count();
+}
+
+template<class T>
+size_t rkit::ConcatenatedSpanISpan<T>::Count() const
+{
+	return m_count;
+}
+
+template<class T>
+T rkit::ConcatenatedSpanISpan<T>::operator[](size_t index) const
+{
+	RKIT_ASSERT(index < m_count);
+
+	for (size_t i = 1; i < m_numSpans; i++)
+	{
+		const ISpan<T> &span = *m_spans[i - 1];
+		const size_t count = span.Count();
+		if (index < count)
+			return span[index];
+
+		index -= count;
+	}
+
+
+	const ISpan<T> &lastSpan = *m_spans[m_numSpans - 1];
+	return lastSpan[index];
 }

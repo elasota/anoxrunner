@@ -32,6 +32,13 @@ namespace rkit::utils
 		void Run() override;
 
 	private:
+		struct WaitingThread
+		{
+			IEvent *m_event = nullptr;
+			WaitingThread *m_prev = nullptr;
+			WaitingThread *m_next = nullptr;
+		};
+
 		static const size_t kStaticDownstreamListSize = 8;
 
 		size_t m_numWaitingDependencies = 0;
@@ -52,13 +59,17 @@ namespace rkit::utils
 		JobType m_jobType;
 
 		// Sync with dep graph mutex
-		bool m_jobCompleted = false;
+		bool m_jobCompleted = false;	// A job is "completed" when it succeeds OR fails
 		bool m_jobFailed = false;
 		bool m_jobDependencyFailed = false;
+
+		WaitingThread *m_firstWaitingThread = nullptr;
+		WaitingThread *m_lastWaitingThread = nullptr;
 
 		// Sync with distribution mutex
 		bool m_jobWasQueued = false;
 		bool m_jobWasStarted = false;
+		rkit::IEvent *m_alertSpecificThreadEvent = nullptr;
 	};
 
 
@@ -79,8 +90,8 @@ namespace rkit::utils
 		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<Job *> *dependencies) override;
 		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<RCPtr<Job> > &dependencies) override;
 
-		// Waits for work from a job queue.
-		// If "waitIfDepleted" is set, then wakeEvent must be an auto-reset event and terminatedEvent must not be signaled
+		void WaitForJob(Job &job, const ISpan<JobType> &idleJobTypes, IEvent *wakeEvent, IEvent *terminatedEvent, IEvent *alertSpecificThreadEvent) override;
+
 		RCPtr<Job> WaitForWork(const ISpan<JobType> &jobTypes, bool waitIfDepleted, IEvent *wakeEvent, IEvent *terminatedEvent) override;
 
 		void Fault(const Result &result) override;
@@ -461,14 +472,25 @@ namespace rkit::utils
 		job->m_jobCompleted = true;
 		job->m_jobFailed = !succeeded;
 
-		if (job->m_numStaticDownstream == 0)
-			return;
+		// Signal dependencies done first so any further jobs are queued
+		if (job->m_numStaticDownstream != 0)
+		{
+			for (size_t i = 0; i < job->m_numStaticDownstream; i++)
+				DependencyDone(job->m_staticDownstreamList[i], succeeded);
 
-		for (size_t i = 0; i < job->m_numStaticDownstream; i++)
-			DependencyDone(job->m_staticDownstreamList[i], succeeded);
+			for (const RCPtr<JobImpl> &dep : job->m_dynamicDownstream)
+				DependencyDone(dep, succeeded);
+		}
 
-		for (const RCPtr<JobImpl> &dep : job->m_dynamicDownstream)
-			DependencyDone(dep, succeeded);
+		const JobImpl::WaitingThread *waitingThread = job->m_firstWaitingThread;
+
+		while (waitingThread != nullptr)
+		{
+			// Get the next one now since waking it will destroy the link
+			const JobImpl::WaitingThread *nextThread = waitingThread->m_next;
+			waitingThread->m_event->Signal();
+			waitingThread = nextThread;
+		}
 	}
 
 	void JobQueue::DependencyDone(const RCPtr<JobImpl> &job, bool succeeded)
@@ -479,6 +501,46 @@ namespace rkit::utils
 		job->m_numWaitingDependencies--;
 		if (job->m_numWaitingDependencies == 0)
 			AddRunnableJob(job, static_cast<size_t>(job->m_jobType));
+	}
+
+	void JobQueue::WaitForJob(Job &jobBase, const ISpan<JobType> &idleJobTypes, IEvent *wakeEvent, IEvent *terminatedEvent, IEvent *alertSpecificThreadEvent)
+	{
+		JobImpl &job = static_cast<JobImpl &>(jobBase);
+
+		for (;;)
+		{
+			// Do any work scheduled for this thread
+			rkit::RCPtr<Job> job = WaitForWork(idleJobTypes, false, wakeEvent, terminatedEvent);
+
+			if (!job.IsValid())
+				break;
+
+			job->Run();
+		}
+
+		JobImpl::WaitingThread waitingThread;
+		waitingThread.m_event = alertSpecificThreadEvent;
+		waitingThread.m_next = nullptr;
+		waitingThread.m_prev = nullptr;
+
+		bool mustWait = false;
+		{
+			MutexLock lock(*m_depGraphMutex);
+			if (!job.m_jobCompleted)
+			{
+				mustWait = true;
+				if (job.m_lastWaitingThread)
+					job.m_lastWaitingThread->m_next = &waitingThread;
+				else
+					job.m_firstWaitingThread = &waitingThread;
+
+				waitingThread.m_prev = job.m_lastWaitingThread;
+				job.m_lastWaitingThread = &waitingThread;
+			}
+		}
+
+		if (mustWait)
+			alertSpecificThreadEvent->Wait();
 	}
 
 	RCPtr<Job> JobQueue::WaitForWork(const ISpan<JobType> &jobTypes, bool waitIfDepleted, IEvent *wakeEvent, IEvent *terminatedEvent)

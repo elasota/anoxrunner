@@ -13,7 +13,7 @@ namespace rkit
 	public:
 		StaticArray();
 		StaticArray(const StaticArray<T, TSize> &other) = default;
-		StaticArray(StaticArray<T, TSize> &&other);
+		StaticArray(StaticArray<T, TSize> &&other) = default;
 		~StaticArray();
 
 		StaticArray<T, TSize> &operator=(const StaticArray<T, TSize> &other);
@@ -51,12 +51,6 @@ namespace rkit
 	template<class T, size_t TSize>
 	StaticArray<T, TSize>::StaticArray()
 		: m_elements{}
-	{
-	}
-
-	template<class T, size_t TSize>
-	StaticArray<T, TSize>::StaticArray(StaticArray<T, TSize> &&other)
-		: m_elements(std::move(other.m_elements))
 	{
 	}
 

@@ -79,7 +79,7 @@ namespace rkit
 	EnumMaskIterator<T> EnumMaskIterator<T>::operator++(int)
 	{
 		EnumMaskIterator result = (*this);
-		++result;
+		++m_index;
 		return result;
 	}
 
@@ -104,7 +104,7 @@ namespace rkit
 	EnumMaskIterator<T> EnumMaskIterator<T>::operator--(int)
 	{
 		EnumMaskIterator result = (*this);
-		++result;
+		--m_index;
 		return result;
 	}
 

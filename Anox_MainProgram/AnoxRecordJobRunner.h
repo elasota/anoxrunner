@@ -1,0 +1,69 @@
+#pragma once
+
+namespace rkit
+{
+	struct Result;
+}
+
+namespace rkit::render
+{
+	struct IBaseCommandAllocator;
+	struct IGraphicsCommandAllocator;
+	struct IGraphicsComputeCommandAllocator;
+	struct IComputeCommandAllocator;
+	struct ICopyCommandAllocator;
+}
+
+namespace anox::priv
+{
+	struct TypedRecordJobRunnerHelper
+	{
+		static void CastCommandAllocator(rkit::render::IBaseCommandAllocator &commandAllocator, rkit::render::IGraphicsCommandAllocator *&outCommandAllocator);
+		static void CastCommandAllocator(rkit::render::IBaseCommandAllocator &commandAllocator, rkit::render::IGraphicsComputeCommandAllocator *&outCommandAllocator);
+		static void CastCommandAllocator(rkit::render::IBaseCommandAllocator &commandAllocator, rkit::render::IComputeCommandAllocator *&outCommandAllocator);
+		static void CastCommandAllocator(rkit::render::IBaseCommandAllocator &commandAllocator, rkit::render::ICopyCommandAllocator *&outCommandAllocator);
+	};
+}
+
+namespace anox
+{
+	struct IRecordJobRunner
+	{
+		virtual ~IRecordJobRunner() {}
+
+		virtual rkit::Result RunBase(rkit::render::IBaseCommandAllocator &commandAllocator) = 0;
+	};
+
+	template<class T>
+	struct ITypedRecordJobRunner : public IRecordJobRunner
+	{
+		virtual ~ITypedRecordJobRunner() {}
+
+		virtual rkit::Result RunRecord(T &commandAllocator) = 0;
+
+	protected:
+		rkit::Result RunBase(rkit::render::IBaseCommandAllocator &commandAllocator) override final;
+	};
+
+	typedef ITypedRecordJobRunner<rkit::render::IComputeCommandAllocator> IComputeRecordJobRunner_t;
+	typedef ITypedRecordJobRunner<rkit::render::IGraphicsComputeCommandAllocator> IGraphicsComputeRecordJobRunner_t;
+	typedef ITypedRecordJobRunner<rkit::render::IGraphicsCommandAllocator> IGraphicsRecordJobRunner_t;
+	typedef ITypedRecordJobRunner<rkit::render::ICopyCommandAllocator> ICopyRecordJobRunner_t;
+}
+
+#include "rkit/Core/Result.h"
+#include "rkit/Core/RKitAssert.h"
+
+namespace anox
+{
+	template<class T>
+	rkit::Result ITypedRecordJobRunner<T>::RunBase(rkit::render::IBaseCommandAllocator &commandAllocator)
+	{
+		T *retypedCmdAllocator = nullptr;
+		::anox::priv::TypedRecordJobRunnerHelper::CastCommandAllocator(commandAllocator, retypedCmdAllocator);
+
+		RKIT_ASSERT(retypedCmdAllocator != nullptr);
+
+		return this->RunRecord(*retypedCmdAllocator);
+	}
+}

@@ -96,11 +96,15 @@ namespace anox
 	{
 		RKIT_CHECK(m_graphicsSubsystem->TransitionDisplayState());
 
-		RKIT_CHECK(m_graphicsSubsystem->BeginFrame());
+		RKIT_CHECK(m_graphicsSubsystem->RetireOldestFrame());
 
 		RKIT_CHECK(m_graphicsSubsystem->StartRendering());
 
+		RKIT_CHECK(m_graphicsSubsystem->DrawFrame());
+
 		RKIT_CHECK(m_graphicsSubsystem->EndFrame());
+
+		// TODO: Run tasks
 
 		return rkit::ResultCode::kOK;
 	}

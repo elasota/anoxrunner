@@ -48,7 +48,12 @@ namespace rkit
 
 		virtual Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<RCPtr<Job> > &dependencies) = 0;
 
+		// Waits for work from a job queue.
+		// If "waitIfDepleted" is set, then wakeEvent must be an auto-reset event and terminatedEvent must not be signaled
 		virtual RCPtr<Job> WaitForWork(const ISpan<JobType> &jobTypes, bool waitIfDepleted, IEvent *wakeEvent, IEvent *terminatedEvent) = 0;
+
+		virtual void WaitForJob(Job &job, const ISpan<JobType> &idleJobTypes, IEvent *wakeEvent, IEvent *terminatedEvent, IEvent *specificThreadWakeEvent) = 0;
+
 		virtual void Fault(const Result &result) = 0;
 
 		virtual Result CheckFault() = 0;

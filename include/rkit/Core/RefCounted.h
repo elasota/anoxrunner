@@ -422,7 +422,8 @@ namespace rkit
 		allocation.m_mem = mem;
 		allocation.m_obj = refCounted;
 
-		RefCountedTracker *tracker = Private::RefCountedInstantiator::InitRefCounted(*refCounted, allocation);
+		Private::RefCountedInstantiator::InitRefCounted(*refCounted, allocation);
+		RefCountedTracker *tracker = Private::RefCountedInstantiator::GetTrackerFromObject(refCounted);
 
 		objPtr = RCPtr<TPtrType>(obj);
 

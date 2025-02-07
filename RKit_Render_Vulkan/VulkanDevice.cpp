@@ -45,6 +45,7 @@ namespace rkit::render::vulkan
 		Result ResetBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences) override;
 		Result WaitForBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll) override;
 		Result WaitForBinaryFencesTimed(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll, uint64_t timeoutMSec) override;
+		Result WaitForDeviceIdle() override;
 
 		VkDevice GetDevice() const override;
 		VkInstance GetInstance() const override;
@@ -307,7 +308,7 @@ namespace rkit::render::vulkan
 
 		QueueFamily &queueFamily = m_queueFamilies[static_cast<size_t>(queueType)];
 		queueFamily.m_vkQueueFamily = queueFamilyIndex;
-		
+
 		RKIT_CHECK(queueFamily.m_queues.Resize(numQueues));
 
 		for (uint32_t i = 0; i < numQueues; i++)
@@ -471,6 +472,14 @@ namespace rkit::render::vulkan
 			RKIT_VK_CHECK(m_vkd.vkWaitForFences(m_device, static_cast<uint32_t>(numFences), dynFences.GetBuffer(), waitForAll ? VK_TRUE : VK_FALSE, timeoutMSec));
 		}
 
+		return ResultCode::kOK;
+	}
+
+	Result VulkanDevice::WaitForDeviceIdle()
+	{
+		RKIT_VK_CHECK(m_vkd.vkDeviceWaitIdle(m_device));
+
+		// FIXME: Wait for swapchains too
 		return ResultCode::kOK;
 	}
 

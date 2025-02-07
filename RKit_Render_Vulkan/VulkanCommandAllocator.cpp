@@ -19,6 +19,11 @@ namespace rkit::render::vulkan
 
 		Result Initialize(uint32_t queueFamily);
 
+		ICopyCommandAllocator *ToCopyCommandAllocator() override;
+		IGraphicsCommandAllocator *ToGraphicsCommandAllocator() override;
+		IComputeCommandAllocator *ToComputeCommandAllocator() override;
+		IGraphicsComputeCommandAllocator *ToGraphicsComputeCommandAllocator() override;
+
 		Result OpenCopyCommandList(ICopyCommandList *&outCommandList) override;
 		Result OpenGraphicsCommandList(IGraphicsCommandList *&outCommandList) override;
 		Result OpenComputeCommandList(IComputeCommandList *&outCommandList) override;
@@ -67,6 +72,38 @@ namespace rkit::render::vulkan
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateCommandPool(m_device.GetDevice(), &poolCreateInfo, m_device.GetAllocCallbacks(), &m_pool));
 
 		return ResultCode::kOK;
+	}
+
+	ICopyCommandAllocator *VulkanCommandAllocator::ToCopyCommandAllocator()
+	{
+		if (IsQueueTypeCompatible(m_queueType, CommandQueueType::kCopy))
+			return this;
+		else
+			return nullptr;
+	}
+
+	IGraphicsCommandAllocator *VulkanCommandAllocator::ToGraphicsCommandAllocator()
+	{
+		if (IsQueueTypeCompatible(m_queueType, CommandQueueType::kGraphics))
+			return this;
+		else
+			return nullptr;
+	}
+
+	IComputeCommandAllocator *VulkanCommandAllocator::ToComputeCommandAllocator()
+	{
+		if (IsQueueTypeCompatible(m_queueType, CommandQueueType::kAsyncCompute))
+			return this;
+		else
+			return nullptr;
+	}
+
+	IGraphicsComputeCommandAllocator *VulkanCommandAllocator::ToGraphicsComputeCommandAllocator()
+	{
+		if (IsQueueTypeCompatible(m_queueType, CommandQueueType::kGraphicsCompute))
+			return this;
+		else
+			return nullptr;
 	}
 
 	Result VulkanCommandAllocator::OpenCopyCommandList(ICopyCommandList *&outCommandList)

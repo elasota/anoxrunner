@@ -135,14 +135,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AnoxFrameDrawer.cpp" />
     <ClCompile Include="AnoxGame.cpp" />
     <ClCompile Include="AnoxGraphicsSettings.cpp" />
     <ClCompile Include="AnoxGraphicsSubsystem.cpp" />
     <ClCompile Include="AnoxMain.cpp" />
+    <ClCompile Include="AnoxRecordJobRunner.cpp" />
     <ClCompile Include="AnoxRenderedWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\anox\AnoxGraphicsSubsystem.h" />
+    <ClInclude Include="AnoxFrameDrawer.h" />
+    <ClInclude Include="AnoxGraphicsJob.h" />
+    <ClInclude Include="AnoxPeriodicResources.h" />
+    <ClInclude Include="AnoxRecordJobRunner.h" />
     <ClInclude Include="AnoxRenderedWindow.h" />
     <ClInclude Include="AnoxGraphicsResourceManager.h" />
     <ClInclude Include="AnoxGraphicsSettings.h" />
