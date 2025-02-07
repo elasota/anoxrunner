@@ -280,22 +280,24 @@ namespace anox
 
 		struct LogicalQueueBase
 		{
-			rkit::render::IBaseCommandQueue *m_commandQueue = nullptr;
-
 			rkit::RCPtr<rkit::Job> m_lastRecordJob;
 			rkit::RCPtr<rkit::Job> m_lastSubmitJob;
 
+			virtual rkit::render::IBaseCommandQueue *GetBaseCommandQueue() const = 0;
 			virtual rkit::Result CreateCommandAllocator(rkit::render::IRenderDevice &renderDevice, rkit::UniquePtr<rkit::render::IBaseCommandAllocator> &cmdAlloc, bool isBundle) = 0;
 		};
 
 		template<class TCommandQueueType, class TCommandAllocatorType,
-			rkit::Result (rkit::render::IRenderDevice::*TCommandAllocCreationMethod)(rkit::UniquePtr<TCommandAllocatorType>&, bool)
+			rkit::Result (rkit::render::IRenderDevice::*TCommandAllocCreationMethod)(rkit::UniquePtr<TCommandAllocatorType>&, TCommandQueueType &, bool),
+			TCommandQueueType *(rkit::render::IBaseCommandQueue::*TQueueConversionMethod)()
 		>
-		struct LogicalQueue : public LogicalQueueBase
+		struct LogicalQueue final : public LogicalQueueBase
 		{
+			TCommandQueueType *m_commandQueue = nullptr;
+
 			inline TCommandQueueType *GetCommandQueue() const
 			{
-				return static_cast<TCommandQueueType *>(this->m_commandQueue);
+				return m_commandQueue;
 			}
 
 			inline TCommandAllocatorType *GetCommandAllocator() const
@@ -303,10 +305,15 @@ namespace anox
 				return static_cast<TCommandAllocatorType *>(this->m_commandAllocator.Get());
 			}
 
+			rkit::render::IBaseCommandQueue *GetBaseCommandQueue() const override
+			{
+				return m_commandQueue;
+			}
+
 			rkit::Result CreateCommandAllocator(rkit::render::IRenderDevice &renderDevice, rkit::UniquePtr<rkit::render::IBaseCommandAllocator> &cmdAlloc, bool isBundle) override
 			{
 				rkit::UniquePtr<TCommandAllocatorType> alloc;
-				RKIT_CHECK((renderDevice.*TCommandAllocCreationMethod)(alloc, isBundle));
+				RKIT_CHECK((renderDevice.*TCommandAllocCreationMethod)(alloc, *this->GetCommandQueue(), isBundle));
 
 				cmdAlloc = std::move(alloc);
 
@@ -381,10 +388,25 @@ namespace anox
 
 		rkit::Vector<FrameSyncPoint> m_syncPoints;
 
-		LogicalQueue<rkit::render::ICopyCommandQueue, rkit::render::ICopyCommandAllocator, &rkit::render::IRenderDevice::CreateCopyCommandAllocator> m_dmaLogicalQueue;
-		LogicalQueue<rkit::render::IGraphicsComputeCommandQueue, rkit::render::IGraphicsComputeCommandAllocator, &rkit::render::IRenderDevice::CreateGraphicsComputeCommandAllocator> m_graphicsComputeLogicalQueue;
-		LogicalQueue<rkit::render::IGraphicsCommandQueue, rkit::render::IGraphicsCommandAllocator, &rkit::render::IRenderDevice::CreateGraphicsCommandAllocator> m_graphicsLogicalQueue;
-		LogicalQueue<rkit::render::IComputeCommandQueue, rkit::render::IComputeCommandAllocator, &rkit::render::IRenderDevice::CreateComputeCommandAllocator> m_asyncComputeLogicalQueue;
+		LogicalQueue<rkit::render::ICopyCommandQueue, rkit::render::ICopyCommandAllocator,
+			&rkit::render::IRenderDevice::CreateCopyCommandAllocator,
+			&rkit::render::IBaseCommandQueue::ToCopyCommandQueue
+		> m_dmaLogicalQueue;
+
+		LogicalQueue<rkit::render::IGraphicsComputeCommandQueue, rkit::render::IGraphicsComputeCommandAllocator,
+			&rkit::render::IRenderDevice::CreateGraphicsComputeCommandAllocator,
+			&rkit::render::IBaseCommandQueue::ToGraphicsComputeCommandQueue
+		> m_graphicsComputeLogicalQueue;
+
+		LogicalQueue<rkit::render::IGraphicsCommandQueue, rkit::render::IGraphicsCommandAllocator,
+			&rkit::render::IRenderDevice::CreateGraphicsCommandAllocator,
+			&rkit::render::IBaseCommandQueue::ToGraphicsCommandQueue
+		> m_graphicsLogicalQueue;
+
+		LogicalQueue<rkit::render::IComputeCommandQueue, rkit::render::IComputeCommandAllocator,
+			&rkit::render::IRenderDevice::CreateComputeCommandAllocator,
+			&rkit::render::IBaseCommandQueue::ToComputeCommandQueue
+		> m_asyncComputeLogicalQueue;
 
 		rkit::StaticArray<LogicalQueueBase*, kNumLogicalQueueTypes> m_logicalQueues;
 
@@ -1183,7 +1205,7 @@ namespace anox
 		LogicalQueueBase *graphicsLogicalQueue = m_logicalQueues[static_cast<size_t>(LogicalQueueType::kGraphics)];
 
 		bool isGraphicsQueueCompatible = false;
-		RKIT_CHECK(swapChainPrototype->CheckQueueCompatibility(isGraphicsQueueCompatible, *graphicsLogicalQueue->m_commandQueue));
+		RKIT_CHECK(swapChainPrototype->CheckQueueCompatibility(isGraphicsQueueCompatible, *graphicsLogicalQueue->GetBaseCommandQueue()));
 
 		if (!isGraphicsQueueCompatible)
 		{
@@ -1195,7 +1217,7 @@ namespace anox
 
 		presentationLogicalQueueRef = graphicsLogicalQueue;
 
-		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), std::move(swapChainPrototype), m_renderDevice.Get(), presentationLogicalQueueRef->m_commandQueue, 2, m_numSyncPoints));
+		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), std::move(swapChainPrototype), m_renderDevice.Get(), presentationLogicalQueueRef->GetBaseCommandQueue(), 2, m_numSyncPoints));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -1481,7 +1503,7 @@ namespace anox
 			if (!logicalQueue)
 				continue;
 
-			rkit::render::CommandQueueType queueType = logicalQueue->m_commandQueue->GetCommandQueueType();
+			rkit::render::CommandQueueType queueType = logicalQueue->GetBaseCommandQueue()->GetCommandQueueType();
 
 			FrameSyncPointCommandListHandler &cmdListHandler = syncPoint.m_commandListHandlers[static_cast<size_t>(queueType)];
 
@@ -1591,7 +1613,7 @@ namespace anox
 	{
 		FrameSyncPoint &syncPoint = m_syncPoints[m_currentSyncPoint];
 
-		rkit::render::CommandQueueType cmdQueueType = m_logicalQueues[static_cast<size_t>(queueType)]->m_commandQueue->GetCommandQueueType();
+		rkit::render::CommandQueueType cmdQueueType = m_logicalQueues[static_cast<size_t>(queueType)]->GetBaseCommandQueue()->GetCommandQueueType();
 
 		FrameSyncPointCommandListHandler &cmdListHandler = syncPoint.m_commandListHandlers[static_cast<size_t>(cmdQueueType)];
 

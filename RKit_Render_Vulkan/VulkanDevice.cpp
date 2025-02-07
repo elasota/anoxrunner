@@ -76,15 +76,15 @@ namespace rkit::render::vulkan
 
 		Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, UniquePtr<ISwapChainPrototype> &&prototype, uint8_t numImages, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) override;
 
-		Result CreateCopyCommandAllocator(UniquePtr<ICopyCommandAllocator> &outCommandAllocator, bool isBundle) override;
-		Result CreateComputeCommandAllocator(UniquePtr<IComputeCommandAllocator> &outCommandAllocator, bool isBundle) override;
-		Result CreateGraphicsCommandAllocator(UniquePtr<IGraphicsCommandAllocator> &outCommandAllocator, bool isBundle) override;
-		Result CreateGraphicsComputeCommandAllocator(UniquePtr<IGraphicsComputeCommandAllocator> &outCommandAllocator, bool isBundle) override;
+		Result CreateCopyCommandAllocator(UniquePtr<ICopyCommandAllocator> &outCommandAllocator, ICopyCommandQueue &queue, bool isBundle) override;
+		Result CreateComputeCommandAllocator(UniquePtr<IComputeCommandAllocator> &outCommandAllocator, IComputeCommandQueue &queue, bool isBundle) override;
+		Result CreateGraphicsCommandAllocator(UniquePtr<IGraphicsCommandAllocator> &outCommandAllocator, IGraphicsCommandQueue &queue, bool isBundle) override;
+		Result CreateGraphicsComputeCommandAllocator(UniquePtr<IGraphicsComputeCommandAllocator> &outCommandAllocator, IGraphicsComputeCommandQueue &queue, bool isBundle) override;
 
 		template<class TCommandListType>
-		Result CreateTypedCommandAllocator(UniquePtr<TCommandListType> &outCommandList, CommandQueueType queueType, bool isBundle);
+		Result CreateTypedCommandAllocator(UniquePtr<TCommandListType> &outCommandList, CommandQueueType commandQueueType, IBaseCommandQueue &commandQueue, bool isBundle);
 
-		Result CreateCommandAllocator(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, CommandQueueType queueType, bool isBundle);
+		Result CreateCommandAllocator(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, CommandQueueType commandQueueType, IBaseCommandQueue &commandQueue, bool isBundle);
 
 		Result LoadDeviceAPI();
 		Result CreatePools();
@@ -597,45 +597,44 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanDevice::CreateCopyCommandAllocator(UniquePtr<ICopyCommandAllocator> &outCommandAllocator, bool isBundle)
+	Result VulkanDevice::CreateCopyCommandAllocator(UniquePtr<ICopyCommandAllocator> &outCommandAllocator, ICopyCommandQueue &commandQueue, bool isBundle)
 	{
-		return CreateTypedCommandAllocator(outCommandAllocator, CommandQueueType::kCopy, isBundle);
+		return CreateTypedCommandAllocator(outCommandAllocator, CommandQueueType::kCopy, commandQueue, isBundle);
 	}
 
-	Result VulkanDevice::CreateComputeCommandAllocator(UniquePtr<IComputeCommandAllocator> &outCommandAllocator, bool isBundle)
+	Result VulkanDevice::CreateComputeCommandAllocator(UniquePtr<IComputeCommandAllocator> &outCommandAllocator, IComputeCommandQueue &commandQueue, bool isBundle)
 	{
-		return CreateTypedCommandAllocator(outCommandAllocator, CommandQueueType::kAsyncCompute, isBundle);
+		return CreateTypedCommandAllocator(outCommandAllocator, CommandQueueType::kAsyncCompute, commandQueue, isBundle);
 	}
 
-	Result VulkanDevice::CreateGraphicsCommandAllocator(UniquePtr<IGraphicsCommandAllocator> &outCommandAllocator, bool isBundle)
+	Result VulkanDevice::CreateGraphicsCommandAllocator(UniquePtr<IGraphicsCommandAllocator> &outCommandAllocator, IGraphicsCommandQueue &commandQueue, bool isBundle)
 	{
-		return CreateTypedCommandAllocator(outCommandAllocator, CommandQueueType::kGraphics, isBundle);
+		return CreateTypedCommandAllocator(outCommandAllocator, CommandQueueType::kGraphics, commandQueue, isBundle);
 	}
 
-	Result VulkanDevice::CreateGraphicsComputeCommandAllocator(UniquePtr<IGraphicsComputeCommandAllocator> &outCommandAllocator, bool isBundle)
+	Result VulkanDevice::CreateGraphicsComputeCommandAllocator(UniquePtr<IGraphicsComputeCommandAllocator> &outCommandAllocator, IGraphicsComputeCommandQueue &commandQueue, bool isBundle)
 	{
-		return CreateTypedCommandAllocator(outCommandAllocator, CommandQueueType::kGraphicsCompute, isBundle);
+		return CreateTypedCommandAllocator(outCommandAllocator, CommandQueueType::kGraphicsCompute, commandQueue, isBundle);
 	}
 
 	template<class TCommandListType>
-	Result VulkanDevice::CreateTypedCommandAllocator(UniquePtr<TCommandListType> &outCommandAllocator, CommandQueueType queueType, bool isBundle)
+	Result VulkanDevice::CreateTypedCommandAllocator(UniquePtr<TCommandListType> &outCommandAllocator, CommandQueueType commandQueueType, IBaseCommandQueue &commandQueue, bool isBundle)
 	{
 		UniquePtr<VulkanCommandAllocatorBase> cmdAllocator;
-		RKIT_CHECK(CreateCommandAllocator(cmdAllocator, queueType, isBundle));
+		RKIT_CHECK(CreateCommandAllocator(cmdAllocator, commandQueueType, commandQueue, isBundle));
 
 		outCommandAllocator = cmdAllocator.StaticCast<TCommandListType>();
 
 		return ResultCode::kOK;
 	}
 
-
-	Result VulkanDevice::CreateCommandAllocator(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, CommandQueueType queueType, bool isBundle)
+	Result VulkanDevice::CreateCommandAllocator(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, CommandQueueType commandQueueType, IBaseCommandQueue &commandQueue, bool isBundle)
 	{
 		UniquePtr<VulkanCommandAllocatorBase> vkCommandAllocator;
 
-		const QueueFamily &queueFamily = m_queueFamilies[static_cast<size_t>(queueType)];
+		const uint32_t queueFamily = static_cast<VulkanQueueProxyBase *>(commandQueue.ToInternalCommandQueue())->GetQueueFamily();
 
-		RKIT_CHECK(VulkanCommandAllocatorBase::Create(vkCommandAllocator, *this, queueType, isBundle, queueFamily.m_vkQueueFamily));
+		RKIT_CHECK(VulkanCommandAllocatorBase::Create(vkCommandAllocator, *this, commandQueueType, isBundle, queueFamily));
 
 		outCommandAllocator = std::move(vkCommandAllocator);
 

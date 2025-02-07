@@ -26,6 +26,12 @@ namespace rkit::render
 	struct IBinaryCPUWaitableFence;
 	struct ISwapChainSyncPoint;
 
+
+	struct ICopyCommandQueue;
+	struct IComputeCommandQueue;
+	struct IGraphicsCommandQueue;
+	struct IGraphicsComputeCommandQueue;
+
 	struct IInternalCommandQueue
 	{
 		virtual ~IInternalCommandQueue() {}
@@ -41,6 +47,10 @@ namespace rkit::render
 
 		virtual Result Flush() = 0;
 
+		virtual ICopyCommandQueue *ToCopyCommandQueue() = 0;
+		virtual IComputeCommandQueue *ToComputeCommandQueue() = 0;
+		virtual IGraphicsCommandQueue *ToGraphicsCommandQueue() = 0;
+		virtual IGraphicsComputeCommandQueue *ToGraphicsComputeCommandQueue() = 0;
 		virtual IInternalCommandQueue *ToInternalCommandQueue() = 0;
 
 		inline const IInternalCommandQueue *ToInternalCommandQueue() const

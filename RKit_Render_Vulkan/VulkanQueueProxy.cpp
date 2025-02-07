@@ -35,6 +35,10 @@ namespace rkit::render::vulkan
 
 		CommandQueueType GetCommandQueueType() const override;
 
+		ICopyCommandQueue *ToCopyCommandQueue() override;
+		IComputeCommandQueue *ToComputeCommandQueue() override;
+		IGraphicsCommandQueue *ToGraphicsCommandQueue() override;
+		IGraphicsComputeCommandQueue *ToGraphicsComputeCommandQueue() override;
 		IInternalCommandQueue *ToInternalCommandQueue() override;
 
 		Result Flush() override;
@@ -174,6 +178,38 @@ namespace rkit::render::vulkan
 	CommandQueueType VulkanQueueProxy::GetCommandQueueType() const
 	{
 		return m_queueType;
+	}
+
+	ICopyCommandQueue *VulkanQueueProxy::ToCopyCommandQueue()
+	{
+		if (IsQueueTypeCompatible(m_queueType, CommandQueueType::kCopy))
+			return this;
+		else
+			return nullptr;
+	}
+
+	IComputeCommandQueue *VulkanQueueProxy::ToComputeCommandQueue()
+	{
+		if (IsQueueTypeCompatible(m_queueType, CommandQueueType::kAsyncCompute))
+			return this;
+		else
+			return nullptr;
+	}
+
+	IGraphicsCommandQueue *VulkanQueueProxy::ToGraphicsCommandQueue()
+	{
+		if (IsQueueTypeCompatible(m_queueType, CommandQueueType::kGraphics))
+			return this;
+		else
+			return nullptr;
+	}
+
+	IGraphicsComputeCommandQueue *VulkanQueueProxy::ToGraphicsComputeCommandQueue()
+	{
+		if (IsQueueTypeCompatible(m_queueType, CommandQueueType::kGraphicsCompute))
+			return this;
+		else
+			return nullptr;
 	}
 
 	IInternalCommandQueue *VulkanQueueProxy::ToInternalCommandQueue()
