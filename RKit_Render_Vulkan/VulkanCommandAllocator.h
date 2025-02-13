@@ -9,7 +9,7 @@ namespace rkit::render::vulkan
 {
 	class VulkanDeviceBase;
 
-	class VulkanCommandAllocatorBase : public IGraphicsComputeCommandAllocator
+	class VulkanCommandAllocatorBase : public IGraphicsComputeCommandAllocator, public IInternalCommandAllocator
 	{
 	public:
 		virtual CommandQueueType GetQueueType() const = 0;

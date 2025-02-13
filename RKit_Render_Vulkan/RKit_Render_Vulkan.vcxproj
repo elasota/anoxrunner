@@ -140,6 +140,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="VulkanCommandAllocator.cpp" />
+    <ClCompile Include="VulkanCommandBatch.cpp" />
     <ClCompile Include="VulkanFence.cpp" />
     <ClCompile Include="VulkanPipelineLibraryLoader.cpp" />
     <ClCompile Include="VulkanPlatformSpecific_Win32.cpp" />
@@ -165,6 +166,7 @@
     <ClInclude Include="VulkanAutoObject.h" />
     <ClInclude Include="VulkanCheck.h" />
     <ClInclude Include="VulkanCommandAllocator.h" />
+    <ClInclude Include="VulkanCommandBatch.h" />
     <ClInclude Include="VulkanCommandList.h" />
     <ClInclude Include="VulkanDevice.h" />
     <ClInclude Include="VulkanFence.h" />

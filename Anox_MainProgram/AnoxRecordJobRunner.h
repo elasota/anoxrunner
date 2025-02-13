@@ -14,16 +14,6 @@ namespace rkit::render
 	struct ICopyCommandAllocator;
 }
 
-namespace anox::priv
-{
-	struct TypedRecordJobRunnerHelper
-	{
-		static void CastCommandAllocator(rkit::render::IBaseCommandAllocator &commandAllocator, rkit::render::IGraphicsCommandAllocator *&outCommandAllocator);
-		static void CastCommandAllocator(rkit::render::IBaseCommandAllocator &commandAllocator, rkit::render::IGraphicsComputeCommandAllocator *&outCommandAllocator);
-		static void CastCommandAllocator(rkit::render::IBaseCommandAllocator &commandAllocator, rkit::render::IComputeCommandAllocator *&outCommandAllocator);
-		static void CastCommandAllocator(rkit::render::IBaseCommandAllocator &commandAllocator, rkit::render::ICopyCommandAllocator *&outCommandAllocator);
-	};
-}
 
 namespace anox
 {
@@ -53,16 +43,14 @@ namespace anox
 
 #include "rkit/Core/Result.h"
 #include "rkit/Core/RKitAssert.h"
+#include "rkit/Render/CommandAllocator.h"
 
 namespace anox
 {
 	template<class T>
 	rkit::Result ITypedRecordJobRunner<T>::RunBase(rkit::render::IBaseCommandAllocator &commandAllocator)
 	{
-		T *retypedCmdAllocator = nullptr;
-		::anox::priv::TypedRecordJobRunnerHelper::CastCommandAllocator(commandAllocator, retypedCmdAllocator);
-
-		RKIT_ASSERT(retypedCmdAllocator != nullptr);
+		T *retypedCmdAllocator = commandAllocator.DynamicCast<T>();
 
 		return this->RunRecord(*retypedCmdAllocator);
 	}

@@ -75,10 +75,5 @@ namespace rkit::render
 		virtual Result CreateSwapChainPrototype(UniquePtr<ISwapChainPrototype> &outSwapChainPrototype, IDisplay &display) = 0;
 
 		virtual Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, UniquePtr<ISwapChainPrototype> &&prototype, uint8_t numImages, RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) = 0;
-
-		virtual Result CreateCopyCommandAllocator(UniquePtr<ICopyCommandAllocator> &outCommandAllocator, ICopyCommandQueue &queue, bool isBundle) = 0;
-		virtual Result CreateComputeCommandAllocator(UniquePtr<IComputeCommandAllocator> &outCommandAllocator, IComputeCommandQueue &queue, bool isBundle) = 0;
-		virtual Result CreateGraphicsCommandAllocator(UniquePtr<IGraphicsCommandAllocator> &outCommandAllocator, IGraphicsCommandQueue &queue, bool isBundle) = 0;
-		virtual Result CreateGraphicsComputeCommandAllocator(UniquePtr<IGraphicsComputeCommandAllocator> &outCommandAllocator, IGraphicsComputeCommandQueue &queue, bool isBundle) = 0;
 	};
 }

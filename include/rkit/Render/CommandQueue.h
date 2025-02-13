@@ -12,6 +12,9 @@ namespace rkit
 	class Span;
 
 	template<class T>
+	class UniquePtr;
+
+	template<class T>
 	class EnumMask;
 }
 
@@ -26,6 +29,10 @@ namespace rkit::render
 	struct IBinaryCPUWaitableFence;
 	struct ISwapChainSyncPoint;
 
+	struct ICopyCommandAllocator;
+	struct IGraphicsCommandAllocator;
+	struct IComputeCommandAllocator;
+	struct IGraphicsComputeCommandAllocator;
 
 	struct ICopyCommandQueue;
 	struct IComputeCommandQueue;
@@ -61,31 +68,21 @@ namespace rkit::render
 
 	struct ICopyCommandQueue : public IBaseCommandQueue
 	{
-		virtual Result QueueCopy(const Span<ICopyCommandList*> &cmdLists) = 0;
-		Result QueueCopy(ICopyCommandList &cmdList);
+		virtual Result CreateCopyCommandAllocator(UniquePtr<ICopyCommandAllocator> &outCommandAllocator, bool isBundle) = 0;
 	};
 
 	struct IComputeCommandQueue : public virtual ICopyCommandQueue
 	{
-		virtual Result QueueCompute(const Span<IComputeCommandList *> &cmdLists) = 0;
-		Result QueueCompute(IComputeCommandList &cmdList);
+		virtual Result CreateComputeCommandAllocator(UniquePtr<IComputeCommandAllocator> &outCommandAllocator, bool isBundle) = 0;
 	};
 
 	struct IGraphicsCommandQueue : public virtual ICopyCommandQueue
 	{
-		virtual Result QueueGraphics(const Span<IGraphicsCommandList *> &cmdLists) = 0;
-		Result QueueGraphics(IGraphicsCommandList &cmdList);
-
-		virtual Result QueueWaitForSwapChainWriteReady(ISwapChainSyncPoint &syncPoint) = 0;
-		virtual Result QueueWaitForSwapChainPresentReady(ISwapChainSyncPoint &syncPoint) = 0;
+		virtual Result CreateGraphicsCommandAllocator(UniquePtr<IGraphicsCommandAllocator> &outCommandAllocator, bool isBundle) = 0;
 	};
 
 	struct IGraphicsComputeCommandQueue : public IComputeCommandQueue, public IGraphicsCommandQueue
 	{
-		virtual Result QueueGraphicsCompute(const Span<IGraphicsComputeCommandList *> &cmdLists) = 0;
-		Result QueueGraphicsCompute(IGraphicsComputeCommandList &cmdList);
+		virtual Result CreateGraphicsComputeCommandAllocator(UniquePtr<IGraphicsComputeCommandAllocator> &outCommandAllocator, bool isBundle) = 0;
 	};
 }
-
-#include "rkit/Core/Result.h"
-

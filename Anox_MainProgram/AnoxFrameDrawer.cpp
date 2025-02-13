@@ -25,32 +25,32 @@ namespace anox
 		public:
 			rkit::Result Run() override;
 
-			rkit::render::IGraphicsCommandList **GetCmdListRef();
+			rkit::render::IGraphicsCommandBatch **GetCmdBatchRef();
 
 		private:
-			rkit::render::IGraphicsCommandList *m_cmdList = nullptr;
+			rkit::render::IGraphicsCommandBatch *m_cmdBatch = nullptr;
 		};
 
 		class RecordTestCommandsJobRunner final : public IGraphicsRecordJobRunner_t
 		{
 		public:
-			explicit RecordTestCommandsJobRunner(rkit::render::IGraphicsCommandList **cmdListRef);
+			explicit RecordTestCommandsJobRunner(rkit::render::IGraphicsCommandBatch **cmdBatchRef);
 
 			rkit::Result RunRecord(rkit::render::IGraphicsCommandAllocator &commandAllocator) override;
 
 		private:
-			rkit::render::IGraphicsCommandList **m_cmdListRef;
+			rkit::render::IGraphicsCommandBatch **m_cmdBatchRef;
 		};
 	};
 
-	FrameDrawer::RecordTestCommandsJobRunner::RecordTestCommandsJobRunner(rkit::render::IGraphicsCommandList **cmdListRef)
-		: m_cmdListRef(cmdListRef)
+	FrameDrawer::RecordTestCommandsJobRunner::RecordTestCommandsJobRunner(rkit::render::IGraphicsCommandBatch **cmdBatchRef)
+		: m_cmdBatchRef(cmdBatchRef)
 	{
 	}
 
 	rkit::Result FrameDrawer::RecordTestCommandsJobRunner::RunRecord(rkit::render::IGraphicsCommandAllocator &commandAllocator)
 	{
-		RKIT_CHECK(commandAllocator.OpenGraphicsCommandList(*m_cmdListRef));
+		//RKIT_CHECK(commandAllocator.OpenGraphicsCommandList(*m_cmdListRef));
 
 		return rkit::ResultCode::kNotYetImplemented;
 	}
@@ -61,9 +61,9 @@ namespace anox
 	}
 
 
-	rkit::render::IGraphicsCommandList **FrameDrawer::SubmitTestCommandsJobRunner::GetCmdListRef()
+	rkit::render::IGraphicsCommandBatch **FrameDrawer::SubmitTestCommandsJobRunner::GetCmdBatchRef()
 	{
-		return &m_cmdList;
+		return &m_cmdBatch;
 	}
 
 	rkit::Result FrameDrawer::DrawFrame(IGraphicsSubsystem &graphicsSubsystem, const rkit::RCPtr<PerFrameResources> &perFrameResources, const rkit::RCPtr<PerFramePerDisplayResources> &perDisplayResources)
@@ -74,7 +74,7 @@ namespace anox
 
 		rkit::RCPtr<rkit::Job> recordJob;
 		rkit::UniquePtr<RecordTestCommandsJobRunner> recordJobRunner;
-		RKIT_CHECK(rkit::New<RecordTestCommandsJobRunner>(recordJobRunner, submitJobRunner->GetCmdListRef()));
+		RKIT_CHECK(rkit::New<RecordTestCommandsJobRunner>(recordJobRunner, submitJobRunner->GetCmdBatchRef()));
 
 		RKIT_CHECK(graphicsSubsystem.CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kGraphics, std::move(recordJobRunner)));
 

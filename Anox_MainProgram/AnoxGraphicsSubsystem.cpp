@@ -288,7 +288,7 @@ namespace anox
 		};
 
 		template<class TCommandQueueType, class TCommandAllocatorType,
-			rkit::Result (rkit::render::IRenderDevice::*TCommandAllocCreationMethod)(rkit::UniquePtr<TCommandAllocatorType>&, TCommandQueueType &, bool),
+			rkit::Result (TCommandQueueType::*TCommandAllocCreationMethod)(rkit::UniquePtr<TCommandAllocatorType>&, bool),
 			TCommandQueueType *(rkit::render::IBaseCommandQueue::*TQueueConversionMethod)()
 		>
 		struct LogicalQueue final : public LogicalQueueBase
@@ -313,7 +313,7 @@ namespace anox
 			rkit::Result CreateCommandAllocator(rkit::render::IRenderDevice &renderDevice, rkit::UniquePtr<rkit::render::IBaseCommandAllocator> &cmdAlloc, bool isBundle) override
 			{
 				rkit::UniquePtr<TCommandAllocatorType> alloc;
-				RKIT_CHECK((renderDevice.*TCommandAllocCreationMethod)(alloc, *this->GetCommandQueue(), isBundle));
+				RKIT_CHECK((m_commandQueue->*TCommandAllocCreationMethod)(alloc, isBundle));
 
 				cmdAlloc = std::move(alloc);
 
@@ -389,22 +389,22 @@ namespace anox
 		rkit::Vector<FrameSyncPoint> m_syncPoints;
 
 		LogicalQueue<rkit::render::ICopyCommandQueue, rkit::render::ICopyCommandAllocator,
-			&rkit::render::IRenderDevice::CreateCopyCommandAllocator,
+			&rkit::render::ICopyCommandQueue::CreateCopyCommandAllocator,
 			&rkit::render::IBaseCommandQueue::ToCopyCommandQueue
 		> m_dmaLogicalQueue;
 
 		LogicalQueue<rkit::render::IGraphicsComputeCommandQueue, rkit::render::IGraphicsComputeCommandAllocator,
-			&rkit::render::IRenderDevice::CreateGraphicsComputeCommandAllocator,
+			&rkit::render::IGraphicsComputeCommandQueue::CreateGraphicsComputeCommandAllocator,
 			&rkit::render::IBaseCommandQueue::ToGraphicsComputeCommandQueue
 		> m_graphicsComputeLogicalQueue;
 
 		LogicalQueue<rkit::render::IGraphicsCommandQueue, rkit::render::IGraphicsCommandAllocator,
-			&rkit::render::IRenderDevice::CreateGraphicsCommandAllocator,
+			&rkit::render::IGraphicsCommandQueue::CreateGraphicsCommandAllocator,
 			&rkit::render::IBaseCommandQueue::ToGraphicsCommandQueue
 		> m_graphicsLogicalQueue;
 
 		LogicalQueue<rkit::render::IComputeCommandQueue, rkit::render::IComputeCommandAllocator,
-			&rkit::render::IRenderDevice::CreateComputeCommandAllocator,
+			&rkit::render::IComputeCommandQueue::CreateComputeCommandAllocator,
 			&rkit::render::IBaseCommandQueue::ToComputeCommandQueue
 		> m_asyncComputeLogicalQueue;
 

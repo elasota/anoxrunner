@@ -1,5 +1,7 @@
 #pragma once
 
+#include "rkit/Core/DynamicCastable.h"
+
 namespace rkit
 {
 	struct Result;
@@ -15,6 +17,11 @@ namespace rkit::render
 	struct IComputeCommandList;
 	struct IGraphicsComputeCommandList;
 
+	struct ICopyCommandBatch;
+	struct IGraphicsCommandBatch;
+	struct IComputeCommandBatch;
+	struct IGraphicsComputeCommandBatch;
+
 	struct IBaseCommandAllocator;
 	struct IInternalCommandAllocator;
 	struct IInternalCommandList;
@@ -26,14 +33,16 @@ namespace rkit::render
 
 	struct CommandListHandle;
 
-	struct IBaseCommandAllocator
+	struct IInternalCommandAllocator
+	{
+		virtual ~IInternalCommandAllocator() {}
+	};
+
+	struct IBaseCommandAllocator : public IDynamicCastable<ICopyCommandAllocator, IGraphicsCommandAllocator, IComputeCommandAllocator, IGraphicsComputeCommandAllocator>
 	{
 		virtual ~IBaseCommandAllocator() {}
 
-		virtual ICopyCommandAllocator *ToCopyCommandAllocator() = 0;
-		virtual IGraphicsCommandAllocator *ToGraphicsCommandAllocator() = 0;
-		virtual IComputeCommandAllocator *ToComputeCommandAllocator() = 0;
-		virtual IGraphicsComputeCommandAllocator *ToGraphicsComputeCommandAllocator() = 0;
+		virtual IInternalCommandAllocator *ToInternalCommandAllocator() = 0;
 
 		virtual Result ResetCommandAllocator(bool clearResources) = 0;
 	};
@@ -42,27 +51,27 @@ namespace rkit::render
 	{
 		virtual ~ICopyCommandAllocator() {}
 
-		virtual Result OpenCopyCommandList(ICopyCommandList *&outCommandList) = 0;
+		virtual Result OpenCopyCommandBatch(ICopyCommandBatch *&outCommandBatch, bool cpuWaitable) = 0;
 	};
 
 	struct IGraphicsCommandAllocator : public virtual ICopyCommandAllocator
 	{
 		virtual ~IGraphicsCommandAllocator() {}
 
-		virtual Result OpenGraphicsCommandList(IGraphicsCommandList *&outCommandList) = 0;
+		virtual Result OpenGraphicsCommandBatch(IGraphicsCommandBatch *&outCommandBatch, bool cpuWaitable) = 0;
 	};
 
 	struct IComputeCommandAllocator : public virtual ICopyCommandAllocator
 	{
 		virtual ~IComputeCommandAllocator() {}
 
-		virtual Result OpenComputeCommandList(IComputeCommandList *&outCommandList) = 0;
+		virtual Result OpenComputeCommandBatch(IGraphicsCommandBatch *&outCommandBatch, bool cpuWaitable) = 0;
 	};
 
 	struct IGraphicsComputeCommandAllocator : public virtual IGraphicsCommandAllocator, public virtual IComputeCommandAllocator
 	{
 		virtual ~IGraphicsComputeCommandAllocator() {}
 
-		virtual Result OpenGraphicsComputeCommandList(IGraphicsComputeCommandList *&outCommandList) = 0;
+		virtual Result OpenGraphicsComputeCommandBatch(IGraphicsComputeCommandBatch *&outCommandBatch, bool cpuWaitable) = 0;
 	};
 }

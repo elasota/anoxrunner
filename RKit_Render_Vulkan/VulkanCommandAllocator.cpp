@@ -1,4 +1,5 @@
 #include "VulkanCommandAllocator.h"
+#include "VulkanCommandBatch.h"
 
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/Vector.h"
@@ -19,27 +20,29 @@ namespace rkit::render::vulkan
 
 		Result Initialize(uint32_t queueFamily);
 
-		ICopyCommandAllocator *ToCopyCommandAllocator() override;
-		IGraphicsCommandAllocator *ToGraphicsCommandAllocator() override;
-		IComputeCommandAllocator *ToComputeCommandAllocator() override;
-		IGraphicsComputeCommandAllocator *ToGraphicsComputeCommandAllocator() override;
+		IInternalCommandAllocator *ToInternalCommandAllocator() override;
 
-		Result OpenCopyCommandList(ICopyCommandList *&outCommandList) override;
-		Result OpenGraphicsCommandList(IGraphicsCommandList *&outCommandList) override;
-		Result OpenComputeCommandList(IComputeCommandList *&outCommandList) override;
-		Result OpenGraphicsComputeCommandList(IGraphicsComputeCommandList *&outCommandList) override;
+		Result OpenCopyCommandBatch(ICopyCommandBatch *&outCommandBatch, bool cpuWaitable) override;
+		Result OpenGraphicsCommandBatch(IGraphicsCommandBatch *&outCommandBatch, bool cpuWaitable) override;
+		Result OpenComputeCommandBatch(IGraphicsCommandBatch *&outCommandBatch, bool cpuWaitable) override;
+		Result OpenGraphicsComputeCommandBatch(IGraphicsComputeCommandBatch *&outCommandBatch, bool cpuWaitable) override;
 
 		Result ResetCommandAllocator(bool discardResources) override;
 
 		CommandQueueType GetQueueType() const override;
 		bool IsBundle() const override;
 
-		template<class TCommandListType>
-		Result CreateTypedCommandList(TCommandListType *&outCommandList);
+		DynamicCastRef_t InternalDynamicCast() override;
 
-		Result CreateCommandList(VulkanCommandList *&outCommandList);
+		template<class TCommandBatchType>
+		Result TypedOpenCommandBatch(TCommandBatchType *&outCommandBath, bool cpuWaitable);
+
+		Result OpenCommandBatch(VulkanCommandBatchBase *&outCommandBatch, bool cpuWaitable);
 
 	private:
+		Vector<UniquePtr<VulkanCommandBatchBase>> m_commandBatches;
+		size_t m_numAllocatedBatches = 0;
+
 		VulkanDeviceBase &m_device;
 		VkCommandPool m_pool = VK_NULL_HANDLE;
 		CommandQueueType m_queueType = CommandQueueType::kCount;
@@ -74,56 +77,29 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	ICopyCommandAllocator *VulkanCommandAllocator::ToCopyCommandAllocator()
+	IInternalCommandAllocator *VulkanCommandAllocator::ToInternalCommandAllocator()
 	{
-		if (IsQueueTypeCompatible(m_queueType, CommandQueueType::kCopy))
-			return this;
-		else
-			return nullptr;
+		return this;
 	}
 
-	IGraphicsCommandAllocator *VulkanCommandAllocator::ToGraphicsCommandAllocator()
+	Result VulkanCommandAllocator::OpenCopyCommandBatch(ICopyCommandBatch *&outCommandBatch, bool cpuWaitable)
 	{
-		if (IsQueueTypeCompatible(m_queueType, CommandQueueType::kGraphics))
-			return this;
-		else
-			return nullptr;
+		return TypedOpenCommandBatch(outCommandBatch, cpuWaitable);
 	}
 
-	IComputeCommandAllocator *VulkanCommandAllocator::ToComputeCommandAllocator()
+	Result VulkanCommandAllocator::OpenGraphicsCommandBatch(IGraphicsCommandBatch *&outCommandBatch, bool cpuWaitable)
 	{
-		if (IsQueueTypeCompatible(m_queueType, CommandQueueType::kAsyncCompute))
-			return this;
-		else
-			return nullptr;
+		return TypedOpenCommandBatch(outCommandBatch, cpuWaitable);
 	}
 
-	IGraphicsComputeCommandAllocator *VulkanCommandAllocator::ToGraphicsComputeCommandAllocator()
+	Result VulkanCommandAllocator::OpenComputeCommandBatch(IGraphicsCommandBatch *&outCommandBatch, bool cpuWaitable)
 	{
-		if (IsQueueTypeCompatible(m_queueType, CommandQueueType::kGraphicsCompute))
-			return this;
-		else
-			return nullptr;
+		return TypedOpenCommandBatch(outCommandBatch, cpuWaitable);
 	}
 
-	Result VulkanCommandAllocator::OpenCopyCommandList(ICopyCommandList *&outCommandList)
+	Result VulkanCommandAllocator::OpenGraphicsComputeCommandBatch(IGraphicsComputeCommandBatch *&outCommandBatch, bool cpuWaitable)
 	{
-		return CreateTypedCommandList(outCommandList);
-	}
-
-	Result VulkanCommandAllocator::OpenGraphicsCommandList(IGraphicsCommandList *&outCommandList)
-	{
-		return CreateTypedCommandList(outCommandList);
-	}
-
-	Result VulkanCommandAllocator::OpenComputeCommandList(IComputeCommandList *&outCommandList)
-	{
-		return CreateTypedCommandList(outCommandList);
-	}
-
-	Result VulkanCommandAllocator::OpenGraphicsComputeCommandList(IGraphicsComputeCommandList *&outCommandList)
-	{
-		return CreateTypedCommandList(outCommandList);
+		return TypedOpenCommandBatch(outCommandBatch, cpuWaitable);
 	}
 
 	Result VulkanCommandAllocator::ResetCommandAllocator(bool discardResources)
@@ -181,43 +157,64 @@ namespace rkit::render::vulkan
 		return m_isBundle;
 	}
 
-	template<class TCommandListType>
-	Result VulkanCommandAllocator::CreateTypedCommandList(TCommandListType *&outCommandList)
+	VulkanCommandAllocator::DynamicCastRef_t VulkanCommandAllocator::InternalDynamicCast()
 	{
-		VulkanCommandList *cmdList;
+		switch (m_queueType)
+		{
+		case CommandQueueType::kGraphics:
+			return DynamicCastRef_t::CreateFrom<VulkanCommandAllocator, IGraphicsCommandAllocator, ICopyCommandAllocator>(this);
+		case CommandQueueType::kGraphicsCompute:
+			return DynamicCastRef_t::CreateFrom<VulkanCommandAllocator, IGraphicsCommandAllocator, IComputeCommandAllocator, IGraphicsComputeCommandAllocator, ICopyCommandAllocator>(this);
+		case CommandQueueType::kAsyncCompute:
+			return DynamicCastRef_t::CreateFrom<VulkanCommandAllocator, IComputeCommandAllocator, ICopyCommandAllocator>(this);
+		case CommandQueueType::kCopy:
+			return DynamicCastRef_t::CreateFrom<VulkanCommandAllocator, ICopyCommandAllocator>(this);
+		default:
+			return DynamicCastRef_t();
+		}
+	}
 
-		RKIT_CHECK(CreateCommandList(cmdList));
+	template<class TCommandBatchType>
+	Result VulkanCommandAllocator::TypedOpenCommandBatch(TCommandBatchType *&outCommandBatch, bool cpuWaitable)
+	{
+		VulkanCommandBatchBase *cmdBatch = nullptr;
 
-		outCommandList = cmdList;
+		RKIT_CHECK(OpenCommandBatch(cmdBatch, cpuWaitable));
+
+		outCommandBatch = cmdBatch;
 
 		return ResultCode::kOK;
 	}
 
-	Result VulkanCommandAllocator::CreateCommandList(VulkanCommandList *&outCommandList)
+	Result VulkanCommandAllocator::OpenCommandBatch(VulkanCommandBatchBase *&outCommandBatch, bool cpuWaitable)
 	{
-		if (m_activeCommandLists < m_commandLists.Count())
+		VulkanCommandBatchBase *cmdBatchPtr = nullptr;
+
+		if (m_numAllocatedBatches == m_commandBatches.Count())
 		{
-			outCommandList = &m_commandLists[m_activeCommandLists++];
-			return ResultCode::kOK;
+			UniquePtr<VulkanCommandBatchBase> cmdBatch;
+
+			RKIT_CHECK(VulkanCommandBatchBase::Create(cmdBatch, m_device, *this));
+
+			cmdBatchPtr = cmdBatch.Get();
+
+			RKIT_CHECK(cmdBatchPtr->OpenCommandBatch(cpuWaitable));
+
+			RKIT_CHECK(m_commandBatches.Append(std::move(cmdBatch)));
+			m_numAllocatedBatches++;
+		}
+		else
+		{
+			cmdBatchPtr = m_commandBatches[m_numAllocatedBatches].Get();
+
+			RKIT_CHECK(cmdBatchPtr->ClearCommandBatch());
+
+			RKIT_CHECK(cmdBatchPtr->OpenCommandBatch(cpuWaitable));
+
+			m_numAllocatedBatches++;
 		}
 
-		VkCommandBufferAllocateInfo allocInfo = {};
-		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		allocInfo.commandPool = m_pool;
-		allocInfo.level = (m_isBundle ? VK_COMMAND_BUFFER_LEVEL_SECONDARY : VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-		allocInfo.commandBufferCount = 1;
-
-		VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
-		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkAllocateCommandBuffers(m_device.GetDevice(), &allocInfo, &cmdBuffer));
-
-		Result appendResult = m_commandLists.Append(VulkanCommandList(m_device, cmdBuffer, *this));
-		if (!appendResult.IsOK())
-		{
-			m_device.GetDeviceAPI().vkFreeCommandBuffers(m_device.GetDevice(), m_pool, 1, &cmdBuffer);
-			return appendResult;
-		}
-
-		outCommandList = &m_commandLists[m_activeCommandLists++];
+		outCommandBatch = cmdBatchPtr;
 
 		return ResultCode::kOK;
 	}

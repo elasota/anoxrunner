@@ -7,6 +7,7 @@
 #include "VulkanAPI.h"
 #include "VulkanCheck.h"
 #include "VulkanDevice.h"
+#include "VulkanCommandAllocator.h"
 #include "VulkanCommandList.h"
 #include "VulkanFence.h"
 #include "VulkanUtils.h"
@@ -21,13 +22,10 @@ namespace rkit::render::vulkan
 		VulkanQueueProxy(IMallocDriver *alloc, CommandQueueType queueType, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI);
 		~VulkanQueueProxy();
 
-		Result QueueCopy(const Span<ICopyCommandList *> &cmdLists) override;
-		Result QueueCompute(const Span<IComputeCommandList *> &cmdLists) override;
-		Result QueueGraphics(const Span<IGraphicsCommandList *> &cmdLists) override;
-		Result QueueWaitForSwapChainWriteReady(ISwapChainSyncPoint &syncPoint) override;
-		Result QueueWaitForSwapChainPresentReady(ISwapChainSyncPoint &syncPoint) override;
-
-		Result QueueGraphicsCompute(const Span<IGraphicsComputeCommandList *> &cmdLists) override;
+		Result CreateCopyCommandAllocator(UniquePtr<ICopyCommandAllocator> &outCommandAllocator, bool isBundle) override;
+		Result CreateComputeCommandAllocator(UniquePtr<IComputeCommandAllocator> &outCommandAllocator, bool isBundle) override;
+		Result CreateGraphicsCommandAllocator(UniquePtr<IGraphicsCommandAllocator> &outCommandAllocator, bool isBundle) override;
+		Result CreateGraphicsComputeCommandAllocator(UniquePtr<IGraphicsComputeCommandAllocator> &outCommandAllocator, bool isBundle) override;
 
 		Result QueueSignalBinaryGPUWaitable(IBinaryGPUWaitableFence &fence) override;
 		Result QueueSignalBinaryCPUWaitable(IBinaryCPUWaitableFence &fence) override;
@@ -51,6 +49,11 @@ namespace rkit::render::vulkan
 		VkQueue GetVkQueue() const override;
 
 		Result Initialize();
+
+		template<class T>
+		Result CreateTypedCommandAllocator(UniquePtr<T> &outCommandAllocator, bool isBundle);
+
+		Result CreateCommandAllocator(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, bool isBundle);
 
 	private:
 		enum class QueueAction
@@ -108,54 +111,24 @@ namespace rkit::render::vulkan
 	{
 	}
 
-	Result VulkanQueueProxy::QueueCopy(const Span<ICopyCommandList *> &cmdLists)
+	Result VulkanQueueProxy::CreateCopyCommandAllocator(UniquePtr<ICopyCommandAllocator> &outCommandAllocator, bool isBundle)
 	{
-		for (ICopyCommandList *cmdList : cmdLists)
-		{
-			RKIT_CHECK(QueueBase(*cmdList));
-		}
-
-		return ResultCode::kOK;
+		return CreateTypedCommandAllocator(outCommandAllocator, isBundle);
 	}
 
-	Result VulkanQueueProxy::QueueCompute(const Span<IComputeCommandList *> &cmdLists)
+	Result VulkanQueueProxy::CreateComputeCommandAllocator(UniquePtr<IComputeCommandAllocator> &outCommandAllocator, bool isBundle)
 	{
-		for (IComputeCommandList *cmdList : cmdLists)
-		{
-			RKIT_CHECK(QueueBase(*cmdList));
-		}
-
-		return ResultCode::kOK;
+		return CreateTypedCommandAllocator(outCommandAllocator, isBundle);
 	}
 
-	Result VulkanQueueProxy::QueueGraphics(const Span<IGraphicsCommandList *> &cmdLists)
+	Result VulkanQueueProxy::CreateGraphicsCommandAllocator(UniquePtr<IGraphicsCommandAllocator> &outCommandAllocator, bool isBundle)
 	{
-		for (IGraphicsCommandList *cmdList : cmdLists)
-		{
-			RKIT_CHECK(QueueBase(*cmdList));
-		}
-
-		return ResultCode::kOK;
+		return CreateTypedCommandAllocator(outCommandAllocator, isBundle);
 	}
 
-	Result VulkanQueueProxy::QueueWaitForSwapChainWriteReady(ISwapChainSyncPoint &syncPoint)
+	Result VulkanQueueProxy::CreateGraphicsComputeCommandAllocator(UniquePtr<IGraphicsComputeCommandAllocator> &outCommandAllocator, bool isBundle)
 	{
-		return ResultCode::kNotYetImplemented;
-	}
-
-	Result VulkanQueueProxy::QueueWaitForSwapChainPresentReady(ISwapChainSyncPoint &syncPoint)
-	{
-		return ResultCode::kNotYetImplemented;
-	}
-
-	Result VulkanQueueProxy::QueueGraphicsCompute(const Span<IGraphicsComputeCommandList *> &cmdLists)
-	{
-		for (IGraphicsComputeCommandList *cmdList : cmdLists)
-		{
-			RKIT_CHECK(QueueBase(*cmdList));
-		}
-
-		return ResultCode::kOK;
+		return CreateTypedCommandAllocator(outCommandAllocator, isBundle);
 	}
 
 	Result VulkanQueueProxy::QueueSignalBinaryGPUWaitable(IBinaryGPUWaitableFence &fence)
@@ -434,9 +407,25 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
+	template<class T>
+	Result VulkanQueueProxy::CreateTypedCommandAllocator(UniquePtr<T> &outCommandAllocator, bool isBundle)
+	{
+		UniquePtr<VulkanCommandAllocatorBase> cmdAllocator;
+		RKIT_CHECK(CreateCommandAllocator(cmdAllocator, isBundle));
+
+		outCommandAllocator = std::move(cmdAllocator);
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanQueueProxy::CreateCommandAllocator(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, bool isBundle)
+	{
+		return VulkanCommandAllocatorBase::Create(outCommandAllocator, m_device, m_queueType, isBundle, m_queueFamily);
+	}
+
 	Result VulkanQueueProxy::QueueBase(IBaseCommandList &cmdList)
 	{
-		return AddCommandList(static_cast<VulkanCommandList *>(cmdList.ToInternalCommandList())->GetCommandBuffer());
+		return AddCommandList(static_cast<VulkanCommandList *>(cmdList.DynamicCast<IInternalCommandList>())->GetCommandBuffer());
 	}
 
 	Result VulkanQueueProxyBase::Create(UniquePtr<VulkanQueueProxyBase> &outQueueProxy, IMallocDriver *alloc, CommandQueueType queueType, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI)
