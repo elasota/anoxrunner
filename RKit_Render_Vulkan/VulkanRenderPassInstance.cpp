@@ -1,8 +1,11 @@
 #include "VulkanRenderPassInstance.h"
 
 #include "VulkanAPI.h"
+#include "VulkanCheck.h"
+#include "VulkanDepthStencilView.h"
 #include "VulkanDevice.h"
 #include "VulkanRenderPass.h"
+#include "VulkanRenderTargetView.h"
 
 #include "rkit/Render/PipelineLibraryItem.h"
 #include "rkit/Render/RenderDefs.h"
@@ -26,6 +29,7 @@ namespace rkit::render::vulkan
 
 	private:
 		VulkanDeviceBase &m_device;
+		VkRenderPass m_renderPass = VK_NULL_HANDLE;
 		VkFramebuffer m_framebuffer = VK_NULL_HANDLE;
 	};
 
@@ -48,11 +52,13 @@ namespace rkit::render::vulkan
 		if (resources.m_width == 0 || resources.m_height == 0)
 			return ResultCode::kInvalidParameter;
 
+		m_renderPass = static_cast<const VulkanRenderPassBase *>(renderPassRef.ResolveCompiled())->GetRenderPass();
+
 		const RenderPassDesc *desc = renderPassRef.ResolveDesc();
 
 		VkFramebufferCreateInfo createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-		createInfo.renderPass = static_cast<const VulkanRenderPassBase *>(renderPassRef.ResolveCompiled())->GetRenderPass();
+		createInfo.renderPass = m_renderPass;
 
 		createInfo.attachmentCount = static_cast<uint32_t>(desc->m_renderTargets.Count());
 
@@ -71,16 +77,29 @@ namespace rkit::render::vulkan
 			attachments = dynamicAttachmentsStorage.ToSpan();
 		}
 
-		if (createInfo.attachmentCount > 0)
-			createInfo.pAttachments = attachments.Ptr();
+		if (desc->m_renderTargets.Count() != resources.m_renderTargetViews.Count())
+			return ResultCode::kInvalidParameter;
 
-		// TODO: Fill attachment list
+		if ((desc->m_depthStencilTarget == nullptr) != (resources.m_depthStencilView == nullptr))
+			return ResultCode::kInvalidParameter;
+
+		size_t attachmentIndex = 0;
+		for (const IRenderTargetView *rtv : resources.m_renderTargetViews)
+			attachments[attachmentIndex++] = static_cast<const VulkanRenderTargetViewBase *>(rtv)->GetImageView();
+
+		if (resources.m_depthStencilView)
+			attachments[attachmentIndex++] = static_cast<const VulkanDepthStencilViewBase *>(resources.m_depthStencilView)->GetImageView();
 
 		createInfo.width = resources.m_width;
 		createInfo.height = resources.m_height;
 		createInfo.layers = resources.m_arraySize;
 
-		return ResultCode::kNotYetImplemented;
+		if (createInfo.attachmentCount > 0)
+			createInfo.pAttachments = attachments.Ptr();
+
+		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateFramebuffer(m_device.GetDevice(), &createInfo, m_device.GetAllocCallbacks(), &m_framebuffer));
+
+		return ResultCode::kOK;
 	}
 
 	Result VulkanRenderPassInstanceBase::Create(UniquePtr<VulkanRenderPassInstanceBase> &renderPassInstance, VulkanDeviceBase &device, const RenderPassRef_t &renderPassRef, const RenderPassResources &resources)

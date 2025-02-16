@@ -152,6 +152,7 @@
     <ClCompile Include="VulkanDevice.cpp" />
     <ClCompile Include="VulkanPhysDevice.cpp" />
     <ClCompile Include="VulkanRenderPassInstance.cpp" />
+    <ClCompile Include="VulkanRenderTargetView.cpp" />
     <ClCompile Include="VulkanResourcePool.cpp" />
     <ClCompile Include="VulkanSwapChain.cpp" />
     <ClCompile Include="VulkanUtils.cpp" />
