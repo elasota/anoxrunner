@@ -1,11 +1,15 @@
 #include "AnoxFrameDrawer.h"
 
+#include "AnoxPeriodicResources.h"
 #include "AnoxRecordJobRunner.h"
 
 #include "anox/AnoxGraphicsSubsystem.h"
 
+#include "rkit/Render/CommandBatch.h"
 #include "rkit/Render/CommandAllocator.h"
+#include "rkit/Render/PipelineStage.h"
 
+#include "rkit/Core/EnumMask.h"
 #include "rkit/Core/Job.h"
 #include "rkit/Core/Result.h"
 #include "rkit/Core/NewDelete.h"
@@ -34,23 +38,31 @@ namespace anox
 		class RecordTestCommandsJobRunner final : public IGraphicsRecordJobRunner_t
 		{
 		public:
-			explicit RecordTestCommandsJobRunner(rkit::render::IGraphicsCommandBatch **cmdBatchRef);
+			explicit RecordTestCommandsJobRunner(rkit::render::IGraphicsCommandBatch **cmdBatchRef, const rkit::RCPtr<PerFramePerDisplayResources> &perDisplayResources);
 
 			rkit::Result RunRecord(rkit::render::IGraphicsCommandAllocator &commandAllocator) override;
 
 		private:
 			rkit::render::IGraphicsCommandBatch **m_cmdBatchRef;
+			rkit::RCPtr<PerFramePerDisplayResources> m_perDisplayResources;
 		};
 	};
 
-	FrameDrawer::RecordTestCommandsJobRunner::RecordTestCommandsJobRunner(rkit::render::IGraphicsCommandBatch **cmdBatchRef)
+	FrameDrawer::RecordTestCommandsJobRunner::RecordTestCommandsJobRunner(rkit::render::IGraphicsCommandBatch **cmdBatchRef, const rkit::RCPtr<PerFramePerDisplayResources> &perDisplayResources)
 		: m_cmdBatchRef(cmdBatchRef)
+		, m_perDisplayResources(perDisplayResources)
 	{
 	}
 
 	rkit::Result FrameDrawer::RecordTestCommandsJobRunner::RunRecord(rkit::render::IGraphicsCommandAllocator &commandAllocator)
 	{
-		//RKIT_CHECK(commandAllocator.OpenGraphicsCommandList(*m_cmdListRef));
+		RKIT_CHECK(commandAllocator.OpenGraphicsCommandBatch(*m_cmdBatchRef, false));
+
+		rkit::render::IGraphicsCommandBatch &cmdBatch = **m_cmdBatchRef;
+
+		rkit::EnumMask<rkit::render::PipelineStage> pipelineStages({ rkit::render::PipelineStage::kColorOutput });
+
+		//RKIT_CHECK(cmdBatch.CmdWaitForPresent(*m_perDisplayResources->m_swapChainSyncPoint, pipelineStages));
 
 		return rkit::ResultCode::kNotYetImplemented;
 	}
@@ -74,7 +86,7 @@ namespace anox
 
 		rkit::RCPtr<rkit::Job> recordJob;
 		rkit::UniquePtr<RecordTestCommandsJobRunner> recordJobRunner;
-		RKIT_CHECK(rkit::New<RecordTestCommandsJobRunner>(recordJobRunner, submitJobRunner->GetCmdBatchRef()));
+		RKIT_CHECK(rkit::New<RecordTestCommandsJobRunner>(recordJobRunner, submitJobRunner->GetCmdBatchRef(), perDisplayResources));
 
 		RKIT_CHECK(graphicsSubsystem.CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kGraphics, std::move(recordJobRunner)));
 

@@ -42,6 +42,8 @@ namespace rkit::render::vulkan
 		Result CreateBinaryGPUWaitableFence(UniquePtr<IBinaryGPUWaitableFence> &outFence) override;
 		Result CreateSwapChainSyncPoint(UniquePtr<ISwapChainSyncPoint> &outSyncPoint) override;
 
+		Result CreateRenderPassResources(UniquePtr<IRenderPassResources> &outResources, const RenderPassRef_t &renderPass, const RenderPassResourcesDesc &desc) override;
+
 		Result ResetBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences) override;
 		Result WaitForBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll) override;
 		Result WaitForBinaryFencesTimed(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll, uint64_t timeoutMSec) override;
@@ -403,6 +405,11 @@ namespace rkit::render::vulkan
 		outSyncPoint = std::move(syncPoint);
 
 		return ResultCode::kOK;
+	}
+
+	Result VulkanDevice::CreateRenderPassResources(UniquePtr<IRenderPassResources> &outResources, const RenderPassRef_t &renderPass, const RenderPassResourcesDesc &desc)
+	{
+		return ResultCode::kNotYetImplemented;
 	}
 
 	Result VulkanDevice::ResetBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences)

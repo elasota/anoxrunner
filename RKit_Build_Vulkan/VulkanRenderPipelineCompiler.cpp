@@ -38,7 +38,6 @@ namespace rkit::buildsystem::vulkan
 	}
 
 
-
 	class PipelineCompilerBase
 	{
 	protected:

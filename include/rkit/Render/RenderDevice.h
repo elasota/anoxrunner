@@ -4,6 +4,7 @@
 
 #include "rkit/Render/RenderEnums.h"
 #include "rkit/Render/Fence.h"
+#include "rkit/Render/PipelineLibraryItemProtos.h"
 
 #include "CommandQueueType.h"
 
@@ -48,6 +49,8 @@ namespace rkit::render
 	struct IGraphicsCommandAllocator;
 	struct IGraphicsComputeCommandAllocator;
 	struct ISwapChainSyncPoint;
+	struct RenderPassResourcesDesc;
+	struct IRenderPassResources;
 
 	struct IRenderDevice
 	{
@@ -61,6 +64,8 @@ namespace rkit::render
 		virtual Result CreateBinaryCPUWaitableFence(UniquePtr<IBinaryCPUWaitableFence> &outFence, bool startSignaled) = 0;
 		virtual Result CreateBinaryGPUWaitableFence(UniquePtr<IBinaryGPUWaitableFence> &outFence) = 0;
 		virtual Result CreateSwapChainSyncPoint(UniquePtr<ISwapChainSyncPoint> &outSyncPoint) = 0;
+
+		virtual Result CreateRenderPassResources(UniquePtr<IRenderPassResources> &outResources, const RenderPassRef_t &renderPass, const RenderPassResourcesDesc &desc) = 0;
 
 		virtual Result ResetBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences) = 0;
 		virtual Result WaitForBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll) = 0;

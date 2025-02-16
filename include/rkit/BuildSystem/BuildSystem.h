@@ -106,6 +106,11 @@ namespace rkit::buildsystem
 
 	inline StringView GetCompiledPipelineIntermediateBasePath()
 	{
-		return "rpll_c/";
+		return "rpll_c/pipe/";
+	}
+
+	inline StringView GetCompiledGlobalsIntermediateBasePath()
+	{
+		return "rpll_c/glob/";
 	}
 }

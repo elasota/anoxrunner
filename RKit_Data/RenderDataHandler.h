@@ -24,6 +24,7 @@ namespace rkit::data
 		const RenderRTTIObjectPtrType *GetCompoundNumericTypePtrRTTI() const override;
 		const RenderRTTIObjectPtrType *GetStructureTypePtrRTTI() const override;
 		const RenderRTTIStructType *GetRenderPassDescRTTI() const override;
+		const RenderRTTIStructType *GetRenderPassNameLookupRTTI() const override;
 		const RenderRTTIStructType *GetDepthStencilTargetDescRTTI() const override;
 
 		Result ProcessIndexable(RenderRTTIIndexableStructType indexableStructType, UniquePtr<IRenderRTTIListBase> *outList, UniquePtr<IRenderRTTIObjectPtrList> *outPtrList, const RenderRTTIStructType **outRTTI) const override;

@@ -19,27 +19,13 @@
 
 namespace rkit::render::vulkan
 {
-	class VulkanSwapChainSubframe final : public ISwapChainSubframe
-	{
-	public:
-		VulkanSwapChainSubframe();
-
-		Result Initialize(uint32_t imageIndex, uint32_t imageLayer);
-
-	private:
-		uint32_t m_imageIndex = 0;
-		uint32_t m_imageLayer = 0;
-	};
-
 	class VulkanSwapChainFrame final : public ISwapChainFrame
 	{
 	public:
-		Result Initialize(const Span<VulkanSwapChainSubframe> &subframes);
-
-		ISwapChainSubframe *GetSubframe(size_t subframeIndex) const override;
+		Result Initialize(size_t imageIndex);
 
 	private:
-		Span<VulkanSwapChainSubframe> m_subframes;
+		size_t m_imageIndex = 0;
 	};
 
 	class VulkanSwapChainSyncPoint final : public VulkanSwapChainSyncPointBase
@@ -48,9 +34,11 @@ namespace rkit::render::vulkan
 		explicit VulkanSwapChainSyncPoint(VulkanDeviceBase &device);
 		~VulkanSwapChainSyncPoint();
 
-		Result Initialize();
-
 		size_t GetFrameIndex() const override;
+		VkSemaphore GetAcquireSema() const override;
+		VkSemaphore GetPresentSema() const override;
+
+		Result Initialize();
 
 		Result AcquireFrame(VkSwapchainKHR swapChain, const Span<VkImage> &images, const Span<VulkanSwapChainFrame> &frames);
 		Result Present(VulkanQueueProxyBase &queue, VkSwapchainKHR swapChain);
@@ -112,7 +100,6 @@ namespace rkit::render::vulkan
 
 		Vector<VkImage> m_images;
 		Vector<VulkanSwapChainFrame> m_swapChainFrames;
-		Vector<VulkanSwapChainSubframe> m_swapChainSubframes;
 
 		SwapChainWriteBehavior m_writeBehavior;
 		VulkanQueueProxyBase &m_queue;
@@ -120,28 +107,11 @@ namespace rkit::render::vulkan
 		Optional<uint32_t> m_acquiredImage;
 	};
 
-	VulkanSwapChainSubframe::VulkanSwapChainSubframe()
-	{
-	}
-
-	Result VulkanSwapChainSubframe::Initialize(uint32_t imageIndex, uint32_t imageLayer)
+	Result VulkanSwapChainFrame::Initialize(size_t imageIndex)
 	{
 		m_imageIndex = imageIndex;
-		m_imageLayer = imageLayer;
 
 		return ResultCode::kOK;
-	}
-
-	Result VulkanSwapChainFrame::Initialize(const Span<VulkanSwapChainSubframe> &subframes)
-	{
-		m_subframes = subframes;
-
-		return ResultCode::kOK;
-	}
-
-	ISwapChainSubframe *VulkanSwapChainFrame::GetSubframe(size_t subframeIndex) const
-	{
-		return &m_subframes[subframeIndex];
 	}
 
 	VulkanSwapChainSyncPoint::VulkanSwapChainSyncPoint(VulkanDeviceBase &device)
@@ -175,6 +145,16 @@ namespace rkit::render::vulkan
 	size_t VulkanSwapChainSyncPoint::GetFrameIndex() const
 	{
 		return m_imageIndex;
+	}
+
+	VkSemaphore VulkanSwapChainSyncPoint::GetAcquireSema() const
+	{
+		return m_acquireSema;
+	}
+
+	VkSemaphore VulkanSwapChainSyncPoint::GetPresentSema() const
+	{
+		return m_presentSema;
 	}
 
 	Result VulkanSwapChainSyncPoint::AcquireFrame(VkSwapchainKHR swapChain, const Span<VkImage> &images, const Span<VulkanSwapChainFrame> &frames)
@@ -332,17 +312,11 @@ namespace rkit::render::vulkan
 		for (VkImage &img : m_images)
 			img = VK_NULL_HANDLE;
 
-		RKIT_CHECK(m_swapChainSubframes.Resize(imageCount * simultaneousImageCount));
 		RKIT_CHECK(m_swapChainFrames.Resize(imageCount));
 
 		for (uint32_t fi = 0; fi < imageCount; fi++)
 		{
-			for (uint32_t sfi = 0; sfi < simultaneousImageCount; sfi++)
-			{
-				RKIT_CHECK(m_swapChainSubframes[fi * simultaneousImageCount + sfi].Initialize(fi, sfi));
-			}
-
-			RKIT_CHECK(m_swapChainFrames[fi].Initialize(m_swapChainSubframes.ToSpan().SubSpan(fi * simultaneousImageCount, simultaneousImageCount)));
+			RKIT_CHECK(m_swapChainFrames[fi].Initialize(fi));
 		}
 
 		RKIT_VK_CHECK(vkd.vkGetSwapchainImagesKHR(m_device.GetDevice(), m_swapChain, &imageCount, m_images.GetBuffer()));

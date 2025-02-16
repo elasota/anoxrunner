@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstddef>
+
+#include "rkit/Core/StringProto.h"
+
 namespace rkit
 {
 	struct Result;
@@ -14,22 +18,14 @@ namespace rkit
 
 namespace rkit::render
 {
+	struct IPipelineLibrary;
+
 	struct IPipelineLibraryConfigValidator
 	{
 		virtual ~IPipelineLibraryConfigValidator() {}
 
 		virtual Result CheckConfig(IReadStream &stream, bool &isConfigMatched) = 0;
 		virtual Result WriteConfig(IWriteStream &stream) const = 0;
-	};
-
-	struct IPipelineLibraryLoosePipeline
-	{
-		virtual ~IPipelineLibraryLoosePipeline() {}
-	};
-
-	struct IPipelineLibrary
-	{
-		virtual ~IPipelineLibrary() {}
 	};
 
 	struct IPipelineLibraryLoader
@@ -48,6 +44,6 @@ namespace rkit::render
 
 		virtual Result SaveMergedPipeline() = 0;
 
-		virtual UniquePtr<IPipelineLibrary> GetFinishedPipeline() = 0;
+		virtual Result GetFinishedPipeline(UniquePtr<IPipelineLibrary> &outPipelineLibrary) = 0;
 	};
 }

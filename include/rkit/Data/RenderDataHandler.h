@@ -77,6 +77,7 @@ namespace rkit::data
 		DescriptorLayoutDesc,
 		DepthStencilTargetDesc,
 		RenderPassDesc,
+		RenderPassNameLookup,
 		GraphicsPipelineDesc,
 		GraphicsPipelineNameLookup,
 		InputLayoutVertexFeedDesc,
@@ -125,6 +126,7 @@ namespace rkit::data
 		ShaderPermutationTree,
 		ShaderPermutationTreeBranch,
 		RenderPassDesc,
+		RenderPassNameLookup,
 
 		Count,
 
@@ -370,6 +372,7 @@ namespace rkit::data
 		virtual const RenderRTTIObjectPtrType *GetCompoundNumericTypePtrRTTI() const = 0;
 		virtual const RenderRTTIObjectPtrType *GetStructureTypePtrRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetRenderPassDescRTTI() const = 0;
+		virtual const RenderRTTIStructType *GetRenderPassNameLookupRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetDepthStencilTargetDescRTTI() const = 0;
 
 		virtual Result ProcessIndexable(RenderRTTIIndexableStructType indexableStructType, UniquePtr<IRenderRTTIListBase> *outList, UniquePtr<IRenderRTTIObjectPtrList> *outPtrList, const RenderRTTIStructType **outRTTI) const = 0;

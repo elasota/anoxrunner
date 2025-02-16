@@ -36,6 +36,9 @@ namespace rkit::render::vulkan
 	class VulkanSwapChainSyncPointBase : public ISwapChainSyncPoint
 	{
 	public:
+		virtual VkSemaphore GetAcquireSema() const = 0;
+		virtual VkSemaphore GetPresentSema() const = 0;
+
 		static Result Create(UniquePtr<VulkanSwapChainSyncPointBase> &outSyncPoint, VulkanDeviceBase &device);
 	};
 

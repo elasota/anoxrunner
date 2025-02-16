@@ -395,9 +395,7 @@ namespace rkit::render
 
 	struct RenderPassDesc
 	{
-		GlobalStringIndex_t m_name;
-
-		const DepthStencilTargetDesc *m_depthStencilTarget;
+		const DepthStencilTargetDesc *m_depthStencilTarget = nullptr;
 		ConstSpan<const RenderTargetDesc *> m_renderTargets;
 	};
 
@@ -441,6 +439,13 @@ namespace rkit::render
 	{
 		GlobalStringIndex_t m_name;
 		const GraphicsPipelineDesc *m_pipeline = nullptr;
+	};
+
+	struct RenderPassNameLookup
+	{
+		GlobalStringIndex_t m_name;
+
+		const RenderPassDesc* m_renderPass;
 	};
 }
 

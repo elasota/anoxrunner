@@ -1070,10 +1070,14 @@ namespace rkit::data
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(RenderPassDesc)
-			RTTI_STRUCT_FIELD(name)
-
 			RTTI_STRUCT_FIELD_NULLABLE(depthStencilTarget)
 			RTTI_STRUCT_FIELD(renderTargets)
+		RTTI_STRUCT_END
+
+		RTTI_STRUCT_BEGIN_INDEXABLE(RenderPassNameLookup)
+			RTTI_STRUCT_FIELD(name)
+
+			RTTI_STRUCT_FIELD(renderPass)
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(GraphicsPipelineDesc)
@@ -2201,6 +2205,11 @@ namespace rkit::data
 		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::RenderPassDesc>::GetRTTIType());
 	}
 
+	const RenderRTTIStructType *RenderDataHandler::GetRenderPassNameLookupRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::RenderPassNameLookup>::GetRTTIType());
+	}
+
 	const RenderRTTIStructType *RenderDataHandler::GetDepthStencilTargetDescRTTI() const
 	{
 		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::DepthStencilTargetDesc>::GetRTTIType());
@@ -2290,6 +2299,7 @@ namespace rkit::data
 		LINK_INDEXABLE_LIST_TYPE(ShaderPermutationTree)
 		LINK_INDEXABLE_LIST_TYPE(ShaderPermutationTreeBranch)
 		LINK_INDEXABLE_LIST_TYPE(RenderPassDesc)
+		LINK_INDEXABLE_LIST_TYPE(RenderPassNameLookup)
 
 		default:
 			return ResultCode::kInternalError;

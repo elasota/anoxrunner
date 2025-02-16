@@ -40,10 +40,20 @@ namespace rkit
 		friend class EnumMaskIterator<T>;
 
 		EnumMask();
+
+		template<size_t TCount>
+		explicit EnumMask(const T(&items)[TCount]);
+
 		EnumMask(const EnumMask &other) = default;
 
 		bool Get(T item) const;
-		void Set(T item, bool value) const;
+		EnumMask<T> &Set(T item, bool value) const;
+
+		template<size_t TCount>
+		EnumMask &Add(const T(&items)[TCount]);
+
+		template<size_t TCount>
+		EnumMask &Remove(const T(&items)[TCount]);
 
 		bool operator==(const EnumMask &other) const;
 		bool operator!=(const EnumMask &other) const;
@@ -95,6 +105,8 @@ namespace rkit
 				m_index = nudgedIndex;
 				break;
 			}
+
+			++nudgedIndex;
 		}
 
 		return *this;
@@ -156,15 +168,43 @@ namespace rkit
 	}
 
 	template<class T>
+	template<size_t TCount>
+	EnumMask<T>::EnumMask(const T(&items)[TCount])
+	{
+		Add(items);
+	}
+
+	template<class T>
 	bool EnumMask<T>::Get(T item) const
 	{
 		return m_boolVector.Get(static_cast<size_t>(item));
 	}
 
 	template<class T>
-	void EnumMask<T>::Set(T item, bool value) const
+	EnumMask<T> &EnumMask<T>::Set(T item, bool value) const
 	{
 		m_boolVector.Set(static_cast<size_t>(item), value);
+		return *this;
+	}
+
+	template<class T>
+	template<size_t TCount>
+	EnumMask<T> &EnumMask<T>::Add(const T(&items)[TCount])
+	{
+		for (T item : items)
+			m_boolVector.Set(static_cast<size_t>(item), true);
+
+		return *this;
+	}
+
+	template<class T>
+	template<size_t TCount>
+	EnumMask<T> &EnumMask<T>::Remove(const T(&items)[TCount])
+	{
+		for (T item : items)
+			m_boolVector.Set(static_cast<size_t>(item), false);
+
+		return *this;
 	}
 
 	template<class T>

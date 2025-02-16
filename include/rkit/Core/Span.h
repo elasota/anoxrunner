@@ -2,6 +2,7 @@
 
 #include <cstddef>
 
+#include "NoCopy.h"
 #include "SpanProtos.h"
 
 namespace std

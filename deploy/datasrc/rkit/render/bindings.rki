@@ -253,9 +253,15 @@ RenderPass RP_Interface
 			Format = Config(CFG_RenderTargetFormat)
 		}
 	}
+}
 
-	DepthStencil =
+RenderPass RP_SimpleColorTarget
+{
+	RenderTargets =
 	{
-		Format = Config(CFG_DepthStencilTargetFormat)
+		Color =
+		{
+			Format = Config(CFG_RenderTargetFormat)
+		}
 	}
 }

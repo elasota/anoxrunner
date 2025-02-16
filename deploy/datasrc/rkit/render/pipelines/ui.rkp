@@ -33,10 +33,5 @@ GraphicsPipeline GP_InterfaceSimple
 		}
 	}
 
-	DepthStencil =
-	{
-		DepthCompareOp = Config(CFG_DepthCompareOp)
-	}
-
 	ExecuteInPass = RP_Interface
 }

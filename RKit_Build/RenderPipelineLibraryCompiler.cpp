@@ -176,6 +176,7 @@ namespace rkit::buildsystem::rpc_common
 	{
 	public:
 		static Result FormatGraphicPipelinePath(String &path, const StringView &identifier, size_t pipelineIndex);
+		static Result FormatGlobalsPath(String &path, const StringView &identifier);
 		static Result FormatIndexPath(String &path, const StringView &identifier);
 		static Result FormatCombinedOutputPath(String &path, const StringView &identifier);
 	};
@@ -369,6 +370,7 @@ namespace rkit::buildsystem::rpc_analyzer
 		Vector<UniquePtr<render::DepthStencilTargetDesc>> m_depthStencilTargetDescs;
 
 		Vector<render::GraphicsPipelineNameLookup> m_graphicsPipelines;
+		Vector<render::RenderPassNameLookup> m_renderPasses;
 
 		Vector<SimpleNumericTypeResolution> m_numericTypeResolutions;
 
@@ -451,6 +453,11 @@ namespace rkit::buildsystem::rpc_common
 	Result LibraryCompilerBase::FormatGraphicPipelinePath(String &path, const StringView &identifier, size_t pipelineIndex)
 	{
 		return path.Format("rpll/g_%zu/%s", pipelineIndex, identifier.GetChars());
+	}
+
+	Result LibraryCompilerBase::FormatGlobalsPath(String &path, const StringView &identifier)
+	{
+		return path.Format("rpll/globs/%s", identifier.GetChars());
 	}
 
 	Result LibraryCompilerBase::FormatIndexPath(String &path, const StringView &identifier)
@@ -1763,6 +1770,12 @@ namespace rkit::buildsystem::rpc_analyzer
 
 		rp.GetDesc().m_renderTargets = rp.GetRenderTargetDescs().ToSpan();
 
+		render::RenderPassNameLookup nameLookup;
+		RKIT_CHECK(IndexString(rp.GetName().ToSpan(), nameLookup.m_name));
+		nameLookup.m_renderPass = &rp.GetDesc();
+
+		RKIT_CHECK(m_renderPasses.Append(nameLookup));
+
 		return ResultCode::kOK;
 	}
 
@@ -2567,6 +2580,38 @@ namespace rkit::buildsystem::rpc_analyzer
 			pipelineIndex++;
 		}
 
+		// Write globals
+		{
+			UniquePtr<IPackageObjectWriter> writer;
+			RKIT_CHECK(bsDriver->CreatePackageObjectWriter(writer));
+
+			UniquePtr<IPackageBuilder> pkgBuilder;
+			RKIT_CHECK(bsDriver->CreatePackageBuilder(dataHandler, writer.Get(), false, pkgBuilder));
+
+			const data::RenderRTTIStructType *renderPassType = dataHandler->GetRenderPassNameLookupRTTI();
+
+			RKIT_ASSERT(renderPassType->m_indexableType == data::RenderRTTIIndexableStructType::RenderPassNameLookup);
+
+			pkgBuilder->BeginSource(this);
+
+			for (const render::RenderPassNameLookup &renderPass : m_renderPasses)
+			{
+				size_t index = 0;
+				RKIT_CHECK(pkgBuilder->IndexObject(&renderPass, renderPassType, true, index));
+			}
+
+			String outPath;
+			RKIT_CHECK(FormatGlobalsPath(outPath, depsNode->GetIdentifier()));
+
+			{
+				UniquePtr<ISeekableReadWriteStream> stream;
+				RKIT_CHECK(m_feedback->OpenOutput(BuildFileLocation::kIntermediateDir, outPath, stream));
+
+				RKIT_CHECK(pkgBuilder->WritePackage(*stream));
+			}
+		}
+
+
 		String indexPath;
 		RKIT_CHECK(FormatIndexPath(indexPath, depsNode->GetIdentifier()));
 
@@ -2643,31 +2688,47 @@ namespace rkit::buildsystem::rpc_combiner
 		PackageInputResolver resolver(*pkg, binaryContent.ToSpan());
 		m_pkgBuilder->BeginSource(&resolver);
 
-		data::IRenderRTTIListBase *graphicPipelineLookups = pkg->GetIndexable(data::RenderRTTIIndexableStructType::GraphicsPipelineNameLookup);
-
-		size_t numGraphicPipelineLookups = graphicPipelineLookups->GetCount();
-
-		for (size_t i = 0; i < numGraphicPipelineLookups; i++)
 		{
-			const render::GraphicsPipelineNameLookup *nameLookup = static_cast<const render::GraphicsPipelineNameLookup *>(graphicPipelineLookups->GetElementPtr(i));
+			data::IRenderRTTIListBase *graphicPipelineLookups = pkg->GetIndexable(data::RenderRTTIIndexableStructType::GraphicsPipelineNameLookup);
 
-			StringView nameStrView = pkg->GetString(nameLookup->m_name.GetIndex());
+			size_t numGraphicPipelineLookups = graphicPipelineLookups->GetCount();
 
-			if (m_graphicPipelineNames.Contains(nameStrView))
+			for (size_t i = 0; i < numGraphicPipelineLookups; i++)
 			{
-				rkit::log::ErrorFmt("Duplicate graphic pipeline name '%s'", nameStrView.GetChars());
-				return ResultCode::kOperationFailed;
+				const render::GraphicsPipelineNameLookup *nameLookup = static_cast<const render::GraphicsPipelineNameLookup *>(graphicPipelineLookups->GetElementPtr(i));
+
+				StringView nameStrView = pkg->GetString(nameLookup->m_name.GetIndex());
+
+				if (m_graphicPipelineNames.Contains(nameStrView))
+				{
+					rkit::log::ErrorFmt("Duplicate graphic pipeline name '%s'", nameStrView.GetChars());
+					return ResultCode::kOperationFailed;
+				}
+				else
+				{
+					String nameStr;
+					RKIT_CHECK(nameStr.Set(nameStrView));
+
+					RKIT_CHECK(m_graphicPipelineNames.Add(std::move(nameStr)));
+				}
+
+				size_t index = 0;
+				RKIT_CHECK(m_pkgBuilder->IndexObject(nameLookup, m_dataDriver->GetRenderDataHandler()->GetGraphicsPipelineNameLookupRTTI(), true, index));
 			}
-			else
+		}
+
+		{
+			data::IRenderRTTIListBase *renderPassLookups = pkg->GetIndexable(data::RenderRTTIIndexableStructType::RenderPassNameLookup);
+
+			size_t numRenderPassLookups = renderPassLookups->GetCount();
+
+			for (size_t i = 0; i < numRenderPassLookups; i++)
 			{
-				String nameStr;
-				RKIT_CHECK(nameStr.Set(nameStrView));
+				const render::RenderPassNameLookup *nameLookup = static_cast<const render::RenderPassNameLookup *>(renderPassLookups->GetElementPtr(i));
 
-				RKIT_CHECK(m_graphicPipelineNames.Add(std::move(nameStr)));
+				size_t index = 0;
+				RKIT_CHECK(m_pkgBuilder->IndexObject(nameLookup, m_dataDriver->GetRenderDataHandler()->GetRenderPassNameLookupRTTI(), true, index));
 			}
-
-			size_t index = 0;
-			RKIT_CHECK(m_pkgBuilder->IndexObject(nameLookup, m_dataDriver->GetRenderDataHandler()->GetGraphicsPipelineNameLookupRTTI(), true, index));
 		}
 
 		return ResultCode::kOK;
@@ -2760,6 +2821,7 @@ namespace rkit::buildsystem::rpc_compiler
 			numGraphicsPipelines = static_cast<size_t>(pipelineCounts[0]);
 		}
 
+		// Add pipelines
 		for (size_t i = 0; i < numGraphicsPipelines; i++)
 		{
 			String pipelinePath;
@@ -2771,6 +2833,17 @@ namespace rkit::buildsystem::rpc_compiler
 
 			UniquePtr<ISeekableReadStream> inStream;
 			RKIT_CHECK(m_feedback->OpenInput(BuildFileLocation::kIntermediateDir, compiledPipelinePath, inStream));
+
+			RKIT_CHECK(m_combiner.AddInput(*inStream));
+		}
+
+		// Add globals
+		{
+			String globalsPath;
+			RKIT_CHECK(FormatGlobalsPath(globalsPath, depsNode->GetIdentifier()));
+
+			UniquePtr<ISeekableReadStream> inStream;
+			RKIT_CHECK(m_feedback->OpenInput(BuildFileLocation::kIntermediateDir, globalsPath, inStream));
 
 			RKIT_CHECK(m_combiner.AddInput(*inStream));
 		}

@@ -172,7 +172,7 @@ namespace rkit
 	template<class T>
 	void Vector<T>::ShrinkToSize(size_t size)
 	{
-		RKIT_CHECK(size < m_count);
+		RKIT_ASSERT(size < m_count);
 
 		if (size > m_count)
 			size = m_count;

@@ -2,7 +2,6 @@
 
 namespace rkit::render
 {
-
 	enum class Filter
 	{
 		Nearest,

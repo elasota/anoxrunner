@@ -11,6 +11,7 @@
 #include "rkit/Render/CommandQueue.h"
 #include "rkit/Render/DeviceCaps.h"
 #include "rkit/Render/DisplayManager.h"
+#include "rkit/Render/PipelineLibrary.h"
 #include "rkit/Render/PipelineLibraryLoader.h"
 #include "rkit/Render/RenderDefs.h"
 #include "rkit/Render/RenderDriver.h"
@@ -1408,7 +1409,7 @@ namespace anox
 				m_setupStep = DeviceSetupStep::kFinished;
 				m_setupProgress = 0;
 
-				m_pipelineLibrary = m_pipelineLibraryLoader->GetFinishedPipeline();
+				RKIT_CHECK(m_pipelineLibraryLoader->GetFinishedPipeline(m_pipelineLibrary));
 				m_pipelineLibraryLoader.Reset();
 
 				m_desiredDisplayMode = rkit::render::DisplayMode::kWindowed;
