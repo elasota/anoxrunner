@@ -7,8 +7,11 @@ namespace rkit::render
 
 namespace rkit::render
 {
+	struct RenderPassDesc;
+
 	struct IPipelineLibraryItemResolver
 	{
+		virtual IInternalRenderPass *ResolveCompiled(const RenderPassDesc &renderPass) const = 0;
 	};
 
 	template<class TDesc, class TCompiled>
@@ -66,6 +69,6 @@ namespace rkit::render
 		if (!m_desc)
 			return nullptr;
 
-		return m_itemResolver->ResolveCompiled(m_desc);
+		return m_itemResolver->ResolveCompiled(*m_desc);
 	}
 }

@@ -11,6 +11,7 @@
 #include "VulkanQueueProxy.h"
 #include "VulkanPhysDevice.h"
 #include "VulkanPlatformSpecific.h"
+#include "VulkanRenderPassInstance.h"
 #include "VulkanResourcePool.h"
 
 #include "rkit/Render/DeviceCaps.h"
@@ -42,7 +43,7 @@ namespace rkit::render::vulkan
 		Result CreateBinaryGPUWaitableFence(UniquePtr<IBinaryGPUWaitableFence> &outFence) override;
 		Result CreateSwapChainSyncPoint(UniquePtr<ISwapChainSyncPoint> &outSyncPoint) override;
 
-		Result CreateRenderPassResources(UniquePtr<IRenderPassResources> &outResources, const RenderPassRef_t &renderPass, const RenderPassResourcesDesc &desc) override;
+		Result CreateRenderPassInstance(UniquePtr<IRenderPassInstance> &outInstance, const RenderPassRef_t &renderPass, const RenderPassResources &resources) override;
 
 		Result ResetBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences) override;
 		Result WaitForBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll) override;
@@ -407,7 +408,7 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanDevice::CreateRenderPassResources(UniquePtr<IRenderPassResources> &outResources, const RenderPassRef_t &renderPass, const RenderPassResourcesDesc &desc)
+	Result VulkanDevice::CreateRenderPassInstance(UniquePtr<IRenderPassInstance> &outResources, const RenderPassRef_t &renderPass, const RenderPassResources &desc)
 	{
 		return ResultCode::kNotYetImplemented;
 	}

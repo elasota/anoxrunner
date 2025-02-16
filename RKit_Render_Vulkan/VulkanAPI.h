@@ -70,6 +70,8 @@ namespace rkit::render::vulkan
 		RKIT_VK_API(vkCreateCommandPool);
 		RKIT_VK_API(vkDestroyCommandPool);
 		RKIT_VK_API(vkResetCommandPool);
+		RKIT_VK_API(vkCreateFramebuffer);
+		RKIT_VK_API(vkDestroyFramebuffer);
 		RKIT_VK_API_EXT(vkCreateSwapchainKHR, VK_KHR_swapchain);
 		RKIT_VK_API_EXT(vkDestroySwapchainKHR, VK_KHR_swapchain);
 		RKIT_VK_API_EXT(vkGetSwapchainImagesKHR, VK_KHR_swapchain);

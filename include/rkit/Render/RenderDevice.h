@@ -49,8 +49,8 @@ namespace rkit::render
 	struct IGraphicsCommandAllocator;
 	struct IGraphicsComputeCommandAllocator;
 	struct ISwapChainSyncPoint;
-	struct RenderPassResourcesDesc;
-	struct IRenderPassResources;
+	struct RenderPassResources;
+	struct IRenderPassInstance;
 
 	struct IRenderDevice
 	{
@@ -65,7 +65,7 @@ namespace rkit::render
 		virtual Result CreateBinaryGPUWaitableFence(UniquePtr<IBinaryGPUWaitableFence> &outFence) = 0;
 		virtual Result CreateSwapChainSyncPoint(UniquePtr<ISwapChainSyncPoint> &outSyncPoint) = 0;
 
-		virtual Result CreateRenderPassResources(UniquePtr<IRenderPassResources> &outResources, const RenderPassRef_t &renderPass, const RenderPassResourcesDesc &desc) = 0;
+		virtual Result CreateRenderPassInstance(UniquePtr<IRenderPassInstance> &outInstance, const RenderPassRef_t &renderPass, const RenderPassResources &resources) = 0;
 
 		virtual Result ResetBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences) = 0;
 		virtual Result WaitForBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll) = 0;

@@ -163,6 +163,8 @@ namespace rkit::render::vulkan
 
 		RenderPassRef_t FindRenderPass(const StringSliceView &name) override;
 
+		IInternalRenderPass *ResolveCompiled(const RenderPassDesc &renderPass) const override;
+
 	private:
 		VulkanPipelineLibraryData m_data;
 	};
@@ -180,6 +182,14 @@ namespace rkit::render::vulkan
 			return RenderPassRef_t();
 
 		return RenderPassRef_t(*this, it.Value());
+	}
+
+	IInternalRenderPass *VulkanPipelineLibrary::ResolveCompiled(const RenderPassDesc &renderPass) const
+	{
+		const RenderPassDesc *indexables = static_cast<const RenderPassDesc *>(m_data.m_package->GetIndexable(data::RenderRTTIIndexableStructType::RenderPassDesc)->GetElementPtr(0));
+		size_t itemIndex = static_cast<size_t>((&renderPass) - indexables);
+
+		return const_cast<VulkanRenderPass *>(&m_data.m_renderPasses[itemIndex]);
 	}
 
 	class VulkanPipelineLibraryLoader final : public PipelineLibraryLoaderBase
