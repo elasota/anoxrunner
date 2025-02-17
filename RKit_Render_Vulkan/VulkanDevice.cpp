@@ -589,7 +589,6 @@ namespace rkit::render::vulkan
 		UniquePtr<VulkanSwapChainBase> vkSwapChain;
 		RKIT_CHECK(VulkanSwapChainBase::Create(vkSwapChain, *this, *static_cast<VulkanSwapChainPrototypeBase *>(prototype.Get()), numImages, fmt, writeBehavior, *queue));
 
-
 		outSwapChain = std::move(vkSwapChain);
 
 		return ResultCode::kOK;

@@ -5,6 +5,7 @@
 #include "VulkanDevice.h"
 #include "VulkanPhysDevice.h"
 #include "VulkanPlatformSpecific.h"
+#include "VulkanRenderTargetView.h"
 #include "VulkanQueueProxy.h"
 #include "VulkanResourcePool.h"
 #include "VulkanUtils.h"
@@ -84,6 +85,8 @@ namespace rkit::render::vulkan
 		Result AcquireFrame(ISwapChainSyncPoint &syncPoint) override;
 		Result Present(ISwapChainSyncPoint &syncPoint) override;
 
+		IRenderTargetView *GetRenderTargetViewForFrame(size_t frameIndex) override;
+
 	private:
 		VulkanDeviceBase &m_device;
 		IDisplay &m_display;
@@ -99,6 +102,7 @@ namespace rkit::render::vulkan
 		size_t m_nextSyncIndex = 0;
 
 		Vector<VkImage> m_images;
+		Vector<UniquePtr<VulkanRenderTargetViewBase>> m_rtvs;
 		Vector<VulkanSwapChainFrame> m_swapChainFrames;
 
 		SwapChainWriteBehavior m_writeBehavior;
@@ -312,6 +316,8 @@ namespace rkit::render::vulkan
 		for (VkImage &img : m_images)
 			img = VK_NULL_HANDLE;
 
+		RKIT_CHECK(m_rtvs.Resize(imageCount));
+
 		RKIT_CHECK(m_swapChainFrames.Resize(imageCount));
 
 		for (uint32_t fi = 0; fi < imageCount; fi++)
@@ -320,6 +326,12 @@ namespace rkit::render::vulkan
 		}
 
 		RKIT_VK_CHECK(vkd.vkGetSwapchainImagesKHR(m_device.GetDevice(), m_swapChain, &imageCount, m_images.GetBuffer()));
+
+		for (uint32_t i = 0; i < imageCount; i++)
+		{
+			VkImageViewType imageViewType = (simultaneousImageCount == 1) ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+			RKIT_CHECK(VulkanRenderTargetViewBase::Create(m_rtvs[i], m_device, m_images[i], swapchainCreateInfo.imageFormat, imageViewType, 0, TexturePlane::kColor, 0, simultaneousImageCount));
+		}
 
 		return ResultCode::kOK;
 	}
@@ -338,6 +350,11 @@ namespace rkit::render::vulkan
 	Result VulkanSwapChain::Present(ISwapChainSyncPoint &syncPointBase)
 	{
 		return static_cast<VulkanSwapChainSyncPoint &>(syncPointBase).Present(m_queue, m_swapChain);
+	}
+
+	IRenderTargetView *VulkanSwapChain::GetRenderTargetViewForFrame(size_t frameIndex)
+	{
+		return m_rtvs[frameIndex].Get();
 	}
 
 	Result VulkanSwapChainBase::Create(UniquePtr<VulkanSwapChainBase> &outSwapChain, VulkanDeviceBase &device, VulkanSwapChainPrototypeBase &prototypeBase, uint8_t numImages, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, VulkanQueueProxyBase &queue)
