@@ -30,6 +30,12 @@ namespace anox
 	struct IGraphicsSubsystem;
 	struct PerFramePerDisplayResources;
 
+	class RenderedWindowResources
+	{
+	public:
+		virtual ~RenderedWindowResources() {}
+	};
+
 	class RenderedWindowBase
 	{
 	public:
@@ -43,6 +49,6 @@ namespace anox
 
 		virtual const rkit::RCPtr<PerFramePerDisplayResources> &GetCurrentFrameResources() const = 0;
 
-		static rkit::Result Create(rkit::UniquePtr<RenderedWindowBase> &outWindow, rkit::UniquePtr<rkit::render::IDisplay> &&display, rkit::UniquePtr<rkit::render::ISwapChainPrototype> &&prototype, rkit::render::IRenderDevice *device, rkit::render::IBaseCommandQueue *swapChainQueue, uint8_t numBackBuffers, uint8_t numSyncPoints);
+		static rkit::Result Create(rkit::UniquePtr<RenderedWindowBase> &outWindow, rkit::UniquePtr<rkit::render::IDisplay> &&display, rkit::UniquePtr<rkit::render::ISwapChainPrototype> &&prototype, rkit::UniquePtr<RenderedWindowResources> &&resources, rkit::render::IRenderDevice *device, rkit::render::IBaseCommandQueue *swapChainQueue, uint8_t numSwapChainFrames, uint8_t numSyncPoints);
 	};
 }

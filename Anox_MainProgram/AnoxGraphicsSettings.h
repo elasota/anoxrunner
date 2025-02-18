@@ -29,6 +29,4 @@ namespace anox
 		RestartRequiringGraphicsSettings m_restartRequired;
 		RuntimeGraphicsSettings m_runtime;
 	};
-
-
 }

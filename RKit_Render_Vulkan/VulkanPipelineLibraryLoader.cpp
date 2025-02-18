@@ -704,6 +704,23 @@ namespace rkit::render::vulkan
 			}
 		}
 
+		// Render pass lookups
+		{
+			data::IRenderRTTIListBase *renderPasses = m_data.m_package->GetIndexable(rkit::data::RenderRTTIIndexableStructType::RenderPassDesc);
+			data::IRenderRTTIListBase *renderPassNameLookups = m_data.m_package->GetIndexable(rkit::data::RenderRTTIIndexableStructType::RenderPassNameLookup);
+
+			const size_t numRenderPassNameLookups = renderPassNameLookups->GetCount();
+
+			for (size_t i = 0; i < numRenderPassNameLookups; i++)
+			{
+				const render::RenderPassNameLookup &nameLookup = *static_cast<const render::RenderPassNameLookup *>(renderPassNameLookups->GetElementPtr(i));
+
+				StringView name = m_data.m_package->GetString(nameLookup.m_name.GetIndex());
+
+				RKIT_CHECK(m_data.m_nameToRenderPass.Set(name, nameLookup.m_renderPass));
+			}
+		}
+
 		return ResultCode::kOK;
 	}
 

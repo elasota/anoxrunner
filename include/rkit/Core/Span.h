@@ -77,6 +77,8 @@ namespace rkit
 	public:
 		Span();
 		Span(T *arr, size_t count);
+		template<size_t TSize>
+		explicit Span(T (&arr)[TSize]);
 
 		T *Ptr() const;
 		size_t Count() const;
@@ -371,6 +373,14 @@ template<class T>
 rkit::Span<T>::Span(T *arr, size_t count)
 	: m_arr(arr)
 	, m_count(count)
+{
+}
+
+template<class T>
+template<size_t TSize>
+rkit::Span<T>::Span(T (&arr)[TSize])
+	: m_arr(arr)
+	, m_count(TSize)
 {
 }
 

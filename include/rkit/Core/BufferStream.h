@@ -194,5 +194,5 @@ inline rkit::Vector<uint8_t> rkit::BufferStream::TakeBuffer()
 	Vector<uint8_t> tempVector = std::move(m_buffer);
 	m_buffer = Vector<uint8_t>();
 
-	return Vector<uint8_t>(std::move(tempVector));
+	return tempVector;
 }

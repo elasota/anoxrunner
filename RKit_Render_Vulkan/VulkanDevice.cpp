@@ -408,9 +408,15 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanDevice::CreateRenderPassInstance(UniquePtr<IRenderPassInstance> &outResources, const RenderPassRef_t &renderPass, const RenderPassResources &desc)
+	Result VulkanDevice::CreateRenderPassInstance(UniquePtr<IRenderPassInstance> &outRPI, const RenderPassRef_t &renderPass, const RenderPassResources &resources)
 	{
-		return ResultCode::kNotYetImplemented;
+		UniquePtr<VulkanRenderPassInstanceBase> rpi;
+
+		RKIT_CHECK(VulkanRenderPassInstanceBase::Create(rpi, *this, renderPass, resources));
+
+		outRPI = std::move(rpi);
+
+		return ResultCode::kOK;
 	}
 
 	Result VulkanDevice::ResetBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences)

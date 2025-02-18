@@ -18,7 +18,7 @@ namespace anox
 	class RenderedWindow final : public RenderedWindowBase
 	{
 	public:
-		RenderedWindow(rkit::UniquePtr<rkit::render::IDisplay> &&display, rkit::render::IRenderDevice *device);
+		RenderedWindow(rkit::UniquePtr<rkit::render::IDisplay> &&display, rkit::UniquePtr<anox::RenderedWindowResources> &&resources, rkit::render::IRenderDevice *device);
 		~RenderedWindow();
 
 		rkit::Result Initialize(uint8_t numBackBuffers, uint8_t numSyncPoints, rkit::UniquePtr<rkit::render::ISwapChainPrototype> &&prototype, rkit::render::IBaseCommandQueue *presentQueue);
@@ -63,13 +63,18 @@ namespace anox
 
 		rkit::UniquePtr<rkit::render::IDisplay> m_display;
 		rkit::UniquePtr<rkit::render::ISwapChain> m_swapChain;
+
 		rkit::Vector<SwapChainFrameState> m_swapChainFrameStates;
 		rkit::Vector<rkit::UniquePtr<rkit::render::ISwapChainSyncPoint>> m_syncPoints;
 		rkit::render::IRenderDevice *m_device;
 
 		rkit::RCPtr<PerFramePerDisplayResources> m_currentPerDisplayResources;
+		rkit::UniquePtr<RenderedWindowResources> m_resources;
 
 		uint8_t m_currentSyncPoint = 0;
+
+		uint32_t m_width = 0;
+		uint32_t m_height = 0;
 	};
 
 	RenderedWindow::AcquireJobRunner::AcquireJobRunner(RenderedWindow &window, const rkit::RCPtr<PerFramePerDisplayResources> &resources)
@@ -104,8 +109,9 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	RenderedWindow::RenderedWindow(rkit::UniquePtr<rkit::render::IDisplay> &&display, rkit::render::IRenderDevice *device)
+	RenderedWindow::RenderedWindow(rkit::UniquePtr<rkit::render::IDisplay> &&display, rkit::UniquePtr<RenderedWindowResources> &&resources, rkit::render::IRenderDevice *device)
 		: m_display(std::move(display))
+		, m_resources(std::move(resources))
 		, m_device(device)
 	{
 	}
@@ -116,16 +122,14 @@ namespace anox
 		m_display.Reset();
 	}
 
-	rkit::Result RenderedWindow::Initialize(uint8_t numBackBuffers, uint8_t numSyncPoints, rkit::UniquePtr<rkit::render::ISwapChainPrototype> &&prototypeRef, rkit::render::IBaseCommandQueue *presentQueue)
+	rkit::Result RenderedWindow::Initialize(uint8_t numSwapChainFrames, uint8_t numSyncPoints, rkit::UniquePtr<rkit::render::ISwapChainPrototype> &&prototypeRef, rkit::render::IBaseCommandQueue *presentQueue)
 	{
 		rkit::UniquePtr<rkit::render::ISwapChainPrototype> prototype = std::move(prototypeRef);
 
 		if (m_device != nullptr)
 		{
-			if (numBackBuffers < 1 || numSyncPoints < 1)
+			if (numSwapChainFrames < 2 || numSyncPoints < 1)
 				return rkit::ResultCode::kInternalError;
-
-			const uint8_t numFrames = numBackBuffers + 1;
 
 			RKIT_CHECK(m_syncPoints.Resize(numSyncPoints));
 			for (size_t i = 0; i < numSyncPoints; i++)
@@ -133,9 +137,11 @@ namespace anox
 				RKIT_CHECK(m_device->CreateSwapChainSyncPoint(m_syncPoints[i]));
 			}
 
-			RKIT_CHECK(m_swapChainFrameStates.Resize(numFrames));
+			RKIT_CHECK(m_swapChainFrameStates.Resize(numSwapChainFrames));
 
-			RKIT_CHECK(m_device->CreateSwapChain(m_swapChain, std::move(prototype), numFrames, rkit::render::RenderTargetFormat::RGBA_UNorm8, rkit::render::SwapChainWriteBehavior::RenderTarget, *presentQueue));
+			RKIT_CHECK(m_device->CreateSwapChain(m_swapChain, std::move(prototype), numSwapChainFrames, rkit::render::RenderTargetFormat::RGBA_UNorm8, rkit::render::SwapChainWriteBehavior::RenderTarget, *presentQueue));
+
+			m_swapChain->GetExtents(m_width, m_height);
 		}
 
 		return rkit::ResultCode::kOK;
@@ -198,15 +204,16 @@ namespace anox
 		return m_currentPerDisplayResources;
 	}
 
-	rkit::Result RenderedWindowBase::Create(rkit::UniquePtr<RenderedWindowBase> &outWindow, rkit::UniquePtr<rkit::render::IDisplay> &&displayRef, rkit::UniquePtr<rkit::render::ISwapChainPrototype> &&prototypeRef, rkit::render::IRenderDevice *device, rkit::render::IBaseCommandQueue *swapChainQueue, uint8_t numBackBuffers, uint8_t numSyncPoints)
+	rkit::Result RenderedWindowBase::Create(rkit::UniquePtr<RenderedWindowBase> &outWindow, rkit::UniquePtr<rkit::render::IDisplay> &&displayRef, rkit::UniquePtr<rkit::render::ISwapChainPrototype> &&prototypeRef, rkit::UniquePtr<RenderedWindowResources> &&resourcesRef, rkit::render::IRenderDevice *device, rkit::render::IBaseCommandQueue *swapChainQueue, uint8_t numSwapChainFrames, uint8_t numSyncPoints)
 	{
 		rkit::UniquePtr<rkit::render::IDisplay> display = std::move(displayRef);
 		rkit::UniquePtr<rkit::render::ISwapChainPrototype> prototype = std::move(prototypeRef);
+		rkit::UniquePtr<RenderedWindowResources> resources = std::move(resourcesRef);
 
 		rkit::UniquePtr<RenderedWindow> window;
-		RKIT_CHECK(rkit::New<RenderedWindow>(window, std::move(display), device));
+		RKIT_CHECK(rkit::New<RenderedWindow>(window, std::move(display), std::move(resources), device));
 
-		RKIT_CHECK(window->Initialize(numBackBuffers, numSyncPoints, std::move(prototype), swapChainQueue));
+		RKIT_CHECK(window->Initialize(numSwapChainFrames, numSyncPoints, std::move(prototype), swapChainQueue));
 
 		outWindow = std::move(window);
 

@@ -1,12 +1,8 @@
 #pragma once
 
 #include "rkit/Core/Span.h"
+#include "rkit/Core/UniquePtr.h"
 
-namespace rkit
-{
-	template<class T>
-	struct ISpan;
-}
 
 namespace rkit::render
 {
@@ -15,7 +11,8 @@ namespace rkit::render
 
 	struct RenderPassResources
 	{
-		Span<IRenderTargetView *> m_renderTargetViews;
+		ConstSpan<IRenderTargetView *> m_renderTargetViews;
+
 		IDepthStencilView *m_depthStencilView = nullptr;
 
 		uint32_t m_width = 0;

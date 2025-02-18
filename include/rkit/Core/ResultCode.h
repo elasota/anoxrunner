@@ -11,6 +11,8 @@ namespace rkit
 		kNotYetImplemented,
 		kInternalError,
 
+		kDataError,
+
 		kIntegerOverflow,
 
 		kKeyNotFound,

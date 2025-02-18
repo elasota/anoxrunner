@@ -24,6 +24,7 @@ namespace rkit::render::vulkan
 
 	class VulkanRenderPassInstanceBase : public IRenderPassInstance
 	{
+	public:
 		static Result Create(UniquePtr<VulkanRenderPassInstanceBase> &renderPassInstance, VulkanDeviceBase &device, const RenderPassRef_t &renderPassRef, const RenderPassResources &resources);
 	};
 }

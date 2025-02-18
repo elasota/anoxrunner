@@ -12,10 +12,14 @@
 #include "rkit/Render/DeviceCaps.h"
 #include "rkit/Render/DisplayManager.h"
 #include "rkit/Render/PipelineLibrary.h"
+#include "rkit/Render/PipelineLibraryItem.h"
+#include "rkit/Render/PipelineLibraryItemProtos.h"
 #include "rkit/Render/PipelineLibraryLoader.h"
 #include "rkit/Render/RenderDefs.h"
 #include "rkit/Render/RenderDriver.h"
 #include "rkit/Render/RenderDevice.h"
+#include "rkit/Render/RenderPassInstance.h"
+#include "rkit/Render/RenderPassResources.h"
 #include "rkit/Render/SwapChain.h"
 
 #include "rkit/Utilities/ThreadPool.h"
@@ -265,6 +269,16 @@ namespace anox
 		private:
 			rkit::UniquePtr<IRecordJobRunner> m_recordJob;
 			rkit::render::IBaseCommandAllocator &m_cmdAlloc;
+		};
+
+		struct GameWindowRenderPassInstances
+		{
+			rkit::UniquePtr<rkit::render::IRenderPassInstance> m_simpleColorTargetRPI;
+		};
+
+		struct GameWindowResources final : public RenderedWindowResources
+		{
+			rkit::Vector<GameWindowRenderPassInstances> m_renderPassInstances;
 		};
 
 		enum class DeviceSetupStep
@@ -968,7 +982,7 @@ namespace anox
 		rkit::UniquePtr<rkit::render::IDisplay> display;
 		RKIT_CHECK(displayManager->CreateDisplay(display, m_currentDisplayMode.Get()));
 
-		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), nullptr, m_renderDevice.Get(), nullptr, 0, 0));
+		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), nullptr, nullptr, m_renderDevice.Get(), nullptr, 0, 0));
 
 		rkit::render::IProgressMonitor *progressMonitor = m_gameWindow->GetDisplay().GetProgressMonitor();
 
@@ -1218,7 +1232,44 @@ namespace anox
 
 		presentationLogicalQueueRef = graphicsLogicalQueue;
 
-		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), std::move(swapChainPrototype), m_renderDevice.Get(), presentationLogicalQueueRef->GetBaseCommandQueue(), 2, m_numSyncPoints));
+		rkit::UniquePtr<GameWindowResources> gameWindowResourcesUniquePtr;
+		RKIT_CHECK(rkit::New<GameWindowResources>(gameWindowResourcesUniquePtr));
+
+		GameWindowResources &gameWindowResources = *gameWindowResourcesUniquePtr.Get();
+
+		const uint8_t numSwapChainFrames = 3;
+		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), std::move(swapChainPrototype), std::move(gameWindowResourcesUniquePtr), m_renderDevice.Get(), presentationLogicalQueueRef->GetBaseCommandQueue(), numSwapChainFrames, m_numSyncPoints));
+
+		RKIT_CHECK(gameWindowResources.m_renderPassInstances.Resize(numSwapChainFrames));
+
+		for (size_t i = 0; i < numSwapChainFrames; i++)
+		{
+			GameWindowRenderPassInstances &rpi = gameWindowResources.m_renderPassInstances[i];
+
+			{
+				rkit::render::RenderPassRef_t simpleColorTargetRP = m_pipelineLibrary->FindRenderPass("RP_SimpleColorTarget");
+
+				if (!simpleColorTargetRP.IsValid())
+				{
+					rkit::log::Error("RP_SimpleColorTarget render pass is missing");
+					return rkit::ResultCode::kDataError;
+				}
+
+				rkit::render::RenderPassResources resources;
+
+				resources.m_arraySize = 1;
+
+				rkit::render::IRenderTargetView *rtvs[] =
+				{
+					m_gameWindow->GetSwapChain()->GetRenderTargetViewForFrame(i),
+				};
+
+				m_gameWindow->GetSwapChain()->GetExtents(resources.m_width, resources.m_height);
+				resources.m_renderTargetViews = rkit::Span<rkit::render::IRenderTargetView *>(rtvs);
+
+				RKIT_CHECK(m_renderDevice->CreateRenderPassInstance(rpi.m_simpleColorTargetRPI, simpleColorTargetRP, resources));
+			}
+		}
 
 		return rkit::ResultCode::kOK;
 	}

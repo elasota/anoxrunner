@@ -107,6 +107,8 @@ namespace rkit::render::vulkan
 		UniquePtr<VulkanRenderPassInstance> instance;
 		RKIT_CHECK(New<VulkanRenderPassInstance>(instance, device));
 
+		RKIT_CHECK(instance->Initialize(renderPassRef, resources));
+
 		renderPassInstance = std::move(instance);
 
 		return ResultCode::kOK;
