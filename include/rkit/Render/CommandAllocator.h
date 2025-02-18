@@ -65,7 +65,7 @@ namespace rkit::render
 	{
 		virtual ~IComputeCommandAllocator() {}
 
-		virtual Result OpenComputeCommandBatch(IGraphicsCommandBatch *&outCommandBatch, bool cpuWaitable) = 0;
+		virtual Result OpenComputeCommandBatch(IComputeCommandBatch *&outCommandBatch, bool cpuWaitable) = 0;
 	};
 
 	struct IGraphicsComputeCommandAllocator : public virtual IGraphicsCommandAllocator, public virtual IComputeCommandAllocator

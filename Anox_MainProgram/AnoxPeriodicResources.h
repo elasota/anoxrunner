@@ -10,6 +10,8 @@ namespace rkit::render
 
 namespace anox
 {
+	class RenderedWindowResources;
+
 	struct PerFrameResources final : public rkit::RefCounted
 	{
 		rkit::render::IBinaryCPUWaitableFence *m_frameEndFence = nullptr;
@@ -17,6 +19,8 @@ namespace anox
 
 	struct PerFramePerDisplayResources final : public rkit::RefCounted
 	{
+		RenderedWindowResources *m_windowResources = nullptr;
 		rkit::render::ISwapChainSyncPoint *m_swapChainSyncPoint = nullptr;
+		size_t m_swapChainFrameIndex = 0;
 	};
 }

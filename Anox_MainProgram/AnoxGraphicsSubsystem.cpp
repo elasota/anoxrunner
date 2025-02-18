@@ -50,6 +50,7 @@
 #include "rkit/Core/UtilitiesDriver.h"
 #include "rkit/Core/Vector.h"
 
+#include "AnoxGameWindowResources.h"
 #include "AnoxRenderedWindow.h"
 #include "AnoxGraphicsSettings.h"
 
@@ -269,16 +270,6 @@ namespace anox
 		private:
 			rkit::UniquePtr<IRecordJobRunner> m_recordJob;
 			rkit::render::IBaseCommandAllocator &m_cmdAlloc;
-		};
-
-		struct GameWindowRenderPassInstances
-		{
-			rkit::UniquePtr<rkit::render::IRenderPassInstance> m_simpleColorTargetRPI;
-		};
-
-		struct GameWindowResources final : public RenderedWindowResources
-		{
-			rkit::Vector<GameWindowRenderPassInstances> m_renderPassInstances;
 		};
 
 		enum class DeviceSetupStep
@@ -1240,11 +1231,11 @@ namespace anox
 		const uint8_t numSwapChainFrames = 3;
 		RKIT_CHECK(RenderedWindowBase::Create(m_gameWindow, std::move(display), std::move(swapChainPrototype), std::move(gameWindowResourcesUniquePtr), m_renderDevice.Get(), presentationLogicalQueueRef->GetBaseCommandQueue(), numSwapChainFrames, m_numSyncPoints));
 
-		RKIT_CHECK(gameWindowResources.m_renderPassInstances.Resize(numSwapChainFrames));
+		RKIT_CHECK(gameWindowResources.m_swapChainFrameResources.Resize(numSwapChainFrames));
 
 		for (size_t i = 0; i < numSwapChainFrames; i++)
 		{
-			GameWindowRenderPassInstances &rpi = gameWindowResources.m_renderPassInstances[i];
+			GameWindowSwapChainFrameResources &scfr = gameWindowResources.m_swapChainFrameResources[i];
 
 			{
 				rkit::render::RenderPassRef_t simpleColorTargetRP = m_pipelineLibrary->FindRenderPass("RP_SimpleColorTarget");
@@ -1267,7 +1258,7 @@ namespace anox
 				m_gameWindow->GetSwapChain()->GetExtents(resources.m_width, resources.m_height);
 				resources.m_renderTargetViews = rkit::Span<rkit::render::IRenderTargetView *>(rtvs);
 
-				RKIT_CHECK(m_renderDevice->CreateRenderPassInstance(rpi.m_simpleColorTargetRPI, simpleColorTargetRP, resources));
+				RKIT_CHECK(m_renderDevice->CreateRenderPassInstance(scfr.m_simpleColorTargetRPI, simpleColorTargetRP, resources));
 			}
 		}
 
@@ -1597,7 +1588,7 @@ namespace anox
 		if (!m_currentDisplayMode.IsSet() || m_currentDisplayMode.Get() == rkit::render::DisplayMode::kSplash)
 			return rkit::ResultCode::kOK;
 
-		RKIT_CHECK(m_frameDrawer->DrawFrame(*this, m_currentFrameResources, m_gameWindow->GetCurrentFrameResources()));
+		RKIT_CHECK(m_frameDrawer->DrawFrame(*this, m_currentFrameResources, *m_gameWindow));
 
 		return rkit::ResultCode::kOK;
 	}

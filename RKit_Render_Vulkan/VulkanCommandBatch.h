@@ -10,6 +10,11 @@ namespace rkit
 	class UniquePtr;
 }
 
+namespace rkit::render
+{
+	struct IRenderPassInstance;
+}
+
 namespace rkit::render::vulkan
 {
 	class VulkanDeviceBase;

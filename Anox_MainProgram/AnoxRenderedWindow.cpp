@@ -89,7 +89,7 @@ namespace anox
 
 		RKIT_CHECK(m_window.m_swapChain->AcquireFrame(syncPoint));
 
-		const size_t frameIndex = syncPoint.GetFrameIndex();
+		m_resources->m_swapChainFrameIndex = syncPoint.GetFrameIndex();
 
 		return rkit::ResultCode::kOK;
 	}
@@ -165,6 +165,7 @@ namespace anox
 		rkit::RCPtr<PerFramePerDisplayResources> displayResources;
 		RKIT_CHECK(rkit::New<PerFramePerDisplayResources>(displayResources));
 
+		displayResources->m_windowResources = this->m_resources.Get();
 		displayResources->m_swapChainSyncPoint = m_syncPoints[m_currentSyncPoint].Get();
 
 		rkit::UniquePtr<rkit::IJobRunner> acquireJobRunner;

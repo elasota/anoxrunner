@@ -24,7 +24,7 @@ namespace rkit::render::vulkan
 
 		Result OpenCopyCommandBatch(ICopyCommandBatch *&outCommandBatch, bool cpuWaitable) override;
 		Result OpenGraphicsCommandBatch(IGraphicsCommandBatch *&outCommandBatch, bool cpuWaitable) override;
-		Result OpenComputeCommandBatch(IGraphicsCommandBatch *&outCommandBatch, bool cpuWaitable) override;
+		Result OpenComputeCommandBatch(IComputeCommandBatch *&outCommandBatch, bool cpuWaitable) override;
 		Result OpenGraphicsComputeCommandBatch(IGraphicsComputeCommandBatch *&outCommandBatch, bool cpuWaitable) override;
 
 		Result ResetCommandAllocator(bool discardResources) override;
@@ -92,7 +92,7 @@ namespace rkit::render::vulkan
 		return TypedOpenCommandBatch(outCommandBatch, cpuWaitable);
 	}
 
-	Result VulkanCommandAllocator::OpenComputeCommandBatch(IGraphicsCommandBatch *&outCommandBatch, bool cpuWaitable)
+	Result VulkanCommandAllocator::OpenComputeCommandBatch(IComputeCommandBatch *&outCommandBatch, bool cpuWaitable)
 	{
 		return TypedOpenCommandBatch(outCommandBatch, cpuWaitable);
 	}

@@ -16,12 +16,13 @@ namespace anox
 	struct PerFrameResources;
 	struct PerFramePerDisplayResources;
 	struct IGraphicsSubsystem;
+	class RenderedWindowBase;
 
 	struct IFrameDrawer
 	{
 		virtual ~IFrameDrawer() {}
 
-		virtual rkit::Result DrawFrame(IGraphicsSubsystem &graphicsSubsystem, const rkit::RCPtr<PerFrameResources> &perFrameResources, const rkit::RCPtr<PerFramePerDisplayResources> &perDisplayResources) = 0;
+		virtual rkit::Result DrawFrame(IGraphicsSubsystem &graphicsSubsystem, const rkit::RCPtr<PerFrameResources> &perFrameResources, RenderedWindowBase &renderedWindow) = 0;
 
 		static rkit::Result Create(rkit::UniquePtr<IFrameDrawer> &outFrameDrawer);
 	};

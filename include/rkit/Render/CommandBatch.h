@@ -17,6 +17,7 @@ namespace rkit::render
 	struct IGraphicsCommandEncoder;
 
 	struct ISwapChainSyncPoint;
+	struct IRenderPassInstance;
 
 	struct IBaseCommandBatch
 	{
@@ -36,7 +37,7 @@ namespace rkit::render
 
 	struct IGraphicsCommandBatch : public virtual ICopyCommandBatch
 	{
-		virtual Result OpenGraphicsCommandEncoder(IGraphicsCommandEncoder *&outCopyCommandEncoder) = 0;
+		virtual Result OpenGraphicsCommandEncoder(IGraphicsCommandEncoder *&outCopyCommandEncoder, IRenderPassInstance &rpi) = 0;
 	};
 
 	struct IGraphicsComputeCommandBatch : public IGraphicsCommandBatch, public IComputeCommandBatch

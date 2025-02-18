@@ -1,12 +1,15 @@
 #include "AnoxFrameDrawer.h"
 
+#include "AnoxGameWindowResources.h"
 #include "AnoxPeriodicResources.h"
 #include "AnoxRecordJobRunner.h"
+#include "AnoxRenderedWindow.h"
 
 #include "anox/AnoxGraphicsSubsystem.h"
 
 #include "rkit/Render/CommandBatch.h"
 #include "rkit/Render/CommandAllocator.h"
+#include "rkit/Render/CommandEncoder.h"
 #include "rkit/Render/PipelineStage.h"
 
 #include "rkit/Core/EnumMask.h"
@@ -19,7 +22,7 @@ namespace anox
 	class FrameDrawer final : public IFrameDrawer
 	{
 	public:
-		rkit::Result DrawFrame(IGraphicsSubsystem &graphicsSubsystem, const rkit::RCPtr<PerFrameResources> &perFrameResources, const rkit::RCPtr<PerFramePerDisplayResources> &perDisplayResources) override;
+		rkit::Result DrawFrame(IGraphicsSubsystem &graphicsSubsystem, const rkit::RCPtr<PerFrameResources> &perFrameResources, RenderedWindowBase &renderedWindow) override;
 
 		rkit::Result Initialize();
 
@@ -62,9 +65,16 @@ namespace anox
 
 		rkit::EnumMask<rkit::render::PipelineStage> pipelineStages({ rkit::render::PipelineStage::kColorOutput });
 
-		//RKIT_CHECK(cmdBatch.CmdWaitForPresent(*m_perDisplayResources->m_swapChainSyncPoint, pipelineStages));
+		GameWindowResources *resources = static_cast<GameWindowResources *>(m_perDisplayResources->m_windowResources);
 
-		return rkit::ResultCode::kNotYetImplemented;
+		GameWindowSwapChainFrameResources &scFrameResources = resources->m_swapChainFrameResources[m_perDisplayResources->m_swapChainFrameIndex];
+
+		rkit::render::IGraphicsCommandEncoder *encoder = nullptr;
+		RKIT_CHECK(cmdBatch.OpenGraphicsCommandEncoder(encoder, *scFrameResources.m_simpleColorTargetRPI));
+
+		RKIT_CHECK(encoder->WaitForSwapChainAcquire(*m_perDisplayResources->m_swapChainSyncPoint, pipelineStages));
+
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result FrameDrawer::SubmitTestCommandsJobRunner::Run()
@@ -78,8 +88,10 @@ namespace anox
 		return &m_cmdBatch;
 	}
 
-	rkit::Result FrameDrawer::DrawFrame(IGraphicsSubsystem &graphicsSubsystem, const rkit::RCPtr<PerFrameResources> &perFrameResources, const rkit::RCPtr<PerFramePerDisplayResources> &perDisplayResources)
+	rkit::Result FrameDrawer::DrawFrame(IGraphicsSubsystem &graphicsSubsystem, const rkit::RCPtr<PerFrameResources> &perFrameResources, RenderedWindowBase &renderedWindow)
 	{
+		rkit::RCPtr<PerFramePerDisplayResources> perDisplayResources = renderedWindow.GetCurrentFrameResources();
+
 		rkit::RCPtr<rkit::Job> submitJob;
 		rkit::UniquePtr<SubmitTestCommandsJobRunner> submitJobRunner;
 		RKIT_CHECK(rkit::New<SubmitTestCommandsJobRunner>(submitJobRunner));
