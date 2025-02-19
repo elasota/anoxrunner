@@ -23,6 +23,7 @@ namespace rkit::render
 	{
 		virtual Result Submit() = 0;
 		virtual Result WaitForCompletion() = 0;
+		virtual Result CloseBatch() = 0;
 	};
 
 	struct ICopyCommandBatch : public IBaseCommandBatch

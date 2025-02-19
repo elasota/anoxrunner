@@ -74,6 +74,8 @@ namespace anox
 
 		RKIT_CHECK(encoder->WaitForSwapChainAcquire(*m_perDisplayResources->m_swapChainSyncPoint, pipelineStages));
 
+		RKIT_CHECK(cmdBatch.CloseBatch());
+
 		return rkit::ResultCode::kOK;
 	}
 

@@ -420,7 +420,7 @@ namespace rkit::render::vulkan
 
 	Result VulkanQueueProxy::CreateCommandAllocator(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, bool isBundle)
 	{
-		return VulkanCommandAllocatorBase::Create(outCommandAllocator, m_device, m_queueType, isBundle, m_queueFamily);
+		return VulkanCommandAllocatorBase::Create(outCommandAllocator, m_device, *this, m_queueType, isBundle, m_queueFamily);
 	}
 
 	Result VulkanQueueProxy::QueueBase(IBaseCommandList &cmdList)

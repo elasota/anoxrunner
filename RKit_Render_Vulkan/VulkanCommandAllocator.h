@@ -8,6 +8,7 @@
 namespace rkit::render::vulkan
 {
 	class VulkanDeviceBase;
+	class VulkanQueueProxyBase;
 
 	class VulkanCommandAllocatorBase : public IGraphicsComputeCommandAllocator, public IInternalCommandAllocator
 	{
@@ -15,6 +16,6 @@ namespace rkit::render::vulkan
 		virtual CommandQueueType GetQueueType() const = 0;
 		virtual bool IsBundle() const = 0;
 
-		static Result Create(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, VulkanDeviceBase &device, CommandQueueType queueType, bool isBundle, uint32_t queueFamily);
+		static Result Create(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, VulkanDeviceBase &device, VulkanQueueProxyBase &queue, CommandQueueType queueType, bool isBundle, uint32_t queueFamily);
 	};
 }

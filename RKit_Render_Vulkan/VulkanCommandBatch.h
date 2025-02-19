@@ -18,6 +18,7 @@ namespace rkit::render
 namespace rkit::render::vulkan
 {
 	class VulkanDeviceBase;
+	class VulkanQueueProxyBase;
 	class VulkanCommandAllocatorBase;
 
 	class VulkanCommandBatchBase : public IGraphicsComputeCommandBatch
@@ -28,6 +29,6 @@ namespace rkit::render::vulkan
 		virtual Result ClearCommandBatch() = 0;
 		virtual Result OpenCommandBatch(bool cpuWaitable) = 0;
 
-		static Result Create(UniquePtr<VulkanCommandBatchBase> &cmdBatch, VulkanDeviceBase &device, VulkanCommandAllocatorBase &cmdAlloc);
+		static Result Create(UniquePtr<VulkanCommandBatchBase> &cmdBatch, VulkanDeviceBase &device, VulkanQueueProxyBase &queue, VulkanCommandAllocatorBase &cmdAlloc);
 	};
 };

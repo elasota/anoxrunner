@@ -5,6 +5,7 @@
 #include "VulkanAPI.h"
 #include "VulkanCheck.h"
 #include "VulkanDevice.h"
+#include "VulkanQueueProxy.h"
 #include "VulkanSwapChain.h"
 #include "VulkanUtils.h"
 
@@ -54,7 +55,7 @@ namespace rkit::render::vulkan
 			kNone = kCount,
 		};
 
-		explicit VulkanCommandBatch(VulkanDeviceBase &device, VulkanCommandAllocatorBase &cmdAlloc);
+		explicit VulkanCommandBatch(VulkanDeviceBase &device, VulkanQueueProxyBase &queue, VulkanCommandAllocatorBase &cmdAlloc);
 		~VulkanCommandBatch();
 
 		Result ClearCommandBatch() override;
@@ -62,6 +63,7 @@ namespace rkit::render::vulkan
 
 		Result Submit() override;
 		Result WaitForCompletion() override;
+		Result CloseBatch() override;
 
 		Result OpenCopyCommandEncoder(ICopyCommandEncoder *&outCopyCommandEncoder) override;
 		Result OpenComputeCommandEncoder(IComputeCommandEncoder *&outCopyCommandEncoder) override;
@@ -69,44 +71,20 @@ namespace rkit::render::vulkan
 
 		Result Initialize();
 
-		Result ChangeToEncoderType(EncoderType encoderType);
+		Result StartNewEncoder(EncoderType encoderType);
 
 		Result AddWaitForVkSema(VkSemaphore sema, const PipelineStageMask_t &afterStageMask);
+		Result AddSignalVkSema(VkSemaphore sema);
 
 	private:
-		enum class BatchItemType
-		{
-			kUnallocated,
-			kSubmit,
-		};
-
-		struct SubmitBatchItem
-		{
-			VkSubmitInfo m_submitInfo;
-
-			size_t m_firstSemaphore;
-			size_t m_firstWaitDstStageMask;
-			size_t m_firstCommandBuffer;
-		};
-
-		union BatchItemUnion
-		{
-			SubmitBatchItem m_submit;
-		};
-
-		struct BatchItem
-		{
-			BatchItemType m_type;
-			BatchItemUnion m_union;
-		};
-
 		static const size_t kNumEncoderTypes = static_cast<size_t>(EncoderType::kCount);
 
-		Result CreateNewSubmitItem(SubmitBatchItem *&outSubmitBatchItem);
+		Result CreateNewSubmitItem(VkSubmitInfo *&outSubmitBatchItem);
 
-		Result SubmitItem(const BatchItem &item);
+		Result CheckCloseCommandList();
 
 		VulkanDeviceBase &m_device;
+		VulkanQueueProxyBase &m_queue;
 		VulkanCommandAllocatorBase &m_cmdAlloc;
 
 		Vector<VkCommandBuffer> m_cmdBuffers;
@@ -114,7 +92,8 @@ namespace rkit::render::vulkan
 		Vector<VkSemaphore> m_semas;
 		Vector<VkPipelineStageFlags> m_waitDstStageMasks;
 
-		Vector<BatchItem> m_items;
+		Vector<VkSubmitInfo> m_submits;
+		bool m_isCommandListOpen = false;
 
 		VkFence m_completionFence = VK_NULL_HANDLE;
 		bool m_isCPUWaitable = false;
@@ -132,7 +111,10 @@ namespace rkit::render::vulkan
 
 	Result VulkanGraphicsCommandEncoder::CloseEncoder()
 	{
-		return ResultCode::kNotYetImplemented;
+		if (m_isRendering)
+			return ResultCode::kNotYetImplemented;
+
+		return ResultCode::kOK;
 	}
 
 	Result VulkanGraphicsCommandEncoder::WaitForSwapChainAcquire(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &afterStages)
@@ -152,8 +134,9 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	VulkanCommandBatch::VulkanCommandBatch(VulkanDeviceBase &device, VulkanCommandAllocatorBase &cmdAlloc)
+	VulkanCommandBatch::VulkanCommandBatch(VulkanDeviceBase &device, VulkanQueueProxyBase &queue, VulkanCommandAllocatorBase &cmdAlloc)
 		: m_device(device)
+		, m_queue(queue)
 		, m_cmdAlloc(cmdAlloc)
 		, m_graphicsCommandEncoder(*this)
 	{
@@ -173,7 +156,7 @@ namespace rkit::render::vulkan
 		m_semas.ShrinkToSize(0);
 		m_waitDstStageMasks.ShrinkToSize(0);
 
-		m_items.ShrinkToSize(0);
+		m_submits.ShrinkToSize(0);
 
 		return ResultCode::kNotYetImplemented;
 	}
@@ -202,7 +185,43 @@ namespace rkit::render::vulkan
 
 	Result VulkanCommandBatch::Submit()
 	{
-		return ResultCode::kNotYetImplemented;
+		RKIT_CHECK(CloseBatch());
+
+		if (m_submits.Count() == 0 && m_completionFence == VK_NULL_HANDLE)
+			return ResultCode::kOK;
+
+		const VkCommandBuffer *cmdBuffers = m_cmdBuffers.GetBuffer();
+		const VkSemaphore *semas = m_semas.GetBuffer();
+		const VkPipelineStageFlags *waitStageFlags = m_waitDstStageMasks.GetBuffer();
+
+		for (VkSubmitInfo &submitInfo : m_submits)
+		{
+			if (submitInfo.commandBufferCount > 0)
+			{
+				submitInfo.pCommandBuffers = cmdBuffers;
+				cmdBuffers += submitInfo.commandBufferCount;
+			}
+
+			if (submitInfo.waitSemaphoreCount > 0)
+			{
+				submitInfo.pWaitSemaphores = semas;
+				submitInfo.pWaitDstStageMask = waitStageFlags;
+
+				semas += submitInfo.waitSemaphoreCount;
+				waitStageFlags += submitInfo.waitSemaphoreCount;
+			}
+
+			if (submitInfo.signalSemaphoreCount > 0)
+			{
+				submitInfo.pSignalSemaphores = semas;
+
+				semas += submitInfo.signalSemaphoreCount;
+			}
+		}
+
+		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkQueueSubmit(m_queue.GetVkQueue(), static_cast<uint32_t>(m_submits.Count()), m_submits.GetBuffer(), m_completionFence));
+
+		return ResultCode::kOK;
 	}
 
 	Result VulkanCommandBatch::WaitForCompletion()
@@ -214,6 +233,14 @@ namespace rkit::render::vulkan
 			return ResultCode::kInternalError;
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkWaitForFences(m_device.GetDevice(), 1, &m_completionFence, VK_TRUE, UINT64_MAX));
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanCommandBatch::CloseBatch()
+	{
+		RKIT_CHECK(StartNewEncoder(EncoderType::kNone));
+		RKIT_CHECK(CheckCloseCommandList());
 
 		return ResultCode::kOK;
 	}
@@ -230,7 +257,7 @@ namespace rkit::render::vulkan
 
 	Result VulkanCommandBatch::OpenGraphicsCommandEncoder(IGraphicsCommandEncoder *&outGraphicsCommandEncoder, IRenderPassInstance &rpi)
 	{
-		RKIT_CHECK(ChangeToEncoderType(EncoderType::kGraphics));
+		RKIT_CHECK(StartNewEncoder(EncoderType::kGraphics));
 
 		RKIT_CHECK(m_graphicsCommandEncoder.OpenEncoder(rpi));
 
@@ -239,20 +266,16 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-
 	Result VulkanCommandBatch::AddWaitForVkSema(VkSemaphore sema, const PipelineStageMask_t &afterStageMask)
 	{
-		SubmitBatchItem *submitItem = nullptr;
-		if (m_items.Count() > 0)
+		VkSubmitInfo *submitItem = nullptr;
+		if (m_submits.Count() > 0)
 		{
-			BatchItem &lastItem = m_items[m_items.Count() - 1];
-			if (lastItem.m_type == BatchItemType::kSubmit)
-			{
-				submitItem = &lastItem.m_union.m_submit;
+			RKIT_CHECK(CheckCloseCommandList());
 
-				if (submitItem->m_submitInfo.commandBufferCount > 0 || submitItem->m_submitInfo.signalSemaphoreCount > 0)
-					submitItem = nullptr;
-			}
+			submitItem = &m_submits[m_submits.Count() - 1];
+			if (submitItem->commandBufferCount > 0 || submitItem->signalSemaphoreCount > 0)
+				submitItem = nullptr;
 		}
 
 		if (!submitItem)
@@ -274,29 +297,53 @@ namespace rkit::render::vulkan
 			}
 		}
 
-		submitItem->m_submitInfo.waitSemaphoreCount++;
+		submitItem->waitSemaphoreCount++;
 
 		return ResultCode::kOK;
 	}
 
-	Result VulkanCommandBatch::CreateNewSubmitItem(SubmitBatchItem *&outSubmitBatchItem)
+	Result VulkanCommandBatch::AddSignalVkSema(VkSemaphore sema)
 	{
-		RKIT_CHECK(m_items.Append(BatchItem()));
+		VkSubmitInfo *submitItem = nullptr;
+		if (m_submits.Count() > 0)
+		{
+			RKIT_CHECK(CheckCloseCommandList());
 
-		BatchItem &newItem = m_items[m_items.Count() - 1];
-		newItem.m_type = BatchItemType::kUnallocated;
+			submitItem = &m_submits[m_submits.Count() - 1];
+		}
 
-		SubmitBatchItem &submitItem = newItem.m_union.m_submit;
-		submitItem = {};
-		submitItem.m_firstCommandBuffer = m_cmdBuffers.Count();
-		submitItem.m_firstSemaphore = m_semas.Count();
-		submitItem.m_firstWaitDstStageMask = m_waitDstStageMasks.Count();
+		if (!submitItem)
+		{
+			RKIT_CHECK(CreateNewSubmitItem(submitItem));
+		}
 
-		VkSubmitInfo &submitInfo = submitItem.m_submitInfo;
-		submitInfo = {};
+		RKIT_CHECK(m_semas.Append(sema));
+
+		submitItem->signalSemaphoreCount++;
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanCommandBatch::CreateNewSubmitItem(VkSubmitInfo *&outSubmitInfo)
+	{
+		VkSubmitInfo submitInfo = {};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-		outSubmitBatchItem = &submitItem;
+		RKIT_CHECK(m_submits.Append(submitInfo));
+
+		outSubmitInfo = &m_submits[m_submits.Count() - 1];
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanCommandBatch::CheckCloseCommandList()
+	{
+		if (m_isCommandListOpen)
+		{
+			RKIT_VK_CHECK(m_device.GetDeviceAPI().vkEndCommandBuffer(m_cmdBuffers[m_cmdBuffers.Count() - 1]));
+
+			m_isCommandListOpen = false;
+		}
 
 		return ResultCode::kOK;
 	}
@@ -306,7 +353,7 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanCommandBatch::ChangeToEncoderType(EncoderType encoderType)
+	Result VulkanCommandBatch::StartNewEncoder(EncoderType encoderType)
 	{
 		if (m_currentEncoderType != EncoderType::kNone)
 		{
@@ -318,10 +365,10 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanCommandBatchBase::Create(UniquePtr<VulkanCommandBatchBase> &outCmdBatch, VulkanDeviceBase &device, VulkanCommandAllocatorBase &cmdAlloc)
+	Result VulkanCommandBatchBase::Create(UniquePtr<VulkanCommandBatchBase> &outCmdBatch, VulkanDeviceBase &device, VulkanQueueProxyBase &queue, VulkanCommandAllocatorBase &cmdAlloc)
 	{
 		UniquePtr<VulkanCommandBatch> cmdBatch;
-		RKIT_CHECK(New<VulkanCommandBatch>(cmdBatch, device, cmdAlloc));
+		RKIT_CHECK(New<VulkanCommandBatch>(cmdBatch, device, queue, cmdAlloc));
 
 		RKIT_CHECK(cmdBatch->Initialize());
 

@@ -67,6 +67,7 @@ namespace rkit::render::vulkan
 		RKIT_VK_API(vkAllocateCommandBuffers);
 		RKIT_VK_API(vkFreeCommandBuffers);
 		RKIT_VK_API(vkResetCommandBuffer);
+		RKIT_VK_API(vkEndCommandBuffer);
 		RKIT_VK_API(vkCreateCommandPool);
 		RKIT_VK_API(vkDestroyCommandPool);
 		RKIT_VK_API(vkResetCommandPool);

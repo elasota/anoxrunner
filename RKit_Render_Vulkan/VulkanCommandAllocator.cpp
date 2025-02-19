@@ -15,7 +15,7 @@ namespace rkit::render::vulkan
 	class VulkanCommandAllocator final : public VulkanCommandAllocatorBase
 	{
 	public:
-		VulkanCommandAllocator(VulkanDeviceBase &device, CommandQueueType queueType, bool isBundle);
+		VulkanCommandAllocator(VulkanDeviceBase &device, VulkanQueueProxyBase &queue, CommandQueueType queueType, bool isBundle);
 		~VulkanCommandAllocator();
 
 		Result Initialize(uint32_t queueFamily);
@@ -44,6 +44,7 @@ namespace rkit::render::vulkan
 		size_t m_numAllocatedBatches = 0;
 
 		VulkanDeviceBase &m_device;
+		VulkanQueueProxyBase &m_queue;
 		VkCommandPool m_pool = VK_NULL_HANDLE;
 		CommandQueueType m_queueType = CommandQueueType::kCount;
 		bool m_isBundle = false;
@@ -52,8 +53,9 @@ namespace rkit::render::vulkan
 		size_t m_activeCommandLists = 0;
 	};
 
-	VulkanCommandAllocator::VulkanCommandAllocator(VulkanDeviceBase &device, CommandQueueType queueType, bool isBundle)
+	VulkanCommandAllocator::VulkanCommandAllocator(VulkanDeviceBase &device, VulkanQueueProxyBase &queue, CommandQueueType queueType, bool isBundle)
 		: m_device(device)
+		, m_queue(queue)
 		, m_queueType(queueType)
 		, m_isBundle(isBundle)
 	{
@@ -194,7 +196,7 @@ namespace rkit::render::vulkan
 		{
 			UniquePtr<VulkanCommandBatchBase> cmdBatch;
 
-			RKIT_CHECK(VulkanCommandBatchBase::Create(cmdBatch, m_device, *this));
+			RKIT_CHECK(VulkanCommandBatchBase::Create(cmdBatch, m_device, m_queue, *this));
 
 			cmdBatchPtr = cmdBatch.Get();
 
@@ -219,11 +221,11 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanCommandAllocatorBase::Create(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, VulkanDeviceBase &device, CommandQueueType queueType, bool isBundle, uint32_t queueFamily)
+	Result VulkanCommandAllocatorBase::Create(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, VulkanDeviceBase &device, VulkanQueueProxyBase &queue, CommandQueueType queueType, bool isBundle, uint32_t queueFamily)
 	{
 		UniquePtr<VulkanCommandAllocator> cmdAllocator;
 
-		RKIT_CHECK(New<VulkanCommandAllocator>(cmdAllocator, device, queueType, isBundle));
+		RKIT_CHECK(New<VulkanCommandAllocator>(cmdAllocator, device, queue, queueType, isBundle));
 
 		RKIT_CHECK(cmdAllocator->Initialize(queueFamily));
 
