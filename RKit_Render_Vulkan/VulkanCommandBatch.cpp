@@ -1,10 +1,15 @@
 #include "VulkanCommandBatch.h"
 
+#include "rkit/Core/HybridVector.h"
+
+#include "rkit/Render/Barrier.h"
 #include "rkit/Render/CommandEncoder.h"
 
 #include "VulkanAPI.h"
 #include "VulkanCheck.h"
+#include "VulkanCommandAllocator.h"
 #include "VulkanDevice.h"
+#include "VulkanImageResource.h"
 #include "VulkanQueueProxy.h"
 #include "VulkanSwapChain.h"
 #include "VulkanUtils.h"
@@ -30,11 +35,15 @@ namespace rkit::render::vulkan
 
 		Result CloseEncoder() override;
 
-		Result WaitForSwapChainAcquire(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &afterStages) override;
+		Result WaitForSwapChainAcquire(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &subsequentStages) override;
+		Result SignalSwapChainPresentReady(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &priorStages) override;
+		Result PipelineBarrier(const BarrierGroup &barrierGroup) override;
 
 		Result OpenEncoder(IRenderPassInstance &rpi);
 
 	private:
+		VulkanQueueProxyBase *DefaultQueue(IBaseCommandQueue *specifiedQueue) const;
+
 		VulkanCommandBatch &m_batch;
 
 		IRenderPassInstance *m_rpi = nullptr;
@@ -73,8 +82,13 @@ namespace rkit::render::vulkan
 
 		Result StartNewEncoder(EncoderType encoderType);
 
-		Result AddWaitForVkSema(VkSemaphore sema, const PipelineStageMask_t &afterStageMask);
-		Result AddSignalVkSema(VkSemaphore sema);
+		Result AddWaitForVkSema(VkSemaphore sema, const PipelineStageMask_t &subsequentStageMask);
+		Result AddSignalVkSema(VkSemaphore sema, const PipelineStageMask_t &priorStageMask);
+
+		Result OpenCommandBuffer(VkCommandBuffer &outCmdBuffer);
+
+		VulkanDeviceBase &GetDevice() const;
+		VulkanQueueProxyBase &GetQueue() const;
 
 	private:
 		static const size_t kNumEncoderTypes = static_cast<size_t>(EncoderType::kCount);
@@ -117,11 +131,131 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanGraphicsCommandEncoder::WaitForSwapChainAcquire(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &afterStages)
+	Result VulkanGraphicsCommandEncoder::WaitForSwapChainAcquire(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &subsequentStages)
 	{
 		VkPipelineStageFlags stageFlags = 0;
 
-		RKIT_CHECK(m_batch.AddWaitForVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetAcquireSema(), afterStages));
+		RKIT_CHECK(m_batch.AddWaitForVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetAcquireSema(), subsequentStages));
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanGraphicsCommandEncoder::SignalSwapChainPresentReady(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &priorStages)
+	{
+		VkPipelineStageFlags stageFlags = 0;
+
+		RKIT_CHECK(m_batch.AddSignalVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetPresentSema(), priorStages));
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanGraphicsCommandEncoder::PipelineBarrier(const BarrierGroup &barrierGroup)
+	{
+		VkPipelineStageFlags srcStageMask = 0;
+		VkPipelineStageFlags dstStageMask = 0;
+
+		VkDependencyFlags depsFlags = 0;
+
+		HybridVector<VkMemoryBarrier, 8> memoryBarriers;
+		HybridVector<VkBufferMemoryBarrier, 8> bufferMemoryBarriers;
+		HybridVector<VkImageMemoryBarrier, 8> imageMemoryBarriers;
+
+		RKIT_CHECK(memoryBarriers.Reserve(barrierGroup.m_globalBarriers.Count()));
+		RKIT_CHECK(bufferMemoryBarriers.Reserve(barrierGroup.m_bufferMemoryBarriers.Count()));
+		RKIT_CHECK(imageMemoryBarriers.Reserve(barrierGroup.m_imageMemoryBarriers.Count()));
+
+		for (const GlobalBarrier &globalBarrier : barrierGroup.m_globalBarriers)
+		{
+			VkMemoryBarrier memBarrier = {};
+			memBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+
+			VkPipelineStageFlags bSrcStageMask = 0;
+			VkPipelineStageFlags bDstStageMask = 0;
+
+			RKIT_CHECK(VulkanUtils::ConvertBidirectionalPipelineStageBits(bSrcStageMask, bDstStageMask, globalBarrier.m_priorStages, globalBarrier.m_subsequentStages));
+			RKIT_CHECK(VulkanUtils::ConvertResourceAccessBits(memBarrier.srcAccessMask, globalBarrier.m_priorAccess));
+			RKIT_CHECK(VulkanUtils::ConvertResourceAccessBits(memBarrier.dstAccessMask, globalBarrier.m_subsequentAccess));
+
+			srcStageMask |= bSrcStageMask;
+			dstStageMask |= bDstStageMask;
+
+			RKIT_CHECK(memoryBarriers.Append(memBarrier));
+		}
+
+		for (const BufferMemoryBarrier &bufferBarrier : barrierGroup.m_bufferMemoryBarriers)
+		{
+			VkBufferMemoryBarrier memBarrier = {};
+			memBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+
+			VkPipelineStageFlags bSrcStageMask = 0;
+			VkPipelineStageFlags bDstStageMask = 0;
+
+			RKIT_CHECK(VulkanUtils::ConvertBidirectionalPipelineStageBits(bSrcStageMask, bDstStageMask, bufferBarrier.m_priorStages, bufferBarrier.m_subsequentStages));
+			RKIT_CHECK(VulkanUtils::ConvertResourceAccessBits(memBarrier.srcAccessMask, bufferBarrier.m_priorAccess));
+			RKIT_CHECK(VulkanUtils::ConvertResourceAccessBits(memBarrier.dstAccessMask, bufferBarrier.m_subsequentAccess));
+
+			srcStageMask |= bSrcStageMask;
+			dstStageMask |= bDstStageMask;
+
+			memBarrier.srcQueueFamilyIndex = DefaultQueue(bufferBarrier.m_sourceQueue)->GetQueueFamily();
+			memBarrier.dstQueueFamilyIndex = DefaultQueue(bufferBarrier.m_destQueue)->GetQueueFamily();
+
+			memBarrier.offset = static_cast<VkDeviceSize>(bufferBarrier.m_offset);
+			memBarrier.size = static_cast<VkDeviceSize>(bufferBarrier.m_size);
+
+			memBarrier.buffer = 0;
+			if (true)
+				return ResultCode::kNotYetImplemented;
+
+			RKIT_CHECK(bufferMemoryBarriers.Append(memBarrier));
+		}
+
+		for (const ImageMemoryBarrier &imageBarrier : barrierGroup.m_imageMemoryBarriers)
+		{
+			VkImageMemoryBarrier memBarrier = {};
+			memBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+
+			VkPipelineStageFlags bSrcStageMask = 0;
+			VkPipelineStageFlags bDstStageMask = 0;
+
+			RKIT_CHECK(VulkanUtils::ConvertBidirectionalPipelineStageBits(bSrcStageMask, bDstStageMask, imageBarrier.m_priorStages, imageBarrier.m_subsequentStages));
+			RKIT_CHECK(VulkanUtils::ConvertResourceAccessBits(memBarrier.srcAccessMask, imageBarrier.m_priorAccess));
+			RKIT_CHECK(VulkanUtils::ConvertResourceAccessBits(memBarrier.dstAccessMask, imageBarrier.m_subsequentAccess));
+
+			srcStageMask |= bSrcStageMask;
+			dstStageMask |= bDstStageMask;
+
+			memBarrier.srcQueueFamilyIndex = DefaultQueue(imageBarrier.m_sourceQueue)->GetQueueFamily();
+			memBarrier.dstQueueFamilyIndex = DefaultQueue(imageBarrier.m_destQueue)->GetQueueFamily();
+
+			if (imageBarrier.m_planes.IsSet())
+			{
+				RKIT_CHECK(VulkanUtils::ConvertImagePlaneBits(memBarrier.subresourceRange.aspectMask, imageBarrier.m_planes.Get()));
+			}
+			else
+				memBarrier.subresourceRange.aspectMask = static_cast<VulkanImageContainer *>(imageBarrier.m_image)->GetAllAspectFlags();
+
+			memBarrier.subresourceRange.baseMipLevel = imageBarrier.m_firstMipLevel;
+			memBarrier.subresourceRange.levelCount = imageBarrier.m_numMipLevels;
+			memBarrier.subresourceRange.baseArrayLayer = imageBarrier.m_firstArrayElement;
+			memBarrier.subresourceRange.layerCount = imageBarrier.m_numArrayElements;
+
+			RKIT_CHECK(VulkanUtils::ConvertImageLayout(memBarrier.oldLayout, imageBarrier.m_priorLayout));
+			RKIT_CHECK(VulkanUtils::ConvertImageLayout(memBarrier.newLayout, imageBarrier.m_subsequentLayout));
+
+			memBarrier.image = static_cast<VulkanImageContainer *>(imageBarrier.m_image)->GetVkImage();
+
+			RKIT_CHECK(imageMemoryBarriers.Append(memBarrier));
+		}
+
+		VkCommandBuffer cmdBuffer;
+		RKIT_CHECK(m_batch.OpenCommandBuffer(cmdBuffer));
+
+		VulkanDeviceBase &device = m_batch.GetDevice();
+		m_batch.GetDevice().GetDeviceAPI().vkCmdPipelineBarrier(cmdBuffer, srcStageMask, dstStageMask, depsFlags,
+			static_cast<uint32_t>(memoryBarriers.Count()), memoryBarriers.GetBuffer(),
+			static_cast<uint32_t>(bufferMemoryBarriers.Count()), bufferMemoryBarriers.GetBuffer(),
+			static_cast<uint32_t>(imageMemoryBarriers.Count()), imageMemoryBarriers.GetBuffer());
 
 		return ResultCode::kOK;
 	}
@@ -132,6 +266,14 @@ namespace rkit::render::vulkan
 		m_isRendering = false;
 
 		return ResultCode::kOK;
+	}
+
+	VulkanQueueProxyBase *VulkanGraphicsCommandEncoder::DefaultQueue(IBaseCommandQueue *specifiedQueue) const
+	{
+		if (specifiedQueue)
+			return static_cast<VulkanQueueProxyBase *>(specifiedQueue->ToInternalCommandQueue());
+
+		return &m_batch.GetQueue();
 	}
 
 	VulkanCommandBatch::VulkanCommandBatch(VulkanDeviceBase &device, VulkanQueueProxyBase &queue, VulkanCommandAllocatorBase &cmdAlloc)
@@ -266,7 +408,7 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanCommandBatch::AddWaitForVkSema(VkSemaphore sema, const PipelineStageMask_t &afterStageMask)
+	Result VulkanCommandBatch::AddWaitForVkSema(VkSemaphore sema, const PipelineStageMask_t &subsequentStages)
 	{
 		VkSubmitInfo *submitItem = nullptr;
 		if (m_submits.Count() > 0)
@@ -284,7 +426,7 @@ namespace rkit::render::vulkan
 		}
 
 		VkPipelineStageFlags stageFlagBits = 0;
-		RKIT_CHECK(VulkanUtils::ConvertPipelineStageBits(stageFlagBits, afterStageMask));
+		RKIT_CHECK(VulkanUtils::ConvertPipelineStageBits(stageFlagBits, subsequentStages));
 
 		RKIT_CHECK(m_semas.Append(sema));
 
@@ -302,7 +444,7 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanCommandBatch::AddSignalVkSema(VkSemaphore sema)
+	Result VulkanCommandBatch::AddSignalVkSema(VkSemaphore sema, const PipelineStageMask_t &priorStages)
 	{
 		VkSubmitInfo *submitItem = nullptr;
 		if (m_submits.Count() > 0)
@@ -322,6 +464,66 @@ namespace rkit::render::vulkan
 		submitItem->signalSemaphoreCount++;
 
 		return ResultCode::kOK;
+	}
+
+
+	Result VulkanCommandBatch::OpenCommandBuffer(VkCommandBuffer &outCmdBuffer)
+	{
+		VkSubmitInfo *submitItem = nullptr;
+		if (m_submits.Count() > 0)
+		{
+			RKIT_CHECK(CheckCloseCommandList());
+
+			submitItem = &m_submits[m_submits.Count() - 1];
+		}
+
+		if (!submitItem)
+		{
+			RKIT_CHECK(CreateNewSubmitItem(submitItem));
+		}
+
+		VkCommandPool pool = m_cmdAlloc.GetCommandPool();
+
+		VkCommandBufferAllocateInfo allocInfo = {};
+		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		allocInfo.commandBufferCount = 1;
+		allocInfo.commandPool = pool;
+		allocInfo.level = m_cmdAlloc.IsBundle() ? VK_COMMAND_BUFFER_LEVEL_SECONDARY : VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		allocInfo.commandBufferCount = 1;
+
+		VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
+		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkAllocateCommandBuffers(m_device.GetDevice(), &allocInfo, &cmdBuffer));
+
+		VkCommandBufferBeginInfo beginInfo = {};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkBeginCommandBuffer(cmdBuffer, &beginInfo));
+
+		Result appendResult = m_cmdBuffers.Append(cmdBuffer);
+		if (!appendResult.IsOK())
+		{
+			m_device.GetDeviceAPI().vkFreeCommandBuffers(m_device.GetDevice(), pool, 1, &cmdBuffer);
+
+			return appendResult;
+		}
+
+		outCmdBuffer = cmdBuffer;
+		m_isCommandListOpen = true;
+
+		submitItem->commandBufferCount++;
+
+		return ResultCode::kOK;
+	}
+
+	VulkanDeviceBase &VulkanCommandBatch::GetDevice() const
+	{
+		return m_device;
+	}
+
+	VulkanQueueProxyBase &VulkanCommandBatch::GetQueue() const
+	{
+		return m_queue;
 	}
 
 	Result VulkanCommandBatch::CreateNewSubmitItem(VkSubmitInfo *&outSubmitInfo)

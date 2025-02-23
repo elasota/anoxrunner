@@ -526,11 +526,13 @@ rkit::HashTableBase<TKey, TValue, TSize>::HashTableBase(HashTableBase<TKey, TVal
 	, m_capacity(other.m_capacity)
 	, m_count(other.m_count)
 	, m_freePosScan(other.m_freePosScan)
+	, m_alloc(other.m_alloc)
 {
 	other.m_memoryBlob = nullptr;
 	other.m_nextAndOccupancy = nullptr;
 	other.m_keys = nullptr;
 	other.m_hashValues = nullptr;
+	other.m_alloc = nullptr;
 	other.m_capacity = 0;
 	other.m_count = 0;
 	other.m_freePosScan = 0;
@@ -586,6 +588,7 @@ rkit::HashTableBase<TKey, TValue, TSize> &rkit::HashTableBase<TKey, TValue, TSiz
 	m_capacity = other.m_capacity;
 	m_count = other.m_count;
 	m_freePosScan = other.m_freePosScan;
+	m_alloc = other.m_alloc;
 
 	other.m_memoryBlob = nullptr;
 	other.m_nextAndOccupancy = nullptr;
@@ -594,6 +597,7 @@ rkit::HashTableBase<TKey, TValue, TSize> &rkit::HashTableBase<TKey, TValue, TSiz
 	other.m_capacity = 0;
 	other.m_count = 0;
 	other.m_freePosScan = 0;
+	other.m_alloc = nullptr;
 
 	return *this;
 }

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "StaticBoolVector.h"
 
 #include <cstddef>
@@ -47,7 +49,7 @@ namespace rkit
 		EnumMask(const EnumMask &other) = default;
 
 		bool Get(T item) const;
-		EnumMask<T> &Set(T item, bool value) const;
+		EnumMask<T> &Set(T item, bool value);
 
 		template<size_t TCount>
 		EnumMask &Add(const T(&items)[TCount]);
@@ -181,7 +183,7 @@ namespace rkit
 	}
 
 	template<class T>
-	EnumMask<T> &EnumMask<T>::Set(T item, bool value) const
+	EnumMask<T> &EnumMask<T>::Set(T item, bool value)
 	{
 		m_boolVector.Set(static_cast<size_t>(item), value);
 		return *this;

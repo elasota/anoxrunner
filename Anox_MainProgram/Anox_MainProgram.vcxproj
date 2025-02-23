@@ -140,7 +140,6 @@
     <ClCompile Include="AnoxGraphicsSettings.cpp" />
     <ClCompile Include="AnoxGraphicsSubsystem.cpp" />
     <ClCompile Include="AnoxMain.cpp" />
-    <ClCompile Include="AnoxRecordJobRunner.cpp" />
     <ClCompile Include="AnoxRenderedWindow.cpp" />
   </ItemGroup>
   <ItemGroup>

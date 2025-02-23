@@ -14,7 +14,7 @@ namespace rkit::render::vulkan
 
 		VkImageView GetImageView() const override;
 
-		Result Initialize(VkImage image, VkFormat format, VkImageViewType imageViewType, uint32_t mipSlice, TexturePlane plane, uint32_t firstArrayElement, uint32_t arraySize);
+		Result Initialize(VkImage image, VkFormat format, VkImageViewType imageViewType, uint32_t mipSlice, ImagePlane plane, uint32_t firstArrayElement, uint32_t arraySize);
 
 	private:
 		VulkanDeviceBase &m_device;
@@ -37,7 +37,7 @@ namespace rkit::render::vulkan
 		return m_imageView;
 	}
 
-	Result VulkanRenderTargetView::Initialize(VkImage image, VkFormat format, VkImageViewType imageViewType, uint32_t mipSlice, TexturePlane plane, uint32_t firstArrayElement, uint32_t arraySize)
+	Result VulkanRenderTargetView::Initialize(VkImage image, VkFormat format, VkImageViewType imageViewType, uint32_t mipSlice, ImagePlane plane, uint32_t firstArrayElement, uint32_t arraySize)
 	{
 		VkImageViewCreateInfo createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -47,13 +47,13 @@ namespace rkit::render::vulkan
 
 		switch (plane)
 		{
-		case TexturePlane::kColor:
+		case ImagePlane::kColor:
 			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			break;
-		case TexturePlane::kDepth:
+		case ImagePlane::kDepth:
 			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 			break;
-		case TexturePlane::kStencil:
+		case ImagePlane::kStencil:
 			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
 			break;
 		default:
@@ -70,7 +70,7 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanRenderTargetViewBase::Create(UniquePtr<VulkanRenderTargetViewBase> &outRTV, VulkanDeviceBase &device, VkImage image, VkFormat format, VkImageViewType imageViewType, uint32_t mipSlice, TexturePlane plane, uint32_t firstArrayElement, uint32_t arraySize)
+	Result VulkanRenderTargetViewBase::Create(UniquePtr<VulkanRenderTargetViewBase> &outRTV, VulkanDeviceBase &device, VkImage image, VkFormat format, VkImageViewType imageViewType, uint32_t mipSlice, ImagePlane plane, uint32_t firstArrayElement, uint32_t arraySize)
 	{
 		UniquePtr<VulkanRenderTargetView> rtv;
 		RKIT_CHECK(New<VulkanRenderTargetView>(rtv, device));

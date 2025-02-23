@@ -3,7 +3,10 @@
 #include "IncludeVulkan.h"
 
 #include "rkit/Render/RenderDefs.h"
+#include "rkit/Render/ImageLayout.h"
+#include "rkit/Render/ImagePlane.h"
 #include "rkit/Render/PipelineStage.h"
+#include "rkit/Render/ResourceAccess.h"
 
 namespace rkit
 {
@@ -20,5 +23,9 @@ namespace rkit::render::vulkan
 	public:
 		static Result ResolveRenderTargetFormat(VkFormat &outVkFormat, RenderTargetFormat rtFormat);
 		static Result ConvertPipelineStageBits(VkPipelineStageFlags &outFlags, const EnumMask<PipelineStage> &stages);
+		static Result ConvertBidirectionalPipelineStageBits(VkPipelineStageFlags &outSrcFlags, VkPipelineStageFlags &outDstFlags, const EnumMask<PipelineStage> &srcStages, const EnumMask<PipelineStage> &dstStages);
+		static Result ConvertResourceAccessBits(VkAccessFlags &outFlags, const EnumMask<ResourceAccess> &accesses);
+		static Result ConvertImagePlaneBits(VkImageAspectFlags &outFlags, const EnumMask<ImagePlane> &planes);
+		static Result ConvertImageLayout(VkImageLayout &outLayout, ImageLayout imageLayout);
 	};
 }

@@ -31,6 +31,7 @@ namespace rkit::render::vulkan
 
 		CommandQueueType GetQueueType() const override;
 		bool IsBundle() const override;
+		VkCommandPool GetCommandPool() const override;
 
 		DynamicCastRef_t InternalDynamicCast() override;
 
@@ -157,6 +158,11 @@ namespace rkit::render::vulkan
 	bool VulkanCommandAllocator::IsBundle() const
 	{
 		return m_isBundle;
+	}
+
+	VkCommandPool VulkanCommandAllocator::GetCommandPool() const
+	{
+		return m_pool;
 	}
 
 	VulkanCommandAllocator::DynamicCastRef_t VulkanCommandAllocator::InternalDynamicCast()

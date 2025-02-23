@@ -55,6 +55,9 @@ namespace rkit::render::vulkan
 
 		Result CreateCommandAllocator(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, bool isBundle);
 
+	protected:
+		DynamicCastRef_t InternalDynamicCast() override;
+
 	private:
 		enum class QueueAction
 		{
@@ -421,6 +424,23 @@ namespace rkit::render::vulkan
 	Result VulkanQueueProxy::CreateCommandAllocator(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, bool isBundle)
 	{
 		return VulkanCommandAllocatorBase::Create(outCommandAllocator, m_device, *this, m_queueType, isBundle, m_queueFamily);
+	}
+
+	VulkanQueueProxy::DynamicCastRef_t VulkanQueueProxy::InternalDynamicCast()
+	{
+		switch (m_queueType)
+		{
+		case CommandQueueType::kGraphics:
+			return DynamicCastRef_t::CreateFrom<VulkanQueueProxy, IGraphicsCommandQueue, ICopyCommandQueue>(this);
+		case CommandQueueType::kGraphicsCompute:
+			return DynamicCastRef_t::CreateFrom<VulkanQueueProxy, IGraphicsCommandQueue, IComputeCommandQueue, IGraphicsComputeCommandQueue, ICopyCommandQueue>(this);
+		case CommandQueueType::kAsyncCompute:
+			return DynamicCastRef_t::CreateFrom<VulkanQueueProxy, IComputeCommandQueue, ICopyCommandQueue>(this);
+		case CommandQueueType::kCopy:
+			return DynamicCastRef_t::CreateFrom<VulkanQueueProxy, ICopyCommandQueue>(this);
+		default:
+			return DynamicCastRef_t();
+		}
 	}
 
 	Result VulkanQueueProxy::QueueBase(IBaseCommandList &cmdList)

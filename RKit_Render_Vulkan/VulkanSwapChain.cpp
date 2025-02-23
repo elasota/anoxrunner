@@ -3,6 +3,7 @@
 #include "VulkanAPI.h"
 #include "VulkanCheck.h"
 #include "VulkanDevice.h"
+#include "VulkanImageResource.h"
 #include "VulkanPhysDevice.h"
 #include "VulkanPlatformSpecific.h"
 #include "VulkanRenderTargetView.h"
@@ -86,8 +87,14 @@ namespace rkit::render::vulkan
 		Result Present(ISwapChainSyncPoint &syncPoint) override;
 
 		IRenderTargetView *GetRenderTargetViewForFrame(size_t frameIndex) override;
+		IImageResource *GetImageForFrame(size_t frameIndex) override;
 
 	private:
+		struct SwapChainImageContainer : public VulkanImageContainer
+		{
+			void SetImage(VkImage image, VkImageAspectFlags allAspectFlags);
+		};
+
 		VulkanDeviceBase &m_device;
 		IDisplay &m_display;
 
@@ -103,6 +110,7 @@ namespace rkit::render::vulkan
 
 		Vector<VkImage> m_images;
 		Vector<UniquePtr<VulkanRenderTargetViewBase>> m_rtvs;
+		Vector<SwapChainImageContainer> m_imageResources;
 		Vector<VulkanSwapChainFrame> m_swapChainFrames;
 
 		SwapChainWriteBehavior m_writeBehavior;
@@ -219,6 +227,12 @@ namespace rkit::render::vulkan
 		return UniquePtr<IVulkanSurface>(std::move(m_surface));
 	}
 
+	void VulkanSwapChain::SwapChainImageContainer::SetImage(VkImage image, VkImageAspectFlags allAspectFlags)
+	{
+		m_image = image;
+		m_allAspectFlags = allAspectFlags;
+	}
+
 	VulkanSwapChain::VulkanSwapChain(VulkanDeviceBase &device, IDisplay &display, uint8_t numImages, SwapChainWriteBehavior writeBehavior, VulkanQueueProxyBase &queue)
 		: m_device(device)
 		, m_display(display)
@@ -275,6 +289,8 @@ namespace rkit::render::vulkan
 
 		const uint32_t simultaneousImageCount = m_display.GetSimultaneousImageCount();
 
+		VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
 		VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
 		swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 
@@ -317,6 +333,7 @@ namespace rkit::render::vulkan
 			img = VK_NULL_HANDLE;
 
 		RKIT_CHECK(m_rtvs.Resize(imageCount));
+		RKIT_CHECK(m_imageResources.Resize(imageCount));
 
 		RKIT_CHECK(m_swapChainFrames.Resize(imageCount));
 
@@ -330,7 +347,9 @@ namespace rkit::render::vulkan
 		for (uint32_t i = 0; i < imageCount; i++)
 		{
 			VkImageViewType imageViewType = (simultaneousImageCount == 1) ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-			RKIT_CHECK(VulkanRenderTargetViewBase::Create(m_rtvs[i], m_device, m_images[i], swapchainCreateInfo.imageFormat, imageViewType, 0, TexturePlane::kColor, 0, simultaneousImageCount));
+			RKIT_CHECK(VulkanRenderTargetViewBase::Create(m_rtvs[i], m_device, m_images[i], swapchainCreateInfo.imageFormat, imageViewType, 0, ImagePlane::kColor, 0, simultaneousImageCount));
+
+			m_imageResources[i].SetImage(m_images[i], aspectMask);
 		}
 
 		return ResultCode::kOK;
@@ -355,6 +374,11 @@ namespace rkit::render::vulkan
 	IRenderTargetView *VulkanSwapChain::GetRenderTargetViewForFrame(size_t frameIndex)
 	{
 		return m_rtvs[frameIndex].Get();
+	}
+
+	IImageResource *VulkanSwapChain::GetImageForFrame(size_t frameIndex)
+	{
+		return &m_imageResources[frameIndex];
 	}
 
 	Result VulkanSwapChainBase::Create(UniquePtr<VulkanSwapChainBase> &outSwapChain, VulkanDeviceBase &device, VulkanSwapChainPrototypeBase &prototypeBase, uint8_t numImages, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, VulkanQueueProxyBase &queue)

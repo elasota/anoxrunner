@@ -14,6 +14,9 @@ namespace rkit::render
 		kColorOutput,
 		kBottomOfPipe,
 
+		kPresentAcquire,
+		kPresentSubmit,
+
 		kCount,
 	};
 

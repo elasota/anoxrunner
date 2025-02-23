@@ -66,6 +66,7 @@ namespace rkit::render::vulkan
 		RKIT_VK_API(vkResetFences);
 		RKIT_VK_API(vkAllocateCommandBuffers);
 		RKIT_VK_API(vkFreeCommandBuffers);
+		RKIT_VK_API(vkBeginCommandBuffer);
 		RKIT_VK_API(vkResetCommandBuffer);
 		RKIT_VK_API(vkEndCommandBuffer);
 		RKIT_VK_API(vkCreateCommandPool);
@@ -75,6 +76,7 @@ namespace rkit::render::vulkan
 		RKIT_VK_API(vkDestroyFramebuffer);
 		RKIT_VK_API(vkCreateImageView);
 		RKIT_VK_API(vkDestroyImageView);
+		RKIT_VK_API(vkCmdPipelineBarrier);
 		RKIT_VK_API_EXT(vkCreateSwapchainKHR, VK_KHR_swapchain);
 		RKIT_VK_API_EXT(vkDestroySwapchainKHR, VK_KHR_swapchain);
 		RKIT_VK_API_EXT(vkGetSwapchainImagesKHR, VK_KHR_swapchain);

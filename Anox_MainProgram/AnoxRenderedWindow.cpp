@@ -3,6 +3,8 @@
 #include "anox/AnoxGraphicsSubsystem.h"
 
 #include "AnoxPeriodicResources.h"
+#include "AnoxRecordJobRunner.h"
+#include "AnoxSubmitJobRunner.h"
 
 #include "rkit/Render/DisplayManager.h"
 #include "rkit/Render/RenderDevice.h"
@@ -37,24 +39,24 @@ namespace anox
 			bool m_isInitialized = false;
 		};
 
-		class AcquireJobRunner final : public rkit::IJobRunner
+		class AcquireJobRunner final : public IGraphicsSubmitJobRunner_t
 		{
 		public:
 			explicit AcquireJobRunner(RenderedWindow &window, const rkit::RCPtr<PerFramePerDisplayResources> &resources);
 
-			rkit::Result Run() override;
+			rkit::Result RunSubmit(rkit::render::IGraphicsCommandQueue &cmdQueue) override;
 
 		private:
 			RenderedWindow &m_window;
 			rkit::RCPtr<PerFramePerDisplayResources> m_resources;
 		};
 
-		class PresentJobRunner final : public rkit::IJobRunner
+		class PresentJobRunner final : public IGraphicsSubmitJobRunner_t
 		{
 		public:
 			explicit PresentJobRunner(RenderedWindow &window, const rkit::RCPtr<PerFramePerDisplayResources> &resources);
 
-			rkit::Result Run() override;
+			rkit::Result RunSubmit(rkit::render::IGraphicsCommandQueue &cmdQueue) override;
 
 		private:
 			RenderedWindow &m_window;
@@ -83,7 +85,7 @@ namespace anox
 	{
 	}
 
-	rkit::Result RenderedWindow::AcquireJobRunner::Run()
+	rkit::Result RenderedWindow::AcquireJobRunner::RunSubmit(rkit::render::IGraphicsCommandQueue &cmdQueue)
 	{
 		rkit::render::ISwapChainSyncPoint &syncPoint = *m_resources->m_swapChainSyncPoint;
 
@@ -100,7 +102,7 @@ namespace anox
 	{
 	}
 
-	rkit::Result RenderedWindow::PresentJobRunner::Run()
+	rkit::Result RenderedWindow::PresentJobRunner::RunSubmit(rkit::render::IGraphicsCommandQueue &cmdQueue)
 	{
 		rkit::render::ISwapChainSyncPoint &syncPoint = *m_resources->m_swapChainSyncPoint;
 
@@ -168,11 +170,10 @@ namespace anox
 		displayResources->m_windowResources = this->m_resources.Get();
 		displayResources->m_swapChainSyncPoint = m_syncPoints[m_currentSyncPoint].Get();
 
-		rkit::UniquePtr<rkit::IJobRunner> acquireJobRunner;
+		rkit::UniquePtr<ISubmitJobRunner> acquireJobRunner;
 		RKIT_CHECK(rkit::New<AcquireJobRunner>(acquireJobRunner, *this, displayResources));
 
-		rkit::RCPtr<rkit::Job> acquireFrameJob;
-		RKIT_CHECK(graphicsSubsystem.CreateAndQueueSubmitJob(&acquireFrameJob, LogicalQueueType::kPresentation, std::move(acquireJobRunner)));
+		RKIT_CHECK(graphicsSubsystem.CreateAndQueueSubmitJob(&displayResources->m_acquireJob, LogicalQueueType::kPresentation, std::move(acquireJobRunner)));
 
 		m_currentPerDisplayResources = displayResources;
 
@@ -184,7 +185,7 @@ namespace anox
 		if (!m_device)
 			return rkit::ResultCode::kOK;
 
-		rkit::UniquePtr<rkit::IJobRunner> presentJobRunner;
+		rkit::UniquePtr<ISubmitJobRunner> presentJobRunner;
 		RKIT_CHECK(rkit::New<PresentJobRunner>(presentJobRunner, *this, m_currentPerDisplayResources));
 
 		rkit::RCPtr<rkit::Job> presentJob;

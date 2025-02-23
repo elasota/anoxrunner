@@ -30,11 +30,13 @@ namespace rkit
 
 		void RemoveRange(size_t firstArg, size_t numArgs);
 		Result Resize(size_t size);
+		Result Reserve(size_t size);
 		void ShrinkToSize(size_t size);
 
 		Result Append(const T &item);
 		Result Append(T &&item);
 		Result Append(const Span<const T> &items);
+		Result AppendMove(const Span<T> &items);
 
 		void Reset();
 
@@ -42,6 +44,8 @@ namespace rkit
 		const T *GetBuffer() const;
 
 		size_t Count() const;
+
+		IMallocDriver *GetAllocator() const;
 
 		Span<T> ToSpan();
 		Span<const T> ToSpan() const;
@@ -170,6 +174,17 @@ namespace rkit
 	}
 
 	template<class T>
+	Result Vector<T>::Reserve(size_t size)
+	{
+		if (m_capacity < size)
+		{
+			RKIT_CHECK(Reallocate(size));
+		}
+
+		return ResultCode::kOK;
+	}
+
+	template<class T>
 	void Vector<T>::ShrinkToSize(size_t size)
 	{
 		RKIT_ASSERT(size < m_count);
@@ -207,6 +222,22 @@ namespace rkit
 		const size_t initialCount = m_count;
 		for (size_t i = 0; i < count; i++)
 			new (arr + initialCount + i) T(itemsPtr[i]);
+
+		m_count = initialCount + count;
+		return ResultCode::kOK;
+	}
+
+	template<class T>
+	Result Vector<T>::AppendMove(const Span<T> &items)
+	{
+		RKIT_CHECK(EnsureCapacityForMore(items.Count()));
+
+		T *arr = m_arr;
+		T *itemsPtr = items.Ptr();
+		const size_t count = items.Count();
+		const size_t initialCount = m_count;
+		for (size_t i = 0; i < count; i++)
+			new (arr + initialCount + i) T(std::move(itemsPtr[i]));
 
 		m_count = initialCount + count;
 		return ResultCode::kOK;
@@ -262,6 +293,12 @@ namespace rkit
 	size_t Vector<T>::Count() const
 	{
 		return m_count;
+	}
+
+	template<class T>
+	IMallocDriver *Vector<T>::GetAllocator() const
+	{
+		return m_alloc;
 	}
 
 	template<class T>

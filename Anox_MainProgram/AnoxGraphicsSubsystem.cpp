@@ -4,10 +4,12 @@
 #include "AnoxFrameDrawer.h"
 #include "AnoxPeriodicResources.h"
 #include "AnoxRecordJobRunner.h"
+#include "AnoxSubmitJobRunner.h"
 
 #include "anox/AnoxGraphicsSubsystem.h"
 
 #include "rkit/Render/CommandAllocator.h"
+#include "rkit/Render/CommandBatch.h"
 #include "rkit/Render/CommandQueue.h"
 #include "rkit/Render/DeviceCaps.h"
 #include "rkit/Render/DisplayManager.h"
@@ -42,6 +44,7 @@
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/NoCopy.h"
 #include "rkit/Core/Optional.h"
+#include "rkit/Core/RefCounted.h"
 #include "rkit/Core/Result.h"
 #include "rkit/Core/StaticBoolVector.h"
 #include "rkit/Core/Stream.h"
@@ -53,8 +56,6 @@
 #include "AnoxGameWindowResources.h"
 #include "AnoxRenderedWindow.h"
 #include "AnoxGraphicsSettings.h"
-
-
 
 namespace anox
 {
@@ -78,8 +79,10 @@ namespace anox
 
 		rkit::Result CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner) override;
 		rkit::Result CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::ISpan<rkit::Job *> &dependencies) override;
-		rkit::Result CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<rkit::IJobRunner> &&jobRunner) override;
-		rkit::Result CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<rkit::IJobRunner> &&jobRunner, const rkit::ISpan<rkit::Job *> &dependencies) override;
+		rkit::Result CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::ISpan<rkit::RCPtr<rkit::Job>> &dependencies) override;
+		rkit::Result CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<ISubmitJobRunner> &&jobRunner) override;
+		rkit::Result CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<ISubmitJobRunner> &&jobRunner, const rkit::ISpan<rkit::Job *> &dependencies) override;
+		rkit::Result CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<ISubmitJobRunner> &&jobRunner, const rkit::ISpan<rkit::RCPtr<rkit::Job>> &dependencies) override;
 
 		void MarkSetupStepCompleted();
 		void MarkSetupStepFailed();
@@ -159,6 +162,7 @@ namespace anox
 		struct FrameSyncPointCommandListHandler
 		{
 			rkit::UniquePtr<rkit::render::IBaseCommandAllocator> m_commandAllocator;
+			rkit::render::IBaseCommandQueue* m_commandQueue = nullptr;
 		};
 
 		class CheckPipelinesJob final : public rkit::IJobRunner
@@ -248,18 +252,6 @@ namespace anox
 			FrameSyncPointCommandListHandler &m_cmdListHandler;
 		};
 
-		class PostCompletionFenceJob final : public rkit::IJobRunner
-		{
-		public:
-			explicit PostCompletionFenceJob(GraphicsSubsystem &graphicsSubsystem, const rkit::RCPtr<PerFrameResources> &resources);
-
-			rkit::Result Run() override;
-
-		private:
-			GraphicsSubsystem &m_graphicsSubsystem;
-			rkit::RCPtr<PerFrameResources> m_resources;
-		};
-
 		class RunRecordJobRunner final : public rkit::IJobRunner
 		{
 		public:
@@ -270,6 +262,43 @@ namespace anox
 		private:
 			rkit::UniquePtr<IRecordJobRunner> m_recordJob;
 			rkit::render::IBaseCommandAllocator &m_cmdAlloc;
+		};
+
+		class RunSubmitJobRunner final : public rkit::IJobRunner
+		{
+		public:
+			explicit RunSubmitJobRunner(rkit::UniquePtr<ISubmitJobRunner> &&submitJob, rkit::render::IBaseCommandQueue &cmdQueue);
+
+			rkit::Result Run() override;
+
+		private:
+			rkit::UniquePtr<ISubmitJobRunner> m_submitJob;
+			rkit::render::IBaseCommandQueue &m_cmdQueue;
+		};
+
+		class CloseFrameRecordRunner final : public IGraphicsRecordJobRunner_t
+		{
+		public:
+			explicit CloseFrameRecordRunner(rkit::render::IBaseCommandBatch *&outBatchPtr);
+
+			rkit::Result RunRecord(rkit::render::IGraphicsCommandAllocator &cmdAlloc) override;
+
+		private:
+			rkit::render::IBaseCommandBatch *&m_outBatchPtr;
+		};
+
+		class CloseFrameSubmitRunner final : public IGraphicsSubmitJobRunner_t
+		{
+		public:
+			explicit CloseFrameSubmitRunner(rkit::render::IBaseCommandBatch *&frameEndBatchPtr);
+
+			rkit::Result RunSubmit(rkit::render::IGraphicsCommandQueue &commandQueue) override;
+
+			rkit::render::IBaseCommandBatch **GetLastBatchRef();
+
+		private:
+			rkit::render::IBaseCommandBatch *m_lastBatch = nullptr;
+			rkit::render::IBaseCommandBatch *&m_frameEndBatchPtr;
 		};
 
 		enum class DeviceSetupStep
@@ -329,7 +358,7 @@ namespace anox
 
 		struct FrameSyncPoint
 		{
-			rkit::UniquePtr<rkit::render::IBinaryCPUWaitableFence> m_frameEndFence;
+			rkit::render::IBaseCommandBatch* m_frameEndBatch = nullptr;
 			rkit::RCPtr<rkit::Job> m_frameEndJob;
 
 			rkit::StaticArray<FrameSyncPointCommandListHandler, static_cast<size_t>(rkit::render::CommandQueueType::kCount)> m_commandListHandlers;
@@ -716,17 +745,6 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	GraphicsSubsystem::PostCompletionFenceJob::PostCompletionFenceJob(GraphicsSubsystem &graphicsSubsystem, const rkit::RCPtr<PerFrameResources> &resources)
-		: m_graphicsSubsystem(graphicsSubsystem)
-		, m_resources(resources)
-	{
-	}
-
-	rkit::Result GraphicsSubsystem::PostCompletionFenceJob::Run()
-	{
-		return rkit::ResultCode::kNotYetImplemented;
-	}
-
 	GraphicsSubsystem::RunRecordJobRunner::RunRecordJobRunner(rkit::UniquePtr<IRecordJobRunner> &&recordJob, rkit::render::IBaseCommandAllocator &cmdAlloc)
 		: m_recordJob(std::move(recordJob))
 		, m_cmdAlloc(cmdAlloc)
@@ -736,6 +754,53 @@ namespace anox
 	rkit::Result GraphicsSubsystem::RunRecordJobRunner::Run()
 	{
 		return m_recordJob->RunBase(m_cmdAlloc);
+	}
+
+	GraphicsSubsystem::RunSubmitJobRunner::RunSubmitJobRunner(rkit::UniquePtr<ISubmitJobRunner> &&submitJob, rkit::render::IBaseCommandQueue &cmdQueue)
+		: m_submitJob(std::move(submitJob))
+		, m_cmdQueue(cmdQueue)
+	{
+	}
+
+	rkit::Result GraphicsSubsystem::RunSubmitJobRunner::Run()
+	{
+		return m_submitJob->RunBase(m_cmdQueue);
+	}
+
+	GraphicsSubsystem::CloseFrameRecordRunner::CloseFrameRecordRunner(rkit::render::IBaseCommandBatch *&outBatchPtr)
+		: m_outBatchPtr(outBatchPtr)
+	{
+	}
+
+	rkit::Result GraphicsSubsystem::CloseFrameRecordRunner::RunRecord(rkit::render::IGraphicsCommandAllocator &cmdAlloc)
+	{
+		rkit::render::IGraphicsCommandBatch *batch = nullptr;
+		RKIT_CHECK(cmdAlloc.OpenGraphicsCommandBatch(batch, true));
+
+		RKIT_CHECK(batch->CloseBatch());
+
+		m_outBatchPtr = batch;
+
+		return rkit::ResultCode::kOK;
+	}
+
+	GraphicsSubsystem::CloseFrameSubmitRunner::CloseFrameSubmitRunner(rkit::render::IBaseCommandBatch *&frameEndBatchPtr)
+		: m_frameEndBatchPtr(frameEndBatchPtr)
+	{
+	}
+
+	rkit::Result GraphicsSubsystem::CloseFrameSubmitRunner::RunSubmit(rkit::render::IGraphicsCommandQueue &commandQueue)
+	{
+		RKIT_CHECK(m_lastBatch->Submit());
+
+		m_frameEndBatchPtr = m_lastBatch;
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::render::IBaseCommandBatch **GraphicsSubsystem::CloseFrameSubmitRunner::GetLastBatchRef()
+	{
+		return &m_lastBatch;
 	}
 
 	rkit::Result GraphicsSubsystem::RenderDataConfigurator::GetEnumConfigKey(size_t configKeyIndex, const rkit::StringView &keyName, rkit::data::RenderRTTIMainType expectedMainType, unsigned int &outValue)
@@ -929,7 +994,7 @@ namespace anox
 			cmdListHandler.m_commandAllocator.Reset();
 		}
 
-		this->m_frameEndFence.Reset();
+		m_frameEndBatch = nullptr;
 	}
 
 	GraphicsSubsystem::GraphicsSubsystem(rkit::data::IDataDriver &dataDriver, rkit::utils::IThreadPool &threadPool, anox::RenderBackend desiredBackend)
@@ -1044,11 +1109,6 @@ namespace anox
 
 		RKIT_CHECK(m_syncPoints.Resize(m_numSyncPoints));
 		m_currentSyncPoint = 0;
-
-		for (size_t i = 0; i < m_numSyncPoints; i++)
-		{
-			RKIT_CHECK(m_renderDevice->CreateBinaryCPUWaitableFence(m_syncPoints[i].m_frameEndFence, false));
-		}
 
 		// FIXME: Localize
 		RKIT_CHECK(progressMonitor->SetText("Loading shader package..."));
@@ -1236,6 +1296,8 @@ namespace anox
 		for (size_t i = 0; i < numSwapChainFrames; i++)
 		{
 			GameWindowSwapChainFrameResources &scfr = gameWindowResources.m_swapChainFrameResources[i];
+
+			scfr.m_colorTargetImage = m_gameWindow->GetSwapChain()->GetImageForFrame(i);
 
 			{
 				rkit::render::RenderPassRef_t simpleColorTargetRP = m_pipelineLibrary->FindRenderPass("RP_SimpleColorTarget");
@@ -1531,9 +1593,8 @@ namespace anox
 			m_threadPool.GetJobQueue()->WaitForJob(*syncPoint.m_frameEndJob, m_threadPool.GetMainThreadJobTypes(), m_prevFrameWaitWakeEvent.Get(), m_prevFrameWaitTerminateEvent.Get(), m_prevFrameWaitSpecificEvent.Get());
 			RKIT_CHECK(m_threadPool.GetJobQueue()->CheckFault());
 
-
-			RKIT_CHECK(syncPoint.m_frameEndFence->WaitFor());
-			RKIT_CHECK(syncPoint.m_frameEndFence->ResetFence());
+			RKIT_ASSERT(syncPoint.m_frameEndBatch != nullptr);
+			RKIT_CHECK(syncPoint.m_frameEndBatch->WaitForCompletion());
 		}
 
 		rkit::StaticBoolVector<static_cast<size_t>(rkit::render::CommandQueueType::kCount)> cmdQueueReset;
@@ -1553,6 +1614,11 @@ namespace anox
 			if (!cmdListHandler.m_commandAllocator.IsValid())
 			{
 				RKIT_CHECK(logicalQueue->CreateCommandAllocator(*m_renderDevice, cmdListHandler.m_commandAllocator, false));
+			}
+
+			if (cmdListHandler.m_commandQueue == nullptr)
+			{
+				cmdListHandler.m_commandQueue = logicalQueue->GetBaseCommandQueue();
 			}
 
 			if (!cmdQueueReset.Get(static_cast<size_t>(queueType)))
@@ -1576,7 +1642,8 @@ namespace anox
 
 		RKIT_CHECK(rkit::New<PerFrameResources>(m_currentFrameResources));
 
-		m_currentFrameResources->m_frameEndFence = syncPoint.m_frameEndFence.Get();
+		m_currentFrameResources->m_frameEndBatchPtr = &syncPoint.m_frameEndBatch;
+		m_currentFrameResources->m_frameEndJobPtr = &syncPoint.m_frameEndJob;
 
 		RKIT_CHECK(m_gameWindow->BeginFrame(*this));
 
@@ -1600,14 +1667,19 @@ namespace anox
 
 		RKIT_CHECK(m_gameWindow->EndFrame(*this));
 
-		// Post completion fence
-		rkit::UniquePtr<rkit::IJobRunner> completionFenceJobRunner;
-		RKIT_CHECK(rkit::New<PostCompletionFenceJob>(completionFenceJobRunner, *this, m_currentFrameResources));
+		rkit::UniquePtr<CloseFrameSubmitRunner> closeFrameSubmitRunner;
+		RKIT_CHECK(rkit::New<CloseFrameSubmitRunner>(closeFrameSubmitRunner, *m_currentFrameResources->m_frameEndBatchPtr));
 
-		rkit::RCPtr<rkit::Job> completionFenceJob;
-		RKIT_CHECK(CreateAndQueueSubmitJob(&completionFenceJob, LogicalQueueType::kGraphics, std::move(completionFenceJobRunner)));
+		rkit::UniquePtr<CloseFrameRecordRunner> closeFrameRecordRunner;
+		RKIT_CHECK(rkit::New<CloseFrameRecordRunner>(closeFrameRecordRunner, *closeFrameSubmitRunner->GetLastBatchRef()));
 
-		m_syncPoints[m_currentSyncPoint].m_frameEndJob = completionFenceJob;
+		rkit::RCPtr<rkit::Job> closeFrameRecordJob;
+		RKIT_CHECK(CreateAndQueueRecordJob(&closeFrameRecordJob, LogicalQueueType::kGraphics, std::move(closeFrameRecordRunner)));
+
+		rkit::RCPtr<rkit::Job> closeFrameSubmitJob;
+		RKIT_CHECK(CreateAndQueueSubmitJob(&closeFrameSubmitJob, LogicalQueueType::kGraphics, std::move(closeFrameSubmitRunner), rkit::Span<rkit::RCPtr<rkit::Job>>(&closeFrameRecordJob, 1).ToValueISpan()));
+
+		*m_currentFrameResources->m_frameEndJobPtr = closeFrameSubmitJob;
 
 		m_currentSyncPoint++;
 
@@ -1652,6 +1724,26 @@ namespace anox
 		return this->CreateAndQueueRecordJob(outJob, queueType, std::move(jobRunner), rkit::Span<rkit::Job *>().ToValueISpan());
 	}
 
+	rkit::Result GraphicsSubsystem::CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::ISpan<rkit::RCPtr<rkit::Job>> &dependencies)
+	{
+		class SpanConverter : public rkit::ISpan<rkit::Job *>
+		{
+		public:
+			explicit SpanConverter(const rkit::ISpan<rkit::RCPtr<rkit::Job>> &span)
+				: m_span(span)
+			{}
+
+			size_t Count() const override { return m_span.Count(); }
+
+			rkit::Job *operator[](size_t index) const { return m_span[index].Get(); }
+
+		private:
+			const rkit::ISpan<rkit::RCPtr<rkit::Job>> &m_span;
+		};
+
+		return CreateAndQueueRecordJob(outJob, queueType, std::move(jobRunner), SpanConverter(dependencies));
+	}
+
 	rkit::Result GraphicsSubsystem::CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::ISpan<rkit::Job *> &dependencies)
 	{
 		FrameSyncPoint &syncPoint = m_syncPoints[m_currentSyncPoint];
@@ -1668,14 +1760,43 @@ namespace anox
 		return this->CreateAndQueueJob(outJob, queueType, std::move(runRecordJobRunner), dependencies, &LogicalQueueBase::m_lastRecordJob);
 	}
 
-	rkit::Result GraphicsSubsystem::CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<rkit::IJobRunner> &&jobRunner)
+	rkit::Result GraphicsSubsystem::CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<ISubmitJobRunner> &&jobRunner)
 	{
-		return this->CreateAndQueueJob(outJob, queueType, std::move(jobRunner), rkit::Span<rkit::Job *>().ToValueISpan(), &LogicalQueueBase::m_lastSubmitJob);
+		return this->CreateAndQueueSubmitJob(outJob, queueType, std::move(jobRunner), rkit::Span<rkit::Job *>().ToValueISpan());
 	}
 
-	rkit::Result GraphicsSubsystem::CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<rkit::IJobRunner> &&jobRunner, const rkit::ISpan<rkit::Job *> &dependencies)
+	rkit::Result GraphicsSubsystem::CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<ISubmitJobRunner> &&jobRunner, const rkit::ISpan<rkit::RCPtr<rkit::Job>> &dependencies)
 	{
-		return this->CreateAndQueueJob(outJob, queueType, std::move(jobRunner), dependencies, &LogicalQueueBase::m_lastSubmitJob);
+		class SpanConverter : public rkit::ISpan<rkit::Job *>
+		{
+		public:
+			explicit SpanConverter(const rkit::ISpan<rkit::RCPtr<rkit::Job>> &span)
+				: m_span(span)
+			{}
+
+			size_t Count() const override { return m_span.Count(); }
+
+			rkit::Job *operator[](size_t index) const { return m_span[index].Get(); }
+
+		private:
+			const rkit::ISpan<rkit::RCPtr<rkit::Job>> &m_span;
+		};
+
+		return CreateAndQueueSubmitJob(outJob, queueType, std::move(jobRunner), SpanConverter(dependencies));
+	}
+
+	rkit::Result GraphicsSubsystem::CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<ISubmitJobRunner> &&jobRunner, const rkit::ISpan<rkit::Job *> &dependencies)
+	{
+		FrameSyncPoint &syncPoint = m_syncPoints[m_currentSyncPoint];
+
+		rkit::render::CommandQueueType cmdQueueType = m_logicalQueues[static_cast<size_t>(queueType)]->GetBaseCommandQueue()->GetCommandQueueType();
+
+		FrameSyncPointCommandListHandler &cmdListHandler = syncPoint.m_commandListHandlers[static_cast<size_t>(cmdQueueType)];
+
+		rkit::UniquePtr<RunSubmitJobRunner> runSubmitJobRunner;
+		RKIT_CHECK(rkit::New<RunSubmitJobRunner>(runSubmitJobRunner, std::move(jobRunner), *cmdListHandler.m_commandQueue));
+
+		return this->CreateAndQueueJob(outJob, queueType, std::move(runSubmitJobRunner), dependencies, &LogicalQueueBase::m_lastSubmitJob);
 	}
 
 	void GraphicsSubsystem::MarkSetupStepCompleted()

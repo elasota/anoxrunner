@@ -3,6 +3,8 @@
 #include "rkit/Render/CommandQueueType.h"
 #include "rkit/Render/CommandAllocator.h"
 
+#include "IncludeVulkan.h"
+
 #include <cstdint>
 
 namespace rkit::render::vulkan
@@ -15,6 +17,7 @@ namespace rkit::render::vulkan
 	public:
 		virtual CommandQueueType GetQueueType() const = 0;
 		virtual bool IsBundle() const = 0;
+		virtual VkCommandPool GetCommandPool() const = 0;
 
 		static Result Create(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, VulkanDeviceBase &device, VulkanQueueProxyBase &queue, CommandQueueType queueType, bool isBundle, uint32_t queueFamily);
 	};

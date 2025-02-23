@@ -4,6 +4,8 @@
 #include "Fence.h"
 #include "PipelineStage.h"
 
+#include "rkit/Core/DynamicCastable.h"
+
 namespace rkit
 {
 	struct Result;
@@ -44,7 +46,7 @@ namespace rkit::render
 		virtual ~IInternalCommandQueue() {}
 	};
 
-	struct IBaseCommandQueue
+	struct IBaseCommandQueue : public IDynamicCastable<ICopyCommandQueue, IGraphicsCommandQueue, IComputeCommandQueue, IGraphicsComputeCommandQueue>
 	{
 		virtual Result QueueSignalBinaryGPUWaitable(IBinaryGPUWaitableFence &fence) = 0;
 		virtual Result QueueSignalBinaryCPUWaitable(IBinaryCPUWaitableFence &fence) = 0;

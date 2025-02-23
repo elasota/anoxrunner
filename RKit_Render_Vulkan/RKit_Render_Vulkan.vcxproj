@@ -172,6 +172,7 @@
     <ClInclude Include="VulkanCommandList.h" />
     <ClInclude Include="VulkanDevice.h" />
     <ClInclude Include="VulkanFence.h" />
+    <ClInclude Include="VulkanImageResource.h" />
     <ClInclude Include="VulkanPhysDevice.h" />
     <ClInclude Include="VulkanPipelineLibraryLoader.h" />
     <ClInclude Include="VulkanPlatformAPI.h" />

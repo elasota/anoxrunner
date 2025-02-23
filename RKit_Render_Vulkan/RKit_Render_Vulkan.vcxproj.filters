@@ -140,5 +140,8 @@
     <ClInclude Include="VulkanCommandBatch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="VulkanImageResource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

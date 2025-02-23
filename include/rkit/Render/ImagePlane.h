@@ -2,10 +2,12 @@
 
 namespace rkit::render
 {
-	enum class TexturePlane
+	enum class ImagePlane
 	{
 		kColor,
 		kDepth,
 		kStencil,
+
+		kCount,
 	};
 }

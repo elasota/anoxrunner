@@ -3,10 +3,12 @@
 #include "AnoxGameWindowResources.h"
 #include "AnoxPeriodicResources.h"
 #include "AnoxRecordJobRunner.h"
+#include "AnoxSubmitJobRunner.h"
 #include "AnoxRenderedWindow.h"
 
 #include "anox/AnoxGraphicsSubsystem.h"
 
+#include "rkit/Render/Barrier.h"
 #include "rkit/Render/CommandBatch.h"
 #include "rkit/Render/CommandAllocator.h"
 #include "rkit/Render/CommandEncoder.h"
@@ -27,10 +29,10 @@ namespace anox
 		rkit::Result Initialize();
 
 	private:
-		class SubmitTestCommandsJobRunner final : public rkit::IJobRunner
+		class SubmitTestCommandsJobRunner final : public IGraphicsSubmitJobRunner_t
 		{
 		public:
-			rkit::Result Run() override;
+			rkit::Result RunSubmit(rkit::render::IGraphicsCommandQueue &commandQueue) override;
 
 			rkit::render::IGraphicsCommandBatch **GetCmdBatchRef();
 
@@ -74,14 +76,52 @@ namespace anox
 
 		RKIT_CHECK(encoder->WaitForSwapChainAcquire(*m_perDisplayResources->m_swapChainSyncPoint, pipelineStages));
 
+		{
+			rkit::render::ImageMemoryBarrier barrier;
+
+			barrier.m_priorStages = rkit::render::PipelineStageMask_t({ rkit::render::PipelineStage::kPresentAcquire });
+			barrier.m_subsequentStages = rkit::render::PipelineStageMask_t({ rkit::render::PipelineStage::kColorOutput });
+			barrier.m_subsequentAccess = rkit::render::ResourceAccessMask_t({ rkit::render::ResourceAccess::kRenderTarget });
+			barrier.m_subsequentLayout = rkit::render::ImageLayout::kRenderTarget;
+
+			barrier.m_image = scFrameResources.m_colorTargetImage;
+
+			rkit::render::BarrierGroup barrierGroup;
+			barrierGroup.m_imageMemoryBarriers = rkit::Span<rkit::render::ImageMemoryBarrier>(&barrier, 1);
+
+			RKIT_CHECK(encoder->PipelineBarrier(barrierGroup));
+		}
+
+
+		{
+			rkit::render::ImageMemoryBarrier barrier;
+
+			barrier.m_priorStages = rkit::render::PipelineStageMask_t({ rkit::render::PipelineStage::kColorOutput });
+			barrier.m_subsequentStages = rkit::render::PipelineStageMask_t({ rkit::render::PipelineStage::kPresentSubmit });
+			barrier.m_priorAccess = rkit::render::ResourceAccessMask_t({ rkit::render::ResourceAccess::kRenderTarget });
+			barrier.m_subsequentAccess = rkit::render::ResourceAccessMask_t({ rkit::render::ResourceAccess::kPresentSource });
+			barrier.m_subsequentLayout = rkit::render::ImageLayout::kPresentSource;
+
+			barrier.m_image = scFrameResources.m_colorTargetImage;
+
+			rkit::render::BarrierGroup barrierGroup;
+			barrierGroup.m_imageMemoryBarriers = rkit::Span<rkit::render::ImageMemoryBarrier>(&barrier, 1);
+
+			RKIT_CHECK(encoder->PipelineBarrier(barrierGroup));
+		}
+
+		RKIT_CHECK(encoder->SignalSwapChainPresentReady(*m_perDisplayResources->m_swapChainSyncPoint, pipelineStages));
+
 		RKIT_CHECK(cmdBatch.CloseBatch());
 
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result FrameDrawer::SubmitTestCommandsJobRunner::Run()
+	rkit::Result FrameDrawer::SubmitTestCommandsJobRunner::RunSubmit(rkit::render::IGraphicsCommandQueue &commandQueue)
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		RKIT_CHECK(m_cmdBatch->Submit());
+
+		return rkit::ResultCode::kOK;
 	}
 
 
@@ -102,11 +142,9 @@ namespace anox
 		rkit::UniquePtr<RecordTestCommandsJobRunner> recordJobRunner;
 		RKIT_CHECK(rkit::New<RecordTestCommandsJobRunner>(recordJobRunner, submitJobRunner->GetCmdBatchRef(), perDisplayResources));
 
-		RKIT_CHECK(graphicsSubsystem.CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kGraphics, std::move(recordJobRunner)));
+		RKIT_CHECK(graphicsSubsystem.CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kGraphics, std::move(recordJobRunner), rkit::Span<rkit::RCPtr<rkit::Job>>(&perDisplayResources->m_acquireJob, 1).ToValueISpan()));
 
-		rkit::Job *recordJobPtr = recordJob.Get();
-
-		RKIT_CHECK(graphicsSubsystem.CreateAndQueueSubmitJob(&submitJob, LogicalQueueType::kGraphics, std::move(submitJobRunner), rkit::Span<rkit::Job *>(&recordJobPtr, 1).ToValueISpan()));
+		RKIT_CHECK(graphicsSubsystem.CreateAndQueueSubmitJob(&submitJob, LogicalQueueType::kGraphics, std::move(submitJobRunner), rkit::Span<rkit::RCPtr<rkit::Job>>(&recordJob, 1).ToValueISpan()));
 
 		return rkit::ResultCode::kOK;
 	}
