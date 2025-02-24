@@ -12,12 +12,15 @@
 #include "rkit/Render/CommandBatch.h"
 #include "rkit/Render/CommandAllocator.h"
 #include "rkit/Render/CommandEncoder.h"
+#include "rkit/Render/ImageRect.h"
 #include "rkit/Render/PipelineStage.h"
+#include "rkit/Render/RenderTargetClear.h"
 
 #include "rkit/Core/EnumMask.h"
 #include "rkit/Core/Job.h"
 #include "rkit/Core/Result.h"
 #include "rkit/Core/NewDelete.h"
+#include "rkit/Core/SpanProtos.h"
 
 namespace anox
 {
@@ -82,7 +85,7 @@ namespace anox
 			barrier.m_priorStages = rkit::render::PipelineStageMask_t({ rkit::render::PipelineStage::kPresentAcquire });
 			barrier.m_subsequentStages = rkit::render::PipelineStageMask_t({ rkit::render::PipelineStage::kColorOutput });
 			barrier.m_subsequentAccess = rkit::render::ResourceAccessMask_t({ rkit::render::ResourceAccess::kRenderTarget });
-			barrier.m_subsequentLayout = rkit::render::ImageLayout::kRenderTarget;
+			barrier.m_subsequentLayout = rkit::render::ImageLayout::RenderTarget;
 
 			barrier.m_image = scFrameResources.m_colorTargetImage;
 
@@ -92,6 +95,19 @@ namespace anox
 			RKIT_CHECK(encoder->PipelineBarrier(barrierGroup));
 		}
 
+		{
+			rkit::render::RenderTargetClear rtClear;
+
+			rtClear.m_clearValue.m_float32[0] = 1.0f;
+			rtClear.m_clearValue.m_float32[1] = 1.0f;
+			rtClear.m_clearValue.m_float32[2] = 0.0f;
+			rtClear.m_clearValue.m_float32[3] = 1.0f;
+			rtClear.m_renderTargetIndex = 0;
+
+			rkit::render::ImageRect2D imgRect = { 0, 0, 50, 50 };
+
+			RKIT_CHECK(encoder->ClearTargets(rkit::ConstSpan<rkit::render::RenderTargetClear>(&rtClear, 1), nullptr, rkit::ConstSpan<rkit::render::ImageRect2D>(&imgRect, 1)));
+		}
 
 		{
 			rkit::render::ImageMemoryBarrier barrier;
@@ -100,7 +116,7 @@ namespace anox
 			barrier.m_subsequentStages = rkit::render::PipelineStageMask_t({ rkit::render::PipelineStage::kPresentSubmit });
 			barrier.m_priorAccess = rkit::render::ResourceAccessMask_t({ rkit::render::ResourceAccess::kRenderTarget });
 			barrier.m_subsequentAccess = rkit::render::ResourceAccessMask_t({ rkit::render::ResourceAccess::kPresentSource });
-			barrier.m_subsequentLayout = rkit::render::ImageLayout::kPresentSource;
+			barrier.m_subsequentLayout = rkit::render::ImageLayout::PresentSource;
 
 			barrier.m_image = scFrameResources.m_colorTargetImage;
 

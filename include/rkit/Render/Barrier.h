@@ -6,7 +6,7 @@
 
 #include "PipelineStage.h"
 #include "ResourceAccess.h"
-#include "ImageLayout.h"
+#include "RenderDefs.h"
 #include "ImagePlane.h"
 
 #include <cstdint>
@@ -51,8 +51,8 @@ namespace rkit::render
 		IBaseCommandQueue *m_sourceQueue = nullptr;
 		IBaseCommandQueue *m_destQueue = nullptr;
 
-		ImageLayout m_priorLayout = ImageLayout::kUndefined;
-		ImageLayout m_subsequentLayout = ImageLayout::kUndefined;
+		ImageLayout m_priorLayout = ImageLayout::Undefined;
+		ImageLayout m_subsequentLayout = ImageLayout::Undefined;
 
 		Optional<EnumMask<ImagePlane>> m_planes;
 

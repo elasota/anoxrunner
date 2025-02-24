@@ -344,10 +344,13 @@ namespace rkit::render::vulkan
 
 		RKIT_VK_CHECK(vkd.vkGetSwapchainImagesKHR(m_device.GetDevice(), m_swapChain, &imageCount, m_images.GetBuffer()));
 
+		VkImageAspectFlags aspectFlags = 0;
+		RKIT_CHECK(VulkanUtils::ResolveRenderTargetFormatAspectFlags(aspectFlags, fmt));
+
 		for (uint32_t i = 0; i < imageCount; i++)
 		{
 			VkImageViewType imageViewType = (simultaneousImageCount == 1) ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-			RKIT_CHECK(VulkanRenderTargetViewBase::Create(m_rtvs[i], m_device, m_images[i], swapchainCreateInfo.imageFormat, imageViewType, 0, ImagePlane::kColor, 0, simultaneousImageCount));
+			RKIT_CHECK(VulkanRenderTargetViewBase::Create(m_rtvs[i], m_device, m_images[i], swapchainCreateInfo.imageFormat, aspectFlags, imageViewType, 0, ImagePlane::kColor, 0, simultaneousImageCount));
 
 			m_imageResources[i].SetImage(m_images[i], aspectMask);
 		}

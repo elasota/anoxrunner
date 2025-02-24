@@ -1065,13 +1065,36 @@ namespace rkit::data
 			RTTI_STRUCT_FIELD(branches)
 		RTTI_STRUCT_END
 
+		RTTI_ENUM_BEGIN(RenderPassLoadOp)
+			RTTI_ENUM_OPTION(Discard)
+			RTTI_ENUM_OPTION(Clear)
+			RTTI_ENUM_OPTION(Load)
+		RTTI_ENUM_END
+
+		RTTI_ENUM_BEGIN(RenderPassStoreOp)
+			RTTI_ENUM_OPTION(Discard)
+			RTTI_ENUM_OPTION(Clear)
+			RTTI_ENUM_OPTION(Store)
+		RTTI_ENUM_END
+
+		RTTI_ENUM_BEGIN(ImageLayout)
+			RTTI_ENUM_OPTION(Undefined)
+			RTTI_ENUM_OPTION(RenderTarget)
+			RTTI_ENUM_OPTION(PresentSource)
+		RTTI_ENUM_END
+
 		RTTI_STRUCT_BEGIN_INDEXABLE(DepthStencilTargetDesc)
+			RTTI_STRUCT_FIELD(depthLoadOp)
+			RTTI_STRUCT_FIELD(depthStoreOp)
+			RTTI_STRUCT_FIELD(stencilLoadOp)
+			RTTI_STRUCT_FIELD(stencilStoreOp)
 			RTTI_STRUCT_FIELD(format)
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(RenderPassDesc)
 			RTTI_STRUCT_FIELD_NULLABLE(depthStencilTarget)
 			RTTI_STRUCT_FIELD(renderTargets)
+			RTTI_STRUCT_FIELD(allowInternalTransitions)
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(RenderPassNameLookup)
@@ -1187,6 +1210,9 @@ namespace rkit::data
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(RenderTargetDesc)
 			RTTI_STRUCT_FIELD_INVISIBLE(name)
+
+			RTTI_STRUCT_FIELD(loadOp)
+			RTTI_STRUCT_FIELD(storeOp)
 
 			RTTI_STRUCT_FIELD(format)
 		RTTI_STRUCT_END

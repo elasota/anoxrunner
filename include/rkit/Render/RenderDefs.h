@@ -339,9 +339,39 @@ namespace rkit::render
 		TempStringIndex_t m_entryPoint;
 	};
 
+	enum class RenderPassLoadOp
+	{
+		Discard,
+		Clear,
+		Load,
+
+		Count,
+	};
+
+	enum class RenderPassStoreOp
+	{
+		Discard,
+		Clear,
+		Store,
+
+		Count,
+	};
+
+	enum class ImageLayout
+	{
+		Undefined,
+		RenderTarget,
+		PresentSource,
+
+		Count,
+	};
+
 	struct RenderTargetDesc
 	{
 		TempStringIndex_t m_name;
+
+		RenderPassLoadOp m_loadOp = RenderPassLoadOp::Discard;
+		RenderPassStoreOp m_storeOp = RenderPassStoreOp::Discard;
 
 		ConfigurableValue<RenderTargetFormat, RenderTargetFormat::RGBA_UNorm8> m_format;
 	};
@@ -390,6 +420,11 @@ namespace rkit::render
 
 	struct DepthStencilTargetDesc
 	{
+		RenderPassLoadOp m_depthLoadOp = RenderPassLoadOp::Discard;
+		RenderPassLoadOp m_stencilLoadOp = RenderPassLoadOp::Discard;
+		RenderPassStoreOp m_depthStoreOp = RenderPassStoreOp::Discard;
+		RenderPassStoreOp m_stencilStoreOp = RenderPassStoreOp::Discard;
+
 		ConfigurableValue<DepthStencilFormat, DepthStencilFormat::DepthUNorm16> m_format;
 	};
 
@@ -397,6 +432,7 @@ namespace rkit::render
 	{
 		const DepthStencilTargetDesc *m_depthStencilTarget = nullptr;
 		ConstSpan<const RenderTargetDesc *> m_renderTargets;
+		bool m_allowInternalTransitions = false;
 	};
 
 	struct GraphicsPipelineDesc

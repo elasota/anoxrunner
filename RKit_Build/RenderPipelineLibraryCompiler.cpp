@@ -313,6 +313,11 @@ namespace rkit::buildsystem::rpc_analyzer
 		static Result CheckValidIdentifier(const char *blamePath, const Span<const char> &token, const utils::ITextParser &parser);
 
 		Result ParseEnum(const char *blamePath, const data::RenderRTTIEnumType *rtti, void *obj, bool isConfigurable, utils::ITextParser &parser);
+		Result ParseNumber(const char *blamePath, const data::RenderRTTINumberType *rtti, void *obj, bool isConfigurable, utils::ITextParser &parser);
+		Result ParseUInt(const char *blamePath, const data::RenderRTTINumberType *rtti, void *obj, bool isConfigurable, const Span<const char> &token, size_t line, size_t col);
+		Result ParseSInt(const char *blamePath, const data::RenderRTTINumberType *rtti, void *obj, bool isConfigurable, const Span<const char> &token, size_t line, size_t col);
+		Result ParseFloat(const char *blamePath, const data::RenderRTTINumberType *rtti, void *obj, bool isConfigurable, const Span<const char> &token, size_t line, size_t col);
+		Result ParseBool(const char *blamePath, const data::RenderRTTINumberType *rtti, void *obj, bool isConfigurable, const Span<const char> &token, size_t line, size_t col);
 		Result ParseStruct(const char *blamePath, const data::RenderRTTIStructType *rtti, void *obj, utils::ITextParser &parser);
 		Result ParseValue(const char *blamePath, const data::RenderRTTITypeBase *rtti, void *obj, bool isConfigurable, utils::ITextParser &parser);
 		Result ParseValueType(const char *blamePath, render::ValueType &valueType, const Span<const char> &token, utils::ITextParser &parser);
@@ -2061,7 +2066,7 @@ namespace rkit::buildsystem::rpc_analyzer
 		case data::RenderRTTIType::Enum:
 			return ParseEnum(blamePath, reinterpret_cast<const data::RenderRTTIEnumType *>(rtti), obj, isConfigurable, parser);
 		case data::RenderRTTIType::Number:
-			return ResultCode::kNotYetImplemented;
+			return ParseNumber(blamePath, reinterpret_cast<const data::RenderRTTINumberType *>(rtti), obj, isConfigurable, parser);
 		case data::RenderRTTIType::Structure:
 			RKIT_ASSERT(!isConfigurable);
 			return ParseStruct(blamePath, reinterpret_cast<const data::RenderRTTIStructType *>(rtti), obj, parser);
@@ -2367,6 +2372,67 @@ namespace rkit::buildsystem::rpc_analyzer
 
 		rkit::log::ErrorFmt("%s [%zu:%zu] Invalid value", blamePath, line, col);
 		return ResultCode::kMalformedFile;
+	}
+
+	Result LibraryAnalyzer::ParseNumber(const char *blamePath, const data::RenderRTTINumberType *rtti, void *obj, bool isConfigurable, utils::ITextParser &parser)
+	{
+		size_t line = 0;
+		size_t col = 0;
+		parser.GetLocation(line, col);
+
+		Span<const char> numberToken;
+		RKIT_CHECK(parser.RequireToken(numberToken));
+
+		switch (rtti->m_representation)
+		{
+		case data::RenderRTTINumberRepresentation::UnsignedInt:
+			return ParseUInt(blamePath, rtti, obj, isConfigurable, numberToken, line, col);
+		case data::RenderRTTINumberRepresentation::SignedInt:
+			return ParseSInt(blamePath, rtti, obj, isConfigurable, numberToken, line, col);
+		case data::RenderRTTINumberRepresentation::Float:
+			return ParseFloat(blamePath, rtti, obj, isConfigurable, numberToken, line, col);
+		default:
+			return ResultCode::kInternalError;
+		}
+	}
+
+	Result LibraryAnalyzer::ParseBool(const char *blamePath, const data::RenderRTTINumberType *rtti, void *obj, bool isConfigurable, const Span<const char> &token, size_t line, size_t col)
+	{
+		uint8_t number = 0;
+		if (IsToken(token, "true"))
+			number = 0;
+		else if (IsToken(token, "false"))
+			number = 1;
+		else
+		{
+			rkit::log::ErrorFmt("%s [%zu:%zu] Invalid boolean value", blamePath, line, col);
+			return ResultCode::kMalformedFile;
+		}
+
+		if (isConfigurable)
+			rtti->m_configurableFunctions.m_writeValueUIntFunc(obj, number);
+		else
+			rtti->m_valueFunctions.m_writeValueUIntFunc(obj, number);
+
+		return ResultCode::kOK;
+	}
+
+	Result LibraryAnalyzer::ParseUInt(const char *blamePath, const data::RenderRTTINumberType *rtti, void *obj, bool isConfigurable, const Span<const char> &token, size_t line, size_t col)
+	{
+		if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize1)
+			return ParseBool(blamePath, rtti, obj, isConfigurable, token, line, col);
+
+		return ResultCode::kNotYetImplemented;
+	}
+
+	Result LibraryAnalyzer::ParseSInt(const char *blamePath, const data::RenderRTTINumberType *rtti, void *obj, bool isConfigurable, const Span<const char> &token, size_t line, size_t col)
+	{
+		return ResultCode::kNotYetImplemented;
+	}
+
+	Result LibraryAnalyzer::ParseFloat(const char *blamePath, const data::RenderRTTINumberType *rtti, void *obj, bool isConfigurable, const Span<const char> &token, size_t line, size_t col)
+	{
+		return ResultCode::kNotYetImplemented;
 	}
 
 	Result LibraryAnalyzer::ParseStruct(const char *blamePath, const data::RenderRTTIStructType *rtti, void *obj, utils::ITextParser &parser)

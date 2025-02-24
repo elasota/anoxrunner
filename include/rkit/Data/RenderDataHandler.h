@@ -62,6 +62,9 @@ namespace rkit::data
 		InputLayoutVertexInputStepping,
 		DepthStencilFormat,
 		StencilOp,
+		RenderPassLoadOp,
+		RenderPassStoreOp,
+		ImageLayout,
 
 		// Structs
 		SamplerDesc,

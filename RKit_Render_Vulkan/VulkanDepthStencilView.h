@@ -20,6 +20,7 @@ namespace rkit::render::vulkan
 	{
 	public:
 		virtual VkImageView GetImageView() const = 0;
+		virtual VkImageAspectFlags GetAspectFlags() const = 0;
 
 		static Result Create(UniquePtr<VulkanDepthStencilViewBase> &outRTV, VulkanDeviceBase &device);
 

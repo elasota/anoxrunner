@@ -4,6 +4,9 @@
 
 #include "rkit/Render/Barrier.h"
 #include "rkit/Render/CommandEncoder.h"
+#include "rkit/Render/DepthStencilTargetClear.h"
+#include "rkit/Render/ImageRect.h"
+#include "rkit/Render/RenderTargetClear.h"
 
 #include "VulkanAPI.h"
 #include "VulkanCheck.h"
@@ -11,6 +14,7 @@
 #include "VulkanDevice.h"
 #include "VulkanImageResource.h"
 #include "VulkanQueueProxy.h"
+#include "VulkanRenderPassInstance.h"
 #include "VulkanSwapChain.h"
 #include "VulkanUtils.h"
 
@@ -38,6 +42,7 @@ namespace rkit::render::vulkan
 		Result WaitForSwapChainAcquire(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &subsequentStages) override;
 		Result SignalSwapChainPresentReady(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &priorStages) override;
 		Result PipelineBarrier(const BarrierGroup &barrierGroup) override;
+		Result ClearTargets(const Span<const RenderTargetClear> &renderTargetClears, const DepthStencilTargetClear *depthStencilClear, const Span<const ImageRect2D> &rects) override;
 
 		Result OpenEncoder(IRenderPassInstance &rpi);
 
@@ -46,7 +51,7 @@ namespace rkit::render::vulkan
 
 		VulkanCommandBatch &m_batch;
 
-		IRenderPassInstance *m_rpi = nullptr;
+		VulkanRenderPassInstanceBase *m_rpi = nullptr;
 		bool m_isRendering = false;
 	};
 
@@ -86,6 +91,8 @@ namespace rkit::render::vulkan
 		Result AddSignalVkSema(VkSemaphore sema, const PipelineStageMask_t &priorStageMask);
 
 		Result OpenCommandBuffer(VkCommandBuffer &outCmdBuffer);
+		Result OpenRenderPass(VkCommandBuffer &outCmdBuffer, const VulkanRenderPassInstanceBase &rpi);
+		Result CloseRenderPass();
 
 		VulkanDeviceBase &GetDevice() const;
 		VulkanQueueProxyBase &GetQueue() const;
@@ -108,6 +115,7 @@ namespace rkit::render::vulkan
 
 		Vector<VkSubmitInfo> m_submits;
 		bool m_isCommandListOpen = false;
+		bool m_isRenderPassOpen = false;
 
 		VkFence m_completionFence = VK_NULL_HANDLE;
 		bool m_isCPUWaitable = false;
@@ -248,6 +256,8 @@ namespace rkit::render::vulkan
 			RKIT_CHECK(imageMemoryBarriers.Append(memBarrier));
 		}
 
+		RKIT_CHECK(m_batch.CloseRenderPass());
+
 		VkCommandBuffer cmdBuffer;
 		RKIT_CHECK(m_batch.OpenCommandBuffer(cmdBuffer));
 
@@ -260,9 +270,82 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
+	Result VulkanGraphicsCommandEncoder::ClearTargets(const Span<const RenderTargetClear> &renderTargetClears, const DepthStencilTargetClear *depthStencilClear, const Span<const ImageRect2D> &rects)
+	{
+		const VulkanDeviceBase &device = m_batch.GetDevice();
+
+		HybridVector<VkClearAttachment, 8> clearAttachments;
+		HybridVector<VkClearRect, 8> clearRects;
+
+		const size_t numRects = rects.Count();
+		const size_t numRTs = renderTargetClears.Count();
+		const size_t numDSTs = (depthStencilClear == nullptr) ? 0 : 1;
+
+		const RenderTargetClear *rtClears = renderTargetClears.Ptr();
+		const DepthStencilTargetClear *dtClears = depthStencilClear;
+		const ImageRect2D *rectsPtr = rects.Ptr();
+
+
+		RKIT_CHECK(clearRects.Resize(numRects));
+		RKIT_CHECK(clearAttachments.Resize(numRTs + numDSTs));
+
+		for (size_t i = 0; i < numRects; i++)
+		{
+			const ImageRect2D &rect = rectsPtr[i];
+			VkClearRect &clearRect = clearRects[i];
+
+			clearRect = {};
+			clearRect.layerCount = 1;
+			clearRect.rect.offset.x = rect.m_x;
+			clearRect.rect.offset.y = rect.m_x;
+			clearRect.rect.extent.width = rect.m_height;
+			clearRect.rect.extent.height = rect.m_width;
+		}
+
+		for (size_t i = 0; i < numRTs; i++)
+		{
+			const RenderTargetClear &rtClear = rtClears[i];
+			VkClearAttachment &clearAttachment = clearAttachments[i];
+
+			clearAttachment = {};
+			clearAttachment.aspectMask = m_rpi->GetImageAspectFlagsForRTV(rtClear.m_renderTargetIndex);
+
+			static_assert(sizeof(rtClear.m_clearValue) == sizeof(clearAttachment.clearValue.color));
+
+			memcpy(&clearAttachment.clearValue.color, &rtClear.m_clearValue, sizeof(clearAttachment.clearValue));
+
+			clearAttachment.colorAttachment = rtClear.m_renderTargetIndex;
+		}
+
+		if (depthStencilClear)
+		{
+			VkClearAttachment &clearAttachment = clearAttachments[numRTs];
+
+			clearAttachment = {};
+
+			if (!depthStencilClear->m_planes.IsSet())
+				clearAttachment.aspectMask = m_rpi->GetImageAspectFlagsForDSV();
+			else
+			{
+				RKIT_CHECK(VulkanUtils::ConvertImagePlaneBits(clearAttachment.aspectMask, depthStencilClear->m_planes.Get()));
+			}
+
+			clearAttachment.colorAttachment = m_rpi->GetDSVAttachmentIndex();
+			clearAttachment.clearValue.depthStencil.depth = depthStencilClear->m_depth;
+			clearAttachment.clearValue.depthStencil.stencil = depthStencilClear->m_stencil;
+		}
+
+		VkCommandBuffer cmdBuffer;
+		RKIT_CHECK(m_batch.OpenRenderPass(cmdBuffer, *m_rpi));
+
+		device.GetDeviceAPI().vkCmdClearAttachments(cmdBuffer, static_cast<uint32_t>(clearAttachments.Count()), clearAttachments.GetBuffer(), static_cast<uint32_t>(clearRects.Count()), clearRects.GetBuffer());
+
+		return ResultCode::kOK;
+	}
+
 	Result VulkanGraphicsCommandEncoder::OpenEncoder(IRenderPassInstance &rpi)
 	{
-		m_rpi = &rpi;
+		m_rpi = static_cast<VulkanRenderPassInstanceBase *>(&rpi);
 		m_isRendering = false;
 
 		return ResultCode::kOK;
@@ -469,12 +552,18 @@ namespace rkit::render::vulkan
 
 	Result VulkanCommandBatch::OpenCommandBuffer(VkCommandBuffer &outCmdBuffer)
 	{
+		if (m_isCommandListOpen)
+		{
+			outCmdBuffer = m_cmdBuffers[m_cmdBuffers.Count() - 1];
+			return ResultCode::kOK;
+		}
+
 		VkSubmitInfo *submitItem = nullptr;
 		if (m_submits.Count() > 0)
 		{
-			RKIT_CHECK(CheckCloseCommandList());
-
 			submitItem = &m_submits[m_submits.Count() - 1];
+			if (submitItem->signalSemaphoreCount > 0)
+				submitItem = nullptr;
 		}
 
 		if (!submitItem)
@@ -516,6 +605,30 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
+	Result VulkanCommandBatch::OpenRenderPass(VkCommandBuffer &outCmdBuffer, const VulkanRenderPassInstanceBase &rpi)
+	{
+		VkCommandBuffer cmdBuffer;
+
+		RKIT_CHECK(OpenCommandBuffer(cmdBuffer));
+
+		if (!m_isRenderPassOpen)
+		{
+			VkRenderPassBeginInfo beginInfo = {};
+			beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			beginInfo.renderPass = rpi.GetVkRenderPass();
+			beginInfo.framebuffer = rpi.GetVkFramebuffer();
+			beginInfo.renderArea = rpi.GetRenderArea();
+
+			m_device.GetDeviceAPI().vkCmdBeginRenderPass(cmdBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+			m_isRenderPassOpen = true;
+		}
+
+		outCmdBuffer = cmdBuffer;
+
+		return ResultCode::kOK;
+	}
+
 	VulkanDeviceBase &VulkanCommandBatch::GetDevice() const
 	{
 		return m_device;
@@ -538,10 +651,25 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
+	Result VulkanCommandBatch::CloseRenderPass()
+	{
+		if (m_isRenderPassOpen)
+		{
+			RKIT_ASSERT(m_isCommandListOpen);
+			m_device.GetDeviceAPI().vkCmdEndRenderPass(m_cmdBuffers[m_cmdBuffers.Count() - 1]);
+
+			m_isRenderPassOpen = false;
+		}
+
+		return ResultCode::kOK;
+	}
+
 	Result VulkanCommandBatch::CheckCloseCommandList()
 	{
 		if (m_isCommandListOpen)
 		{
+			RKIT_CHECK(CloseRenderPass());
+
 			RKIT_VK_CHECK(m_device.GetDeviceAPI().vkEndCommandBuffer(m_cmdBuffers[m_cmdBuffers.Count() - 1]));
 
 			m_isCommandListOpen = false;

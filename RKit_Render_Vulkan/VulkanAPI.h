@@ -76,6 +76,9 @@ namespace rkit::render::vulkan
 		RKIT_VK_API(vkDestroyFramebuffer);
 		RKIT_VK_API(vkCreateImageView);
 		RKIT_VK_API(vkDestroyImageView);
+		RKIT_VK_API(vkCmdBeginRenderPass);
+		RKIT_VK_API(vkCmdClearAttachments);
+		RKIT_VK_API(vkCmdEndRenderPass);
 		RKIT_VK_API(vkCmdPipelineBarrier);
 		RKIT_VK_API_EXT(vkCreateSwapchainKHR, VK_KHR_swapchain);
 		RKIT_VK_API_EXT(vkDestroySwapchainKHR, VK_KHR_swapchain);

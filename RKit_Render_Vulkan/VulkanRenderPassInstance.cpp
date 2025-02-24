@@ -6,6 +6,7 @@
 #include "VulkanDevice.h"
 #include "VulkanRenderPass.h"
 #include "VulkanRenderTargetView.h"
+#include "VulkanUtils.h"
 
 #include "rkit/Render/PipelineLibraryItem.h"
 #include "rkit/Render/RenderDefs.h"
@@ -25,12 +26,24 @@ namespace rkit::render::vulkan
 		VulkanRenderPassInstance(VulkanDeviceBase &device);
 		~VulkanRenderPassInstance();
 
+		VkImageAspectFlags GetImageAspectFlagsForRTV(size_t index) const override;
+		VkImageAspectFlags GetImageAspectFlagsForDSV() const override;
+		uint32_t GetDSVAttachmentIndex() const override;
+		VkRenderPass GetVkRenderPass() const override;
+		VkFramebuffer GetVkFramebuffer() const override;
+		VkRect2D GetRenderArea() const override;
+
 		Result Initialize(const RenderPassRef_t &renderPassRef, const RenderPassResources &resources);
 
 	private:
 		VulkanDeviceBase &m_device;
 		VkRenderPass m_renderPass = VK_NULL_HANDLE;
 		VkFramebuffer m_framebuffer = VK_NULL_HANDLE;
+		uint32_t m_dsvAttachmentIndex = 0;
+
+		Vector<VkImageAspectFlags> m_rtvAspectFlags;
+		VkImageAspectFlags m_dsvAspectFlags = 0;
+		VkRect2D m_renderArea = {};
 	};
 
 	VulkanRenderPassInstance::VulkanRenderPassInstance(VulkanDeviceBase &device)
@@ -54,6 +67,8 @@ namespace rkit::render::vulkan
 
 		m_renderPass = static_cast<const VulkanRenderPassBase *>(renderPassRef.ResolveCompiled())->GetRenderPass();
 
+		m_renderArea = VulkanUtils::ConvertImageRect(resources.m_renderArea);
+
 		const RenderPassDesc *desc = renderPassRef.ResolveDesc();
 
 		VkFramebufferCreateInfo createInfo = {};
@@ -63,7 +78,11 @@ namespace rkit::render::vulkan
 		createInfo.attachmentCount = static_cast<uint32_t>(desc->m_renderTargets.Count());
 
 		if (desc->m_depthStencilTarget != nullptr)
+		{
+			m_dsvAttachmentIndex = createInfo.attachmentCount;
+			m_dsvAspectFlags = static_cast<VulkanDepthStencilViewBase *>(resources.m_depthStencilView)->GetAspectFlags();
 			createInfo.attachmentCount++;
+		}
 
 		StaticArray<VkImageView, 9> staticAttachmentsStorage;
 		Vector<VkImageView> dynamicAttachmentsStorage;
@@ -83,9 +102,15 @@ namespace rkit::render::vulkan
 		if ((desc->m_depthStencilTarget == nullptr) != (resources.m_depthStencilView == nullptr))
 			return ResultCode::kInvalidParameter;
 
+		RKIT_CHECK(m_rtvAspectFlags.Resize(resources.m_renderTargetViews.Count()));
+
 		size_t attachmentIndex = 0;
 		for (const IRenderTargetView *rtv : resources.m_renderTargetViews)
-			attachments[attachmentIndex++] = static_cast<const VulkanRenderTargetViewBase *>(rtv)->GetImageView();
+		{
+			m_rtvAspectFlags[attachmentIndex] = static_cast<const VulkanRenderTargetViewBase *>(rtv)->GetImageAspectFlags();
+			attachments[attachmentIndex] = static_cast<const VulkanRenderTargetViewBase *>(rtv)->GetImageView();
+			attachmentIndex++;
+		}
 
 		if (resources.m_depthStencilView)
 			attachments[attachmentIndex++] = static_cast<const VulkanDepthStencilViewBase *>(resources.m_depthStencilView)->GetImageView();
@@ -100,6 +125,36 @@ namespace rkit::render::vulkan
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateFramebuffer(m_device.GetDevice(), &createInfo, m_device.GetAllocCallbacks(), &m_framebuffer));
 
 		return ResultCode::kOK;
+	}
+
+	VkImageAspectFlags VulkanRenderPassInstance::GetImageAspectFlagsForRTV(size_t index) const
+	{
+		return m_rtvAspectFlags[index];
+	}
+
+	VkImageAspectFlags VulkanRenderPassInstance::GetImageAspectFlagsForDSV() const
+	{
+		return m_dsvAspectFlags;
+	}
+
+	uint32_t VulkanRenderPassInstance::GetDSVAttachmentIndex() const
+	{
+		return m_dsvAttachmentIndex;
+	}
+
+	VkRenderPass VulkanRenderPassInstance::GetVkRenderPass() const
+	{
+		return m_renderPass;
+	}
+
+	VkFramebuffer VulkanRenderPassInstance::GetVkFramebuffer() const
+	{
+		return m_framebuffer;
+	}
+
+	VkRect2D VulkanRenderPassInstance::GetRenderArea() const
+	{
+		return m_renderArea;
 	}
 
 	Result VulkanRenderPassInstanceBase::Create(UniquePtr<VulkanRenderPassInstanceBase> &renderPassInstance, VulkanDeviceBase &device, const RenderPassRef_t &renderPassRef, const RenderPassResources &resources)

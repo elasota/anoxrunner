@@ -292,6 +292,9 @@ namespace rkit::render::vulkan
 		static Result ResolvePushConstantSize(uint32_t &size, const VectorNumericType &valueType);
 		static Result ResolvePushConstantSize(uint32_t &size, NumericType numericType);
 
+		static Result ResolveStoreOp(VkAttachmentStoreOp &outStoreOp, RenderPassStoreOp storeOp);
+		static Result ResolveLoadOp(VkAttachmentLoadOp &outLoadOp, RenderPassLoadOp loadOp);
+
 		Result FindSampler(VkSampler &outSampler, const SamplerDesc *sampler) const;
 		Result FindDescriptorSetLayout(VkDescriptorSetLayout &outDSL, const DescriptorLayoutDesc *descLayout) const;
 		Result FindPipelineLayout(VkPipelineLayout &outPipelineLayout, const PipelineLayoutDesc *pipelineLayout) const;
@@ -1601,6 +1604,43 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
+	Result VulkanPipelineLibraryLoader::ResolveStoreOp(VkAttachmentStoreOp &outStoreOp, RenderPassStoreOp storeOp)
+	{
+		switch (storeOp)
+		{
+		case RenderPassStoreOp::Discard:
+			outStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			break;
+		case RenderPassStoreOp::Store:
+			outStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+			break;
+		default:
+			return ResultCode::kInternalError;
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanPipelineLibraryLoader::ResolveLoadOp(VkAttachmentLoadOp &outLoadOp, RenderPassLoadOp loadOp)
+	{
+		switch (loadOp)
+		{
+		case RenderPassLoadOp::Discard:
+			outLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			break;
+		case RenderPassLoadOp::Clear:
+			outLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			break;
+		case RenderPassLoadOp::Load:
+			outLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			break;
+		default:
+			return ResultCode::kInternalError;
+		}
+
+		return ResultCode::kOK;
+	}
+
 #define RKIT_VK_FIND_FROM_LIST(type, object)\
 	size_t index = 0;\
 	do {\
@@ -1680,6 +1720,8 @@ namespace rkit::render::vulkan
 		{
 			VkAttachmentDescription dsDesc = {};
 			RKIT_CHECK(ResolveDepthStencilFormat(dsDesc.format, ResolveConfigurable(depthStencil->m_format)));
+			RKIT_CHECK(ResolveLoadOp(dsDesc.loadOp, depthStencil->m_depthLoadOp));
+			RKIT_CHECK(ResolveStoreOp(dsDesc.storeOp, depthStencil->m_depthStoreOp));
 
 			dsDesc.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 			dsDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1689,8 +1731,8 @@ namespace rkit::render::vulkan
 
 			if (haveStencil)
 			{
-				dsDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-				dsDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+				RKIT_CHECK(ResolveLoadOp(dsDesc.stencilLoadOp, depthStencil->m_stencilLoadOp));
+				RKIT_CHECK(ResolveStoreOp(dsDesc.stencilStoreOp, depthStencil->m_stencilStoreOp));
 			}
 			else
 			{
@@ -1717,8 +1759,9 @@ namespace rkit::render::vulkan
 			RKIT_CHECK(VulkanUtils::ResolveRenderTargetFormat(caDesc.format, ResolveConfigurable(rtDesc->m_format)));
 			caDesc.samples = VK_SAMPLE_COUNT_1_BIT;
 
-			caDesc.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-			caDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			RKIT_CHECK(ResolveLoadOp(caDesc.loadOp, rtDesc->m_loadOp));
+			RKIT_CHECK(ResolveStoreOp(caDesc.storeOp, rtDesc->m_storeOp));
+
 			caDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 			caDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 

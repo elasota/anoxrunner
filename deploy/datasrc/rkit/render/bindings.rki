@@ -250,6 +250,8 @@ RenderPass RP_Interface
 	{
 		Color =
 		{
+			LoadOp = Load
+			StoreOp = Store
 			Format = Config(CFG_RenderTargetFormat)
 		}
 	}
@@ -261,7 +263,11 @@ RenderPass RP_SimpleColorTarget
 	{
 		Color =
 		{
+			LoadOp = Discard
+			StoreOp = Store
 			Format = Config(CFG_RenderTargetFormat)
 		}
 	}
+
+	AllowInternalTransitions = true
 }

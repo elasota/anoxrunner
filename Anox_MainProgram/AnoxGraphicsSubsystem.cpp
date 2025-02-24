@@ -1319,6 +1319,8 @@ namespace anox
 
 				m_gameWindow->GetSwapChain()->GetExtents(resources.m_width, resources.m_height);
 				resources.m_renderTargetViews = rkit::Span<rkit::render::IRenderTargetView *>(rtvs);
+				resources.m_renderArea.m_width = resources.m_width;
+				resources.m_renderArea.m_height = resources.m_height;
 
 				RKIT_CHECK(m_renderDevice->CreateRenderPassInstance(scfr.m_simpleColorTargetRPI, simpleColorTargetRP, resources));
 			}

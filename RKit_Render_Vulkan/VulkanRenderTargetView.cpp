@@ -13,12 +13,14 @@ namespace rkit::render::vulkan
 		~VulkanRenderTargetView();
 
 		VkImageView GetImageView() const override;
+		VkImageAspectFlags GetImageAspectFlags() const override;
 
-		Result Initialize(VkImage image, VkFormat format, VkImageViewType imageViewType, uint32_t mipSlice, ImagePlane plane, uint32_t firstArrayElement, uint32_t arraySize);
+		Result Initialize(VkImage image, VkFormat format, VkImageAspectFlags imageAspectFlags, VkImageViewType imageViewType, uint32_t mipSlice, ImagePlane plane, uint32_t firstArrayElement, uint32_t arraySize);
 
 	private:
 		VulkanDeviceBase &m_device;
 		VkImageView m_imageView = VK_NULL_HANDLE;
+		VkImageAspectFlags m_imageAspectFlags = 0;
 	};
 
 	VulkanRenderTargetView::VulkanRenderTargetView(VulkanDeviceBase &device)
@@ -37,8 +39,16 @@ namespace rkit::render::vulkan
 		return m_imageView;
 	}
 
-	Result VulkanRenderTargetView::Initialize(VkImage image, VkFormat format, VkImageViewType imageViewType, uint32_t mipSlice, ImagePlane plane, uint32_t firstArrayElement, uint32_t arraySize)
+	VkImageAspectFlags VulkanRenderTargetView::GetImageAspectFlags() const
 	{
+		return m_imageAspectFlags;
+	}
+
+
+	Result VulkanRenderTargetView::Initialize(VkImage image, VkFormat format, VkImageAspectFlags imageAspectFlags, VkImageViewType imageViewType, uint32_t mipSlice, ImagePlane plane, uint32_t firstArrayElement, uint32_t arraySize)
+	{
+		m_imageAspectFlags = imageAspectFlags;
+
 		VkImageViewCreateInfo createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		createInfo.image = image;
@@ -70,12 +80,12 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanRenderTargetViewBase::Create(UniquePtr<VulkanRenderTargetViewBase> &outRTV, VulkanDeviceBase &device, VkImage image, VkFormat format, VkImageViewType imageViewType, uint32_t mipSlice, ImagePlane plane, uint32_t firstArrayElement, uint32_t arraySize)
+	Result VulkanRenderTargetViewBase::Create(UniquePtr<VulkanRenderTargetViewBase> &outRTV, VulkanDeviceBase &device, VkImage image, VkFormat format, VkImageAspectFlags imageAspectFlags, VkImageViewType imageViewType, uint32_t mipSlice, ImagePlane plane, uint32_t firstArrayElement, uint32_t arraySize)
 	{
 		UniquePtr<VulkanRenderTargetView> rtv;
 		RKIT_CHECK(New<VulkanRenderTargetView>(rtv, device));
 
-		RKIT_CHECK(rtv->Initialize(image, format, imageViewType, mipSlice, plane, firstArrayElement, arraySize));
+		RKIT_CHECK(rtv->Initialize(image, format, imageAspectFlags, imageViewType, mipSlice, plane, firstArrayElement, arraySize));
 
 		outRTV = std::move(rtv);
 

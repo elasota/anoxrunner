@@ -1,5 +1,7 @@
 #include "VulkanUtils.h"
 
+#include "rkit/Render/ImageRect.h"
+
 #include "rkit/Core/EnumMask.h"
 
 namespace rkit::render::vulkan
@@ -13,6 +15,21 @@ namespace rkit::render::vulkan
 			break;
 		case RenderTargetFormat::RGBA_UNorm8_sRGB:
 			outVkFormat = VK_FORMAT_R8G8B8A8_SRGB;
+			break;
+		default:
+			return ResultCode::kInternalError;
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanUtils::ResolveRenderTargetFormatAspectFlags(VkImageAspectFlags &outFlags, RenderTargetFormat rtFormat)
+	{
+		switch (rtFormat)
+		{
+		case RenderTargetFormat::RGBA_UNorm8:
+		case RenderTargetFormat::RGBA_UNorm8_sRGB:
+			outFlags = VK_IMAGE_ASPECT_COLOR_BIT;
 			break;
 		default:
 			return ResultCode::kInternalError;
@@ -100,13 +117,13 @@ namespace rkit::render::vulkan
 	{
 		switch (imageLayout)
 		{
-		case ImageLayout::kUndefined:
+		case ImageLayout::Undefined:
 			outLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			break;
-		case ImageLayout::kRenderTarget:
+		case ImageLayout::RenderTarget:
 			outLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 			break;
-		case ImageLayout::kPresentSource:
+		case ImageLayout::PresentSource:
 			outLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 			break;
 		default:
@@ -116,6 +133,15 @@ namespace rkit::render::vulkan
 		return ResultCode::kOK;
 	}
 
+	VkRect2D VulkanUtils::ConvertImageRect(const ImageRect2D &rect)
+	{
+		VkRect2D result;
+		result.offset.x = rect.m_x;
+		result.offset.y = rect.m_y;
+		result.extent.width = rect.m_width;
+		result.extent.height = rect.m_height;
+		return result;
+	}
 
 	Result VulkanUtils::ConvertPipelineStageBits(VkPipelineStageFlags &outFlags, const EnumMask<PipelineStage> &stages)
 	{
