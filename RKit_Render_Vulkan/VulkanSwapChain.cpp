@@ -172,7 +172,12 @@ namespace rkit::render::vulkan
 	Result VulkanSwapChainSyncPoint::AcquireFrame(VkSwapchainKHR swapChain, const Span<VkImage> &images, const Span<VulkanSwapChainFrame> &frames)
 	{
 		// TODO: Handle suboptimal
-		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkAcquireNextImageKHR(m_device.GetDevice(), swapChain, UINT64_MAX, m_acquireSema, VK_NULL_HANDLE, &m_imageIndex));
+		VkResult acquireResult = m_device.GetDeviceAPI().vkAcquireNextImageKHR(m_device.GetDevice(), swapChain, UINT64_MAX, m_acquireSema, VK_NULL_HANDLE, &m_imageIndex);
+
+		if (acquireResult != VK_SUBOPTIMAL_KHR)
+		{
+			RKIT_VK_CHECK(acquireResult);
+		}
 
 		return ResultCode::kOK;
 	}
@@ -187,7 +192,12 @@ namespace rkit::render::vulkan
 		presentInfo.pSwapchains = &swapChain;
 		presentInfo.pImageIndices = &m_imageIndex;
 
-		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkQueuePresentKHR(queue.GetVkQueue(), &presentInfo));
+		VkResult presentResult = m_device.GetDeviceAPI().vkQueuePresentKHR(queue.GetVkQueue(), &presentInfo);
+
+		if (presentResult != VK_SUBOPTIMAL_KHR)
+		{
+			RKIT_VK_CHECK(presentResult);
+		}
 
 		return ResultCode::kOK;
 	}
