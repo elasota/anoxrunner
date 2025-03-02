@@ -13,11 +13,6 @@
 
 #include "IncludeVulkan.h"
 
-namespace rkit::render
-{
-	struct IBaseCommandList;
-}
-
 namespace rkit::render::vulkan
 {
 	struct VulkanDeviceAPI;

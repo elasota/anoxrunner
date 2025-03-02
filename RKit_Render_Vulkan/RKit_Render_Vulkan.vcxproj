@@ -148,7 +148,6 @@
     <ClCompile Include="RenderVulkan.cpp" />
     <ClCompile Include="VulkanAPI.cpp" />
     <ClCompile Include="VulkanAPILoader.cpp" />
-    <ClCompile Include="VulkanCommandList.cpp" />
     <ClCompile Include="VulkanDevice.cpp" />
     <ClCompile Include="VulkanPhysDevice.cpp" />
     <ClCompile Include="VulkanRenderPassInstance.cpp" />
@@ -169,7 +168,6 @@
     <ClInclude Include="VulkanCheck.h" />
     <ClInclude Include="VulkanCommandAllocator.h" />
     <ClInclude Include="VulkanCommandBatch.h" />
-    <ClInclude Include="VulkanCommandList.h" />
     <ClInclude Include="VulkanDevice.h" />
     <ClInclude Include="VulkanFence.h" />
     <ClInclude Include="VulkanImageResource.h" />

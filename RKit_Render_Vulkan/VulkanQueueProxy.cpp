@@ -8,7 +8,6 @@
 #include "VulkanCheck.h"
 #include "VulkanDevice.h"
 #include "VulkanCommandAllocator.h"
-#include "VulkanCommandList.h"
 #include "VulkanFence.h"
 #include "VulkanUtils.h"
 
@@ -71,8 +70,6 @@ namespace rkit::render::vulkan
 		static const size_t kMaxSubmitInfos = 64;
 		static const size_t kMaxWaitSemas = 64;
 		static const size_t kMaxSignalSemas = 64;
-
-		Result QueueBase(IBaseCommandList &cmdList);
 
 		Result FlushWithFence(VkFence fence);
 
@@ -441,11 +438,6 @@ namespace rkit::render::vulkan
 		default:
 			return DynamicCastRef_t();
 		}
-	}
-
-	Result VulkanQueueProxy::QueueBase(IBaseCommandList &cmdList)
-	{
-		return AddCommandList(static_cast<VulkanCommandList *>(cmdList.DynamicCast<IInternalCommandList>())->GetCommandBuffer());
 	}
 
 	Result VulkanQueueProxyBase::Create(UniquePtr<VulkanQueueProxyBase> &outQueueProxy, IMallocDriver *alloc, CommandQueueType queueType, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI)
