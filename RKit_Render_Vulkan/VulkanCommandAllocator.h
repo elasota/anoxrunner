@@ -18,6 +18,7 @@ namespace rkit::render::vulkan
 		virtual CommandQueueType GetQueueType() const = 0;
 		virtual bool IsBundle() const = 0;
 		virtual VkCommandPool GetCommandPool() const = 0;
+		virtual Result AcquireCommandBuffer(VkCommandBuffer &outCmdBuffer) = 0;
 
 		static Result Create(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, VulkanDeviceBase &device, VulkanQueueProxyBase &queue, CommandQueueType queueType, bool isBundle, uint32_t queueFamily);
 	};

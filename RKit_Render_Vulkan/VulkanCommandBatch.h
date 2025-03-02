@@ -26,7 +26,7 @@ namespace rkit::render::vulkan
 	public:
 		virtual ~VulkanCommandBatchBase() {}
 
-		virtual Result ClearCommandBatch() = 0;
+		virtual Result ResetCommandBatch() = 0;
 		virtual Result OpenCommandBatch(bool cpuWaitable) = 0;
 
 		static Result Create(UniquePtr<VulkanCommandBatchBase> &cmdBatch, VulkanDeviceBase &device, VulkanQueueProxyBase &queue, VulkanCommandAllocatorBase &cmdAlloc);

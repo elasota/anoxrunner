@@ -6,7 +6,6 @@
 
 #include "VulkanAPI.h"
 #include "VulkanCheck.h"
-#include "VulkanCommandList.h"
 #include "VulkanDevice.h"
 #include "IncludeVulkan.h"
 
@@ -32,6 +31,7 @@ namespace rkit::render::vulkan
 		CommandQueueType GetQueueType() const override;
 		bool IsBundle() const override;
 		VkCommandPool GetCommandPool() const override;
+		Result AcquireCommandBuffer(VkCommandBuffer &outCmdBuffer) override;
 
 		DynamicCastRef_t InternalDynamicCast() override;
 
@@ -50,8 +50,8 @@ namespace rkit::render::vulkan
 		CommandQueueType m_queueType = CommandQueueType::kCount;
 		bool m_isBundle = false;
 
-		Vector<VulkanCommandList> m_commandLists;
-		size_t m_activeCommandLists = 0;
+		Vector<VkCommandBuffer> m_cmdBuffers;
+		size_t m_activeCmdBuffers = 0;
 	};
 
 	VulkanCommandAllocator::VulkanCommandAllocator(VulkanDeviceBase &device, VulkanQueueProxyBase &queue, CommandQueueType queueType, bool isBundle)
@@ -114,38 +114,19 @@ namespace rkit::render::vulkan
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkResetCommandPool(m_device.GetDevice(), m_pool, resetFlags));
 
+		m_numAllocatedBatches = 0;
+
 		if (discardResources)
 		{
-			const size_t kMaxFreeGrouping = 16;
+			if (m_cmdBuffers.Count() > 0)
+				m_device.GetDeviceAPI().vkFreeCommandBuffers(m_device.GetDevice(), m_pool, static_cast<uint32_t>(m_cmdBuffers.Count()), m_cmdBuffers.GetBuffer());
 
-			VkCommandBuffer buffersToFree[kMaxFreeGrouping];
-			uint32_t numQueuedFrees = 0;
+			m_cmdBuffers.Reset();
+			m_commandBatches.Reset();
 
-			for (const VulkanCommandList &cmdList : m_commandLists)
-			{
-				buffersToFree[numQueuedFrees++] = cmdList.GetCommandBuffer();
-				if (numQueuedFrees == kMaxFreeGrouping)
-				{
-					m_device.GetDeviceAPI().vkFreeCommandBuffers(m_device.GetDevice(), m_pool, numQueuedFrees, buffersToFree);
-					numQueuedFrees = 0;
-				}
-			}
-
-			if (numQueuedFrees > 0)
-				m_device.GetDeviceAPI().vkFreeCommandBuffers(m_device.GetDevice(), m_pool, numQueuedFrees, buffersToFree);
-
-			m_commandLists.Reset();
-
-			m_activeCommandLists = 0;
 		}
-		else
-		{
-			while (m_activeCommandLists > 0)
-			{
-				m_activeCommandLists--;
-				RKIT_VK_CHECK(m_device.GetDeviceAPI().vkResetCommandBuffer(m_commandLists[m_activeCommandLists].GetCommandBuffer(), VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT));
-			}
-		}
+
+		m_activeCmdBuffers = 0;
 
 		return ResultCode::kOK;
 	}
@@ -163,6 +144,38 @@ namespace rkit::render::vulkan
 	VkCommandPool VulkanCommandAllocator::GetCommandPool() const
 	{
 		return m_pool;
+	}
+
+	Result VulkanCommandAllocator::AcquireCommandBuffer(VkCommandBuffer &outCmdBuffer)
+	{
+		if (m_activeCmdBuffers < m_cmdBuffers.Count())
+		{
+			outCmdBuffer = m_cmdBuffers[m_activeCmdBuffers];
+			m_activeCmdBuffers++;
+
+			return ResultCode::kOK;
+		}
+
+		VkCommandBufferAllocateInfo allocInfo = {};
+		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		allocInfo.commandBufferCount = 1;
+		allocInfo.commandPool = m_pool;
+		allocInfo.level = m_isBundle ? VK_COMMAND_BUFFER_LEVEL_SECONDARY : VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		allocInfo.commandBufferCount = 1;
+
+		VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
+		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkAllocateCommandBuffers(m_device.GetDevice(), &allocInfo, &cmdBuffer));
+
+		Result appendResult = m_cmdBuffers.Append(cmdBuffer);
+		if (!appendResult.IsOK())
+		{
+			m_device.GetDeviceAPI().vkFreeCommandBuffers(m_device.GetDevice(), m_pool, 1, &cmdBuffer);
+			return appendResult;
+		}
+
+		outCmdBuffer = cmdBuffer;
+
+		return ResultCode::kOK;
 	}
 
 	VulkanCommandAllocator::DynamicCastRef_t VulkanCommandAllocator::InternalDynamicCast()
@@ -215,7 +228,7 @@ namespace rkit::render::vulkan
 		{
 			cmdBatchPtr = m_commandBatches[m_numAllocatedBatches].Get();
 
-			RKIT_CHECK(cmdBatchPtr->ClearCommandBatch());
+			RKIT_CHECK(cmdBatchPtr->ResetCommandBatch());
 
 			RKIT_CHECK(cmdBatchPtr->OpenCommandBatch(cpuWaitable));
 

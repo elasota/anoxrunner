@@ -72,7 +72,7 @@ namespace rkit::render::vulkan
 		explicit VulkanCommandBatch(VulkanDeviceBase &device, VulkanQueueProxyBase &queue, VulkanCommandAllocatorBase &cmdAlloc);
 		~VulkanCommandBatch();
 
-		Result ClearCommandBatch() override;
+		Result ResetCommandBatch() override;
 		Result OpenCommandBatch(bool cpuWaitable) override;
 
 		Result Submit() override;
@@ -374,7 +374,7 @@ namespace rkit::render::vulkan
 			m_device.GetDeviceAPI().vkDestroyFence(m_device.GetDevice(), m_completionFence, m_device.GetAllocCallbacks());
 	}
 
-	Result VulkanCommandBatch::ClearCommandBatch()
+	Result VulkanCommandBatch::ResetCommandBatch()
 	{
 		m_cmdBuffers.ShrinkToSize(0);
 
@@ -383,7 +383,15 @@ namespace rkit::render::vulkan
 
 		m_submits.ShrinkToSize(0);
 
-		return ResultCode::kNotYetImplemented;
+		if (m_isCPUWaitable)
+		{
+			RKIT_ASSERT(m_completionFence != VK_NULL_HANDLE);
+			m_device.GetDeviceAPI().vkResetFences(m_device.GetDevice(), 1, &m_completionFence);
+
+			m_isCPUWaitable = false;
+		}
+
+		return ResultCode::kOK;
 	}
 
 	Result VulkanCommandBatch::OpenCommandBatch(bool cpuWaitable)
@@ -571,17 +579,8 @@ namespace rkit::render::vulkan
 			RKIT_CHECK(CreateNewSubmitItem(submitItem));
 		}
 
-		VkCommandPool pool = m_cmdAlloc.GetCommandPool();
-
-		VkCommandBufferAllocateInfo allocInfo = {};
-		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		allocInfo.commandBufferCount = 1;
-		allocInfo.commandPool = pool;
-		allocInfo.level = m_cmdAlloc.IsBundle() ? VK_COMMAND_BUFFER_LEVEL_SECONDARY : VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		allocInfo.commandBufferCount = 1;
-
 		VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
-		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkAllocateCommandBuffers(m_device.GetDevice(), &allocInfo, &cmdBuffer));
+		RKIT_CHECK(m_cmdAlloc.AcquireCommandBuffer(cmdBuffer));
 
 		VkCommandBufferBeginInfo beginInfo = {};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -589,13 +588,7 @@ namespace rkit::render::vulkan
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkBeginCommandBuffer(cmdBuffer, &beginInfo));
 
-		Result appendResult = m_cmdBuffers.Append(cmdBuffer);
-		if (!appendResult.IsOK())
-		{
-			m_device.GetDeviceAPI().vkFreeCommandBuffers(m_device.GetDevice(), pool, 1, &cmdBuffer);
-
-			return appendResult;
-		}
+		RKIT_CHECK(m_cmdBuffers.Append(cmdBuffer));
 
 		outCmdBuffer = cmdBuffer;
 		m_isCommandListOpen = true;
