@@ -28,7 +28,7 @@ namespace anox
 
 			rkit::Result Open(rkit::UniquePtr<rkit::ISeekableReadStream> &&stream);
 
-			FileHandle FindFile(const rkit::StringView &fileName) const override;
+			FileHandle FindFile(const rkit::StringSliceView &fileName) const override;
 
 		private:
 			struct FileInfo
@@ -43,7 +43,7 @@ namespace anox
 
 			uint32_t GetNumFiles() const override;
 			FileHandle GetFileByIndex(uint32_t fileIndex) const override;
-			rkit::Result OpenFileByIndex(uint32_t fileIndex, rkit::UniquePtr<rkit::IReadStream> &outStream) const override;
+			rkit::Result OpenFileByIndex(uint32_t fileIndex, rkit::UniquePtr<rkit::ISeekableReadStream> &outStream) const override;
 			uint32_t GetFileSizeByIndex(uint32_t fileIndex) const override;
 			rkit::StringView GetFilePathByIndex(uint32_t fileIndex) const override;
 

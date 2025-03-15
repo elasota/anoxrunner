@@ -4,10 +4,13 @@
 
 namespace rkit
 {
-	DeflateDecompressStream::DeflateDecompressStream(UniquePtr<IReadStream> &&stream, IMallocDriver *alloc)
+	DeflateDecompressStream::DeflateDecompressStream(UniquePtr<IReadStream> &&stream, ISeekableStream *seekable, Optional<FilePos_t> decompressedSize, IMallocDriver *alloc)
 		: m_stream(std::move(stream))
+		, m_seekable(seekable)
 		, m_alloc(alloc)
 		, m_streamInitialized(false)
+		, m_filePos(0)
+		, m_decompressedSize(decompressedSize)
 	{
 	}
 
@@ -17,9 +20,15 @@ namespace rkit
 			inflateEnd(&m_zstream);
 	}
 
-
 	Result DeflateDecompressStream::ReadPartial(void *data, size_t count, size_t &outCountRead)
 	{
+		if (m_decompressedSize.IsSet())
+		{
+			const FilePos_t maxRead = m_decompressedSize.Get() - m_filePos;
+			if (count > maxRead)
+				count = static_cast<size_t>(maxRead);
+		}
+
 		Bytef *initialOut = static_cast<Bytef *>(data);
 
 		outCountRead = 0;
@@ -52,6 +61,7 @@ namespace rkit
 			if (availOut == 0)
 			{
 				outCountRead = count;
+				m_filePos += outCountRead;
 				return ResultCode::kOK;
 			}
 
@@ -68,6 +78,7 @@ namespace rkit
 			if (numDecompressedBytes == count)
 			{
 				outCountRead = count;
+				m_filePos += outCountRead;
 				return ResultCode::kOK;
 			}
 
@@ -82,6 +93,7 @@ namespace rkit
 				if (amountCompressedRead == 0)
 				{
 					outCountRead = static_cast<size_t>(m_zstream.next_out - initialOut);
+					m_filePos += outCountRead;
 					return ResultCode::kOK;
 				}
 
@@ -89,6 +101,69 @@ namespace rkit
 				m_zstream.avail_in = static_cast<uInt>(amountCompressedRead);
 			}
 		}
+	}
+
+	Result DeflateDecompressStream::SeekStart(FilePos_t pos)
+	{
+		if (pos < m_filePos)
+		{
+			RKIT_CHECK(RestartDecompression());
+		}
+
+		if (pos > m_filePos)
+		{
+			return ResultCode::kNotYetImplemented;
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result DeflateDecompressStream::SeekCurrent(FileOffset_t offset)
+	{
+		return SeekRelativeTo(m_filePos, offset);
+	}
+
+	Result DeflateDecompressStream::SeekEnd(FileOffset_t offset)
+	{
+		return SeekRelativeTo(m_decompressedSize.Get(), offset);
+	}
+
+	Result DeflateDecompressStream::SeekRelativeTo(FilePos_t pos, FileOffset_t offset)
+	{
+		if (offset < 0)
+		{
+			const FilePos_t negativeOffset = static_cast<FilePos_t>(-(offset + 1)) + 1;
+			if (negativeOffset > pos)
+				return ResultCode::kIOSeekOutOfRange;
+
+			return SeekStart(pos - negativeOffset);
+		}
+		else if (offset > 0)
+		{
+			const FilePos_t unsignedOffset = static_cast<FilePos_t>(offset);
+			const FilePos_t maxOffset = m_decompressedSize.Get() - pos;
+			if (unsignedOffset > maxOffset)
+				return ResultCode::kIOSeekOutOfRange;
+
+			return SeekStart(pos + unsignedOffset);
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result DeflateDecompressStream::RestartDecompression()
+	{
+		return ResultCode::kNotYetImplemented;
+	}
+
+	FilePos_t DeflateDecompressStream::Tell() const
+	{
+		return m_filePos;
+	}
+
+	FilePos_t DeflateDecompressStream::GetSize() const
+	{
+		return m_decompressedSize.Get();
 	}
 
 	voidpf DeflateDecompressStream::AllocCallback(voidpf opaque, uInt items, uInt size)

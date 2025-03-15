@@ -45,8 +45,9 @@ namespace rkit
 		Result OpenShadowFileReadWrite(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadWriteStream &stream) const override;
 		Result InitializeShadowFile(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadWriteStream &stream) const override;
 
+		Result CreateRestartableDeflateDecompressStream(UniquePtr<ISeekableReadStream> &outStream, UniquePtr<ISeekableReadStream> &&compressedStream, FilePos_t decompressedSize) const override;
 		Result CreateDeflateDecompressStream(UniquePtr<IReadStream> &outStream, UniquePtr<IReadStream> &&compressedStream) const override;
-		Result CreateRangeLimitedReadStream(UniquePtr<IReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream, FilePos_t startPos, FilePos_t size) const override;
+		Result CreateRangeLimitedReadStream(UniquePtr<ISeekableReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream, FilePos_t startPos, FilePos_t size) const override;
 
 		Result CreateThreadPool(UniquePtr<utils::IThreadPool> &outThreadPool, uint32_t numThreads) const override;
 
@@ -215,6 +216,21 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
+	Result UtilitiesDriver::CreateRestartableDeflateDecompressStream(UniquePtr<ISeekableReadStream> &outStream, UniquePtr<ISeekableReadStream> &&compressedStream, FilePos_t decompressedSize) const
+	{
+		IMallocDriver *alloc = GetDrivers().m_mallocDriver;
+
+		ISeekableStream *seekable = compressedStream.Get();
+		UniquePtr<IReadStream> streamMoved(std::move(compressedStream));
+
+		UniquePtr<DeflateDecompressStream> createdStream;
+		RKIT_CHECK(NewWithAlloc<DeflateDecompressStream>(createdStream, alloc, std::move(streamMoved), seekable, decompressedSize, alloc));
+
+		outStream = std::move(createdStream);
+
+		return ResultCode::kOK;
+	}
+
 	Result UtilitiesDriver::CreateDeflateDecompressStream(UniquePtr<IReadStream> &outStream, UniquePtr<IReadStream> &&compressedStream) const
 	{
 		IMallocDriver *alloc = GetDrivers().m_mallocDriver;
@@ -222,14 +238,14 @@ namespace rkit
 		UniquePtr<IReadStream> streamMoved(std::move(compressedStream));
 
 		UniquePtr<DeflateDecompressStream> createdStream;
-		RKIT_CHECK(NewWithAlloc<DeflateDecompressStream>(createdStream, alloc, std::move(streamMoved), alloc));
+		RKIT_CHECK(NewWithAlloc<DeflateDecompressStream>(createdStream, alloc, std::move(streamMoved), nullptr, rkit::Optional<FilePos_t>(), alloc));
 
 		outStream = UniquePtr<IReadStream>(std::move(createdStream));
 
 		return ResultCode::kOK;
 	}
 
-	Result UtilitiesDriver::CreateRangeLimitedReadStream(UniquePtr<IReadStream> &outStream, UniquePtr<ISeekableReadStream> &&streamSrc, FilePos_t startPos, FilePos_t size) const
+	Result UtilitiesDriver::CreateRangeLimitedReadStream(UniquePtr<ISeekableReadStream> &outStream, UniquePtr<ISeekableReadStream> &&streamSrc, FilePos_t startPos, FilePos_t size) const
 	{
 		IMallocDriver *alloc = GetDrivers().m_mallocDriver;
 

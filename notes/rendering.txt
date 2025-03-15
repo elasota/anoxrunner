@@ -79,4 +79,17 @@ RenderTargetView
 DepthStencilView
 
 
-Vulkan needs a "framebuffer" which is a collection of render targets.                             
+Vulkan needs a "framebuffer" which is a collection of render targets.
+
+
+Q2 image import dispositions:
+it_skin
+it_sprite
+it_wall
+it_pic
+it_sky
+
+pic and sky don't get normal mag filters
+sky uses linear filtering
+pic normally uses linear filtering, except for conchars
+skins are flood-filled

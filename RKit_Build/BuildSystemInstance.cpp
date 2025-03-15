@@ -16,6 +16,8 @@
 #include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/Vector.h"
 
+#include "rkit/Utilities/Sha2.h"
+
 #include <algorithm>
 
 namespace rkit::buildsystem
@@ -250,9 +252,10 @@ namespace rkit::buildsystem
 	class DependencyNode final : public IDependencyNode
 	{
 	public:
-		DependencyNode(IDependencyNodeCompiler *compiler, uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation inputLocation);
+		DependencyNode(IDependencyNodeCompiler *compiler, uint32_t nodeNamespace, uint32_t nodeType, Vector<uint8_t> &&content, BuildFileLocation inputLocation);
 
 		Result Initialize(const StringView &identifier);
+		Result Initialize(const StringView &identifier, const StringView &origin);
 
 		IDependencyNodeCompiler *GetCompiler() const;
 		uint32_t GetLastCompilerVersion() const;
@@ -264,6 +267,9 @@ namespace rkit::buildsystem
 
 		void MarkOutOfDate() override;
 		bool WasCompiled() const override;
+		bool IsContentBased() const override;
+
+		Span<const uint8_t> GetContent() const override;
 
 		StringView GetIdentifier() const override;
 		DependencyState GetDependencyState() const override;
@@ -292,7 +298,7 @@ namespace rkit::buildsystem
 		Result AddNodeDependency(const NodeDependencyInfo &nodeInfo);
 
 		Result SerializeInitialState(IWriteStream &stream) const;
-		static Result DeserializeInitialState(IReadStream &stream, uint32_t &outNodeNamespace, uint32_t &outNodeType, BuildFileLocation &outInputLocation);
+		static Result DeserializeInitialState(IReadStream &stream, uint32_t &outNodeNamespace, uint32_t &outNodeType, Vector<uint8_t> &outContent, BuildFileLocation &outInputLocation);
 
 		Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool) const override;
 		Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver) override;
@@ -381,6 +387,8 @@ namespace rkit::buildsystem
 		Vector<FileDependencyInfo> m_compileFileDependencies;
 		Vector<NodeDependencyInfo> m_nodeDependencies;
 
+		Vector<uint8_t> m_content;
+
 		DependencyState m_dependencyState;
 		size_t m_checkNodeIndex;
 
@@ -422,8 +430,10 @@ namespace rkit::buildsystem
 		BuildSystemInstance();
 
 		Result Initialize(const StringView &targetName, const StringView &srcDir, const StringView &intermediateDir, const StringView &dataDir) override;
-		IDependencyNode *FindNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) const override;
-		Result FindOrCreateNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier, IDependencyNode *&outNode) override;
+		IDependencyNode *FindNamedNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) const override;
+		IDependencyNode *FindContentNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const Span<const uint8_t> &content) const override;
+		Result FindOrCreateNamedNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier, IDependencyNode *&outNode) override;
+		Result FindOrCreateContentNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, Vector<uint8_t> &&content, IDependencyNode *&outNode) override;
 		Result AddRootNode(IDependencyNode *node) override;
 		Result AddPostBuildAction(IBuildSystemAction *action) override;
 
@@ -433,7 +443,8 @@ namespace rkit::buildsystem
 
 		IDependencyGraphFactory *GetDependencyGraphFactory() const override;
 
-		Result CreateNode(uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation buildFileLocation, const StringView &identifier, UniquePtr<IDependencyNode> &outNode) const override;
+		Result CreateNamedNode(uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation buildFileLocation, const StringView &identifier, UniquePtr<IDependencyNode> &outNode) const override;
+		Result CreateContentNode(uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation buildFileLocation, Vector<uint8_t> &&content, UniquePtr<IDependencyNode> &outNode) const override;
 		Result RegisterNodeCompiler(uint32_t nodeNamespace, uint32_t nodeType, UniquePtr<IDependencyNodeCompiler> &&compiler) override;
 
 		Result ResolveFileStatus(BuildFileLocation location, const StringView &path, FileStatusView &outStatusView, bool cached, bool &outExists);
@@ -461,6 +472,19 @@ namespace rkit::buildsystem
 
 			char m_chars[5];
 		};
+
+		struct ContentID
+		{
+			static const size_t kContentStringSize = 51;	// 255 bits
+
+			char m_chars[kContentStringSize + 1];
+
+			StringView GetStringView() const;
+		};
+
+		static ContentID CreateContentID(const Span<const uint8_t> &content);
+
+		Result CreateNode(uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation buildFileLocation, const StringView &identifier, Vector<uint8_t> &&content, UniquePtr<IDependencyNode> &outNode) const;
 
 		Result AddNode(UniquePtr<DependencyNode> &&node);
 		Result AddRelevantNode(DependencyNode *node);
@@ -525,7 +549,7 @@ namespace rkit::buildsystem
 		return m_typeID;
 	}
 
-	DependencyNode::DependencyNode(IDependencyNodeCompiler *compiler, uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation inputLocation)
+	DependencyNode::DependencyNode(IDependencyNodeCompiler *compiler, uint32_t nodeNamespace, uint32_t nodeType, Vector<uint8_t> &&content, BuildFileLocation inputLocation)
 		: m_compiler(compiler)
 		, m_inputLocation(inputLocation)
 		, m_nodeType(nodeType)
@@ -537,6 +561,7 @@ namespace rkit::buildsystem
 		, m_lastCompilerVersion(0)
 		, m_serializedIndex(0)
 		, m_wasCompiled(false)
+		, m_content(std::move(content))
 	{
 	}
 
@@ -596,6 +621,16 @@ namespace rkit::buildsystem
 	bool DependencyNode::WasCompiled() const
 	{
 		return m_wasCompiled;
+	}
+
+	bool DependencyNode::IsContentBased() const
+	{
+		return m_content.Count() > 0;
+	}
+
+	Span<const uint8_t> DependencyNode::GetContent() const
+	{
+		return m_content.ToSpan();
 	}
 
 	StringView DependencyNode::GetIdentifier() const
@@ -1001,15 +1036,39 @@ namespace rkit::buildsystem
 	{
 		RKIT_CHECK(stream.WriteAll(&m_nodeNamespace, sizeof(m_nodeNamespace)));
 		RKIT_CHECK(stream.WriteAll(&m_nodeType, sizeof(m_nodeType)));
+
+		const uint64_t contentSize = m_content.Count();
+		RKIT_CHECK(stream.WriteAll(&contentSize, sizeof(contentSize)));
+
+		if (contentSize > 0)
+		{
+			RKIT_CHECK(stream.WriteAll(m_content.GetBuffer(), m_content.Count()));
+		}
+
 		RKIT_CHECK(serializer::SerializeEnum(stream, m_inputLocation));
 
 		return ResultCode::kOK;
 	}
 
-	Result DependencyNode::DeserializeInitialState(IReadStream &stream, uint32_t &outNodeNamespace, uint32_t &outNodeType, BuildFileLocation &outInputLocation)
+	Result DependencyNode::DeserializeInitialState(IReadStream &stream, uint32_t &outNodeNamespace, uint32_t &outNodeType, Vector<uint8_t> &outContent, BuildFileLocation &outInputLocation)
 	{
 		RKIT_CHECK(stream.ReadAll(&outNodeNamespace, sizeof(outNodeNamespace)));
 		RKIT_CHECK(stream.ReadAll(&outNodeType, sizeof(outNodeType)));
+
+
+		uint64_t contentSize = 0;
+		RKIT_CHECK(stream.ReadAll(&contentSize, sizeof(contentSize)));
+
+		if (contentSize > std::numeric_limits<size_t>::max())
+			return ResultCode::kOutOfMemory;
+
+		RKIT_CHECK(outContent.Resize(static_cast<size_t>(contentSize)));
+
+		if (contentSize > 0)
+		{
+			RKIT_CHECK(stream.ReadAll(outContent.GetBuffer(), outContent.Count()));
+		}
+
 		RKIT_CHECK(serializer::DeserializeEnum(stream, outInputLocation));
 
 		return ResultCode::kOK;
@@ -1186,7 +1245,7 @@ namespace rkit::buildsystem
 	Result DependencyNode::DependencyNodeCompilerFeedback::AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier)
 	{
 		IDependencyNode *node = nullptr;
-		RKIT_CHECK(m_buildInstance->FindOrCreateNode(nodeTypeNamespace, nodeTypeID, inputFileLocation, identifier, node));
+		RKIT_CHECK(m_buildInstance->FindOrCreateNamedNode(nodeTypeNamespace, nodeTypeID, inputFileLocation, identifier, node));
 
 		NodeDependencyInfo depInfo;
 		depInfo.m_mustBeUpToDate = true;
@@ -1413,8 +1472,9 @@ namespace rkit::buildsystem
 			uint32_t nodeNamespace = 0;
 			uint32_t nodeType = 0;
 			BuildFileLocation inputLocation = BuildFileLocation::kInvalid;
+			Vector<uint8_t> content;
 
-			RKIT_CHECK(DependencyNode::DeserializeInitialState(stream, nodeNamespace, nodeType, inputLocation));
+			RKIT_CHECK(DependencyNode::DeserializeInitialState(stream, nodeNamespace, nodeType, content, inputLocation));
 
 			HashMap<NodeTypeKey, UniquePtr<IDependencyNodeCompiler>>::ConstIterator_t it = m_nodeCompilers.Find(NodeTypeKey(nodeNamespace, nodeType));
 			if (it == m_nodeCompilers.end())
@@ -1422,7 +1482,7 @@ namespace rkit::buildsystem
 
 			IDependencyNodeCompiler *compiler = it.Value().Get();
 
-			RKIT_CHECK(New<DependencyNode>(nodesVector[i], compiler, nodeNamespace, nodeType, inputLocation));
+			RKIT_CHECK(New<DependencyNode>(nodesVector[i], compiler, nodeNamespace, nodeType, std::move(content), inputLocation));
 		}
 
 		serializer::DeserializeResolver resolver(nodes, strings);
@@ -1480,7 +1540,7 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
-	IDependencyNode *BuildSystemInstance::FindNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) const
+	IDependencyNode *BuildSystemInstance::FindNamedNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) const
 	{
 		NodeTypeKey ntk(nodeTypeNamespace, nodeTypeID);
 		NodeKey key(ntk, inputFileLocation, identifier);
@@ -1493,12 +1553,22 @@ namespace rkit::buildsystem
 		return it.Value();
 	}
 
-	Result BuildSystemInstance::FindOrCreateNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier, IDependencyNode *&outNode)
+	IDependencyNode *BuildSystemInstance::FindContentNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const Span<const uint8_t> &content) const
 	{
+		return FindNamedNode(nodeTypeNamespace, nodeTypeID, inputFileLocation, CreateContentID(content).GetStringView());
+	}
+
+	Result BuildSystemInstance::FindOrCreateContentNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, Vector<uint8_t> &&contentRef, IDependencyNode *&outNode)
+	{
+		Vector<uint8_t> content = std::move(contentRef);
+
 		outNode = nullptr;
 
+		ContentID contentID = CreateContentID(content.ToSpan());
+		StringView contentIdentifier = contentID.GetStringView();
+
 		{
-			IDependencyNode *node = FindNode(nodeTypeNamespace, nodeTypeID, inputFileLocation, identifier);
+			IDependencyNode *node = FindNamedNode(nodeTypeNamespace, nodeTypeID, inputFileLocation, contentIdentifier);
 
 			if (node)
 			{
@@ -1509,7 +1579,7 @@ namespace rkit::buildsystem
 
 		{
 			UniquePtr<IDependencyNode> node;
-			RKIT_CHECK(CreateNode(nodeTypeNamespace, nodeTypeID, inputFileLocation, identifier, node));
+			RKIT_CHECK(CreateNode(nodeTypeNamespace, nodeTypeID, inputFileLocation, contentIdentifier, std::move(content), node));
 
 			IDependencyNode *nodePtr = node.Get();
 
@@ -1521,6 +1591,33 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
+	Result BuildSystemInstance::FindOrCreateNamedNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier, IDependencyNode *&outNode)
+	{
+		outNode = nullptr;
+
+		{
+			IDependencyNode *node = FindNamedNode(nodeTypeNamespace, nodeTypeID, inputFileLocation, identifier);
+
+			if (node)
+			{
+				outNode = node;
+				return ResultCode::kOK;
+			}
+		}
+
+		{
+			UniquePtr<IDependencyNode> node;
+			RKIT_CHECK(CreateNamedNode(nodeTypeNamespace, nodeTypeID, inputFileLocation, identifier, node));
+
+			IDependencyNode *nodePtr = node.Get();
+
+			RKIT_CHECK(AddNode(node.StaticCast<DependencyNode>()));
+
+			outNode = nodePtr;
+		}
+
+		return ResultCode::kOK;
+	}
 
 	Result BuildSystemInstance::AddRootNode(IDependencyNode *node)
 	{
@@ -1700,8 +1797,38 @@ namespace rkit::buildsystem
 		return const_cast<BuildSystemInstance *>(this);
 	}
 
-	Result BuildSystemInstance::CreateNode(uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation buildFileLocation, const StringView &identifier, UniquePtr<IDependencyNode> &outNode) const
+	BuildSystemInstance::ContentID BuildSystemInstance::CreateContentID(const Span<const uint8_t> &content)
 	{
+		const utils::ISha256Calculator *calculator = GetDrivers().m_utilitiesDriver->GetSha256Calculator();
+		utils::Sha256DigestBytes digest = calculator->SimpleHashBuffer(content.Ptr(), content.Count());
+
+		const char *contentIDChars = "abcdefghijklmnopqrstuvwxyz012345";
+
+		ContentID contentID;
+		contentID.m_chars[ContentID::kContentStringSize] = '\0';
+
+		uint8_t numBitsBuffered = 0;
+		uint16_t bufferedNumber = 0;
+		size_t hashRead = 0;
+		for (size_t i = 0; i < ContentID::kContentStringSize; i++)
+		{
+			while (numBitsBuffered < 5)
+			{
+				RKIT_ASSERT(hashRead < utils::Sha256DigestBytes::kSize);
+				bufferedNumber |= digest.m_data[hashRead++] << (numBitsBuffered);
+				numBitsBuffered += 8;
+			}
+
+			contentID.m_chars[i] = contentIDChars[bufferedNumber % 32];
+		}
+
+		return contentID;
+	}
+
+	Result BuildSystemInstance::CreateNode(uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation buildFileLocation, const StringView &identifier, Vector<uint8_t> &&contentRef, UniquePtr<IDependencyNode> &outNode) const
+	{
+		Vector<uint8_t> content = std::move(contentRef);
+
 		HashMap<NodeTypeKey, UniquePtr<IDependencyNodeCompiler> >::ConstIterator_t compilerIt = m_nodeCompilers.Find(NodeTypeKey(nodeNamespace, nodeType));
 
 		if (compilerIt == m_nodeCompilers.end())
@@ -1711,13 +1838,28 @@ namespace rkit::buildsystem
 		}
 
 		UniquePtr<DependencyNode> depNode;
-		RKIT_CHECK(New<DependencyNode>(depNode, compilerIt.Value().Get(), nodeNamespace, nodeType, buildFileLocation));
+		RKIT_CHECK(New<DependencyNode>(depNode, compilerIt.Value().Get(), nodeNamespace, nodeType, std::move(content), buildFileLocation));
 
 		RKIT_CHECK(depNode->Initialize(identifier));
 
 		outNode = std::move(depNode);
 
 		return ResultCode::kOK;
+	}
+
+	Result BuildSystemInstance::CreateNamedNode(uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation buildFileLocation, const StringView &identifier, UniquePtr<IDependencyNode> &outNode) const
+	{
+		return CreateNode(nodeNamespace, nodeType, buildFileLocation, identifier, Vector<uint8_t>(), outNode);
+	}
+
+	Result BuildSystemInstance::CreateContentNode(uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation buildFileLocation, Vector<uint8_t> &&contentRef, UniquePtr<IDependencyNode> &outNode) const
+	{
+		Vector<uint8_t> content = std::move(contentRef);
+
+		if (content.Count() == 0)
+			return ResultCode::kInvalidParameter;
+
+		return CreateNode(nodeNamespace, nodeType, buildFileLocation, CreateContentID(content.ToSpan()).GetStringView(), std::move(content), outNode);
 	}
 
 	Result BuildSystemInstance::RegisterNodeCompiler(uint32_t nodeNamespace, uint32_t nodeType, UniquePtr<IDependencyNodeCompiler> &&compiler)
@@ -1961,6 +2103,7 @@ namespace rkit::buildsystem
 		UniquePtr<CachedFileStatus> fileStatus;
 		RKIT_CHECK(New<CachedFileStatus>(fileStatus));
 
+		fileStatus->m_exists = false;
 		RKIT_CHECK(m_fs->ResolveFileStatusIfExists(location, path, fileStatus.Get(), ResolveCachedFileStatusCallback));
 
 		if (!fileStatus->m_exists)
@@ -1986,7 +2129,11 @@ namespace rkit::buildsystem
 	Result BuildSystemInstance::TryOpenFileRead(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &outFile)
 	{
 		// Keep the behavior here in sync with ResolveFileStatus
-		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+		return m_fs->TryOpenFileRead(location, path, outFile);
+
+#if 0
+			ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+
 
 		if (location == rkit::buildsystem::BuildFileLocation::kSourceDir)
 		{
@@ -2006,6 +2153,7 @@ namespace rkit::buildsystem
 		}
 
 		return ResultCode::kNotYetImplemented;
+#endif
 	}
 
 	Result BuildSystemInstance::OpenFileWrite(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outFile)
@@ -2146,5 +2294,10 @@ namespace rkit::buildsystem
 	const char *BuildSystemInstance::PrintableFourCC::GetChars() const
 	{
 		return m_chars;
+	}
+
+	StringView BuildSystemInstance::ContentID::GetStringView() const
+	{
+		return StringView(m_chars, kContentStringSize);
 	}
 }

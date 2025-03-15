@@ -24,7 +24,7 @@ namespace anox
 			FileHandle();
 			FileHandle(const IArchive *archive, uint32_t fileIndex);
 
-			rkit::Result Open(rkit::UniquePtr<rkit::IReadStream> &outStream) const;
+			rkit::Result Open(rkit::UniquePtr<rkit::ISeekableReadStream> &outStream) const;
 			bool IsValid() const;
 			uint32_t GetFileSize() const;
 			rkit::StringView GetFilePath() const;
@@ -74,14 +74,14 @@ namespace anox
 
 			virtual ~IArchive() {}
 
-			virtual FileHandle FindFile(const rkit::StringView &fileName) const = 0;
+			virtual FileHandle FindFile(const rkit::StringSliceView &fileName) const = 0;
 
 			ArchiveFileListView GetFiles() const;
 
 		protected:
 			virtual uint32_t GetNumFiles() const = 0;
 			virtual FileHandle GetFileByIndex(uint32_t fileIndex) const = 0;
-			virtual rkit::Result OpenFileByIndex(uint32_t fileIndex, rkit::UniquePtr<rkit::IReadStream> &outStream) const = 0;
+			virtual rkit::Result OpenFileByIndex(uint32_t fileIndex, rkit::UniquePtr<rkit::ISeekableReadStream> &outStream) const = 0;
 			virtual uint32_t GetFileSizeByIndex(uint32_t fileIndex) const = 0;
 			virtual rkit::StringView GetFilePathByIndex(uint32_t fileIndex) const = 0;
 		};
@@ -102,7 +102,7 @@ inline anox::afs::FileHandle::FileHandle(const IArchive *archive, uint32_t fileI
 {
 }
 
-inline rkit::Result anox::afs::FileHandle::Open(rkit::UniquePtr<rkit::IReadStream> &outStream) const
+inline rkit::Result anox::afs::FileHandle::Open(rkit::UniquePtr<rkit::ISeekableReadStream> &outStream) const
 {
 	if (m_archive == nullptr)
 		return rkit::ResultCode::kFileOpenError;

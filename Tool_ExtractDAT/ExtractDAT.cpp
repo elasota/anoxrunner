@@ -60,7 +60,7 @@ rkit::Result anox::ExtractDATProgram::Run()
 
 	for (anox::afs::FileHandle fh : archive->GetFiles())
 	{
-		rkit::UniquePtr<rkit::IReadStream> fileStream;
+		rkit::UniquePtr<rkit::ISeekableReadStream> fileStream;
 		RKIT_CHECK(fh.Open(fileStream));
 
 		uint32_t fileSize = fh.GetFileSize();

@@ -102,6 +102,9 @@ namespace rkit
 
 			virtual void MarkOutOfDate() = 0;
 			virtual bool WasCompiled() const = 0;
+			virtual bool IsContentBased() const = 0;
+
+			virtual Span<const uint8_t> GetContent() const = 0;
 
 			virtual StringView GetIdentifier() const = 0;
 			virtual DependencyState GetDependencyState() const = 0;
@@ -161,8 +164,9 @@ namespace rkit
 		{
 			virtual ~IDependencyGraphFactory() {}
 
-			virtual Result CreateNode(uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation inputFileLocation, const StringView &identifier, UniquePtr<IDependencyNode> &outNode) const = 0;
 			virtual Result RegisterNodeCompiler(uint32_t nodeNamespace, uint32_t nodeType, UniquePtr<IDependencyNodeCompiler> &&factory) = 0;
+			virtual Result CreateNamedNode(uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation buildFileLocation, const StringView &identifier, UniquePtr<IDependencyNode> &outNode) const = 0;
+			virtual Result CreateContentNode(uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation buildFileLocation, Vector<uint8_t> &&content, UniquePtr<IDependencyNode> &outNode) const = 0;
 		};
 	}
 }

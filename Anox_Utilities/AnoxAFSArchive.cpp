@@ -104,7 +104,7 @@ namespace anox
 			return rkit::ResultCode::kOK;
 		}
 
-		FileHandle Archive::FindFile(const rkit::StringView &fileName) const
+		FileHandle Archive::FindFile(const rkit::StringSliceView &fileName) const
 		{
 			size_t numFiles = m_files.Count();
 
@@ -119,7 +119,7 @@ namespace anox
 			return FileHandle();
 		}
 
-		rkit::Result Archive::OpenFileByIndex(uint32_t fileIndex, rkit::UniquePtr<rkit::IReadStream> &outStream) const
+		rkit::Result Archive::OpenFileByIndex(uint32_t fileIndex, rkit::UniquePtr<rkit::ISeekableReadStream> &outStream) const
 		{
 			rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
 
@@ -130,10 +130,10 @@ namespace anox
 
 			if (fileInfo.m_compressedSize > 0)
 			{
-				rkit::UniquePtr<rkit::IReadStream> sliceStream;
+				rkit::UniquePtr<rkit::ISeekableReadStream> sliceStream;
 				RKIT_CHECK(utils->CreateRangeLimitedReadStream(sliceStream, std::move(mutualAccessorStream), fileInfo.m_filePosition, fileInfo.m_compressedSize));
 
-				RKIT_CHECK(utils->CreateDeflateDecompressStream(outStream, std::move(sliceStream)));
+				RKIT_CHECK(utils->CreateRestartableDeflateDecompressStream(outStream, std::move(sliceStream), fileInfo.m_compressedSize));
 			}
 			else
 			{

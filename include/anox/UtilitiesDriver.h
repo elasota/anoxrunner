@@ -11,6 +11,8 @@ namespace rkit
 
 	struct ISeekableReadStream;
 	struct Result;
+
+	struct FileAttributes;
 }
 
 namespace anox
