@@ -133,7 +133,7 @@ namespace anox
 				rkit::UniquePtr<rkit::ISeekableReadStream> sliceStream;
 				RKIT_CHECK(utils->CreateRangeLimitedReadStream(sliceStream, std::move(mutualAccessorStream), fileInfo.m_filePosition, fileInfo.m_compressedSize));
 
-				RKIT_CHECK(utils->CreateRestartableDeflateDecompressStream(outStream, std::move(sliceStream), fileInfo.m_compressedSize));
+				RKIT_CHECK(utils->CreateRestartableDeflateDecompressStream(outStream, std::move(sliceStream), fileInfo.m_uncompressedSize));
 			}
 			else
 			{

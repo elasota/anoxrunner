@@ -87,5 +87,9 @@ namespace rkit
 		virtual void GetProgramVersion(uint32_t &outMajor, uint32_t &outMinor, uint32_t &outPatch) const = 0;
 
 		virtual void GetRKitVersion(uint32_t &outMajor, uint32_t &outMinor, uint32_t &outPatch) const = 0;
+
+		virtual ConstSpan<uint8_t> GetLinearToSRGBTable() const = 0;
+		virtual ConstSpan<uint16_t> GetSRGBToLinearTable() const = 0;
+		virtual int GetSRGBToLinearPrecisionBits() const = 0;
 	};
 }

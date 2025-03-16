@@ -109,7 +109,7 @@ namespace anox::buildsystem
 		analysisHeader.m_materialType = data::MaterialType::kSingle;
 		analysisHeader.m_colorType = data::MaterialColorType::kRGBA;
 
-		ImageImportDisposition disposition = ImageImportDisposition::kWorldTransparent;
+		ImageImportDisposition disposition = ImageImportDisposition::kWorldAlphaTested;
 
 		MaterialNodeType nodeType = MaterialNodeType::kCount;
 
@@ -132,7 +132,7 @@ namespace anox::buildsystem
 		RKIT_CHECK(dynamicData.m_imageImports.Resize(1));
 
 		rkit::String &imageImport = dynamicData.m_imageImports[0];
-		RKIT_CHECK(TextureCompiler::CreateImportIdentifier(imageImport, name, disposition));
+		RKIT_CHECK(TextureCompilerBase::CreateImportIdentifier(imageImport, name, disposition));
 
 		RKIT_CHECK(dynamicData.m_bitmapDefs.Resize(1));
 

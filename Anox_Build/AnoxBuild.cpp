@@ -54,8 +54,8 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 	}
 
 	{
-		rkit::UniquePtr<buildsystem::TextureCompiler> texCompiler;
-		RKIT_CHECK(rkit::New<buildsystem::TextureCompiler>(texCompiler));
+		rkit::UniquePtr<buildsystem::TextureCompilerBase> texCompiler;
+		RKIT_CHECK(buildsystem::TextureCompilerBase::Create(texCompiler));
 
 		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kTextureNodeID, std::move(texCompiler)));
 	}

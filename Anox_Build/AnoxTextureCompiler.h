@@ -16,8 +16,8 @@ namespace anox::buildsystem
 
 	enum class ImageImportDisposition
 	{
-		kWorldTransparent,
-		kWorldOpaque,
+		kWorldAlphaBlend,
+		kWorldAlphaTested,
 		kGraphicTransparent,
 		kGraphicOpaque,
 		kInterformPalette,
@@ -25,21 +25,14 @@ namespace anox::buildsystem
 		kCount,
 	};
 
-	class TextureCompiler final : public rkit::buildsystem::IDependencyNodeCompiler
+	class TextureCompilerBase : public rkit::buildsystem::IDependencyNodeCompiler
 	{
 	public:
-		bool HasAnalysisStage() const override;
-
-		rkit::Result RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
-		rkit::Result RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
-
-		uint32_t GetVersion() const override;
+		static rkit::Result Create(rkit::UniquePtr<TextureCompilerBase> &outCompiler);
 
 		static rkit::Result CreateImportIdentifier(rkit::String &identifier, const rkit::StringView &imagePath, ImageImportDisposition disposition);
 
-	private:
-		static rkit::Result CompileTGA(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::StringView &shortName, ImageImportDisposition disposition);
-		static rkit::Result CompilePCX(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::StringView &shortName, ImageImportDisposition disposition);
-		static rkit::Result CompilePNG(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::StringView &shortName, ImageImportDisposition disposition);
+	protected:
+		TextureCompilerBase() {}
 	};
 }
