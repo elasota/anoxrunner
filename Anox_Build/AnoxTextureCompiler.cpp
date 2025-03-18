@@ -9,6 +9,8 @@
 #include "rkit/Core/String.h"
 #include "rkit/Core/Vector.h"
 
+#include "rkit/Data/DDSFile.h"
+
 namespace anox::buildsystem
 {
 	namespace priv
@@ -126,6 +128,80 @@ namespace anox::buildsystem
 			uint32_t m_width;
 			uint32_t m_height;
 		};
+
+		template<class TElementType, size_t TNumElements, size_t TElementIndex, bool TElementIsInRange>
+		struct UsesChannelHelperBase
+		{
+		};
+
+		template<class TElementType, size_t TNumElements, size_t TElementIndex>
+		struct UsesChannelHelperBase<TElementType, TNumElements, TElementIndex, true>
+		{
+			static bool UsesChannel(const TextureCompilerImage<TElementType, TNumElements> &image);
+		};
+
+		template<class TElementType, size_t TNumElements, size_t TElementIndex>
+		struct UsesChannelHelperBase<TElementType, TNumElements, TElementIndex, false>
+		{
+			static bool UsesChannel(const TextureCompilerImage<TElementType, TNumElements> &image);
+		};
+
+		template<class TElementType, size_t TNumElements, size_t TElementIndex>
+		struct UsesChannelHelper : public UsesChannelHelperBase<TElementType, TNumElements, TElementIndex, (TElementIndex < TNumElements)>
+		{
+		};
+
+		template<class TElementType, size_t TElementIndex>
+		struct ChannelDefaultValueHelper
+		{
+			static TElementType GetDefaultValue();
+		};
+
+		template<class TElementType>
+		struct ChannelDefaultValueHelper<TElementType, 3>
+		{
+			static TElementType GetDefaultValue();
+		};
+
+		template<class TElementType>
+		struct NormalizedValueHelper
+		{
+			static TElementType GetNormalizedOne();
+		};
+
+		template<>
+		struct NormalizedValueHelper<float>
+		{
+			static float GetNormalizedOne();
+		};
+
+		template<>
+		struct NormalizedValueHelper<double>
+		{
+			static double GetNormalizedOne();
+		};
+
+		template<class TElementType, size_t TNumElements, size_t TElementIndex, bool TIsInRange>
+		struct PixelPackHelperBase
+		{
+		};
+
+		template<class TElementType, size_t TNumElements, size_t TElementIndex>
+		struct PixelPackHelperBase<TElementType, TNumElements, TElementIndex, true>
+		{
+			static uint64_t Pack(const TextureCompilerPixel<TElementType, TNumElements> &pixel);
+		};
+
+		template<class TElementType, size_t TNumElements, size_t TElementIndex>
+		struct PixelPackHelperBase<TElementType, TNumElements, TElementIndex, false>
+		{
+			static uint64_t Pack(const TextureCompilerPixel<TElementType, TNumElements> &pixel);
+		};
+
+		template<class TElementType, size_t TNumElements>
+		struct PixelPackHelper : public PixelPackHelperBase<TElementType, TNumElements, 0, (TNumElements > 0)>
+		{
+		};
 	}
 
 	class TextureCompiler final : public TextureCompilerBase
@@ -149,7 +225,8 @@ namespace anox::buildsystem
 		template<class TElementType, size_t TNumElements>
 		static rkit::Result Generate2DMipMapChain(const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &images, ImageImportDisposition disposition);
 
-		static rkit::Result ExportDDS(const rkit::Span<priv::TextureCompilerImage<uint8_t, 4>> &images, size_t numLevels, size_t numLayers, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::StringView &shortName, ImageImportDisposition disposition);
+		template<class TElementType, size_t TNumElements>
+		static rkit::Result ExportDDS(const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &images, size_t numLevels, size_t numLayers, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::StringView &shortName, ImageImportDisposition disposition);
 
 		static bool DispositionHasAlpha(ImageImportDisposition disposition);
 		static bool DispositionHasMipMaps(ImageImportDisposition disposition);
@@ -181,7 +258,7 @@ namespace anox::buildsystem::priv
 	template<class TElementType, size_t TNumElements>
 	template<class... TElementValue>
 	TextureCompilerPixel<TElementType, TNumElements>::TextureCompilerPixel(TElementValue... values)
-		: m_values { values... }
+		: m_values{ values... }
 	{
 	}
 
@@ -276,6 +353,75 @@ namespace anox::buildsystem::priv
 	uint32_t TextureCompilerImage<TPixelElement, TElementsPerPixel>::GetHeight() const
 	{
 		return m_height;
+	}
+
+	template<class TElementType, size_t TNumElements, size_t TElementIndex>
+	bool UsesChannelHelperBase<TElementType, TNumElements, TElementIndex, true>::UsesChannel(const TextureCompilerImage<TElementType, TNumElements> &image)
+	{
+		const uint32_t width = image.GetWidth();
+		const uint32_t height = image.GetHeight();
+
+		for (uint32_t y = 0; y < height; y++)
+		{
+			const rkit::ConstSpan<TextureCompilerPixel<TElementType, TNumElements>> scanline = image.GetScanline(y);
+
+			for (const TextureCompilerPixel<TElementType, TNumElements> &pixel : scanline)
+			{
+				if (!(pixel.GetAt<TElementIndex>() == ChannelDefaultValueHelper<TElementType, TElementIndex>::GetDefaultValue()))
+					return true;
+			}
+		}
+
+		return false;
+	}
+
+	template<class TElementType, size_t TNumElements, size_t TElementIndex>
+	bool UsesChannelHelperBase<TElementType, TNumElements, TElementIndex, false>::UsesChannel(const TextureCompilerImage<TElementType, TNumElements> &image)
+	{
+		return false;
+	}
+
+	template<class TElementType, size_t TElementIndex>
+	TElementType ChannelDefaultValueHelper<TElementType, TElementIndex>::GetDefaultValue()
+	{
+		return static_cast<TElementType>(0);
+	}
+
+	template<class TElementType>
+	TElementType ChannelDefaultValueHelper<TElementType, 3>::GetDefaultValue()
+	{
+		return NormalizedValueHelper<TElementType>::GetNormalizedOne();
+	}
+
+	template<class TElementType>
+	TElementType NormalizedValueHelper<TElementType>::GetNormalizedOne()
+	{
+		return std::numeric_limits<TElementType>::max();
+	}
+
+	float NormalizedValueHelper<float>::GetNormalizedOne()
+	{
+		return 1.0f;
+	}
+
+	double NormalizedValueHelper<double>::GetNormalizedOne()
+	{
+		return 1.0f;
+	}
+
+
+	template<class TElementType, size_t TNumElements, size_t TElementIndex>
+	uint64_t PixelPackHelperBase<TElementType, TNumElements, TElementIndex, true>::Pack(const TextureCompilerPixel<TElementType, TNumElements> &pixel)
+	{
+		uint64_t bits = static_cast<uint64_t>(pixel.GetAt<TElementIndex>()) << (sizeof(TElementType) * 8 * TElementIndex);
+		bits |= PixelPackHelperBase<TElementType, TNumElements, TElementIndex + 1, ((TElementIndex + 1) < TNumElements)>::Pack(pixel);
+		return bits;
+	}
+
+	template<class TElementType, size_t TNumElements, size_t TElementIndex>
+	uint64_t PixelPackHelperBase<TElementType, TNumElements, TElementIndex, false>::Pack(const TextureCompilerPixel<TElementType, TNumElements> &pixel)
+	{
+		return 0;
 	}
 }
 
@@ -574,12 +720,190 @@ namespace anox::buildsystem
 		return rkit::ResultCode::kNotYetImplemented;
 	}
 
-	rkit::Result TextureCompiler::ExportDDS(const rkit::Span<priv::TextureCompilerImage<uint8_t, 4>> &images, size_t numMipMaps, size_t numLayers, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::StringView &shortName, ImageImportDisposition disposition)
+	template<class TElementType, size_t TNumElements>
+	rkit::Result TextureCompiler::ExportDDS(const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &images, size_t numMipMaps, size_t numLayers, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::StringView &shortName, ImageImportDisposition disposition)
 	{
 		rkit::String outName;
 		RKIT_CHECK(outName.Format("ax_tex/%s.%i.dds", shortName.GetChars(), static_cast<int>(disposition)));
 
-		return rkit::ResultCode::kNotYetImplemented;
+		bool isCompressed = false;
+		bool hasPitch = true;
+		bool is3D = false;
+		bool isExtended = false;
+		bool isCubeMap = false;
+		uint8_t pixelSize = TNumElements;
+
+		size_t numChannelsToSave = 1;
+
+		for (const priv::TextureCompilerImage<TElementType, TNumElements> &image : images)
+		{
+			if (numChannelsToSave < 4)
+			{
+				if (priv::UsesChannelHelper<TElementType, TNumElements, 3>::UsesChannel(image))
+					numChannelsToSave = 4;
+			}
+			if (numChannelsToSave < 3)
+			{
+				if (priv::UsesChannelHelper<TElementType, TNumElements, 2>::UsesChannel(image))
+					numChannelsToSave = 3;
+			}
+			if (numChannelsToSave < 2)
+			{
+				if (priv::UsesChannelHelper<TElementType, TNumElements, 1>::UsesChannel(image))
+					numChannelsToSave = 2;
+			}
+		}
+
+		uint32_t ddsFlags = 0;
+		ddsFlags |= rkit::data::DDSFlags::kCaps;
+		ddsFlags |= rkit::data::DDSFlags::kHeight;
+		ddsFlags |= rkit::data::DDSFlags::kWidth;
+		ddsFlags |= rkit::data::DDSFlags::kPixelFormat;
+
+		if (hasPitch)
+		{
+			if (isCompressed)
+				ddsFlags |= rkit::data::DDSFlags::kLinearSize;
+			else
+				ddsFlags |= rkit::data::DDSFlags::kPitch;
+		}
+
+		if (is3D)
+			ddsFlags |= rkit::data::DDSFlags::kDepth;
+
+		rkit::data::DDSHeader ddsHeader = {};
+		ddsHeader.m_magic = rkit::data::DDSHeader::kExpectedMagic;
+		ddsHeader.m_headerSizeMinus4 = sizeof(ddsHeader) - 4;
+		ddsHeader.m_ddsFlags = ddsFlags;
+
+		ddsHeader.m_height = images[0].GetHeight();
+		ddsHeader.m_width = images[0].GetWidth();
+
+		if (isCompressed)
+		{
+			return rkit::ResultCode::kNotYetImplemented;
+		}
+		else
+		{
+			uint32_t pitch = (images[0].GetWidth() * pixelSize + 3) / 4;
+			ddsHeader.m_pitchOrLinearSize = pitch;
+		}
+
+		if (is3D)
+			return rkit::ResultCode::kNotYetImplemented;
+		else
+			ddsHeader.m_depth = 1;
+
+		ddsHeader.m_mipMapCount = static_cast<uint32_t>(numMipMaps);
+
+		{
+			rkit::data::DDSPixelFormat &pixelFormat = ddsHeader.m_pixelFormat;
+
+			pixelFormat.m_pixelFormatSize = sizeof(pixelFormat);
+
+			{
+				uint32_t pixelFormatFlags = 0;
+
+				if (!isCompressed)
+				{
+					pixelFormatFlags |= rkit::data::DDSPixelFormatFlags::kRGB;
+
+					if (numChannelsToSave >= 4)
+						pixelFormatFlags |= rkit::data::DDSPixelFormatFlags::kAlphaPixels;
+				}
+
+				pixelFormat.m_pixelFormatFlags = pixelFormatFlags;
+			}
+
+			if (isExtended)
+			{
+				pixelFormat.m_fourCC = rkit::data::DDSFourCCs::kExtended;
+			}
+			else
+			{
+				if (isCompressed)
+					return rkit::ResultCode::kNotYetImplemented;
+			}
+
+			pixelFormat.m_rgbBitCount = pixelSize * 8;
+
+			pixelFormat.m_rBitMask = 0x000000ffu;
+
+			if (numChannelsToSave >= 2)
+				pixelFormat.m_gBitMask = 0x0000ff00u;
+			if (numChannelsToSave >= 3)
+				pixelFormat.m_bBitMask = 0x00ff0000u;
+			if (numChannelsToSave >= 4)
+				pixelFormat.m_aBitMask = 0xff000000u;
+		}
+
+		{
+			uint32_t caps = 0;
+			caps |= rkit::data::DDSCaps::kTexture;
+
+			if (images.Count() > 1)
+				caps |= rkit::data::DDSCaps::kComplex;
+			if (numMipMaps > 1)
+				caps |= rkit::data::DDSCaps::kMipMap;
+
+			ddsHeader.m_caps = caps;
+		}
+
+		{
+			uint32_t caps2 = 0;
+
+			if (isCubeMap)
+			{
+				caps2 |= rkit::data::DDSCaps2::kCubeMap;
+				caps2 |= rkit::data::DDSCaps2::kCubeMapPositiveX;
+				caps2 |= rkit::data::DDSCaps2::kCubeMapNegativeX;
+				caps2 |= rkit::data::DDSCaps2::kCubeMapPositiveY;
+				caps2 |= rkit::data::DDSCaps2::kCubeMapNegativeY;
+				caps2 |= rkit::data::DDSCaps2::kCubeMapPositiveZ;
+				caps2 |= rkit::data::DDSCaps2::kCubeMapNegativeZ;
+			}
+
+			if (is3D)
+				caps2 |= rkit::data::DDSCaps2::kVolume;
+
+			ddsHeader.m_caps2 = caps2;
+		}
+
+		rkit::UniquePtr<rkit::ISeekableReadWriteStream> stream;
+		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outName, stream));
+
+		RKIT_CHECK(stream->WriteAll(&ddsHeader, sizeof(ddsHeader)));
+
+		rkit::Vector<uint8_t> packedScanline;
+		RKIT_CHECK(packedScanline.Resize(pixelSize * images[0].GetWidth()));
+
+		for (const priv::TextureCompilerImage<TElementType, TNumElements> &image : images)
+		{
+			uint32_t width = image.GetWidth();
+			uint32_t height = image.GetHeight();
+			uint8_t *scanlineBuffer = packedScanline.GetBuffer();
+
+			for (uint32_t y = 0; y < height; y++)
+			{
+				uint8_t *scanlineOut = scanlineBuffer;
+
+				const rkit::ConstSpan<priv::TextureCompilerPixel<TElementType, TNumElements>> scanline = image.GetScanline(y);
+
+				for (const priv::TextureCompilerPixel<TElementType, TNumElements> &pixel : scanline)
+				{
+					rkit::endian::LittleUInt64_t packedPixel(priv::PixelPackHelper<TElementType, TNumElements>::Pack(pixel));
+
+					for (size_t i = 0; i < pixelSize; i++)
+						scanlineOut[i] = packedPixel.GetBytes()[i];
+
+					scanlineOut += pixelSize;
+				}
+
+				RKIT_CHECK(stream->WriteAll(scanlineBuffer, pixelSize * width));
+			}
+		}
+
+		return rkit::ResultCode::kOK;
 	}
 
 	bool TextureCompiler::DispositionHasAlpha(ImageImportDisposition disposition)
