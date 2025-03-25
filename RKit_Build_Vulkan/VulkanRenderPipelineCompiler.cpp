@@ -1071,7 +1071,7 @@ namespace rkit::buildsystem::vulkan
 			}
 		}
 
-		if (fullPath.Length() == 0 || !GetDrivers().m_utilitiesDriver->ValidateFilePath(fullPath.ToSpan()))
+		if (fullPath.Length() == 0 || !GetDrivers().m_utilitiesDriver->ValidateFilePath(fullPath.ToSpan(), false))
 			return ResultCode::kOperationFailed;
 
 		path = std::move(fullPath);

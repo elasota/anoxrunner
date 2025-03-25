@@ -48,6 +48,7 @@ namespace rkit
 			BuildFileLocation m_location = BuildFileLocation::kSourceDir;
 			uint64_t m_fileSize = 0;
 			UTCMSecTimestamp_t m_fileTime = 0;
+			bool m_isDirectory = false;
 
 			bool operator==(const FileStatusView &other) const;
 			bool operator!=(const FileStatusView &other) const;
@@ -59,6 +60,7 @@ namespace rkit
 			BuildFileLocation m_location = BuildFileLocation::kSourceDir;
 			uint64_t m_fileSize = 0;
 			UTCMSecTimestamp_t m_fileTime = 0;
+			bool m_isDirectory = false;
 
 			FileStatusView ToView() const;
 			Result Set(const FileStatusView &view);
@@ -127,6 +129,8 @@ namespace rkit
 
 		struct IDependencyNodeCompilerFeedback
 		{
+			typedef Result(*EnumerateFilesResultCallback_t)(void *userdata, const String &path);
+
 			virtual ~IDependencyNodeCompilerFeedback() {}
 
 			virtual Result CheckInputExists(BuildFileLocation location, const StringView &path, bool &outExists) = 0;
@@ -136,6 +140,8 @@ namespace rkit
 
 			virtual Result AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) = 0;
 			virtual bool FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const = 0;
+
+			virtual Result EnumerateFiles(BuildFileLocation location, const StringSliceView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback) = 0;
 
 			virtual IBuildSystemInstance *GetBuildSystemInstance() const = 0;
 
@@ -173,7 +179,11 @@ namespace rkit
 
 inline bool rkit::buildsystem::FileStatusView::operator==(const FileStatusView &other) const
 {
-	return m_filePath == other.m_filePath && m_fileSize == other.m_fileSize && m_fileTime == other.m_fileTime && m_location == other.m_location;
+	return m_filePath == other.m_filePath
+		&& m_fileSize == other.m_fileSize
+		&& m_fileTime == other.m_fileTime
+		&& m_location == other.m_location
+		&& m_isDirectory == other.m_isDirectory;
 }
 
 inline bool rkit::buildsystem::FileStatusView::operator!=(const FileStatusView &other) const
@@ -188,6 +198,7 @@ inline rkit::buildsystem::FileStatusView rkit::buildsystem::FileStatus::ToView()
 	view.m_filePath = m_filePath;
 	view.m_fileSize = m_fileSize;
 	view.m_fileTime = m_fileTime;
+	view.m_isDirectory = m_isDirectory;
 
 	return view;
 }
@@ -198,6 +209,7 @@ inline rkit::Result rkit::buildsystem::FileStatus::Set(const FileStatusView &vie
 	RKIT_CHECK(m_filePath.Set(view.m_filePath));
 	m_fileSize = view.m_fileSize;
 	m_fileTime = view.m_fileTime;
+	m_isDirectory = view.m_isDirectory;
 
 	return ResultCode::kOK;
 }

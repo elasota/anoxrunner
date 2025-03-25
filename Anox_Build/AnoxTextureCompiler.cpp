@@ -517,7 +517,7 @@ namespace anox::buildsystem
 	{
 		typedef uint8_t RGBTriplet_t[3];
 
-		priv::PCXHeader pcxHeader;
+		priv::PCXHeader pcxHeader = {};
 
 		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
 		RKIT_CHECK(feedback->OpenInput(depsNode->GetInputFileLocation(), shortName, stream));

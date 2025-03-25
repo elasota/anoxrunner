@@ -40,8 +40,9 @@ namespace rkit
 
 			virtual ~IBuildFileSystem() {}
 
-			virtual Result ResolveFileStatusIfExists(BuildFileLocation inputFileLocation, const StringView &identifier, void *userdata, ApplyFileStatusCallback_t applyStatus) = 0;
+			virtual Result ResolveFileStatusIfExists(BuildFileLocation inputFileLocation, const StringView &identifier, bool allowDirectories, void *userdata, ApplyFileStatusCallback_t applyStatus) = 0;
 			virtual Result TryOpenFileRead(BuildFileLocation inputFileLocation, const StringView &identifier, UniquePtr<ISeekableReadStream> &outStream) = 0;
+			virtual Result EnumerateDirectory(BuildFileLocation inputFileLocation, const StringView &path, bool listFiles, bool listDirectories, void *userdata, ApplyFileStatusCallback_t callback) = 0;
 		};
 
 		struct IPipelineLibraryCombiner
@@ -59,6 +60,8 @@ namespace rkit
 
 		struct IBuildSystemInstance
 		{
+			typedef Result(*EnumerateFilesResultCallback_t)(void *userdata, const String &path);
+
 			virtual ~IBuildSystemInstance() {}
 
 			virtual Result Initialize(const rkit::StringView &targetName, const StringView &srcDir, const StringView &intermediateDir, const StringView &dataDir) = 0;
@@ -81,6 +84,8 @@ namespace rkit
 
 			virtual Result TryOpenFileRead(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &outFile) = 0;
 			virtual Result OpenFileWrite(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outFile) = 0;
+
+			virtual Result EnumerateFiles(BuildFileLocation location, const StringSliceView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback) = 0;
 		};
 
 		struct IBuildSystemDriver : public ICustomDriver

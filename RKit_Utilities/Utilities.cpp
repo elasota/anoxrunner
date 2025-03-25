@@ -56,7 +56,7 @@ namespace rkit
 		Result CreateTextParser(const Span<const char> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<utils::ITextParser> &outParser) const override;
 		Result ReadEntireFile(ISeekableReadStream &stream, Vector<uint8_t> &outBytes) const override;
 
-		bool ValidateFilePath(const Span<const char> &fileName) const override;
+		bool ValidateFilePath(const Span<const char> &fileName, bool permitWildcards) const override;
 
 		void NormalizeFilePath(const Span<char> &chars) const override;
 		bool FindFilePathExtension(const StringView &str, StringView &outExt) const override;
@@ -79,8 +79,13 @@ namespace rkit
 		ConstSpan<uint16_t> GetSRGBToLinearTable() const override;
 		int GetSRGBToLinearPrecisionBits() const override;
 
+		bool ContainsWildcards(const StringSliceView &str) const override;
+		bool MatchesWildcard(const StringSliceView &candidate, const StringSliceView &wildcard) const override;
+
 	private:
-		static bool ValidateFilePathSlice(const Span<const char> &name);
+		static bool ValidateFilePathSlice(const Span<const char> &name, bool permitWildcards);
+
+		static bool MatchesWildcardWithMinLiteralCount(const StringSliceView &candidate, const StringSliceView &wildcard, size_t minLiteralCount);
 
 		utils::Sha256Calculator m_sha256Calculator;
 
@@ -313,7 +318,7 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
-	bool UtilitiesDriver::ValidateFilePathSlice(const rkit::Span<const char> &sliceName)
+	bool UtilitiesDriver::ValidateFilePathSlice(const rkit::Span<const char> &sliceName, bool permitWildcards)
 	{
 		if (sliceName.Count() == 0)
 			return false;
@@ -371,6 +376,12 @@ namespace rkit
 
 				for (size_t j = 0; extChars[j] != 0; j++)
 				{
+					if (permitWildcards && (c == '*' || c == '?'))
+					{
+						isValidChar = true;
+						break;
+					}
+
 					if (extChars[j] == c)
 					{
 						isValidChar = true;
@@ -386,21 +397,21 @@ namespace rkit
 		return true;
 	}
 
-	bool UtilitiesDriver::ValidateFilePath(const Span<const char> &name) const
+	bool UtilitiesDriver::ValidateFilePath(const Span<const char> &name, bool permitWildcards) const
 	{
 		size_t sliceStart = 0;
 		for (size_t i = 0; i < name.Count(); i++)
 		{
 			if (name[i] == '/')
 			{
-				if (!ValidateFilePathSlice(name.SubSpan(sliceStart, i - sliceStart)))
+				if (!ValidateFilePathSlice(name.SubSpan(sliceStart, i - sliceStart), permitWildcards))
 					return false;
 
 				sliceStart = i + 1;
 			}
 		}
 
-		return ValidateFilePathSlice(name.SubSpan(sliceStart, name.Count() - sliceStart));
+		return ValidateFilePathSlice(name.SubSpan(sliceStart, name.Count() - sliceStart), permitWildcards);
 	}
 
 	void UtilitiesDriver::NormalizeFilePath(const Span<char> &chars) const
@@ -1626,6 +1637,109 @@ namespace rkit
 		255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
 		255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
 	};
+
+	bool UtilitiesDriver::ContainsWildcards(const StringSliceView &str) const
+	{
+		for (char c : str)
+		{
+			if (c == '?' || c == '*')
+				return true;
+		}
+
+		return false;
+	}
+
+	bool UtilitiesDriver::MatchesWildcard(const StringSliceView &candidateRef, const StringSliceView &wildcardRef) const
+	{
+		StringSliceView candidate = candidateRef;
+		StringSliceView wildcard = wildcardRef;
+
+		size_t minLiteralChars = 0;
+		bool prefixHasAsterisk = 0;
+
+		for (char c : wildcardRef)
+		{
+			if (c != '*')
+				minLiteralChars++;
+		}
+
+		return MatchesWildcardWithMinLiteralCount(candidateRef, wildcardRef, minLiteralChars);
+	}
+
+	bool UtilitiesDriver::MatchesWildcardWithMinLiteralCount(const StringSliceView &candidateRef, const StringSliceView &wildcardRef, size_t minLiteralCount)
+	{
+		StringSliceView candidate = candidateRef;
+		StringSliceView wildcard = wildcardRef;
+
+		if (wildcardRef.Length() == 0)
+			return candidateRef.Length() == 0;
+
+		size_t prefixAnyCount = 0;
+		bool prefixHasAsterisk = false;
+
+		size_t wildcardPrefixSkipSize = 0;
+
+		while (wildcardPrefixSkipSize < wildcard.Length())
+		{
+			const char c = wildcard[wildcardPrefixSkipSize];
+
+			if (c == '?')
+				prefixAnyCount++;
+			else if (c == '*')
+				prefixHasAsterisk = true;
+			else
+				break;
+
+			wildcardPrefixSkipSize++;
+		}
+
+		candidate = candidate.SubString(prefixAnyCount);
+		wildcard = wildcard.SubString(wildcardPrefixSkipSize);
+
+		minLiteralCount -= prefixAnyCount;
+
+		size_t wildcardNonAsteriskChunkSize = 0;
+
+		while (wildcardNonAsteriskChunkSize < wildcard.Length())
+		{
+			if (wildcard[wildcardNonAsteriskChunkSize] == '*')
+				break;
+
+			wildcardNonAsteriskChunkSize++;
+		}
+
+		size_t maxStartLoc = 0;
+		if (prefixHasAsterisk)
+			maxStartLoc = candidate.Length() - minLiteralCount;
+
+		for (;;)
+		{
+			bool matches = true;
+
+			for (size_t i = 0; i < wildcardNonAsteriskChunkSize; i++)
+			{
+				const char wcChar = wildcard[i];
+				if (wcChar != '?' && wcChar != candidate[i])
+				{
+					matches = false;
+					break;
+				}
+			}
+
+			if (matches)
+			{
+				if (MatchesWildcardWithMinLiteralCount(candidate.SubString(wildcardNonAsteriskChunkSize), wildcard.SubString(wildcardNonAsteriskChunkSize), minLiteralCount - wildcardNonAsteriskChunkSize))
+					return true;
+			}
+
+			// No match here
+			if (maxStartLoc == 0)
+				return false;
+
+			candidate = candidate.SubString(1);
+			maxStartLoc--;
+		}
+	}
 }
 
 

@@ -442,7 +442,7 @@ namespace rkit
 			size_t count = m_storage.m_staticStorage.m_size;
 			if (count < TStaticSize)
 			{
-				new (m_storage.m_staticStorage.GetStorage()) T(std::move(item));
+				new (m_storage.m_staticStorage.GetStorage() + count) T(std::move(item));
 				m_storage.m_staticStorage.m_size = count + 1;
 
 				return ResultCode::kOK;

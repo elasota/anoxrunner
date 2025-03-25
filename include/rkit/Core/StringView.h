@@ -37,6 +37,12 @@ namespace rkit
 
 		Span<const TChar> ToSpan() const;
 
+		SpanIterator<TChar> begin();
+		SpanIterator<const TChar> begin() const;
+
+		SpanIterator<TChar> end();
+		SpanIterator<const TChar> end() const;
+
 		const TChar *GetChars() const;
 		size_t Length() const;
 
@@ -152,6 +158,31 @@ rkit::Span<const TChar> rkit::BaseStringSliceView<TChar>::ToSpan() const
 		return Span<const TChar>(&BaseStringPrivate::NullTerminatedStringHelper<TChar>::kDefaultNullTerminator, 0);
 
 	return m_span;
+}
+
+
+template<class TChar>
+rkit::SpanIterator<TChar> rkit::BaseStringSliceView<TChar>::begin()
+{
+	return ToSpan().begin();
+}
+
+template<class TChar>
+rkit::SpanIterator<const TChar> rkit::BaseStringSliceView<TChar>::begin() const
+{
+	return ToSpan().begin();
+}
+
+template<class TChar>
+rkit::SpanIterator<TChar> rkit::BaseStringSliceView<TChar>::end()
+{
+	return ToSpan().end();
+}
+
+template<class TChar>
+rkit::SpanIterator<const TChar> rkit::BaseStringSliceView<TChar>::end() const
+{
+	return ToSpan().end();
 }
 
 template<class TChar>

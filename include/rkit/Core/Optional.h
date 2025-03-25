@@ -37,6 +37,7 @@ namespace rkit
 			ValueUnion(const Uninitialized &uninit);
 			ValueUnion(const T &value);
 			ValueUnion(T &&value);
+			~ValueUnion();
 
 			Uninitialized m_uninit;
 			T m_value;
@@ -273,6 +274,11 @@ namespace rkit
 	template<class T>
 	Optional<T>::ValueUnion::ValueUnion(T &&value)
 		: m_value(std::move(value))
+	{
+	}
+
+	template<class T>
+	Optional<T>::ValueUnion::~ValueUnion()
 	{
 	}
 }

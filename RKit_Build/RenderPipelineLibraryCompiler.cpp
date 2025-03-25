@@ -1800,7 +1800,7 @@ namespace rkit::buildsystem::rpc_analyzer
 		IUtilitiesDriver *utils = GetDrivers().m_utilitiesDriver;
 
 		utils->NormalizeFilePath(path.GetChars());
-		if (!utils->ValidateFilePath(path.GetChars()))
+		if (!utils->ValidateFilePath(path.GetChars(), false))
 		{
 			rkit::log::ErrorFmt("%s [%zu:%zu] Invalid file path", blamePath, line, col);
 			return ResultCode::kMalformedFile;

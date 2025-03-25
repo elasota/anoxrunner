@@ -1,5 +1,6 @@
 #include "DepsNodeCompiler.h"
 
+#include "rkit/Core/HybridVector.h"
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/Stream.h"
@@ -87,7 +88,7 @@ namespace rkit::buildsystem
 
 			utils->NormalizeFilePath(constructedPath.ToSpan());
 
-			if (!utils->ValidateFilePath(constructedPath.ToSpan()))
+			if (!utils->ValidateFilePath(constructedPath.ToSpan(), true))
 			{
 				rkit::log::ErrorFmt("%zu:%zu: Path is invalid", line, col);
 				return ResultCode::kMalformedFile;
@@ -97,22 +98,52 @@ namespace rkit::buildsystem
 
 			StringView pathStrView(constructedPath.GetBuffer(), constructedPath.Count() - 1);
 
-			StringView extStrView;
-			if (!utils->FindFilePathExtension(pathStrView, extStrView))
+			Vector<String> wildcardMatchStrings;
+			HybridVector<StringView, 1> pathStringViews;
+
+			if (utils->ContainsWildcards(pathStrView))
 			{
-				rkit::log::ErrorFmt("%zu:%zu: Path has no extension", line, col);
-				return ResultCode::kMalformedFile;
+				struct EnumeratorAdder
+				{
+					static Result EnumerateFile(void *userdata, const String &str)
+					{
+						return static_cast<Vector<String> *>(userdata)->Append(str);
+					}
+				};
+
+				RKIT_CHECK(feedback->EnumerateFiles(rkit::buildsystem::BuildFileLocation::kSourceDir, pathStrView, &wildcardMatchStrings, EnumeratorAdder::EnumerateFile));
+
+				const size_t numFiles = wildcardMatchStrings.Count();
+
+				RKIT_CHECK(pathStringViews.Resize(numFiles));
+
+				for (size_t i = 0; i < numFiles; i++)
+					pathStringViews[i] = wildcardMatchStrings[i];
+			}
+			else
+			{
+				RKIT_CHECK(pathStringViews.Append(pathStrView));
 			}
 
-			uint32_t nodeNamespace = 0;
-			uint32_t nodeType = 0;
-			if (!feedback->FindNodeTypeByFileExtension(extStrView, nodeNamespace, nodeType))
+			for (const StringView &pathStrViewItem : pathStringViews)
 			{
-				rkit::log::ErrorFmt("%zu:%zu: Unrecognized file extension: '%s'", line, col, extStrView.GetChars());
-				return ResultCode::kMalformedFile;
-			}
+				StringView extStrView;
+				if (!utils->FindFilePathExtension(pathStrViewItem, extStrView))
+				{
+					rkit::log::ErrorFmt("%zu:%zu: Path has no extension", line, col);
+					return ResultCode::kMalformedFile;
+				}
 
-			RKIT_CHECK(feedback->AddNodeDependency(nodeNamespace, nodeType, BuildFileLocation::kSourceDir, pathStrView));
+				uint32_t nodeNamespace = 0;
+				uint32_t nodeType = 0;
+				if (!feedback->FindNodeTypeByFileExtension(extStrView, nodeNamespace, nodeType))
+				{
+					rkit::log::ErrorFmt("%zu:%zu: Unrecognized file extension: '%s'", line, col, extStrView.GetChars());
+					return ResultCode::kMalformedFile;
+				}
+
+				RKIT_CHECK(feedback->AddNodeDependency(nodeNamespace, nodeType, BuildFileLocation::kSourceDir, pathStrViewItem));
+			}
 		}
 
 		return ResultCode::kOK;

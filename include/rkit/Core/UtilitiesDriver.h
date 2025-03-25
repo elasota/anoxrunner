@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rkit/Core/StringProto.h"
 #include "rkit/Core/StreamProtos.h"
 #include "rkit/Core/HashValue.h"
 
@@ -69,7 +70,7 @@ namespace rkit
 		virtual Result CreateTextParser(const Span<const char> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<utils::ITextParser> &outParser) const = 0;
 		virtual Result ReadEntireFile(ISeekableReadStream &stream, Vector<uint8_t> &outBytes) const = 0;
 
-		virtual bool ValidateFilePath(const Span<const char> &fileName) const = 0;
+		virtual bool ValidateFilePath(const Span<const char> &fileName, bool permitWildcards) const = 0;
 
 		virtual void NormalizeFilePath(const Span<char> &chars) const = 0;
 		virtual bool FindFilePathExtension(const StringView &str, StringView &outExt) const = 0;
@@ -91,5 +92,8 @@ namespace rkit
 		virtual ConstSpan<uint8_t> GetLinearToSRGBTable() const = 0;
 		virtual ConstSpan<uint16_t> GetSRGBToLinearTable() const = 0;
 		virtual int GetSRGBToLinearPrecisionBits() const = 0;
+
+		virtual bool ContainsWildcards(const StringSliceView &str) const = 0;
+		virtual bool MatchesWildcard(const StringSliceView &candidate, const StringSliceView &wildcard) const = 0;
 	};
 }

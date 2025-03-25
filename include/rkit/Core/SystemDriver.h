@@ -47,9 +47,9 @@ namespace rkit
 
 	enum class FileLocation
 	{
-		kDataSourceDirectory,
-		kConfigDirectory,
-		kGameDirectory,
+		kDataSourceDirectory,		// Source directory for compilatble data
+		kConfigDirectory,			// Configuration data
+		kGameDirectory,				// Compiled game data directory
 		kUserSettingsDirectory,
 		kAbsolute,
 	};
