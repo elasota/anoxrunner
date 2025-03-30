@@ -1,7 +1,7 @@
 #pragma once
 
 #include "FileAttributes.h"
-#include "String.h"
+#include "Path.h"
 
 namespace rkit
 {
@@ -9,7 +9,7 @@ namespace rkit
 
 	struct DirectoryScanItem
 	{
-		StringView m_fileName;
+		OSRelPathView m_fileName;
 		FileAttributes m_attribs;
 	};
 

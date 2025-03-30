@@ -4,6 +4,7 @@
 
 #include "rkit/Core/Drivers.h"
 #include "rkit/Core/FourCC.h"
+#include "rkit/Core/PathProto.h"
 #include "rkit/Core/StringProto.h"
 
 namespace rkit
@@ -32,7 +33,7 @@ namespace rkit
 		struct IPackageObjectWriter;
 		struct FileStatusView;
 
-		StringView GetShaderSourceBasePath();
+		CIPathView GetShaderSourceBasePath();
 
 		struct IBuildFileSystem
 		{
@@ -40,9 +41,9 @@ namespace rkit
 
 			virtual ~IBuildFileSystem() {}
 
-			virtual Result ResolveFileStatusIfExists(BuildFileLocation inputFileLocation, const StringView &identifier, bool allowDirectories, void *userdata, ApplyFileStatusCallback_t applyStatus) = 0;
-			virtual Result TryOpenFileRead(BuildFileLocation inputFileLocation, const StringView &identifier, UniquePtr<ISeekableReadStream> &outStream) = 0;
-			virtual Result EnumerateDirectory(BuildFileLocation inputFileLocation, const StringView &path, bool listFiles, bool listDirectories, void *userdata, ApplyFileStatusCallback_t callback) = 0;
+			virtual Result ResolveFileStatusIfExists(BuildFileLocation inputFileLocation, const CIPathView &path, bool allowDirectories, void *userdata, ApplyFileStatusCallback_t applyStatus) = 0;
+			virtual Result TryOpenFileRead(BuildFileLocation inputFileLocation, const CIPathView &path, UniquePtr<ISeekableReadStream> &outStream) = 0;
+			virtual Result EnumerateDirectory(BuildFileLocation inputFileLocation, const CIPathView &path, bool listFiles, bool listDirectories, void *userdata, ApplyFileStatusCallback_t callback) = 0;
 		};
 
 		struct IPipelineLibraryCombiner
@@ -64,7 +65,7 @@ namespace rkit
 
 			virtual ~IBuildSystemInstance() {}
 
-			virtual Result Initialize(const rkit::StringView &targetName, const StringView &srcDir, const StringView &intermediateDir, const StringView &dataDir) = 0;
+			virtual Result Initialize(const StringView &targetName, const OSAbsPathView &srcDir, const OSAbsPathView &intermediateDir, const OSAbsPathView &dataDir) = 0;
 			virtual Result LoadCache() = 0;
 
 			virtual IDependencyNode *FindNamedNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) const = 0;
@@ -82,10 +83,10 @@ namespace rkit
 
 			virtual CallbackSpan<IDependencyNode *, const IBuildSystemInstance *> GetBuildRelevantNodes() const = 0;
 
-			virtual Result TryOpenFileRead(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &outFile) = 0;
-			virtual Result OpenFileWrite(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outFile) = 0;
+			virtual Result TryOpenFileRead(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadStream> &outFile) = 0;
+			virtual Result OpenFileWrite(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadWriteStream> &outFile) = 0;
 
-			virtual Result EnumerateFiles(BuildFileLocation location, const StringSliceView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback) = 0;
+			virtual Result EnumerateFiles(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback) = 0;
 		};
 
 		struct IBuildSystemDriver : public ICustomDriver
@@ -103,22 +104,22 @@ namespace rkit
 	}
 }
 
-#include "rkit/Core/StringView.h"
+#include "rkit/Core/Path.h"
 
 namespace rkit::buildsystem
 {
-	inline StringView GetShaderSourceBasePath()
+	inline CIPathView GetShaderSourceBasePath()
 	{
-		return "rkit/render/src/";
+		return "rkit/render/src";
 	}
 
-	inline StringView GetCompiledPipelineIntermediateBasePath()
+	inline CIPathView GetCompiledPipelineIntermediateBasePath()
 	{
-		return "rpll_c/pipe/";
+		return "rpll_c/pipe";
 	}
 
-	inline StringView GetCompiledGlobalsIntermediateBasePath()
+	inline CIPathView GetCompiledGlobalsIntermediateBasePath()
 	{
-		return "rpll_c/glob/";
+		return "rpll_c/glob";
 	}
 }

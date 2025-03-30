@@ -3,6 +3,7 @@
 #include "BuildFileLocation.h"
 
 #include "rkit/Core/Result.h"
+#include "rkit/Core/Path.h"
 #include "rkit/Core/String.h"
 #include "rkit/Core/Timestamp.h"
 
@@ -44,7 +45,7 @@ namespace rkit
 
 		struct FileStatusView
 		{
-			StringView m_filePath;
+			CIPathView m_filePath;
 			BuildFileLocation m_location = BuildFileLocation::kSourceDir;
 			uint64_t m_fileSize = 0;
 			UTCMSecTimestamp_t m_fileTime = 0;
@@ -56,7 +57,7 @@ namespace rkit
 
 		struct FileStatus
 		{
-			String m_filePath;
+			CIPath m_filePath;
 			BuildFileLocation m_location = BuildFileLocation::kSourceDir;
 			uint64_t m_fileSize = 0;
 			UTCMSecTimestamp_t m_fileTime = 0;
@@ -133,15 +134,15 @@ namespace rkit
 
 			virtual ~IDependencyNodeCompilerFeedback() {}
 
-			virtual Result CheckInputExists(BuildFileLocation location, const StringView &path, bool &outExists) = 0;
-			virtual Result OpenInput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &inputFile) = 0;
-			virtual Result TryOpenInput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadStream> &inputFile) = 0;
-			virtual Result OpenOutput(BuildFileLocation location, const StringView &path, UniquePtr<ISeekableReadWriteStream> &outputFile) = 0;
+			virtual Result CheckInputExists(BuildFileLocation location, const CIPathView &path, bool &outExists) = 0;
+			virtual Result OpenInput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadStream> &inputFile) = 0;
+			virtual Result TryOpenInput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadStream> &inputFile) = 0;
+			virtual Result OpenOutput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadWriteStream> &outputFile) = 0;
 
 			virtual Result AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) = 0;
 			virtual bool FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const = 0;
 
-			virtual Result EnumerateFiles(BuildFileLocation location, const StringSliceView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback) = 0;
+			virtual Result EnumerateFiles(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback) = 0;
 
 			virtual IBuildSystemInstance *GetBuildSystemInstance() const = 0;
 

@@ -37,7 +37,8 @@
 #define RKIT_IMPLEMENT_RESULT_FIRST_CHANCE_RESULT_FAILURE\
 	void rkit::Result::FirstChanceResultFailure() const\
 	{\
-		::rkit::GetDrivers().m_systemDriver->FirstChanceResultFailure(*this);\
+		::rkit::ISystemDriver *sysDriver = ::rkit::GetDrivers().m_systemDriver;\
+		if (sysDriver) sysDriver->FirstChanceResultFailure(*this);\
 	}
 
 #else

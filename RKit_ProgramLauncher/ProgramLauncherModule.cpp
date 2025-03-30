@@ -4,6 +4,7 @@
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/ModuleGlue.h"
 #include "rkit/Core/NewDelete.h"
+#include "rkit/Core/Path.h"
 #include "rkit/Core/ProgramDriver.h"
 #include "rkit/Core/Span.h"
 #include "rkit/Core/String.h"
@@ -113,10 +114,13 @@ namespace rkit
 
 		Result LoadModuleConfig(ModuleConfig &outConfig)
 		{
-			UniquePtr<ISeekableReadStream> configStream = GetDrivers().m_systemDriver->OpenFileRead(FileLocation::kConfigDirectory, "RKitModuleConfig.json");
+			UniquePtr<ISeekableReadStream> configStream;
+			Result openResult = GetDrivers().m_systemDriver->OpenFileRead(configStream, FileLocation::kProgramDirectory, "rkitmoduleconfig.json");
 
-			if (!configStream.IsValid())
+			if (openResult.GetResultCode() == ResultCode::kFileOpenError)
 				return ResultCode::kConfigMissing;
+
+			RKIT_CHECK(openResult);
 
 			UniquePtr<utils::IJsonDocument> configJsonDoc;
 			RKIT_CHECK(GetDrivers().m_utilitiesDriver->CreateJsonDocument(configJsonDoc, GetDrivers().m_mallocDriver, configStream.Get()));

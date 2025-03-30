@@ -2,6 +2,7 @@
 
 #ifdef NDEBUG
 #define RKIT_ASSERT(n) ((void)0)
+#define RKIT_VERIFY(n)	((void)(n))
 #else
 
 namespace rkit::priv
@@ -10,6 +11,7 @@ namespace rkit::priv
 }
 
 #define RKIT_ASSERT(expr)	(::rkit::priv::AssertionCheckFunc(!!(expr), #expr, __FILE__, __LINE__))
+#define RKIT_VERIFY(expr)	(::rkit::priv::AssertionCheckFunc(!!(expr), #expr, __FILE__, __LINE__))
 
 #endif
 

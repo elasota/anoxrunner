@@ -3,6 +3,7 @@
 #include "rkit/Core/Algorithm.h"
 #include "rkit/Core/Endian.h"
 #include "rkit/Core/LogDriver.h"
+#include "rkit/Core/Path.h"
 #include "rkit/Core/Result.h"
 #include "rkit/Core/StaticArray.h"
 #include "rkit/Core/Stream.h"
@@ -215,9 +216,9 @@ namespace anox::buildsystem
 		uint32_t GetVersion() const override;
 
 	private:
-		static rkit::Result CompileTGA(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::StringView &shortName, ImageImportDisposition disposition);
-		static rkit::Result CompilePCX(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::StringView &shortName, ImageImportDisposition disposition);
-		static rkit::Result CompilePNG(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::StringView &shortName, ImageImportDisposition disposition);
+		static rkit::Result CompileTGA(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
+		static rkit::Result CompilePCX(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
+		static rkit::Result CompilePNG(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
 
 		template<class TElementType, size_t TNumElements>
 		static rkit::Result GenerateMipMaps(rkit::Vector<priv::TextureCompilerImage<TElementType, TNumElements>> &resultImages, const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &sourceImages, size_t &outNumLevels, ImageImportDisposition disposition);
@@ -226,7 +227,7 @@ namespace anox::buildsystem
 		static rkit::Result Generate2DMipMapChain(const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &images, ImageImportDisposition disposition);
 
 		template<class TElementType, size_t TNumElements>
-		static rkit::Result ExportDDS(const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &images, size_t numLevels, size_t numLayers, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::StringView &shortName, ImageImportDisposition disposition);
+		static rkit::Result ExportDDS(const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &images, size_t numLevels, size_t numLayers, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
 
 		static bool DispositionHasAlpha(ImageImportDisposition disposition);
 		static bool DispositionHasMipMaps(ImageImportDisposition disposition);
@@ -495,25 +496,28 @@ namespace anox::buildsystem
 
 		rkit::StringSliceView extension = identifier.SubString(dotPosition, dispositionDotPos - dotPosition);
 
+		rkit::CIPath path;
+		RKIT_CHECK(path.Set(shortName));
+
 		if (extension == ".pcx")
-			return CompilePCX(depsNode, feedback, shortName, disposition);
+			return CompilePCX(depsNode, feedback, path, disposition);
 
 		if (extension == ".png")
-			return CompilePNG(depsNode, feedback, shortName, disposition);
+			return CompilePNG(depsNode, feedback, path, disposition);
 
 		if (extension == ".tga")
-			return CompileTGA(depsNode, feedback, shortName, disposition);
+			return CompileTGA(depsNode, feedback, path, disposition);
 
 		rkit::log::ErrorFmt("Texture job '%s' used an unsupported format", identifier.GetChars());
 		return rkit::ResultCode::kOperationFailed;
 	}
 
-	rkit::Result TextureCompiler::CompileTGA(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::StringView &shortName, ImageImportDisposition disposition)
+	rkit::Result TextureCompiler::CompileTGA(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
 	{
 		return rkit::ResultCode::kNotYetImplemented;
 	}
 
-	rkit::Result TextureCompiler::CompilePCX(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::StringView &shortName, ImageImportDisposition disposition)
+	rkit::Result TextureCompiler::CompilePCX(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
 	{
 		typedef uint8_t RGBTriplet_t[3];
 
@@ -675,7 +679,7 @@ namespace anox::buildsystem
 		return ExportDDS(images.ToSpan(), numLevels, 1, depsNode, feedback, shortName, disposition);
 	}
 
-	rkit::Result TextureCompiler::CompilePNG(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::StringView &shortName, ImageImportDisposition disposition)
+	rkit::Result TextureCompiler::CompilePNG(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
 	{
 		return rkit::ResultCode::kNotYetImplemented;
 	}
@@ -721,10 +725,13 @@ namespace anox::buildsystem
 	}
 
 	template<class TElementType, size_t TNumElements>
-	rkit::Result TextureCompiler::ExportDDS(const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &images, size_t numMipMaps, size_t numLayers, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::StringView &shortName, ImageImportDisposition disposition)
+	rkit::Result TextureCompiler::ExportDDS(const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &images, size_t numMipMaps, size_t numLayers, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
 	{
 		rkit::String outName;
 		RKIT_CHECK(outName.Format("ax_tex/%s.%i.dds", shortName.GetChars(), static_cast<int>(disposition)));
+
+		rkit::CIPath outPath;
+		RKIT_CHECK(outPath.Set(outName));
 
 		bool isCompressed = false;
 		bool hasPitch = true;
@@ -870,7 +877,7 @@ namespace anox::buildsystem
 		}
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> stream;
-		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outName, stream));
+		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, stream));
 
 		RKIT_CHECK(stream->WriteAll(&ddsHeader, sizeof(ddsHeader)));
 

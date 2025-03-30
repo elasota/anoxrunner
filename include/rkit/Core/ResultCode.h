@@ -40,6 +40,7 @@ namespace rkit
 
 		kOperationFailed,
 		kTextParsingFailed,
+		kTextEncodingError,
 
 		kGraphicsAPIException,
 

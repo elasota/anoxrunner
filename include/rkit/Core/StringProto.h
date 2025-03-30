@@ -4,7 +4,7 @@
 
 namespace rkit
 {
-	template<class TChar, size_t TStaticSize>
+	template<class TChar, size_t TStaticSize = 16>
 	class BaseString;
 
 	template<class TChar>

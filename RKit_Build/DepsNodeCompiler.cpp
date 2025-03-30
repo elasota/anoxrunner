@@ -25,8 +25,11 @@ namespace rkit::buildsystem
 	{
 		GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, "Data");
 
+		CIPath nodePath;
+		RKIT_CHECK(nodePath.Set(depsNode->GetIdentifier()));
+
 		rkit::UniquePtr<ISeekableReadStream> stream;
-		RKIT_CHECK(feedback->TryOpenInput(BuildFileLocation::kSourceDir, depsNode->GetIdentifier(), stream));
+		RKIT_CHECK(feedback->TryOpenInput(BuildFileLocation::kSourceDir, nodePath, stream));
 
 		if (!stream.Get())
 		{
@@ -111,7 +114,9 @@ namespace rkit::buildsystem
 					}
 				};
 
-				RKIT_CHECK(feedback->EnumerateFiles(rkit::buildsystem::BuildFileLocation::kSourceDir, pathStrView, &wildcardMatchStrings, EnumeratorAdder::EnumerateFile));
+				//RKIT_CHECK(feedback->EnumerateFiles(rkit::buildsystem::BuildFileLocation::kSourceDir, pathStrView, &wildcardMatchStrings, EnumeratorAdder::EnumerateFile));
+				if (true)
+					return ResultCode::kNotYetImplemented;
 
 				const size_t numFiles = wildcardMatchStrings.Count();
 

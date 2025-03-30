@@ -28,6 +28,9 @@ namespace rkit
 	template<class T>
 	class SharedPtr;
 
+	template<class T>
+	class Span;
+
 	struct IMutexProtectedReadWriteStream;
 	struct IMutexProtectedReadStream;
 	struct IMutexProtectedWriteStream;
@@ -89,11 +92,21 @@ namespace rkit
 
 		virtual void GetRKitVersion(uint32_t &outMajor, uint32_t &outMinor, uint32_t &outPatch) const = 0;
 
-		virtual ConstSpan<uint8_t> GetLinearToSRGBTable() const = 0;
-		virtual ConstSpan<uint16_t> GetSRGBToLinearTable() const = 0;
+		virtual Span<const uint8_t> GetLinearToSRGBTable() const = 0;
+		virtual Span<const uint16_t> GetSRGBToLinearTable() const = 0;
 		virtual int GetSRGBToLinearPrecisionBits() const = 0;
 
 		virtual bool ContainsWildcards(const StringSliceView &str) const = 0;
 		virtual bool MatchesWildcard(const StringSliceView &candidate, const StringSliceView &wildcard) const = 0;
+
+		virtual bool DefaultIsPathComponentValid(const BaseStringSliceView<char> &span, bool isFirst, bool isLast, bool allowWildcards) const = 0;
+
+		virtual Result ConvertUTF16ToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const uint16_t> &src) const = 0;
+		virtual Result ConvertUTF16WCharToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const wchar_t> &src) const = 0;
+
+		virtual Result ConvertUTF8ToUTF16(size_t &outSize, const Span<uint16_t> &dest, const Span<const uint8_t> &src) const = 0;
+		virtual Result ConvertUTF8ToUTF16WChar(size_t &outSize, const Span<wchar_t> &dest, const Span<const uint8_t> &src) const = 0;
+
+		virtual bool IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t> &span, bool isAbsolute, bool isFirst, bool isLast, bool allowWildcards) const = 0;
 	};
 }

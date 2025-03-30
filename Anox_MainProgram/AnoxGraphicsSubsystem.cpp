@@ -44,6 +44,7 @@
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/NoCopy.h"
 #include "rkit/Core/Optional.h"
+#include "rkit/Core/Path.h"
 #include "rkit/Core/RefCounted.h"
 #include "rkit/Core/Result.h"
 #include "rkit/Core/StaticBoolVector.h"
@@ -168,7 +169,7 @@ namespace anox
 		class CheckPipelinesJob final : public rkit::IJobRunner
 		{
 		public:
-			explicit CheckPipelinesJob(GraphicsSubsystem &graphicsSubsystem, const rkit::StringView &pipelinesFileName, const rkit::StringView &pipelinesCacheFileName, bool canUpdateShadowFile);
+			explicit CheckPipelinesJob(GraphicsSubsystem &graphicsSubsystem, const rkit::CIPathView &pipelinesFileName, const rkit::CIPathView &pipelinesCacheFileName, bool canUpdateShadowFile);
 
 			rkit::Result Run() override;
 
@@ -178,21 +179,21 @@ namespace anox
 				rkit::HashMap<size_t, rkit::Optional<int32_t>> &staticResolutions, size_t pipelineIndex, size_t base, const rkit::render::ShaderPermutationTree *tree);
 
 			GraphicsSubsystem &m_graphicsSubsystem;
-			rkit::StringView m_pipelinesFileName;
-			rkit::StringView m_pipelinesCacheFileName;
+			rkit::CIPathView m_pipelinesFileName;
+			rkit::CIPathView m_pipelinesCacheFileName;
 			bool m_canUpdateShadowFile;
 		};
 
 		class CreateNewIndividualCacheJob final : public rkit::IJobRunner
 		{
 		public:
-			explicit CreateNewIndividualCacheJob(GraphicsSubsystem &graphicsSubsystem, const rkit::StringView &pipelinesCacheFileName);
+			explicit CreateNewIndividualCacheJob(GraphicsSubsystem &graphicsSubsystem, const rkit::CIPathView &pipelinesCacheFileName);
 
 			rkit::Result Run() override;
 
 		private:
 			GraphicsSubsystem &m_graphicsSubsystem;
-			rkit::StringView m_pipelinesCacheFileName;
+			rkit::CIPathView m_pipelinesCacheFileName;
 		};
 
 		class LoadOneGraphicsPipelineJob final : public rkit::IJobRunner
@@ -376,7 +377,7 @@ namespace anox
 
 		void SetPipelineLibraryLoader(rkit::UniquePtr<rkit::render::IPipelineLibraryLoader> &&loader, rkit::UniquePtr<LivePipelineSets> &&livePipelineSets, bool haveExistingMergedCache);
 
-		rkit::Result CreateGameDisplayAndDevice(const rkit::StringView &renderModule, const rkit::StringView &pipelinesFile, const rkit::StringView &pipelinesCacheFile, bool canUpdatePipelineCache);
+		rkit::Result CreateGameDisplayAndDevice(const rkit::StringView &renderModule, const rkit::CIPathView &pipelinesFile, const rkit::CIPathView &pipelinesCacheFile, bool canUpdatePipelineCache);
 
 		rkit::Result WaitForRenderingTasks();
 
@@ -397,7 +398,7 @@ namespace anox
 
 		rkit::utils::IThreadPool &m_threadPool;
 
-		rkit::StringView m_pipelinesCacheFileName;
+		rkit::CIPathView m_pipelinesCacheFileName;
 
 		rkit::UniquePtr<rkit::IMutex> m_setupMutex;
 		DeviceSetupStep m_setupStep = DeviceSetupStep::kFinished;
@@ -457,7 +458,7 @@ namespace anox
 		rkit::UniquePtr<IFrameDrawer> m_frameDrawer;
 	};
 
-	GraphicsSubsystem::CheckPipelinesJob::CheckPipelinesJob(GraphicsSubsystem &graphicsSubsystem, const rkit::StringView &pipelinesFileName, const rkit::StringView &pipelinesCacheFileName, bool canUpdateShadowFile)
+	GraphicsSubsystem::CheckPipelinesJob::CheckPipelinesJob(GraphicsSubsystem &graphicsSubsystem, const rkit::CIPathView &pipelinesFileName, const rkit::CIPathView &pipelinesCacheFileName, bool canUpdateShadowFile)
 		: m_graphicsSubsystem(graphicsSubsystem)
 		, m_pipelinesFileName(pipelinesFileName)
 		, m_pipelinesCacheFileName(pipelinesCacheFileName)
@@ -471,12 +472,13 @@ namespace anox
 		rkit::IUtilitiesDriver *utilsDriver = rkit::GetDrivers().m_utilitiesDriver;
 		rkit::data::IDataDriver *dataDriver = &m_graphicsSubsystem.GetDataDriver();
 
-		rkit::UniquePtr<rkit::ISeekableReadStream> pipelinesFile = sysDriver->OpenFileRead(rkit::FileLocation::kGameDirectory, m_pipelinesFileName.GetChars());
+		rkit::UniquePtr<rkit::ISeekableReadStream> pipelinesFile;
+		rkit::Result openResult = sysDriver->OpenFileRead(pipelinesFile, rkit::FileLocation::kGameDirectory, m_pipelinesFileName);
 
-		if (!pipelinesFile.IsValid())
+		if (!openResult.IsOK())
 		{
 			rkit::log::Error("Failed to open pipeline package");
-			return rkit::ResultCode::kFileOpenError;
+			return openResult;
 		}
 
 		rkit::data::IRenderDataHandler *rdh = dataDriver->GetRenderDataHandler();
@@ -495,7 +497,12 @@ namespace anox
 		rkit::UniquePtr<rkit::ISeekableReadStream> cacheReadStream;
 
 		// Try opening the cache itself
-		cacheReadStream = sysDriver->OpenFileRead(rkit::FileLocation::kUserSettingsDirectory, m_pipelinesCacheFileName.GetChars());
+		openResult = sysDriver->OpenFileRead(cacheReadStream, rkit::FileLocation::kUserSettingsDirectory, m_pipelinesCacheFileName);
+		if (!openResult.IsOK())
+		{
+			rkit::log::Error("Failed to open pipeline cache");
+			return openResult;
+		}
 
 		rkit::FilePos_t binaryContentStart = pipelinesFile->Tell();
 
@@ -626,7 +633,7 @@ namespace anox
 		}
 	}
 
-	GraphicsSubsystem::CreateNewIndividualCacheJob::CreateNewIndividualCacheJob(GraphicsSubsystem &graphicsSubsystem, const rkit::StringView &pipelinesCacheFileName)
+	GraphicsSubsystem::CreateNewIndividualCacheJob::CreateNewIndividualCacheJob(GraphicsSubsystem &graphicsSubsystem, const rkit::CIPathView &pipelinesCacheFileName)
 		: m_graphicsSubsystem(graphicsSubsystem)
 		, m_pipelinesCacheFileName(pipelinesCacheFileName)
 	{
@@ -638,11 +645,10 @@ namespace anox
 
 		m_graphicsSubsystem.m_pipelineLibraryLoader->CloseMergedLibrary(true, true);
 
-		rkit::UniquePtr<rkit::ISeekableReadWriteStream> pipelinesFile = sysDriver->OpenFileReadWrite(rkit::FileLocation::kUserSettingsDirectory, m_graphicsSubsystem.m_pipelinesCacheFileName.GetChars(), true, true, true);
-		rkit::ISeekableReadWriteStream *writeStream = pipelinesFile.Get();
+		rkit::UniquePtr<rkit::ISeekableReadWriteStream> pipelinesFile;
+		RKIT_CHECK(sysDriver->OpenFileReadWrite(pipelinesFile, rkit::FileLocation::kUserSettingsDirectory, m_graphicsSubsystem.m_pipelinesCacheFileName, true, true, true));
 
-		if (!pipelinesFile.IsValid())
-			return rkit::ResultCode::kOperationFailed;
+		rkit::ISeekableReadWriteStream *writeStream = pipelinesFile.Get();
 
 		m_graphicsSubsystem.m_pipelineLibraryLoader->SetMergedLibraryStream(std::move(pipelinesFile), writeStream);
 
@@ -1029,7 +1035,7 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result GraphicsSubsystem::CreateGameDisplayAndDevice(const rkit::StringView &renderModuleName, const rkit::StringView &pipelinesFile, const rkit::StringView &pipelinesCacheFile, bool canUpdatePipelineCache)
+	rkit::Result GraphicsSubsystem::CreateGameDisplayAndDevice(const rkit::StringView &renderModuleName, const rkit::CIPathView &pipelinesFile, const rkit::CIPathView &pipelinesCacheFile, bool canUpdatePipelineCache)
 	{
 		rkit::render::IDisplayManager *displayManager = rkit::GetDrivers().m_systemDriver->GetDisplayManager();
 
@@ -1352,8 +1358,8 @@ namespace anox
 		m_backend = m_desiredBackend;
 
 		rkit::StringView backendModule;
-		rkit::StringView pipelinesFile;
-		rkit::StringView pipelinesCacheFile;
+		rkit::CIPathView pipelinesFile;
+		rkit::CIPathView pipelinesCacheFile;
 		bool canUpdatePipelineCache = false;
 
 		switch (m_backend.Get())

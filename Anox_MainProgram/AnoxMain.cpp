@@ -8,6 +8,7 @@
 #include "rkit/Core/ModuleGlue.h"
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/Optional.h"
+#include "rkit/Core/Path.h"
 #include "rkit/Core/ProgramStub.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/SystemDriver.h"
@@ -53,9 +54,10 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 	bool run = false;
 
 	rkit::StringView buildTarget;
-	rkit::StringView buildSourceDirectory;
-	rkit::StringView buildIntermediateDirectory;
-	rkit::StringView dataDirectory;
+	rkit::OSAbsPath buildSourceDirectory;
+	rkit::OSAbsPath buildIntermediateDirectory;
+	rkit::OSAbsPath dataDirectory;
+	rkit::OSAbsPath baseDirectory;
 
 	rkit::render::BackendType renderBackendType = rkit::render::BackendType::Vulkan;
 
@@ -76,7 +78,11 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 				return rkit::ResultCode::kInvalidParameter;
 			}
 
-			buildIntermediateDirectory = args[i];
+			if (!buildIntermediateDirectory.SetFromUTF8(args[i]).IsOK())
+			{
+				rkit::log::Error("-idir path was invalid");
+				return rkit::ResultCode::kInvalidParameter;
+			}
 		}
 		else if (arg == "-ddir")
 		{
@@ -88,7 +94,11 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 				return rkit::ResultCode::kInvalidParameter;
 			}
 
-			dataDirectory = args[i];
+			if (!dataDirectory.SetFromUTF8(args[i]).IsOK())
+			{
+				rkit::log::Error("-ddir path was invalid");
+				return rkit::ResultCode::kInvalidParameter;
+			}
 		}
 		else if (arg == "-sdir")
 		{
@@ -100,7 +110,27 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 				return rkit::ResultCode::kInvalidParameter;
 			}
 
-			buildSourceDirectory = args[i];
+			if (!buildSourceDirectory.SetFromUTF8(args[i]).IsOK())
+			{
+				rkit::log::Error("-sdir path was invalid");
+				return rkit::ResultCode::kInvalidParameter;
+			}
+		}
+		else if (arg == "-base")
+		{
+			i++;
+
+			if (i == args.Count())
+			{
+				rkit::log::Error("Expected path after -base");
+				return rkit::ResultCode::kInvalidParameter;
+			}
+
+			if (!baseDirectory.SetFromUTF8(args[i]).IsOK())
+			{
+				rkit::log::Error("-base path was invalid");
+				return rkit::ResultCode::kInvalidParameter;
+			}
 		}
 		else if (arg == "-build")
 		{
@@ -151,6 +181,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 	}
 
 	// FIXME: Move this to RKit Config
+	RKIT_CHECK(sysDriver->SetGameDirectoryOverride(baseDirectory));
 	RKIT_CHECK(sysDriver->SetSettingsDirectory("AnoxRunner"));
 
 	if (autoBuild)

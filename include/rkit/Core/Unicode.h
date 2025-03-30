@@ -109,8 +109,13 @@ namespace rkit
 
 	namespace UTF16
 	{
-		inline bool Decode(const uint16_t *characters, size_t availableCharacters, size_t &outCharactersDigested, uint32_t &outCodePoint)
+		static const unsigned int kMaxEncodedWords = 2;
+
+		template<class TChar>
+		inline bool Decode(const TChar *characters, size_t availableCharacters, size_t &outCharactersDigested, uint32_t &outCodePoint)
 		{
+			static_assert(sizeof(TChar) >= 2);
+
 			if (availableCharacters <= 0)
 				return false;
 
@@ -144,12 +149,15 @@ namespace rkit
 			return true;
 		}
 
-		inline void Encode(uint16_t *characters, size_t &outCharactersEmitted, uint32_t codePoint)
+		template<class TChar>
+		inline void Encode(TChar *characters, size_t &outCharactersEmitted, uint32_t codePoint)
 		{
+			static_assert(sizeof(TChar) >= 2);
+
 			if (codePoint <= 0xd7ff || codePoint >= 0xe000)
 			{
 				outCharactersEmitted = 1;
-				characters[0] = static_cast<uint16_t>(codePoint);
+				characters[0] = static_cast<TChar>(codePoint);
 				return;
 			}
 
@@ -158,8 +166,8 @@ namespace rkit
 			uint16_t highBits = ((codePointBits >> 10) & 0x3ff);
 
 			outCharactersEmitted = 2;
-			characters[0] = (0xd800 + highBits);
-			characters[1] = (0xdc00 + lowBits);
+			characters[0] = static_cast<TChar>(0xd800 + highBits);
+			characters[1] = static_cast<TChar>(0xdc00 + lowBits);
 		}
 	}
 }

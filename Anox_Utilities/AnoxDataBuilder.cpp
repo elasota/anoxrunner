@@ -25,7 +25,7 @@ namespace anox::utils
 	public:
 		AnoxDataBuilder(anox::IUtilitiesDriver *utils);
 
-		rkit::Result Run(const rkit::StringView &targetName, const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir, rkit::render::BackendType backendType) override;
+		rkit::Result Run(const rkit::StringView &targetName, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataDir, rkit::render::BackendType backendType) override;
 
 	private:
 		class ExportPipelinesCheckRunner final : public rkit::buildsystem::IBuildSystemAction
@@ -51,11 +51,11 @@ namespace anox::utils
 	public:
 		AnoxFileSystem();
 
-		rkit::Result Load(anox::IUtilitiesDriver *utils, const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir);
+		rkit::Result Load(anox::IUtilitiesDriver *utils, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataDir);
 
-		rkit::Result ResolveFileStatusIfExists(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::StringView &identifier, bool allowDirectories, void *userdata, ApplyFileStatusCallback_t applyStatus) override;
-		rkit::Result TryOpenFileRead(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::StringView &identifier, rkit::UniquePtr<rkit::ISeekableReadStream> &outStream) override;
-		rkit::Result EnumerateDirectory(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::StringView &path, bool listFiles, bool listDirectories, void *userdata, ApplyFileStatusCallback_t callback) override;
+		rkit::Result ResolveFileStatusIfExists(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::CIPathView &path, bool allowDirectories, void *userdata, ApplyFileStatusCallback_t applyStatus) override;
+		rkit::Result TryOpenFileRead(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::CIPathView &path, rkit::UniquePtr<rkit::ISeekableReadStream> &outStream) override;
+		rkit::Result EnumerateDirectory(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::CIPathView &path, bool listFiles, bool listDirectories, void *userdata, ApplyFileStatusCallback_t callback) override;
 
 	private:
 		struct MountedArchive
@@ -67,11 +67,11 @@ namespace anox::utils
 
 		static rkit::Result StripTrailingPathSeparators(rkit::String &str);
 
-		bool FindFileInArchive(const rkit::StringSliceView &path, const MountedArchive *&outArchive, afs::FileHandle &outFileHandle);
+		bool FindFileInArchive(const rkit::CIPathView &path, const MountedArchive *&outArchive, afs::FileHandle &outFileHandle);
 
-		rkit::String m_sourceDir;
-		rkit::String m_intermedDir;
-		rkit::String m_dataDir;
+		rkit::OSAbsPath m_sourceDir;
+		rkit::OSAbsPath m_intermedDir;
+		rkit::OSAbsPath m_dataDir;
 
 		rkit::Vector<MountedArchive> m_afsArchives;
 	};
@@ -134,7 +134,7 @@ namespace anox::utils
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxDataBuilder::Run(const rkit::StringView &targetName, const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir, rkit::render::BackendType backendType)
+	rkit::Result AnoxDataBuilder::Run(const rkit::StringView &targetName, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataDir, rkit::render::BackendType backendType)
 	{
 		rkit::IModule *buildModule = rkit::GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, "Build");
 		if (!buildModule)
@@ -238,38 +238,16 @@ namespace anox::utils
 	{
 	}
 
-	rkit::Result AnoxFileSystem::ResolveFileStatusIfExists(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::StringView &identifier, bool allowDirectories, void *userdata, ApplyFileStatusCallback_t applyStatus)
+	rkit::Result AnoxFileSystem::ResolveFileStatusIfExists(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::CIPathView &path, bool allowDirectories, void *userdata, ApplyFileStatusCallback_t applyStatus)
 	{
 		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
 
-		rkit::String tempPath;
-		rkit::StringView path = identifier;
-		rkit::FileLocation fileLocation = rkit::FileLocation::kGameDirectory;
-
-		if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kSourceDir)
-		{
-			path = identifier;
-			fileLocation = rkit::FileLocation::kDataSourceDirectory;
-		}
-		else if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kIntermediateDir)
-		{
-			RKIT_CHECK(tempPath.Set(m_intermedDir));
-			RKIT_CHECK(tempPath.Append(sysDriver->GetPathSeparator()));
-			RKIT_CHECK(tempPath.Append(identifier));
-
-			path = tempPath;
-			fileLocation = rkit::FileLocation::kAbsolute;
-		}
-		else
-			return rkit::ResultCode::kNotYetImplemented;
-
-		// Try to import file from the root directory
 		rkit::FileAttributes attribs;
 		bool exists = false;
 
 		bool isInArchive = false;
 
-		if (fileLocation == rkit::FileLocation::kDataSourceDirectory)
+		if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kSourceDir)
 		{
 			afs::FileHandle fileHandle;
 			const MountedArchive *archive;
@@ -279,30 +257,32 @@ namespace anox::utils
 				exists = true;
 				isInArchive = true;
 			}
+			else
+			{
+				RKIT_CHECK(sysDriver->GetFileAttributes(rkit::FileLocation::kDataSourceDirectory, path, exists, attribs));
+			}
 		}
-
-		if (!exists)
+		else if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kIntermediateDir)
 		{
-			RKIT_CHECK(sysDriver->GetFileAttributes(fileLocation, path.GetChars(), exists, attribs));
+			rkit::OSRelPath relPath;
+			RKIT_CHECK(relPath.ConvertFrom(path));
+
+			rkit::OSAbsPath osPath = m_intermedDir;
+			RKIT_CHECK(osPath.Append(relPath));
+
+			RKIT_CHECK(sysDriver->GetFileAttributesAbs(osPath, exists, attribs));
 		}
+		else
+			return rkit::ResultCode::kNotYetImplemented;
 
-		if (!exists && fileLocation == rkit::FileLocation::kDataSourceDirectory)
-		{
-			rkit::String anoxDataPath = m_sourceDir;
-
-			RKIT_CHECK(anoxDataPath.Append(sysDriver->GetPathSeparator()));
-			RKIT_CHECK(anoxDataPath.Append(path));
-
-			RKIT_CHECK(sysDriver->GetFileAttributes(rkit::FileLocation::kAbsolute, anoxDataPath.CStr(), exists, attribs));
-		}
-
+		// Try to import file from the root directory
 		if (exists)
 		{
 			if (attribs.m_isDirectory && !allowDirectories)
 				return rkit::ResultCode::kOK;
 
 			rkit::buildsystem::FileStatusView fsView;
-			fsView.m_filePath = identifier;
+			fsView.m_filePath = path;
 			fsView.m_fileSize = attribs.m_fileSize;
 			fsView.m_fileTime = attribs.m_fileTime;
 			fsView.m_location = inputFileLocation;
@@ -314,50 +294,53 @@ namespace anox::utils
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxFileSystem::TryOpenFileRead(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::StringView &identifier, rkit::UniquePtr<rkit::ISeekableReadStream> &outStream)
+	rkit::Result AnoxFileSystem::TryOpenFileRead(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::CIPathView &path, rkit::UniquePtr<rkit::ISeekableReadStream> &outStream)
 	{
 		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
 
-		rkit::String tempPath;
-		rkit::StringView path = identifier;
 		rkit::FileLocation fileLocation = rkit::FileLocation::kGameDirectory;
 
 		if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kSourceDir)
-		{
-			path = identifier;
-			fileLocation = rkit::FileLocation::kDataSourceDirectory;
-		}
-		else if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kIntermediateDir)
-		{
-			RKIT_CHECK(tempPath.Set(m_intermedDir));
-			RKIT_CHECK(tempPath.Append(sysDriver->GetPathSeparator()));
-			RKIT_CHECK(tempPath.Append(identifier));
-
-			path = tempPath;
-			fileLocation = rkit::FileLocation::kAbsolute;
-		}
-		else
-			return rkit::ResultCode::kNotYetImplemented;
-
-		// Try to import file from the root directory
-		if (fileLocation == rkit::FileLocation::kDataSourceDirectory)
 		{
 			afs::FileHandle fileHandle;
 			const MountedArchive *archive;
 			if (FindFileInArchive(path, archive, fileHandle))
 				return fileHandle.Open(outStream);
-		}
 
-		outStream = sysDriver->OpenFileRead(fileLocation, path.GetChars());
+			rkit::Result openResult = sysDriver->OpenFileRead(outStream, rkit::FileLocation::kDataSourceDirectory, path);
+			if (openResult.GetResultCode() == rkit::ResultCode::kFileOpenError)
+				return rkit::ResultCode::kOK;
+
+			return openResult;
+		}
+		else if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kIntermediateDir)
+		{
+			rkit::OSRelPath relPath;
+			RKIT_CHECK(relPath.Set(relPath));
+
+			rkit::OSAbsPath osPath = m_intermedDir;
+			RKIT_CHECK(osPath.Append(relPath));
+
+			rkit::Result openResult = sysDriver->OpenFileReadAbs(outStream, osPath);
+			if (openResult.GetResultCode() == rkit::ResultCode::kFileOpenError)
+				return rkit::ResultCode::kOK;
+
+			return openResult;
+		}
+		else
+			return rkit::ResultCode::kNotYetImplemented;
+
 
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxFileSystem::EnumerateDirectory(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::StringView &path, bool listFiles, bool listDirectories, void *userdata, ApplyFileStatusCallback_t callback)
+	rkit::Result AnoxFileSystem::EnumerateDirectory(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::CIPathView &path, bool listFiles, bool listDirectories, void *userdata, ApplyFileStatusCallback_t callback)
 	{
 		if (!listFiles && !listDirectories)
 			return rkit::ResultCode::kOK;
 
+		return rkit::ResultCode::kNotYetImplemented;
+#if 0
 		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
 
 		if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kSourceDir)
@@ -368,13 +351,12 @@ namespace anox::utils
 			rkit::FileAttributes attribs;
 			RKIT_CHECK(sysDriver->GetFileAttributes(fileLocation, path.GetChars(), exists, attribs));
 
-			rkit::StringView pathStrView = path;
-			rkit::String tempPath;
+			rkit::CIPathView pathStrView = path;
+			rkit::CIPath tempPath;
 
 			if (!exists || !attribs.m_isDirectory)
 			{
 				RKIT_CHECK(tempPath.Set(m_sourceDir));
-				RKIT_CHECK(tempPath.Append(sysDriver->GetPathSeparator()));
 				RKIT_CHECK(tempPath.Append(pathStrView));
 
 				pathStrView = tempPath;
@@ -409,8 +391,14 @@ namespace anox::utils
 						continue;
 				}
 
+				rkit::CIPath path;
+				RKIT_CHECK(path.Set(scanItem.m_fileName));
+
+				if (true)
+					return rkit::ResultCode::kNotYetImplemented;	// Fix path
+
 				rkit::buildsystem::FileStatusView fsView;
-				fsView.m_filePath = scanItem.m_fileName;
+				fsView.m_filePath = path;
 				fsView.m_fileSize = scanItem.m_attribs.m_fileSize;
 				fsView.m_fileTime = scanItem.m_attribs.m_fileTime;
 				fsView.m_location = inputFileLocation;
@@ -421,15 +409,20 @@ namespace anox::utils
 		}
 
 		return rkit::ResultCode::kOK;
+#endif
 	}
 
-	bool AnoxFileSystem::FindFileInArchive(const rkit::StringSliceView &path, const MountedArchive *&outArchive, afs::FileHandle &outFileHandle)
+	bool AnoxFileSystem::FindFileInArchive(const rkit::CIPathView &path, const MountedArchive *&outArchive, afs::FileHandle &outFileHandle)
 	{
 		rkit::Optional<size_t> firstSlashPos;
 
-		for (size_t i = 0; i < path.Length(); i++)
+		rkit::StringView pathStr = path.ToStringView();
+
+		// FIXME: Improve this
+
+		for (size_t i = 0; i < pathStr.Length(); i++)
 		{
-			if (path[i] == '/')
+			if (pathStr[i] == '/')
 			{
 				firstSlashPos = i;
 				break;
@@ -438,8 +431,8 @@ namespace anox::utils
 
 		if (firstSlashPos.IsSet())
 		{
-			const rkit::StringSliceView archiveName = path.SubString(0, firstSlashPos.Get());
-			const rkit::StringSliceView itemName = path.SubString(firstSlashPos.Get() + 1);
+			const rkit::StringSliceView archiveName = pathStr.SubString(0, firstSlashPos.Get());
+			const rkit::StringSliceView itemName = pathStr.SubString(firstSlashPos.Get() + 1);
 
 			for (const MountedArchive &archive : m_afsArchives)
 			{
@@ -481,20 +474,16 @@ namespace anox::utils
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxFileSystem::Load(anox::IUtilitiesDriver *utils, const rkit::StringView &sourceDir, const rkit::StringView &intermedDir, const rkit::StringView &dataDir)
+	rkit::Result AnoxFileSystem::Load(anox::IUtilitiesDriver *utils, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataDir)
 	{
 		RKIT_CHECK(m_sourceDir.Set(sourceDir));
 		RKIT_CHECK(m_intermedDir.Set(intermedDir));
 		RKIT_CHECK(m_dataDir.Set(dataDir));
 
-		RKIT_CHECK(StripTrailingPathSeparators(m_sourceDir));
-		RKIT_CHECK(StripTrailingPathSeparators(m_intermedDir));
-		RKIT_CHECK(StripTrailingPathSeparators(m_dataDir));
-
 		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
 
 		rkit::UniquePtr<rkit::IDirectoryScan> dirScan;
-		RKIT_CHECK(sysDriver->OpenDirectoryScan(rkit::FileLocation::kAbsolute, m_sourceDir.CStr(), dirScan));
+		RKIT_CHECK(sysDriver->OpenDirectoryScanAbs(m_sourceDir, dirScan));
 
 		if (dirScan.Get())
 		{
@@ -507,21 +496,22 @@ namespace anox::utils
 				if (!haveItem)
 					break;
 
-				if (scanItem.m_attribs.m_isDirectory == false && scanItem.m_fileName.Length() >= 5 && scanItem.m_fileName.EndsWithNoCase(".dat"))
+				if (scanItem.m_attribs.m_isDirectory == false && scanItem.m_fileName.Length() >= 5 && scanItem.m_fileName.ToStringView().EndsWithNoCase(RKIT_OS_PATH_LITERAL(".dat")))
 				{
-					rkit::String archivePath;
-					RKIT_CHECK(archivePath.Set(m_sourceDir));
-					RKIT_CHECK(archivePath.Append(sysDriver->GetPathSeparator()));
+					rkit::OSAbsPath archivePath = m_sourceDir;
 					RKIT_CHECK(archivePath.Append(scanItem.m_fileName));
 
-					rkit::UniquePtr<rkit::ISeekableReadStream> archiveStream = sysDriver->OpenFileRead(rkit::FileLocation::kAbsolute, archivePath.CStr());
+					rkit::UniquePtr<rkit::ISeekableReadStream> archiveStream;
+					rkit::Result openResult = sysDriver->OpenFileReadAbs(archiveStream, archivePath);
 
-					if (!archiveStream.Get())
+					if (!openResult.IsOK())
 					{
 						rkit::log::ErrorFmt("Failed to open archive %s", scanItem.m_fileName.GetChars());
-						return rkit::ResultCode::kFileOpenError;
+						return openResult;
 					}
 
+					return rkit::ResultCode::kNotYetImplemented;
+#if 0
 					MountedArchive mountedArchive;
 					mountedArchive.m_fileAttribs = scanItem.m_attribs;
 					RKIT_CHECK(mountedArchive.m_archiveName.Set(scanItem.m_fileName.SubString(0, scanItem.m_fileName.Length() - 4)));
@@ -529,6 +519,7 @@ namespace anox::utils
 					RKIT_CHECK(utils->OpenAFSArchive(std::move(archiveStream), mountedArchive.m_archive));
 
 					RKIT_CHECK(m_afsArchives.Append(std::move(mountedArchive)));
+#endif
 				}
 			}
 		}

@@ -5,6 +5,8 @@
 #include "rkit/Core/ModuleGlue.h"
 #include "rkit/Core/Module.h"
 #include "rkit/Core/ProgramDriver.h"
+#include "rkit/Core/String.h"
+#include "rkit/Core/Vector.h"
 
 #include "rkit/Win32/SystemModuleInitParameters_Win32.h"
 #include "rkit/Win32/ModuleAPI_Win32.h"
@@ -268,11 +270,63 @@ static int WinMainCommon(HINSTANCE hInstance)
 	drivers->m_logDriver.m_obj = &rkit::g_consoleLogDriver;
 #endif
 
-	rkit::SystemModuleInitParameters_Win32 systemParams(hInstance);
+	rkit::WString modulePathStr;
+	rkit::WString moduleDirStr;
 
-	rkit::IModule *systemModule = ::rkit::g_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "System_Win32", &systemParams);
-	if (!systemModule)
-		return rkit::Result(rkit::ResultCode::kModuleLoadFailed).ToExitCode();
+	{
+		DWORD requiredSize = 16;
+
+		for (;;)
+		{
+			rkit::Vector<wchar_t> moduleFileNameChars;
+
+			rkit::Result resizeResult = moduleFileNameChars.Resize(requiredSize);
+			if (!resizeResult.IsOK())
+				return resizeResult.ToExitCode();
+
+			rkit::WStringConstructionBuffer cbuf;
+
+			DWORD moduleStrSize = GetModuleFileNameW(nullptr, moduleFileNameChars.GetBuffer(), requiredSize);
+
+			if (moduleStrSize == requiredSize)
+			{
+				if (requiredSize >= 0x1000000)
+					return rkit::Result(rkit::ResultCode::kOutOfMemory).ToExitCode();
+
+				requiredSize *= 2;
+				continue;
+			}
+
+			rkit::Result setResult = modulePathStr.Set(moduleFileNameChars.ToSpan().SubSpan(0, moduleStrSize));
+			if (!setResult.IsOK())
+				return setResult.ToExitCode();
+
+			DWORD dirEnd = moduleStrSize;
+			DWORD dirEndScan = dirEnd;
+			while (dirEndScan > 0 && moduleFileNameChars[dirEndScan] != '\\')
+				dirEndScan--;
+
+
+			setResult = moduleDirStr.Set(moduleFileNameChars.ToSpan().SubSpan(0, dirEndScan));
+			if (!setResult.IsOK())
+				return setResult.ToExitCode();
+
+			break;
+		}
+	}
+
+	rkit::IModule *systemModule = nullptr;
+
+	{
+		rkit::SystemModuleInitParameters_Win32 systemParams(hInstance, std::move(modulePathStr), std::move(moduleDirStr));
+
+		modulePathStr.Clear();
+		moduleDirStr.Clear();
+
+		systemModule = ::rkit::g_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "System_Win32", &systemParams);
+		if (!systemModule)
+			return rkit::Result(rkit::ResultCode::kModuleLoadFailed).ToExitCode();
+	}
 
 	rkit::IModule *programLauncherModule = ::rkit::g_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "ProgramLauncher", nullptr);
 	if (!programLauncherModule)

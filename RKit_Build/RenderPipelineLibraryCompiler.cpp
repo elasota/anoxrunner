@@ -175,10 +175,10 @@ namespace rkit::buildsystem::rpc_common
 	class LibraryCompilerBase
 	{
 	public:
-		static Result FormatGraphicPipelinePath(String &path, const StringView &identifier, size_t pipelineIndex);
-		static Result FormatGlobalsPath(String &path, const StringView &identifier);
-		static Result FormatIndexPath(String &path, const StringView &identifier);
-		static Result FormatCombinedOutputPath(String &path, const StringView &identifier);
+		static Result FormatGraphicPipelinePath(CIPath &path, const StringView &identifier, size_t pipelineIndex);
+		static Result FormatGlobalsPath(CIPath &path, const StringView &identifier);
+		static Result FormatIndexPath(CIPath &path, const StringView &identifier);
+		static Result FormatCombinedOutputPath(CIPath &path, const StringView &identifier);
 	};
 }
 
@@ -187,7 +187,7 @@ namespace rkit::buildsystem::rpc_analyzer
 	class IncludedFileKey
 	{
 	public:
-		IncludedFileKey(BuildFileLocation location, const String &str);
+		IncludedFileKey(BuildFileLocation location, const CIPath &str);
 
 		bool operator==(const IncludedFileKey &other) const;
 		bool operator!=(const IncludedFileKey &other) const;
@@ -196,7 +196,7 @@ namespace rkit::buildsystem::rpc_analyzer
 
 	private:
 		BuildFileLocation m_location = BuildFileLocation::kInvalid;
-		String m_string;
+		CIPath m_string;
 	};
 
 	class ShortTempToken
@@ -217,9 +217,9 @@ namespace rkit::buildsystem::rpc_analyzer
 	struct AnalyzerIncludeStack
 	{
 		AnalyzerIncludeStack();
-		AnalyzerIncludeStack(BuildFileLocation location, const String &path, bool canTryAlternate);
+		AnalyzerIncludeStack(BuildFileLocation location, const CIPath &path, bool canTryAlternate);
 
-		String m_path;
+		CIPath m_path;
 		BuildFileLocation m_location = BuildFileLocation::kInvalid;
 		bool m_canTryAlternate = false;
 		bool m_isScanning = true;
@@ -455,30 +455,42 @@ namespace rkit
 
 namespace rkit::buildsystem::rpc_common
 {
-	Result LibraryCompilerBase::FormatGraphicPipelinePath(String &path, const StringView &identifier, size_t pipelineIndex)
+	Result LibraryCompilerBase::FormatGraphicPipelinePath(CIPath &path, const StringView &identifier, size_t pipelineIndex)
 	{
-		return path.Format("rpll/g_%zu/%s", pipelineIndex, identifier.GetChars());
+		String str;
+		RKIT_CHECK(str.Format("rpll/g_%zu/%s", pipelineIndex, identifier.GetChars()));
+
+		return path.Set(str);
 	}
 
-	Result LibraryCompilerBase::FormatGlobalsPath(String &path, const StringView &identifier)
+	Result LibraryCompilerBase::FormatGlobalsPath(CIPath &path, const StringView &identifier)
 	{
-		return path.Format("rpll/globs/%s", identifier.GetChars());
+		String str;
+		RKIT_CHECK(str.Format("rpll/globs/%s", identifier.GetChars()));
+
+		return path.Set(str);
 	}
 
-	Result LibraryCompilerBase::FormatIndexPath(String &path, const StringView &identifier)
+	Result LibraryCompilerBase::FormatIndexPath(CIPath &path, const StringView &identifier)
 	{
-		return path.Format("rpll/idx/%s", identifier.GetChars());
+		String str;
+		RKIT_CHECK(str.Format("rpll/idx/%s", identifier.GetChars()));
+
+		return path.Set(str);
 	}
 
-	Result LibraryCompilerBase::FormatCombinedOutputPath(String &path, const StringView &identifier)
+	Result LibraryCompilerBase::FormatCombinedOutputPath(CIPath &path, const StringView &identifier)
 	{
-		return path.Format("rpll/out/%s", identifier.GetChars());
+		String str;
+		RKIT_CHECK(str.Format("rpll/out/%s", identifier.GetChars()));
+
+		return path.Set(str);
 	}
 }
 
 namespace rkit::buildsystem::rpc_analyzer
 {
-	IncludedFileKey::IncludedFileKey(BuildFileLocation location, const String &str)
+	IncludedFileKey::IncludedFileKey(BuildFileLocation location, const CIPath &str)
 		: m_location(location)
 		, m_string(str)
 	{
@@ -489,7 +501,7 @@ namespace rkit::buildsystem::rpc_analyzer
 		HashValue_t hash = baseHash;
 
 		hash = Hasher<int32_t>::ComputeHash(hash, static_cast<int32_t>(m_location));
-		hash = Hasher<String>::ComputeHash(hash, m_string);
+		hash = Hasher<CIPath>::ComputeHash(hash, m_string);
 
 		return hash;
 	}
@@ -540,7 +552,7 @@ namespace rkit::buildsystem::rpc_analyzer
 	{
 	}
 
-	AnalyzerIncludeStack::AnalyzerIncludeStack(BuildFileLocation location, const String &path, bool canTryAlternate)
+	AnalyzerIncludeStack::AnalyzerIncludeStack(BuildFileLocation location, const CIPath &path, bool canTryAlternate)
 		: m_location(location)
 		, m_path(path)
 		, m_canTryAlternate(canTryAlternate)
@@ -581,7 +593,7 @@ namespace rkit::buildsystem::rpc_analyzer
 			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution("nshort", render::NumericType::SNorm16)));
 		}
 
-		String path;
+		CIPath path;
 		RKIT_CHECK(path.Set(depsNode->GetIdentifier()));
 
 		RKIT_CHECK(m_includeStack.Append(AnalyzerIncludeStack(depsNode->GetInputFileLocation(), path, false)));
@@ -1811,7 +1823,10 @@ namespace rkit::buildsystem::rpc_analyzer
 		String str;
 		RKIT_CHECK(str.Set(path.GetChars()));
 
-		RKIT_CHECK(m_includeStack.Append(AnalyzerIncludeStack(loc, str, true)));
+		CIPath ciPath;
+		RKIT_CHECK(ciPath.Set(str));
+
+		RKIT_CHECK(m_includeStack.Append(AnalyzerIncludeStack(loc, ciPath, true)));
 
 		return ResultCode::kOK;
 	}
@@ -2631,7 +2646,7 @@ namespace rkit::buildsystem::rpc_analyzer
 			size_t index = 0;
 			RKIT_CHECK(pkgBuilder->IndexObject(&graphicsPipeline, pipelineType, true, index));
 
-			String outPath;
+			CIPath outPath;
 			RKIT_CHECK(FormatGraphicPipelinePath(outPath, depsNode->GetIdentifier(), pipelineIndex));
 
 			{
@@ -2641,7 +2656,7 @@ namespace rkit::buildsystem::rpc_analyzer
 				RKIT_CHECK(pkgBuilder->WritePackage(*stream));
 			}
 
-			RKIT_CHECK(m_feedback->AddNodeDependency(IModuleDriver::kDefaultNamespace, kRenderGraphicsPipelineNodeID, BuildFileLocation::kIntermediateDir, outPath));
+			RKIT_CHECK(m_feedback->AddNodeDependency(IModuleDriver::kDefaultNamespace, kRenderGraphicsPipelineNodeID, BuildFileLocation::kIntermediateDir, outPath.ToString()));
 
 			pipelineIndex++;
 		}
@@ -2666,7 +2681,7 @@ namespace rkit::buildsystem::rpc_analyzer
 				RKIT_CHECK(pkgBuilder->IndexObject(&renderPass, renderPassType, true, index));
 			}
 
-			String outPath;
+			CIPath outPath;
 			RKIT_CHECK(FormatGlobalsPath(outPath, depsNode->GetIdentifier()));
 
 			{
@@ -2678,7 +2693,7 @@ namespace rkit::buildsystem::rpc_analyzer
 		}
 
 
-		String indexPath;
+		CIPath indexPath;
 		RKIT_CHECK(FormatIndexPath(indexPath, depsNode->GetIdentifier()));
 
 		UniquePtr<ISeekableReadWriteStream> indexStream;
@@ -2857,7 +2872,7 @@ namespace rkit::buildsystem::rpc_compiler
 
 	Result LibraryCompiler::Run(IDependencyNode *depsNode)
 	{
-		String indexPath;
+		CIPath indexPath;
 		RKIT_CHECK(FormatIndexPath(indexPath, depsNode->GetIdentifier()));
 
 		size_t numGraphicsPipelines = 0;
@@ -2890,10 +2905,10 @@ namespace rkit::buildsystem::rpc_compiler
 		// Add pipelines
 		for (size_t i = 0; i < numGraphicsPipelines; i++)
 		{
-			String pipelinePath;
+			CIPath pipelinePath;
 			RKIT_CHECK(FormatGraphicPipelinePath(pipelinePath, depsNode->GetIdentifier(), i));
 
-			String compiledPipelinePath;
+			CIPath compiledPipelinePath;
 			RKIT_CHECK(compiledPipelinePath.Set(GetCompiledPipelineIntermediateBasePath()));
 			RKIT_CHECK(compiledPipelinePath.Append(pipelinePath));
 
@@ -2905,7 +2920,7 @@ namespace rkit::buildsystem::rpc_compiler
 
 		// Add globals
 		{
-			String globalsPath;
+			CIPath globalsPath;
 			RKIT_CHECK(FormatGlobalsPath(globalsPath, depsNode->GetIdentifier()));
 
 			UniquePtr<ISeekableReadStream> inStream;
@@ -2914,7 +2929,7 @@ namespace rkit::buildsystem::rpc_compiler
 			RKIT_CHECK(m_combiner.AddInput(*inStream));
 		}
 
-		String outPath;
+		CIPath outPath;
 		RKIT_CHECK(FormatCombinedOutputPath(outPath, depsNode->GetIdentifier()));
 
 		UniquePtr<ISeekableReadWriteStream> outStream;

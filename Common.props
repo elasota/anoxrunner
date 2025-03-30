@@ -13,6 +13,7 @@
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;RKIT_PLATFORM=RKIT_PLATFORM_WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ExceptionHandling>false</ExceptionHandling>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <OpenMPSupport>false</OpenMPSupport>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup />

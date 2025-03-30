@@ -15,6 +15,7 @@
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/Module.h"
 #include "rkit/Core/ModuleDriver.h"
+#include "rkit/Core/Path.h"
 #include "rkit/Core/Stream.h"
 
 #include <glslang/Include/glslang_c_interface.h>
@@ -42,12 +43,12 @@ namespace rkit::buildsystem::vulkan
 	{
 	protected:
 		static Result LoadDataDriver(data::IDataDriver **outDriver);
-		static Result LoadPackage(BuildFileLocation location, const StringView &path, bool allowTempStrings, IDependencyNodeCompilerFeedback *feedback, UniquePtr<data::IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *binaryContent);
+		static Result LoadPackage(BuildFileLocation location, const CIPathView &path, bool allowTempStrings, IDependencyNodeCompilerFeedback *feedback, UniquePtr<data::IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *binaryContent);
 
 		typedef const render::ShaderDesc *(render::GraphicsPipelineDesc:: *GraphicsPipelineShaderField_t);
 		static Result GetGraphicsShaderPipelineShaderFieldForStage(render::vulkan::GraphicPipelineStage stage, GraphicsPipelineShaderField_t &outField);
 
-		static Result FormatGraphicsPipelineStageFilePath(String &str, const StringView &inPath, render::vulkan::GraphicPipelineStage stage);
+		static Result FormatGraphicsPipelineStageFilePath(CIPath &str, const CIPathView &inPath, render::vulkan::GraphicPipelineStage stage);
 	};
 
 	enum class PipelineType
@@ -93,11 +94,11 @@ namespace rkit::buildsystem::vulkan
 		class DynamicIncludeResult : public IncludeResultBase
 		{
 		public:
-			DynamicIncludeResult(String &&name, Vector<uint8_t> &&buffer);
+			DynamicIncludeResult(CIPath &&name, Vector<uint8_t> &&buffer);
 
 		private:
 			Vector<uint8_t> m_buffer;
-			String m_name;
+			CIPath m_name;
 		};
 
 		static Result WriteString(IWriteStream &stream, const rkit::StringSliceView &str);
@@ -113,7 +114,7 @@ namespace rkit::buildsystem::vulkan
 		static Result WriteConfigurableRTFormat(IWriteStream &stream, const render::ConfigurableValueBase<render::RenderTargetFormat> &format);
 
 		Result NormalizePath(String &path) const;
-		Result TryInclude(String &&path, bool &outSucceeded, UniquePtr<IncludeResultBase> &outIncludeResult) const;
+		Result TryInclude(CIPath &&path, bool &outSucceeded, UniquePtr<IncludeResultBase> &outIncludeResult) const;
 		Result ProcessInclude(const StringView &headerName, const StringView &includerName, size_t includeDepth, bool isSystem, UniquePtr<IncludeResultBase> &outIncludeResult);
 		void FreeIncludeResult(glsl_include_result_t *result);
 
@@ -210,8 +211,11 @@ namespace rkit::buildsystem::vulkan
 
 	Result RenderPipelineCompiler::RunAnalysis(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
 	{
+		CIPath depsPath;
+		RKIT_CHECK(depsPath.Set(depsNode->GetIdentifier()));
+
 		UniquePtr<data::IRenderDataPackage> package;
-		RKIT_CHECK(LoadPackage(BuildFileLocation::kIntermediateDir, depsNode->GetIdentifier(), true, feedback, package, nullptr));
+		RKIT_CHECK(LoadPackage(BuildFileLocation::kIntermediateDir, depsPath, true, feedback, package, nullptr));
 
 		Vector<uint32_t> stages;
 
@@ -249,10 +253,13 @@ namespace rkit::buildsystem::vulkan
 
 	Result RenderPipelineCompiler::RunCompile(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
 	{
+		CIPath depsPath;
+		RKIT_CHECK(depsPath.Set(depsNode->GetIdentifier()));
+
 		Vector<Vector<uint8_t>> binaryContent;
 
 		UniquePtr<data::IRenderDataPackage> package;
-		RKIT_CHECK(LoadPackage(BuildFileLocation::kIntermediateDir, depsNode->GetIdentifier(), true, feedback, package, &binaryContent));
+		RKIT_CHECK(LoadPackage(BuildFileLocation::kIntermediateDir, depsPath, true, feedback, package, &binaryContent));
 
 		if (m_pipelineType == PipelineType::Graphics)
 		{
@@ -316,8 +323,11 @@ namespace rkit::buildsystem::vulkan
 			{
 				Vector<uint8_t> &stageBinaryData = binaryContentData[i];
 
-				String spvPath;
-				RKIT_CHECK(FormatGraphicsPipelineStageFilePath(spvPath, depsNode->GetIdentifier(), stage));
+				CIPath nodePath;
+				RKIT_CHECK(nodePath.Set(depsNode->GetIdentifier()));
+
+				CIPath spvPath;
+				RKIT_CHECK(FormatGraphicsPipelineStageFilePath(spvPath, nodePath, stage));
 
 				UniquePtr<ISeekableReadStream> stream;
 				RKIT_CHECK(feedback->TryOpenInput(BuildFileLocation::kIntermediateDir, spvPath, stream));
@@ -358,9 +368,15 @@ namespace rkit::buildsystem::vulkan
 		UniquePtr<IPackageBuilder> packageBuilder;
 		RKIT_CHECK(bsDriver->CreatePackageBuilder(dataDriver->GetRenderDataHandler(), objectWriter.Get(), false, packageBuilder));
 
-		String outPath;
+		CIPath outPath;
 		RKIT_CHECK(outPath.Set(GetCompiledPipelineIntermediateBasePath()));
-		RKIT_CHECK(outPath.Append(depsNode->GetIdentifier()));
+
+		{
+			CIPath pipelinePath;
+			RKIT_CHECK(pipelinePath.Set(depsNode->GetIdentifier()));
+
+			RKIT_CHECK(outPath.Append(pipelinePath));
+		}
 
 		UniquePtr<ISeekableReadWriteStream> stream;
 		RKIT_CHECK(feedback->OpenOutput(BuildFileLocation::kIntermediateDir, outPath, stream));
@@ -1078,12 +1094,12 @@ namespace rkit::buildsystem::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result RenderPipelineStageBuildJob::TryInclude(String &&path, bool &outSucceeded, UniquePtr<IncludeResultBase> &outIncludeResult) const
+	Result RenderPipelineStageBuildJob::TryInclude(CIPath &&path, bool &outSucceeded, UniquePtr<IncludeResultBase> &outIncludeResult) const
 	{
 		outSucceeded = false;
 		outIncludeResult.Reset();
 
-		String fullPath;
+		CIPath fullPath;
 		RKIT_CHECK(fullPath.Set(buildsystem::GetShaderSourceBasePath()));
 		RKIT_CHECK(fullPath.Append(path));
 
@@ -1171,11 +1187,15 @@ namespace rkit::buildsystem::vulkan
 
 		if (isAbsolutePath)
 		{
-			StringSliceView headerAbsPath = headerName.SubString(2);
+			StringSliceView headerAbsPathStr = headerName.SubString(2);
 
-			String normalizedPath;
-			RKIT_CHECK(normalizedPath.Set(headerAbsPath));
-			RKIT_CHECK(NormalizePath(normalizedPath));
+			// FIXME: Use Path stuff
+			String normalizedPathStr;
+			RKIT_CHECK(normalizedPathStr.Set(headerAbsPathStr));
+			RKIT_CHECK(NormalizePath(normalizedPathStr));
+
+			CIPath normalizedPath;
+			RKIT_CHECK(normalizedPath.Set(normalizedPathStr));
 
 			bool succeeded = false;
 			RKIT_CHECK(TryInclude(std::move(normalizedPath), succeeded, outIncludeResult));
@@ -1194,10 +1214,13 @@ namespace rkit::buildsystem::vulkan
 						basePathLength = i + 1;
 				}
 
-				String path;
-				RKIT_CHECK(path.Set(includerName.SubString(0, basePathLength)));
-				RKIT_CHECK(path.Append(headerName));
-				RKIT_CHECK(NormalizePath(path));
+				String pathStr;
+				RKIT_CHECK(pathStr.Set(includerName.SubString(0, basePathLength)));
+				RKIT_CHECK(pathStr.Append(headerName));
+				RKIT_CHECK(NormalizePath(pathStr));
+
+				CIPath path;
+				RKIT_CHECK(path.Set(pathStr));
 
 				bool succeeded = false;
 				RKIT_CHECK(TryInclude(std::move(path), succeeded, outIncludeResult));
@@ -1214,8 +1237,11 @@ namespace rkit::buildsystem::vulkan
 
 				for (const String &includePath : m_includePaths)
 				{
-					String fullPath = includePath;
-					RKIT_CHECK(fullPath.Append(normalizedHeaderName));
+					String fullPathStr = includePath;
+					RKIT_CHECK(fullPathStr.Append(normalizedHeaderName));
+
+					CIPath fullPath;
+					RKIT_CHECK(fullPath.Set(fullPathStr));
 
 					bool succeeded = false;
 					RKIT_CHECK(TryInclude(std::move(fullPath), succeeded, outIncludeResult));
@@ -1311,7 +1337,7 @@ namespace rkit::buildsystem::vulkan
 		header_name = m_name.CStr();
 	}
 
-	RenderPipelineStageBuildJob::DynamicIncludeResult::DynamicIncludeResult(String &&name, Vector<uint8_t> &&data)
+	RenderPipelineStageBuildJob::DynamicIncludeResult::DynamicIncludeResult(CIPath &&name, Vector<uint8_t> &&data)
 	{
 		m_name = std::move(name);
 		m_buffer = std::move(data);
@@ -1341,8 +1367,11 @@ namespace rkit::buildsystem::vulkan
 	{
 		if (m_pipelineType == PipelineType::Graphics)
 		{
+			CIPath nodePath;
+			RKIT_CHECK(nodePath.Set(depsNode->GetIdentifier()));
+
 			UniquePtr<data::IRenderDataPackage> package;
-			RKIT_CHECK(LoadPackage(BuildFileLocation::kIntermediateDir, depsNode->GetIdentifier(), true, feedback, package, nullptr));
+			RKIT_CHECK(LoadPackage(BuildFileLocation::kIntermediateDir, nodePath, true, feedback, package, nullptr));
 
 			data::IRenderRTTIListBase *list = package->GetIndexable(data::RenderRTTIIndexableStructType::GraphicsPipelineDesc);
 			if (list->GetCount() != 1)
@@ -1358,8 +1387,8 @@ namespace rkit::buildsystem::vulkan
 			RenderPipelineStageBuildJob buildJob(depsNode, feedback, m_pipelineType);
 			RKIT_CHECK(buildJob.RunGraphics(package.Get(), pipelineDesc, stage));
 
-			String outPath;
-			RKIT_CHECK(FormatGraphicsPipelineStageFilePath(outPath, depsNode->GetIdentifier(), stage));
+			CIPath outPath;
+			RKIT_CHECK(FormatGraphicsPipelineStageFilePath(outPath, nodePath, stage));
 
 			UniquePtr<ISeekableReadWriteStream> outStream;
 			RKIT_CHECK(feedback->OpenOutput(BuildFileLocation::kIntermediateDir, outPath, outStream));
@@ -1377,7 +1406,7 @@ namespace rkit::buildsystem::vulkan
 		return 1;
 	}
 
-	Result PipelineCompilerBase::LoadPackage(BuildFileLocation location, const StringView &path, bool allowTempStrings, IDependencyNodeCompilerFeedback *feedback, UniquePtr<data::IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *binaryContent)
+	Result PipelineCompilerBase::LoadPackage(BuildFileLocation location, const CIPathView &path, bool allowTempStrings, IDependencyNodeCompilerFeedback *feedback, UniquePtr<data::IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *binaryContent)
 	{
 		UniquePtr<ISeekableReadStream> packageStream;
 		RKIT_CHECK(feedback->TryOpenInput(location, path, packageStream));
@@ -1416,9 +1445,14 @@ namespace rkit::buildsystem::vulkan
 		return ResultCode::kOK;
 	}
 
-	Result PipelineCompilerBase::FormatGraphicsPipelineStageFilePath(String &str, const StringView &inPath, render::vulkan::GraphicPipelineStage stage)
+	Result PipelineCompilerBase::FormatGraphicsPipelineStageFilePath(CIPath &path, const CIPathView &inPath, render::vulkan::GraphicPipelineStage stage)
 	{
-		return str.Format("vk_pl_g_%i/%s", static_cast<int>(stage), inPath.GetChars());
+		String str;
+		RKIT_CHECK(str.Format("vk_pl_g_%i/%s", static_cast<int>(stage), inPath.GetChars()));
+
+		RKIT_CHECK(path.Set(str));
+
+		return ResultCode::kOK;
 	}
 
 	Result PipelineCompilerBase::LoadDataDriver(data::IDataDriver **outDriver)

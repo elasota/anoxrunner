@@ -7,6 +7,7 @@
 
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/Optional.h"
+#include "rkit/Core/Path.h"
 #include "rkit/Core/String.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/Vector.h"
@@ -93,9 +94,14 @@ namespace anox::buildsystem
 		return rkit::ResultCode::kNotYetImplemented;
 	}
 
-	rkit::Result MaterialCompiler::ConstructAnalysisPath(rkit::String &analysisPath, const rkit::StringView &identifier, MaterialNodeType nodeType)
+	rkit::Result MaterialCompiler::ConstructAnalysisPath(rkit::CIPath &analysisPath, const rkit::StringView &identifier, MaterialNodeType nodeType)
 	{
-		return analysisPath.Format("anox/mat/%s.a%i", identifier.GetChars(), static_cast<int>(nodeType));
+		rkit::String pathStr;
+		RKIT_CHECK(pathStr.Format("anox/mat/%s.a%i", identifier.GetChars(), static_cast<int>(nodeType)));
+
+		RKIT_CHECK(analysisPath.Set(pathStr));
+
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result MaterialCompiler::RunAnalyzeImage(const rkit::StringView &name, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
@@ -147,7 +153,7 @@ namespace anox::buildsystem
 		frameDef.m_xOffset = 0;
 		frameDef.m_yOffset = 0;
 
-		rkit::String analysisPath;
+		rkit::CIPath analysisPath;
 		RKIT_CHECK(ConstructAnalysisPath(analysisPath, name, nodeType));
 
 		RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kTextureNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, imageImport));
@@ -195,8 +201,11 @@ namespace anox::buildsystem
 			rkit::String longName = shortName;
 			RKIT_CHECK(longName.Append(".atd"));
 
+			rkit::CIPath ciPath;
+			RKIT_CHECK(ciPath.Set(longName));
+
 			rkit::UniquePtr<rkit::ISeekableReadStream> atdStream;
-			RKIT_CHECK(feedback->TryOpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, longName, atdStream));
+			RKIT_CHECK(feedback->TryOpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, ciPath, atdStream));
 
 			if (atdStream.IsValid())
 				return RunAnalyzeATD(longName, std::move(atdStream), depsNode, feedback);
@@ -214,8 +223,11 @@ namespace anox::buildsystem
 			rkit::String longName = shortName;
 			RKIT_CHECK(longName.Append(imageExt));
 
+			rkit::CIPath ciPath;
+			RKIT_CHECK(ciPath.Set(longName));
+
 			bool imageExists = false;
-			RKIT_CHECK(feedback->CheckInputExists(rkit::buildsystem::BuildFileLocation::kSourceDir, longName, imageExists));
+			RKIT_CHECK(feedback->CheckInputExists(rkit::buildsystem::BuildFileLocation::kSourceDir, ciPath, imageExists));
 
 			if (imageExists)
 			{

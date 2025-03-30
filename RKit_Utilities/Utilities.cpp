@@ -5,6 +5,7 @@
 #include "rkit/Core/String.h"
 #include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/Mutex.h"
+#include "rkit/Core/Unicode.h"
 #include "rkit/Core/Vector.h"
 
 #include "rkit/Utilities/ThreadPool.h"
@@ -82,10 +83,27 @@ namespace rkit
 		bool ContainsWildcards(const StringSliceView &str) const override;
 		bool MatchesWildcard(const StringSliceView &candidate, const StringSliceView &wildcard) const override;
 
+		bool DefaultIsPathComponentValid(const BaseStringSliceView<char> &span, bool isFirst, bool isLast, bool allowWildcards) const override;
+
+		Result ConvertUTF16ToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const uint16_t> &src) const override;
+		Result ConvertUTF16WCharToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const wchar_t> &src) const override;
+
+		Result ConvertUTF8ToUTF16(size_t &outSize, const Span<uint16_t> &dest, const Span<const uint8_t> &src) const override;
+		Result ConvertUTF8ToUTF16WChar(size_t &outSize, const Span<wchar_t> &dest, const Span<const uint8_t> &src) const override;
+
+		bool IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t> &span, bool isAbsolute, bool isFirst, bool isLast, bool allowWildcards) const override;
+
+
 	private:
 		static bool ValidateFilePathSlice(const Span<const char> &name, bool permitWildcards);
 
 		static bool MatchesWildcardWithMinLiteralCount(const StringSliceView &candidate, const StringSliceView &wildcard, size_t minLiteralCount);
+
+		template<class TWChar>
+		static Result TypedConvertUTF16ToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const TWChar> &src);
+
+		template<class TWChar>
+		static Result TypedConvertUTF8ToUTF16(size_t &outSize, const Span<TWChar> &dest, const Span<const uint8_t> &src);
 
 		utils::Sha256Calculator m_sha256Calculator;
 
@@ -1666,6 +1684,329 @@ namespace rkit
 		return MatchesWildcardWithMinLiteralCount(candidateRef, wildcardRef, minLiteralChars);
 	}
 
+	bool UtilitiesDriver::DefaultIsPathComponentValid(const BaseStringSliceView<char> &span, bool isFirst, bool isLast, bool allowWildcards) const
+	{
+		if (span[span.Length() - 1] == '.')
+		{
+			// Check paths ending with periods
+			const bool isParentDir = (span.Length() == 2 && span[0] == '.');
+			const bool isCurrentDir = (span.Length() == 1 && span[0] == '.' && isFirst);
+
+			if (!isParentDir && !isCurrentDir)
+				return false;
+		}
+		else
+		{
+			// Check for consecutive periods
+			for (size_t i = 1; i < span.Length(); i++)
+			{
+				if (span[i] == '.' && span[i - 1] == '.')
+					return false;
+			}
+		}
+
+		// Check for 8.3 truncations
+		if (span.Length() <= 11)
+		{
+			size_t dotPos = span.Length();
+			for (size_t ri = 1; ri < span.Length() && ri < 3; ri++)
+			{
+				size_t i = span.Length() - 1 - ri;
+				if (span[i] == '.')
+				{
+					dotPos = span[i];
+					break;
+				}
+			}
+
+			if (dotPos <= 8 && dotPos >= 2 && span[dotPos - 2] == '~' && span[dotPos - 1] >= '0' && span[dotPos - 1] <= '9')
+				return false;
+		}
+
+		for (char ch : span)
+		{
+			if (ch >= 0 && ch < 32)
+				return false;
+
+			for (const char *invalidCharPtr = "<>:\"/\\|?*"; *invalidCharPtr; invalidCharPtr++)
+			{
+				if (ch == *invalidCharPtr)
+					return false;
+			}
+		}
+
+		if (span.Length() == 3 || (span.Length() > 3 && span[3] == '.'))
+		{
+			const char *bannedNames[] =
+			{
+				"con", "prn", "aux", "nul"
+			};
+
+			for (const char *bannedName : bannedNames)
+			{
+				bool isBanned = true;
+				for (size_t chIndex = 0; chIndex < 3; chIndex++)
+				{
+					char ch = span[chIndex];
+					if (ch >= 'A' && ch <= 'Z')
+						ch = (ch - 'A') + 'a';
+
+					if (ch != bannedName[chIndex])
+					{
+						isBanned = false;
+						break;
+					}
+				}
+
+				if (isBanned)
+					return false;
+			}
+		}
+
+		// Check for Windows banned names
+		if (
+			((span.Length() == 4 || (span.Length() > 4 && span[4] == '.')) && span[3] >= '0' && span[3] <= '9')
+			|| ((span.Length() == 5 || (span.Length() > 5 && span[5] == '.')) && span[3] == '\xc2' && (span[4] == '\xb2' || span[4] == '\xb3' || span[4] == '\xb9'))
+			)
+		{
+			const char *bannedPrefixes[] =
+			{
+				"com", "lpt"
+			};
+
+			for (const char *bannedPrefix : bannedPrefixes)
+			{
+				bool isBanned = true;
+				for (size_t chIndex = 0; chIndex < 3; chIndex++)
+				{
+					char ch = span[chIndex];
+					if (ch >= 'A' && ch <= 'Z')
+						ch = (ch - 'A') + 'a';
+
+					if (ch != bannedPrefix[chIndex])
+					{
+						isBanned = false;
+						break;
+					}
+				}
+
+				if (isBanned)
+					return false;
+			}
+		}
+
+		// Check for invalid UTF-8
+		for (size_t i = 0; i < span.Length(); i++)
+		{
+			const char cchar = span[i];
+			const uint8_t codeByte = static_cast<uint8_t>(cchar);
+
+			if (codeByte & 0x80)
+			{
+				size_t maxCodeLength = span.Length() - i;
+				if (maxCodeLength > 4)
+					maxCodeLength = 4;
+
+				bool isValidCode = false;
+				for (size_t codeLength = 2; codeLength <= maxCodeLength; codeLength++)
+				{
+					uint8_t mask = (0xf80u >> codeLength) & 0xffu;
+					uint8_t checkValue = (0xf00u >> codeLength) & 0xffu;
+					uint8_t lowBitsMask = (0x7fu >> codeLength);
+					if ((codeByte & mask) == checkValue)
+					{
+						if (codeByte == checkValue)
+							return false;	// Not minimum length
+
+						uint32_t codePoint = static_cast<uint32_t>(codeByte & lowBitsMask) << (6 * (codeLength - 1));
+
+						for (size_t extraByteIndex = 1; extraByteIndex < codeLength; extraByteIndex++)
+						{
+							const size_t bitPos = (codeLength - extraByteIndex - 1) * 6;
+							const uint8_t extraByte = static_cast<uint8_t>(span[i + extraByteIndex]);
+
+							if ((extraByte & 0xc0) != 0x80)
+								return false;
+
+							codePoint |= static_cast<uint32_t>(extraByte) << bitPos;
+						}
+
+						// Out of range
+						if (codePoint > 0x10ffffu)
+							return false;
+
+						// UTF-16 surrogates
+						if (codePoint >= 0xd800u && codePoint <= 0xdfffu)
+							return false;
+
+						isValidCode = true;
+						i += codeLength - 1;
+						break;
+					}
+				}
+
+				if (!isValidCode)
+					return false;
+			}
+		}
+
+		return true;
+	}
+
+	Result UtilitiesDriver::ConvertUTF16ToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const uint16_t> &src) const
+	{
+		return TypedConvertUTF16ToUTF8(outSize, dest, src);
+	}
+
+	Result UtilitiesDriver::ConvertUTF16WCharToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const wchar_t> &src) const
+	{
+		return TypedConvertUTF16ToUTF8(outSize, dest, src);
+	}
+
+	Result UtilitiesDriver::ConvertUTF8ToUTF16(size_t &outSize, const Span<uint16_t> &dest, const Span<const uint8_t> &src) const
+	{
+		return TypedConvertUTF8ToUTF16(outSize, dest, src);
+	}
+
+	Result UtilitiesDriver::ConvertUTF8ToUTF16WChar(size_t &outSize, const Span<wchar_t> &dest, const Span<const uint8_t> &src) const
+	{
+		return TypedConvertUTF8ToUTF16(outSize, dest, src);
+	}
+
+	bool UtilitiesDriver::IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t> &span, bool isAbsolute, bool isFirst, bool isLast, bool allowWildcards) const
+	{
+		if (isAbsolute && isFirst)
+		{
+			if (span.Length() != 2)
+				return false;
+
+			if (span[1] != ':')
+				return false;
+
+			wchar_t firstChar = span[0];
+			if ((firstChar < 'A' || firstChar > 'Z') && (firstChar < 'a' || firstChar > 'z'))
+				return false;
+
+			return true;
+		}
+
+		if (span[span.Length() - 1] == '.')
+			return false;
+
+		// Check for 8.3 truncations
+		if (span.Length() <= 11)
+		{
+			size_t dotPos = span.Length();
+			for (size_t ri = 1; ri < span.Length() && ri < 3; ri++)
+			{
+				size_t i = span.Length() - 1 - ri;
+				if (span[i] == '.')
+				{
+					dotPos = span[i];
+					break;
+				}
+			}
+
+			if (dotPos <= 8 && dotPos >= 2 && span[dotPos - 2] == '~' && span[dotPos - 1] >= '0' && span[dotPos - 1] <= '9')
+				return false;
+		}
+
+		for (wchar_t ch : span)
+		{
+			if (ch >= 0 && ch < 32)
+				return false;
+
+			for (const char *invalidCharPtr = "<>:\"/\\|?*"; *invalidCharPtr; invalidCharPtr++)
+			{
+				if (ch == *invalidCharPtr)
+					return false;
+			}
+		}
+
+		if (span.Length() == 3 || (span.Length() > 3 && span[3] == '.'))
+		{
+			const wchar_t *bannedNames[] =
+			{
+				L"con", L"prn", L"aux", L"nul"
+			};
+
+			for (const wchar_t *bannedName : bannedNames)
+			{
+				bool isBanned = true;
+				for (size_t chIndex = 0; chIndex < 3; chIndex++)
+				{
+					wchar_t ch = span[chIndex];
+					if (ch >= 'A' && ch <= 'Z')
+						ch = (ch - 'A') + 'a';
+
+					if (ch != bannedName[chIndex])
+					{
+						isBanned = false;
+						break;
+					}
+				}
+
+				if (isBanned)
+					return false;
+			}
+		}
+
+		// Check for Windows banned names
+		if (
+			((span.Length() == 4 || (span.Length() > 4 && span[4] == '.')) && span[3] >= '0' && span[3] <= '9')
+			|| ((span.Length() == 5 || (span.Length() > 5 && span[5] == '.')) && span[3] == 0xc2 && (span[4] == 0xb2 || span[4] == 0xb3 || span[4] == 0xb9))
+			)
+		{
+			const wchar_t *bannedPrefixes[] =
+			{
+				L"com", L"lpt"
+			};
+
+			for (const wchar_t *bannedPrefix : bannedPrefixes)
+			{
+				bool isBanned = true;
+				for (size_t chIndex = 0; chIndex < 3; chIndex++)
+				{
+					wchar_t ch = span[chIndex];
+					if (ch >= 'A' && ch <= 'Z')
+						ch = (ch - 'A') + 'a';
+
+					if (ch != bannedPrefix[chIndex])
+					{
+						isBanned = false;
+						break;
+					}
+				}
+
+				if (isBanned)
+					return false;
+			}
+		}
+
+		// Check for invalid UTF-16
+		for (size_t i = 0; i < span.Length(); i++)
+		{
+			const wchar_t wchar = span[i];
+
+			if (wchar < 0xd7ff || wchar >= 0xe000)
+				continue;
+
+			if (wchar >= 0xdc00 && wchar <= 0xdfff)
+				return false;	// Orphaned low surrogate
+
+			if (i == span.Length() - 1)
+				return false;
+
+			i++;
+			const wchar_t lowSurrogate = span[i];
+
+			if (lowSurrogate < 0xdc00 || lowSurrogate > 0xdfff)
+				return false;
+		}
+
+		return true;
+	}
+
 	bool UtilitiesDriver::MatchesWildcardWithMinLiteralCount(const StringSliceView &candidateRef, const StringSliceView &wildcardRef, size_t minLiteralCount)
 	{
 		StringSliceView candidate = candidateRef;
@@ -1739,6 +2080,54 @@ namespace rkit
 			candidate = candidate.SubString(1);
 			maxStartLoc--;
 		}
+	}
+
+	template<class TWChar>
+	Result UtilitiesDriver::TypedConvertUTF16ToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const TWChar> &src)
+	{
+		return ResultCode::kNotYetImplemented;
+	}
+
+	template<class TWChar>
+	Result UtilitiesDriver::TypedConvertUTF8ToUTF16(size_t &outSize, const Span<TWChar> &dest, const Span<const uint8_t> &src)
+	{
+		size_t availableSrc = src.Count();
+		const uint8_t *srcBytes = src.Ptr();
+
+		size_t availableDest = dest.Count();
+		TWChar *destChars = dest.Ptr();
+
+		size_t resultSize = 0;
+
+		while (availableSrc > 0)
+		{
+			size_t bytesDigested = 0;
+			uint32_t codePoint = 0;
+			if (!UTF8::Decode(srcBytes, availableSrc, bytesDigested, codePoint))
+				return ResultCode::kTextEncodingError;
+
+			availableSrc -= bytesDigested;
+			srcBytes += bytesDigested;
+
+			uint16_t encoded[UTF16::kMaxEncodedWords];
+			size_t dwordsEmitted = 0;
+			UTF16::Encode(encoded, dwordsEmitted, codePoint);
+
+			if (availableDest >= dwordsEmitted)
+			{
+				for (size_t i = 0; i < dwordsEmitted; i++)
+					destChars[i] = static_cast<TWChar>(encoded[i]);
+
+				destChars += dwordsEmitted;
+				availableDest -= dwordsEmitted;
+			}
+
+			resultSize += dwordsEmitted;
+		}
+
+		outSize = resultSize;
+
+		return ResultCode::kOK;
 	}
 }
 

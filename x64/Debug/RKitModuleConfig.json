@@ -1,0 +1,27 @@
+{
+	"DefaultProgram":
+	{
+		"Namespace": "Anox",
+		"Name":      "MainProgram"
+	},
+
+	"Modules":
+	{
+		"Tool":
+		[
+			"ExtractDAT"
+		],
+
+		"RKit":
+		[
+		]
+	},
+
+	"Programs":
+	{
+		"Tool":
+		[
+			"ExtractDAT"
+		]
+	}
+}
