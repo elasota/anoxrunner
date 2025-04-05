@@ -22,6 +22,9 @@ namespace rkit
 	class BasePathView;
 
 	template<bool TIsAbsolute, class TPathTraits>
+	class BasePathSliceView;
+
+	template<bool TIsAbsolute, class TPathTraits>
 	class BasePathIterator;
 
 	template<uint32_t TTraitFlags>
@@ -39,6 +42,7 @@ namespace rkit
 
 	typedef BasePath<false, DefaultCaseInsensitivePathTraits> CIPath;
 	typedef BasePathView<false, DefaultCaseInsensitivePathTraits> CIPathView;
+	typedef BasePathSliceView<false, DefaultCaseInsensitivePathTraits> CIPathSliceView;
 	typedef BasePathIterator<false, DefaultCaseInsensitivePathTraits> CIPathIterator;
 
 	typedef BasePath<false, DefaultCaseSensitivePathTraits> CSPath;

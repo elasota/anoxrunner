@@ -65,75 +65,165 @@ namespace rkit::buildsystem
 			if (!haveToken)
 				break;
 
-			Vector<char> constructedPath;
+			Vector<CIPath> pathScans;
+
+			RKIT_CHECK(pathScans.Resize(1));
+
 			size_t numPathChunks = 0;
 			size_t chunkStart = 0;
-			for (size_t i = 0; true; i++)
-			{
-				if (i == token.Count() || token[i] == '/')
-				{
-					bool handledOK = false;
-					RKIT_CHECK(HandlePathChunk(constructedPath, handledOK, numPathChunks, depsNode, token.SubSpan(chunkStart, i - chunkStart)));
 
-					if (!handledOK)
+			bool haveAnyWildcards = false;
+
+			while (chunkStart < token.Count())
+			{
+				size_t nextChunkStart = chunkStart;
+				size_t chunkEnd = chunkStart;
+
+				bool isFirst = (chunkStart == 0);
+				bool isLast = false;
+
+				for (size_t i = chunkStart; true; i++)
+				{
+					if (i == token.Count() || token[i] == '/')
 					{
-						rkit::log::ErrorFmt("%zu:%zu: Path is invalid", line, col);
+						chunkEnd = i;
+						numPathChunks++;
+						nextChunkStart = i;
+
+						if (i == token.Count())
+							isLast = true;
+						else
+							nextChunkStart++;
+
+						break;
+					}
+				}
+
+				ConstSpan<char> chunkSpan = token.SubSpan(chunkStart, chunkEnd - chunkStart);
+
+				if (chunkSpan.Count() == 1 && chunkSpan[0] == '.')
+				{
+					if (!isFirst)
+					{
+						rkit::log::ErrorFmt("%zu:%zu: '.' path element may only be the first element", line, col);
 						return ResultCode::kMalformedFile;
 					}
 
-					numPathChunks++;
-					chunkStart = i + 1;
+					RKIT_ASSERT(pathScans.Count() == 1);
+					RKIT_CHECK(pathScans[0].Set(nodePath.AbsSlice(nodePath.NumComponents() - 1)));
+				}
+				else
+				{
+					bool hasWildcards = false;
+					for (char c : chunkSpan)
+					{
+						if (c == '?' || c == '*')
+						{
+							hasWildcards = true;
+							haveAnyWildcards = true;
+							break;
+						}
+					}
+
+					StringSliceView chunkSlice = StringSliceView(chunkSpan.Ptr(), chunkSpan.Count());
+
+					if (!hasWildcards)
+					{
+
+						if (CIPath::Validate(chunkSlice) == PathValidationResult::kInvalid)
+						{
+							rkit::log::ErrorFmt("%zu:%zu: Path is invalid", line, col);
+							return ResultCode::kMalformedFile;
+						}
+
+						Vector<CIPath> newPaths;
+						for (const CIPath &path : pathScans)
+						{
+							CIPath newPath = path;
+							RKIT_CHECK(newPath.AppendComponent(chunkSlice));
+
+							RKIT_CHECK(newPaths.Append(std::move(newPath)));
+						}
+
+						pathScans = std::move(newPaths);
+					}
+					else
+					{
+						class PathEnumerator
+						{
+						public:
+							explicit PathEnumerator(const CIPath &basePath, Vector<CIPath> &newPaths, const StringSliceView &wildcard, IUtilitiesDriver *utils)
+								: m_basePath(basePath)
+								, m_newPaths(newPaths)
+								, m_wildcard(wildcard)
+								, m_utils(utils)
+							{
+							}
+
+							Result ApplyResult(const CIPathView &pathView)
+							{
+								CIPathView::Component_t lastComponent = pathView.LastComponent();
+
+								if (m_utils->MatchesWildcard(lastComponent, m_wildcard))
+								{
+									CIPath path;
+									RKIT_CHECK(path.Set(pathView));
+									RKIT_CHECK(m_newPaths.Append(std::move(path)));
+								}
+
+								return ResultCode::kOK;
+							}
+
+							static Result StaticApplyResult(void *userdata, const CIPathView &path)
+							{
+								return static_cast<PathEnumerator *>(userdata)->ApplyResult(path);
+							}
+
+						private:
+							const CIPath &m_basePath;
+							Vector<CIPath> &m_newPaths;
+							const StringSliceView &m_wildcard;
+							IUtilitiesDriver *m_utils;
+						};
+
+						Vector<CIPath> newPaths;
+
+						IUtilitiesDriver *utils = GetDrivers().m_utilitiesDriver;
+
+						for (const CIPath &path : pathScans)
+						{
+							PathEnumerator enumerator(path, newPaths, chunkSlice, utils);
+
+							if (isLast)
+							{
+								RKIT_CHECK(feedback->EnumerateFiles(BuildFileLocation::kSourceDir, path, &enumerator, PathEnumerator::StaticApplyResult));
+							}
+							else
+							{
+								RKIT_CHECK(feedback->EnumerateDirectories(BuildFileLocation::kSourceDir, path, &enumerator, PathEnumerator::StaticApplyResult));
+							}
+						}
+
+						pathScans = std::move(newPaths);
+					}
 				}
 
-				if (i == token.Count())
-					break;
+				chunkStart = nextChunkStart;
 			}
 
-			utils->NormalizeFilePath(constructedPath.ToSpan());
-
-			if (!utils->ValidateFilePath(constructedPath.ToSpan(), true))
+			for (const CIPath &path : pathScans)
 			{
-				rkit::log::ErrorFmt("%zu:%zu: Path is invalid", line, col);
-				return ResultCode::kMalformedFile;
-			}
+				bool exists = false;
+				RKIT_CHECK(feedback->CheckInputExists(BuildFileLocation::kSourceDir, path, exists));
 
-			RKIT_CHECK(constructedPath.Append('\0'));
-
-			StringView pathStrView(constructedPath.GetBuffer(), constructedPath.Count() - 1);
-
-			Vector<String> wildcardMatchStrings;
-			HybridVector<StringView, 1> pathStringViews;
-
-			if (utils->ContainsWildcards(pathStrView))
-			{
-				struct EnumeratorAdder
+				if (haveAnyWildcards && !exists)
 				{
-					static Result EnumerateFile(void *userdata, const String &str)
-					{
-						return static_cast<Vector<String> *>(userdata)->Append(str);
-					}
-				};
+					rkit::log::ErrorFmt("%zu:%zu: Input file was not found", line, col);
+					return ResultCode::kMalformedFile;
+				}
 
-				//RKIT_CHECK(feedback->EnumerateFiles(rkit::buildsystem::BuildFileLocation::kSourceDir, pathStrView, &wildcardMatchStrings, EnumeratorAdder::EnumerateFile));
-				if (true)
-					return ResultCode::kNotYetImplemented;
-
-				const size_t numFiles = wildcardMatchStrings.Count();
-
-				RKIT_CHECK(pathStringViews.Resize(numFiles));
-
-				for (size_t i = 0; i < numFiles; i++)
-					pathStringViews[i] = wildcardMatchStrings[i];
-			}
-			else
-			{
-				RKIT_CHECK(pathStringViews.Append(pathStrView));
-			}
-
-			for (const StringView &pathStrViewItem : pathStringViews)
-			{
-				StringView extStrView;
-				if (!utils->FindFilePathExtension(pathStrViewItem, extStrView))
+				StringSliceView extStrView;
+				if (!utils->FindFilePathExtension(path[path.NumComponents() - 1], extStrView))
 				{
 					rkit::log::ErrorFmt("%zu:%zu: Path has no extension", line, col);
 					return ResultCode::kMalformedFile;
@@ -147,7 +237,7 @@ namespace rkit::buildsystem
 					return ResultCode::kMalformedFile;
 				}
 
-				RKIT_CHECK(feedback->AddNodeDependency(nodeNamespace, nodeType, BuildFileLocation::kSourceDir, pathStrViewItem));
+				RKIT_CHECK(feedback->AddNodeDependency(nodeNamespace, nodeType, BuildFileLocation::kSourceDir, path.ToString()));
 			}
 		}
 

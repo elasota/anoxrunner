@@ -61,7 +61,7 @@ namespace rkit
 
 		struct IBuildSystemInstance
 		{
-			typedef Result(*EnumerateFilesResultCallback_t)(void *userdata, const String &path);
+			typedef Result (*EnumerateFilesResultCallback_t)(void *userdata, const CIPathView &path);
 
 			virtual ~IBuildSystemInstance() {}
 
@@ -72,7 +72,7 @@ namespace rkit
 			virtual IDependencyNode *FindContentNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const Span<const uint8_t> &content) const = 0;
 			virtual Result FindOrCreateNamedNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier, IDependencyNode *&outNode) = 0;
 			virtual Result FindOrCreateContentNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, Vector<uint8_t> &&content, IDependencyNode *&outNode) = 0;
-			virtual Result RegisterNodeTypeByExtension(const StringView &ext, uint32_t nodeNamespace, uint32_t nodeType) = 0;
+			virtual Result RegisterNodeTypeByExtension(const StringSliceView &ext, uint32_t nodeNamespace, uint32_t nodeType) = 0;
 
 			virtual Result AddRootNode(IDependencyNode *node) = 0;
 			virtual Result AddPostBuildAction(IBuildSystemAction *action) = 0;
@@ -86,6 +86,7 @@ namespace rkit
 			virtual Result TryOpenFileRead(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadStream> &outFile) = 0;
 			virtual Result OpenFileWrite(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadWriteStream> &outFile) = 0;
 
+			virtual Result EnumerateDirectories(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback) = 0;
 			virtual Result EnumerateFiles(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback) = 0;
 		};
 

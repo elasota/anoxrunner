@@ -27,6 +27,7 @@ namespace rkit
 		kInvalidUnicode,
 		kInvalidJson,
 		kInvalidCString,
+		kInvalidPath,
 
 		kEndOfStream,
 		kIOReadError,
@@ -40,7 +41,6 @@ namespace rkit
 
 		kOperationFailed,
 		kTextParsingFailed,
-		kTextEncodingError,
 
 		kGraphicsAPIException,
 

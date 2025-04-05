@@ -49,7 +49,6 @@ namespace rkit
 	enum class FileLocation
 	{
 		kProgramDirectory,			// Same directory as the program
-		kDataSourceDirectory,		// Source directory for compilable data
 		kGameDirectory,				// Compiled game data directory
 		kUserSettingsDirectory,
 	};
@@ -87,7 +86,6 @@ namespace rkit
 
 		virtual Result SetGameDirectoryOverride(const OSAbsPathView &path) = 0;
 		virtual Result SetSettingsDirectory(const StringView &path) = 0;
-		virtual Result SetBaseDirectory(const OSAbsPathView &path) = 0;
 		virtual char GetPathSeparator() const = 0;
 
 		virtual IPlatformDriver *GetPlatformDriver() const = 0;

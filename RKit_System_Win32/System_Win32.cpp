@@ -182,7 +182,6 @@ namespace rkit
 
 		Result SetGameDirectoryOverride(const OSAbsPathView &path) override;
 		Result SetSettingsDirectory(const StringView &path) override;
-		Result SetBaseDirectory(const OSAbsPathView &path) override;
 		char GetPathSeparator() const override;
 
 		IPlatformDriver *GetPlatformDriver() const override;
@@ -215,7 +214,6 @@ namespace rkit
 
 		OSAbsPath m_gameDirectoryOverride;
 		OSAbsPath m_settingsDirectory;
-		OSAbsPath m_baseDirectory;
 
 		HINSTANCE m_hInstance;
 	};
@@ -1050,11 +1048,6 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
-	Result SystemDriver_Win32::SetBaseDirectory(const OSAbsPathView &path)
-	{
-		return m_baseDirectory.Set(path);
-	}
-
 	char SystemDriver_Win32::GetPathSeparator() const
 	{
 		return '\\';
@@ -1184,16 +1177,6 @@ namespace rkit
 		{
 		case FileLocation::kProgramDirectory:
 			RKIT_CHECK(outPath.Set(m_programDirStr));
-			break;
-
-		case FileLocation::kDataSourceDirectory:
-			{
-				if (true)
-					return ResultCode::kNotYetImplemented;
-
-				outPath = m_baseDirectory;
-				RKIT_CHECK(outPath.AppendComponent(L"datasrc"));
-			}
 			break;
 
 		case FileLocation::kGameDirectory:

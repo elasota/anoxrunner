@@ -331,9 +331,10 @@ namespace rkit::buildsystem
 			Result OpenOutput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadWriteStream> &outputFile) override;
 
 			Result AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) override;
-			bool FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const override;
+			bool FindNodeTypeByFileExtension(const StringSliceView &ext, uint32_t &outNamespace, uint32_t &outType) const override;
 
 			Result EnumerateFiles(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback) override;
+			Result EnumerateDirectories(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback) override;
 
 			IBuildSystemInstance *GetBuildSystemInstance() const override;
 
@@ -459,10 +460,11 @@ namespace rkit::buildsystem
 		Result TryOpenFileRead(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadStream> &outFile) override;
 		Result OpenFileWrite(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadWriteStream> &outFile) override;
 
+		Result EnumerateDirectories(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback) override;
 		Result EnumerateFiles(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback) override;
 
-		Result RegisterNodeTypeByExtension(const StringView &ext, uint32_t nodeNamespace, uint32_t nodeType) override;
-		bool FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const;
+		Result RegisterNodeTypeByExtension(const StringSliceView &ext, uint32_t nodeNamespace, uint32_t nodeType) override;
+		bool FindNodeTypeByFileExtension(const StringSliceView &ext, uint32_t &outNamespace, uint32_t &outType) const;
 
 		CallbackSpan<IDependencyNode *, const IBuildSystemInstance *> GetBuildRelevantNodes() const override;
 
@@ -517,11 +519,12 @@ namespace rkit::buildsystem
 		Result CheckedLoadCache(ISeekableReadStream &stream, FilePos_t pos);
 		Result SaveCache();
 
+		Result InternalEnumerateFilesOrDirectories(BuildFileLocation location, const CIPathView &path, bool isDirectoryMode, void *userdata, EnumerateFilesResultCallback_t resultCallback);
+
 		String m_targetName;
 		OSAbsPath m_srcDir;
 		OSAbsPath m_intermedDir;
 		OSAbsPath m_dataDir;
-		char m_pathSeparator;
 
 		HashMap<NodeTypeKey, UniquePtr<IDependencyNodeCompiler> > m_nodeCompilers;
 		HashMap<NodeKey, DependencyNode *> m_nodeLookup;
@@ -1277,7 +1280,7 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
-	bool DependencyNode::DependencyNodeCompilerFeedback::FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const
+	bool DependencyNode::DependencyNodeCompilerFeedback::FindNodeTypeByFileExtension(const StringSliceView &ext, uint32_t &outNamespace, uint32_t &outType) const
 	{
 		return m_buildInstance->FindNodeTypeByFileExtension(ext, outNamespace, outType);
 	}
@@ -1285,6 +1288,11 @@ namespace rkit::buildsystem
 	Result DependencyNode::DependencyNodeCompilerFeedback::EnumerateFiles(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback)
 	{
 		return m_buildInstance->EnumerateFiles(location, path, userdata, resultCallback);
+	}
+
+	Result DependencyNode::DependencyNodeCompilerFeedback::EnumerateDirectories(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback)
+	{
+		return m_buildInstance->EnumerateDirectories(location, path, userdata, resultCallback);
 	}
 
 	IBuildSystemInstance *DependencyNode::DependencyNodeCompilerFeedback::GetBuildSystemInstance() const
@@ -1417,8 +1425,7 @@ namespace rkit::buildsystem
 	}
 
 	BuildSystemInstance::BuildSystemInstance()
-		: m_pathSeparator(0)
-		, m_fs(nullptr)
+		: m_fs(nullptr)
 	{
 	}
 
@@ -1429,8 +1436,6 @@ namespace rkit::buildsystem
 
 	Result BuildSystemInstance::Initialize(const rkit::StringView &targetName, const OSAbsPathView &srcDir, const OSAbsPathView &intermediateDir, const OSAbsPathView &dataDir)
 	{
-		m_pathSeparator = GetDrivers().m_systemDriver->GetPathSeparator();
-
 		RKIT_CHECK(m_targetName.Set(targetName));
 		RKIT_CHECK(m_srcDir.Set(srcDir));
 		RKIT_CHECK(m_intermedDir.Set(intermediateDir));
@@ -2188,131 +2193,46 @@ namespace rkit::buildsystem
 
 	Result BuildSystemInstance::EnumerateFiles(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback)
 	{
-#if 0
-		size_t chunkStart = 0;
-		size_t chunkEnd = 0;
-
-		HybridVector<String, 16> resultsAtLevel;
-
-		RKIT_CHECK(resultsAtLevel.Resize(1));
-		RKIT_CHECK(resultsAtLevel[0].Set(StringSliceView("")));
-
-		IUtilitiesDriver *utils = GetDrivers().m_utilitiesDriver;
-
-		String currentPrefix;
-		while (chunkEnd <= path.Length())
-		{
-			const bool isLastChunk = (chunkEnd == path.Length());
-
-			if (isLastChunk || path[chunkEnd] == '/')
-			{
-				const StringSliceView chunk = path.SubString(chunkStart, chunkEnd - chunkStart);
-
-				const bool isFirstChunk = (chunkStart == 0);
-
-				HybridVector<String, 16> newResults;
-
-				for (const String &parent : resultsAtLevel)
-				{
-					String newPathBase = parent;
-
-					if (!isFirstChunk)
-					{
-						RKIT_CHECK(newPathBase.Append('/'));
-					}
-
-					if (utils->ContainsWildcards(chunk))
-					{
-						struct DirEnumerator
-						{
-							HybridVector<String, 16> &m_vector;
-							const String &m_parentPath;
-							const StringSliceView &m_wildcard;
-							IUtilitiesDriver *m_utils;
-
-							DirEnumerator(HybridVector<String, 16> &vector, const String &parentPath, const StringSliceView &wildcard, IUtilitiesDriver* utils)
-								: m_vector(vector)
-								, m_parentPath(parentPath)
-								, m_wildcard(wildcard)
-								, m_utils(utils)
-							{
-							}
-
-							static Result EnumerateItem(void *userdata, const FileStatusView &fileStatusView)
-							{
-								DirEnumerator *self = static_cast<DirEnumerator *>(userdata);
-
-								if (self->m_utils->MatchesWildcard(fileStatusView.m_filePath, self->m_wildcard))
-								{
-									String fullPath = self->m_parentPath;
-									RKIT_CHECK(fullPath.Append(fileStatusView.m_filePath));
-
-									RKIT_CHECK(self->m_vector.Append(std::move(fullPath)));
-								}
-
-								return ResultCode::kOK;
-							}
-						};
-
-						DirEnumerator dirEnumerator(newResults, newPathBase, chunk, utils);
-
-						RKIT_CHECK(m_fs->EnumerateDirectory(location, parent, isLastChunk, !isLastChunk, &dirEnumerator, DirEnumerator::EnumerateItem));
-					}
-					else
-					{
-						Optional<FileStatus> fileStatusOpt;
-
-						struct FileStatusApplyer
-						{
-							static Result ApplyFileStatus(void *userdata, const FileStatusView &fileStatusView)
-							{
-								Optional<FileStatus> &status = *static_cast<Optional<FileStatus> *>(userdata);
-								status = FileStatus();
-								return status.Get().Set(fileStatusView);
-							}
-						};
-
-						RKIT_CHECK(newPathBase.Append(chunk));
-
-						rkit::buildsystem::BuildFileLocation location = rkit::buildsystem::BuildFileLocation::kSourceDir;
-
-						RKIT_CHECK(m_fs->ResolveFileStatusIfExists(location, newPathBase, true, &fileStatusOpt, FileStatusApplyer::ApplyFileStatus));
-
-						if (!fileStatusOpt.IsSet() || fileStatusOpt.Get().m_isDirectory == isLastChunk)
-							continue;
-
-
-						RKIT_CHECK(newResults.Append(newPathBase));
-					}
-				}
-
-				resultsAtLevel = std::move(newResults);
-
-				chunkStart = chunkEnd + 1;
-			}
-
-			chunkEnd++;
-		}
-
-		for (const String &path : resultsAtLevel)
-		{
-			StringConstructionBuffer constructionBuffer;
-			RKIT_CHECK(constructionBuffer.Allocate(path.Length()));
-
-			CopySpanNonOverlapping(constructionBuffer.GetSpan(), path.ToSpan());
-
-			utils->NormalizeFilePath(constructionBuffer.GetSpan());
-
-			String newPath(std::move(constructionBuffer));
-
-			RKIT_CHECK(resultCallback(userdata, newPath));
-		}
-#endif
-
-		return ResultCode::kNotYetImplemented;
+		return InternalEnumerateFilesOrDirectories(location, path, false, userdata, resultCallback);
 	}
 
-	Result BuildSystemInstance::RegisterNodeTypeByExtension(const StringView &ext, uint32_t nodeNamespace, uint32_t nodeType)
+	Result BuildSystemInstance::EnumerateDirectories(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback)
+	{
+		return InternalEnumerateFilesOrDirectories(location, path, true, userdata, resultCallback);
+	}
+
+	Result BuildSystemInstance::InternalEnumerateFilesOrDirectories(BuildFileLocation location, const CIPathView &path, bool directoryMode, void *userdata, EnumerateFilesResultCallback_t resultCallback)
+	{
+		class ResultCallbackShim
+		{
+		public:
+			ResultCallbackShim(void *userdata, EnumerateFilesResultCallback_t callback)
+				: m_userdata(userdata)
+				, m_callback(callback)
+			{
+			}
+
+			Result ApplyFileStatus(const FileStatusView &fileStatus)
+			{
+				return m_callback(m_userdata, fileStatus.m_filePath);
+			}
+
+			static Result StaticApplyFileStatus(void *userdata, const FileStatusView &fileStatus)
+			{
+				return static_cast<ResultCallbackShim *>(userdata)->ApplyFileStatus(fileStatus);
+			}
+
+		private:
+			void *m_userdata;
+			EnumerateFilesResultCallback_t m_callback;
+		};
+
+		ResultCallbackShim shim(userdata, resultCallback);
+
+		return m_fs->EnumerateDirectory(location, path, !directoryMode, directoryMode, &shim, ResultCallbackShim::StaticApplyFileStatus);
+	}
+
+	Result BuildSystemInstance::RegisterNodeTypeByExtension(const StringSliceView &ext, uint32_t nodeNamespace, uint32_t nodeType)
 	{
 		NodeTypeKey nodeTypeKey(nodeNamespace, nodeType);
 
@@ -2330,7 +2250,7 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
-	bool BuildSystemInstance::FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const
+	bool BuildSystemInstance::FindNodeTypeByFileExtension(const StringSliceView &ext, uint32_t &outNamespace, uint32_t &outType) const
 	{
 		HashMap<String, NodeTypeKey>::ConstIterator_t it = m_nodeTypesByExtension.Find(ext);
 		if (it == m_nodeTypesByExtension.end())

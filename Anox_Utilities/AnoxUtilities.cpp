@@ -30,7 +30,7 @@ namespace anox
 		rkit::StringView GetDriverName() const override { return "Utilities"; }
 
 		rkit::Result OpenAFSArchive(rkit::UniquePtr<rkit::ISeekableReadStream> &&stream, rkit::UniquePtr<anox::afs::IArchive> &outArchive) override;
-		rkit::Result RunDataBuild(const rkit::StringView &targetName, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataDir, rkit::render::BackendType backendType) override;
+		rkit::Result RunDataBuild(const rkit::StringView &targetName, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataDir, const rkit::OSAbsPathView &dataSourceDir, rkit::render::BackendType backendType) override;
 	};
 
 	typedef rkit::CustomDriverModuleStub<UtilitiesDriver> UtilitiesModule;
@@ -51,12 +51,12 @@ rkit::Result anox::UtilitiesDriver::OpenAFSArchive(rkit::UniquePtr<rkit::ISeekab
 }
 
 
-rkit::Result anox::UtilitiesDriver::RunDataBuild(const rkit::StringView &targetName, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataDir, rkit::render::BackendType backendType)
+rkit::Result anox::UtilitiesDriver::RunDataBuild(const rkit::StringView &targetName, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataDir, const rkit::OSAbsPathView &dataSourceDir, rkit::render::BackendType backendType)
 {
 	rkit::UniquePtr<anox::utils::IDataBuilder> dataBuilder;
 	RKIT_CHECK(anox::utils::IDataBuilder::Create(this, dataBuilder));
 
-	RKIT_CHECK(dataBuilder->Run(targetName, sourceDir, intermedDir, dataDir, backendType));
+	RKIT_CHECK(dataBuilder->Run(targetName, sourceDir, intermedDir, dataDir, dataSourceDir, backendType));
 
 	return rkit::ResultCode::kOK;
 }

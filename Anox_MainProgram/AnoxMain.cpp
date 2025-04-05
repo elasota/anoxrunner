@@ -56,6 +56,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 	rkit::StringView buildTarget;
 	rkit::OSAbsPath buildSourceDirectory;
 	rkit::OSAbsPath buildIntermediateDirectory;
+	rkit::OSAbsPath dataSourceDirectory;
 	rkit::OSAbsPath dataDirectory;
 	rkit::OSAbsPath baseDirectory;
 
@@ -100,6 +101,22 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 				return rkit::ResultCode::kInvalidParameter;
 			}
 		}
+		else if (arg == "-dsrcdir")
+		{
+			i++;
+
+			if (i == args.Count())
+			{
+				rkit::log::Error("Expected path after -ddir");
+				return rkit::ResultCode::kInvalidParameter;
+			}
+
+			if (!dataSourceDirectory.SetFromUTF8(args[i]).IsOK())
+			{
+				rkit::log::Error("-ddir path was invalid");
+				return rkit::ResultCode::kInvalidParameter;
+			}
+		}
 		else if (arg == "-sdir")
 		{
 			i++;
@@ -113,22 +130,6 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 			if (!buildSourceDirectory.SetFromUTF8(args[i]).IsOK())
 			{
 				rkit::log::Error("-sdir path was invalid");
-				return rkit::ResultCode::kInvalidParameter;
-			}
-		}
-		else if (arg == "-base")
-		{
-			i++;
-
-			if (i == args.Count())
-			{
-				rkit::log::Error("Expected path after -base");
-				return rkit::ResultCode::kInvalidParameter;
-			}
-
-			if (!baseDirectory.SetFromUTF8(args[i]).IsOK())
-			{
-				rkit::log::Error("-base path was invalid");
 				return rkit::ResultCode::kInvalidParameter;
 			}
 		}
@@ -181,7 +182,6 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 	}
 
 	// FIXME: Move this to RKit Config
-	RKIT_CHECK(sysDriver->SetGameDirectoryOverride(baseDirectory));
 	RKIT_CHECK(sysDriver->SetSettingsDirectory("AnoxRunner"));
 
 	if (autoBuild)
@@ -195,7 +195,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 
 		IUtilitiesDriver *utilsDriver = static_cast<IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, "Utilities"));
 
-		RKIT_CHECK(utilsDriver->RunDataBuild(buildTarget, buildSourceDirectory, buildIntermediateDirectory, dataDirectory, renderBackendType));
+		RKIT_CHECK(utilsDriver->RunDataBuild(buildTarget, buildSourceDirectory, buildIntermediateDirectory, dataDirectory, dataSourceDirectory, renderBackendType));
 	}
 
 #if RKIT_IS_FINAL

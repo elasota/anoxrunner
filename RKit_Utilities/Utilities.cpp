@@ -60,7 +60,7 @@ namespace rkit
 		bool ValidateFilePath(const Span<const char> &fileName, bool permitWildcards) const override;
 
 		void NormalizeFilePath(const Span<char> &chars) const override;
-		bool FindFilePathExtension(const StringView &str, StringView &outExt) const override;
+		bool FindFilePathExtension(const StringSliceView &str, StringSliceView &outExt) const override;
 
 		Result EscapeCStringInPlace(const Span<char> &chars, size_t &outNewLength) const override;
 
@@ -83,7 +83,7 @@ namespace rkit
 		bool ContainsWildcards(const StringSliceView &str) const override;
 		bool MatchesWildcard(const StringSliceView &candidate, const StringSliceView &wildcard) const override;
 
-		bool DefaultIsPathComponentValid(const BaseStringSliceView<char> &span, bool isFirst, bool isLast, bool allowWildcards) const override;
+		bool DefaultIsPathComponentValid(const BaseStringSliceView<char> &span, bool isFirst, bool allowWildcards) const override;
 
 		Result ConvertUTF16ToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const uint16_t> &src) const override;
 		Result ConvertUTF16WCharToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const wchar_t> &src) const override;
@@ -91,7 +91,7 @@ namespace rkit
 		Result ConvertUTF8ToUTF16(size_t &outSize, const Span<uint16_t> &dest, const Span<const uint8_t> &src) const override;
 		Result ConvertUTF8ToUTF16WChar(size_t &outSize, const Span<wchar_t> &dest, const Span<const uint8_t> &src) const override;
 
-		bool IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t> &span, bool isAbsolute, bool isFirst, bool isLast, bool allowWildcards) const override;
+		bool IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const override;
 
 
 	private:
@@ -443,7 +443,7 @@ namespace rkit
 		}
 	}
 
-	bool UtilitiesDriver::FindFilePathExtension(const StringView &str, StringView &outExt) const
+	bool UtilitiesDriver::FindFilePathExtension(const StringSliceView &str, StringSliceView &outExt) const
 	{
 		for (size_t ri = 0; ri < str.Length(); ri++)
 		{
@@ -451,7 +451,7 @@ namespace rkit
 
 			if (str[i] == '.')
 			{
-				outExt = StringView(str.GetChars() + i + 1, ri);
+				outExt = StringSliceView(str.GetChars() + i + 1, ri);
 				return true;
 			}
 		}
@@ -1684,7 +1684,7 @@ namespace rkit
 		return MatchesWildcardWithMinLiteralCount(candidateRef, wildcardRef, minLiteralChars);
 	}
 
-	bool UtilitiesDriver::DefaultIsPathComponentValid(const BaseStringSliceView<char> &span, bool isFirst, bool isLast, bool allowWildcards) const
+	bool UtilitiesDriver::DefaultIsPathComponentValid(const BaseStringSliceView<char> &span, bool isFirst, bool allowWildcards) const
 	{
 		if (span[span.Length() - 1] == '.')
 		{
@@ -1873,7 +1873,7 @@ namespace rkit
 		return TypedConvertUTF8ToUTF16(outSize, dest, src);
 	}
 
-	bool UtilitiesDriver::IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t> &span, bool isAbsolute, bool isFirst, bool isLast, bool allowWildcards) const
+	bool UtilitiesDriver::IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const
 	{
 		if (isAbsolute && isFirst)
 		{
@@ -2085,7 +2085,42 @@ namespace rkit
 	template<class TWChar>
 	Result UtilitiesDriver::TypedConvertUTF16ToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const TWChar> &src)
 	{
-		return ResultCode::kNotYetImplemented;
+		size_t availableSrc = src.Count();
+		const TWChar *srcWords = src.Ptr();
+
+		size_t availableDest = dest.Count();
+		uint8_t *destBytes = dest.Ptr();
+
+		size_t resultSize = 0;
+
+		while (availableSrc > 0)
+		{
+			size_t wordsDigested = 0;
+			uint32_t codePoint = 0;
+			if (!UTF16::Decode(srcWords, availableSrc, wordsDigested, codePoint))
+				return ResultCode::kInvalidUnicode;
+
+			availableSrc -= wordsDigested;
+			srcWords += wordsDigested;
+
+			uint8_t encoded[UTF8::kMaxEncodedBytes];
+			size_t bytesEmitted = 0;
+			UTF8::Encode(encoded, bytesEmitted, codePoint);
+
+			if (availableDest >= bytesEmitted)
+			{
+				CopySpanNonOverlapping(Span<uint8_t>(destBytes, bytesEmitted), ConstSpan<uint8_t>(encoded, bytesEmitted));
+
+				destBytes += bytesEmitted;
+				availableDest -= bytesEmitted;
+			}
+
+			resultSize += bytesEmitted;
+		}
+
+		outSize = resultSize;
+
+		return ResultCode::kOK;
 	}
 
 	template<class TWChar>
@@ -2104,7 +2139,7 @@ namespace rkit
 			size_t bytesDigested = 0;
 			uint32_t codePoint = 0;
 			if (!UTF8::Decode(srcBytes, availableSrc, bytesDigested, codePoint))
-				return ResultCode::kTextEncodingError;
+				return ResultCode::kInvalidUnicode;
 
 			availableSrc -= bytesDigested;
 			srcBytes += bytesDigested;

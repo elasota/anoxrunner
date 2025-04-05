@@ -130,7 +130,7 @@ namespace rkit
 
 		struct IDependencyNodeCompilerFeedback
 		{
-			typedef Result(*EnumerateFilesResultCallback_t)(void *userdata, const String &path);
+			typedef Result(*EnumerateFilesResultCallback_t)(void *userdata, const CIPathView &fileName);
 
 			virtual ~IDependencyNodeCompilerFeedback() {}
 
@@ -140,9 +140,10 @@ namespace rkit
 			virtual Result OpenOutput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadWriteStream> &outputFile) = 0;
 
 			virtual Result AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) = 0;
-			virtual bool FindNodeTypeByFileExtension(const StringView &ext, uint32_t &outNamespace, uint32_t &outType) const = 0;
+			virtual bool FindNodeTypeByFileExtension(const StringSliceView &ext, uint32_t &outNamespace, uint32_t &outType) const = 0;
 
 			virtual Result EnumerateFiles(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback) = 0;
+			virtual Result EnumerateDirectories(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback) = 0;
 
 			virtual IBuildSystemInstance *GetBuildSystemInstance() const = 0;
 

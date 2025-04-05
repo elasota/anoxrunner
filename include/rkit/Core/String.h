@@ -385,6 +385,8 @@ rkit::BaseString<TChar, TStaticSize> &rkit::BaseString<TChar, TStaticSize>::oper
 			m_chars = other.m_chars;
 			StringStorage<TChar>::LocateFromFirstCharAddress(m_chars)->IncRef();
 		}
+
+		m_length = other.m_length;
 	}
 
 	return *this;

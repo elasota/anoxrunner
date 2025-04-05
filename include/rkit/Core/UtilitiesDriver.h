@@ -76,7 +76,7 @@ namespace rkit
 		virtual bool ValidateFilePath(const Span<const char> &fileName, bool permitWildcards) const = 0;
 
 		virtual void NormalizeFilePath(const Span<char> &chars) const = 0;
-		virtual bool FindFilePathExtension(const StringView &str, StringView &outExt) const = 0;
+		virtual bool FindFilePathExtension(const StringSliceView &str, StringSliceView &outExt) const = 0;
 
 		virtual Result EscapeCStringInPlace(const Span<char> &chars, size_t &outNewLength) const = 0;
 
@@ -99,7 +99,7 @@ namespace rkit
 		virtual bool ContainsWildcards(const StringSliceView &str) const = 0;
 		virtual bool MatchesWildcard(const StringSliceView &candidate, const StringSliceView &wildcard) const = 0;
 
-		virtual bool DefaultIsPathComponentValid(const BaseStringSliceView<char> &span, bool isFirst, bool isLast, bool allowWildcards) const = 0;
+		virtual bool DefaultIsPathComponentValid(const BaseStringSliceView<char> &span, bool isFirst, bool allowWildcards) const = 0;
 
 		virtual Result ConvertUTF16ToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const uint16_t> &src) const = 0;
 		virtual Result ConvertUTF16WCharToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const wchar_t> &src) const = 0;
@@ -107,6 +107,6 @@ namespace rkit
 		virtual Result ConvertUTF8ToUTF16(size_t &outSize, const Span<uint16_t> &dest, const Span<const uint8_t> &src) const = 0;
 		virtual Result ConvertUTF8ToUTF16WChar(size_t &outSize, const Span<wchar_t> &dest, const Span<const uint8_t> &src) const = 0;
 
-		virtual bool IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t> &span, bool isAbsolute, bool isFirst, bool isLast, bool allowWildcards) const = 0;
+		virtual bool IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const = 0;
 	};
 }
