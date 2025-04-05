@@ -32,6 +32,7 @@ namespace anox::buildsystem
 		static rkit::Result ConstructAnalysisPath(rkit::CIPath &analysisPath, const rkit::StringView &identifier, MaterialNodeType nodeType);
 
 		rkit::Result RunAnalyzeATD(const rkit::StringView &name, rkit::UniquePtr<rkit::ISeekableReadStream> &&atdStream, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
-		rkit::Result RunAnalyzeImage(const rkit::StringView &name, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+		rkit::Result RunAnalyzeImage(const rkit::StringView &longName, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+		rkit::Result ResolveShortName(rkit::String &shortName, const rkit::StringView &identifier);
 	};
 }

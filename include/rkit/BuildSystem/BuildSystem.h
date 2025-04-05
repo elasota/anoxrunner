@@ -26,12 +26,14 @@ namespace rkit
 		static const uint32_t kRenderGraphicsPipelineNodeID = RKIT_FOURCC('R', 'G', 'P', 'L');
 		static const uint32_t kRenderComputePipelineNodeID = RKIT_FOURCC('R', 'C', 'P', 'L');
 		static const uint32_t kRenderPipelineLibraryNodeID = RKIT_FOURCC('R', 'P', 'L', 'L');
+		static const uint32_t kCopyFileNodeID = RKIT_FOURCC('C', 'o', 'p', 'y');
 
 		struct IDependencyNode;
 		struct IDependencyGraphFactory;
 		struct IPackageBuilder;
 		struct IPackageObjectWriter;
 		struct FileStatusView;
+		struct IDependencyNodeCompiler;
 
 		CIPathView GetShaderSourceBasePath();
 

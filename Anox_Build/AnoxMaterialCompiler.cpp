@@ -8,6 +8,7 @@
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/Optional.h"
 #include "rkit/Core/Path.h"
+#include "rkit/Core/StaticArray.h"
 #include "rkit/Core/String.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/Vector.h"
@@ -70,6 +71,45 @@ namespace anox::buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
+	rkit::Result MaterialAnalysisDynamicData::Deserialize(rkit::IReadStream &stream)
+	{
+		rkit::StaticArray<uint64_t, 3> counts;
+
+		RKIT_CHECK(stream.ReadAll(counts.GetBuffer(), sizeof(counts[0]) * counts.Count()));
+
+		RKIT_CHECK(m_imageImports.Resize(counts[0]));
+		RKIT_CHECK(m_bitmapDefs.Resize(counts[1]));
+		RKIT_CHECK(m_frameDefs.Resize(counts[2]));
+
+		for (rkit::String &str : m_imageImports)
+		{
+			uint64_t strLength64 = 0;
+
+			RKIT_CHECK(stream.ReadAll(&strLength64, sizeof(strLength64)));
+
+			if (strLength64 > std::numeric_limits<size_t>::max())
+				return rkit::ResultCode::kIntegerOverflow;
+
+			const size_t strLength = static_cast<size_t>(strLength64);
+
+			rkit::StringConstructionBuffer scBuf;
+			RKIT_CHECK(scBuf.Allocate(strLength));
+
+			rkit::Span<char> scChars = scBuf.GetSpan();
+			RKIT_CHECK(stream.ReadAll(scChars.Ptr(), scChars.Count()));
+
+			str = rkit::String(std::move(scBuf));
+		}
+
+		data::MaterialBitmapDef *bitmaps = m_bitmapDefs.GetBuffer();
+		data::MaterialFrameDef *frameDefs = m_frameDefs.GetBuffer();
+
+		RKIT_CHECK(stream.ReadAll(bitmaps, sizeof(bitmaps[0]) * m_bitmapDefs.Count()));
+		RKIT_CHECK(stream.ReadAll(frameDefs, sizeof(frameDefs[0]) * m_frameDefs.Count()));
+
+		return rkit::ResultCode::kOK;
+	}
+
 	bool MaterialCompiler::HasAnalysisStage() const
 	{
 		return true;
@@ -104,7 +144,7 @@ namespace anox::buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result MaterialCompiler::RunAnalyzeImage(const rkit::StringView &name, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	rkit::Result MaterialCompiler::RunAnalyzeImage(const rkit::StringView &longName, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		MaterialAnalysisHeader analysisHeader = {};
 		analysisHeader.m_magic = MaterialAnalysisHeader::kExpectedMagic;
@@ -138,7 +178,7 @@ namespace anox::buildsystem
 		RKIT_CHECK(dynamicData.m_imageImports.Resize(1));
 
 		rkit::String &imageImport = dynamicData.m_imageImports[0];
-		RKIT_CHECK(TextureCompilerBase::CreateImportIdentifier(imageImport, name, disposition));
+		RKIT_CHECK(TextureCompilerBase::CreateImportIdentifier(imageImport, longName, disposition));
 
 		RKIT_CHECK(dynamicData.m_bitmapDefs.Resize(1));
 
@@ -154,7 +194,7 @@ namespace anox::buildsystem
 		frameDef.m_yOffset = 0;
 
 		rkit::CIPath analysisPath;
-		RKIT_CHECK(ConstructAnalysisPath(analysisPath, name, nodeType));
+		RKIT_CHECK(ConstructAnalysisPath(analysisPath, depsNode->GetIdentifier(), nodeType));
 
 		RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kTextureNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, imageImport));
 
@@ -168,11 +208,10 @@ namespace anox::buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result MaterialCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	rkit::Result MaterialCompiler::ResolveShortName(rkit::String &shortName, const rkit::StringView &identifier)
 	{
 		// Remove extension
 		rkit::Optional<size_t> extPos;
-		const rkit::StringView identifier = depsNode->GetIdentifier();
 		for (size_t i = 0; i < identifier.Length(); i++)
 		{
 			const size_t pos = identifier.Length() - 1 - i;
@@ -189,12 +228,21 @@ namespace anox::buildsystem
 
 		if (!extPos.IsSet())
 		{
-			rkit::log::ErrorFmt("Material '%s' didn't end with a material extension", depsNode->GetIdentifier().GetChars());
+			rkit::log::ErrorFmt("Material '%s' didn't end with a material extension", identifier.GetChars());
 			return rkit::ResultCode::kInternalError;
 		}
 
-		rkit::String shortName;
 		RKIT_CHECK(shortName.Set(identifier.SubString(0, extPos.Get())));
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result MaterialCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		const rkit::StringView identifier = depsNode->GetIdentifier();
+
+		rkit::String shortName;
+		RKIT_CHECK(ResolveShortName(shortName, identifier));
 
 		// Check for ATD
 		{
@@ -240,6 +288,32 @@ namespace anox::buildsystem
 
 	rkit::Result MaterialCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
+		MaterialNodeType nodeType = MaterialNodeType::kCount;
+
+		RKIT_CHECK(MaterialNodeTypeFromFourCC(nodeType, depsNode->GetDependencyNodeType()));
+
+		rkit::CIPath analysisPath;
+		RKIT_CHECK(ConstructAnalysisPath(analysisPath, depsNode->GetIdentifier(), nodeType));
+
+		MaterialAnalysisDynamicData dynamicData;
+
+		{
+			rkit::UniquePtr<rkit::ISeekableReadStream> analysisStream;
+			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, analysisPath, analysisStream));
+
+			MaterialAnalysisHeader analysisHeader;
+			RKIT_CHECK(analysisStream->ReadAll(&analysisHeader, sizeof(analysisHeader)));
+
+			if (analysisHeader.m_magic != MaterialAnalysisHeader::kExpectedMagic || analysisHeader.m_version != MaterialAnalysisHeader::kExpectedVersion)
+			{
+				rkit::log::ErrorFmt("Material '%s' analysis file was invalid", depsNode->GetIdentifier().GetChars());
+				return rkit::ResultCode::kOperationFailed;
+			}
+
+			RKIT_CHECK(dynamicData.Deserialize(*analysisStream));
+		}
+
+
 		return rkit::ResultCode::kNotYetImplemented;
 	}
 
