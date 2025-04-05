@@ -63,6 +63,27 @@ namespace rkit::buildsystem
 		CIPathView m_path;
 	};
 
+	class DirectoryScanKey
+	{
+	public:
+		DirectoryScanKey();
+		DirectoryScanKey(BuildFileLocation inputLocation, const CIPathView &path, bool directoryMode);
+
+		bool operator==(const DirectoryScanKey &other) const;
+		bool operator!=(const DirectoryScanKey &other) const;
+
+		bool operator<(const DirectoryScanKey &other) const;
+
+		DirectoryScanKey &operator=(const DirectoryScanKey &other);
+
+		HashValue_t ComputeHash(HashValue_t baseHash) const;
+
+	private:
+		BuildFileLocation m_location;
+		CIPathView m_path;
+		bool m_directoryMode;
+	};
+
 	class NodeKey
 	{
 	public:
@@ -88,6 +109,12 @@ template<>
 struct ::rkit::Hasher<rkit::buildsystem::FileLocationKey>
 {
 	static HashValue_t ComputeHash(HashValue_t baseHash, const rkit::buildsystem::FileLocationKey &value);
+};
+
+template<>
+struct ::rkit::Hasher<rkit::buildsystem::DirectoryScanKey>
+{
+	static HashValue_t ComputeHash(HashValue_t baseHash, const rkit::buildsystem::DirectoryScanKey &value);
 };
 
 template<>
@@ -153,6 +180,61 @@ rkit::HashValue_t rkit::buildsystem::FileLocationKey::ComputeHash(HashValue_t ba
 	return hash;
 }
 
+
+
+rkit::buildsystem::DirectoryScanKey::DirectoryScanKey()
+	: m_location(BuildFileLocation::kInvalid)
+	, m_path("")
+	, m_directoryMode(false)
+{
+}
+
+rkit::buildsystem::DirectoryScanKey::DirectoryScanKey(BuildFileLocation inputLocation, const CIPathView &path, bool directoryMode)
+	: m_location(inputLocation)
+	, m_path(path)
+	, m_directoryMode(directoryMode)
+{
+}
+
+bool rkit::buildsystem::DirectoryScanKey::operator==(const DirectoryScanKey &other) const
+{
+	return m_location == other.m_location && m_path == other.m_path && m_directoryMode == other.m_directoryMode;
+}
+
+bool rkit::buildsystem::DirectoryScanKey::operator!=(const DirectoryScanKey &other) const
+{
+	return !((*this) == other);
+}
+
+
+bool rkit::buildsystem::DirectoryScanKey::operator<(const DirectoryScanKey &other) const
+{
+	if (m_location != other.m_location)
+		return m_location < other.m_location;
+
+	if (m_path != other.m_path)
+		return m_path < other.m_path;
+
+	return m_directoryMode < other.m_directoryMode;
+}
+
+rkit::buildsystem::DirectoryScanKey &rkit::buildsystem::DirectoryScanKey::operator=(const DirectoryScanKey &other)
+{
+	m_location = other.m_location;
+	m_path = other.m_path;
+	m_directoryMode = other.m_directoryMode;
+	return *this;
+}
+
+rkit::HashValue_t rkit::buildsystem::DirectoryScanKey::ComputeHash(HashValue_t baseHash) const
+{
+	HashValue_t hash = baseHash;
+	hash = Hasher<uint32_t>::ComputeHash(hash, static_cast<uint32_t>(m_location));
+	hash = Hasher<rkit::CIPathView>::ComputeHash(hash, m_path);
+	hash = Hasher<bool>::ComputeHash(hash, m_directoryMode);
+	return hash;
+}
+
 rkit::buildsystem::NodeKey::NodeKey(const NodeTypeKey &nodeTypeKey, BuildFileLocation inputLocation, const StringView &identifier)
 	: m_typeKey(nodeTypeKey)
 	, m_identifier(identifier)
@@ -187,6 +269,11 @@ rkit::HashValue_t rkit::Hasher<rkit::buildsystem::FileLocationKey>::ComputeHash(
 	return value.ComputeHash(baseHash);
 }
 
+rkit::HashValue_t rkit::Hasher<rkit::buildsystem::DirectoryScanKey>::ComputeHash(HashValue_t baseHash, const rkit::buildsystem::DirectoryScanKey &value)
+{
+	return value.ComputeHash(baseHash);
+}
+
 rkit::HashValue_t rkit::Hasher<rkit::buildsystem::NodeKey>::ComputeHash(HashValue_t baseHash, const rkit::buildsystem::NodeKey &value)
 {
 	return value.ComputeHash(baseHash);
@@ -217,8 +304,11 @@ namespace rkit::buildsystem
 		static Result SerializeString(IWriteStream &stream, StringPoolBuilder &stringPool, const StringView &str);
 		static Result SerializeCIPath(IWriteStream &stream, StringPoolBuilder &stringPool, const CIPathView &path);
 
+		static Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const CIPath &path);
 		static Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const FileStatus &fs);
+		static Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const DirectoryScan &ds);
 		static Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const FileDependencyInfo &fdi);
+		static Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const DirectoryScanDependencyInfo &dsdi);
 		static Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const NodeDependencyInfo &ndi);
 		static Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, bool value);
 
@@ -246,8 +336,11 @@ namespace rkit::buildsystem
 		static Result DeserializeString(IReadStream &stream, const IDeserializeResolver &resolver, String &str);
 		static Result DeserializeCIPath(IReadStream &stream, const IDeserializeResolver &resolver, CIPath &path);
 
+		static Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, CIPath &path);
 		static Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, FileStatus &fs);
+		static Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, DirectoryScan &ds);
 		static Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, FileDependencyInfo &fdi);
+		static Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, DirectoryScanDependencyInfo &dsdi);
 		static Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, NodeDependencyInfo &ndi);
 		static Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, bool &value);
 
@@ -293,6 +386,8 @@ namespace rkit::buildsystem
 		CallbackSpan<FileStatusView, const IDependencyNode *> GetCompileProducts() const override;
 		CallbackSpan<FileDependencyInfoView, const IDependencyNode *> GetAnalysisFileDependencies() const override;
 		CallbackSpan<FileDependencyInfoView, const IDependencyNode *> GetCompileFileDependencies() const override;
+		CallbackSpan<DirectoryScanDependencyInfoView, const IDependencyNode *> GetAnalysisDirectoryScanDependencies() const override;
+		CallbackSpan<DirectoryScanDependencyInfoView, const IDependencyNode *> GetCompileDirectoryScanDependencies() const override;
 		CallbackSpan<NodeDependencyInfo, const IDependencyNode *> GetNodeDependencies() const override;
 
 		Result FindOrAddAnalysisProduct(BuildFileLocation location, const CIPathView &path, size_t &outIndex);
@@ -300,6 +395,8 @@ namespace rkit::buildsystem
 
 		Result AddAnalysisFileDependency(const FileDependencyInfoView &fileInfo);
 		Result AddCompileFileDependency(const FileDependencyInfoView &fileInfo);
+		Result AddAnalysisDirectoryScanDependency(const DirectoryScanDependencyInfoView &dirScanInfo);
+		Result AddCompileDirectoryScanDependency(const DirectoryScanDependencyInfoView &dirScanInfo);
 		Result AddNodeDependency(const NodeDependencyInfo &nodeInfo);
 
 		Result SerializeInitialState(IWriteStream &stream) const;
@@ -345,6 +442,8 @@ namespace rkit::buildsystem
 		private:
 			Result CheckedMarkOutputFileFinished(size_t productIndex, BuildFileLocation location, const CIPathView &path);
 
+			Result InternalEnumerateFilesOrDirectories(BuildFileLocation location, const CIPathView &path, bool directoryMode, void *userdata, EnumerateFilesResultCallback_t resultCallback);
+
 			BuildSystemInstance *m_buildInstance;
 			DependencyNode *m_dependencyNode;
 			bool m_isCompilePhase;
@@ -384,15 +483,20 @@ namespace rkit::buildsystem
 		static FileStatusView GetCompileProductByIndex(const IDependencyNode *const &node, size_t index);
 		static FileDependencyInfoView GetAnalysisFileDependencyByIndex(const IDependencyNode *const & node, size_t index);
 		static FileDependencyInfoView GetCompileFileDependencyByIndex(const IDependencyNode *const &node, size_t index);
+		static DirectoryScanDependencyInfoView GetAnalysisDirectoryScanDependencyByIndex(const IDependencyNode *const &node, size_t index);
+		static DirectoryScanDependencyInfoView GetCompileDirectoryScanDependencyByIndex(const IDependencyNode *const &node, size_t index);
 		static NodeDependencyInfo GetNodeDependencyByIndex(const IDependencyNode *const & node, size_t index);
 
 		static Result FindOrAddProduct(Vector<FileStatus> &products, BuildFileLocation location, const CIPathView &path, size_t &outIndex);
 		static Result AddFileDependency(Vector<FileDependencyInfo> &fileDependencies, const FileDependencyInfoView &fileInfo);
+		static Result AddDirectoryScanDependency(Vector<DirectoryScanDependencyInfo> &dirScanDependencies, const DirectoryScanDependencyInfoView &dirScanInfo);
 
 		Vector<FileStatus> m_analysisProducts;
 		Vector<FileStatus> m_compileProducts;
 		Vector<FileDependencyInfo> m_analysisFileDependencies;
 		Vector<FileDependencyInfo> m_compileFileDependencies;
+		Vector<DirectoryScanDependencyInfo> m_analysisDirectoryScanDependencies;
+		Vector<DirectoryScanDependencyInfo> m_compileDirectoryScanDependencies;
 		Vector<NodeDependencyInfo> m_nodeDependencies;
 
 		Vector<uint8_t> m_content;
@@ -456,6 +560,7 @@ namespace rkit::buildsystem
 		Result RegisterNodeCompiler(uint32_t nodeNamespace, uint32_t nodeType, UniquePtr<IDependencyNodeCompiler> &&compiler) override;
 
 		Result ResolveFileStatus(BuildFileLocation location, const CIPathView &path, bool allowDirectories, FileStatusView &outStatusView, bool cached, bool &outExists);
+		Result ResolveDirectoryScan(BuildFileLocation location, const CIPathView &path, bool directoryMode, DirectoryScanView &outScanView, bool cached, bool &outExists);
 
 		Result TryOpenFileRead(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadStream> &outFile) override;
 		Result OpenFileWrite(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadWriteStream> &outFile) override;
@@ -473,6 +578,12 @@ namespace rkit::buildsystem
 		{
 			bool m_exists = true;
 			FileStatus m_status;
+		};
+
+		struct CachedDirScan
+		{
+			bool m_exists = true;
+			DirectoryScan m_scan;
 		};
 
 		struct PrintableFourCC
@@ -538,6 +649,7 @@ namespace rkit::buildsystem
 		Vector<IBuildSystemAction *> m_postBuildActions;
 
 		HashMap<FileLocationKey, UniquePtr<CachedFileStatus> > m_cachedFileStatus;
+		HashMap<DirectoryScanKey, UniquePtr<CachedDirScan> > m_cachedDirScan;
 		HashMap<String, NodeTypeKey> m_nodeTypesByExtension;
 
 		IBuildFileSystem *m_fs;
@@ -736,6 +848,16 @@ namespace rkit::buildsystem
 		return CallbackSpan<NodeDependencyInfo, const IDependencyNode *>(GetNodeDependencyByIndex, this, m_nodeDependencies.Count());
 	}
 
+	CallbackSpan<DirectoryScanDependencyInfoView, const IDependencyNode *> DependencyNode::GetAnalysisDirectoryScanDependencies() const
+	{
+		return CallbackSpan<DirectoryScanDependencyInfoView, const IDependencyNode *>(GetAnalysisDirectoryScanDependencyByIndex, this, m_analysisDirectoryScanDependencies.Count());
+	}
+
+	CallbackSpan<DirectoryScanDependencyInfoView, const IDependencyNode *> DependencyNode::GetCompileDirectoryScanDependencies() const
+	{
+		return CallbackSpan<DirectoryScanDependencyInfoView, const IDependencyNode *>(GetCompileDirectoryScanDependencyByIndex, this, m_compileDirectoryScanDependencies.Count());
+	}
+
 	Result DependencyNode::FindOrAddProduct(Vector<FileStatus> &products, BuildFileLocation location, const CIPathView &path, size_t &outIndex)
 	{
 		for (size_t i = 0; i < products.Count(); i++)
@@ -778,6 +900,16 @@ namespace rkit::buildsystem
 		return AddFileDependency(m_compileFileDependencies, fileInfo);
 	}
 
+	Result DependencyNode::AddAnalysisDirectoryScanDependency(const DirectoryScanDependencyInfoView &dirScanInfo)
+	{
+		return AddDirectoryScanDependency(m_analysisDirectoryScanDependencies, dirScanInfo);
+	}
+
+	Result DependencyNode::AddCompileDirectoryScanDependency(const DirectoryScanDependencyInfoView &dirScanInfo)
+	{
+		return AddDirectoryScanDependency(m_compileDirectoryScanDependencies, dirScanInfo);
+	}
+
 	Result DependencyNode::AddFileDependency(Vector<FileDependencyInfo> &fileDependencies, const FileDependencyInfoView &fileInfo)
 	{
 		for (FileDependencyInfo &existingFDI : fileDependencies)
@@ -793,6 +925,27 @@ namespace rkit::buildsystem
 		RKIT_CHECK(fdi.Set(fileInfo));
 
 		RKIT_CHECK(fileDependencies.Append(std::move(fdi)));
+
+		return ResultCode::kOK;
+	}
+
+	Result DependencyNode::AddDirectoryScanDependency(Vector<DirectoryScanDependencyInfo> &dirScanDependencies, const DirectoryScanDependencyInfoView &dirScanInfo)
+	{
+		for (DirectoryScanDependencyInfo &existingDSDI : dirScanDependencies)
+		{
+			if (existingDSDI.m_dirScan.m_directoryLocation == dirScanInfo.m_dirScan.m_directoryLocation
+				&& existingDSDI.m_dirScan.m_directoryPath == dirScanInfo.m_dirScan.m_directoryPath
+				&& existingDSDI.m_dirScan.m_directoryMode == dirScanInfo.m_dirScan.m_directoryMode)
+			{
+				RKIT_CHECK(existingDSDI.Set(dirScanInfo));
+				return ResultCode::kOK;
+			}
+		}
+
+		DirectoryScanDependencyInfo dsdi;
+		RKIT_CHECK(dsdi.Set(dirScanInfo));
+
+		RKIT_CHECK(dirScanDependencies.Append(std::move(dsdi)));
 
 		return ResultCode::kOK;
 	}
@@ -831,6 +984,11 @@ namespace rkit::buildsystem
 		return SerializeString(stream, stringPool, path.ToStringView());
 	}
 
+	Result serializer::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const CIPath &path)
+	{
+		return SerializeCIPath(stream, stringPool, path);
+	}
+
 	Result serializer::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const FileStatus &fs)
 	{
 		RKIT_CHECK(SerializeCIPath(stream, stringPool, fs.m_filePath));
@@ -841,11 +999,30 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
+	Result serializer::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const DirectoryScan &ds)
+	{
+		RKIT_CHECK(SerializeVector(stream, stringPool, ds.m_paths));
+		RKIT_CHECK(SerializeCIPath(stream, stringPool, ds.m_directoryPath));
+		RKIT_CHECK(SerializeEnum(stream, ds.m_directoryLocation));
+		RKIT_CHECK(Serialize(stream, stringPool, ds.m_directoryMode));
+
+		return ResultCode::kOK;
+	}
+
 	Result serializer::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const FileDependencyInfo &fdi)
 	{
 		RKIT_CHECK(Serialize(stream, stringPool, fdi.m_status));
 		RKIT_CHECK(Serialize(stream, stringPool, fdi.m_fileExists));
 		RKIT_CHECK(Serialize(stream, stringPool, fdi.m_mustBeUpToDate));
+
+		return ResultCode::kOK;
+	}
+
+	Result serializer::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const DirectoryScanDependencyInfo &dsdi)
+	{
+		RKIT_CHECK(Serialize(stream, stringPool, dsdi.m_dirScan));
+		RKIT_CHECK(Serialize(stream, stringPool, dsdi.m_dirExists));
+		RKIT_CHECK(Serialize(stream, stringPool, dsdi.m_mustBeUpToDate));
 
 		return ResultCode::kOK;
 	}
@@ -969,6 +1146,11 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
+	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, CIPath &path)
+	{
+		return DeserializeCIPath(stream, resolver, path);
+	}
+
 	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, FileStatus &fs)
 	{
 		RKIT_CHECK(DeserializeCIPath(stream, resolver, fs.m_filePath));
@@ -979,11 +1161,30 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
+	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, DirectoryScan &ds)
+	{
+		RKIT_CHECK(DeserializeVector(stream, resolver, ds.m_paths));
+		RKIT_CHECK(DeserializeCIPath(stream, resolver, ds.m_directoryPath));
+		RKIT_CHECK(DeserializeEnum(stream, ds.m_directoryLocation));
+		RKIT_CHECK(Deserialize(stream, resolver, ds.m_directoryMode));
+
+		return ResultCode::kOK;
+	}
+
 	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, FileDependencyInfo &fdi)
 	{
 		RKIT_CHECK(Deserialize(stream, resolver, fdi.m_status));
 		RKIT_CHECK(Deserialize(stream, resolver, fdi.m_fileExists));
 		RKIT_CHECK(Deserialize(stream, resolver, fdi.m_mustBeUpToDate));
+
+		return ResultCode::kOK;
+	}
+
+	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, DirectoryScanDependencyInfo &dsdi)
+	{
+		RKIT_CHECK(Deserialize(stream, resolver, dsdi.m_dirScan));
+		RKIT_CHECK(Deserialize(stream, resolver, dsdi.m_dirExists));
+		RKIT_CHECK(Deserialize(stream, resolver, dsdi.m_mustBeUpToDate));
 
 		return ResultCode::kOK;
 	}
@@ -1108,6 +1309,8 @@ namespace rkit::buildsystem
 		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_compileProducts));
 		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_analysisFileDependencies));
 		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_compileFileDependencies));
+		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_analysisDirectoryScanDependencies));
+		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_compileDirectoryScanDependencies));
 		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_nodeDependencies));
 
 		RKIT_CHECK(serializer::SerializeString(stream, stringPool, m_identifier));
@@ -1127,6 +1330,8 @@ namespace rkit::buildsystem
 		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_compileProducts));
 		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_analysisFileDependencies));
 		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_compileFileDependencies));
+		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_analysisDirectoryScanDependencies));
+		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_compileDirectoryScanDependencies));
 		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_nodeDependencies));
 
 		RKIT_CHECK(serializer::DeserializeString(stream, resolver, m_identifier));
@@ -1285,14 +1490,40 @@ namespace rkit::buildsystem
 		return m_buildInstance->FindNodeTypeByFileExtension(ext, outNamespace, outType);
 	}
 
+	Result DependencyNode::DependencyNodeCompilerFeedback::InternalEnumerateFilesOrDirectories(BuildFileLocation location, const CIPathView &path, bool directoryMode, void *userdata, EnumerateFilesResultCallback_t resultCallback)
+	{
+		DirectoryScanDependencyInfoView newDepInfo;
+
+		RKIT_CHECK(m_buildInstance->ResolveDirectoryScan(location, path, directoryMode, newDepInfo.m_dirScan, true, newDepInfo.m_dirExists));
+
+		if (m_isCompilePhase)
+		{
+			RKIT_CHECK(m_dependencyNode->AddCompileDirectoryScanDependency(newDepInfo));
+		}
+		else
+		{
+			RKIT_CHECK(m_dependencyNode->AddAnalysisDirectoryScanDependency(newDepInfo));
+		}
+
+		if (newDepInfo.m_dirExists)
+		{
+			for (const CIPathView &pathView : newDepInfo.m_dirScan.m_paths)
+			{
+				RKIT_CHECK(resultCallback(userdata, pathView));
+			}
+		}		
+
+		return ResultCode::kOK;
+	}
+
 	Result DependencyNode::DependencyNodeCompilerFeedback::EnumerateFiles(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback)
 	{
-		return m_buildInstance->EnumerateFiles(location, path, userdata, resultCallback);
+		return InternalEnumerateFilesOrDirectories(location, path, false, userdata, resultCallback);
 	}
 
 	Result DependencyNode::DependencyNodeCompilerFeedback::EnumerateDirectories(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback)
 	{
-		return m_buildInstance->EnumerateDirectories(location, path, userdata, resultCallback);
+		return InternalEnumerateFilesOrDirectories(location, path, true, userdata, resultCallback);
 	}
 
 	IBuildSystemInstance *DependencyNode::DependencyNodeCompilerFeedback::GetBuildSystemInstance() const
@@ -1417,6 +1648,20 @@ namespace rkit::buildsystem
 		const FileDependencyInfo &fileDependencyInfo = static_cast<const DependencyNode *>(node)->m_compileFileDependencies[index];
 
 		return fileDependencyInfo.ToView();
+	}
+
+	DirectoryScanDependencyInfoView DependencyNode::GetAnalysisDirectoryScanDependencyByIndex(const IDependencyNode *const &node, size_t index)
+	{
+		const DirectoryScanDependencyInfo &dirScan = static_cast<const DependencyNode *>(node)->m_analysisDirectoryScanDependencies[index];
+
+		return dirScan.ToView();
+	}
+
+	DirectoryScanDependencyInfoView DependencyNode::GetCompileDirectoryScanDependencyByIndex(const IDependencyNode *const &node, size_t index)
+	{
+		const DirectoryScanDependencyInfo &dirScan = static_cast<const DependencyNode *>(node)->m_compileDirectoryScanDependencies[index];
+
+		return dirScan.ToView();
 	}
 
 	NodeDependencyInfo DependencyNode::GetNodeDependencyByIndex(const IDependencyNode *const &node, size_t index)
@@ -2005,27 +2250,31 @@ namespace rkit::buildsystem
 
 			CallbackSpan<FileStatusView, const IDependencyNode *> productsSpan = (phase == kCompilePhase) ? node->GetCompileProducts() : node->GetAnalysisProducts();
 			CallbackSpan<FileDependencyInfoView, const IDependencyNode *> fileDepsSpan = (phase == kCompilePhase) ? node->GetCompileFileDependencies() : node->GetAnalysisFileDependencies();
+			CallbackSpan<DirectoryScanDependencyInfoView, const IDependencyNode *> dirScanDepsSpan = (phase == kCompilePhase) ? node->GetCompileDirectoryScanDependencies() : node->GetAnalysisDirectoryScanDependencies();
 
 			bool demote = false;
-			for (FileDependencyInfoView fdiView : fileDepsSpan)
+			if (!demote)
 			{
-				if (!fdiView.m_mustBeUpToDate)
-					continue;
-
-				FileStatusView fileStatus;
-				bool exists = false;
-				RKIT_CHECK(ResolveFileStatus(fdiView.m_status.m_location, fdiView.m_status.m_filePath, false, fileStatus, true, exists));
-
-				if (exists != fdiView.m_fileExists)
+				for (FileDependencyInfoView fdiView : fileDepsSpan)
 				{
-					demote = true;
-					break;
-				}
+					if (!fdiView.m_mustBeUpToDate)
+						continue;
 
-				if (exists && fileStatus != fdiView.m_status)
-				{
-					demote = true;
-					break;
+					FileStatusView fileStatus;
+					bool exists = false;
+					RKIT_CHECK(ResolveFileStatus(fdiView.m_status.m_location, fdiView.m_status.m_filePath, false, fileStatus, true, exists));
+
+					if (exists != fdiView.m_fileExists)
+					{
+						demote = true;
+						break;
+					}
+
+					if (exists && fileStatus != fdiView.m_status)
+					{
+						demote = true;
+						break;
+					}
 				}
 			}
 
@@ -2044,6 +2293,31 @@ namespace rkit::buildsystem
 					}
 
 					if (fileStatus != productStatus)
+					{
+						demote = true;
+						break;
+					}
+				}
+			}
+
+			if (!demote)
+			{
+				for (DirectoryScanDependencyInfoView dsdiView : dirScanDepsSpan)
+				{
+					if (!dsdiView.m_mustBeUpToDate)
+						continue;
+
+					DirectoryScanView dirScanStatus;
+					bool exists = false;
+					RKIT_CHECK(ResolveDirectoryScan(dsdiView.m_dirScan.m_directoryLocation, dsdiView.m_dirScan.m_directoryPath, dsdiView.m_dirScan.m_directoryMode, dirScanStatus, true, exists));
+
+					if (exists != dsdiView.m_dirExists)
+					{
+						demote = true;
+						break;
+					}
+
+					if (exists && dirScanStatus != dsdiView.m_dirScan)
 					{
 						demote = true;
 						break;
@@ -2104,6 +2378,87 @@ namespace rkit::buildsystem
 
 		RKIT_CHECK(AddRelevantNode(nodeDepNode));
 		RKIT_CHECK(m_depCheckStack.Append(nodeDepNode));
+
+		return ResultCode::kOK;
+	}
+
+	Result BuildSystemInstance::ResolveDirectoryScan(BuildFileLocation location, const CIPathView &path, bool directoryMode, DirectoryScanView &outStatusView, bool cached, bool &outExists)
+	{
+		if (cached)
+		{
+			DirectoryScanKey lookupLocKey(location, path, directoryMode);
+
+			HashMap<DirectoryScanKey, UniquePtr<CachedDirScan> >::ConstIterator_t lookupIt = m_cachedDirScan.Find(lookupLocKey);
+			if (lookupIt != m_cachedDirScan.end())
+			{
+				const CachedDirScan *fStatus = lookupIt.Value().Get();
+
+				outExists = fStatus->m_exists;
+
+				if (fStatus->m_exists)
+					outStatusView = fStatus->m_scan.ToView();
+				else
+					outStatusView = DirectoryScanView();
+
+				return ResultCode::kOK;
+			}
+		}
+
+		UniquePtr<CachedDirScan> dirScan;
+		RKIT_CHECK(New<CachedDirScan>(dirScan));
+
+		RKIT_CHECK(dirScan->m_scan.m_directoryPath.Set(path));
+		dirScan->m_scan.m_directoryLocation = location;
+		dirScan->m_exists = false;
+
+		rkit::buildsystem::FileStatusView dirFSView;
+		bool dirExists = false;
+		RKIT_CHECK(ResolveFileStatus(location, path, true, dirFSView, true, dirScan->m_exists));
+
+		if (dirExists && dirFSView.m_isDirectory)
+		{
+			dirScan->m_exists = true;
+
+			class ResultCallbackShim
+			{
+			public:
+				explicit ResultCallbackShim(DirectoryScan &dirScan, bool directoryMode)
+					: m_dirScan(dirScan)
+					, m_directoryMode(directoryMode)
+				{
+				}
+
+				Result ApplyFileStatus(const FileStatusView &fileStatus)
+				{
+					CIPath path;
+					RKIT_CHECK(path.Set(fileStatus.m_filePath));
+					RKIT_CHECK(m_dirScan.m_paths.Append(path));
+
+					return ResultCode::kOK;
+				}
+
+				static Result StaticApplyFileStatus(void *userdata, const FileStatusView &fileStatus)
+				{
+					return static_cast<ResultCallbackShim *>(userdata)->ApplyFileStatus(fileStatus);
+				}
+
+			private:
+				DirectoryScan &m_dirScan;
+				bool m_directoryMode;
+			};
+
+			ResultCallbackShim shim(dirScan->m_scan, directoryMode);
+
+			RKIT_CHECK(m_fs->EnumerateDirectory(location, path, !directoryMode, directoryMode, &shim, ResultCallbackShim::StaticApplyFileStatus));
+
+			outExists = true;
+			outStatusView = dirScan->m_scan.ToView();
+		}
+		else
+			outExists = false;
+
+		DirectoryScanKey cacheKey(location, dirScan->m_scan.m_directoryPath, directoryMode);
+		RKIT_CHECK(m_cachedDirScan.Set(std::move(cacheKey), std::move(dirScan)));
 
 		return ResultCode::kOK;
 	}
@@ -2203,33 +2558,19 @@ namespace rkit::buildsystem
 
 	Result BuildSystemInstance::InternalEnumerateFilesOrDirectories(BuildFileLocation location, const CIPathView &path, bool directoryMode, void *userdata, EnumerateFilesResultCallback_t resultCallback)
 	{
-		class ResultCallbackShim
+		bool exists = false;
+		DirectoryScanView directoryScanView;
+		RKIT_CHECK(ResolveDirectoryScan(location, path, directoryMode, directoryScanView, true, exists));
+
+		if (!exists)
+			return ResultCode::kOK;
+
+		for (const CIPathView path : directoryScanView.m_paths)
 		{
-		public:
-			ResultCallbackShim(void *userdata, EnumerateFilesResultCallback_t callback)
-				: m_userdata(userdata)
-				, m_callback(callback)
-			{
-			}
+			RKIT_CHECK(resultCallback(userdata, path));
+		}
 
-			Result ApplyFileStatus(const FileStatusView &fileStatus)
-			{
-				return m_callback(m_userdata, fileStatus.m_filePath);
-			}
-
-			static Result StaticApplyFileStatus(void *userdata, const FileStatusView &fileStatus)
-			{
-				return static_cast<ResultCallbackShim *>(userdata)->ApplyFileStatus(fileStatus);
-			}
-
-		private:
-			void *m_userdata;
-			EnumerateFilesResultCallback_t m_callback;
-		};
-
-		ResultCallbackShim shim(userdata, resultCallback);
-
-		return m_fs->EnumerateDirectory(location, path, !directoryMode, directoryMode, &shim, ResultCallbackShim::StaticApplyFileStatus);
+		return ResultCode::kOK;
 	}
 
 	Result BuildSystemInstance::RegisterNodeTypeByExtension(const StringSliceView &ext, uint32_t nodeNamespace, uint32_t nodeType)

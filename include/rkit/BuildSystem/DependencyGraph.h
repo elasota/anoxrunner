@@ -6,6 +6,7 @@
 #include "rkit/Core/Path.h"
 #include "rkit/Core/String.h"
 #include "rkit/Core/Timestamp.h"
+#include "rkit/Core/Vector.h"
 
 #include <cstddef>
 
@@ -87,6 +88,48 @@ namespace rkit
 			Result Set(const FileDependencyInfoView &view);
 		};
 
+		struct DirectoryScanView
+		{
+			CallbackSpan<CIPathView, void *> m_paths;
+			CIPathView m_directoryPath;
+			BuildFileLocation m_directoryLocation = BuildFileLocation::kSourceDir;
+			bool m_directoryMode = false;
+
+			bool operator==(const DirectoryScanView &other) const;
+			bool operator!=(const DirectoryScanView &other) const;
+		};
+
+		struct DirectoryScan
+		{
+			Vector<CIPath> m_paths;
+			CIPath m_directoryPath;
+			BuildFileLocation m_directoryLocation = BuildFileLocation::kSourceDir;
+			bool m_directoryMode = false;
+
+			DirectoryScanView ToView() const;
+			Result Set(const DirectoryScanView &view);
+		};
+
+		struct DirectoryScanDependencyInfoView
+		{
+			DirectoryScanView m_dirScan;
+			bool m_dirExists = true;
+			bool m_mustBeUpToDate = true;
+
+			bool operator==(const DirectoryScanDependencyInfoView &other) const;
+			bool operator!=(const DirectoryScanDependencyInfoView &other) const;
+		};
+
+		struct DirectoryScanDependencyInfo
+		{
+			DirectoryScan m_dirScan;
+			bool m_dirExists = true;
+			bool m_mustBeUpToDate = true;
+
+			DirectoryScanDependencyInfoView ToView() const;
+			Result Set(const DirectoryScanDependencyInfoView &view);
+		};
+
 		struct NodeDependencyInfo
 		{
 			IDependencyNode *m_node = nullptr;
@@ -122,6 +165,8 @@ namespace rkit
 			virtual CallbackSpan<FileStatusView, const IDependencyNode *> GetCompileProducts() const = 0;
 			virtual CallbackSpan<FileDependencyInfoView, const IDependencyNode *> GetAnalysisFileDependencies() const = 0;
 			virtual CallbackSpan<FileDependencyInfoView, const IDependencyNode *> GetCompileFileDependencies() const = 0;
+			virtual CallbackSpan<DirectoryScanDependencyInfoView, const IDependencyNode *> GetAnalysisDirectoryScanDependencies() const = 0;
+			virtual CallbackSpan<DirectoryScanDependencyInfoView, const IDependencyNode *> GetCompileDirectoryScanDependencies() const = 0;
 			virtual CallbackSpan<NodeDependencyInfo, const IDependencyNode *> GetNodeDependencies() const = 0;
 
 			virtual Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool) const = 0;
@@ -231,6 +276,98 @@ inline rkit::Result rkit::buildsystem::FileDependencyInfo::Set(const FileDepende
 	m_fileExists = view.m_fileExists;
 	m_mustBeUpToDate = view.m_mustBeUpToDate;
 	RKIT_CHECK(m_status.Set(view.m_status));
+
+	return ResultCode::kOK;
+}
+
+inline bool rkit::buildsystem::DirectoryScanView::operator==(const DirectoryScanView &other) const
+{
+	if (m_directoryLocation != other.m_directoryLocation)
+		return false;
+
+	if (m_directoryPath != other.m_directoryPath)
+		return false;
+
+	if (m_directoryMode != other.m_directoryMode)
+		return false;
+
+	const size_t numPaths = m_paths.Count();
+	if (other.m_paths.Count() != numPaths)
+		return false;
+
+	for (size_t i = 0; i < numPaths; i++)
+	{
+		if (m_paths[i] != other.m_paths[i])
+			return false;
+	}
+
+	return true;
+}
+
+inline bool rkit::buildsystem::DirectoryScanView::operator!=(const DirectoryScanView &other) const
+{
+	return !((*this) == other);
+}
+
+inline rkit::buildsystem::DirectoryScanView rkit::buildsystem::DirectoryScan::ToView() const
+{
+	typedef Vector<CIPath> PathVector_t;
+
+	struct CIPathVectorReadCallback
+	{
+		typedef void *Userdata_t;
+
+		static CIPathView GetElement(const Userdata_t &userdata, size_t index)
+		{
+			return (*static_cast<const PathVector_t *>(userdata))[index];
+		}
+	};
+
+	DirectoryScanView result;
+
+	const PathVector_t *pathsVector = &m_paths;
+
+	result.m_paths = CallbackSpan<CIPathView, void *>(CIPathVectorReadCallback::GetElement, const_cast<PathVector_t *>(pathsVector), pathsVector->Count());
+	result.m_directoryMode = m_directoryMode;
+	result.m_directoryPath = m_directoryPath;
+	result.m_directoryLocation = m_directoryLocation;
+
+	return result;
+}
+
+inline rkit::Result rkit::buildsystem::DirectoryScan::Set(const DirectoryScanView &view)
+{
+	const size_t numPaths = view.m_paths.Count();
+
+	RKIT_CHECK(m_paths.Resize(numPaths));
+
+	for (size_t i = 0; i < numPaths; i++)
+	{
+		RKIT_CHECK(m_paths[i].Set(view.m_paths[i]));
+	}
+
+	m_directoryMode = view.m_directoryMode;
+	RKIT_CHECK(m_directoryPath.Set(view.m_directoryPath));
+	m_directoryLocation = view.m_directoryLocation;
+
+	return ResultCode::kOK;
+}
+
+inline rkit::buildsystem::DirectoryScanDependencyInfoView rkit::buildsystem::DirectoryScanDependencyInfo::ToView() const
+{
+	DirectoryScanDependencyInfoView result;
+	result.m_dirExists = m_dirExists;
+	result.m_dirScan = m_dirScan.ToView();
+	result.m_mustBeUpToDate = m_mustBeUpToDate;
+
+	return result;
+}
+
+inline rkit::Result rkit::buildsystem::DirectoryScanDependencyInfo::Set(const DirectoryScanDependencyInfoView &view)
+{
+	RKIT_CHECK(m_dirScan.Set(view.m_dirScan));
+	m_dirExists = view.m_dirExists;
+	m_mustBeUpToDate = view.m_mustBeUpToDate;
 
 	return ResultCode::kOK;
 }
