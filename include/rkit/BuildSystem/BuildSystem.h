@@ -17,6 +17,7 @@ namespace rkit
 	namespace data
 	{
 		struct IRenderDataHandler;
+		struct ContentID;
 	}
 
 	namespace buildsystem
@@ -75,6 +76,8 @@ namespace rkit
 			virtual Result FindOrCreateNamedNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier, IDependencyNode *&outNode) = 0;
 			virtual Result FindOrCreateContentNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, Vector<uint8_t> &&content, IDependencyNode *&outNode) = 0;
 			virtual Result RegisterNodeTypeByExtension(const StringSliceView &ext, uint32_t nodeNamespace, uint32_t nodeType) = 0;
+
+			virtual Result RegisterCASSource(const data::ContentID &contentID, BuildFileLocation inputFileLocation, const CIPathView &path) = 0;
 
 			virtual Result AddRootNode(IDependencyNode *node) = 0;
 			virtual Result AddPostBuildAction(IBuildSystemAction *action) = 0;

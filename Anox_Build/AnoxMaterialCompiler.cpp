@@ -33,10 +33,21 @@ namespace anox::buildsystem
 		bool m_bilinear;
 	};
 
+	struct MaterialAnalysisBitmapDef
+	{
+		uint32_t m_nameIndex;
+	};
+
+	struct MaterialAnalysisImageImport
+	{
+		rkit::String m_identifier;
+		ImageImportDisposition m_disposition;
+	};
+
 	struct MaterialAnalysisDynamicData
 	{
-		rkit::Vector<rkit::String> m_imageImports;
-		rkit::Vector<anox::data::MaterialBitmapDef> m_bitmapDefs;
+		rkit::Vector<MaterialAnalysisImageImport> m_imageImports;
+		rkit::Vector<MaterialAnalysisBitmapDef> m_bitmapDefs;
 		rkit::Vector<anox::data::MaterialFrameDef> m_frameDefs;
 
 		rkit::Result Serialize(rkit::IWriteStream &stream) const;
@@ -54,15 +65,17 @@ namespace anox::buildsystem
 
 		RKIT_CHECK(stream.WriteAll(counts, sizeof(counts)));
 
-		for (const rkit::String &str : m_imageImports)
+		for (const MaterialAnalysisImageImport &imageImport : m_imageImports)
 		{
-			uint64_t strLength = str.Length();
+			uint64_t strLength = imageImport.m_identifier.Length();
 
 			RKIT_CHECK(stream.WriteAll(&strLength, sizeof(strLength)));
-			RKIT_CHECK(stream.WriteAll(str.CStr(), str.Length()));
+			RKIT_CHECK(stream.WriteAll(imageImport.m_identifier.CStr(), imageImport.m_identifier.Length()));
+
+			RKIT_CHECK(stream.WriteAll(&imageImport.m_disposition, sizeof(imageImport.m_disposition)));
 		}
 
-		const data::MaterialBitmapDef *bitmaps = m_bitmapDefs.GetBuffer();
+		const MaterialAnalysisBitmapDef *bitmaps = m_bitmapDefs.GetBuffer();
 		const data::MaterialFrameDef *frameDefs = m_frameDefs.GetBuffer();
 
 		RKIT_CHECK(stream.WriteAll(bitmaps, sizeof(bitmaps[0]) * m_bitmapDefs.Count()));
@@ -81,7 +94,7 @@ namespace anox::buildsystem
 		RKIT_CHECK(m_bitmapDefs.Resize(counts[1]));
 		RKIT_CHECK(m_frameDefs.Resize(counts[2]));
 
-		for (rkit::String &str : m_imageImports)
+		for (MaterialAnalysisImageImport &imageImport : m_imageImports)
 		{
 			uint64_t strLength64 = 0;
 
@@ -98,10 +111,12 @@ namespace anox::buildsystem
 			rkit::Span<char> scChars = scBuf.GetSpan();
 			RKIT_CHECK(stream.ReadAll(scChars.Ptr(), scChars.Count()));
 
-			str = rkit::String(std::move(scBuf));
+			imageImport.m_identifier = rkit::String(std::move(scBuf));
+
+			RKIT_CHECK(stream.ReadAll(&imageImport.m_disposition, sizeof(ImageImportDisposition)));
 		}
 
-		data::MaterialBitmapDef *bitmaps = m_bitmapDefs.GetBuffer();
+		MaterialAnalysisBitmapDef *bitmaps = m_bitmapDefs.GetBuffer();
 		data::MaterialFrameDef *frameDefs = m_frameDefs.GetBuffer();
 
 		RKIT_CHECK(stream.ReadAll(bitmaps, sizeof(bitmaps[0]) * m_bitmapDefs.Count()));
@@ -177,12 +192,13 @@ namespace anox::buildsystem
 
 		RKIT_CHECK(dynamicData.m_imageImports.Resize(1));
 
-		rkit::String &imageImport = dynamicData.m_imageImports[0];
-		RKIT_CHECK(TextureCompilerBase::CreateImportIdentifier(imageImport, longName, disposition));
+		MaterialAnalysisImageImport &imageImport = dynamicData.m_imageImports[0];
+		RKIT_CHECK(TextureCompilerBase::CreateImportIdentifier(imageImport.m_identifier, longName, disposition));
+		imageImport.m_disposition = disposition;
 
 		RKIT_CHECK(dynamicData.m_bitmapDefs.Resize(1));
 
-		data::MaterialBitmapDef &bitmapDef = dynamicData.m_bitmapDefs[0];
+		MaterialAnalysisBitmapDef &bitmapDef = dynamicData.m_bitmapDefs[0];
 		bitmapDef.m_nameIndex = 0;
 
 		RKIT_CHECK(dynamicData.m_frameDefs.Resize(1));
@@ -196,7 +212,7 @@ namespace anox::buildsystem
 		rkit::CIPath analysisPath;
 		RKIT_CHECK(ConstructAnalysisPath(analysisPath, depsNode->GetIdentifier(), nodeType));
 
-		RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kTextureNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, imageImport));
+		RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kTextureNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, imageImport.m_identifier));
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> analysisStream;
 		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, analysisPath, analysisStream));
@@ -295,13 +311,13 @@ namespace anox::buildsystem
 		rkit::CIPath analysisPath;
 		RKIT_CHECK(ConstructAnalysisPath(analysisPath, depsNode->GetIdentifier(), nodeType));
 
+		MaterialAnalysisHeader analysisHeader;
 		MaterialAnalysisDynamicData dynamicData;
 
 		{
 			rkit::UniquePtr<rkit::ISeekableReadStream> analysisStream;
 			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, analysisPath, analysisStream));
 
-			MaterialAnalysisHeader analysisHeader;
 			RKIT_CHECK(analysisStream->ReadAll(&analysisHeader, sizeof(analysisHeader)));
 
 			if (analysisHeader.m_magic != MaterialAnalysisHeader::kExpectedMagic || analysisHeader.m_version != MaterialAnalysisHeader::kExpectedVersion)
@@ -313,6 +329,40 @@ namespace anox::buildsystem
 			RKIT_CHECK(dynamicData.Deserialize(*analysisStream));
 		}
 
+		const size_t numImageImports = dynamicData.m_imageImports.Count();
+
+		rkit::Vector<rkit::data::ContentID> bitmapContentIDs;
+		RKIT_CHECK(bitmapContentIDs.Resize(numImageImports));
+
+		for (size_t i = 0; i < numImageImports; i++)
+		{
+			const MaterialAnalysisImageImport &imageImport = dynamicData.m_imageImports[i];
+
+			rkit::String intermediatePathStr;
+			RKIT_CHECK(TextureCompilerBase::ResolveIntermediatePath(intermediatePathStr, imageImport.m_identifier));
+
+			rkit::CIPath intermediatePath;
+			RKIT_CHECK(intermediatePath.Set(intermediatePathStr));
+
+			RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, intermediatePath, bitmapContentIDs[i]));
+		}
+
+		data::MaterialHeader materialHeader;
+		materialHeader.m_magic = data::MaterialHeader::kExpectedMagic;
+		materialHeader.m_version = data::MaterialHeader::kExpectedVersion;
+		materialHeader.m_width = analysisHeader.m_width;
+		materialHeader.m_height = analysisHeader.m_height;
+
+		materialHeader.m_bilinear = analysisHeader.m_bilinear ? 1 : 0;
+		materialHeader.m_materialType = static_cast<uint8_t>(analysisHeader.m_materialType);
+		materialHeader.m_colorType = static_cast<uint8_t>(analysisHeader.m_colorType);
+		materialHeader.m_unused = 0;
+
+		//materialHeader.m_numStrings = dynamicData.m_bitmapDefs;
+		//rkit::endian::LittleUInt32_t m_numStrings;
+
+		//rkit::endian::LittleUInt32_t m_numBitmaps;
+		//rkit::endian::LittleUInt32_t m_numFrames;
 
 		return rkit::ResultCode::kNotYetImplemented;
 	}

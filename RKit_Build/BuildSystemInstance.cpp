@@ -19,6 +19,8 @@
 #include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/Vector.h"
 
+#include "rkit/Data/ContentID.h"
+
 #include "rkit/Utilities/Sha2.h"
 
 #include <algorithm>
@@ -304,6 +306,7 @@ namespace rkit::buildsystem
 		static Result SerializeString(IWriteStream &stream, StringPoolBuilder &stringPool, const StringView &str);
 		static Result SerializeCIPath(IWriteStream &stream, StringPoolBuilder &stringPool, const CIPathView &path);
 
+		static Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const data::ContentID &contentID);
 		static Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const CIPath &path);
 		static Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const FileStatus &fs);
 		static Result Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const DirectoryScan &ds);
@@ -336,6 +339,7 @@ namespace rkit::buildsystem
 		static Result DeserializeString(IReadStream &stream, const IDeserializeResolver &resolver, String &str);
 		static Result DeserializeCIPath(IReadStream &stream, const IDeserializeResolver &resolver, CIPath &path);
 
+		static Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, data::ContentID &contentID);
 		static Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, CIPath &path);
 		static Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, FileStatus &fs);
 		static Result Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, DirectoryScan &ds);
@@ -384,6 +388,7 @@ namespace rkit::buildsystem
 
 		CallbackSpan<FileStatusView, const IDependencyNode *> GetAnalysisProducts() const override;
 		CallbackSpan<FileStatusView, const IDependencyNode *> GetCompileProducts() const override;
+		CallbackSpan<data::ContentID, const IDependencyNode *> GetCompileCASProducts() const override;
 		CallbackSpan<FileDependencyInfoView, const IDependencyNode *> GetAnalysisFileDependencies() const override;
 		CallbackSpan<FileDependencyInfoView, const IDependencyNode *> GetCompileFileDependencies() const override;
 		CallbackSpan<DirectoryScanDependencyInfoView, const IDependencyNode *> GetAnalysisDirectoryScanDependencies() const override;
@@ -392,6 +397,7 @@ namespace rkit::buildsystem
 
 		Result FindOrAddAnalysisProduct(BuildFileLocation location, const CIPathView &path, size_t &outIndex);
 		Result FindOrAddCompileProduct(BuildFileLocation location, const CIPathView &path, size_t &outIndex);
+		Result AddCASProduct(const data::ContentID &contentID);
 
 		Result AddAnalysisFileDependency(const FileDependencyInfoView &fileInfo);
 		Result AddCompileFileDependency(const FileDependencyInfoView &fileInfo);
@@ -426,6 +432,8 @@ namespace rkit::buildsystem
 			Result OpenInput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadStream> &inputFile) override;
 			Result TryOpenInput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadStream> &inputFile) override;
 			Result OpenOutput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadWriteStream> &outputFile) override;
+
+			Result IndexCAS(BuildFileLocation location, const CIPathView &path, data::ContentID &outContentID) override;
 
 			Result AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) override;
 			bool FindNodeTypeByFileExtension(const StringSliceView &ext, uint32_t &outNamespace, uint32_t &outType) const override;
@@ -481,6 +489,7 @@ namespace rkit::buildsystem
 
 		static FileStatusView GetAnalysisProductByIndex(const IDependencyNode *const& node, size_t index);
 		static FileStatusView GetCompileProductByIndex(const IDependencyNode *const &node, size_t index);
+		static data::ContentID GetCompileCASProductByIndex(const IDependencyNode *const &node, size_t index);
 		static FileDependencyInfoView GetAnalysisFileDependencyByIndex(const IDependencyNode *const & node, size_t index);
 		static FileDependencyInfoView GetCompileFileDependencyByIndex(const IDependencyNode *const &node, size_t index);
 		static DirectoryScanDependencyInfoView GetAnalysisDirectoryScanDependencyByIndex(const IDependencyNode *const &node, size_t index);
@@ -493,6 +502,7 @@ namespace rkit::buildsystem
 
 		Vector<FileStatus> m_analysisProducts;
 		Vector<FileStatus> m_compileProducts;
+		Vector<data::ContentID> m_casProducts;
 		Vector<FileDependencyInfo> m_analysisFileDependencies;
 		Vector<FileDependencyInfo> m_compileFileDependencies;
 		Vector<DirectoryScanDependencyInfo> m_analysisDirectoryScanDependencies;
@@ -573,6 +583,8 @@ namespace rkit::buildsystem
 
 		CallbackSpan<IDependencyNode *, const IBuildSystemInstance *> GetBuildRelevantNodes() const override;
 
+		Result RegisterCASSource(const data::ContentID &contentID, BuildFileLocation inputFileLocation, const CIPathView &path) override;
+
 	private:
 		struct CachedFileStatus
 		{
@@ -602,6 +614,12 @@ namespace rkit::buildsystem
 			char m_chars[kContentStringSize + 1];
 
 			StringView GetStringView() const;
+		};
+
+		struct CASSource
+		{
+			BuildFileLocation m_location = BuildFileLocation::kInvalid;
+			CIPath m_path;
 		};
 
 		static ContentID CreateContentID(const Span<const uint8_t> &content);
@@ -651,6 +669,8 @@ namespace rkit::buildsystem
 		HashMap<FileLocationKey, UniquePtr<CachedFileStatus> > m_cachedFileStatus;
 		HashMap<DirectoryScanKey, UniquePtr<CachedDirScan> > m_cachedDirScan;
 		HashMap<String, NodeTypeKey> m_nodeTypesByExtension;
+
+		HashMap<data::ContentID, CASSource> m_casSources;
 
 		IBuildFileSystem *m_fs;
 	};
@@ -833,6 +853,11 @@ namespace rkit::buildsystem
 		return CallbackSpan<FileStatusView, const IDependencyNode *>(GetCompileProductByIndex, this, m_compileProducts.Count());
 	}
 
+	CallbackSpan<data::ContentID, const IDependencyNode *> DependencyNode::GetCompileCASProducts() const
+	{
+		return CallbackSpan<data::ContentID, const IDependencyNode *>(GetCompileCASProductByIndex, this, m_casProducts.Count());
+	}
+
 	CallbackSpan<FileDependencyInfoView, const IDependencyNode *> DependencyNode::GetAnalysisFileDependencies() const
 	{
 		return CallbackSpan<FileDependencyInfoView, const IDependencyNode *>(GetAnalysisFileDependencyByIndex, this, m_analysisFileDependencies.Count());
@@ -888,6 +913,17 @@ namespace rkit::buildsystem
 	Result DependencyNode::FindOrAddCompileProduct(BuildFileLocation location, const CIPathView &path, size_t &outIndex)
 	{
 		return FindOrAddProduct(m_compileProducts, location, path, outIndex);
+	}
+
+	Result DependencyNode::AddCASProduct(const data::ContentID &contentID)
+	{
+		for (const data::ContentID &casContentID : m_casProducts)
+		{
+			if (casContentID == contentID)
+				return ResultCode::kOK;
+		}
+
+		return m_casProducts.Append(contentID);
 	}
 
 	Result DependencyNode::AddAnalysisFileDependency(const FileDependencyInfoView &fileInfo)
@@ -982,6 +1018,11 @@ namespace rkit::buildsystem
 	Result serializer::SerializeCIPath(IWriteStream &stream, StringPoolBuilder &stringPool, const CIPathView &path)
 	{
 		return SerializeString(stream, stringPool, path.ToStringView());
+	}
+
+	Result serializer::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const data::ContentID &contentID)
+	{
+		return stream.WriteAll(contentID.m_data, sizeof(contentID.m_data));
 	}
 
 	Result serializer::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const CIPath &path)
@@ -1146,6 +1187,11 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
+	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, data::ContentID &contentID)
+	{
+		return stream.ReadAll(contentID.m_data, sizeof(contentID.m_data));
+	}
+
 	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, CIPath &path)
 	{
 		return DeserializeCIPath(stream, resolver, path);
@@ -1307,6 +1353,7 @@ namespace rkit::buildsystem
 
 		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_analysisProducts));
 		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_compileProducts));
+		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_casProducts));
 		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_analysisFileDependencies));
 		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_compileFileDependencies));
 		RKIT_CHECK(serializer::SerializeVector(stream, stringPool, m_analysisDirectoryScanDependencies));
@@ -1328,6 +1375,7 @@ namespace rkit::buildsystem
 
 		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_analysisProducts));
 		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_compileProducts));
+		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_casProducts));
 		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_analysisFileDependencies));
 		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_compileFileDependencies));
 		RKIT_CHECK(serializer::DeserializeVector(stream, resolver, m_analysisDirectoryScanDependencies));
@@ -1468,6 +1516,44 @@ namespace rkit::buildsystem
 		RKIT_CHECK(pathCopy.Set(path));
 
 		RKIT_CHECK(New<FeedbackWrapperStream>(outputFile, *this, productIndex, location, std::move(pathCopy), std::move(realFile)));
+
+		return ResultCode::kOK;
+	}
+
+	Result DependencyNode::DependencyNodeCompilerFeedback::IndexCAS(BuildFileLocation location, const CIPathView &path, data::ContentID &outContentID)
+	{
+		UniquePtr<ISeekableReadStream> inputFile;
+		RKIT_CHECK(this->OpenInput(location, path, inputFile));
+
+		const utils::ISha256Calculator *calculator = GetDrivers().m_utilitiesDriver->GetSha256Calculator();
+		utils::Sha256StreamingState streamingState = calculator->CreateStreamingState();
+
+		FilePos_t amountRemaining = inputFile->GetSize();
+		uint8_t buffer[1024];
+
+		while (amountRemaining > 0)
+		{
+			size_t amountToRead = sizeof(buffer);
+			if (amountToRead > amountRemaining)
+				amountToRead = static_cast<size_t>(amountRemaining);
+
+			amountRemaining -= static_cast<FilePos_t>(amountToRead);
+
+			RKIT_CHECK(inputFile->ReadAll(buffer, amountToRead));
+			calculator->AppendStreamingState(streamingState, buffer, amountToRead);
+		}
+
+		calculator->FinalizeStreamingState(streamingState);
+
+		utils::Sha256DigestBytes digest = calculator->FlushToBytes(streamingState.m_state);
+
+		static_assert(sizeof(digest.m_data) == sizeof(outContentID.m_data));
+
+		memcpy(outContentID.m_data, digest.m_data, sizeof(digest.m_data));
+
+		RKIT_CHECK(m_buildInstance->RegisterCASSource(outContentID, location, path));
+
+		RKIT_CHECK(m_dependencyNode->AddCASProduct(outContentID));
 
 		return ResultCode::kOK;
 	}
@@ -1634,6 +1720,11 @@ namespace rkit::buildsystem
 		const FileStatus &fileStatus = static_cast<const DependencyNode *>(node)->m_compileProducts[index];
 
 		return fileStatus.ToView();
+	}
+
+	data::ContentID DependencyNode::GetCompileCASProductByIndex(const IDependencyNode *const &node, size_t index)
+	{
+		return static_cast<const DependencyNode *>(node)->m_casProducts[index];
 	}
 
 	FileDependencyInfoView DependencyNode::GetAnalysisFileDependencyByIndex(const IDependencyNode *const &node, size_t index)
@@ -2302,6 +2393,17 @@ namespace rkit::buildsystem
 
 			if (!demote)
 			{
+				if (phase == kCompilePhase)
+				{
+					for (data::ContentID contentID : node->GetCompileCASProducts())
+					{
+						return ResultCode::kNotYetImplemented;
+					}
+				}
+			}
+
+			if (!demote)
+			{
 				for (DirectoryScanDependencyInfoView dsdiView : dirScanDepsSpan)
 				{
 					if (!dsdiView.m_mustBeUpToDate)
@@ -2606,6 +2708,20 @@ namespace rkit::buildsystem
 	CallbackSpan<IDependencyNode *, const IBuildSystemInstance *> BuildSystemInstance::GetBuildRelevantNodes() const
 	{
 		return CallbackSpan<IDependencyNode *, const IBuildSystemInstance *>(GetRelevantNodeByIndex, this, m_relevantNodes.Count());
+	}
+
+	Result BuildSystemInstance::RegisterCASSource(const data::ContentID &contentID, BuildFileLocation inputFileLocation, const CIPathView &path)
+	{
+		if (m_casSources.Find(contentID) == m_casSources.end())
+		{
+			CASSource casSource;
+			RKIT_CHECK(casSource.m_path.Set(path));
+			casSource.m_location = inputFileLocation;
+
+			RKIT_CHECK(m_casSources.Set(contentID, std::move(casSource)));
+		}
+
+		return ResultCode::kOK;
 	}
 
 	Result BuildSystemInstance::ResolveCachedFileStatusCallback(void *userdata, const FileStatusView &status)

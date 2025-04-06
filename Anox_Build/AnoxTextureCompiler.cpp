@@ -227,7 +227,7 @@ namespace anox::buildsystem
 		static rkit::Result Generate2DMipMapChain(const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &images, ImageImportDisposition disposition);
 
 		template<class TElementType, size_t TNumElements>
-		static rkit::Result ExportDDS(const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &images, size_t numLevels, size_t numLayers, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
+		static rkit::Result ExportDDS(const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &images, size_t numLevels, size_t numLayers, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, ImageImportDisposition disposition);
 
 		static bool DispositionHasAlpha(ImageImportDisposition disposition);
 		static bool DispositionHasMipMaps(ImageImportDisposition disposition);
@@ -676,7 +676,7 @@ namespace anox::buildsystem
 		size_t numLevels = 0;
 		RKIT_CHECK(GenerateMipMaps(images, rkit::Span<priv::TextureCompilerImage<uint8_t, 4>>(&image, 1), numLevels, disposition));
 
-		return ExportDDS(images.ToSpan(), numLevels, 1, depsNode, feedback, shortName, disposition);
+		return ExportDDS(images.ToSpan(), numLevels, 1, depsNode, feedback, disposition);
 	}
 
 	rkit::Result TextureCompiler::CompilePNG(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
@@ -725,10 +725,10 @@ namespace anox::buildsystem
 	}
 
 	template<class TElementType, size_t TNumElements>
-	rkit::Result TextureCompiler::ExportDDS(const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &images, size_t numMipMaps, size_t numLayers, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
+	rkit::Result TextureCompiler::ExportDDS(const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &images, size_t numMipMaps, size_t numLayers, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, ImageImportDisposition disposition)
 	{
 		rkit::String outName;
-		RKIT_CHECK(outName.Format("ax_tex/%s.%i.dds", shortName.GetChars(), static_cast<int>(disposition)));
+		RKIT_CHECK(ResolveIntermediatePath(outName, depsNode->GetIdentifier()));
 
 		rkit::CIPath outPath;
 		RKIT_CHECK(outPath.Set(outName));
@@ -941,6 +941,11 @@ namespace anox::buildsystem
 	uint32_t TextureCompiler::GetVersion() const
 	{
 		return 1;
+	}
+
+	rkit::Result TextureCompilerBase::ResolveIntermediatePath(rkit::String &outString, const rkit::StringView &identifierWithDisposition)
+	{
+		return outString.Format("ax_tex/%s.dds", identifierWithDisposition.GetChars());
 	}
 
 	rkit::Result TextureCompilerBase::CreateImportIdentifier(rkit::String &result, const rkit::StringView &imagePath, ImageImportDisposition disposition)

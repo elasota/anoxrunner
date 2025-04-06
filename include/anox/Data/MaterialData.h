@@ -2,7 +2,10 @@
 
 #include <cstdint>
 
+#include "rkit/Core/Endian.h"
 #include "rkit/Core/FourCC.h"
+
+#include "rkit/Data/ContentID.h"
 
 namespace anox::data
 {
@@ -28,40 +31,37 @@ namespace anox::data
 
 	struct MaterialFrameDef
 	{
-		uint32_t m_bitmap = 0;
-		uint32_t m_next = 0;
-		uint32_t m_waitMSec = 100;
+		rkit::endian::LittleUInt32_t m_bitmap;
+		rkit::endian::LittleUInt32_t m_next;
+		rkit::endian::LittleUInt32_t m_waitMSec;
 
-		int32_t m_xOffset = 0;
-		int32_t m_yOffset = 0;
+		rkit::endian::LittleInt32_t m_xOffset;
+		rkit::endian::LittleInt32_t m_yOffset;
 	};
 
 	struct MaterialBitmapDef
 	{
-		uint32_t m_nameIndex;
+		rkit::data::ContentID m_contentID;
 	};
 
 	struct MaterialHeader
 	{
 		static const uint32_t kExpectedMagic = RKIT_FOURCC('A', 'M', 'T', 'L');
+		static const uint32_t kExpectedVersion = 1;
 
-		uint32_t m_magic;
-		uint32_t m_version;
-		uint32_t m_width;
-		uint32_t m_height;
+		rkit::endian::LittleUInt32_t m_magic;
+		rkit::endian::LittleUInt32_t m_version;
+		rkit::endian::LittleUInt32_t m_width;
+		rkit::endian::LittleUInt32_t m_height;
 
 		uint8_t m_bilinear;
 		uint8_t m_materialType;
 		uint8_t m_colorType;
 		uint8_t m_unused;
 
-		uint32_t m_numStrings;
+		rkit::endian::LittleUInt32_t m_numBitmaps;
+		rkit::endian::LittleUInt32_t m_numFrames;
 
-		uint32_t m_numBitmaps;
-		uint32_t m_numFrames;
-
-		// uint32_t m_stringLengths[]
-		// char m_stringChars[]
 		// MaterialBitmapDef m_bitmapDefs
 		// MaterialFrameDef m_frameDefs
 	};

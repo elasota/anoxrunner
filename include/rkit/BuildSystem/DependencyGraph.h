@@ -24,6 +24,11 @@ namespace rkit
 	template<class T>
 	class UniquePtr;
 
+	namespace data
+	{
+		struct ContentID;
+	}
+
 	namespace buildsystem
 	{
 		struct IBuildSystemInstance;
@@ -163,6 +168,7 @@ namespace rkit
 
 			virtual CallbackSpan<FileStatusView, const IDependencyNode *> GetAnalysisProducts() const = 0;
 			virtual CallbackSpan<FileStatusView, const IDependencyNode *> GetCompileProducts() const = 0;
+			virtual CallbackSpan<data::ContentID, const IDependencyNode *> GetCompileCASProducts() const = 0;
 			virtual CallbackSpan<FileDependencyInfoView, const IDependencyNode *> GetAnalysisFileDependencies() const = 0;
 			virtual CallbackSpan<FileDependencyInfoView, const IDependencyNode *> GetCompileFileDependencies() const = 0;
 			virtual CallbackSpan<DirectoryScanDependencyInfoView, const IDependencyNode *> GetAnalysisDirectoryScanDependencies() const = 0;
@@ -183,6 +189,7 @@ namespace rkit
 			virtual Result OpenInput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadStream> &inputFile) = 0;
 			virtual Result TryOpenInput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadStream> &inputFile) = 0;
 			virtual Result OpenOutput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadWriteStream> &outputFile) = 0;
+			virtual Result IndexCAS(BuildFileLocation location, const CIPathView &path, data::ContentID &outContentID) = 0;
 
 			virtual Result AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) = 0;
 			virtual bool FindNodeTypeByFileExtension(const StringSliceView &ext, uint32_t &outNamespace, uint32_t &outType) const = 0;

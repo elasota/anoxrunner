@@ -32,6 +32,8 @@ namespace anox::buildsystem
 
 		static rkit::Result CreateImportIdentifier(rkit::String &identifier, const rkit::StringView &imagePath, ImageImportDisposition disposition);
 
+		static rkit::Result ResolveIntermediatePath(rkit::String &outString, const rkit::StringView &identifierWithDisposition);
+
 	protected:
 		TextureCompilerBase() {}
 	};
