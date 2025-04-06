@@ -910,11 +910,13 @@ namespace rkit::buildsystem
 
 	Result DependencyNode::FindOrAddAnalysisProduct(BuildFileLocation location, const CIPathView &path, size_t &outIndex)
 	{
+		RKIT_ASSERT(path.Length() != 0);
 		return FindOrAddProduct(m_analysisProducts, location, path, outIndex);
 	}
 
 	Result DependencyNode::FindOrAddCompileProduct(BuildFileLocation location, const CIPathView &path, size_t &outIndex)
 	{
+		RKIT_ASSERT(path.Length() != 0);
 		return FindOrAddProduct(m_compileProducts, location, path, outIndex);
 	}
 
@@ -970,6 +972,8 @@ namespace rkit::buildsystem
 
 	Result DependencyNode::AddDirectoryScanDependency(Vector<DirectoryScanDependencyInfo> &dirScanDependencies, const DirectoryScanDependencyInfoView &dirScanInfo)
 	{
+		RKIT_ASSERT(dirScanInfo.m_dirScan.m_directoryPath.Length() != 0);
+
 		for (DirectoryScanDependencyInfo &existingDSDI : dirScanDependencies)
 		{
 			if (existingDSDI.m_dirScan.m_directoryLocation == dirScanInfo.m_dirScan.m_directoryLocation
@@ -1433,6 +1437,13 @@ namespace rkit::buildsystem
 		FileStatusView newFStatusView;
 		bool exists = false;
 		RKIT_CHECK(m_buildInstance->ResolveFileStatus(location, path, false, newFStatusView, true, exists));
+
+		// If these don't exist, then the file status view will be empty
+		if (!exists)
+		{
+			newFStatusView.m_filePath = path;
+			newFStatusView.m_location = location;
+		}
 
 		FileDependencyInfoView newDepInfo;
 		newDepInfo.m_status = newFStatusView;
@@ -2063,7 +2074,7 @@ namespace rkit::buildsystem
 		{
 			const DependencyNode *node = m_relevantNodes[i];
 
-			for (data::ContentID contentID : node->GetCompileCASProducts())
+			for (const data::ContentID &contentID : node->GetCompileCASProducts())
 			{
 				RKIT_CHECK(UpdateCAS(contentID));
 			}
@@ -2574,7 +2585,13 @@ namespace rkit::buildsystem
 			outStatusView = dirScan->m_scan.ToView();
 		}
 		else
+		{
 			outExists = false;
+			outStatusView = DirectoryScanView();
+			outStatusView.m_directoryLocation = location;
+			outStatusView.m_directoryMode = directoryMode;
+			outStatusView.m_directoryPath = path;
+		}
 
 		DirectoryScanKey cacheKey(location, dirScan->m_scan.m_directoryPath, directoryMode);
 		RKIT_CHECK(m_cachedDirScan.Set(std::move(cacheKey), std::move(dirScan)));

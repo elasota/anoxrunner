@@ -855,6 +855,12 @@ namespace rkit
 	template<class TOtherPathTraits>
 	Result BasePath<TIsAbsolute, TPathTraits>::ConvertFrom(const BasePathView<TIsAbsolute, TOtherPathTraits> &path)
 	{
+		if (path.Length() == 0)
+		{
+			m_path.Clear();
+			return ResultCode::kOK;
+		}
+
 		const BaseStringView<typename TOtherPathTraits::Char_t> &otherStr = path.ToStringView();
 		const ConstSpan<typename TOtherPathTraits::Char_t> otherCharsSpan = otherStr.ToSpan();
 
