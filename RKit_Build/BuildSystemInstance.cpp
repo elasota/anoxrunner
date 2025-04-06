@@ -6,6 +6,7 @@
 #include "rkit/BuildSystem/DependencyGraph.h"
 
 #include "rkit/Core/BufferStream.h"
+#include "rkit/Core/FileAttributes.h"
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/HybridVector.h"
 #include "rkit/Core/LogDriver.h"
@@ -649,6 +650,8 @@ namespace rkit::buildsystem
 		Result SaveCache();
 
 		Result InternalEnumerateFilesOrDirectories(BuildFileLocation location, const CIPathView &path, bool isDirectoryMode, void *userdata, EnumerateFilesResultCallback_t resultCallback);
+
+		Result UpdateCAS(const data::ContentID &contentID);
 
 		String m_targetName;
 		OSAbsPath m_srcDir;
@@ -2034,7 +2037,7 @@ namespace rkit::buildsystem
 			}
 		}
 
-		// Step 2: Compile
+		// Step 2: Compile (NOTE: relevant nodes list may be added during this)
 		for (size_t ri = 0; ri < m_relevantNodes.Count(); ri++)
 		{
 			DependencyNode *node = m_relevantNodes[m_relevantNodes.Count() - 1 - ri];
@@ -2055,7 +2058,18 @@ namespace rkit::buildsystem
 			RKIT_CHECK(m_postBuildActions[i]->Run());
 		}
 
-		// Step 4: Write updated state
+		// Step 4: Copy CAS files
+		for (size_t i = 0; i < m_relevantNodes.Count(); i++)
+		{
+			const DependencyNode *node = m_relevantNodes[i];
+
+			for (data::ContentID contentID : node->GetCompileCASProducts())
+			{
+				RKIT_CHECK(UpdateCAS(contentID));
+			}
+		}
+
+		// Step 5: Write updated state
 		RKIT_CHECK(SaveCache());
 
 		return ResultCode::kOK;
@@ -2066,6 +2080,7 @@ namespace rkit::buildsystem
 		rkit::BufferStream depsGraphNodesStream;
 		StringPoolBuilder stringPool;
 
+		// Write nodes
 		size_t serializedIndex = 0;
 		for (DependencyNode *node : m_relevantNodes)
 		{
@@ -2077,11 +2092,13 @@ namespace rkit::buildsystem
 		{
 			RKIT_CHECK(node->SerializeInitialState(depsGraphNodesStream));
 		}
+
 		for (DependencyNode *node : m_relevantNodes)
 		{
 			RKIT_CHECK(node->Serialize(depsGraphNodesStream, stringPool));
 		}
 
+		// Write strings
 		rkit::BufferStream stringPoolStream;
 		size_t numStrings = stringPool.NumStrings();
 
@@ -2670,6 +2687,99 @@ namespace rkit::buildsystem
 		for (const CIPathView path : directoryScanView.m_paths)
 		{
 			RKIT_CHECK(resultCallback(userdata, path));
+		}
+
+		return ResultCode::kOK;
+	}
+
+	Result BuildSystemInstance::UpdateCAS(const data::ContentID &contentID)
+	{
+		data::ContentIDString contentIDString = contentID.ToString();
+
+		OSAbsPath contentBasePath = m_intermedDir;
+		OSAbsPath contentPath;
+
+		CIPath contentDir;
+		RKIT_CHECK(contentDir.AppendComponent("content"));
+
+		{
+			CIPath pathCI = contentDir;
+
+			RKIT_CHECK(pathCI.AppendComponent(contentIDString.ToStringView()));
+
+			OSRelPath osRelPath;
+			RKIT_CHECK(osRelPath.ConvertFrom(static_cast<CIPathView>(pathCI)));
+
+			contentPath = contentBasePath;
+			RKIT_CHECK(contentPath.Append(osRelPath));
+		}
+
+		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+
+
+		FileAttributes attribs;
+		bool exists = false;
+		RKIT_CHECK(sysDriver->GetFileAttributesAbs(contentPath, exists, attribs));
+
+		if (!exists)
+		{
+			HashMap<data::ContentID, CASSource>::ConstIterator_t it = m_casSources.Find(contentID);
+			if (it == m_casSources.end())
+			{
+				rkit::log::ErrorFmt("Couldn't find CAS source for content '%s'", contentIDString.ToStringView().GetChars());
+				return ResultCode::kInternalError;
+			}
+
+			OSAbsPath tempPath;
+
+			{
+				CIPath pathCI = contentDir;
+
+				String tempName;
+				RKIT_CHECK(tempName.Set(contentIDString.ToStringView()));
+				RKIT_CHECK(tempName.Append(".tmp"));
+
+				RKIT_CHECK(pathCI.AppendComponent(tempName));
+
+				OSRelPath osRelPath;
+				RKIT_CHECK(osRelPath.ConvertFrom(static_cast<CIPathView>(pathCI)));
+
+				tempPath = contentBasePath;
+				RKIT_CHECK(tempPath.Append(osRelPath));
+			}
+
+			UniquePtr<ISeekableReadStream> inStream;
+			RKIT_CHECK(m_fs->TryOpenFileRead(it.Value().m_location, it.Value().m_path, inStream));
+
+			if (!inStream.IsValid())
+			{
+				rkit::log::ErrorFmt("Couldn't open CAS source '%s'", it.Value().m_path.CStr());
+				return ResultCode::kInternalError;
+			}
+
+			UniquePtr<ISeekableWriteStream> outStream;
+			RKIT_CHECK(sysDriver->OpenFileWriteAbs(outStream, tempPath, true, true, true));
+
+			FilePos_t amountRemaining = inStream->GetSize();
+			while (amountRemaining > 0)
+			{
+				uint8_t buffer[2048];
+
+				size_t amountToCopy = sizeof(buffer);
+				if (amountToCopy > amountRemaining)
+					amountToCopy = static_cast<size_t>(amountRemaining);
+
+				RKIT_CHECK(inStream->ReadAll(buffer, amountToCopy));
+				RKIT_CHECK(outStream->WriteAll(buffer, amountToCopy));
+
+				amountRemaining -= amountToCopy;
+			}
+
+			RKIT_CHECK(outStream->Flush());
+			outStream.Reset();
+			inStream.Reset();
+
+			RKIT_CHECK(sysDriver->MoveFileFromAbsToAbs(tempPath, contentPath, true));
 		}
 
 		return ResultCode::kOK;

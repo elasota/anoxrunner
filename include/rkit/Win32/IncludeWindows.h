@@ -14,6 +14,9 @@
 #undef CreateMutex
 #undef GetFileAttributes
 #undef CreateEvent
+#undef CreateFile
+#undef MoveFile
+#undef CopyFile
 
 #pragma pop_macro("WIN32_LEAN_AND_MEAN")
 #pragma pop_macro("NOMINMAX")

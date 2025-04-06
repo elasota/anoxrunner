@@ -159,6 +159,16 @@ namespace anox::buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
+	rkit::Result MaterialCompiler::ConstructOutputPath(rkit::CIPath &outputPath, const rkit::StringView &identifier, MaterialNodeType nodeType)
+	{
+		rkit::String pathStr;
+		RKIT_CHECK(pathStr.Format("anox/mat/%s.o%i", identifier.GetChars(), static_cast<int>(nodeType)));
+
+		RKIT_CHECK(outputPath.Set(pathStr));
+
+		return rkit::ResultCode::kOK;
+	}
+
 	rkit::Result MaterialCompiler::RunAnalyzeImage(const rkit::StringView &longName, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		MaterialAnalysisHeader analysisHeader = {};
@@ -304,6 +314,12 @@ namespace anox::buildsystem
 
 	rkit::Result MaterialCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
+		struct DeduplicatedContentID
+		{
+			rkit::data::ContentID m_contentID;
+			size_t m_uniqueIndex = 0;
+		};
+
 		MaterialNodeType nodeType = MaterialNodeType::kCount;
 
 		RKIT_CHECK(MaterialNodeTypeFromFourCC(nodeType, depsNode->GetDependencyNodeType()));
@@ -331,7 +347,7 @@ namespace anox::buildsystem
 
 		const size_t numImageImports = dynamicData.m_imageImports.Count();
 
-		rkit::Vector<rkit::data::ContentID> bitmapContentIDs;
+		rkit::Vector<DeduplicatedContentID> bitmapContentIDs;
 		RKIT_CHECK(bitmapContentIDs.Resize(numImageImports));
 
 		for (size_t i = 0; i < numImageImports; i++)
@@ -344,7 +360,42 @@ namespace anox::buildsystem
 			rkit::CIPath intermediatePath;
 			RKIT_CHECK(intermediatePath.Set(intermediatePathStr));
 
-			RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, intermediatePath, bitmapContentIDs[i]));
+			RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, intermediatePath, bitmapContentIDs[i].m_contentID));
+		}
+
+		rkit::Vector<data::MaterialBitmapDef> bitmapDefs;
+
+		for (DeduplicatedContentID &ddContentID : bitmapContentIDs)
+		{
+			ddContentID.m_uniqueIndex = bitmapDefs.Count();
+
+			for (size_t i = 0; i < bitmapDefs.Count(); i++)
+			{
+				if (ddContentID.m_contentID == bitmapDefs[i].m_contentID)
+				{
+					ddContentID.m_uniqueIndex = i;
+					break;
+				}
+			}
+
+			if (ddContentID.m_uniqueIndex == bitmapDefs.Count())
+			{
+				data::MaterialBitmapDef bitmapDef;
+				bitmapDef.m_contentID = ddContentID.m_contentID;
+
+				RKIT_CHECK(bitmapDefs.Append(bitmapDef));
+			}
+		}
+
+		rkit::Vector<data::MaterialFrameDef> frameDefs;
+
+		for (const data::MaterialFrameDef &inFrameDef : dynamicData.m_frameDefs)
+		{
+			data::MaterialFrameDef outFrameDef = inFrameDef;
+
+			outFrameDef.m_bitmap = static_cast<uint32_t>(bitmapContentIDs[inFrameDef.m_bitmap.Get()].m_uniqueIndex);
+
+			RKIT_CHECK(frameDefs.Append(outFrameDef));
 		}
 
 		data::MaterialHeader materialHeader;
@@ -358,13 +409,20 @@ namespace anox::buildsystem
 		materialHeader.m_colorType = static_cast<uint8_t>(analysisHeader.m_colorType);
 		materialHeader.m_unused = 0;
 
-		//materialHeader.m_numStrings = dynamicData.m_bitmapDefs;
-		//rkit::endian::LittleUInt32_t m_numStrings;
+		materialHeader.m_numBitmaps = static_cast<uint32_t>(bitmapDefs.Count());
+		materialHeader.m_numFrames = static_cast<uint32_t>(frameDefs.Count());
 
-		//rkit::endian::LittleUInt32_t m_numBitmaps;
-		//rkit::endian::LittleUInt32_t m_numFrames;
+		rkit::CIPath outputPath;
+		RKIT_CHECK(ConstructOutputPath(outputPath, depsNode->GetIdentifier(), nodeType));
 
-		return rkit::ResultCode::kNotYetImplemented;
+		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
+		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outputPath, outFile));
+
+		RKIT_CHECK(outFile->WriteAll(&materialHeader, sizeof(materialHeader)));
+		RKIT_CHECK(outFile->WriteAll(bitmapDefs.GetBuffer(), bitmapDefs.Count() * sizeof(bitmapDefs[0])));
+		RKIT_CHECK(outFile->WriteAll(frameDefs.GetBuffer(), frameDefs.Count() * sizeof(frameDefs[0])));
+
+		return rkit::ResultCode::kOK;
 	}
 
 	uint32_t MaterialCompiler::GetVersion() const

@@ -30,6 +30,7 @@ namespace anox::buildsystem
 
 		static rkit::Result MaterialNodeTypeFromFourCC(MaterialNodeType &outNodeType, uint32_t nodeTypeFourCC);
 		static rkit::Result ConstructAnalysisPath(rkit::CIPath &analysisPath, const rkit::StringView &identifier, MaterialNodeType nodeType);
+		static rkit::Result ConstructOutputPath(rkit::CIPath &analysisPath, const rkit::StringView &identifier, MaterialNodeType nodeType);
 
 		rkit::Result RunAnalyzeATD(const rkit::StringView &name, rkit::UniquePtr<rkit::ISeekableReadStream> &&atdStream, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 		rkit::Result RunAnalyzeImage(const rkit::StringView &longName, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);

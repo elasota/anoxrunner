@@ -180,6 +180,16 @@ namespace rkit
 		Result GetFileAttributes(FileLocation location, const CIPathView &path, bool &outExists, FileAttributes &outAttribs) override;
 		Result GetFileAttributesAbs(const OSAbsPathView &path, bool &outExists, FileAttributes &outAttribs) override;
 
+		Result CopyFileFromAbsToAbs(const OSAbsPathView &srcPath, const OSAbsPathView &destPath, bool overwrite) override;
+		Result CopyFileToAbs(FileLocation location, const CIPathView &path, const OSAbsPathView &destPath, bool overwrite) override;
+		Result CopyFileFromAbs(const OSAbsPathView &srcPath, FileLocation location, const CIPathView &path, bool overwrite) override;
+		Result CopyFile(FileLocation srcLocation, const CIPathView &srcPath, FileLocation destLocation, const CIPathView &destPath, bool overwrite) override;
+
+		Result MoveFileFromAbsToAbs(const OSAbsPathView &srcPath, const OSAbsPathView &destPath, bool overwrite) override;
+		Result MoveFileToAbs(FileLocation location, const CIPathView &path, const OSAbsPathView &destPath, bool overwrite) override;
+		Result MoveFileFromAbs(const OSAbsPathView &srcPath, FileLocation location, const CIPathView &path, bool overwrite) override;
+		Result MoveFile(FileLocation srcLocation, const CIPathView &srcPath, FileLocation destLocation, const CIPathView &destPath, bool overwrite) override;
+
 		Result SetGameDirectoryOverride(const OSAbsPathView &path) override;
 		Result SetSettingsDirectory(const StringView &path) override;
 		char GetPathSeparator() const override;
@@ -941,6 +951,85 @@ namespace rkit
 		RKIT_CHECK(ResolveAbsPath(absPath, location, path));
 
 		return GetFileAttributesAbs(absPath, outExists, outAttribs);
+	}
+
+
+	Result SystemDriver_Win32::CopyFileFromAbsToAbs(const OSAbsPathView &srcPath, const OSAbsPathView &destPath, bool overwrite)
+	{
+		BOOL succeeded = ::CopyFileW(srcPath.GetChars(), destPath.GetChars(), !overwrite);
+
+		if (succeeded)
+			return ResultCode::kOK;
+		else
+			return ResultCode::kIOError;
+	}
+
+	Result SystemDriver_Win32::CopyFileToAbs(FileLocation location, const CIPathView &path, const OSAbsPathView &destPath, bool overwrite)
+	{
+		OSAbsPath srcPath;
+		RKIT_CHECK(ResolveAbsPath(srcPath, location, path));
+
+		return CopyFileFromAbsToAbs(srcPath, destPath, overwrite);
+	}
+
+	Result SystemDriver_Win32::CopyFileFromAbs(const OSAbsPathView &srcPath, FileLocation location, const CIPathView &path, bool overwrite)
+	{
+		OSAbsPath destPath;
+		RKIT_CHECK(ResolveAbsPath(destPath, location, path));
+
+		return CopyFileFromAbsToAbs(srcPath, destPath, overwrite);
+	}
+
+	Result SystemDriver_Win32::CopyFile(FileLocation srcLocation, const CIPathView &srcPath, FileLocation destLocation, const CIPathView &destPath, bool overwrite)
+	{
+		OSAbsPath osSrcPath;
+		RKIT_CHECK(ResolveAbsPath(osSrcPath, srcLocation, srcPath));
+
+		OSAbsPath osDestPath;
+		RKIT_CHECK(ResolveAbsPath(osDestPath, destLocation, destPath));
+
+		return CopyFileFromAbsToAbs(osSrcPath, osDestPath, overwrite);
+	}
+
+	Result SystemDriver_Win32::MoveFileFromAbsToAbs(const OSAbsPathView &srcPath, const OSAbsPathView &destPath, bool overwrite)
+	{
+		DWORD flags = MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH;
+		if (overwrite)
+			flags |= MOVEFILE_REPLACE_EXISTING;
+
+		BOOL succeeded = ::MoveFileExW(srcPath.GetChars(), destPath.GetChars(), flags);
+
+		if (succeeded)
+			return ResultCode::kOK;
+		else
+			return ResultCode::kIOError;
+	}
+
+	Result SystemDriver_Win32::MoveFileToAbs(FileLocation location, const CIPathView &path, const OSAbsPathView &destPath, bool overwrite)
+	{
+		OSAbsPath srcPath;
+		RKIT_CHECK(ResolveAbsPath(srcPath, location, path));
+
+		return MoveFileFromAbsToAbs(srcPath, destPath, overwrite);
+	}
+
+	Result SystemDriver_Win32::MoveFileFromAbs(const OSAbsPathView &srcPath, FileLocation location, const CIPathView &path, bool overwrite)
+	{
+		OSAbsPath destPath;
+		RKIT_CHECK(ResolveAbsPath(destPath, location, path));
+
+		return MoveFileFromAbsToAbs(srcPath, destPath, overwrite);
+	}
+
+	Result SystemDriver_Win32::MoveFile(FileLocation srcLocation, const CIPathView &srcPath, FileLocation destLocation, const CIPathView &destPath, bool overwrite)
+	{
+		OSAbsPath osSrcPath;
+		RKIT_CHECK(ResolveAbsPath(osSrcPath, srcLocation, srcPath));
+
+		OSAbsPath osDestPath;
+		RKIT_CHECK(ResolveAbsPath(osDestPath, destLocation, destPath));
+
+		return MoveFileFromAbsToAbs(osSrcPath, osDestPath, overwrite);
 	}
 
 	Result SystemDriver_Win32::OpenDirectoryScanAbs(const OSAbsPathView &path, UniquePtr<IDirectoryScan> &outDirectoryScan)
