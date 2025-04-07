@@ -149,20 +149,20 @@ namespace anox::buildsystem
 		return rkit::ResultCode::kNotYetImplemented;
 	}
 
-	rkit::Result MaterialCompiler::ConstructAnalysisPath(rkit::CIPath &analysisPath, const rkit::StringView &identifier, MaterialNodeType nodeType)
+	rkit::Result MaterialCompiler::ConstructAnalysisPath(rkit::CIPath &analysisPath, const rkit::StringView &identifier)
 	{
 		rkit::String pathStr;
-		RKIT_CHECK(pathStr.Format("anox/mat/%s.a%i", identifier.GetChars(), static_cast<int>(nodeType)));
+		RKIT_CHECK(pathStr.Format("anox/mat/%s.a", identifier.GetChars()));
 
 		RKIT_CHECK(analysisPath.Set(pathStr));
 
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result MaterialCompiler::ConstructOutputPath(rkit::CIPath &outputPath, const rkit::StringView &identifier, MaterialNodeType nodeType)
+	rkit::Result MaterialCompiler::ConstructOutputPath(rkit::CIPath &outputPath, const rkit::StringView &identifier)
 	{
 		rkit::String pathStr;
-		RKIT_CHECK(pathStr.Format("anox/mat/%s.o%i", identifier.GetChars(), static_cast<int>(nodeType)));
+		RKIT_CHECK(pathStr.Format("anox/mat/%s", identifier.GetChars()));
 
 		RKIT_CHECK(outputPath.Set(pathStr));
 
@@ -220,7 +220,7 @@ namespace anox::buildsystem
 		frameDef.m_yOffset = 0;
 
 		rkit::CIPath analysisPath;
-		RKIT_CHECK(ConstructAnalysisPath(analysisPath, depsNode->GetIdentifier(), nodeType));
+		RKIT_CHECK(ConstructAnalysisPath(analysisPath, depsNode->GetIdentifier()));
 
 		RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kTextureNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, imageImport.m_identifier));
 
@@ -320,12 +320,8 @@ namespace anox::buildsystem
 			size_t m_uniqueIndex = 0;
 		};
 
-		MaterialNodeType nodeType = MaterialNodeType::kCount;
-
-		RKIT_CHECK(MaterialNodeTypeFromFourCC(nodeType, depsNode->GetDependencyNodeType()));
-
 		rkit::CIPath analysisPath;
-		RKIT_CHECK(ConstructAnalysisPath(analysisPath, depsNode->GetIdentifier(), nodeType));
+		RKIT_CHECK(ConstructAnalysisPath(analysisPath, depsNode->GetIdentifier()));
 
 		MaterialAnalysisHeader analysisHeader;
 		MaterialAnalysisDynamicData dynamicData;
@@ -413,14 +409,16 @@ namespace anox::buildsystem
 		materialHeader.m_numFrames = static_cast<uint32_t>(frameDefs.Count());
 
 		rkit::CIPath outputPath;
-		RKIT_CHECK(ConstructOutputPath(outputPath, depsNode->GetIdentifier(), nodeType));
+		RKIT_CHECK(ConstructOutputPath(outputPath, depsNode->GetIdentifier()));
 
-		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
-		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outputPath, outFile));
+		{
+			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
+			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputDir, outputPath, outFile));
 
-		RKIT_CHECK(outFile->WriteAll(&materialHeader, sizeof(materialHeader)));
-		RKIT_CHECK(outFile->WriteAll(bitmapDefs.GetBuffer(), bitmapDefs.Count() * sizeof(bitmapDefs[0])));
-		RKIT_CHECK(outFile->WriteAll(frameDefs.GetBuffer(), frameDefs.Count() * sizeof(frameDefs[0])));
+			RKIT_CHECK(outFile->WriteAll(&materialHeader, sizeof(materialHeader)));
+			RKIT_CHECK(outFile->WriteAll(bitmapDefs.GetBuffer(), bitmapDefs.Count() * sizeof(bitmapDefs[0])));
+			RKIT_CHECK(outFile->WriteAll(frameDefs.GetBuffer(), frameDefs.Count() * sizeof(frameDefs[0])));
+		}
 
 		return rkit::ResultCode::kOK;
 	}

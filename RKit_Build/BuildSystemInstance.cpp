@@ -433,6 +433,7 @@ namespace rkit::buildsystem
 			Result OpenInput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadStream> &inputFile) override;
 			Result TryOpenInput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadStream> &inputFile) override;
 			Result OpenOutput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadWriteStream> &outputFile) override;
+			Result AddAnonymousDeployableContent(BuildFileLocation location, const CIPathView &path) override;
 
 			Result IndexCAS(BuildFileLocation location, const CIPathView &path, data::ContentID &outContentID) override;
 
@@ -1534,6 +1535,27 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
+	Result DependencyNode::DependencyNodeCompilerFeedback::AddAnonymousDeployableContent(BuildFileLocation location, const CIPathView &path)
+	{
+		data::ContentID contentID;
+		RKIT_CHECK(IndexCAS(location, path, contentID));
+
+		RKIT_CHECK(m_dependencyNode->AddCASProduct(contentID));
+
+		RKIT_CHECK(m_buildInstance->RegisterCASSource(contentID, location, path));
+
+		CIPath casPath;
+		RKIT_CHECK(casPath.AppendComponent("cas"));
+		RKIT_CHECK(casPath.Append(path));
+
+		UniquePtr<ISeekableReadWriteStream> casIDFile;
+		RKIT_CHECK(OpenOutput(location, casPath, casIDFile));
+
+		RKIT_CHECK(casIDFile->WriteAll(contentID.m_data, data::ContentID::kSize));
+
+		return ResultCode::kOK;
+	}
+
 	Result DependencyNode::DependencyNodeCompilerFeedback::IndexCAS(BuildFileLocation location, const CIPathView &path, data::ContentID &outContentID)
 	{
 		UniquePtr<ISeekableReadStream> inputFile;
@@ -2374,7 +2396,7 @@ namespace rkit::buildsystem
 			bool demote = false;
 			if (!demote)
 			{
-				for (FileDependencyInfoView fdiView : fileDepsSpan)
+				for (const FileDependencyInfoView &fdiView : fileDepsSpan)
 				{
 					if (!fdiView.m_mustBeUpToDate)
 						continue;
@@ -2399,7 +2421,7 @@ namespace rkit::buildsystem
 
 			if (!demote)
 			{
-				for (FileStatusView productStatus : productsSpan)
+				for (const FileStatusView &productStatus : productsSpan)
 				{
 					FileStatusView fileStatus;
 					bool exists = false;
@@ -2423,9 +2445,20 @@ namespace rkit::buildsystem
 			{
 				if (phase == kCompilePhase)
 				{
-					for (data::ContentID contentID : node->GetCompileCASProducts())
+					for (const data::ContentID &contentID : node->GetCompileCASProducts())
 					{
-						return ResultCode::kNotYetImplemented;
+						data::ContentIDString idString = contentID.ToString();
+
+						CIPath contentPath;
+						RKIT_CHECK(contentPath.AppendComponent("content"));
+						RKIT_CHECK(contentPath.AppendComponent(idString.ToStringView()));
+
+						FileStatusView fileStatus;
+						bool exists = false;
+						RKIT_CHECK(ResolveFileStatus(rkit::buildsystem::BuildFileLocation::kOutputDir, contentPath, false, fileStatus, true, exists));
+
+						if (!exists)
+							demote = true;
 					}
 				}
 			}
@@ -2713,7 +2746,7 @@ namespace rkit::buildsystem
 	{
 		data::ContentIDString contentIDString = contentID.ToString();
 
-		OSAbsPath contentBasePath = m_intermedDir;
+		OSAbsPath contentBasePath = m_dataDir;
 		OSAbsPath contentPath;
 
 		CIPath contentDir;

@@ -288,6 +288,16 @@ namespace anox::utils
 
 			RKIT_CHECK(sysDriver->GetFileAttributesAbs(osPath, exists, attribs));
 		}
+		else if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kOutputDir)
+		{
+			rkit::OSRelPath relPath;
+			RKIT_CHECK(relPath.ConvertFrom(path));
+
+			rkit::OSAbsPath osPath = m_dataDir;
+			RKIT_CHECK(osPath.Append(relPath));
+
+			RKIT_CHECK(sysDriver->GetFileAttributesAbs(osPath, exists, attribs));
+		}
 		else
 			return rkit::ResultCode::kNotYetImplemented;
 
