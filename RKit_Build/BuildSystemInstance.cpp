@@ -1,5 +1,6 @@
 #include "BuildSystemInstance.h"
 
+#include "CopyFileCompiler.h"
 #include "DepsNodeCompiler.h"
 #include "RenderPipelineLibraryCompiler.h"
 
@@ -553,7 +554,7 @@ namespace rkit::buildsystem
 	public:
 		BuildSystemInstance();
 
-		Result Initialize(const StringView &targetName, const OSAbsPathView &srcDir, const OSAbsPathView &intermediateDir, const OSAbsPathView &dataDir) override;
+		Result Initialize(const StringView &targetName, const OSAbsPathView &srcDir, const OSAbsPathView &intermediateDir, const OSAbsPathView &dataFilesDir, const OSAbsPathView &dataContentDir) override;
 		IDependencyNode *FindNamedNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) const override;
 		IDependencyNode *FindContentNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const Span<const uint8_t> &content) const override;
 		Result FindOrCreateNamedNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier, IDependencyNode *&outNode) override;
@@ -638,8 +639,9 @@ namespace rkit::buildsystem
 
 		void ErrorBlameNode(DependencyNode *node, const StringView &msg);
 
-		Result ConstructIntermediatePath(OSAbsPath &outStr, const CIPathView &path) const;
-		Result ConstructOutputPath(OSAbsPath &outStr, const CIPathView &path) const;
+		Result ConstructIntermediatePath(OSAbsPath &outStr, const CIPathView &path) const override;
+		Result ConstructOutputFilePath(OSAbsPath &outStr, const CIPathView &path) const override;
+		Result ConstructOutputContentPath(OSAbsPath &outStr, const CIPathView &path) const override;
 
 		static PrintableFourCC FourCCToPrintable(uint32_t fourCC);
 
@@ -657,7 +659,8 @@ namespace rkit::buildsystem
 		String m_targetName;
 		OSAbsPath m_srcDir;
 		OSAbsPath m_intermedDir;
-		OSAbsPath m_dataDir;
+		OSAbsPath m_dataFilesDir;
+		OSAbsPath m_dataContentDir;
 
 		HashMap<NodeTypeKey, UniquePtr<IDependencyNodeCompiler> > m_nodeCompilers;
 		HashMap<NodeKey, DependencyNode *> m_nodeLookup;
@@ -1806,12 +1809,13 @@ namespace rkit::buildsystem
 		return rkit::New<BuildSystemInstance>(outInstance);
 	}
 
-	Result BuildSystemInstance::Initialize(const rkit::StringView &targetName, const OSAbsPathView &srcDir, const OSAbsPathView &intermediateDir, const OSAbsPathView &dataDir)
+	Result BuildSystemInstance::Initialize(const rkit::StringView &targetName, const OSAbsPathView &srcDir, const OSAbsPathView &intermediateDir, const OSAbsPathView &dataFilesDir, const OSAbsPathView &dataContentDir)
 	{
 		RKIT_CHECK(m_targetName.Set(targetName));
 		RKIT_CHECK(m_srcDir.Set(srcDir));
 		RKIT_CHECK(m_intermedDir.Set(intermediateDir));
-		RKIT_CHECK(m_dataDir.Set(dataDir));
+		RKIT_CHECK(m_dataFilesDir.Set(dataFilesDir));
+		RKIT_CHECK(m_dataContentDir.Set(dataContentDir));
 
 		UniquePtr<IDependencyNodeCompiler> depsCompiler;
 		RKIT_CHECK(New<DepsNodeCompiler>(depsCompiler));
@@ -1819,8 +1823,12 @@ namespace rkit::buildsystem
 		UniquePtr<IDependencyNodeCompiler> pipelineLibraryCompiler;
 		RKIT_CHECK(New<RenderPipelineLibraryCompiler>(pipelineLibraryCompiler));
 
+		UniquePtr<IDependencyNodeCompiler> copyFileCompiler;
+		RKIT_CHECK(New<CopyFileCompiler>(copyFileCompiler));
+
 		RKIT_CHECK(RegisterNodeCompiler(kDefaultNamespace, kDepsNodeID, std::move(depsCompiler)));
 		RKIT_CHECK(RegisterNodeCompiler(kDefaultNamespace, kRenderPipelineLibraryNodeID, std::move(pipelineLibraryCompiler)));
+		RKIT_CHECK(RegisterNodeCompiler(kDefaultNamespace, kCopyFileNodeID, std::move(copyFileCompiler)));
 
 		RKIT_CHECK(RegisterNodeTypeByExtension("deps", kDefaultNamespace, kDepsNodeID));
 		RKIT_CHECK(RegisterNodeTypeByExtension("rkp", kDefaultNamespace, kRenderPipelineLibraryNodeID));
@@ -2450,12 +2458,11 @@ namespace rkit::buildsystem
 						data::ContentIDString idString = contentID.ToString();
 
 						CIPath contentPath;
-						RKIT_CHECK(contentPath.AppendComponent("content"));
 						RKIT_CHECK(contentPath.AppendComponent(idString.ToStringView()));
 
 						FileStatusView fileStatus;
 						bool exists = false;
-						RKIT_CHECK(ResolveFileStatus(rkit::buildsystem::BuildFileLocation::kOutputDir, contentPath, false, fileStatus, true, exists));
+						RKIT_CHECK(ResolveFileStatus(rkit::buildsystem::BuildFileLocation::kOutputContent, contentPath, false, fileStatus, true, exists));
 
 						if (!exists)
 							demote = true;
@@ -2575,13 +2582,10 @@ namespace rkit::buildsystem
 		dirScan->m_exists = false;
 
 		rkit::buildsystem::FileStatusView dirFSView;
-		bool dirExists = false;
 		RKIT_CHECK(ResolveFileStatus(location, path, true, dirFSView, true, dirScan->m_exists));
 
-		if (dirExists && dirFSView.m_isDirectory)
+		if (dirScan->m_exists && dirFSView.m_isDirectory)
 		{
-			dirScan->m_exists = true;
-
 			class ResultCallbackShim
 			{
 			public:
@@ -2659,7 +2663,7 @@ namespace rkit::buildsystem
 		RKIT_CHECK(New<CachedFileStatus>(fileStatus));
 
 		fileStatus->m_exists = false;
-		RKIT_CHECK(m_fs->ResolveFileStatusIfExists(location, path, false, fileStatus.Get(), ResolveCachedFileStatusCallback));
+		RKIT_CHECK(m_fs->ResolveFileStatusIfExists(location, path, allowDirectories, fileStatus.Get(), ResolveCachedFileStatusCallback));
 
 		if (!fileStatus->m_exists)
 		{
@@ -2695,9 +2699,13 @@ namespace rkit::buildsystem
 		{
 			RKIT_CHECK(ConstructIntermediatePath(fullPath, path));
 		}
-		else if (location == rkit::buildsystem::BuildFileLocation::kOutputDir)
+		else if (location == rkit::buildsystem::BuildFileLocation::kOutputFiles)
 		{
-			RKIT_CHECK(ConstructOutputPath(fullPath, path));
+			RKIT_CHECK(ConstructOutputFilePath(fullPath, path));
+		}
+		else if (location == rkit::buildsystem::BuildFileLocation::kOutputContent)
+		{
+			RKIT_CHECK(ConstructOutputContentPath(fullPath, path));
 		}
 		else
 			return ResultCode::kFileOpenError;
@@ -2746,19 +2754,12 @@ namespace rkit::buildsystem
 	{
 		data::ContentIDString contentIDString = contentID.ToString();
 
-		OSAbsPath contentBasePath = m_dataDir;
+		OSAbsPath contentBasePath = m_dataContentDir;
 		OSAbsPath contentPath;
 
-		CIPath contentDir;
-		RKIT_CHECK(contentDir.AppendComponent("content"));
-
 		{
-			CIPath pathCI = contentDir;
-
-			RKIT_CHECK(pathCI.AppendComponent(contentIDString.ToStringView()));
-
 			OSRelPath osRelPath;
-			RKIT_CHECK(osRelPath.ConvertFrom(static_cast<CIPathView>(pathCI)));
+			RKIT_CHECK(osRelPath.ConvertFrom(CIPathView(contentIDString.ToStringView())));
 
 			contentPath = contentBasePath;
 			RKIT_CHECK(contentPath.Append(osRelPath));
@@ -2783,16 +2784,12 @@ namespace rkit::buildsystem
 			OSAbsPath tempPath;
 
 			{
-				CIPath pathCI = contentDir;
-
 				String tempName;
 				RKIT_CHECK(tempName.Set(contentIDString.ToStringView()));
 				RKIT_CHECK(tempName.Append(".tmp"));
 
-				RKIT_CHECK(pathCI.AppendComponent(tempName));
-
 				OSRelPath osRelPath;
-				RKIT_CHECK(osRelPath.ConvertFrom(static_cast<CIPathView>(pathCI)));
+				RKIT_CHECK(osRelPath.ConvertFrom(CIPathView(tempName)));
 
 				tempPath = contentBasePath;
 				RKIT_CHECK(tempPath.Append(osRelPath));
@@ -2895,6 +2892,7 @@ namespace rkit::buildsystem
 		fStatus.m_location = status.m_location;
 		fStatus.m_fileSize = status.m_fileSize;
 		fStatus.m_fileTime = status.m_fileTime;
+		fStatus.m_isDirectory = status.m_isDirectory;
 
 		cfs->m_exists = true;
 
@@ -2918,9 +2916,21 @@ namespace rkit::buildsystem
 		return ResultCode::kOK;
 	}
 
-	Result BuildSystemInstance::ConstructOutputPath(OSAbsPath &outStr, const CIPathView &path) const
+	Result BuildSystemInstance::ConstructOutputFilePath(OSAbsPath &outStr, const CIPathView &path) const
 	{
-		outStr = m_dataDir;
+		outStr = m_dataFilesDir;
+
+		OSRelPath relPath;
+		RKIT_CHECK(relPath.ConvertFrom(path));
+
+		RKIT_CHECK(outStr.Append(relPath));
+
+		return ResultCode::kOK;
+	}
+
+	Result BuildSystemInstance::ConstructOutputContentPath(OSAbsPath &outStr, const CIPathView &path) const
+	{
+		outStr = m_dataContentDir;
 
 		OSRelPath relPath;
 		RKIT_CHECK(relPath.ConvertFrom(path));

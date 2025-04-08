@@ -137,6 +137,7 @@
   <ItemGroup>
     <ClInclude Include="..\include\rkit\BuildSystem\DependencyGraph.h" />
     <ClInclude Include="BuildSystemInstance.h" />
+    <ClInclude Include="CopyFileCompiler.h" />
     <ClInclude Include="DepsNodeCompiler.h" />
     <ClInclude Include="PackageBuilder.h" />
     <ClInclude Include="RenderPipelineLibraryCompiler.h" />
@@ -145,6 +146,7 @@
   <ItemGroup>
     <ClCompile Include="BuildSystem.cpp" />
     <ClCompile Include="BuildSystemInstance.cpp" />
+    <ClCompile Include="CopyFileCompiler.cpp" />
     <ClCompile Include="DepsNodeCompiler.cpp" />
     <ClCompile Include="PackageBuilder.cpp" />
     <ClCompile Include="RenderPipelineLibraryCompiler.cpp" />

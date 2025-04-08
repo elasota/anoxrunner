@@ -413,7 +413,7 @@ namespace anox::buildsystem
 
 		{
 			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
-			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputDir, outputPath, outFile));
+			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, outputPath, outFile));
 
 			RKIT_CHECK(outFile->WriteAll(&materialHeader, sizeof(materialHeader)));
 			RKIT_CHECK(outFile->WriteAll(bitmapDefs.GetBuffer(), bitmapDefs.Count() * sizeof(bitmapDefs[0])));

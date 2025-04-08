@@ -27,7 +27,7 @@ namespace rkit
 		static const uint32_t kRenderGraphicsPipelineNodeID = RKIT_FOURCC('R', 'G', 'P', 'L');
 		static const uint32_t kRenderComputePipelineNodeID = RKIT_FOURCC('R', 'C', 'P', 'L');
 		static const uint32_t kRenderPipelineLibraryNodeID = RKIT_FOURCC('R', 'P', 'L', 'L');
-		static const uint32_t kCopyFileNodeID = RKIT_FOURCC('C', 'o', 'p', 'y');
+		static const uint32_t kCopyFileNodeID = RKIT_FOURCC('C', 'O', 'P', 'Y');
 
 		struct IDependencyNode;
 		struct IDependencyGraphFactory;
@@ -68,7 +68,7 @@ namespace rkit
 
 			virtual ~IBuildSystemInstance() {}
 
-			virtual Result Initialize(const StringView &targetName, const OSAbsPathView &srcDir, const OSAbsPathView &intermediateDir, const OSAbsPathView &dataDir) = 0;
+			virtual Result Initialize(const StringView &targetName, const OSAbsPathView &srcDir, const OSAbsPathView &intermediateDir, const OSAbsPathView &dataFilesDir, const OSAbsPathView &dataContentDir) = 0;
 			virtual Result LoadCache() = 0;
 
 			virtual IDependencyNode *FindNamedNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) const = 0;
@@ -93,6 +93,10 @@ namespace rkit
 
 			virtual Result EnumerateDirectories(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback) = 0;
 			virtual Result EnumerateFiles(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback) = 0;
+
+			virtual Result ConstructIntermediatePath(OSAbsPath &outStr, const CIPathView &path) const = 0;
+			virtual Result ConstructOutputFilePath(OSAbsPath &outStr, const CIPathView &path) const = 0;
+			virtual Result ConstructOutputContentPath(OSAbsPath &outStr, const CIPathView &path) const = 0;
 		};
 
 		struct IBuildSystemDriver : public ICustomDriver

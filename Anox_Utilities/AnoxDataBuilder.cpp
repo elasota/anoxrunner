@@ -52,7 +52,7 @@ namespace anox::utils
 	public:
 		AnoxFileSystem();
 
-		rkit::Result Load(anox::IUtilitiesDriver *utils, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataDir, const rkit::OSAbsPathView &dataSourceDir);
+		rkit::Result Load(anox::IUtilitiesDriver *utils, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataFilesDir, const rkit::OSAbsPathView &dataContentDir, const rkit::OSAbsPathView &dataSourceDir);
 
 		rkit::Result ResolveFileStatusIfExists(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::CIPathView &path, bool allowDirectories, void *userdata, ApplyFileStatusCallback_t applyStatus) override;
 		rkit::Result TryOpenFileRead(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::CIPathView &path, rkit::UniquePtr<rkit::ISeekableReadStream> &outStream) override;
@@ -72,7 +72,8 @@ namespace anox::utils
 
 		rkit::OSAbsPath m_sourceDir;
 		rkit::OSAbsPath m_intermedDir;
-		rkit::OSAbsPath m_dataDir;
+		rkit::OSAbsPath m_dataFilesDir;
+		rkit::OSAbsPath m_dataContentDir;
 		rkit::OSAbsPath m_dataSourceDir;
 
 		rkit::Vector<MountedArchive> m_afsArchives;
@@ -129,7 +130,7 @@ namespace anox::utils
 		}
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
-		RKIT_CHECK(bsi.OpenFileWrite(rkit::buildsystem::BuildFileLocation::kOutputDir, "pipelines_vk.rkp", outStream));
+		RKIT_CHECK(bsi.OpenFileWrite(rkit::buildsystem::BuildFileLocation::kOutputFiles, "pipelines_vk.rkp", outStream));
 
 		RKIT_CHECK(combiner->WritePackage(*outStream));
 
@@ -152,13 +153,33 @@ namespace anox::utils
 			return rkit::ResultCode::kModuleLoadFailed;
 		}
 
+		rkit::OSAbsPath dataFilesDir;
+		rkit::OSAbsPath dataContentDir;
+
+		{
+			rkit::CIPathView filesSubDir("files");
+			rkit::CIPathView contentSubDir("content");
+
+			rkit::OSRelPath osFilesSubDir;
+			RKIT_CHECK(osFilesSubDir.ConvertFrom(filesSubDir));
+
+			rkit::OSRelPath osContentSubDir;
+			RKIT_CHECK(osContentSubDir.ConvertFrom(contentSubDir));
+
+			RKIT_CHECK(dataFilesDir.Set(dataDir));
+			RKIT_CHECK(dataFilesDir.Append(osFilesSubDir));
+
+			RKIT_CHECK(dataContentDir.Set(dataDir));
+			RKIT_CHECK(dataContentDir.Append(osContentSubDir));
+		}
+
 		AnoxFileSystem fs;
-		RKIT_CHECK(fs.Load(m_utils, sourceDir, intermedDir, dataDir, dataSourceDir));
+		RKIT_CHECK(fs.Load(m_utils, sourceDir, intermedDir, dataFilesDir, dataContentDir, dataSourceDir));
 
 		rkit::UniquePtr<rkit::buildsystem::IBuildSystemInstance> instance;
 		RKIT_CHECK(m_bsDriver->CreateBuildSystemInstance(instance));
 
-		RKIT_CHECK(instance->Initialize(targetName, sourceDir, intermedDir, dataDir));
+		RKIT_CHECK(instance->Initialize(targetName, sourceDir, intermedDir, dataFilesDir, dataContentDir));
 
 		rkit::StringView renderAddOnDriverName;
 		switch (backendType)
@@ -288,12 +309,22 @@ namespace anox::utils
 
 			RKIT_CHECK(sysDriver->GetFileAttributesAbs(osPath, exists, attribs));
 		}
-		else if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kOutputDir)
+		else if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kOutputFiles)
 		{
 			rkit::OSRelPath relPath;
 			RKIT_CHECK(relPath.ConvertFrom(path));
 
-			rkit::OSAbsPath osPath = m_dataDir;
+			rkit::OSAbsPath osPath = m_dataFilesDir;
+			RKIT_CHECK(osPath.Append(relPath));
+
+			RKIT_CHECK(sysDriver->GetFileAttributesAbs(osPath, exists, attribs));
+		}
+		else if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kOutputContent)
+		{
+			rkit::OSRelPath relPath;
+			RKIT_CHECK(relPath.ConvertFrom(path));
+
+			rkit::OSAbsPath osPath = m_dataContentDir;
 			RKIT_CHECK(osPath.Append(relPath));
 
 			RKIT_CHECK(sysDriver->GetFileAttributesAbs(osPath, exists, attribs));
@@ -341,7 +372,15 @@ namespace anox::utils
 
 			rkit::Result openResult = sysDriver->OpenFileReadAbs(outStream, osPath);
 			if (openResult.GetResultCode() == rkit::ResultCode::kFileOpenError)
-				return rkit::ResultCode::kOK;
+			{
+				osPath = m_sourceDir;
+				RKIT_CHECK(osPath.Append(relPath));
+
+				openResult = sysDriver->OpenFileReadAbs(outStream, osPath);
+
+				if (openResult.GetResultCode() == rkit::ResultCode::kFileOpenError)
+					return rkit::ResultCode::kOK;
+			}
 
 			return openResult;
 		}
@@ -529,11 +568,12 @@ namespace anox::utils
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxFileSystem::Load(anox::IUtilitiesDriver *utils, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataDir, const rkit::OSAbsPathView &dataSourceDir)
+	rkit::Result AnoxFileSystem::Load(anox::IUtilitiesDriver *utils, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataFilesDir, const rkit::OSAbsPathView &dataContentDir, const rkit::OSAbsPathView &dataSourceDir)
 	{
 		RKIT_CHECK(m_sourceDir.Set(sourceDir));
 		RKIT_CHECK(m_intermedDir.Set(intermedDir));
-		RKIT_CHECK(m_dataDir.Set(dataDir));
+		RKIT_CHECK(m_dataFilesDir.Set(dataFilesDir));
+		RKIT_CHECK(m_dataContentDir.Set(dataContentDir));
 		RKIT_CHECK(m_dataSourceDir.Set(dataSourceDir));
 
 		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;

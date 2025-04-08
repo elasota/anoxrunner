@@ -33,6 +33,9 @@
     <ClInclude Include="PackageBuilder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="CopyFileCompiler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BuildSystem.cpp">
@@ -48,6 +51,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="PackageBuilder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CopyFileCompiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

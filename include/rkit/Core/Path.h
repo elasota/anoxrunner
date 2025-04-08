@@ -219,6 +219,9 @@ namespace rkit
 		template<class TOtherPathTraits>
 		Result ConvertFrom(const BasePathView<TIsAbsolute, TOtherPathTraits> &path);
 
+		template<class TOtherPathTraits>
+		Result ConvertFrom(const BasePath<TIsAbsolute, TOtherPathTraits> &path);
+
 		operator View_t() const;
 
 		const Char_t *CStr() const;
@@ -849,6 +852,13 @@ namespace rkit
 	Result BasePath<TIsAbsolute, TPathTraits>::SetFromUTF8(const StringView &str)
 	{
 		return SetFromEncodedString<char, PathEncoding::kUTF8>(str);
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	template<class TOtherPathTraits>
+	Result BasePath<TIsAbsolute, TPathTraits>::ConvertFrom(const BasePath<TIsAbsolute, TOtherPathTraits> &path)
+	{
+		return this->ConvertFrom(static_cast<BasePathView<TIsAbsolute, TOtherPathTraits>>(path));
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>

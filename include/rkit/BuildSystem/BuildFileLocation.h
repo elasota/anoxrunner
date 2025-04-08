@@ -7,6 +7,7 @@ namespace rkit::buildsystem
 		kInvalid,
 		kSourceDir,
 		kIntermediateDir,
-		kOutputDir,
+		kOutputFiles,
+		kOutputContent,
 	};
 }
