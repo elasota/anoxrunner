@@ -1,6 +1,8 @@
 #include "anox/AnoxGame.h"
 #include "anox/AnoxGraphicsSubsystem.h"
 
+#include "AnoxGameLogic.h"
+
 #include "rkit/Data/DataDriver.h"
 
 #include "rkit/Core/Drivers.h"
@@ -37,6 +39,7 @@ namespace anox
 
 		rkit::UniquePtr<rkit::utils::IThreadPool> m_threadPool;
 		rkit::UniquePtr<IGraphicsSubsystem> m_graphicsSubsystem;
+		rkit::UniquePtr<IGameLogic> m_gameLogic;
 
 		rkit::data::IDataDriver *m_dataDriver = nullptr;
 
@@ -87,6 +90,10 @@ namespace anox
 			numWorkThreads = m_numThreadsOverride.Get() - 1;
 
 		RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->CreateThreadPool(m_threadPool, numWorkThreads));
+
+		RKIT_CHECK(IGameLogic::Create(m_gameLogic, this));
+		RKIT_CHECK(m_gameLogic->Start());
+
 		RKIT_CHECK(IGraphicsSubsystem::Create(m_graphicsSubsystem, *m_dataDriver, *m_threadPool, anox::RenderBackend::kVulkan));
 
 		return rkit::ResultCode::kOK;
@@ -97,6 +104,8 @@ namespace anox
 		RKIT_CHECK(m_graphicsSubsystem->TransitionDisplayState());
 
 		RKIT_CHECK(m_graphicsSubsystem->RetireOldestFrame());
+
+		RKIT_CHECK(m_gameLogic->RunFrame());
 
 		RKIT_CHECK(m_graphicsSubsystem->StartRendering());
 

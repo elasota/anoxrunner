@@ -80,6 +80,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CoroThread.cpp" />
     <ClCompile Include="DeflateDecompressStream.cpp" />
     <ClCompile Include="JobQueue.cpp" />
     <ClCompile Include="Json.cpp" />
@@ -129,6 +130,7 @@
     <ClInclude Include="..\include\rkit\Core\UtilitiesDriver.h" />
     <ClInclude Include="..\include\rkit\Core\Vector.h" />
     <ClInclude Include="..\include\rkit\Utilities\IShadowFile.h" />
+    <ClInclude Include="CoroThread.h" />
     <ClInclude Include="DeflateDecompressStream.h" />
     <ClInclude Include="JobQueue.h" />
     <ClInclude Include="Json.h" />

@@ -10,6 +10,7 @@
 
 #include "rkit/Utilities/ThreadPool.h"
 
+#include "CoroThread.h"
 #include "DeflateDecompressStream.h"
 #include "JobQueue.h"
 #include "Json.h"
@@ -92,6 +93,8 @@ namespace rkit
 		Result ConvertUTF8ToUTF16WChar(size_t &outSize, const Span<wchar_t> &dest, const Span<const uint8_t> &src) const override;
 
 		bool IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const override;
+
+		Result CreateCoroThread(UniquePtr<coro::Thread> &thread, size_t stackSize) const override;
 
 
 	private:
@@ -2161,6 +2164,16 @@ namespace rkit
 		}
 
 		outSize = resultSize;
+
+		return ResultCode::kOK;
+	}
+
+	Result UtilitiesDriver::CreateCoroThread(UniquePtr<coro::Thread> &thread, size_t stackSize) const
+	{
+		UniquePtr<utils::CoroThreadBase> threadBase;
+		RKIT_CHECK(utils::CoroThreadBase::Create(threadBase, stackSize));
+
+		thread = std::move(threadBase);
 
 		return ResultCode::kOK;
 	}

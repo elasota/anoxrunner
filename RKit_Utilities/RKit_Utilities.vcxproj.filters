@@ -48,6 +48,9 @@
     <ClCompile Include="ShadowFile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CoroThread.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TextParser.h">
@@ -186,6 +189,9 @@
       <Filter>Header Files\rkit</Filter>
     </ClInclude>
     <ClInclude Include="ShadowFile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CoroThread.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

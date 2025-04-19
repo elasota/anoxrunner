@@ -215,22 +215,21 @@ template<class T>
 rkit::Result rkit::SafeDiv(T &result, const T &a, const T &b)
 {
 	T modResult;
-	return priv::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::Div(result, modResult, a, b);
+	return priv::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::DivMod(result, modResult, a, b);
 }
 
 template<class T>
 rkit::Result rkit::SafeMod(T &result, const T &a, const T &b)
 {
 	T divResult;
-	return priv::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::Div(divResult, result, a, b);
+	return priv::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::DivMod(divResult, result, a, b);
 }
 
 template<class T>
 rkit::Result rkit::SafeDivMod(T &divResult, T &modResult, const T &a, const T &b)
 {
-	return priv::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::Div(divResult, modResult, a, b);
+	return priv::SafeMathHelper<T, std::is_integral<T>::value, std::is_signed<T>::value>::DivMod(divResult, modResult, a, b);
 }
-
 
 template<class TSigned, class TUnsigned>
 inline TUnsigned rkit::ToUnsignedAbs(TSigned v)

@@ -137,6 +137,7 @@
   <ItemGroup>
     <ClCompile Include="AnoxFrameDrawer.cpp" />
     <ClCompile Include="AnoxGame.cpp" />
+    <ClCompile Include="AnoxGameLogic.cpp" />
     <ClCompile Include="AnoxGraphicsSettings.cpp" />
     <ClCompile Include="AnoxGraphicsSubsystem.cpp" />
     <ClCompile Include="AnoxMain.cpp" />
@@ -144,7 +145,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\anox\AnoxGraphicsSubsystem.h" />
+    <ClInclude Include="AnoxCaptureHarness.h" />
     <ClInclude Include="AnoxFrameDrawer.h" />
+    <ClInclude Include="AnoxGameLogic.h" />
     <ClInclude Include="AnoxGraphicsJob.h" />
     <ClInclude Include="AnoxPeriodicResources.h" />
     <ClInclude Include="AnoxRecordJobRunner.h" />

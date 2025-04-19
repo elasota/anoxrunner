@@ -10,6 +10,11 @@
 
 namespace rkit
 {
+	namespace coro
+	{
+		class Thread;
+	}
+
 	namespace utils
 	{
 		struct IJsonDocument;
@@ -108,5 +113,7 @@ namespace rkit
 		virtual Result ConvertUTF8ToUTF16WChar(size_t &outSize, const Span<wchar_t> &dest, const Span<const uint8_t> &src) const = 0;
 
 		virtual bool IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const = 0;
+
+		virtual Result CreateCoroThread(UniquePtr<coro::Thread> &thread, size_t stackSize) const = 0;
 	};
 }

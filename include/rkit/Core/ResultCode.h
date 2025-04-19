@@ -45,5 +45,7 @@ namespace rkit
 		kGraphicsAPIException,
 
 		kFormatError,
+
+		kCoroStackOverflow,
 	};
 }
