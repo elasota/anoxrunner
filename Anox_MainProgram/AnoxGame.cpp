@@ -1,7 +1,9 @@
 #include "anox/AnoxGame.h"
 #include "anox/AnoxGraphicsSubsystem.h"
+#include "anox/AnoxFileSystem.h"
 
 #include "AnoxGameLogic.h"
+#include "AnoxGameFileSystem.h"
 
 #include "rkit/Data/DataDriver.h"
 
@@ -38,6 +40,7 @@ namespace anox
 		bool m_isExiting = false;
 
 		rkit::UniquePtr<rkit::utils::IThreadPool> m_threadPool;
+		rkit::UniquePtr<AnoxGameFileSystemBase> m_fileSystem;
 		rkit::UniquePtr<IGraphicsSubsystem> m_graphicsSubsystem;
 		rkit::UniquePtr<IGameLogic> m_gameLogic;
 
@@ -91,10 +94,12 @@ namespace anox
 
 		RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->CreateThreadPool(m_threadPool, numWorkThreads));
 
+		RKIT_CHECK(AnoxGameFileSystemBase::Create(m_fileSystem));
+
 		RKIT_CHECK(IGameLogic::Create(m_gameLogic, this));
 		RKIT_CHECK(m_gameLogic->Start());
 
-		RKIT_CHECK(IGraphicsSubsystem::Create(m_graphicsSubsystem, *m_dataDriver, *m_threadPool, anox::RenderBackend::kVulkan));
+		RKIT_CHECK(IGraphicsSubsystem::Create(m_graphicsSubsystem, *m_fileSystem, *m_dataDriver, *m_threadPool, anox::RenderBackend::kVulkan));
 
 		return rkit::ResultCode::kOK;
 	}

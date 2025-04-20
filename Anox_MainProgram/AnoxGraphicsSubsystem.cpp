@@ -6,6 +6,7 @@
 #include "AnoxRecordJobRunner.h"
 #include "AnoxSubmitJobRunner.h"
 
+#include "anox/AnoxFileSystem.h"
 #include "anox/AnoxGraphicsSubsystem.h"
 
 #include "rkit/Render/CommandAllocator.h"
@@ -60,10 +61,12 @@
 
 namespace anox
 {
+	struct IGameDataFileSystem;
+
 	class GraphicsSubsystem final : public IGraphicsSubsystem, public rkit::NoCopy
 	{
 	public:
-		explicit GraphicsSubsystem(rkit::data::IDataDriver &dataDriver, rkit::utils::IThreadPool &threadPool, anox::RenderBackend desiredBackend);
+		explicit GraphicsSubsystem(IGameDataFileSystem &fileSystem, rkit::data::IDataDriver &dataDriver, rkit::utils::IThreadPool &threadPool, anox::RenderBackend desiredBackend);
 		~GraphicsSubsystem();
 
 		rkit::Result Initialize();
@@ -169,7 +172,7 @@ namespace anox
 		class CheckPipelinesJob final : public rkit::IJobRunner
 		{
 		public:
-			explicit CheckPipelinesJob(GraphicsSubsystem &graphicsSubsystem, const rkit::CIPathView &pipelinesFileName, const rkit::CIPathView &pipelinesCacheFileName, bool canUpdateShadowFile);
+			explicit CheckPipelinesJob(GraphicsSubsystem &graphicsSubsystem, IGameDataFileSystem &fileSystem, const rkit::CIPathView &pipelinesFileName, const rkit::CIPathView &pipelinesCacheFileName, bool canUpdateShadowFile);
 
 			rkit::Result Run() override;
 
@@ -179,6 +182,7 @@ namespace anox
 				rkit::HashMap<size_t, rkit::Optional<int32_t>> &staticResolutions, size_t pipelineIndex, size_t base, const rkit::render::ShaderPermutationTree *tree);
 
 			GraphicsSubsystem &m_graphicsSubsystem;
+			IGameDataFileSystem &m_fileSystem;
 			rkit::CIPathView m_pipelinesFileName;
 			rkit::CIPathView m_pipelinesCacheFileName;
 			bool m_canUpdateShadowFile;
@@ -412,6 +416,7 @@ namespace anox
 		rkit::UniquePtr<LivePipelineSets> m_livePipelineSets;
 		bool m_haveExistingMergedCache = false;
 
+		IGameDataFileSystem &m_fileSystem;
 		rkit::data::IDataDriver &m_dataDriver;
 
 		uint8_t m_numSyncPoints = 3;
@@ -458,8 +463,9 @@ namespace anox
 		rkit::UniquePtr<IFrameDrawer> m_frameDrawer;
 	};
 
-	GraphicsSubsystem::CheckPipelinesJob::CheckPipelinesJob(GraphicsSubsystem &graphicsSubsystem, const rkit::CIPathView &pipelinesFileName, const rkit::CIPathView &pipelinesCacheFileName, bool canUpdateShadowFile)
+	GraphicsSubsystem::CheckPipelinesJob::CheckPipelinesJob(GraphicsSubsystem &graphicsSubsystem, IGameDataFileSystem &fileSystem, const rkit::CIPathView &pipelinesFileName, const rkit::CIPathView &pipelinesCacheFileName, bool canUpdateShadowFile)
 		: m_graphicsSubsystem(graphicsSubsystem)
+		, m_fileSystem(fileSystem)
 		, m_pipelinesFileName(pipelinesFileName)
 		, m_pipelinesCacheFileName(pipelinesCacheFileName)
 		, m_canUpdateShadowFile(canUpdateShadowFile)
@@ -473,7 +479,7 @@ namespace anox
 		rkit::data::IDataDriver *dataDriver = &m_graphicsSubsystem.GetDataDriver();
 
 		rkit::UniquePtr<rkit::ISeekableReadStream> pipelinesFile;
-		rkit::Result openResult = sysDriver->OpenFileRead(pipelinesFile, rkit::FileLocation::kGameDirectory, m_pipelinesFileName);
+		rkit::Result openResult = m_fileSystem.OpenNamedFile(pipelinesFile, m_pipelinesFileName);
 
 		if (!openResult.IsOK())
 		{
@@ -1003,8 +1009,9 @@ namespace anox
 		m_frameEndBatch = nullptr;
 	}
 
-	GraphicsSubsystem::GraphicsSubsystem(rkit::data::IDataDriver &dataDriver, rkit::utils::IThreadPool &threadPool, anox::RenderBackend desiredBackend)
-		: m_threadPool(threadPool)
+	GraphicsSubsystem::GraphicsSubsystem(IGameDataFileSystem &fileSystem, rkit::data::IDataDriver &dataDriver, rkit::utils::IThreadPool &threadPool, anox::RenderBackend desiredBackend)
+		: m_fileSystem(fileSystem)
+		, m_threadPool(threadPool)
 		, m_dataDriver(dataDriver)
 		, m_desiredBackend(desiredBackend)
 	{
@@ -1124,7 +1131,7 @@ namespace anox
 		m_stepCompleted = false;
 
 		rkit::UniquePtr<rkit::IJobRunner> jobRunner;
-		RKIT_CHECK(rkit::New<CheckPipelinesJob>(jobRunner, *this, pipelinesFile, pipelinesCacheFile, canUpdatePipelineCache));
+		RKIT_CHECK(rkit::New<CheckPipelinesJob>(jobRunner, *this, m_fileSystem, pipelinesFile, pipelinesCacheFile, canUpdatePipelineCache));
 
 		RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kIO, std::move(jobRunner), nullptr));
 
@@ -1822,10 +1829,10 @@ namespace anox
 	}
 }
 
-rkit::Result anox::IGraphicsSubsystem::Create(rkit::UniquePtr<IGraphicsSubsystem> &outSubsystem, rkit::data::IDataDriver &dataDriver, rkit::utils::IThreadPool &threadPool, anox::RenderBackend defaultBackend)
+rkit::Result anox::IGraphicsSubsystem::Create(rkit::UniquePtr<IGraphicsSubsystem> &outSubsystem, IGameDataFileSystem &fileSystem, rkit::data::IDataDriver &dataDriver, rkit::utils::IThreadPool &threadPool, anox::RenderBackend defaultBackend)
 {
 	rkit::UniquePtr<anox::GraphicsSubsystem> subsystem;
-	RKIT_CHECK(rkit::New<anox::GraphicsSubsystem>(subsystem, dataDriver, threadPool, defaultBackend));
+	RKIT_CHECK(rkit::New<anox::GraphicsSubsystem>(subsystem, fileSystem, dataDriver, threadPool, defaultBackend));
 
 	RKIT_CHECK(subsystem->Initialize());
 
