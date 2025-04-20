@@ -63,7 +63,7 @@ namespace rkit::coro
 	struct Context
 	{
 		typedef void *(*PushStackCallback_t)(void *userdata, const FrameMetadataBase &metadata);
-		typedef void (*FreeStackCallback_t)(void *userdata, void *prevFrameBase);
+		typedef void (*FreeStackCallback_t)(void *userdata, void *frame, void *prevFrame);
 
 		StackFrameBase *m_frame = nullptr;
 		Disposition m_disposition = Disposition::kResume;

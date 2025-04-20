@@ -35,10 +35,10 @@ namespace rkit::utils
 
 		void *PushStack(const coro::FrameMetadataBase &metadata);
 		void *PushStackNewBlob(size_t size, size_t alignment);
-		void PopStack(void *prevFrameBase);
+		void PopStack(void *frame, void *prevFrame);
 
 		static void *StaticPushStack(void *userdata, const coro::FrameMetadataBase &metadata);
-		static void StaticPopStack(void *userdata, void *prevFrameBase);
+		static void StaticPopStack(void *userdata, void *frame, void *prevFrame);
 
 		coro::Context m_context;
 		StackBlob m_topStackBlob;
@@ -60,7 +60,7 @@ namespace rkit::utils
 			coro::StackFrameBase *prevFrame = m_context.m_frame->m_prevFrame;
 
 			m_context.m_frame->m_destructFrame(m_context.m_frame);
-			m_context.m_freeStack(m_context.m_userdata, m_context.m_frame);
+			m_context.m_freeStack(m_context.m_userdata, m_context.m_frame, prevFrame);
 			m_context.m_frame = prevFrame;
 		}
 
@@ -70,13 +70,13 @@ namespace rkit::utils
 
 	coro::ThreadState CoroThreadImpl::GetState() const
 	{
-		if (m_context.m_disposition != coro::Disposition::kStackOverflow)
+		if (m_context.m_disposition == coro::Disposition::kStackOverflow)
 			return coro::ThreadState::kFaulted;
 
 		if (m_context.m_frame == nullptr)
 			return coro::ThreadState::kInactive;
 
-		if (m_context.m_disposition != coro::Disposition::kResume)
+		if (m_context.m_disposition == coro::Disposition::kResume)
 			return coro::ThreadState::kSuspended;
 
 		return coro::ThreadState::kFaulted;
@@ -106,6 +106,8 @@ namespace rkit::utils
 		m_topStackBlob.m_memoryBase = static_cast<uint8_t *>(m_alloc->Alloc(stackSize));
 		if (!m_topStackBlob.m_memoryBase)
 			return ResultCode::kOutOfMemory;
+
+		m_topStackBlob.m_memorySize = stackSize;
 
 		return ResultCode::kOK;
 	}
@@ -143,12 +145,12 @@ namespace rkit::utils
 		return nullptr;
 	}
 
-	void CoroThreadImpl::PopStack(void *prevFrameBase)
+	void CoroThreadImpl::PopStack(void *frame, void *prevFrame)
 	{
 		m_topStackBlob.m_frameCount--;
-		m_topStackBlob.m_topFrame = static_cast<coro::StackFrameBase *>(prevFrameBase);
+		m_topStackBlob.m_topFrame = static_cast<coro::StackFrameBase *>(prevFrame);
 
-		RKIT_ASSERT((m_topStackBlob.m_frameCount == 0) == (prevFrameBase == nullptr));
+		RKIT_ASSERT((m_topStackBlob.m_frameCount == 0) == (prevFrame == nullptr));
 	}
 
 	void *CoroThreadImpl::StaticPushStack(void *userdata, const coro::FrameMetadataBase &metadata)
@@ -156,9 +158,9 @@ namespace rkit::utils
 		return static_cast<CoroThreadImpl *>(userdata)->PushStack(metadata);
 	}
 
-	void CoroThreadImpl::StaticPopStack(void *userdata, void *prevFrameBase)
+	void CoroThreadImpl::StaticPopStack(void *userdata, void *frame, void *prevFrame)
 	{
-		static_cast<CoroThreadImpl *>(userdata)->PopStack(prevFrameBase);
+		static_cast<CoroThreadImpl *>(userdata)->PopStack(frame, prevFrame);
 	}
 
 	Result CoroThreadBase::Create(UniquePtr<CoroThreadBase> &thread, size_t stackSize)

@@ -165,7 +165,7 @@ namespace rkit::coro::compiler
 		StackFrameBase *frame = &derivedFrame->m_base;
 		StackFrameBase *prevFrame = frame->m_prevFrame;
 
-		coroContext->m_freeStack(coroContext->m_userdata, frame);
+		coroContext->m_freeStack(coroContext->m_userdata, frame, prevFrame);
 		coroContext->m_frame = prevFrame;
 
 		return { nullptr };
