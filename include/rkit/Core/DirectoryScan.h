@@ -5,8 +5,6 @@
 
 namespace rkit
 {
-	struct Result;
-
 	struct DirectoryScanItem
 	{
 		OSRelPathView m_fileName;

@@ -944,7 +944,7 @@ namespace rkit::utils::shadowfile
 
 		Result initializeWriteAccessResult = InitializeWriteAccess();
 
-		if (initializeWriteAccessResult.IsOK())
+		if (utils::ResultIsOK(initializeWriteAccessResult))
 			m_isWriteAccessInitialized = true;
 		else
 			m_haveFSWriteFaults = true;
@@ -1097,7 +1097,7 @@ namespace rkit::utils::shadowfile
 		RKIT_CHECK(m_readStream.ReadAll(&m_sfHeader, sizeof(m_sfHeader)));
 
 		if (m_sfHeader.m_version != m_sfHeader.kExpectedVersion || (m_sfHeader.m_committedLocatorPlusOne != 1 && m_sfHeader.m_committedLocatorPlusOne != 2))
-			return Result::SoftFault(ResultCode::kOperationFailed);
+			return utils::SoftFaultResult(ResultCode::kOperationFailed);
 
 		if (m_sfHeader.m_identifier != ShadowFSHeader::kExpectedIdentifier)
 			return ResultCode::kOperationFailed;

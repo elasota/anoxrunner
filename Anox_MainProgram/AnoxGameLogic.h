@@ -1,11 +1,11 @@
 #pragma once
 
+#include "rkit/Core/CoreDefs.h"
+
 namespace rkit
 {
 	template<class T>
 	class UniquePtr;
-
-	struct Result;
 }
 
 namespace anox

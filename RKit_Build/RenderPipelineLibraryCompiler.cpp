@@ -727,7 +727,8 @@ namespace rkit::buildsystem::rpc_analyzer
 
 		outHaveDirective = true;
 
-		Result parseResult;
+		Result parseResult(ResultCode::kOK);
+
 		if (IsToken(directiveToken, "include"))
 			parseResult = ParseIncludeDirective(path, parser);
 		else if (IsToken(directiveToken, "StaticSampler"))
@@ -750,7 +751,7 @@ namespace rkit::buildsystem::rpc_analyzer
 			return ResultCode::kMalformedFile;
 		}
 
-		if (!parseResult.IsOK())
+		if (!utils::ResultIsOK(parseResult))
 			rkit::log::ErrorFmt("%s [%zu:%zu] Directive parsing failed", path, line, col);
 
 		return parseResult;

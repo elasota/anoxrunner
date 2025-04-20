@@ -28,3 +28,25 @@
 
 
 #define RKIT_PLATFORM_WIN32	1
+
+#if RKIT_IS_DEBUG
+	#define RKIT_USE_CLASS_RESULT 1
+#else
+	#define RKIT_USE_CLASS_RESULT 0
+#endif
+
+#if RKIT_USE_CLASS_RESULT
+
+namespace rkit
+{
+	struct Result;
+}
+
+#else
+
+namespace rkit
+{
+	enum class Result : uint64_t;
+}
+
+#endif

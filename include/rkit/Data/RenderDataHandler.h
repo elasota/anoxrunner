@@ -3,13 +3,13 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "rkit/Render/RenderDefProtos.h"
+#include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/StringProto.h"
+
+#include "rkit/Render/RenderDefProtos.h"
 
 namespace rkit
 {
-	struct Result;
-
 	template<class T>
 	class UniquePtr;
 

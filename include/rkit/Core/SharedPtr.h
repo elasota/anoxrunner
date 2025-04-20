@@ -6,8 +6,6 @@
 
 namespace rkit
 {
-	struct Result;
-
 	struct BaseRefCountTracker
 	{
 		typedef void (*SelfDestructFunc_t)(BaseRefCountTracker &tracker);

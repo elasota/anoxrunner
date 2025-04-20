@@ -5,11 +5,6 @@
 #include "rkit/Core/FourCC.h"
 #include "rkit/Core/StringProto.h"
 
-namespace rkit
-{
-	struct Result;
-}
-
 namespace anox::buildsystem
 {
 	static const uint32_t kTextureNodeID = RKIT_FOURCC('A', 'T', 'E', 'X');

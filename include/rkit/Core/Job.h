@@ -4,8 +4,6 @@
 
 namespace rkit
 {
-	struct Result;
-
 	template<class T>
 	class RCPtr;
 

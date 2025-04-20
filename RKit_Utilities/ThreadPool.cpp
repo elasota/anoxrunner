@@ -111,13 +111,13 @@ namespace rkit::utils
 
 	Result ThreadPool::PrivClose()
 	{
-		Result finalResult;
+		Result finalResult = ResultCode::kOK;
 
 		if (m_jobQueue.IsValid())
 		{
 			Result result = m_jobQueue->Close();
 
-			if (!result.IsOK())
+			if (!utils::ResultIsOK(result))
 				finalResult = result;
 		}
 
@@ -125,7 +125,7 @@ namespace rkit::utils
 		{
 			Result result = threadData.m_thread.Finalize();
 
-			if (!result.IsOK())
+			if (!utils::ResultIsOK(result))
 				finalResult = result;
 		}
 
@@ -188,7 +188,7 @@ namespace rkit::utils
 
 			job->Run();
 
-			if (!m_pool.GetJobQueue()->CheckFault().IsOK())
+			if (!utils::ResultIsOK(m_pool.GetJobQueue()->CheckFault()))
 				break;
 		}
 

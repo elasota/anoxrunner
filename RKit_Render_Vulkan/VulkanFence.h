@@ -4,11 +4,6 @@
 
 #include "IncludeVulkan.h"
 
-namespace rkit
-{
-	struct Result;
-}
-
 namespace rkit::render::vulkan
 {
 	class VulkanDeviceBase;

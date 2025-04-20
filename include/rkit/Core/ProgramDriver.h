@@ -7,7 +7,6 @@
 namespace rkit
 {
 	struct DriverInitParameters;
-	struct Result;
 
 	struct IProgramDriver
 	{

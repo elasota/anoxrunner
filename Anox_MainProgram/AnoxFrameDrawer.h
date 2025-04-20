@@ -1,9 +1,9 @@
 #pragma once
 
+#include "rkit/Core/CoreDefs.h"
+
 namespace rkit
 {
-	struct Result;
-
 	template<class T>
 	class RCPtr;
 

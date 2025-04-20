@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/StringProto.h"
 #include "rkit/Core/Optional.h"
 
@@ -7,8 +8,6 @@
 
 namespace rkit
 {
-	struct Result;
-
 	struct ISeekableReadStream;
 	struct ISeekableReadWriteStream;
 

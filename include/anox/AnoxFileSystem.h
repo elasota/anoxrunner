@@ -1,10 +1,10 @@
 #pragma once
 
+#include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/PathProto.h"
 
 namespace rkit
 {
-	struct Result;
 	struct ISeekableReadStream;
 
 	template<class T>

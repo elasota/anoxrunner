@@ -2,11 +2,11 @@
 
 #include <cstddef>
 
+#include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/StringProto.h"
 
 namespace rkit
 {
-	struct Result;
 	struct IReadStream;
 	struct IWriteStream;
 	struct ISeekableReadStream;

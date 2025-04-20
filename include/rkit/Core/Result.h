@@ -5,13 +5,15 @@
 
 #include <cstdint>
 
+#if RKIT_USE_CLASS_RESULT
+
 namespace rkit
 {
+	enum class ResultCode : uint32_t;
+
 	struct RKIT_NODISCARD Result
 	{
 	public:
-
-		Result();
 		Result(ResultCode resultCode);
 		explicit Result(ResultCode resultCode, uint32_t extCode);
 
@@ -23,6 +25,7 @@ namespace rkit
 		static Result SoftFault(ResultCode resultCode);
 
 	private:
+		Result();
 		struct SoftFaultTag {};
 
 		Result(ResultCode resultCode, const SoftFaultTag &);
@@ -45,13 +48,6 @@ namespace rkit
 		Union m_u;
 	};
 }
-
-
-#define RKIT_CHECK(expr) do {\
-	::rkit::Result RKIT_PP_CONCAT(exprResult_, __LINE__) = (expr);\
-	if (!RKIT_PP_CONCAT(exprResult_, __LINE__).IsOK())\
-		return RKIT_PP_CONCAT(exprResult_, __LINE__);\
-} while (false)
 
 inline rkit::Result::Result()
 	: m_u { { ResultCode::kOK, 0 } }
@@ -102,3 +98,84 @@ inline rkit::Result rkit::Result::SoftFault(rkit::ResultCode resultCode)
 {
 	return Result(resultCode, SoftFaultTag());
 }
+
+
+namespace rkit
+{
+	namespace utils
+	{
+		inline Result CreateResultWithExtCode(ResultCode resultCode, uint32_t extCode)
+		{
+			return Result(resultCode, extCode);
+		}
+
+		inline bool ResultIsOK(const Result &result)
+		{
+			return result.IsOK();
+		}
+
+		inline ResultCode GetResultCode(const Result &result)
+		{
+			return result.GetResultCode();
+		}
+
+		inline int ResultToExitCode(const Result &result)
+		{
+			return result.ToExitCode();
+		}
+
+		inline Result SoftFaultResult(ResultCode resultCode)
+		{
+			return Result::SoftFault(resultCode);
+		}
+	}
+}
+
+#define RKIT_CHECK(expr) do {\
+	::rkit::Result RKIT_PP_CONCAT(exprResult_, __LINE__) = (expr);\
+	if (!RKIT_PP_CONCAT(exprResult_, __LINE__).IsOK())\
+		return RKIT_PP_CONCAT(exprResult_, __LINE__);\
+} while (false)
+
+#else
+
+namespace rkit
+{
+	enum class RKIT_NODISCARD Result : uint64_t;
+
+	namespace utils
+	{
+		inline Result CreateResultWithExtCode(Result result, uint32_t extCode)
+		{
+			return static_cast<Result>((static_cast<uint64_t>(extCode) << 32) | static_cast<uint64_t>(result));
+		}
+
+		inline bool ResultIsOK(Result result)
+		{
+			return static_cast<uint64_t>(result) == 0;
+		}
+
+		inline ResultCode GetResultCode(Result result)
+		{
+			return static_cast<ResultCode>(static_cast<uint32_t>(result) & 0xffffffffu);
+		}
+
+		inline int ResultToExitCode(Result result)
+		{
+			return -static_cast<int>(GetResultCode(result));
+		}
+
+		inline Result SoftFaultResult(Result result)
+		{
+			return result;
+		}
+	}
+}
+
+#define RKIT_CHECK(expr) do {\
+	::rkit::Result RKIT_PP_CONCAT(exprResult_, __LINE__) = (expr);\
+	if (static_cast<uint64_t>(RKIT_PP_CONCAT(exprResult_, __LINE__)) != 0)\
+		return RKIT_PP_CONCAT(exprResult_, __LINE__);\
+} while (false)
+
+#endif

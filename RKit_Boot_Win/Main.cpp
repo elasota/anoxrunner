@@ -148,7 +148,7 @@ namespace rkit
 		IModule* module = new (moduleMemory) Module_Win32(hmodule, initFunc, mallocDriver);
 
 		Result initResult = module->Init(initParams);
-		if (!initResult.IsOK())
+		if (!utils::ResultIsOK(initResult))
 		{
 			module->Unload();
 			return nullptr;
@@ -281,8 +281,8 @@ static int WinMainCommon(HINSTANCE hInstance)
 			rkit::Vector<wchar_t> moduleFileNameChars;
 
 			rkit::Result resizeResult = moduleFileNameChars.Resize(requiredSize);
-			if (!resizeResult.IsOK())
-				return resizeResult.ToExitCode();
+			if (!rkit::utils::ResultIsOK(resizeResult))
+				return rkit::utils::ResultToExitCode(resizeResult);
 
 			rkit::WStringConstructionBuffer cbuf;
 
@@ -291,15 +291,15 @@ static int WinMainCommon(HINSTANCE hInstance)
 			if (moduleStrSize == requiredSize)
 			{
 				if (requiredSize >= 0x1000000)
-					return rkit::Result(rkit::ResultCode::kOutOfMemory).ToExitCode();
+					return rkit::utils::ResultToExitCode(rkit::Result(rkit::ResultCode::kOutOfMemory));
 
 				requiredSize *= 2;
 				continue;
 			}
 
 			rkit::Result setResult = modulePathStr.Set(moduleFileNameChars.ToSpan().SubSpan(0, moduleStrSize));
-			if (!setResult.IsOK())
-				return setResult.ToExitCode();
+			if (!rkit::utils::ResultIsOK(setResult))
+				return rkit::utils::ResultToExitCode(setResult);
 
 			DWORD dirEnd = moduleStrSize;
 			DWORD dirEndScan = dirEnd;
@@ -308,8 +308,8 @@ static int WinMainCommon(HINSTANCE hInstance)
 
 
 			setResult = moduleDirStr.Set(moduleFileNameChars.ToSpan().SubSpan(0, dirEndScan));
-			if (!setResult.IsOK())
-				return setResult.ToExitCode();
+			if (!rkit::utils::ResultIsOK(setResult))
+				return rkit::utils::ResultToExitCode(setResult);
 
 			break;
 		}
@@ -325,25 +325,25 @@ static int WinMainCommon(HINSTANCE hInstance)
 
 		systemModule = ::rkit::g_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "System_Win32", &systemParams);
 		if (!systemModule)
-			return rkit::Result(rkit::ResultCode::kModuleLoadFailed).ToExitCode();
+			return rkit::utils::ResultToExitCode(rkit::Result(rkit::ResultCode::kModuleLoadFailed));
 	}
 
 	rkit::IModule *programLauncherModule = ::rkit::g_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "ProgramLauncher", nullptr);
 	if (!programLauncherModule)
 	{
 		systemModule->Unload();
-		return rkit::Result(rkit::ResultCode::kModuleLoadFailed).ToExitCode();
+		return rkit::utils::ResultToExitCode(rkit::Result(rkit::ResultCode::kModuleLoadFailed));
 	}
 
 	rkit::Result result = drivers->m_programDriver->InitProgram();
-	if (result.IsOK())
+	if (rkit::utils::ResultIsOK(result))
 	{
 		for (;;)
 		{
 			bool isExiting = false;
 			result = drivers->m_programDriver->RunFrame(isExiting);
 
-			if (!result.IsOK() || isExiting)
+			if (!rkit::utils::ResultIsOK(result) || isExiting)
 				break;
 		}
 	}
@@ -353,7 +353,7 @@ static int WinMainCommon(HINSTANCE hInstance)
 	programLauncherModule->Unload();
 	systemModule->Unload();
 
-	return result.ToExitCode();
+	return rkit::utils::ResultToExitCode(result);
 }
 
 

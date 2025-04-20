@@ -11,7 +11,6 @@ namespace rkit
 	class UniquePtr;
 
 	struct ISeekableReadStream;
-	struct Result;
 
 	struct FileAttributes;
 }

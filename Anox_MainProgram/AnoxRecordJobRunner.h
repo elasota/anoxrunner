@@ -1,10 +1,5 @@
 #pragma once
 
-namespace rkit
-{
-	struct Result;
-}
-
 namespace rkit::render
 {
 	struct IBaseCommandAllocator;

@@ -670,6 +670,7 @@ namespace rkit
 
 	Thread_Win32::Thread_Win32()
 		: m_hThread(nullptr)
+		, m_result(ResultCode::kOK)
 	{
 	}
 
@@ -778,7 +779,7 @@ namespace rkit
 		Result exprConvResult = ConvUtil_Win32::UTF8ToUTF16(expr, exprWChar);
 		Result fileConvResult = ConvUtil_Win32::UTF8ToUTF16(file, fileWChar);
 
-		if (!exprConvResult.IsOK() || !fileConvResult.IsOK())
+		if (!rkit::utils::ResultIsOK(exprConvResult) || !rkit::utils::ResultIsOK(fileConvResult))
 		{
 			_wassert(L"Failed to convert assertion message", RKIT_PP_CONCAT(L, __FILE__), line);
 		}
@@ -880,7 +881,7 @@ namespace rkit
 		UniquePtr<Thread_Win32> thread;
 		Result createThreadResult = NewWithAlloc<Thread_Win32>(thread, m_alloc);
 
-		if (!createThreadResult.IsOK())
+		if (!utils::ResultIsOK(createThreadResult))
 		{
 			::CloseHandle(hKickoffEvent);
 			return createThreadResult;
@@ -1110,12 +1111,12 @@ namespace rkit
 		wchar_t *docsPath = nullptr;
 		HRESULT hr = SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &docsPath);
 		if (!SUCCEEDED(hr))
-			return Result(ResultCode::kOperationFailed, static_cast<uint32_t>(hr));
+			return utils::CreateResultWithExtCode(ResultCode::kOperationFailed, static_cast<uint32_t>(hr));
 
 		size_t docsPathLength = wcslen(docsPath);
 
 		Result resizeResult = docsPathStrBuf.Allocate(docsPathLength);
-		if (!resizeResult.IsOK())
+		if (!utils::ResultIsOK(resizeResult))
 		{
 			CoTaskMemFree(docsPath);
 			return resizeResult;
@@ -1313,7 +1314,7 @@ namespace rkit
 		HANDLE fHandle = CreateFileW(path.GetChars(), access, shareMode, nullptr, disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
 
 		if (fHandle == INVALID_HANDLE_VALUE)
-			return Result::SoftFault(ResultCode::kFileOpenError);
+			return utils::SoftFaultResult(ResultCode::kFileOpenError);
 
 		LARGE_INTEGER fileSize;
 		if (!GetFileSizeEx(fHandle, &fileSize))
@@ -1323,7 +1324,7 @@ namespace rkit
 		}
 
 		Result createObjResult = New<File_Win32>(outFile, fHandle, static_cast<FilePos_t>(fileSize.QuadPart));
-		if (!createObjResult.IsOK())
+		if (!utils::ResultIsOK(createObjResult))
 		{
 			CloseHandle(fHandle);
 			return ResultCode::kFileOpenError;

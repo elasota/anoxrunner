@@ -4,7 +4,6 @@ namespace rkit
 {
 	struct Drivers;
 	struct ModuleInitParameters;
-	struct Result;
 
 	struct ModuleAPI_Win32
 	{

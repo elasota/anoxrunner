@@ -1,11 +1,10 @@
 #pragma once
 
+#include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/DynamicCastable.h"
 
 namespace rkit
 {
-	struct Result;
-
 	template<class T>
 	class UniquePtr;
 }

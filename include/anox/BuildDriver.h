@@ -6,8 +6,6 @@ namespace rkit
 {
 	template<class T>
 	class UniquePtr;
-
-	struct Result;
 }
 
 namespace anox

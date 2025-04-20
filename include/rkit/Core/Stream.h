@@ -1,11 +1,10 @@
 #pragma once
 
+#include "CoreDefs.h"
 #include "StreamProtos.h"
 
 namespace rkit
 {
-	struct Result;
-
 	template<class T>
 	class SharedPtr;
 

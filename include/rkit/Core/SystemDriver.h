@@ -17,7 +17,6 @@ namespace rkit
 	class UniqueThreadRef;
 
 	struct FileAttributes;
-	struct Result;
 
 	struct IDirectoryScan;
 	struct ISeekableReadStream;

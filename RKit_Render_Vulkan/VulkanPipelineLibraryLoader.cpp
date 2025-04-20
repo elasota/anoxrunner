@@ -737,7 +737,7 @@ namespace rkit::render::vulkan
 	{
 		if (!m_cacheReadStream.IsValid())
 		{
-			return Result::SoftFault(ResultCode::kOperationFailed);
+			return utils::SoftFaultResult(ResultCode::kOperationFailed);
 		}
 
 		PipelineCacheHeader header = {};
@@ -752,13 +752,13 @@ namespace rkit::render::vulkan
 			|| memcmp(&header.m_configHashBytes, &m_configHashBytes, sizeof(header.m_configHashBytes))
 			)
 		{
-			return Result::SoftFault(ResultCode::kOperationFailed);
+			return utils::SoftFaultResult(ResultCode::kOperationFailed);
 		}
 
 		FilePos_t cacheSize = m_cacheReadStream->GetSize() - sizeof(header);
 
 		if (cacheSize < sizeof(VkPipelineCacheHeaderVersionOne))
-			return Result::SoftFault(ResultCode::kOperationFailed);
+			return utils::SoftFaultResult(ResultCode::kOperationFailed);
 
 		if (cacheSize > std::numeric_limits<size_t>::max())
 			return ResultCode::kOperationFailed;
@@ -789,7 +789,7 @@ namespace rkit::render::vulkan
 			|| memcmp(vkCacheHeader.pipelineCacheUUID, deviceProps.pipelineCacheUUID, VK_UUID_SIZE))
 		{
 			// Pipeline cache mismatch
-			return Result::SoftFault(ResultCode::kOperationFailed);
+			return utils::SoftFaultResult(ResultCode::kOperationFailed);
 		}
 
 		VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};

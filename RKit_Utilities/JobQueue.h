@@ -2,7 +2,6 @@
 
 namespace rkit
 {
-	struct Result;
 	struct IJobQueue;
 	struct IMallocDriver;
 

@@ -46,17 +46,19 @@ namespace rkit
 namespace rkit
 {
 	inline UniqueThreadRef::UniqueThreadRef()
-		: m_finalResult(Result::SoftFault(ResultCode::kInvalidParameter))
+		: m_finalResult(utils::SoftFaultResult(ResultCode::kInvalidParameter))
 	{
 	}
 
 	inline UniqueThreadRef::UniqueThreadRef(UniqueThreadRef &&other)
 		: m_thread(std::move(other.m_thread))
+		, m_finalResult(other.m_finalResult)
 	{
 	}
 
 	inline UniqueThreadRef::UniqueThreadRef(UniquePtr<IThread> &&thread)
 		: m_thread(std::move(thread))
+		, m_finalResult(ResultCode::kOK)
 	{
 	}
 
@@ -70,7 +72,8 @@ namespace rkit
 	{
 		if (m_thread.IsValid())
 		{
-			Result oldThreadResult;
+			Result oldThreadResult(ResultCode::kOK);
+
 			m_thread->Finalize(oldThreadResult);
 		}
 

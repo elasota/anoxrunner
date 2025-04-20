@@ -7,8 +7,6 @@
 
 namespace rkit
 {
-	struct Result;
-
 	class BufferStream final : public ISeekableReadWriteStream
 	{
 	public:

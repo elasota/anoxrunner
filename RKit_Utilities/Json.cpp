@@ -124,6 +124,7 @@ namespace rkit::utils
 		, m_preloadedEnd(0)
 		, m_preloadPosInFile(0)
 		, m_isEOF(false)
+		, m_errorResult(ResultCode::kOK)
 	{
 		Preload();
 	}
@@ -185,10 +186,10 @@ namespace rkit::utils
 		size_t amountPreloaded = 0;
 
 		Result result = m_readStream->ReadPartial(m_preloadBuffer + m_preloadedStart, preloadCapacity, amountPreloaded);
-		if (!result.IsOK())
+		if (!utils::ResultIsOK(result))
 		{
 			m_isEOF = true;
-			if (result.GetResultCode() == ResultCode::kEndOfStream)
+			if (utils::GetResultCode(result) == ResultCode::kEndOfStream)
 				m_errorResult = result;
 		}
 

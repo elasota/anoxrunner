@@ -1,11 +1,11 @@
 #pragma once
 
+#include "rkit/Core/CoreDefs.h"
+
 #include "PipelineStage.h"
 
 namespace rkit
 {
-	struct Result;
-
 	template<class T>
 	class EnumMask;
 }

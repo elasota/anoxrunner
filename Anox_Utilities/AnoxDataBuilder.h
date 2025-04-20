@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/PathProto.h"
 #include "rkit/Core/StringProto.h"
 
@@ -9,8 +10,6 @@ namespace rkit
 {
 	template<class T>
 	class UniquePtr;
-
-	struct Result;
 }
 
 namespace anox

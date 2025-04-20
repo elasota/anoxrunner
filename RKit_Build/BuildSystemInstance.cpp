@@ -1421,6 +1421,7 @@ namespace rkit::buildsystem
 		: m_buildInstance(instance)
 		, m_dependencyNode(node)
 		, m_isCompilePhase(isCompilePhase)
+		, m_fault(ResultCode::kOK)
 	{
 	}
 
@@ -1660,7 +1661,7 @@ namespace rkit::buildsystem
 	{
 		Result result = CheckedMarkOutputFileFinished(productIndex, location, path);
 
-		if (!result.IsOK())
+		if (!utils::ResultIsOK(result))
 			m_fault = result;
 	}
 
@@ -1927,14 +1928,14 @@ namespace rkit::buildsystem
 		UniquePtr<ISeekableReadStream> graphStream;
 		Result openResult = sysDriver->OpenFileReadAbs(graphStream, cacheFullPath);
 
-		if (openResult.GetResultCode() == ResultCode::kFileOpenError)
+		if (utils::GetResultCode(openResult) == ResultCode::kFileOpenError)
 			return ResultCode::kOK;
 
 		RKIT_CHECK(openResult);
 
 		BuildCacheFileHeader header;
 		size_t countRead = 0;
-		if (!graphStream->ReadPartial(&header, sizeof(header), countRead).IsOK() || countRead != sizeof(header))
+		if (!utils::ResultIsOK(graphStream->ReadPartial(&header, sizeof(header), countRead)) || countRead != sizeof(header))
 			return ResultCode::kOK;
 
 		if (header.m_identifier != BuildCacheFileHeader::kCacheIdentifier || header.m_version != BuildCacheFileHeader::kCacheVersion || header.m_activeInstance >= 2)
@@ -1942,7 +1943,7 @@ namespace rkit::buildsystem
 
 		const BuildCacheInstanceInfo &cacheInstance = header.m_instances[header.m_activeInstance];
 
-		if (!CheckedLoadCache(*graphStream, cacheInstance.m_filePos).IsOK())
+		if (!utils::ResultIsOK(CheckedLoadCache(*graphStream, cacheInstance.m_filePos)))
 		{
 			m_nodeLookup.Clear();
 			m_nodes.Reset();
@@ -2306,7 +2307,7 @@ namespace rkit::buildsystem
 		RKIT_CHECK(m_nodes.Append(std::move(node)));
 
 		rkit::Result htabAddResult = m_nodeLookup.Set(nodeKey, nodePtr);
-		if (!htabAddResult.IsOK())
+		if (!utils::ResultIsOK(htabAddResult))
 			m_nodes.RemoveRange(m_nodes.Count() - 1, 1);
 
 		return htabAddResult;
@@ -2714,7 +2715,7 @@ namespace rkit::buildsystem
 		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
 		Result openResult = sysDriver->OpenFileReadWriteAbs(outFile, fullPath, true, true, true);
 
-		if (!openResult.IsOK())
+		if (!utils::ResultIsOK(openResult))
 		{
 			rkit::log::ErrorFmt("Failed to open output file '%s'", fullPath.CStr());
 			return ResultCode::kFileOpenError;

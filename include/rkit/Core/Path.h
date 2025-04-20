@@ -1,7 +1,7 @@
 #pragma once
 
-#include "rkit/Core/CoreDefs.h"
-#include "rkit/Core/UtilitiesDriver.h"
+#include "CoreDefs.h"
+#include "UtilitiesDriver.h"
 
 #include "PathProto.h"
 #include "String.h"
@@ -13,8 +13,6 @@ namespace rkit
 
 	template<bool TIsAbsolute, class TPathTraits>
 	class BasePath;
-
-	struct Result;
 
 	enum class PathValidationResult
 	{
@@ -1026,6 +1024,7 @@ namespace rkit
 	}
 }
 
+#include "Result.h"
 
 #if RKIT_PLATFORM == RKIT_PLATFORM_WIN32
 
@@ -1037,7 +1036,7 @@ namespace rkit
 
 		size_t sz = 0;
 		Result result = GetDrivers().m_utilitiesDriver->ConvertUTF16WCharToUTF8(sz, retypedDestSpan, srcSpan);
-		RKIT_ASSERT(result.IsOK());
+		RKIT_ASSERT(::rkit::utils::ResultIsOK(result));
 
 		return sz;
 	}
@@ -1048,7 +1047,7 @@ namespace rkit
 		ConstSpan<uint8_t> retypedSrcSpan = ConstSpan<uint8_t>(reinterpret_cast<const uint8_t *>(srcSpan.Ptr()), srcSpan.Count());
 
 		Result result = GetDrivers().m_utilitiesDriver->ConvertUTF8ToUTF16WChar(sz, destSpan, retypedSrcSpan);
-		RKIT_ASSERT(result.IsOK());
+		RKIT_ASSERT(::rkit::utils::ResultIsOK(result));
 
 		return sz;
 	}

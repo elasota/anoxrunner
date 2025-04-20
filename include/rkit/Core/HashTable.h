@@ -928,7 +928,7 @@ rkit::Result rkit::HashSet<TKey, TSize>::Add(TCandidateKey &&key)
 	RKIT_CHECK(this->CreatePositionForNewEntry(hash, position));
 
 	Result constructResult = TKeyConstructor::Construct(this->m_keys + position, std::forward<TKey>(key));
-	if (!constructResult.IsOK())
+	if (!utils::ResultIsOK(constructResult))
 	{
 		this->m_keys[position].~TKey();
 		this->RemoveEntryNoDestruct(position);
@@ -972,7 +972,7 @@ rkit::Result rkit::HashMap<TKey, TValue, TSize>::Set(TCandidateKey &&key, TCandi
 
 	{
 		Result keyConstructResult = TKeyConstructor::Construct(this->m_keys + position, std::forward<TCandidateKey>(key));
-		if (!keyConstructResult.IsOK())
+		if (!utils::ResultIsOK(keyConstructResult))
 		{
 			this->RemoveEntryNoDestruct(position);
 			return keyConstructResult;
@@ -981,7 +981,7 @@ rkit::Result rkit::HashMap<TKey, TValue, TSize>::Set(TCandidateKey &&key, TCandi
 
 	{
 		Result valueConstructResult = TValueConstructor::Construct(this->m_values.GetValuePtrAt(position), std::forward<TCandidateValue>(value));
-		if (!valueConstructResult.IsOK())
+		if (!utils::ResultIsOK(valueConstructResult))
 		{
 			this->m_keys[position].~TKey();
 

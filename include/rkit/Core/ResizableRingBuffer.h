@@ -7,7 +7,6 @@
 namespace rkit
 {
 	struct IMallocDriver;
-	struct Result;
 
 	template<class TTraits>
 	class ResizableRingBufferHandle;

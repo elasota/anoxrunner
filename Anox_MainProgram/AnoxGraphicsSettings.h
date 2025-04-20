@@ -4,11 +4,6 @@
 
 #include "rkit/Data/RenderDataHandler.h"
 
-namespace rkit
-{
-	struct Result;
-}
-
 namespace anox
 {
 	struct RestartRequiringGraphicsSettings

@@ -3,11 +3,6 @@
 #include "TypeList.h"
 #include "TypeTraits.h"
 
-namespace rkit
-{
-	struct Result;
-}
-
 namespace rkit::coro
 {
 	enum class Disposition

@@ -1273,7 +1273,7 @@ namespace rkit::buildsystem::vulkan
 		UniquePtr<IncludeResultBase> includeResult;
 		Result result = job->ProcessInclude(StringView(header_name, strlen(header_name)), StringView(includer_name, strlen(includer_name)), include_depth, is_system, includeResult);
 
-		if (!result.IsOK())
+		if (!utils::ResultIsOK(result))
 			return nullptr;
 
 		SimpleObjectAllocation<IncludeResultBase> allocation = includeResult.Detach();

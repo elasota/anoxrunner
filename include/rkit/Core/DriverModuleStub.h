@@ -1,8 +1,9 @@
 #pragma once
 
+#include "rkit/Core/CoreDefs.h"
+
 namespace rkit
 {
-	struct Result;
 	struct ModuleInitParameters;
 	struct Drivers;
 	struct ICustomDriver;
@@ -53,7 +54,7 @@ rkit::Result rkit::DriverModuleStub<TDriver, TDriverInterface, TDriverMember>::I
 		driverInitParams = static_cast<const DriverModuleInitParameters *>(initParams)->m_driverInitParams;
 
 	Result initResult = ms_driver->InitDriver(driverInitParams);
-	if (!initResult.IsOK())
+	if (!utils::ResultIsOK(initResult))
 	{
 		SafeDelete(ms_driver);
 		GetMutableDrivers().*TDriverMember = ms_driver;

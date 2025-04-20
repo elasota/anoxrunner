@@ -9,7 +9,6 @@
 namespace rkit
 {
 	struct IMutex;
-	struct Result;
 
 	template<class T>
 	class UniquePtr;

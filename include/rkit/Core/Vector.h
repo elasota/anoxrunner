@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CoreDefs.h"
 #include "RKitAssert.h"
 
 #include <cstddef>
@@ -8,7 +9,6 @@
 namespace rkit
 {
 	struct IMallocDriver;
-	struct Result;
 
 	template<class T>
 	class Span;

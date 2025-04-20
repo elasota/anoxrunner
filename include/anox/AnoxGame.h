@@ -1,13 +1,13 @@
 #pragma once
 
+#include "rkit/Core/CoreDefs.h"
+
 #include <cstdint>
 
 namespace rkit
 {
 	template<class T>
 	class UniquePtr;
-
-	struct Result;
 
 	template<class T>
 	class Optional;

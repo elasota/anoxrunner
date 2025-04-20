@@ -7,8 +7,6 @@ namespace rkit
 	template<class T>
 	class UniquePtr;
 
-	struct Result;
-
 	namespace buildsystem
 	{
 		struct IBaseBuildSystemInstance : public IBuildSystemInstance

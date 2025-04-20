@@ -9,7 +9,6 @@
 namespace rkit
 {
 	struct IMallocDriver;
-	struct Result;
 
 	template<class T>
 	class UniquePtr;

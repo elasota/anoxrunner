@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CoreDefs.h"
 #include "NoCopy.h"
 #include "SimpleObjectAllocation.h"
 
@@ -8,7 +9,6 @@
 namespace rkit
 {
 	class RefCounted;
-	struct Result;
 	struct RefCountedTracker;
 
 	namespace Private

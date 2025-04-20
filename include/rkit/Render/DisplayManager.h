@@ -1,13 +1,12 @@
 #pragma once
 
+#include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/StringProto.h"
 
 #include <cstdint>
 
 namespace rkit
 {
-	struct Result;
-
 	template<class T>
 	class UniquePtr;
 }

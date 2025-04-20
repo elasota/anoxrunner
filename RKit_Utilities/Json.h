@@ -5,7 +5,6 @@ namespace rkit
 	template<class T>
 	class UniquePtr;
 
-	struct Result;
 	struct IMallocDriver;
 	struct IReadStream;
 

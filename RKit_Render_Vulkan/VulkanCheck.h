@@ -4,11 +4,6 @@
 
 #include "IncludeVulkanCore.h"
 
-namespace rkit
-{
-	struct Result;
-}
-
 namespace rkit::render::vulkan::results
 {
 	Result FirstChanceVulkanFailure(VkResult result);

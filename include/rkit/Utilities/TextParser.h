@@ -1,8 +1,9 @@
 #pragma once
 
-#include "TextParserProtos.h"
-
+#include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/StringProto.h"
+
+#include "TextParserProtos.h"
 
 #include <cstdint>
 
@@ -10,8 +11,6 @@ namespace rkit
 {
 	template<class T>
 	class Span;
-
-	struct Result;
 }
 
 namespace rkit::utils

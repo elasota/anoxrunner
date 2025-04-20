@@ -1,6 +1,7 @@
 #include "VulkanCommandBatch.h"
 
 #include "rkit/Core/HybridVector.h"
+#include "rkit/Core/Result.h"
 
 #include "rkit/Render/Barrier.h"
 #include "rkit/Render/CommandEncoder.h"
@@ -523,7 +524,7 @@ namespace rkit::render::vulkan
 
 		{
 			Result dstMaskAppendResult = m_waitDstStageMasks.Append(stageFlagBits);
-			if (!dstMaskAppendResult.IsOK())
+			if (!utils::ResultIsOK(dstMaskAppendResult))
 			{
 				m_semas.ShrinkToSize(m_semas.Count() - 1);
 				return dstMaskAppendResult;

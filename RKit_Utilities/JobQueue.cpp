@@ -193,12 +193,12 @@ namespace rkit::utils
 		{
 			Result result = m_jobRunner->Run();
 
-			if (!result.IsOK())
+			if (!utils::ResultIsOK(result))
 				m_jobQueue.Fault(result);
 
 			m_jobRunner.Reset();
 
-			jobSucceeded = result.IsOK();
+			jobSucceeded = utils::ResultIsOK(result);
 		}
 
 		m_jobQueue.JobDone(this, jobSucceeded);
@@ -207,6 +207,7 @@ namespace rkit::utils
 	JobQueue::JobQueue(IMallocDriver *alloc)
 		: m_alloc(alloc)
 		, m_isInitialized(false)
+		, m_result(ResultCode::kOK)
 	{
 	}
 
@@ -649,13 +650,13 @@ namespace rkit::utils
 	void JobQueue::Fault(const Result &result)
 	{
 		MutexLock lock(*m_resultMutex);
-		if (!result.IsOK())
+		if (!utils::ResultIsOK(result))
 			m_result = result;
 	}
 
 	Result JobQueue::CheckFault()
 	{
-		Result result;
+		Result result(ResultCode::kOK);
 
 		{
 			MutexLock lock(*m_resultMutex);

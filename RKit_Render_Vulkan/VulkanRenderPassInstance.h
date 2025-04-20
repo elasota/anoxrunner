@@ -1,5 +1,7 @@
 #pragma once
 
+#include "rkit/Core/CoreDefs.h"
+
 #include "rkit/Render/RenderPassInstance.h"
 #include "rkit/Render/PipelineLibraryItemProtos.h"
 
@@ -7,8 +9,6 @@
 
 namespace rkit
 {
-	struct Result;
-
 	template<class T>
 	class UniquePtr;
 }

@@ -167,7 +167,7 @@ namespace rkit::render::vulkan
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkAllocateCommandBuffers(m_device.GetDevice(), &allocInfo, &cmdBuffer));
 
 		Result appendResult = m_cmdBuffers.Append(cmdBuffer);
-		if (!appendResult.IsOK())
+		if (!utils::ResultIsOK(appendResult))
 		{
 			m_device.GetDeviceAPI().vkFreeCommandBuffers(m_device.GetDevice(), m_pool, 1, &cmdBuffer);
 			return appendResult;

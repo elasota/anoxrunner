@@ -371,14 +371,14 @@ namespace anox::utils
 			RKIT_CHECK(osPath.Append(relPath));
 
 			rkit::Result openResult = sysDriver->OpenFileReadAbs(outStream, osPath);
-			if (openResult.GetResultCode() == rkit::ResultCode::kFileOpenError)
+			if (rkit::utils::GetResultCode(openResult) == rkit::ResultCode::kFileOpenError)
 			{
 				osPath = m_sourceDir;
 				RKIT_CHECK(osPath.Append(relPath));
 
 				openResult = sysDriver->OpenFileReadAbs(outStream, osPath);
 
-				if (openResult.GetResultCode() == rkit::ResultCode::kFileOpenError)
+				if (rkit::utils::GetResultCode(openResult) == rkit::ResultCode::kFileOpenError)
 					return rkit::ResultCode::kOK;
 			}
 
@@ -393,7 +393,7 @@ namespace anox::utils
 			RKIT_CHECK(osPath.Append(relPath));
 
 			rkit::Result openResult = sysDriver->OpenFileReadAbs(outStream, osPath);
-			if (openResult.GetResultCode() == rkit::ResultCode::kFileOpenError)
+			if (rkit::utils::GetResultCode(openResult) == rkit::ResultCode::kFileOpenError)
 				return rkit::ResultCode::kOK;
 
 			return openResult;
@@ -600,7 +600,7 @@ namespace anox::utils
 					rkit::UniquePtr<rkit::ISeekableReadStream> archiveStream;
 					rkit::Result openResult = sysDriver->OpenFileReadAbs(archiveStream, archivePath);
 
-					if (!openResult.IsOK())
+					if (!rkit::utils::ResultIsOK(openResult))
 					{
 						rkit::log::ErrorFmt("Failed to open archive %s", scanItem.m_fileName.GetChars());
 						return openResult;

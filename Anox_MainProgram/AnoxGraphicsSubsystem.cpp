@@ -481,7 +481,7 @@ namespace anox
 		rkit::UniquePtr<rkit::ISeekableReadStream> pipelinesFile;
 		rkit::Result openResult = m_fileSystem.OpenNamedFile(pipelinesFile, m_pipelinesFileName);
 
-		if (!openResult.IsOK())
+		if (!rkit::utils::ResultIsOK(openResult))
 		{
 			rkit::log::Error("Failed to open pipeline package");
 			return openResult;
@@ -504,7 +504,7 @@ namespace anox
 
 		// Try opening the cache itself
 		openResult = sysDriver->OpenFileRead(cacheReadStream, rkit::FileLocation::kUserSettingsDirectory, m_pipelinesCacheFileName);
-		if (!openResult.IsOK())
+		if (!rkit::utils::ResultIsOK(openResult))
 		{
 			rkit::log::Error("Failed to open pipeline cache");
 			return openResult;
@@ -521,9 +521,9 @@ namespace anox
 
 		rkit::Result openMergedResult = loader->OpenMergedLibrary();
 
-		m_graphicsSubsystem.SetPipelineLibraryLoader(std::move(loader), std::move(pipelineSets), openMergedResult.IsOK());
+		m_graphicsSubsystem.SetPipelineLibraryLoader(std::move(loader), std::move(pipelineSets), rkit::utils::ResultIsOK(openMergedResult));
 
-		if (openMergedResult.IsOK())
+		if (rkit::utils::ResultIsOK(openMergedResult))
 			m_graphicsSubsystem.MarkSetupStepCompleted();
 		else
 			m_graphicsSubsystem.MarkSetupStepFailed();
@@ -680,7 +680,7 @@ namespace anox
 
 		rkit::Result loadPipelineResult = m_graphicsSubsystem.m_pipelineLibraryLoader->LoadGraphicsPipelineFromMergedLibrary(lp.m_pipelineIndex, lp.m_variationIndex);
 
-		if (!loadPipelineResult.IsOK())
+		if (!rkit::utils::ResultIsOK(loadPipelineResult))
 		{
 			m_graphicsSubsystem.m_pipelineLibraryLoader->CloseMergedLibrary(true, true);
 			m_graphicsSubsystem.MarkSetupStepFailed();

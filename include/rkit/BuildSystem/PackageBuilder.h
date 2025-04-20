@@ -12,7 +12,6 @@
 namespace rkit
 {
 	struct IWriteStream;
-	struct Result;
 
 	template<class T>
 	class UniquePtr;

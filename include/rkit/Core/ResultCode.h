@@ -1,8 +1,14 @@
 #pragma once
 
+#include <cstdint>
+
 namespace rkit
 {
+#if RKIT_USE_CLASS_RESULT
 	enum class ResultCode : uint32_t
+#else
+	enum class Result : uint64_t
+#endif
 	{
 		kOK,
 
@@ -48,4 +54,8 @@ namespace rkit
 
 		kCoroStackOverflow,
 	};
+
+#if !RKIT_USE_CLASS_RESULT
+	typedef Result ResultCode;
+#endif
 }

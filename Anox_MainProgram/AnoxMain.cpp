@@ -79,7 +79,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 				return rkit::ResultCode::kInvalidParameter;
 			}
 
-			if (!buildIntermediateDirectory.SetFromUTF8(args[i]).IsOK())
+			if (!rkit::utils::ResultIsOK(buildIntermediateDirectory.SetFromUTF8(args[i])))
 			{
 				rkit::log::Error("-idir path was invalid");
 				return rkit::ResultCode::kInvalidParameter;
@@ -95,7 +95,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 				return rkit::ResultCode::kInvalidParameter;
 			}
 
-			if (!dataDirectory.SetFromUTF8(args[i]).IsOK())
+			if (!rkit::utils::ResultIsOK(dataDirectory.SetFromUTF8(args[i])))
 			{
 				rkit::log::Error("-ddir path was invalid");
 				return rkit::ResultCode::kInvalidParameter;
@@ -111,7 +111,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 				return rkit::ResultCode::kInvalidParameter;
 			}
 
-			if (!dataSourceDirectory.SetFromUTF8(args[i]).IsOK())
+			if (!rkit::utils::ResultIsOK(dataSourceDirectory.SetFromUTF8(args[i])))
 			{
 				rkit::log::Error("-ddir path was invalid");
 				return rkit::ResultCode::kInvalidParameter;
@@ -127,7 +127,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 				return rkit::ResultCode::kInvalidParameter;
 			}
 
-			if (!buildSourceDirectory.SetFromUTF8(args[i]).IsOK())
+			if (!rkit::utils::ResultIsOK(buildSourceDirectory.SetFromUTF8(args[i])))
 			{
 				rkit::log::Error("-sdir path was invalid");
 				return rkit::ResultCode::kInvalidParameter;

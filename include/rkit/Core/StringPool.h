@@ -9,8 +9,6 @@
 
 namespace rkit
 {
-	struct Result;
-
 	template<class TChar>
 	class BaseStringPoolBuilder
 	{
@@ -58,7 +56,7 @@ inline rkit::Result rkit::BaseStringPoolBuilder<TChar>::IndexString(const BaseSt
 		RKIT_CHECK(m_strings.Append(std::move(strPtr)));
 
 		Result hashMapInsertResult = m_stringToIndex.Set(GetStringByIndex(index), index);
-		if (!hashMapInsertResult.IsOK())
+		if (!utils::ResultIsOK(hashMapInsertResult))
 		{
 			m_strings.RemoveRange(index, 1);
 			return hashMapInsertResult;

@@ -58,12 +58,12 @@ namespace rkit
 				return ResultCode::kConfigInvalid;
 
 			Result getResult = objValue.GetObjectElement(key, outValue);
-			if (getResult.GetResultCode() == ResultCode::kKeyNotFound)
+			if (utils::GetResultCode(getResult) == ResultCode::kKeyNotFound)
 			{
 				outExists = false;
 				return ResultCode::kOK;
 			}
-			else if (!getResult.IsOK())
+			else if (!utils::ResultIsOK(getResult))
 				return getResult;
 
 			outExists = true;
@@ -117,7 +117,7 @@ namespace rkit
 			UniquePtr<ISeekableReadStream> configStream;
 			Result openResult = GetDrivers().m_systemDriver->OpenFileRead(configStream, FileLocation::kProgramDirectory, "rkitmoduleconfig.json");
 
-			if (openResult.GetResultCode() == ResultCode::kFileOpenError)
+			if (utils::GetResultCode(openResult) == ResultCode::kFileOpenError)
 				return ResultCode::kConfigMissing;
 
 			RKIT_CHECK(openResult);
@@ -394,7 +394,7 @@ namespace rkit
 
 		String nameStr;
 		rkit::Result strSetResult = nameStr.Set(moduleNameStringView);
-		if (!strSetResult.IsOK())
+		if (!utils::ResultIsOK(strSetResult))
 			return nullptr;
 
 		IMallocDriver *mallocDriver = GetDrivers().m_mallocDriver;
@@ -508,7 +508,7 @@ namespace rkit
 
 		RKIT_CHECK(ProgramLauncherPrivate::LoadProgramModule(*ms_moduleConfig));
 
-		return Result();
+		return Result(ResultCode::kOK);
 	}
 
 	void ProgramModule::Shutdown()

@@ -1,12 +1,9 @@
 #pragma once
 
+#include "rkit/Core/CoreDefs.h"
+
 #include <cstdint>
 #include <limits>
-
-namespace rkit
-{
-	struct Result;
-}
 
 namespace rkit::render
 {

@@ -3,7 +3,6 @@
 namespace rkit
 {
 	struct Drivers;
-	struct Result;
 
 	struct ModuleInitParameters
 	{

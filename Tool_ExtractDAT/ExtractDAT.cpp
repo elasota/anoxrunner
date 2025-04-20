@@ -50,7 +50,7 @@ rkit::Result anox::ExtractDATProgram::Run()
 
 	rkit::UniquePtr<rkit::ISeekableReadStream> datFileStream;
 	rkit::Result openResult = rkit::GetDrivers().m_systemDriver->OpenFileReadAbs(datFileStream, inPath);
-	if (openResult.GetResultCode() == rkit::ResultCode::kFileOpenError)
+	if (rkit::utils::GetResultCode(openResult) == rkit::ResultCode::kFileOpenError)
 	{
 		::rkit::log::Error("Failed to open input file");
 		return rkit::ResultCode::kFileOpenError;
@@ -89,7 +89,7 @@ rkit::Result anox::ExtractDATProgram::Run()
 
 		rkit::UniquePtr<rkit::ISeekableWriteStream> writeStream;
 		openResult = rkit::GetDrivers().m_systemDriver->OpenFileWriteAbs(writeStream, outPath, true, true, true);
-		if (openResult.GetResultCode() == rkit::ResultCode::kFileOpenError)
+		if (rkit::utils::GetResultCode(openResult) == rkit::ResultCode::kFileOpenError)
 			return rkit::ResultCode::kFileOpenError;
 
 		RKIT_CHECK(openResult);

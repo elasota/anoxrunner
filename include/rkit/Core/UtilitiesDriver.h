@@ -47,8 +47,6 @@ namespace rkit
 	struct ISeekableWriteStream;
 	struct IJobQueue;
 
-	struct Result;
-
 	struct IUtilitiesDriver
 	{
 		typedef Result(*AllocateDynamicStringCallback_t)(void *userdata, size_t numChars, void *&outBuffer);

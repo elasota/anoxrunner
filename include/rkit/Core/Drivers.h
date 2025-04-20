@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CoreDefs.h"
 #include "SimpleObjectAllocation.h"
 #include "StringProto.h"
 
@@ -17,7 +18,6 @@ namespace rkit
 	struct IUtilitiesDriver;
 	struct ILogDriver;
 	struct Drivers;
-	struct Result;
 
 	template<class T>
 	class UniquePtr;

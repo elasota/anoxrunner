@@ -584,6 +584,7 @@ namespace rkit::render
 		: m_alloc(alloc)
 		, m_hInst(hInst)
 		, m_actions(alloc, alloc)
+		, m_msgProcResult(ResultCode::kOK)
 	{
 	}
 
@@ -850,9 +851,9 @@ namespace rkit::render
 
 	Result RenderWindow_Win32::ThreadFunc()
 	{
-		Result result = Result();
+		Result result = Result(ResultCode::kOK);
 
-		while (result.IsOK())
+		while (utils::ResultIsOK(result))
 		{
 			ActionQueueItem *aqi = nullptr;
 			{
@@ -889,7 +890,7 @@ namespace rkit::render
 				result = ThreadProcessWinMessages();
 			}
 
-			if (!result.IsOK())
+			if (!utils::ResultIsOK(result))
 				break;
 		}
 
@@ -903,7 +904,7 @@ namespace rkit::render
 
 	Result RenderWindow_Win32::ThreadProcessWinMessages()
 	{
-		while (!m_actionLoopWasKicked && m_msgProcResult.IsOK())
+		while (!m_actionLoopWasKicked && utils::ResultIsOK(m_msgProcResult))
 		{
 			MSG msg;
 			BOOL msgGetResult = GetMessageW(&msg, m_hWnd, 0, 0);
@@ -1047,9 +1048,9 @@ namespace rkit::render
 		*displayModeParams.m_completedFlag = false;
 		Result result = (this->*(displayModeParams.m_callback))();
 
-		*displayModeParams.m_completedFlag = result.IsOK();
+		*displayModeParams.m_completedFlag = utils::ResultIsOK(result);
 
-		if (result.IsOK())
+		if (utils::ResultIsOK(result))
 		{
 			RECT clRect = {};
 			::GetClientRect(m_hWnd, &clRect);
@@ -1122,7 +1123,7 @@ namespace rkit::render
 
 		m_window.m_startEvent->Signal();
 
-		if (result.IsOK())
+		if (utils::ResultIsOK(result))
 		{
 			result = m_window.ThreadFunc();
 		}

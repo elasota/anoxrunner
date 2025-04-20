@@ -1,9 +1,6 @@
 #pragma once
 
-namespace rkit
-{
-	struct Result;
-}
+#include "rkit/Core/CoreDefs.h"
 
 namespace rkit::render
 {

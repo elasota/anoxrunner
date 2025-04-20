@@ -31,7 +31,7 @@ namespace rkit::render::vulkan
 		Result FirstChanceVulkanFailure(VkResult result)
 		{
 			rkit::log::ErrorFmt("Vulkan error %x", static_cast<unsigned int>(result));
-			return Result(ResultCode::kGraphicsAPIException, static_cast<uint32_t>(result));
+			return utils::CreateResultWithExtCode(ResultCode::kGraphicsAPIException, static_cast<uint32_t>(result));
 		}
 	}
 
@@ -642,7 +642,7 @@ namespace rkit::render::vulkan
 		RKIT_VK_CHECK(m_vki.vkCreateDevice(rPhysDevice->GetPhysDevice(), &devCreateInfo, GetAllocCallbacks(), &device));
 
 		Result wrapDeviceResult = VulkanDeviceBase::CreateDevice(outDevice, m_vkg, m_vki, m_vkg_p, m_vki_p, m_vkInstance, device, queueFamilySpecs, GetAllocCallbacks(), enabledCaps, rPhysDevice, std::move(enabledExts));
-		if (!wrapDeviceResult.IsOK())
+		if (!utils::ResultIsOK(wrapDeviceResult))
 		{
 			m_vki.vkDestroyDevice(device, GetAllocCallbacks());
 			return wrapDeviceResult;

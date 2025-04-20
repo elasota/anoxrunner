@@ -3,7 +3,6 @@
 namespace rkit
 {
 	class Job;
-	struct Result;
 
 	template<class T>
 	class RCPtr;

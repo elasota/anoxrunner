@@ -1,3 +1,4 @@
+#include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/Vector.h"
 #include "rkit/Core/StringProto.h"
 
@@ -8,7 +9,6 @@ namespace rkit
 	template<class T>
 	class UniquePtr;
 
-	struct Result;
 	struct IReadStream;
 }
 

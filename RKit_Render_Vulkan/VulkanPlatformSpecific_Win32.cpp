@@ -32,7 +32,7 @@ namespace rkit::render::vulkan::platform
 		struct WindowThreadInitTaskData
 		{
 			VulkanSurface_Win32 *m_surf = nullptr;
-			Result m_result;
+			Result m_result = Result(ResultCode::kOK);
 			UniquePtr<IEvent> m_doneEvent;
 		};
 

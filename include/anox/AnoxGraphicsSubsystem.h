@@ -6,8 +6,6 @@
 
 namespace rkit
 {
-	struct Result;
-
 	class Job;
 	struct IJobRunner;
 

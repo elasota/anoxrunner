@@ -11,7 +11,6 @@
 namespace rkit
 {
 	struct ISeekableReadStream;
-	struct Result;
 
 	template<class T>
 	class UniquePtr;
