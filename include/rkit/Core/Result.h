@@ -30,9 +30,19 @@ namespace rkit
 #if RKIT_IS_DEBUG
 		void FirstChanceResultFailure() const;
 #endif
+		struct ResultAndExtCode
+		{
+			ResultCode m_resultCode;
+			uint32_t m_extCode;
+		};
 
-		ResultCode m_resultCode;
-		uint32_t m_extCode;
+		union Union
+		{
+			ResultAndExtCode m_re;
+			uint64_t m_u64;
+		};
+
+		Union m_u;
 	};
 }
 
@@ -44,8 +54,7 @@ namespace rkit
 } while (false)
 
 inline rkit::Result::Result()
-	: m_resultCode(ResultCode::kOK)
-	, m_extCode(0)
+	: m_u { { ResultCode::kOK, 0 } }
 {
 }
 
@@ -55,8 +64,7 @@ inline rkit::Result::Result(ResultCode resultCode)
 }
 
 inline rkit::Result::Result(ResultCode resultCode, uint32_t extCode)
-	: m_resultCode(resultCode)
-	, m_extCode(extCode)
+	: m_u{ { resultCode, extCode } }
 {
 #if RKIT_IS_DEBUG
 	if (!this->IsOK())
@@ -65,30 +73,29 @@ inline rkit::Result::Result(ResultCode resultCode, uint32_t extCode)
 }
 
 inline rkit::Result::Result(ResultCode resultCode, const SoftFaultTag &)
-	: m_resultCode(resultCode)
-	, m_extCode(0)
+	: m_u{ { resultCode, static_cast<uint32_t>(0) } }
 {
 }
 
 inline bool rkit::Result::IsOK() const
 {
-	return m_resultCode == ResultCode::kOK;
+	return m_u.m_u64 == 0;
 }
 
 inline int rkit::Result::ToExitCode() const
 {
-	return -static_cast<int>(m_resultCode);
+	return -static_cast<int>(m_u.m_re.m_resultCode);
 }
 
 inline rkit::ResultCode rkit::Result::GetResultCode() const
 {
-	return m_resultCode;
+	return m_u.m_re.m_resultCode;
 }
 
 
 inline uint32_t rkit::Result::GetExtendedCode() const
 {
-	return m_extCode;
+	return m_u.m_re.m_extCode;
 }
 
 inline rkit::Result rkit::Result::SoftFault(rkit::ResultCode resultCode)

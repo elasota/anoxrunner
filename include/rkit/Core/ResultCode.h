@@ -2,7 +2,7 @@
 
 namespace rkit
 {
-	enum class ResultCode
+	enum class ResultCode : uint32_t
 	{
 		kOK,
 
