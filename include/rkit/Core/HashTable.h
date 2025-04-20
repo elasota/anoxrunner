@@ -804,6 +804,7 @@ void rkit::HashTableBase<TKey, TValue, TSize>::ReserveMainPosition(HashValue_t n
 {
 	RKIT_ASSERT(!GetOccupancyAt(position));
 	SetOccupancyAt(position, true);
+	m_hashValues[position] = newKeyHash;
 	m_count++;
 }
 
