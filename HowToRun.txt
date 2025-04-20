@@ -1,0 +1,9 @@
+Build the whole solution
+
+To run Anachronox you must perform a data build first.  To do this:
+- Create a directory to serve as the intermediate directory
+- Create a directory to serve as the compiled data directory
+
+Run RKit_Boot_Win with the following parameters:
+-run -build debug -sdir <path to Anachronox "anoxdata" directory> -idir <path to intermediate directory> -ddir <path to compiled data directory> -dsrcdir <path to datasrc directory from this repository>
+
