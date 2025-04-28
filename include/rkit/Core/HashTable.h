@@ -177,6 +177,8 @@ namespace rkit
 		void ReserveNonMainPosition(HashValue_t newKeyHash, TSize initialFreePosition, TSize &newFreePosition);
 		void RemoveEntryNoDestruct(TSize position);
 
+		void RemoveEntryAtPosition(TSize position);
+
 		template<class TCandidateKey>
 		bool FindKeyPosition(HashValue_t keyHash, const TCandidateKey &key, TSize &outPosition) const;
 
@@ -258,6 +260,12 @@ namespace rkit
 
 		template<class TCandidateKey, class TKeyHasher = Hasher<TCandidateKey>>
 		HashMapConstIterator<TKey, TValue, TSize> Find(const TCandidateKey &key) const;
+
+		template<class TCandidateKey, class TKeyHasher = Hasher<TCandidateKey>>
+		bool Remove(const TCandidateKey &key);
+
+		void RemoveAtAndInvalidateIterator(const HashMapIterator<TKey, TValue, TSize> &it);
+		void RemoveAtAndStepIterator(const HashMapIterator<TKey, TValue, TSize> &it);
 	};
 }
 
@@ -850,18 +858,21 @@ void rkit::HashTableBase<TKey, TValue, TSize>::ReserveNonMainPosition(HashValue_
 template<class TKey, class TValue, class TSize>
 void rkit::HashTableBase<TKey, TValue, TSize>::RemoveEntryNoDestruct(TSize position)
 {
-	TSize prev = position;
-
-	while (m_nextAndOccupancy[prev].m_next != position)
-		prev = m_nextAndOccupancy[prev].m_next;
-
-	m_nextAndOccupancy[prev].m_next = m_nextAndOccupancy[position].m_next;
-	m_nextAndOccupancy[position].m_next = position;
-
 	SetOccupancyAt(position, false);
 	m_count--;
 }
 
+
+template<class TKey, class TValue, class TSize>
+void rkit::HashTableBase<TKey, TValue, TSize>::RemoveEntryAtPosition(TSize position)
+{
+	RKIT_ASSERT(GetOccupancyAt(position));
+
+	m_keys[position].~TKey();
+	m_values.DestructValueAt(position);
+
+	RemoveEntryNoDestruct(position);
+}
 
 template<class TKey, class TValue, class TSize>
 template<class TCandidateKey>
@@ -1048,6 +1059,35 @@ rkit::HashMapConstIterator<TKey, TValue, TSize> rkit::HashMap<TKey, TValue, TSiz
 		return rkit::HashMapConstIterator<TKey, TValue, TSize>(*this, position);
 
 	return end();
+}
+
+template<class TKey, class TValue, class TSize>
+template<class TCandidateKey, class TKeyHasher>
+bool rkit::HashMap<TKey, TValue, TSize>::Remove(const TCandidateKey &key)
+{
+	HashValue_t keyHash = TKeyHasher::ComputeHash(0, key);
+
+	TSize position = 0;
+	if (this->FindKeyPosition(keyHash, key, position))
+	{
+		this->RemoveEntryAtPosition(position);
+		return true;
+	}
+
+	return false;
+}
+
+template<class TKey, class TValue, class TSize>
+void rkit::HashMap<TKey, TValue, TSize>::RemoveAtAndStepIterator(const HashMapIterator<TKey, TValue, TSize> &it)
+{
+	this->RemoveEntryAtPosition(it.m_offset);
+	++it;
+}
+
+template<class TKey, class TValue, class TSize>
+void rkit::HashMap<TKey, TValue, TSize>::RemoveAtAndInvalidateIterator(const HashMapIterator<TKey, TValue, TSize> &it)
+{
+	this->RemoveEntryAtPosition(it.m_offset);
 }
 
 template<class TTarget, class TOriginal>

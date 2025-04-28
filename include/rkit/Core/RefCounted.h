@@ -33,6 +33,8 @@ namespace rkit
 	protected:
 		virtual void RCTrackerZero() = 0;
 
+		RefCount_t RCTrackerRefCount() const;
+
 	private:
 		RefCountedTracker() = delete;
 
@@ -48,10 +50,11 @@ namespace rkit
 		RefCounted();
 		virtual ~RefCounted() {}
 
+		void RCTrackerZero() override;
+		RefCount_t RCTrackerRefCount() const;
+
 	private:
 		void InitRefCounted(const SimpleObjectAllocation<RefCounted> &alloc);
-
-		void RCTrackerZero() override;
 
 		SimpleObjectAllocation<RefCounted> m_allocation;
 	};
@@ -63,6 +66,7 @@ namespace rkit
 		RCPtr();
 		explicit RCPtr(std::nullptr_t);
 		explicit RCPtr(T *ptr);
+		explicit RCPtr(T *ptr, RefCountedTracker *tracker);
 		RCPtr(const RCPtr<T> &other) noexcept;
 		RCPtr(RCPtr<T> &&other) noexcept;
 		template<class TOther>
@@ -131,6 +135,11 @@ namespace rkit
 			RCTrackerZero();
 	}
 
+	inline RefCountedTracker::RefCount_t RefCountedTracker::RCTrackerRefCount() const
+	{
+		return m_refCount.load(std::memory_order_relaxed);
+	}
+
 	inline void RefCounted::RCTrackerZero()
 	{
 		SimpleObjectAllocation<RefCounted> allocation = m_allocation;
@@ -141,6 +150,11 @@ namespace rkit
 
 		obj->~RefCounted();
 		alloc->Free(mem);
+	}
+
+	inline RefCounted::RefCount_t RefCounted::RCTrackerRefCount() const
+	{
+		return RefCountedTracker::RCTrackerRefCount();
 	}
 
 	inline RefCounted::RefCounted()
@@ -175,6 +189,15 @@ namespace rkit
 	{
 		if (m_tracker != nullptr)
 			m_tracker->RCTrackerAddRef();
+	}
+
+	template<class T>
+	RCPtr<T>::RCPtr(T *ptr, RefCountedTracker *tracker)
+		: m_object(ptr)
+		, m_tracker(tracker)
+	{
+		if (tracker != nullptr)
+			tracker->RCTrackerAddRef();
 	}
 
 	template<class T>
@@ -394,8 +417,9 @@ namespace rkit
 		allocation.m_obj = refCounted;
 
 		Private::RefCountedInstantiator::InitRefCounted(*refCounted, allocation);
+		RefCountedTracker *tracker = Private::RefCountedInstantiator::GetTrackerFromObject(refCounted);
 
-		objPtr = RCPtr<TPtrType>(obj);
+		objPtr = RCPtr<TPtrType>(obj, tracker);
 
 		return ResultCode::kOK;
 	}
@@ -425,7 +449,7 @@ namespace rkit
 		Private::RefCountedInstantiator::InitRefCounted(*refCounted, allocation);
 		RefCountedTracker *tracker = Private::RefCountedInstantiator::GetTrackerFromObject(refCounted);
 
-		objPtr = RCPtr<TPtrType>(obj);
+		objPtr = RCPtr<TPtrType>(obj, tracker);
 
 		return ResultCode::kOK;
 	}

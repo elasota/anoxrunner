@@ -39,6 +39,9 @@
     <ClCompile Include="AnoxGameFileSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="AnoxResourceLoader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\anox\AnoxGraphicsSubsystem.h">
@@ -72,6 +75,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="AnoxGameFileSystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="AnoxResourceLoader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
