@@ -1,11 +1,17 @@
 #include "AnoxGameLogic.h"
 
+#include "anox/AnoxGame.h"
+#include "rkit/Core/Future.h"
+
 #include "rkit/Core/NewDelete.h"
+#include "rkit/Core/Path.h"
 
 #include "rkit/Core/Coroutine.h"
 #include "rkit/Core/CoroutineCompiler.h"
 
 #include "rkit/Core/UtilitiesDriver.h"
+
+#include "AnoxResourceManager.h"
 
 namespace anox
 {
@@ -85,6 +91,9 @@ namespace anox
 		struct Params {};
 
 		CORO_BEGIN
+			rkit::Future<AnoxResourceRetrieveResult> resResult;
+			rkit::CIPathView path("");
+			CORO_CHECK(self->m_game->GetResourceManager()->GetCIPathKeyedResource(resResult, anox::resloaders::kRawFileResourceTypeCode, rkit::CIPathView("configs/anox.cfg")));
 		CORO_END
 	};
 

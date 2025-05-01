@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Result.h"
 #include "TypeList.h"
 #include "TypeTraits.h"
 
@@ -10,6 +11,7 @@ namespace rkit::coro
 		kResume,
 
 		kStackOverflow,
+		kFailResult,
 	};
 
 	enum class InstructionType
@@ -66,6 +68,7 @@ namespace rkit::coro
 		void *m_userdata = nullptr;
 		PushStackCallback_t m_allocStack = nullptr;
 		FreeStackCallback_t m_freeStack = nullptr;
+		Result m_result = Result(ResultCode::kOK);
 	};
 
 	struct FrameMetadataBase

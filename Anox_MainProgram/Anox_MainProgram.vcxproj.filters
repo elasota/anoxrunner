@@ -39,7 +39,10 @@
     <ClCompile Include="AnoxGameFileSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="AnoxResourceLoader.cpp">
+    <ClCompile Include="AnoxResourceManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="AnoxFileResource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -77,7 +80,10 @@
     <ClInclude Include="AnoxGameFileSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="AnoxResourceLoader.h">
+    <ClInclude Include="AnoxResourceManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="AnoxFileResource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

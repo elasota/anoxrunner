@@ -107,6 +107,11 @@ namespace rkit
 	}
 
 	template<class T>
+	Future<T>::Future()
+	{
+	}
+
+	template<class T>
 	Future<T>::Future(const RCPtr<FutureContainer<T>> &futureContainer)
 		: m_container(futureContainer)
 	{

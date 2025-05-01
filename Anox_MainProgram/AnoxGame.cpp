@@ -4,7 +4,7 @@
 
 #include "AnoxGameLogic.h"
 #include "AnoxGameFileSystem.h"
-#include "AnoxResourceLoader.h"
+#include "AnoxResourceManager.h"
 
 #include "rkit/Data/DataDriver.h"
 
@@ -37,12 +37,14 @@ namespace anox
 		rkit::Result RunFrame() override;
 		bool IsExiting() const override;
 
+		AnoxResourceManagerBase *GetResourceManager() const override;
+
 	private:
 		bool m_isExiting = false;
 
 		rkit::UniquePtr<rkit::utils::IThreadPool> m_threadPool;
 		rkit::UniquePtr<AnoxGameFileSystemBase> m_fileSystem;
-		rkit::UniquePtr<AnoxResourceLoaderBase> m_resourceLoader;
+		rkit::UniquePtr<AnoxResourceManagerBase> m_resourceManager;
 		rkit::UniquePtr<IGraphicsSubsystem> m_graphicsSubsystem;
 		rkit::UniquePtr<IGameLogic> m_gameLogic;
 
@@ -69,7 +71,7 @@ namespace anox
 		}
 
 		m_graphicsSubsystem.Reset();
-		m_resourceLoader.Reset();
+		m_resourceManager.Reset();
 		m_threadPool.Reset();
 	}
 
@@ -98,7 +100,7 @@ namespace anox
 		RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->CreateThreadPool(m_threadPool, numWorkThreads));
 
 		RKIT_CHECK(AnoxGameFileSystemBase::Create(m_fileSystem));
-		RKIT_CHECK(AnoxResourceLoaderBase::Create(m_resourceLoader, m_fileSystem.Get(), m_threadPool->GetJobQueue()));
+		RKIT_CHECK(AnoxResourceManagerBase::Create(m_resourceManager, m_fileSystem.Get(), m_threadPool->GetJobQueue()));
 
 		RKIT_CHECK(IGameLogic::Create(m_gameLogic, this));
 		RKIT_CHECK(m_gameLogic->Start());
@@ -130,6 +132,11 @@ namespace anox
 	bool AnoxGame::IsExiting() const
 	{
 		return m_isExiting;
+	}
+
+	AnoxResourceManagerBase *AnoxGame::GetResourceManager() const
+	{
+		return m_resourceManager.Get();
 	}
 
 	rkit::Result anox::IAnoxGame::Create(rkit::UniquePtr<IAnoxGame> &outGame, const rkit::Optional<uint16_t> &numThreads)

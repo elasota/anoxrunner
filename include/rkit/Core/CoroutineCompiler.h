@@ -171,6 +171,14 @@ namespace rkit::coro::compiler
 		return { nullptr };
 	}
 
+	CodePtr FaultWithResult(Context *coroContext, const Result &result)
+	{
+		coroContext->m_disposition = Disposition::kFailResult;
+		coroContext->m_result = result;
+
+		return { nullptr };
+	}
+
 #if 0
 		struct CoroStackFrameBase
 		{
@@ -944,6 +952,13 @@ namespace rkit::coro
 		CORO_CONTINUE_BODY_SCOPE\
 		CORO_FUNCTION_DEF\
 		((void)0)
+
+#define CORO_CHECK(expr)	\
+	do {\
+		::rkit::Result RKIT_PP_CONCAT(exprResult_, __LINE__) = (expr);\
+		if (!::rkit::utils::ResultIsOK(RKIT_PP_CONCAT(exprResult_, __LINE__)))\
+			return ::rkit::coro::compiler::FaultWithResult(CORO_INTERNAL_coroContext, RKIT_PP_CONCAT(exprResult_, __LINE__));\
+	} while (false)
 
 // If/ElseIf/Else/EndIf chains work on the following assumptions
 // Code under the "If", "Else If", and "Else" instructions all have the "If" instruction
