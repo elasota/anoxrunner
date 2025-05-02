@@ -7,6 +7,6 @@ namespace anox
 	class AnoxGameFileSystemBase : public IGameDataFileSystem
 	{
 	public:
-		static rkit::Result Create(rkit::UniquePtr<AnoxGameFileSystemBase> &fileSystem);
+		static rkit::Result Create(rkit::UniquePtr<AnoxGameFileSystemBase> &outFileSystem, rkit::IJobQueue &jobQueue);
 	};
 }

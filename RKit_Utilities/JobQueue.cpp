@@ -87,7 +87,7 @@ namespace rkit::utils
 		explicit JobQueue(IMallocDriver *alloc);
 		~JobQueue();
 
-		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<Job *> *dependencies) override;
+		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<Job *> &dependencies) override;
 		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<RCPtr<Job> > &dependencies) override;
 
 		void WaitForJob(Job &job, const ISpan<JobType> &idleJobTypes, IEvent *wakeEvent, IEvent *terminatedEvent, IEvent *alertSpecificThreadEvent) override;
@@ -285,13 +285,11 @@ namespace rkit::utils
 		}
 	}
 
-	Result JobQueue::CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<Job *> *dependencies)
+	Result JobQueue::CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<Job *> &dependencies)
 	{
 		UniquePtr<IJobRunner> jobRunnerTemp(std::move(jobRunner));
 
-		size_t numDependencies = 0;
-		if (dependencies)
-			numDependencies = dependencies->Count();
+		size_t numDependencies = dependencies.Count();
 
 		RCPtr<JobImpl> resultJob;
 		RKIT_CHECK(NewWithAlloc<JobImpl>(resultJob, m_alloc, *this, std::move(jobRunnerTemp), numDependencies, jobType));
@@ -300,11 +298,11 @@ namespace rkit::utils
 
 		bool isRunnableNow = true;
 		bool isAborted = false;
-		if (numDependencies > 0 && dependencies != nullptr)
+		if (numDependencies > 0)
 		{
 			MutexLock lock(*m_depGraphMutex);
 
-			for (Job *job : *dependencies)
+			for (Job *job : dependencies)
 			{
 				if (!static_cast<JobImpl *>(job)->m_jobCompleted)
 					isRunnableNow = false;
@@ -319,7 +317,7 @@ namespace rkit::utils
 
 			if (!isAborted)
 			{
-				for (Job *job : *dependencies)
+				for (Job *job : dependencies)
 				{
 					if (!static_cast<JobImpl *>(job)->m_jobCompleted)
 					{
@@ -328,7 +326,7 @@ namespace rkit::utils
 					}
 				}
 
-				for (Job *job : *dependencies)
+				for (Job *job : dependencies)
 				{
 					if (!static_cast<JobImpl *>(job)->m_jobCompleted)
 					{
@@ -378,7 +376,7 @@ namespace rkit::utils
 
 		SpanConverter spanConverter(dependencies);
 
-		return CreateJob(outJob, jobType, std::move(jobRunner), &spanConverter);
+		return CreateJob(outJob, jobType, std::move(jobRunner), spanConverter);
 	}
 
 	void JobQueue::AddRunnableJob(const RCPtr<JobImpl> &job, size_t jobTypeIndex)

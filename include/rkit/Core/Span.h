@@ -93,7 +93,7 @@ namespace rkit
 		operator Span<const T>() const;
 
 		SpanToISpanRefWrapper<T> ToRefISpan() const;
-		SpanToISpanValueWrapper<T> ToValueISpan() const;
+		SpanToISpanValueWrapper<typename std::remove_const<T>::type> ToValueISpan() const;
 
 	private:
 		T *m_arr;
@@ -150,13 +150,13 @@ namespace rkit
 	struct SpanToISpanValueWrapper final : public ISpan<T>
 	{
 		SpanToISpanValueWrapper();
-		explicit SpanToISpanValueWrapper(T *arr, size_t count);
+		explicit SpanToISpanValueWrapper(const T *arr, size_t count);
 
 		size_t Count() const override;
 		T operator[](size_t index) const override;
 
 	private:
-		T *m_arr;
+		const T *m_arr;
 		size_t m_count;
 	};
 
@@ -436,9 +436,9 @@ rkit::SpanToISpanRefWrapper<T> rkit::Span<T>::ToRefISpan() const
 }
 
 template<class T>
-rkit::SpanToISpanValueWrapper<T> rkit::Span<T>::ToValueISpan() const
+rkit::SpanToISpanValueWrapper<typename std::remove_const<T>::type> rkit::Span<T>::ToValueISpan() const
 {
-	return rkit::SpanToISpanValueWrapper<T>(m_arr, m_count);
+	return rkit::SpanToISpanValueWrapper<typename std::remove_const<T>::type>(m_arr, m_count);
 }
 
 template<class T>
@@ -524,7 +524,7 @@ rkit::SpanToISpanValueWrapper<T>::SpanToISpanValueWrapper()
 }
 
 template<class T>
-rkit::SpanToISpanValueWrapper<T>::SpanToISpanValueWrapper(T *arr, size_t count)
+rkit::SpanToISpanValueWrapper<T>::SpanToISpanValueWrapper(const T *arr, size_t count)
 	: m_arr(arr)
 	, m_count(count)
 {

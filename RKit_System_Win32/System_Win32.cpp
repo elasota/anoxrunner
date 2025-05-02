@@ -2,6 +2,9 @@
 #include "rkit/Core/DirectoryScan.h"
 #include "rkit/Core/Drivers.h"
 #include "rkit/Core/Event.h"
+#include "rkit/Core/Future.h"
+#include "rkit/Core/Job.h"
+#include "rkit/Core/JobQueue.h"
 #include "rkit/Core/MallocDriver.h"
 #include "rkit/Core/Module.h"
 #include "rkit/Core/ModuleGlue.h"
@@ -163,6 +166,9 @@ namespace rkit
 		void AssertionFailure(const char *expr, const char *file, unsigned int line) override;
 		void FirstChanceResultFailure(const Result &result) override;
 
+		Result AsyncOpenFileRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<UniquePtr<ISeekableReadStream>> &outStream, FileLocation location, const CIPathView &path) override;
+		Result AsyncOpenFileReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<UniquePtr<ISeekableReadStream>> &outStream, const OSAbsPathView &path) override;
+
 		Result OpenFileRead(UniquePtr<ISeekableReadStream> &outStream, FileLocation location, const CIPathView &path) override;
 		Result OpenFileReadAbs(UniquePtr<ISeekableReadStream> &outStream, const OSAbsPathView &path) override;
 		Result OpenFileWrite(UniquePtr<ISeekableWriteStream> &outStream, FileLocation location, const CIPathView &path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
@@ -226,6 +232,23 @@ namespace rkit
 		OSAbsPath m_settingsDirectory;
 
 		HINSTANCE m_hInstance;
+	};
+
+	class OpenFileReadJobRunner final : public IJobRunner
+	{
+	public:
+		OpenFileReadJobRunner(const Future<UniquePtr<ISeekableReadStream>> &streamFuture, const OSAbsPath &filePath, ISystemDriver &systemDriver);
+		~OpenFileReadJobRunner();
+
+		Result Run() override;
+
+	private:
+		Result CheckedRun();
+
+		Future<UniquePtr<ISeekableReadStream>> m_streamFuture;
+		OSAbsPath m_filePath;
+		ISystemDriver &m_systemDriver;
+		bool m_completed = false;
 	};
 
 	class SystemModule_Win32
@@ -818,6 +841,27 @@ namespace rkit
 		}
 	}
 
+	Result SystemDriver_Win32::AsyncOpenFileRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<UniquePtr<ISeekableReadStream>> &outStream, FileLocation location, const CIPathView &path)
+	{
+		OSAbsPath absPath;
+		RKIT_CHECK(ResolveAbsPath(absPath, location, path));
+
+		return AsyncOpenFileReadAbs(jobQueue, outOpenJob, dependencyJob, outStream, absPath);
+	}
+
+	Result SystemDriver_Win32::AsyncOpenFileReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<UniquePtr<ISeekableReadStream>> &outStream, const OSAbsPathView &path)
+	{
+		OSAbsPath pathCopy;
+		RKIT_CHECK(pathCopy.Set(path));
+
+		UniquePtr<OpenFileReadJobRunner> runner;
+		RKIT_CHECK(New<OpenFileReadJobRunner>(runner, outStream, pathCopy, *this));
+
+		RKIT_CHECK(jobQueue.CreateJob(&outOpenJob, JobType::kIO, std::move(runner), dependencyJob));
+
+		return ResultCode::kOK;
+	}
+
 	Result SystemDriver_Win32::OpenFileRead(UniquePtr<ISeekableReadStream> &outStream, FileLocation location, const CIPathView &path)
 	{
 		OSAbsPath absPath;
@@ -1329,6 +1373,40 @@ namespace rkit
 			CloseHandle(fHandle);
 			return ResultCode::kFileOpenError;
 		}
+
+		return ResultCode::kOK;
+	}
+
+	OpenFileReadJobRunner::OpenFileReadJobRunner(const Future<UniquePtr<ISeekableReadStream>> &streamFuture, const OSAbsPath &filePath, ISystemDriver &systemDriver)
+		: m_streamFuture(streamFuture)
+		, m_filePath(filePath)
+		, m_systemDriver(systemDriver)
+	{
+		RKIT_ASSERT(streamFuture.GetFutureContainer().IsValid());
+	}
+
+	OpenFileReadJobRunner::~OpenFileReadJobRunner()
+	{
+		if (!m_completed)
+			this->m_streamFuture.GetFutureContainer()->Fail();
+	}
+
+	Result OpenFileReadJobRunner::Run()
+	{
+		Result runResult = CheckedRun();
+		if (!utils::ResultIsOK(runResult))
+			m_streamFuture.GetFutureContainer()->Fail();
+
+		return runResult;
+	}
+
+	Result OpenFileReadJobRunner::CheckedRun()
+	{
+		UniquePtr<ISeekableReadStream> stream;
+		RKIT_CHECK(m_systemDriver.OpenFileReadAbs(stream, m_filePath));
+
+		m_completed = true;
+		m_streamFuture.GetFutureContainer()->Complete(std::move(stream));
 
 		return ResultCode::kOK;
 	}

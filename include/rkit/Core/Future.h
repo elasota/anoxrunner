@@ -47,8 +47,12 @@ namespace rkit
 		FutureState GetState() const;
 
 		T *TryGetResult() const;
+		T &GetResult() const;
 
 		void Reset();
+
+		Result Init();
+		const RCPtr<FutureContainer<T>> &GetFutureContainer() const;
 
 	private:
 		RCPtr<FutureContainer<T>> m_container;
@@ -139,14 +143,34 @@ namespace rkit
 			return nullptr;
 
 		if (m_container->GetState() == FutureState::kCompleted)
-			return m_container->TryGetResult();
+			return &m_container->GetResult();
 
 		return nullptr;
+	}
+
+	template<class T>
+	T &Future<T>::GetResult() const
+	{
+		T *resultPtr = this->TryGetResult();
+		RKIT_ASSERT(resultPtr);
+		return *resultPtr;
 	}
 
 	template<class T>
 	void Future<T>::Reset()
 	{
 		m_container.Reset();
+	}
+
+	template<class T>
+	const RCPtr<FutureContainer<T>> &Future<T>::GetFutureContainer() const
+	{
+		return m_container;
+	}
+
+	template<class T>
+	Result Future<T>::Init()
+	{
+		return New<FutureContainer<T>>(m_container);
 	}
 }

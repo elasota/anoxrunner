@@ -27,7 +27,6 @@ namespace anox
 {
 	class AnoxResourceManager;
 	class AnoxPendingResourceFutureContainer;
-	class AnoxIOJobRunner;
 
 	struct AnoxResourceLoaderSynchronizer final : public rkit::RefCounted
 	{
@@ -112,21 +111,6 @@ namespace anox
 	private:
 		rkit::CIPath m_key;
 		rkit::CIPathView m_keyView;
-	};
-
-	class AnoxIOJobRunner final : public rkit::IJobRunner
-	{
-	public:
-		AnoxIOJobRunner(const rkit::RCPtr<AnoxResourceLoaderFactoryBase> &factory, AnoxResourceBase *resource,
-			const rkit::RCPtr<IAnoxResourceLoadCompletionNotifier> &loadCompleter, const void *keyPtr);
-
-		rkit::Result Run() override;
-
-	private:
-		rkit::RCPtr<AnoxResourceLoaderFactoryBase> m_factory;
-		AnoxResourceBase *m_resource;
-		rkit::RCPtr<IAnoxResourceLoadCompletionNotifier> m_loadCompleter;
-		const void *m_keyPtr;
 	};
 
 	class AnoxProcessJobRunner final : public rkit::IJobRunner
@@ -300,20 +284,6 @@ namespace anox
 	AnoxResourceKeyType CIPathKeyedResourceTracker::GetKeyType() const
 	{
 		return AnoxResourceKeyType::kCIPath;
-	}
-
-	AnoxIOJobRunner::AnoxIOJobRunner(const rkit::RCPtr<AnoxResourceLoaderFactoryBase> &factory, AnoxResourceBase *resource,
-		const rkit::RCPtr<IAnoxResourceLoadCompletionNotifier> &loadCompleter, const void *keyPtr)
-		: m_factory(factory)
-		, m_resource(resource)
-		, m_loadCompleter(loadCompleter)
-		, m_keyPtr(keyPtr)
-	{
-	}
-
-	rkit::Result AnoxIOJobRunner::Run()
-	{
-		return m_factory->BaseRunIOTask(*m_resource, m_keyPtr);
 	}
 
 	AnoxProcessJobRunner::AnoxProcessJobRunner(const rkit::RCPtr<AnoxResourceLoaderFactoryBase> &factory, AnoxResourceBase *resource,
@@ -549,14 +519,12 @@ namespace anox
 		rkit::RCPtr<rkit::Job> ioJob;
 		const void *keyPtr = &keyedTracker->GetKey();
 
-		{
-			rkit::UniquePtr<rkit::IJobRunner> ioJobRunner;
-			RKIT_CHECK(rkit::New<AnoxIOJobRunner>(ioJobRunner, factory, resource, loadCompleter, keyPtr));
-			RKIT_CHECK(m_jobQueue->CreateJob(&ioJob, rkit::JobType::kIO, std::move(ioJobRunner), rkit::Span<rkit::RCPtr<rkit::Job>>().ToValueISpan()));
-		}
+		RKIT_CHECK(factory->BaseCreateIOJob(resourceRCPtr, *m_fileSystem, keyPtr, ioJob));
 
 		{
-			rkit::Span<rkit::RCPtr<rkit::Job>> processJobDepSpan(&ioJob, 1);
+			rkit::Span<rkit::RCPtr<rkit::Job>> processJobDepSpan;
+			if (ioJob.IsValid())
+				processJobDepSpan = rkit::Span<rkit::RCPtr<rkit::Job>>(&ioJob, 1);
 
 			rkit::UniquePtr<rkit::IJobRunner> processJobRunner;
 			RKIT_CHECK(rkit::New<AnoxProcessJobRunner>(processJobRunner, factory, resource, loadCompleter, keyPtr));

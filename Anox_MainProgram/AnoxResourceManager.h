@@ -17,6 +17,8 @@ namespace rkit
 
 	template<class T>
 	class Future;
+
+	class Job;
 }
 
 namespace rkit::data
@@ -55,7 +57,7 @@ namespace anox
 	{
 		virtual ~AnoxResourceLoaderFactoryBase() {}
 
-		virtual rkit::Result BaseRunIOTask(AnoxResourceBase &resource, const void *keyPtr) = 0;
+		virtual rkit::Result BaseCreateIOJob(const rkit::RCPtr<AnoxResourceBase> &resource, const AnoxGameFileSystemBase &fileSystem, const void *keyPtr, rkit::RCPtr<rkit::Job> &outJob) = 0;
 		virtual rkit::Result BaseRunProcessingTask(AnoxResourceBase &resource, const void *keyPtr) = 0;
 		virtual rkit::Result CreateResourceObject(rkit::UniquePtr<AnoxResourceBase> &outResource) = 0;
 	};
@@ -63,13 +65,13 @@ namespace anox
 	template<class TKeyType>
 	struct AnoxKeyedResourceLoader : public AnoxResourceLoaderFactoryBase
 	{
-		virtual rkit::Result RunIOTask(AnoxResourceBase &resource, const TKeyType &key) = 0;
+		virtual rkit::Result CreateIOJob(const rkit::RCPtr<AnoxResourceBase> &resource, const AnoxGameFileSystemBase& fileSystem, const TKeyType &key, rkit::RCPtr<rkit::Job> &outJob) = 0;
 		virtual rkit::Result RunProcessingTask(AnoxResourceBase &resource, const TKeyType &key) = 0;
 
 	private:
-		rkit::Result BaseRunIOTask(AnoxResourceBase &resource, const void *keyPtr) override
+		rkit::Result BaseCreateIOJob(const rkit::RCPtr<AnoxResourceBase> &resource, const AnoxGameFileSystemBase &fileSystem, const void *keyPtr, rkit::RCPtr<rkit::Job> &outJob) override
 		{
-			return this->RunIOTask(resource, *static_cast<const TKeyType *>(keyPtr));
+			return this->CreateIOJob(resource, fileSystem, *static_cast<const TKeyType *>(keyPtr), outJob);
 		}
 
 		rkit::Result BaseRunProcessingTask(AnoxResourceBase &resource, const void *keyPtr) override

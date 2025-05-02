@@ -96,6 +96,7 @@ namespace rkit
 
 		Result CreateCoroThread(UniquePtr<coro::Thread> &thread, size_t stackSize) const override;
 
+		Result CreateBlockingReader(UniquePtr<ISeekableReadStream> &outReadStream, UniquePtr<IAsyncReadFile> &&asyncFile, FilePos_t fileSize) const override;
 
 	private:
 		static bool ValidateFilePathSlice(const Span<const char> &name, bool permitWildcards);
@@ -2176,6 +2177,11 @@ namespace rkit
 		thread = std::move(threadBase);
 
 		return ResultCode::kOK;
+	}
+
+	Result UtilitiesDriver::CreateBlockingReader(UniquePtr<ISeekableReadStream> &outReadStream, UniquePtr<IAsyncReadFile> &&asyncFile, FilePos_t fileSize) const
+	{
+		return ResultCode::kNotYetImplemented;
 	}
 }
 

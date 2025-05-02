@@ -99,7 +99,7 @@ namespace anox
 
 		RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->CreateThreadPool(m_threadPool, numWorkThreads));
 
-		RKIT_CHECK(AnoxGameFileSystemBase::Create(m_fileSystem));
+		RKIT_CHECK(AnoxGameFileSystemBase::Create(m_fileSystem, *m_threadPool->GetJobQueue()));
 		RKIT_CHECK(AnoxResourceManagerBase::Create(m_resourceManager, m_fileSystem.Get(), m_threadPool->GetJobQueue()));
 
 		RKIT_CHECK(IGameLogic::Create(m_gameLogic, this));

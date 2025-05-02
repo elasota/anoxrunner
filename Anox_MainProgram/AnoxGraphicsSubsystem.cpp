@@ -37,6 +37,7 @@
 #include "rkit/Core/Endian.h"
 #include "rkit/Core/EnumEnumerator.h"
 #include "rkit/Core/Event.h"
+#include "rkit/Core/Future.h"
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/Job.h"
 #include "rkit/Core/LogDriver.h"
@@ -172,7 +173,7 @@ namespace anox
 		class CheckPipelinesJob final : public rkit::IJobRunner
 		{
 		public:
-			explicit CheckPipelinesJob(GraphicsSubsystem &graphicsSubsystem, IGameDataFileSystem &fileSystem, const rkit::CIPathView &pipelinesFileName, const rkit::CIPathView &pipelinesCacheFileName, bool canUpdateShadowFile);
+			explicit CheckPipelinesJob(GraphicsSubsystem &graphicsSubsystem, const rkit::Future<rkit::UniquePtr<rkit::ISeekableReadStream>> &stream, const rkit::CIPathView &pipelinesCacheFileName);
 
 			rkit::Result Run() override;
 
@@ -182,10 +183,8 @@ namespace anox
 				rkit::HashMap<size_t, rkit::Optional<int32_t>> &staticResolutions, size_t pipelineIndex, size_t base, const rkit::render::ShaderPermutationTree *tree);
 
 			GraphicsSubsystem &m_graphicsSubsystem;
-			IGameDataFileSystem &m_fileSystem;
-			rkit::CIPathView m_pipelinesFileName;
+			rkit::Future<rkit::UniquePtr<rkit::ISeekableReadStream>> m_stream;
 			rkit::CIPathView m_pipelinesCacheFileName;
-			bool m_canUpdateShadowFile;
 		};
 
 		class CreateNewIndividualCacheJob final : public rkit::IJobRunner
@@ -463,12 +462,10 @@ namespace anox
 		rkit::UniquePtr<IFrameDrawer> m_frameDrawer;
 	};
 
-	GraphicsSubsystem::CheckPipelinesJob::CheckPipelinesJob(GraphicsSubsystem &graphicsSubsystem, IGameDataFileSystem &fileSystem, const rkit::CIPathView &pipelinesFileName, const rkit::CIPathView &pipelinesCacheFileName, bool canUpdateShadowFile)
+	GraphicsSubsystem::CheckPipelinesJob::CheckPipelinesJob(GraphicsSubsystem &graphicsSubsystem, const rkit::Future<rkit::UniquePtr<rkit::ISeekableReadStream>> &stream, const rkit::CIPathView &pipelinesCacheFileName)
 		: m_graphicsSubsystem(graphicsSubsystem)
-		, m_fileSystem(fileSystem)
-		, m_pipelinesFileName(pipelinesFileName)
+		, m_stream(stream)
 		, m_pipelinesCacheFileName(pipelinesCacheFileName)
-		, m_canUpdateShadowFile(canUpdateShadowFile)
 	{
 	}
 
@@ -478,14 +475,7 @@ namespace anox
 		rkit::IUtilitiesDriver *utilsDriver = rkit::GetDrivers().m_utilitiesDriver;
 		rkit::data::IDataDriver *dataDriver = &m_graphicsSubsystem.GetDataDriver();
 
-		rkit::UniquePtr<rkit::ISeekableReadStream> pipelinesFile;
-		rkit::Result openResult = m_fileSystem.OpenNamedFile(pipelinesFile, m_pipelinesFileName);
-
-		if (!rkit::utils::ResultIsOK(openResult))
-		{
-			rkit::log::Error("Failed to open pipeline package");
-			return openResult;
-		}
+		rkit::UniquePtr<rkit::ISeekableReadStream> pipelinesFile = std::move(m_stream.GetResult());
 
 		rkit::data::IRenderDataHandler *rdh = dataDriver->GetRenderDataHandler();
 
@@ -503,7 +493,7 @@ namespace anox
 		rkit::UniquePtr<rkit::ISeekableReadStream> cacheReadStream;
 
 		// Try opening the cache itself
-		openResult = sysDriver->OpenFileRead(cacheReadStream, rkit::FileLocation::kUserSettingsDirectory, m_pipelinesCacheFileName);
+		rkit::Result openResult = sysDriver->OpenFileRead(cacheReadStream, rkit::FileLocation::kUserSettingsDirectory, m_pipelinesCacheFileName);
 		if (!rkit::utils::ResultIsOK(openResult))
 		{
 			rkit::log::Error("Failed to open pipeline cache");
@@ -1130,10 +1120,17 @@ namespace anox
 		m_setupStep = DeviceSetupStep::kOpenPipelinePackage;
 		m_stepCompleted = false;
 
-		rkit::UniquePtr<rkit::IJobRunner> jobRunner;
-		RKIT_CHECK(rkit::New<CheckPipelinesJob>(jobRunner, *this, m_fileSystem, pipelinesFile, pipelinesCacheFile, canUpdatePipelineCache));
+		rkit::RCPtr<rkit::Job> openPipelineCacheJob;
 
-		RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kIO, std::move(jobRunner), nullptr));
+		rkit::Future<rkit::UniquePtr<rkit::ISeekableReadStream>> pipelineStreamFuture;
+		RKIT_CHECK(pipelineStreamFuture.Init());
+
+		RKIT_CHECK(m_fileSystem.OpenNamedFileBlocking(openPipelineCacheJob, pipelineStreamFuture, pipelinesFile));
+
+		rkit::UniquePtr<rkit::IJobRunner> jobRunner;
+		RKIT_CHECK(rkit::New<CheckPipelinesJob>(jobRunner, *this, pipelineStreamFuture, pipelinesCacheFile));
+
+		RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kIO, std::move(jobRunner), openPipelineCacheJob));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -1191,7 +1188,7 @@ namespace anox
 			spanToPass = &dependencies;
 
 		rkit::RCPtr<rkit::Job> newJob;
-		RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(&newJob, rkit::JobType::kNormalPriority, std::move(jobRunner), spanToPass));
+		RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(&newJob, rkit::JobType::kNormalPriority, std::move(jobRunner), *spanToPass));
 
 
 		jobRef = newJob;

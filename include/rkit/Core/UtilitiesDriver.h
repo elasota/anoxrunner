@@ -45,6 +45,7 @@ namespace rkit
 	struct ISeekableReadWriteStream;
 	struct ISeekableReadStream;
 	struct ISeekableWriteStream;
+	struct IAsyncReadFile;
 	struct IJobQueue;
 
 	struct IUtilitiesDriver
@@ -113,5 +114,7 @@ namespace rkit
 		virtual bool IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const = 0;
 
 		virtual Result CreateCoroThread(UniquePtr<coro::Thread> &thread, size_t stackSize) const = 0;
+
+		virtual Result CreateBlockingReader(UniquePtr<ISeekableReadStream> &outReadStream, UniquePtr<IAsyncReadFile> &&asyncFile, FilePos_t fileSize) const = 0;
 	};
 }

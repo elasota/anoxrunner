@@ -10,36 +10,40 @@ namespace anox
 	class AnoxGameFileSystem final : public AnoxGameFileSystemBase
 	{
 	public:
-		AnoxGameFileSystem();
+		AnoxGameFileSystem(rkit::IJobQueue &jobQueue);
 
-		rkit::Result OpenNamedFile(rkit::UniquePtr<rkit::ISeekableReadStream> &stream, const rkit::CIPathView &path) override;
+		rkit::Result OpenNamedFileBlocking(rkit::RCPtr<rkit::Job> &openJob, const rkit::Future<rkit::UniquePtr<rkit::ISeekableReadStream>> &outStream, const rkit::CIPathView &path) override;
+		rkit::Result OpenNamedFileAsync(rkit::RCPtr<rkit::Job> &openJob, const rkit::Future<rkit::UniquePtr<rkit::IAsyncReadFile>> &outStream, rkit::FilePos_t &outSize, const rkit::CIPathView &path) override;
+
+	private:
+		rkit::IJobQueue &m_jobQueue;
 	};
 
-
-	AnoxGameFileSystem::AnoxGameFileSystem()
+	AnoxGameFileSystem::AnoxGameFileSystem(rkit::IJobQueue &jobQueue)
+		: m_jobQueue(jobQueue)
 	{
 	}
 
-	rkit::Result AnoxGameFileSystem::OpenNamedFile(rkit::UniquePtr<rkit::ISeekableReadStream> &stream, const rkit::CIPathView &path)
+	rkit::Result AnoxGameFileSystem::OpenNamedFileBlocking(rkit::RCPtr<rkit::Job> &openJob, const rkit::Future<rkit::UniquePtr<rkit::ISeekableReadStream>> &outStream, const rkit::CIPathView &path)
 	{
-		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
+		rkit::CIPath fullPath;
+		RKIT_CHECK(fullPath.Set(rkit::CIPathView("files")));
+		RKIT_CHECK(fullPath.Append(path));
 
-		rkit::CIPath extPath;
-		RKIT_CHECK(extPath.Set(rkit::CIPathSliceView("files")));
-		RKIT_CHECK(extPath.Append(path));
-
-		rkit::UniquePtr<rkit::ISeekableReadStream> srStream;
-		RKIT_CHECK(sysDriver->OpenFileRead(srStream, rkit::FileLocation::kGameDirectory, extPath));
-
-		stream = std::move(srStream);
+		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->AsyncOpenFileRead(m_jobQueue, openJob, nullptr, outStream, rkit::FileLocation::kGameDirectory, fullPath));
 
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxGameFileSystemBase::Create(rkit::UniquePtr<AnoxGameFileSystemBase> &outFileSystem)
+	rkit::Result AnoxGameFileSystem::OpenNamedFileAsync(rkit::RCPtr<rkit::Job> &openJob, const rkit::Future<rkit::UniquePtr<rkit::IAsyncReadFile>> &outStream, rkit::FilePos_t &outSize, const rkit::CIPathView &path)
+	{
+		return rkit::ResultCode::kNotYetImplemented;
+	}
+
+	rkit::Result AnoxGameFileSystemBase::Create(rkit::UniquePtr<AnoxGameFileSystemBase> &outFileSystem, rkit::IJobQueue &jobQueue)
 	{
 		rkit::UniquePtr<AnoxGameFileSystem> fileSystem;
-		RKIT_CHECK(rkit::New<AnoxGameFileSystem>(fileSystem));
+		RKIT_CHECK(rkit::New<AnoxGameFileSystem>(fileSystem, jobQueue));
 
 		outFileSystem = std::move(fileSystem);
 
