@@ -18,18 +18,18 @@ namespace rkit
 		typedef void (*ReadSucceedCallback_t)(void *userdata, uint32_t bytesRead);
 		typedef void (*ReadFailCallback_t)(void *userdata, uint32_t osErrorCode, uint32_t bytesRead);
 
-		virtual Result PostReadRequest(void *readBuffer, FilePos_t pos, size_t amount, void *completionUserData, ReadSucceedCallback_t succeedCallback, ReadFailCallback_t failCallback) = 0;
+		virtual Result PostReadRequest(void *readBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, ReadSucceedCallback_t succeedCallback, ReadFailCallback_t failCallback) = 0;
 	};
 
 	struct IAsyncWriteRequester
 	{
-		virtual ~IAsyncReadRequester() {}
+		virtual ~IAsyncWriteRequester() {}
 
 		typedef void (*WriteSucceedCallback_t)(void *userdata, uint32_t bytesWritten);
 		typedef void (*WriteFailCallback_t)(void *userdata, uint32_t osErrorCode, uint32_t bytesWritten);
 
-		virtual Result PostWriteRequest(const void *writeBuffer, FilePos_t pos, size_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback) = 0;
-		virtual Result PostAppendRequest(const void *writeBuffer, size_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback) = 0;
+		virtual Result PostWriteRequest(const void *writeBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback) = 0;
+		virtual Result PostAppendRequest(const void *writeBuffer, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback) = 0;
 	};
 
 	struct IAsyncReadFile
@@ -48,5 +48,12 @@ namespace rkit
 
 	struct IAsyncReadWriteFile : public IAsyncWriteFile, public IAsyncReadFile
 	{
+	};
+
+	template<class TFileType>
+	struct AsyncFileOpenResult
+	{
+		UniquePtr<TFileType> m_file;
+		FilePos_t m_initialSize = 0;
 	};
 }

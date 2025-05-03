@@ -95,6 +95,15 @@ namespace rkit
 		operator T *() const;
 		T *operator->() const;
 
+		template<class TOther>
+		RCPtr<TOther> StaticCast() const;
+
+		template<class TOther>
+		RCPtr<TOther> ReinterpretCast() const;
+
+		template<class TOther>
+		RCPtr<TOther> ConstCast() const;
+
 	private:
 		T *m_object;
 		RefCountedTracker *m_tracker;
@@ -386,6 +395,27 @@ namespace rkit
 	inline T *RCPtr<T>::Get() const
 	{
 		return m_object;
+	}
+
+	template<class T>
+	template<class TOther>
+	RCPtr<TOther> RCPtr<T>::StaticCast() const
+	{
+		return RCPtr<TOther>(static_cast<TOther *>(m_object), m_tracker);
+	}
+
+	template<class T>
+	template<class TOther>
+	RCPtr<TOther> RCPtr<T>::ReinterpretCast() const
+	{
+		return RCPtr<TOther>(reinterpret_cast<TOther *>(m_object), m_tracker);
+	}
+
+	template<class T>
+	template<class TOther>
+	RCPtr<TOther> RCPtr<T>::ConstCast() const
+	{
+		return RCPtr<TOther>(const_cast<TOther *>(m_object), m_tracker);
 	}
 
 	template<class T>

@@ -3,6 +3,7 @@
 namespace rkit
 {
 	class Job;
+	class JobSignaller;
 
 	template<class T>
 	class RCPtr;
@@ -52,6 +53,8 @@ namespace rkit
 		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const RCPtr<Job> &dependency);
 
 		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, std::nullptr_t dependencies);
+
+		virtual Result CreateSignalledJob(RCPtr<JobSignaller> &outSignaler, RCPtr<Job> &outJob) = 0;
 
 		// Waits for work from a job queue.
 		// If "waitIfDepleted" is set, then wakeEvent must be an auto-reset event and terminatedEvent must not be signaled

@@ -78,6 +78,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AsyncIOThread_Win32.cpp" />
     <ClCompile Include="DisplayManager_Win32.cpp" />
     <ClCompile Include="System_Win32.cpp" />
   </ItemGroup>
@@ -85,6 +86,7 @@
     <ClInclude Include="..\include\rkit\Win32\Win32ModuleInitParameters.h" />
     <ClInclude Include="..\include\rkit\Win32\Win32PlatformDriver.h" />
     <ClInclude Include="ConvUtil.h" />
+    <ClInclude Include="Win32AsyncIOThread.h" />
     <ClInclude Include="Win32DisplayManager.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

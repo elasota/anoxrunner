@@ -143,9 +143,9 @@ namespace anox
 
 		rkit::Result Initialize();
 
-		rkit::Result RegisterContentKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxContentIDKeyedResourceLoader> &&factory) override;
-		rkit::Result RegisterCIPathKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxCIPathKeyedResourceLoader> &&factory) override;
-		rkit::Result RegisterStringKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxStringKeyedResourceLoader> &&factory) override;
+		rkit::Result RegisterContentKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::data::ContentID>> &&factory) override;
+		rkit::Result RegisterCIPathKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::CIPathView>> &&factory) override;
+		rkit::Result RegisterStringKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::StringView>> &&factory) override;
 
 		rkit::Result GetContentIDKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::data::ContentID &cid) override;
 		rkit::Result GetCIPathKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::CIPathView &path) override;
@@ -367,17 +367,17 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxResourceManager::RegisterContentKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxContentIDKeyedResourceLoader> &&factory)
+	rkit::Result AnoxResourceManager::RegisterContentKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::data::ContentID>> &&factory)
 	{
 		return InternalRegisterLoaderFactory(resourceType, AnoxResourceKeyType::kContentID, std::move(factory));
 	}
 
-	rkit::Result AnoxResourceManager::RegisterCIPathKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxCIPathKeyedResourceLoader> &&factory)
+	rkit::Result AnoxResourceManager::RegisterCIPathKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::CIPathView>> &&factory)
 	{
 		return InternalRegisterLoaderFactory(resourceType, AnoxResourceKeyType::kCIPath, std::move(factory));
 	}
 
-	rkit::Result AnoxResourceManager::RegisterStringKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxStringKeyedResourceLoader> &&factory)
+	rkit::Result AnoxResourceManager::RegisterStringKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::StringView>> &&factory)
 	{
 		return InternalRegisterLoaderFactory(resourceType, AnoxResourceKeyType::kString, std::move(factory));
 	}
@@ -468,12 +468,14 @@ namespace anox
 
 		// Create the resource
 		rkit::UniquePtr<AnoxResourceBase> resourceUPtr;
-		RKIT_CHECK(factory->CreateResourceObject(resourceUPtr));
+		RKIT_CHECK(factory->BaseCreateResourceObject(resourceUPtr));
 
 		AnoxResourceBase *resource = resourceUPtr.Get();
 
 		rkit::UniquePtr<TKeyedTracker> keyedTrackerUPtr;
 		RKIT_CHECK(rkit::New<TKeyedTracker>(keyedTrackerUPtr, m_sync, std::move(resourceUPtr)));
+
+		RKIT_CHECK(keyedTrackerUPtr->SetKey(key));
 
 		// Create the tracker and form a RC ptr from it immediately.
 		// We need to do this the unregister code is in RCTrackerZero, not
@@ -553,7 +555,7 @@ namespace anox
 
 	void AnoxResourceManager::UnsyncedUnregisterResource(const AnoxResourceTracker *tracker, bool wasLinked)
 	{
-		bool isRegistered = false;
+		bool isRegistered = wasLinked;
 
 		if (m_firstResource == tracker)
 		{

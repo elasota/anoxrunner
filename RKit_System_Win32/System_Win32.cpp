@@ -1,4 +1,5 @@
 #include "rkit/Core/Algorithm.h"
+#include "rkit/Core/AsyncFile.h"
 #include "rkit/Core/DirectoryScan.h"
 #include "rkit/Core/Drivers.h"
 #include "rkit/Core/Event.h"
@@ -22,6 +23,7 @@
 #include "rkit/Win32/Win32PlatformDriver.h"
 #include "rkit/Win32/SystemModuleInitParameters_Win32.h"
 
+#include "Win32AsyncIOThread.h"
 #include "Win32DisplayManager.h"
 #include "ConvUtil.h"
 
@@ -54,10 +56,93 @@ namespace rkit
 
 		Result Truncate(FilePos_t pos) override;
 
+		HANDLE GetHandle() const;
+
 	private:
 		HANDLE m_hfile;
 		FilePos_t m_filePos;
 		FilePos_t m_fileSize;
+	};
+
+	class AsyncFileInstance_Win32 final : public RefCounted
+	{
+	public:
+		explicit AsyncFileInstance_Win32(UniquePtr<File_Win32> &&file);
+		~AsyncFileInstance_Win32();
+
+		HANDLE GetHandle() const;
+
+	private:
+		HANDLE m_hfile;
+		UniquePtr<File_Win32> m_file;
+	};
+
+	class AsyncReadWriteRequester_Win32 final : public IAsyncReadRequester, public IAsyncWriteRequester
+	{
+	public:
+		explicit AsyncReadWriteRequester_Win32(const RCPtr<AsyncFileInstance_Win32> &instance);
+
+		Result PostReadRequest(void *readBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, ReadSucceedCallback_t succeedCallback, ReadFailCallback_t failCallback) override;
+		Result PostWriteRequest(const void *writeBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback) override;
+		Result PostAppendRequest(const void *writeBuffer, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback) override;
+
+	private:
+		void OpenRequest();
+		void CloseRequest();
+
+		Result CheckedPostReadRequest(void *readBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, ReadSucceedCallback_t succeedCallback, ReadFailCallback_t failCallback);
+		Result CheckedPostWriteRequest(const void *writeBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback);
+		Result CheckedPostAppendRequest(const void *writeBuffer, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback);
+
+		static VOID WINAPI StaticOverlappedReadCompletion(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped);
+		static VOID WINAPI StaticOverlappedWriteCompletion(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped);
+		static VOID WINAPI StaticOverlappedAppendCompletion(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped);
+
+		struct ReadSucceedFailCallbacks
+		{
+			ReadSucceedCallback_t m_succeed;
+			ReadFailCallback_t m_fail;
+		};
+
+		struct WriteSucceedFailCallbacks
+		{
+			WriteSucceedCallback_t m_succeed;
+			WriteFailCallback_t m_fail;
+		};
+
+		union SucceedFailCallbacksUnion
+		{
+			ReadSucceedFailCallbacks m_read;
+			WriteSucceedFailCallbacks m_write;
+		};
+
+		struct OverlappedHolder
+		{
+			OVERLAPPED m_overlapped;
+			void *m_userdata;
+			SucceedFailCallbacksUnion m_callbacks;
+		};
+
+		HANDLE m_hfile;
+		const RCPtr<AsyncFileInstance_Win32> m_instance;
+		OverlappedHolder m_overlappedHolder;
+
+#if RKIT_IS_DEBUG
+		std::atomic<uint32_t> m_outstandingRequests;
+#endif
+	};
+
+	class AsyncFile_Win32 final : public IAsyncReadWriteFile
+	{
+	public:
+		explicit AsyncFile_Win32(RCPtr<AsyncFileInstance_Win32> &&instance);
+		~AsyncFile_Win32();
+
+		Result CreateReadRequester(UniquePtr<IAsyncReadRequester> &requester) override;
+		Result CreateWriteRequester(UniquePtr<IAsyncWriteRequester> &requester) override;
+
+	private:
+		RCPtr<AsyncFileInstance_Win32> m_instance;
 	};
 
 	class DirectoryScan_Win32 final : public IDirectoryScan
@@ -169,8 +254,13 @@ namespace rkit
 		Result AsyncOpenFileRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<UniquePtr<ISeekableReadStream>> &outStream, FileLocation location, const CIPathView &path) override;
 		Result AsyncOpenFileReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<UniquePtr<ISeekableReadStream>> &outStream, const OSAbsPathView &path) override;
 
+		Result AsyncOpenFileAsyncRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<AsyncFileOpenReadResult> &outStream, FileLocation location, const CIPathView &path) override;
+		Result AsyncOpenFileAsyncReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<AsyncFileOpenReadResult> &outStream, const OSAbsPathView &path) override;
+
 		Result OpenFileRead(UniquePtr<ISeekableReadStream> &outStream, FileLocation location, const CIPathView &path) override;
 		Result OpenFileReadAbs(UniquePtr<ISeekableReadStream> &outStream, const OSAbsPathView &path) override;
+		Result OpenFileAsyncRead(AsyncFileOpenReadResult &outResult, FileLocation location, const CIPathView &path) override;
+		Result OpenFileAsyncReadAbs(AsyncFileOpenReadResult &outResult, const OSAbsPathView &path) override;
 		Result OpenFileWrite(UniquePtr<ISeekableWriteStream> &outStream, FileLocation location, const CIPathView &path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
 		Result OpenFileWriteAbs(UniquePtr<ISeekableWriteStream> &outStream, const OSAbsPathView &path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
 		Result OpenFileReadWrite(UniquePtr<ISeekableReadWriteStream> &outStream, FileLocation location, const CIPathView &path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
@@ -212,7 +302,8 @@ namespace rkit
 
 	private:
 		static DWORD OpenFlagsToDisposition(bool createIfNotExists, bool truncateIfExists);
-		Result OpenFileGeneral(UniquePtr<File_Win32> &outStream, const OSAbsPathView &path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition);
+		Result OpenFileGeneral(UniquePtr<File_Win32> &outStream, const OSAbsPathView &path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition, DWORD extraFlags);
+		Result OpenFileAsyncGeneral(UniquePtr<AsyncFile_Win32> &outStream, FilePos_t &outInitialSize, const OSAbsPathView &path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition, DWORD extraFlags);
 		static Result CheckCreateDirectories(Vector<wchar_t> &pathChars);
 
 		Result ResolveAbsPath(OSAbsPath &outPath, FileLocation location, const CIPathView &path);
@@ -223,6 +314,7 @@ namespace rkit
 		Vector<Vector<char> > m_commandLineCharBuffers;
 		Vector<StringView> m_commandLine;
 		UniquePtr<render::DisplayManagerBase_Win32> m_displayManager;
+		UniquePtr<AsyncIOThread_Win32> m_asioThread;
 		LPWSTR *m_argvW;
 
 		WString m_exePathStr;
@@ -246,6 +338,23 @@ namespace rkit
 		Result CheckedRun();
 
 		Future<UniquePtr<ISeekableReadStream>> m_streamFuture;
+		OSAbsPath m_filePath;
+		ISystemDriver &m_systemDriver;
+		bool m_completed = false;
+	};
+
+	class OpenFileAsyncReadJobRunner final : public IJobRunner
+	{
+	public:
+		OpenFileAsyncReadJobRunner(const Future<AsyncFileOpenReadResult> &streamFuture, const OSAbsPath &filePath, ISystemDriver &systemDriver);
+		~OpenFileAsyncReadJobRunner();
+
+		Result Run() override;
+
+	private:
+		Result CheckedRun();
+
+		Future<AsyncFileOpenReadResult> m_streamFuture;
 		OSAbsPath m_filePath;
 		ISystemDriver &m_systemDriver;
 		bool m_completed = false;
@@ -491,6 +600,114 @@ namespace rkit
 			return ResultCode::kOperationFailed;
 	}
 
+	HANDLE File_Win32::GetHandle() const
+	{
+		return m_hfile;
+	}
+
+	AsyncFileInstance_Win32::AsyncFileInstance_Win32(UniquePtr<File_Win32> &&file)
+		: m_hfile(file->GetHandle())
+		, m_file(std::move(file))
+	{
+	}
+
+	AsyncFileInstance_Win32::~AsyncFileInstance_Win32()
+	{
+	}
+
+	HANDLE AsyncFileInstance_Win32::GetHandle() const
+	{
+		return m_hfile;
+	}
+
+	AsyncReadWriteRequester_Win32::AsyncReadWriteRequester_Win32(const RCPtr<AsyncFileInstance_Win32> &instance)
+		: m_hfile(instance->GetHandle())
+		, m_instance(instance)
+		, m_overlappedHolder {}
+#if RKIT_IS_DEBUG
+		, m_outstandingRequests(0)
+#endif
+	{
+	}
+
+	Result AsyncReadWriteRequester_Win32::PostReadRequest(void *readBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, ReadSucceedCallback_t succeedCallback, ReadFailCallback_t failCallback)
+	{
+		OpenRequest();
+		Result postResult = CheckedPostReadRequest(readBuffer, pos, amount, completionUserData, succeedCallback, failCallback);
+		if (!postResult.IsOK())
+			CloseRequest();
+
+		return postResult;
+	}
+
+	Result AsyncReadWriteRequester_Win32::PostWriteRequest(const void *writeBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback)
+	{
+		OpenRequest();
+		Result postResult = CheckedPostWriteRequest(writeBuffer, pos, amount, completionUserData, succeedCallback, failCallback);
+		if (!postResult.IsOK())
+			CloseRequest();
+
+		return postResult;
+	}
+
+	Result AsyncReadWriteRequester_Win32::PostAppendRequest(const void *writeBuffer, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback)
+	{
+		OpenRequest();
+		Result postResult = CheckedPostAppendRequest(writeBuffer, amount, completionUserData, succeedCallback, failCallback);
+		if (!postResult.IsOK())
+			CloseRequest();
+
+		return postResult;
+	}
+
+	void AsyncReadWriteRequester_Win32::OpenRequest()
+	{
+#if RKIT_IS_DEBUG
+		uint32_t numOutstanding = m_outstandingRequests.fetch_add(1);
+		RKIT_ASSERT(numOutstanding == 0);
+#endif
+	}
+
+	void AsyncReadWriteRequester_Win32::CloseRequest()
+	{
+#if RKIT_IS_DEBUG
+		m_outstandingRequests.fetch_sub(1);
+#endif
+	}
+
+	Result AsyncReadWriteRequester_Win32::CheckedPostReadRequest(void *readBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, ReadSucceedCallback_t succeedCallback, ReadFailCallback_t failCallback)
+	{
+		return ResultCode::kNotYetImplemented;
+	}
+
+	Result AsyncReadWriteRequester_Win32::CheckedPostWriteRequest(const void *writeBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback)
+	{
+		return ResultCode::kNotYetImplemented;
+	}
+
+	Result AsyncReadWriteRequester_Win32::CheckedPostAppendRequest(const void *writeBuffer, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback)
+	{
+		return ResultCode::kNotYetImplemented;
+	}
+
+	AsyncFile_Win32::AsyncFile_Win32(RCPtr<AsyncFileInstance_Win32> &&instance)
+		: m_instance(std::move(instance))
+	{
+	}
+
+	AsyncFile_Win32::~AsyncFile_Win32()
+	{
+	}
+
+	Result AsyncFile_Win32::CreateReadRequester(UniquePtr<IAsyncReadRequester> &requester)
+	{
+		return New<AsyncReadWriteRequester_Win32>(requester, m_instance);
+	}
+
+	Result AsyncFile_Win32::CreateWriteRequester(UniquePtr<IAsyncWriteRequester> &requester)
+	{
+		return New<AsyncReadWriteRequester_Win32>(requester, m_instance);
+	}
 
 	DirectoryScan_Win32::DirectoryScan_Win32()
 		: m_handle(INVALID_HANDLE_VALUE)
@@ -773,6 +990,9 @@ namespace rkit
 
 		RKIT_CHECK(render::DisplayManagerBase_Win32::Create(m_displayManager, m_alloc, m_hInstance));
 
+		RKIT_CHECK(New<AsyncIOThread_Win32>(m_asioThread, *this));
+		RKIT_CHECK(m_asioThread->Initialize());
+
 		return ResultCode::kOK;
 	}
 
@@ -862,6 +1082,27 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
+	Result SystemDriver_Win32::AsyncOpenFileAsyncRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<AsyncFileOpenReadResult> &outStream, FileLocation location, const CIPathView &path)
+	{
+		OSAbsPath absPath;
+		RKIT_CHECK(ResolveAbsPath(absPath, location, path));
+
+		return AsyncOpenFileAsyncReadAbs(jobQueue, outOpenJob, dependencyJob, outStream, absPath);
+	}
+
+	Result SystemDriver_Win32::AsyncOpenFileAsyncReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<AsyncFileOpenReadResult> &outStream, const OSAbsPathView &path)
+	{
+		OSAbsPath pathCopy;
+		RKIT_CHECK(pathCopy.Set(path));
+
+		UniquePtr<OpenFileAsyncReadJobRunner> runner;
+		RKIT_CHECK(New<OpenFileAsyncReadJobRunner>(runner, outStream, pathCopy, *this));
+
+		RKIT_CHECK(jobQueue.CreateJob(&outOpenJob, JobType::kIO, std::move(runner), dependencyJob));
+
+		return ResultCode::kOK;
+	}
+
 	Result SystemDriver_Win32::OpenFileRead(UniquePtr<ISeekableReadStream> &outStream, FileLocation location, const CIPathView &path)
 	{
 		OSAbsPath absPath;
@@ -873,9 +1114,29 @@ namespace rkit
 	Result SystemDriver_Win32::OpenFileReadAbs(UniquePtr<ISeekableReadStream> &outStream, const OSAbsPathView &path)
 	{
 		UniquePtr<File_Win32> file;
-		RKIT_CHECK(OpenFileGeneral(file, path, false, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING));
+		RKIT_CHECK(OpenFileGeneral(file, path, false, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, 0));
 
 		outStream = std::move(file);
+		return ResultCode::kOK;
+	}
+
+	Result SystemDriver_Win32::OpenFileAsyncRead(AsyncFileOpenReadResult &outStream, FileLocation location, const CIPathView &path)
+	{
+		OSAbsPath absPath;
+		RKIT_CHECK(ResolveAbsPath(absPath, location, path));
+
+		return OpenFileAsyncReadAbs(outStream, absPath);
+	}
+
+	Result SystemDriver_Win32::OpenFileAsyncReadAbs(AsyncFileOpenReadResult &outStream, const OSAbsPathView &path)
+	{
+		UniquePtr<AsyncFile_Win32> file;
+		FilePos_t initialSize = 0;
+		RKIT_CHECK(OpenFileAsyncGeneral(file, initialSize, path, false, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, 0));
+
+		outStream.m_file = std::move(file);
+		outStream.m_initialSize = initialSize;
+
 		return ResultCode::kOK;
 	}
 
@@ -890,7 +1151,7 @@ namespace rkit
 	Result SystemDriver_Win32::OpenFileWriteAbs(UniquePtr<ISeekableWriteStream> &outStream, const OSAbsPathView &path, bool createIfNotExists, bool createDirectories, bool truncateIfExists)
 	{
 		UniquePtr<File_Win32> file;
-		RKIT_CHECK(OpenFileGeneral(file, path, createDirectories, GENERIC_WRITE, FILE_SHARE_READ, OpenFlagsToDisposition(createIfNotExists, truncateIfExists)));
+		RKIT_CHECK(OpenFileGeneral(file, path, createDirectories, GENERIC_WRITE, FILE_SHARE_READ, OpenFlagsToDisposition(createIfNotExists, truncateIfExists), 0));
 
 		outStream = std::move(file);
 		return ResultCode::kOK;
@@ -907,7 +1168,7 @@ namespace rkit
 	Result SystemDriver_Win32::OpenFileReadWriteAbs(UniquePtr<ISeekableReadWriteStream> &outStream, const OSAbsPathView &path, bool createIfNotExists, bool createDirectories, bool truncateIfExists)
 	{
 		UniquePtr<File_Win32> file;
-		RKIT_CHECK(OpenFileGeneral(file, path, createDirectories, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, OpenFlagsToDisposition(createIfNotExists, truncateIfExists)));
+		RKIT_CHECK(OpenFileGeneral(file, path, createDirectories, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, OpenFlagsToDisposition(createIfNotExists, truncateIfExists), 0));
 
 		outStream = std::move(file);
 		return ResultCode::kOK;
@@ -1342,7 +1603,7 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
-	Result SystemDriver_Win32::OpenFileGeneral(UniquePtr<File_Win32> &outFile, const OSAbsPathView &path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition)
+	Result SystemDriver_Win32::OpenFileGeneral(UniquePtr<File_Win32> &outFile, const OSAbsPathView &path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition, DWORD extraFlags)
 	{
 		if (createDirectories)
 		{
@@ -1355,7 +1616,7 @@ namespace rkit
 			RKIT_CHECK(CheckCreateDirectories(dirCharsVector));
 		}
 
-		HANDLE fHandle = CreateFileW(path.GetChars(), access, shareMode, nullptr, disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
+		HANDLE fHandle = CreateFileW(path.GetChars(), access, shareMode, nullptr, disposition, FILE_ATTRIBUTE_NORMAL | extraFlags, nullptr);
 
 		if (fHandle == INVALID_HANDLE_VALUE)
 			return utils::SoftFaultResult(ResultCode::kFileOpenError);
@@ -1373,6 +1634,19 @@ namespace rkit
 			CloseHandle(fHandle);
 			return ResultCode::kFileOpenError;
 		}
+
+		return ResultCode::kOK;
+	}
+
+	Result SystemDriver_Win32::OpenFileAsyncGeneral(UniquePtr<AsyncFile_Win32> &outStream, FilePos_t &outInitialSize, const OSAbsPathView &path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition, DWORD extraFlags)
+	{
+		UniquePtr<File_Win32> file;
+		RKIT_CHECK(OpenFileGeneral(file, path, createDirectories, access, shareMode, disposition, extraFlags | FILE_FLAG_OVERLAPPED));
+
+		RCPtr<AsyncFileInstance_Win32> asyncFileInstance;
+		RKIT_CHECK(New<AsyncFileInstance_Win32>(asyncFileInstance, std::move(file)));
+
+		RKIT_CHECK(New<AsyncFile_Win32>(outStream, std::move(asyncFileInstance)));
 
 		return ResultCode::kOK;
 	}
@@ -1407,6 +1681,40 @@ namespace rkit
 
 		m_completed = true;
 		m_streamFuture.GetFutureContainer()->Complete(std::move(stream));
+
+		return ResultCode::kOK;
+	}
+
+
+	OpenFileAsyncReadJobRunner::OpenFileAsyncReadJobRunner(const Future<AsyncFileOpenReadResult> &streamFuture, const OSAbsPath &filePath, ISystemDriver &systemDriver)
+		: m_streamFuture(streamFuture)
+		, m_filePath(filePath)
+		, m_systemDriver(systemDriver)
+	{
+	}
+
+	OpenFileAsyncReadJobRunner::~OpenFileAsyncReadJobRunner()
+	{
+		if (!m_completed)
+			this->m_streamFuture.GetFutureContainer()->Fail();
+	}
+
+	Result OpenFileAsyncReadJobRunner::Run()
+	{
+		Result runResult = CheckedRun();
+		if (!utils::ResultIsOK(runResult))
+			m_streamFuture.GetFutureContainer()->Fail();
+
+		return runResult;
+	}
+
+	Result OpenFileAsyncReadJobRunner::CheckedRun()
+	{
+		AsyncFileOpenReadResult result;
+		RKIT_CHECK(m_systemDriver.OpenFileAsyncReadAbs(result, m_filePath));
+
+		m_completed = true;
+		m_streamFuture.GetFutureContainer()->Complete(std::move(result));
 
 		return ResultCode::kOK;
 	}

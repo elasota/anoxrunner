@@ -10,7 +10,9 @@ namespace rkit
 
 namespace anox
 {
-	class AnoxFileResourceLoaderBase : public AnoxCIPathKeyedResourceLoader
+	class AnoxFileResourceBase;
+
+	class AnoxFileResourceLoaderBase : public AnoxCIPathKeyedResourceLoader<AnoxFileResourceBase>
 	{
 	public:
 		static rkit::Result Create(rkit::RCPtr<AnoxFileResourceLoaderBase> &resLoader);

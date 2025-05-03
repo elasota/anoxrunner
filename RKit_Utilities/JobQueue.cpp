@@ -72,6 +72,23 @@ namespace rkit::utils
 		rkit::IEvent *m_alertSpecificThreadEvent = nullptr;
 	};
 
+	class JobSignallerImpl final : public JobSignaller
+	{
+	public:
+		JobSignallerImpl(JobQueue &jobQueue, const RCPtr<JobImpl> &job);
+		~JobSignallerImpl();
+
+		void SignalDone(bool succeeded) override;
+
+	private:
+		// Needed due to vtable being trashed in destructor
+		void InternalSignalDone(bool succeeded);
+
+		bool m_haveSignalled = false;
+
+		JobQueue &m_jobQueue;
+		RCPtr<JobImpl> m_job;
+	};
 
 	struct JobCategoryInfo
 	{
@@ -83,12 +100,15 @@ namespace rkit::utils
 	{
 	public:
 		friend class JobImpl;
+		friend class JobSignallerImpl;
 
 		explicit JobQueue(IMallocDriver *alloc);
 		~JobQueue();
 
 		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<Job *> &dependencies) override;
 		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<RCPtr<Job> > &dependencies) override;
+
+		Result CreateSignalledJob(RCPtr<JobSignaller> &outSignaler, RCPtr<Job> &outJob) override;
 
 		void WaitForJob(Job &job, const ISpan<JobType> &idleJobTypes, IEvent *wakeEvent, IEvent *terminatedEvent, IEvent *alertSpecificThreadEvent) override;
 
@@ -202,6 +222,28 @@ namespace rkit::utils
 		}
 
 		m_jobQueue.JobDone(this, jobSucceeded);
+	}
+
+	JobSignallerImpl::JobSignallerImpl(JobQueue &jobQueue, const RCPtr<JobImpl> &job)
+		: m_jobQueue(jobQueue)
+		, m_job(job)
+	{
+	}
+
+	JobSignallerImpl::~JobSignallerImpl()
+	{
+		if (!m_haveSignalled)
+			InternalSignalDone(false);
+	}
+
+	void JobSignallerImpl::SignalDone(bool succeeded)
+	{
+		InternalSignalDone(succeeded);
+	}
+
+	void JobSignallerImpl::InternalSignalDone(bool succeeded)
+	{
+		m_jobQueue.JobDone(m_job.Get(), succeeded);
 	}
 
 	JobQueue::JobQueue(IMallocDriver *alloc)
@@ -377,6 +419,21 @@ namespace rkit::utils
 		SpanConverter spanConverter(dependencies);
 
 		return CreateJob(outJob, jobType, std::move(jobRunner), spanConverter);
+	}
+
+
+	Result JobQueue::CreateSignalledJob(RCPtr<JobSignaller> &outSignaler, RCPtr<Job> &outJob)
+	{
+		RCPtr<JobImpl> resultJob;
+		RKIT_CHECK(NewWithAlloc<JobImpl>(resultJob, m_alloc, *this, UniquePtr<IJobRunner>(), 0, JobType::kNormalPriority));
+
+		RCPtr<JobSignallerImpl> signaller;
+		RKIT_CHECK(New<JobSignallerImpl>(signaller, *this, resultJob));
+
+		outSignaler = std::move(signaller);
+		outJob = std::move(resultJob);
+
+		return ResultCode::kOK;
 	}
 
 	void JobQueue::AddRunnableJob(const RCPtr<JobImpl> &job, size_t jobTypeIndex)

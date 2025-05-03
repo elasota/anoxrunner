@@ -29,6 +29,6 @@ namespace anox
 		virtual ~IGameDataFileSystem() {}
 
 		virtual rkit::Result OpenNamedFileBlocking(rkit::RCPtr<rkit::Job> &openJob, const rkit::Future<rkit::UniquePtr<rkit::ISeekableReadStream>> &outStream, const rkit::CIPathView &path) = 0;
-		virtual rkit::Result OpenNamedFileAsync(rkit::RCPtr<rkit::Job> &openJob, const rkit::Future<rkit::UniquePtr<rkit::IAsyncReadFile>> &outStream, rkit::FilePos_t &outSize, const rkit::CIPathView &path) = 0;
+		virtual rkit::Result OpenNamedFileAsync(rkit::RCPtr<rkit::Job> &openJob, const rkit::Future<rkit::AsyncFileOpenReadResult> &outStream, const rkit::CIPathView &path) = 0;
 	};
 }

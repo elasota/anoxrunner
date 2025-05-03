@@ -2,6 +2,7 @@
 
 #include "PathProto.h"
 #include "StringProto.h"
+#include "StreamProtos.h"
 
 #include <cstdint>
 #include <cstddef>
@@ -78,8 +79,13 @@ namespace rkit
 		virtual Result AsyncOpenFileRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<UniquePtr<ISeekableReadStream>> &outStream, FileLocation location, const CIPathView &path) = 0;
 		virtual Result AsyncOpenFileReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<UniquePtr<ISeekableReadStream>> &outStream, const OSAbsPathView &path) = 0;
 
+		virtual Result AsyncOpenFileAsyncRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<AsyncFileOpenReadResult> &outStream, FileLocation location, const CIPathView &path) = 0;
+		virtual Result AsyncOpenFileAsyncReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<AsyncFileOpenReadResult> &outStream, const OSAbsPathView &path) = 0;
+
 		virtual Result OpenFileRead(UniquePtr<ISeekableReadStream> &outStream, FileLocation location, const CIPathView &path) = 0;
 		virtual Result OpenFileReadAbs(UniquePtr<ISeekableReadStream> &outStream, const OSAbsPathView &path) = 0;
+		virtual Result OpenFileAsyncRead(AsyncFileOpenReadResult &outResult, FileLocation location, const CIPathView &path) = 0;
+		virtual Result OpenFileAsyncReadAbs(AsyncFileOpenReadResult &outResult, const OSAbsPathView &path) = 0;
 		virtual Result OpenFileWrite(UniquePtr<ISeekableWriteStream> &outStream, FileLocation location, const CIPathView &path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) = 0;
 		virtual Result OpenFileWriteAbs(UniquePtr<ISeekableWriteStream> &outStream, const OSAbsPathView &path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) = 0;
 		virtual Result OpenFileReadWrite(UniquePtr<ISeekableReadWriteStream> &outStream, FileLocation location, const CIPathView &path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) = 0;

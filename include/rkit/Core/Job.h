@@ -23,4 +23,10 @@ namespace rkit
 	public:
 		virtual void Run() = 0;
 	};
+
+	class JobSignaller : public RefCounted
+	{
+	public:
+		virtual void SignalDone(bool succeeded) = 0;
+	};
 }
