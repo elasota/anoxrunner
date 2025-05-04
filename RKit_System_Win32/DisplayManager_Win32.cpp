@@ -634,7 +634,7 @@ namespace rkit::render
 		RKIT_CHECK(sysDriver->CreateEvent(m_changeDisplayModeEvent, true, false));
 		RKIT_CHECK(sysDriver->CreateMutex(m_actionsMutex));
 
-		RKIT_CHECK(sysDriver->CreateThread(m_thread, std::move(ctx)));
+		RKIT_CHECK(sysDriver->CreateThread(m_thread, std::move(ctx), "RenderWindow"));
 
 		m_startEvent->Wait();
 		m_startEvent.Reset();

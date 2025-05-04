@@ -93,7 +93,7 @@ namespace anox
 		CORO_BEGIN
 			rkit::Future<AnoxResourceRetrieveResult> resResult;
 			rkit::CIPathView path("");
-			CORO_CHECK(self->m_game->GetResourceManager()->GetCIPathKeyedResource(resResult, anox::resloaders::kRawFileResourceTypeCode, rkit::CIPathView("configs/anox.cfg")));
+			//CORO_CHECK(self->m_game->GetResourceManager()->GetCIPathKeyedResource(resResult, anox::resloaders::kRawFileResourceTypeCode, rkit::CIPathView("configs/anox.cfg")));
 		CORO_END
 	};
 

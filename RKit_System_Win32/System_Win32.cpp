@@ -36,6 +36,10 @@
 
 namespace rkit
 {
+	class Thread_Win32;
+
+	typedef HRESULT(WINAPI *SetThreadDescriptionProc_Win32_t)(HANDLE hThread, PCWSTR lpThreadDescription);
+
 	class File_Win32 final : public ISeekableReadWriteStream
 	{
 	public:
@@ -240,13 +244,15 @@ namespace rkit
 		HANDLE m_event = nullptr;
 	};
 
-	class Thread_Win32;
-
 	struct ThreadKickoffInfo_Win32
 	{
 		HANDLE m_hKickoffEvent;
 		Result *m_outResult;
 		UniquePtr<IThreadContext> m_threadContext;
+#if RKIT_IS_DEBUG
+		const wchar_t *m_threadName;
+		SetThreadDescriptionProc_Win32_t m_setThreadDescriptionProc;
+#endif
 	};
 
 	class Thread_Win32 final : public IThread
@@ -293,7 +299,7 @@ namespace rkit
 		Result OpenFileReadWrite(UniquePtr<ISeekableReadWriteStream> &outStream, FileLocation location, const CIPathView &path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
 		Result OpenFileReadWriteAbs(UniquePtr<ISeekableReadWriteStream> &outStream, const OSAbsPathView &path, bool createIfNotExists, bool createDirectories, bool truncateIfExists) override;
 
-		Result CreateThread(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContext) override;
+		Result CreateThread(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContext, const StringView &threadName) override;
 		Result CreateMutex(UniquePtr<IMutex> &mutex) override;
 		Result CreateEvent(UniquePtr<IEvent> &outEvent, bool autoReset, bool startSignaled) override;
 		void SleepMSec(uint32_t msec) const override;
@@ -351,6 +357,12 @@ namespace rkit
 		OSAbsPath m_settingsDirectory;
 
 		HINSTANCE m_hInstance;
+
+		HMODULE m_kernelBaseModule = nullptr;
+
+#if RKIT_IS_DEBUG
+		SetThreadDescriptionProc_Win32_t m_setThreadDescriptionProc;
+#endif
 	};
 
 	class OpenFileReadJobRunner final : public IJobRunner
@@ -1178,6 +1190,9 @@ namespace rkit
 
 		if (m_argvW)
 			LocalFree(m_argvW);
+
+		if (m_kernelBaseModule)
+			FreeLibrary(m_kernelBaseModule);
 	}
 
 	Result SystemDriver_Win32::Initialize()
@@ -1205,6 +1220,14 @@ namespace rkit
 		}
 
 		RKIT_CHECK(render::DisplayManagerBase_Win32::Create(m_displayManager, m_alloc, m_hInstance));
+
+#if RKIT_IS_DEBUG
+		m_kernelBaseModule = LoadLibraryW(L"KernelBase.dll");
+		if (m_kernelBaseModule)
+			m_setThreadDescriptionProc = reinterpret_cast<SetThreadDescriptionProc_Win32_t>(GetProcAddress(m_kernelBaseModule, "SetThreadDescription"));
+		else
+			m_setThreadDescriptionProc = nullptr;
+#endif
 
 		RKIT_CHECK(New<AsyncIOThread_Win32>(m_asioThread, *this));
 		RKIT_CHECK(m_asioThread->Initialize());
@@ -1390,7 +1413,7 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
-	Result SystemDriver_Win32::CreateThread(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContextRef)
+	Result SystemDriver_Win32::CreateThread(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContextRef, const StringView &threadName)
 	{
 		UniquePtr<IThreadContext> threadContext(std::move(threadContextRef));
 
@@ -1408,10 +1431,19 @@ namespace rkit
 			return createThreadResult;
 		}
 
+
 		ThreadKickoffInfo_Win32 kickoffInfo;
 		kickoffInfo.m_hKickoffEvent = hKickoffEvent;
 		kickoffInfo.m_outResult = thread->GetResultPtr();
 		kickoffInfo.m_threadContext = std::move(threadContext);
+
+#if RKIT_IS_DEBUG
+		Vector<wchar_t> threadNameVector(m_alloc);
+		RKIT_CHECK(ConvUtil_Win32::UTF8ToUTF16(threadName.GetChars(), threadNameVector));
+
+		kickoffInfo.m_threadName = threadNameVector.GetBuffer();
+		kickoffInfo.m_setThreadDescriptionProc = m_setThreadDescriptionProc;
+#endif
 
 		DWORD threadID = 0;
 		HANDLE hThread = ::CreateThread(nullptr, 0, ThreadStartRoutine, &kickoffInfo, 0, &threadID);
@@ -1773,6 +1805,11 @@ namespace rkit
 		HANDLE hKickoffEvent = kickoff->m_hKickoffEvent;
 		Result *outResult = kickoff->m_outResult;
 		UniquePtr<IThreadContext> context = std::move(kickoff->m_threadContext);
+
+#if RKIT_IS_DEBUG
+		if (kickoff->m_threadName && kickoff->m_threadName[0] && kickoff->m_setThreadDescriptionProc)
+			kickoff->m_setThreadDescriptionProc(GetCurrentThread(), kickoff->m_threadName);
+#endif
 
 		::SetEvent(hKickoffEvent);
 

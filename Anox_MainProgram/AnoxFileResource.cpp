@@ -190,7 +190,7 @@ namespace anox
 
 	rkit::Result AnoxFileResourceLoader::RunProcessingTask(AnoxFileResourceBase &resource, const rkit::CIPathView &key)
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result AnoxFileResourceLoader::CreateResourceObject(rkit::UniquePtr<AnoxFileResourceBase> &outResource)

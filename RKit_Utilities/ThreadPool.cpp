@@ -5,6 +5,7 @@
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/RefCounted.h"
 #include "rkit/Core/Vector.h"
+#include "rkit/Core/String.h"
 #include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/Thread.h"
 
@@ -164,7 +165,12 @@ namespace rkit::utils
 			UniquePtr<IThreadContext> context;
 			RKIT_CHECK(New<ThreadPoolThreadContext>(context, *this, std::move(jobTypes), std::move(wakeEvent), std::move(terminateEvent)));
 
-			RKIT_CHECK(GetDrivers().m_systemDriver->CreateThread(td.m_thread, std::move(context)));
+			String threadName;
+#if RKIT_IS_DEBUG
+			RKIT_CHECK(threadName.Format("Worker %i", static_cast<int>(i)));
+#endif
+
+			RKIT_CHECK(GetDrivers().m_systemDriver->CreateThread(td.m_thread, std::move(context), threadName));
 		}
 
 		return ResultCode::kOK;

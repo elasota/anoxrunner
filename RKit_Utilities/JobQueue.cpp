@@ -205,6 +205,8 @@ namespace rkit::utils
 
 	void JobImpl::Run()
 	{
+		RKIT_ASSERT(m_numWaitingDependencies == 0);
+
 		bool jobSucceeded = true;
 
 		if (m_jobDependencyFailed)
@@ -348,7 +350,6 @@ namespace rkit::utils
 
 		JobCategoryInfo &ci = m_categories[static_cast<size_t>(jobType)];
 
-		bool isRunnableNow = true;
 		bool isAborted = false;
 		if (numDependencies > 0)
 		{
@@ -356,15 +357,11 @@ namespace rkit::utils
 
 			for (Job *job : dependencies)
 			{
-				if (!static_cast<JobImpl *>(job)->m_jobCompleted)
-					isRunnableNow = false;
+				if (static_cast<JobImpl *>(job)->m_jobCompleted)
+					resultJob->m_numWaitingDependencies--;
 
 				if (static_cast<JobImpl *>(job)->m_jobFailed)
-				{
 					isAborted = true;
-					isRunnableNow = false;
-					break;
-				}
 			}
 
 			if (!isAborted)
@@ -372,29 +369,25 @@ namespace rkit::utils
 				for (Job *job : dependencies)
 				{
 					if (!static_cast<JobImpl *>(job)->m_jobCompleted)
-					{
-						isRunnableNow = false;
 						RKIT_CHECK(static_cast<JobImpl *>(job)->ReserveDownstreamDependency());
-					}
 				}
 
 				for (Job *job : dependencies)
 				{
 					if (!static_cast<JobImpl *>(job)->m_jobCompleted)
-					{
 						*(static_cast<JobImpl *>(job)->GetLastDownstreamDependency()) = resultJob;
-					}
 				}
 			}
 		}
 
 		if (isAborted)
 		{
+			resultJob->m_numWaitingDependencies = 0;
 			resultJob->m_jobCompleted = true;
 			resultJob->m_jobFailed = true;
 		}
 
-		if (isRunnableNow)
+		if (resultJob->m_numWaitingDependencies == 0)
 			AddRunnableJob(resultJob, static_cast<size_t>(jobType));
 
 		if (outJob)
