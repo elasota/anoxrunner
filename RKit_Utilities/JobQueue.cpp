@@ -361,7 +361,11 @@ namespace rkit::utils
 					resultJob->m_numWaitingDependencies--;
 
 				if (static_cast<JobImpl *>(job)->m_jobFailed)
+				{
+					resultJob->m_numWaitingDependencies = 0;
 					isAborted = true;
+					break;
+				}
 			}
 
 			if (!isAborted)
@@ -382,7 +386,6 @@ namespace rkit::utils
 
 		if (isAborted)
 		{
-			resultJob->m_numWaitingDependencies = 0;
 			resultJob->m_jobCompleted = true;
 			resultJob->m_jobFailed = true;
 		}
@@ -459,13 +462,15 @@ namespace rkit::utils
 		const size_t kThisCategoryBit = (static_cast<size_t>(1) << jobTypeIndex);
 		const size_t kLowerCategoriesBits = kThisCategoryBit - 1;
 
-		for (CategoryWaitList &waitList : m_singleCategoryWaitLists)
 		{
-			if (waitList.m_firstWaitingThread)
+			for (CategoryWaitList &waitList : m_singleCategoryWaitLists)
 			{
-				threadToKick = waitList.m_firstWaitingThread;
-				ciWaitListToKick = &waitList;
-				break;
+				if (waitList.m_firstWaitingThread)
+				{
+					threadToKick = waitList.m_firstWaitingThread;
+					ciWaitListToKick = &waitList;
+					break;
+				}
 			}
 		}
 

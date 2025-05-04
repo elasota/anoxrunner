@@ -48,7 +48,7 @@ namespace rkit::utils
 		Vector<ThreadData> m_threads;
 
 		AllJobTypesSpan m_allJobsSpan;
-		JobTypeList<JobType::kNormalPriority> m_normalJobsSpan;
+		JobTypeList<> m_noJobsSpan;
 	};
 
 	class ThreadPoolThreadContext final : public IThreadContext
@@ -95,7 +95,7 @@ namespace rkit::utils
 	const ISpan<JobType> &ThreadPool::GetMainThreadJobTypes() const
 	{
 		if (m_numThreads > 0)
-			return m_normalJobsSpan;
+			return m_noJobsSpan;
 		else
 			return m_allJobsSpan;
 	}
@@ -146,13 +146,20 @@ namespace rkit::utils
 
 		for (uint32_t i = 0; i < m_numThreads; i++)
 		{
-			JobType jobType = JobType::kNormalPriority;
-
-			if (i == 0)
-				jobType = JobType::kIO;
-
 			Vector<JobType> jobTypes;
-			RKIT_CHECK(jobTypes.Append(jobType));
+			if (m_numThreads == 1)
+			{
+				RKIT_CHECK(jobTypes.Append(JobType::kIO));
+				RKIT_CHECK(jobTypes.Append(JobType::kNormalPriority));
+			}
+			else
+			{
+				JobType jobType = JobType::kNormalPriority;
+				if (i == 0)
+					jobType = JobType::kIO;
+
+				RKIT_CHECK(jobTypes.Append(jobType));
+			}
 
 			ThreadData &td = m_threads[i];
 

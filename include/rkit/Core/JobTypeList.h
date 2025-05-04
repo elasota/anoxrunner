@@ -12,6 +12,14 @@ namespace rkit
 		{
 		};
 
+		template<>
+		struct JobTypeListHelper<>
+		{
+			static const size_t kCount = 0;
+
+			static JobType Resolve(size_t index);
+		};
+
 		template<JobType TJobType>
 		struct JobTypeListHelper<TJobType>
 		{
@@ -42,6 +50,12 @@ namespace rkit
 
 namespace rkit::priv
 {
+	inline JobType JobTypeListHelper<>::Resolve(size_t index)
+	{
+		RKIT_ASSERT(false);
+		return JobType();
+	}
+
 	template<JobType TJobType>
 	JobType JobTypeListHelper<TJobType>::Resolve(size_t index)
 	{
