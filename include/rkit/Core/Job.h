@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CoreDefs.h"
 #include "RefCounted.h"
 
 namespace rkit
@@ -27,6 +28,6 @@ namespace rkit
 	class JobSignaller : public RefCounted
 	{
 	public:
-		virtual void SignalDone(bool succeeded) = 0;
+		virtual void SignalDone(const Result &result) = 0;
 	};
 }

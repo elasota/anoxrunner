@@ -53,6 +53,8 @@ namespace rkit
 		kFormatError,
 
 		kCoroStackOverflow,
+
+		kJobAborted,
 	};
 
 #if !RKIT_USE_CLASS_RESULT

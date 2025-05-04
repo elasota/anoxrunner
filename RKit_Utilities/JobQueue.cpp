@@ -78,11 +78,11 @@ namespace rkit::utils
 		JobSignallerImpl(JobQueue &jobQueue, const RCPtr<JobImpl> &job);
 		~JobSignallerImpl();
 
-		void SignalDone(bool succeeded) override;
+		void SignalDone(const Result &result) override;
 
 	private:
 		// Needed due to vtable being trashed in destructor
-		void InternalSignalDone(bool succeeded);
+		void InternalSignalDone(const Result &result);
 
 		bool m_haveSignalled = false;
 
@@ -211,14 +211,19 @@ namespace rkit::utils
 			jobSucceeded = false;
 		else
 		{
-			Result result = m_jobRunner->Run();
+			if (m_jobRunner.IsValid())
+			{
+				Result result = m_jobRunner->Run();
 
-			if (!utils::ResultIsOK(result))
-				m_jobQueue.Fault(result);
+				if (!utils::ResultIsOK(result))
+					m_jobQueue.Fault(result);
 
-			m_jobRunner.Reset();
+				m_jobRunner.Reset();
 
-			jobSucceeded = utils::ResultIsOK(result);
+				jobSucceeded = utils::ResultIsOK(result);
+			}
+			else
+				jobSucceeded = true;
 		}
 
 		m_jobQueue.JobDone(this, jobSucceeded);
@@ -233,17 +238,22 @@ namespace rkit::utils
 	JobSignallerImpl::~JobSignallerImpl()
 	{
 		if (!m_haveSignalled)
-			InternalSignalDone(false);
+			InternalSignalDone(ResultCode::kJobAborted);
 	}
 
-	void JobSignallerImpl::SignalDone(bool succeeded)
+	void JobSignallerImpl::SignalDone(const Result &result)
 	{
-		InternalSignalDone(succeeded);
+		InternalSignalDone(result);
 	}
 
-	void JobSignallerImpl::InternalSignalDone(bool succeeded)
+	void JobSignallerImpl::InternalSignalDone(const Result &result)
 	{
-		m_jobQueue.JobDone(m_job.Get(), succeeded);
+		m_haveSignalled = true;
+
+		if (!utils::ResultIsOK(result))
+			m_jobQueue.Fault(result);
+
+		m_jobQueue.JobDone(m_job.Get(), utils::ResultIsOK(result));
 	}
 
 	JobQueue::JobQueue(IMallocDriver *alloc)
@@ -705,7 +715,7 @@ namespace rkit::utils
 	void JobQueue::Fault(const Result &result)
 	{
 		MutexLock lock(*m_resultMutex);
-		if (!utils::ResultIsOK(result))
+		if (!utils::ResultIsOK(result) && utils::ResultIsOK(m_result))
 			m_result = result;
 	}
 

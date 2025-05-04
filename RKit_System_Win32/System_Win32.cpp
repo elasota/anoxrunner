@@ -77,71 +77,98 @@ namespace rkit
 		UniquePtr<File_Win32> m_file;
 	};
 
-	class AsyncReadWriteRequester_Win32 final : public IAsyncReadRequester, public IAsyncWriteRequester
+	class AsyncReadWriteRequesterInstance_Win32 final : public RefCounted
 	{
 	public:
-		explicit AsyncReadWriteRequester_Win32(const RCPtr<AsyncFileInstance_Win32> &instance);
+		explicit AsyncReadWriteRequesterInstance_Win32(AsyncIOThread_Win32 &asioThread, const RCPtr<AsyncFileInstance_Win32> &instance);
 
-		Result PostReadRequest(void *readBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, ReadSucceedCallback_t succeedCallback, ReadFailCallback_t failCallback) override;
-		Result PostWriteRequest(const void *writeBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback) override;
-		Result PostAppendRequest(const void *writeBuffer, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback) override;
+		void PostReadRequest(IJobQueue &jobQueue, void *readBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback);
+		void PostWriteRequest(IJobQueue &jobQueue, const void *writeBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback);
+		void PostAppendRequest(IJobQueue &jobQueue, const void *writeBuffer, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback);
 
 	private:
 		void OpenRequest();
 		void CloseRequest();
 
-		Result CheckedPostReadRequest(void *readBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, ReadSucceedCallback_t succeedCallback, ReadFailCallback_t failCallback);
-		Result CheckedPostWriteRequest(const void *writeBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback);
-		Result CheckedPostAppendRequest(const void *writeBuffer, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback);
+		void PostToIOQueue();
 
-		static VOID WINAPI StaticOverlappedReadCompletion(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped);
-		static VOID WINAPI StaticOverlappedWriteCompletion(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped);
-		static VOID WINAPI StaticOverlappedAppendCompletion(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped);
+		Result CheckedPostReadRequest(IJobQueue &jobQueue, void *readBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback);
+		Result CheckedPostWriteRequest(IJobQueue &jobQueue, const void *writeBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback);
+		Result CheckedPostAppendRequest(IJobQueue &jobQueue, const void *writeBuffer, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback);
 
-		struct ReadSucceedFailCallbacks
+		void ContinueRequest();
+		Result CheckedContinueRequest();
+
+		static VOID WINAPI StaticCompleteRequest(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped);
+		static void StaticExecute(void *userdata);
+		static void StaticCancel(void *userdata);
+		static void StaticFlush(void *userdata);
+
+		void Execute();
+		void Cancel();
+		void Flush();
+		void CompleteRequest(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered);
+
+		enum class RequestType
 		{
-			ReadSucceedCallback_t m_succeed;
-			ReadFailCallback_t m_fail;
-		};
-
-		struct WriteSucceedFailCallbacks
-		{
-			WriteSucceedCallback_t m_succeed;
-			WriteFailCallback_t m_fail;
-		};
-
-		union SucceedFailCallbacksUnion
-		{
-			ReadSucceedFailCallbacks m_read;
-			WriteSucceedFailCallbacks m_write;
+			kRead,
+			kWrite,
+			kAppend,
 		};
 
 		struct OverlappedHolder
 		{
 			OVERLAPPED m_overlapped;
+
 			void *m_userdata;
-			SucceedFailCallbacksUnion m_callbacks;
+			AsyncIOCompletionCallback_t m_callback;
+
+			RequestType m_requestType;
+			void *m_dataBuffer;
+			FilePos_t m_startPosition;
+			size_t m_remainingBytes;
+			size_t m_bytesProcessed;
+
+			DWORD m_amountRequestedByLastRequest;
 		};
 
+		AsyncIOTaskItem_Win32 m_taskItem;
+
+		AsyncIOThread_Win32 &m_asioThread;
 		HANDLE m_hfile;
 		const RCPtr<AsyncFileInstance_Win32> m_instance;
 		OverlappedHolder m_overlappedHolder;
+		RCPtr<AsyncReadWriteRequesterInstance_Win32> m_keepalive;
 
 #if RKIT_IS_DEBUG
 		std::atomic<uint32_t> m_outstandingRequests;
 #endif
 	};
 
+	class AsyncReadWriteRequester_Win32 final : public IAsyncReadRequester, public IAsyncWriteRequester
+	{
+	public:
+		explicit AsyncReadWriteRequester_Win32(const RCPtr<AsyncReadWriteRequesterInstance_Win32> &instance);
+
+		void PostReadRequest(IJobQueue &jobQueue, void *readBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback) override;
+		void PostWriteRequest(IJobQueue &jobQueue, const void *writeBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback) override;
+		void PostAppendRequest(IJobQueue &jobQueue, const void *writeBuffer, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback) override;
+
+	private:
+		RCPtr<AsyncReadWriteRequesterInstance_Win32> m_instance;
+	};
+
 	class AsyncFile_Win32 final : public IAsyncReadWriteFile
 	{
 	public:
-		explicit AsyncFile_Win32(RCPtr<AsyncFileInstance_Win32> &&instance);
+		explicit AsyncFile_Win32(AsyncIOThread_Win32 &asioThread, RCPtr<AsyncFileInstance_Win32> &&instance);
 		~AsyncFile_Win32();
 
 		Result CreateReadRequester(UniquePtr<IAsyncReadRequester> &requester) override;
 		Result CreateWriteRequester(UniquePtr<IAsyncWriteRequester> &requester) override;
 
 	private:
+		AsyncIOThread_Win32 &m_asioThread;
 		RCPtr<AsyncFileInstance_Win32> m_instance;
 	};
 
@@ -620,78 +647,261 @@ namespace rkit
 		return m_hfile;
 	}
 
-	AsyncReadWriteRequester_Win32::AsyncReadWriteRequester_Win32(const RCPtr<AsyncFileInstance_Win32> &instance)
+	AsyncReadWriteRequesterInstance_Win32::AsyncReadWriteRequesterInstance_Win32(AsyncIOThread_Win32 &asioThread, const RCPtr<AsyncFileInstance_Win32> &instance)
 		: m_hfile(instance->GetHandle())
 		, m_instance(instance)
 		, m_overlappedHolder {}
+		, m_asioThread(asioThread)
 #if RKIT_IS_DEBUG
 		, m_outstandingRequests(0)
 #endif
 	{
+		m_taskItem.m_cancelFunc = StaticCancel;
+		m_taskItem.m_executeFunc = StaticExecute;
+		m_taskItem.m_flushFunc = StaticFlush;
+		m_taskItem.m_userdata = this;
 	}
 
-	Result AsyncReadWriteRequester_Win32::PostReadRequest(void *readBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, ReadSucceedCallback_t succeedCallback, ReadFailCallback_t failCallback)
+	void AsyncReadWriteRequesterInstance_Win32::PostReadRequest(IJobQueue &jobQueue, void *readBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback)
 	{
 		OpenRequest();
-		Result postResult = CheckedPostReadRequest(readBuffer, pos, amount, completionUserData, succeedCallback, failCallback);
-		if (!postResult.IsOK())
+		Result postResult = CheckedPostReadRequest(jobQueue, readBuffer, pos, amount, completionUserData, completeCallback);
+		if (!utils::ResultIsOK(postResult))
+		{
 			CloseRequest();
-
-		return postResult;
+			completeCallback(completionUserData, postResult, 0);
+		}
 	}
 
-	Result AsyncReadWriteRequester_Win32::PostWriteRequest(const void *writeBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback)
+	void AsyncReadWriteRequesterInstance_Win32::PostWriteRequest(IJobQueue &jobQueue, const void *writeBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback)
 	{
 		OpenRequest();
-		Result postResult = CheckedPostWriteRequest(writeBuffer, pos, amount, completionUserData, succeedCallback, failCallback);
-		if (!postResult.IsOK())
+		Result postResult = CheckedPostWriteRequest(jobQueue, writeBuffer, pos, amount, completionUserData, completeCallback);
+		if (!utils::ResultIsOK(postResult))
+		{
 			CloseRequest();
-
-		return postResult;
+			completeCallback(completionUserData, postResult, 0);
+		}
 	}
 
-	Result AsyncReadWriteRequester_Win32::PostAppendRequest(const void *writeBuffer, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback)
+	void AsyncReadWriteRequesterInstance_Win32::PostAppendRequest(IJobQueue &jobQueue, const void *writeBuffer, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback)
 	{
 		OpenRequest();
-		Result postResult = CheckedPostAppendRequest(writeBuffer, amount, completionUserData, succeedCallback, failCallback);
-		if (!postResult.IsOK())
+		Result postResult = CheckedPostAppendRequest(jobQueue, writeBuffer, amount, completionUserData, completeCallback);
+		if (!utils::ResultIsOK(postResult))
+		{
 			CloseRequest();
-
-		return postResult;
+			completeCallback(completionUserData, postResult, 0);
+		}
 	}
 
-	void AsyncReadWriteRequester_Win32::OpenRequest()
+	void AsyncReadWriteRequesterInstance_Win32::OpenRequest()
 	{
 #if RKIT_IS_DEBUG
 		uint32_t numOutstanding = m_outstandingRequests.fetch_add(1);
 		RKIT_ASSERT(numOutstanding == 0);
 #endif
+
+		m_keepalive = RCPtr<AsyncReadWriteRequesterInstance_Win32>(this);
 	}
 
-	void AsyncReadWriteRequester_Win32::CloseRequest()
+	void AsyncReadWriteRequesterInstance_Win32::CloseRequest()
 	{
 #if RKIT_IS_DEBUG
 		m_outstandingRequests.fetch_sub(1);
 #endif
+
+		m_keepalive.Reset();
 	}
 
-	Result AsyncReadWriteRequester_Win32::CheckedPostReadRequest(void *readBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, ReadSucceedCallback_t succeedCallback, ReadFailCallback_t failCallback)
+	void AsyncReadWriteRequesterInstance_Win32::PostToIOQueue()
 	{
-		return ResultCode::kNotYetImplemented;
+		m_asioThread.PostTask(m_taskItem);
 	}
 
-	Result AsyncReadWriteRequester_Win32::CheckedPostWriteRequest(const void *writeBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback)
+	Result AsyncReadWriteRequesterInstance_Win32::CheckedPostReadRequest(IJobQueue &jobQueue, void *readBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback)
 	{
-		return ResultCode::kNotYetImplemented;
+		if (std::numeric_limits<FilePos_t>::max() - pos < amount)
+			return ResultCode::kIntegerOverflow;
+
+		m_overlappedHolder.m_overlapped = {};
+		m_overlappedHolder.m_userdata = completionUserData;
+		m_overlappedHolder.m_callback = completeCallback;
+		m_overlappedHolder.m_requestType = RequestType::kRead;
+		m_overlappedHolder.m_dataBuffer = readBuffer;
+		m_overlappedHolder.m_startPosition = pos;
+		m_overlappedHolder.m_remainingBytes = amount;
+		m_overlappedHolder.m_bytesProcessed = 0;
+
+		PostToIOQueue();
+
+		return ResultCode::kOK;
 	}
 
-	Result AsyncReadWriteRequester_Win32::CheckedPostAppendRequest(const void *writeBuffer, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback)
+	Result AsyncReadWriteRequesterInstance_Win32::CheckedPostWriteRequest(IJobQueue &jobQueue, const void *writeBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback)
 	{
-		return ResultCode::kNotYetImplemented;
+		if (std::numeric_limits<FilePos_t>::max() - pos < amount)
+			return ResultCode::kIntegerOverflow;
+
+		m_overlappedHolder.m_overlapped = {};
+		m_overlappedHolder.m_userdata = completionUserData;
+		m_overlappedHolder.m_callback = completeCallback;
+		m_overlappedHolder.m_requestType = RequestType::kWrite;
+		m_overlappedHolder.m_dataBuffer = const_cast<void *>(writeBuffer);
+		m_overlappedHolder.m_startPosition = pos;
+		m_overlappedHolder.m_remainingBytes = amount;
+		m_overlappedHolder.m_bytesProcessed = 0;
+
+		PostToIOQueue();
+
+		return ResultCode::kOK;
 	}
 
-	AsyncFile_Win32::AsyncFile_Win32(RCPtr<AsyncFileInstance_Win32> &&instance)
-		: m_instance(std::move(instance))
+	Result AsyncReadWriteRequesterInstance_Win32::CheckedPostAppendRequest(IJobQueue &jobQueue, const void *writeBuffer, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback)
+	{
+		m_overlappedHolder.m_overlapped = {};
+		m_overlappedHolder.m_userdata = completionUserData;
+		m_overlappedHolder.m_callback = completeCallback;
+		m_overlappedHolder.m_requestType = RequestType::kWrite;
+		m_overlappedHolder.m_dataBuffer = const_cast<void *>(writeBuffer);
+		m_overlappedHolder.m_startPosition = 0;
+		m_overlappedHolder.m_remainingBytes = amount;
+		m_overlappedHolder.m_bytesProcessed = 0;
+
+		PostToIOQueue();
+
+		return ResultCode::kOK;
+	}
+
+	void AsyncReadWriteRequesterInstance_Win32::ContinueRequest()
+	{
+		Result continueResult = CheckedContinueRequest();
+		if (!utils::ResultIsOK(continueResult))
+			m_overlappedHolder.m_callback(m_overlappedHolder.m_userdata, continueResult, m_overlappedHolder.m_bytesProcessed);
+	}
+
+	Result AsyncReadWriteRequesterInstance_Win32::CheckedContinueRequest()
+	{
+		DWORD operationAmount = MAXDWORD;
+		if (operationAmount > m_overlappedHolder.m_remainingBytes)
+			operationAmount = static_cast<DWORD>(m_overlappedHolder.m_remainingBytes);
+
+		m_overlappedHolder.m_amountRequestedByLastRequest = operationAmount;
+
+		switch (m_overlappedHolder.m_requestType)
+		{
+		case RequestType::kRead:
+			m_overlappedHolder.m_overlapped.OffsetHigh = static_cast<DWORD>(m_overlappedHolder.m_startPosition >> 32);
+			m_overlappedHolder.m_overlapped.OffsetHigh = static_cast<DWORD>(m_overlappedHolder.m_startPosition & 0xffffffffu);
+			if (!ReadFileEx(m_hfile, m_overlappedHolder.m_dataBuffer, operationAmount, &m_overlappedHolder.m_overlapped, StaticCompleteRequest))
+				return utils::CreateResultWithExtCode(ResultCode::kIOWriteError, GetLastError());
+			break;
+		case RequestType::kWrite:
+			m_overlappedHolder.m_overlapped.OffsetHigh = static_cast<DWORD>(m_overlappedHolder.m_startPosition >> 32);
+			m_overlappedHolder.m_overlapped.OffsetHigh = static_cast<DWORD>(m_overlappedHolder.m_startPosition & 0xffffffffu);
+			if (!WriteFileEx(m_hfile, m_overlappedHolder.m_dataBuffer, operationAmount, &m_overlappedHolder.m_overlapped, StaticCompleteRequest))
+				return utils::CreateResultWithExtCode(ResultCode::kIOWriteError, GetLastError());
+			break;
+		case RequestType::kAppend:
+			m_overlappedHolder.m_overlapped.OffsetHigh = static_cast<DWORD>(-1);
+			m_overlappedHolder.m_overlapped.OffsetHigh = static_cast<DWORD>(-1);
+			if (!WriteFileEx(m_hfile, m_overlappedHolder.m_dataBuffer, operationAmount, &m_overlappedHolder.m_overlapped, StaticCompleteRequest))
+				return utils::CreateResultWithExtCode(ResultCode::kIOWriteError, GetLastError());
+			break;
+
+		default:
+			return ResultCode::kInternalError;
+		};
+
+		m_asioThread.PostInProgress(m_taskItem);
+
+		return ResultCode::kOK;
+	}
+
+	VOID WINAPI AsyncReadWriteRequesterInstance_Win32::StaticCompleteRequest(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped)
+	{
+		uint8_t *ptr = reinterpret_cast<uint8_t *>(lpOverlapped);
+		ptr -= offsetof(AsyncReadWriteRequesterInstance_Win32::OverlappedHolder, m_overlapped);
+		ptr -= offsetof(AsyncReadWriteRequesterInstance_Win32, m_overlappedHolder);
+
+		reinterpret_cast<AsyncReadWriteRequesterInstance_Win32 *>(ptr)->CompleteRequest(dwErrorCode, dwNumberOfBytesTransfered);
+	}
+
+	void AsyncReadWriteRequesterInstance_Win32::StaticExecute(void *userdata)
+	{
+		static_cast<AsyncReadWriteRequesterInstance_Win32 *>(userdata)->Execute();
+	}
+
+	void AsyncReadWriteRequesterInstance_Win32::StaticCancel(void *userdata)
+	{
+		static_cast<AsyncReadWriteRequesterInstance_Win32 *>(userdata)->Cancel();
+	}
+
+	void AsyncReadWriteRequesterInstance_Win32::StaticFlush(void *userdata)
+	{
+		static_cast<AsyncReadWriteRequesterInstance_Win32 *>(userdata)->Flush();
+	}
+
+	void AsyncReadWriteRequesterInstance_Win32::Execute()
+	{
+		ContinueRequest();
+	}
+
+	void AsyncReadWriteRequesterInstance_Win32::Cancel()
+	{
+		BOOL cancelled = ::CancelIoEx(m_hfile, &m_overlappedHolder.m_overlapped);
+		if (cancelled || GetLastError() != ERROR_NOT_FOUND)
+		{
+			// Wait for the overlapped request
+			DWORD bytesTransferred = 0;
+			GetOverlappedResult(m_hfile, &m_overlappedHolder.m_overlapped, &bytesTransferred, TRUE);
+		}
+	}
+
+	void AsyncReadWriteRequesterInstance_Win32::Flush()
+	{
+		DWORD bytesTransferred = 0;
+		GetOverlappedResult(m_hfile, &m_overlappedHolder.m_overlapped, &bytesTransferred, TRUE);
+	}
+
+	void AsyncReadWriteRequesterInstance_Win32::CompleteRequest(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered)
+	{
+		m_asioThread.RemoveInProgress(m_taskItem);
+
+		m_overlappedHolder.m_bytesProcessed += dwNumberOfBytesTransfered;
+		m_overlappedHolder.m_dataBuffer = static_cast<uint8_t *>(m_overlappedHolder.m_dataBuffer) + dwNumberOfBytesTransfered;
+		m_overlappedHolder.m_startPosition += dwNumberOfBytesTransfered;
+		m_overlappedHolder.m_remainingBytes -= dwNumberOfBytesTransfered;
+
+		if (dwNumberOfBytesTransfered != m_overlappedHolder.m_amountRequestedByLastRequest || m_overlappedHolder.m_remainingBytes == 0)
+			m_overlappedHolder.m_callback(m_overlappedHolder.m_userdata, ResultCode::kOK, m_overlappedHolder.m_bytesProcessed);
+		else
+			ContinueRequest();
+	}
+
+	AsyncReadWriteRequester_Win32::AsyncReadWriteRequester_Win32(const RCPtr<AsyncReadWriteRequesterInstance_Win32> &instance)
+		: m_instance(instance)
+	{
+	}
+
+	void AsyncReadWriteRequester_Win32::PostReadRequest(IJobQueue &jobQueue, void *readBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback)
+	{
+		return m_instance->PostReadRequest(jobQueue, readBuffer, pos, amount, completionUserData, completeCallback);
+	}
+
+	void AsyncReadWriteRequester_Win32::PostWriteRequest(IJobQueue &jobQueue, const void *writeBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback)
+	{
+		return m_instance->PostWriteRequest(jobQueue, writeBuffer, pos, amount, completionUserData, completeCallback);
+	}
+
+	void AsyncReadWriteRequester_Win32::PostAppendRequest(IJobQueue &jobQueue, const void *writeBuffer, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback)
+	{
+		return m_instance->PostAppendRequest(jobQueue, writeBuffer, amount, completionUserData, completeCallback);
+	}
+
+	AsyncFile_Win32::AsyncFile_Win32(AsyncIOThread_Win32 &asioThread, RCPtr<AsyncFileInstance_Win32> &&instance)
+		: m_asioThread(asioThread)
+		, m_instance(std::move(instance))
 	{
 	}
 
@@ -701,12 +911,18 @@ namespace rkit
 
 	Result AsyncFile_Win32::CreateReadRequester(UniquePtr<IAsyncReadRequester> &requester)
 	{
-		return New<AsyncReadWriteRequester_Win32>(requester, m_instance);
+		RCPtr<AsyncReadWriteRequesterInstance_Win32> requesterInstance;
+		RKIT_CHECK(New<AsyncReadWriteRequesterInstance_Win32>(requesterInstance, m_asioThread, m_instance));
+
+		return New<AsyncReadWriteRequester_Win32>(requester, requesterInstance);
 	}
 
 	Result AsyncFile_Win32::CreateWriteRequester(UniquePtr<IAsyncWriteRequester> &requester)
 	{
-		return New<AsyncReadWriteRequester_Win32>(requester, m_instance);
+		RCPtr<AsyncReadWriteRequesterInstance_Win32> requesterInstance;
+		RKIT_CHECK(New<AsyncReadWriteRequesterInstance_Win32>(requesterInstance, m_asioThread, m_instance));
+
+		return New<AsyncReadWriteRequester_Win32>(requester, requesterInstance);
 	}
 
 	DirectoryScan_Win32::DirectoryScan_Win32()
@@ -1643,10 +1859,16 @@ namespace rkit
 		UniquePtr<File_Win32> file;
 		RKIT_CHECK(OpenFileGeneral(file, path, createDirectories, access, shareMode, disposition, extraFlags | FILE_FLAG_OVERLAPPED));
 
+		const FilePos_t initialSize = file->GetSize();
+
 		RCPtr<AsyncFileInstance_Win32> asyncFileInstance;
 		RKIT_CHECK(New<AsyncFileInstance_Win32>(asyncFileInstance, std::move(file)));
 
-		RKIT_CHECK(New<AsyncFile_Win32>(outStream, std::move(asyncFileInstance)));
+		UniquePtr<AsyncFile_Win32> stream;
+		RKIT_CHECK(New<AsyncFile_Win32>(stream, *m_asioThread, std::move(asyncFileInstance)));
+
+		outStream = std::move(stream);
+		outInitialSize = initialSize;
 
 		return ResultCode::kOK;
 	}
@@ -1703,7 +1925,10 @@ namespace rkit
 	{
 		Result runResult = CheckedRun();
 		if (!utils::ResultIsOK(runResult))
+		{
 			m_streamFuture.GetFutureContainer()->Fail();
+			m_completed = true;
+		}
 
 		return runResult;
 	}

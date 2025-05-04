@@ -15,6 +15,8 @@ namespace anox
 		rkit::Result OpenNamedFileBlocking(rkit::RCPtr<rkit::Job> &openJob, const rkit::Future<rkit::UniquePtr<rkit::ISeekableReadStream>> &outStream, const rkit::CIPathView &path) override;
 		rkit::Result OpenNamedFileAsync(rkit::RCPtr<rkit::Job> &openJob, const rkit::Future<rkit::AsyncFileOpenReadResult> &outStream, const rkit::CIPathView &path) override;
 
+		rkit::IJobQueue &GetJobQueue() const override;
+
 	private:
 		rkit::IJobQueue &m_jobQueue;
 	};
@@ -43,6 +45,11 @@ namespace anox
 
 		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->AsyncOpenFileAsyncRead(m_jobQueue, openJob, nullptr, outStream, rkit::FileLocation::kGameDirectory, fullPath));
 		return rkit::ResultCode::kOK;
+	}
+
+	rkit::IJobQueue &AnoxGameFileSystem::GetJobQueue() const
+	{
+		return m_jobQueue;
 	}
 
 	rkit::Result AnoxGameFileSystemBase::Create(rkit::UniquePtr<AnoxGameFileSystemBase> &outFileSystem, rkit::IJobQueue &jobQueue)

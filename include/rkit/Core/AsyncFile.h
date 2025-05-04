@@ -10,26 +10,25 @@ namespace rkit
 	template<class T>
 	class UniquePtr;
 
+	struct IJobQueue;
+
+	typedef void (*AsyncIOCompletionCallback_t)(void *userdata, const Result &result, size_t bytesProcessed);
+
+
 	// NOTE: Async requests may return immediately
 	struct IAsyncReadRequester
 	{
 		virtual ~IAsyncReadRequester() {}
 
-		typedef void (*ReadSucceedCallback_t)(void *userdata, uint32_t bytesRead);
-		typedef void (*ReadFailCallback_t)(void *userdata, uint32_t osErrorCode, uint32_t bytesRead);
-
-		virtual Result PostReadRequest(void *readBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, ReadSucceedCallback_t succeedCallback, ReadFailCallback_t failCallback) = 0;
+		virtual void PostReadRequest(IJobQueue &jobQueue, void *readBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completionCallback) = 0;
 	};
 
 	struct IAsyncWriteRequester
 	{
 		virtual ~IAsyncWriteRequester() {}
 
-		typedef void (*WriteSucceedCallback_t)(void *userdata, uint32_t bytesWritten);
-		typedef void (*WriteFailCallback_t)(void *userdata, uint32_t osErrorCode, uint32_t bytesWritten);
-
-		virtual Result PostWriteRequest(const void *writeBuffer, FilePos_t pos, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback) = 0;
-		virtual Result PostAppendRequest(const void *writeBuffer, uint32_t amount, void *completionUserData, WriteSucceedCallback_t succeedCallback, WriteFailCallback_t failCallback) = 0;
+		virtual void PostWriteRequest(IJobQueue &jobQueue, const void *writeBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completionCallback) = 0;
+		virtual void PostAppendRequest(IJobQueue &jobQueue, const void *writeBuffer, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completionCallback) = 0;
 	};
 
 	struct IAsyncReadFile
