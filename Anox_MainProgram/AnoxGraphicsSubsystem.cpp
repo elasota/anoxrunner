@@ -457,7 +457,6 @@ namespace anox
 
 		rkit::UniquePtr<rkit::IEvent> m_prevFrameWaitWakeEvent;
 		rkit::UniquePtr<rkit::IEvent> m_prevFrameWaitTerminateEvent;
-		rkit::UniquePtr<rkit::IEvent> m_prevFrameWaitSpecificEvent;
 
 		rkit::UniquePtr<IFrameDrawer> m_frameDrawer;
 	};
@@ -1025,7 +1024,6 @@ namespace anox
 		RKIT_CHECK(sysDriver->CreateEvent(m_shutdownTerminateEvent, true, false));
 		RKIT_CHECK(sysDriver->CreateEvent(m_prevFrameWaitWakeEvent, true, false));
 		RKIT_CHECK(sysDriver->CreateEvent(m_prevFrameWaitTerminateEvent, true, false));
-		RKIT_CHECK(sysDriver->CreateEvent(m_prevFrameWaitSpecificEvent, true, false));
 
 		RKIT_CHECK(IFrameDrawer::Create(m_frameDrawer));
 
@@ -1602,7 +1600,7 @@ namespace anox
 
 		if (syncPoint.m_frameEndJob.IsValid())
 		{
-			m_threadPool.GetJobQueue()->WaitForJob(*syncPoint.m_frameEndJob, m_threadPool.GetMainThreadJobTypes(), m_prevFrameWaitWakeEvent.Get(), m_prevFrameWaitTerminateEvent.Get(), m_prevFrameWaitSpecificEvent.Get());
+			m_threadPool.GetJobQueue()->WaitForJob(*syncPoint.m_frameEndJob, m_threadPool.GetMainThreadJobTypes(), m_prevFrameWaitWakeEvent.Get(), m_prevFrameWaitTerminateEvent.Get());
 			RKIT_CHECK(m_threadPool.GetJobQueue()->CheckFault());
 
 			RKIT_ASSERT(syncPoint.m_frameEndBatch != nullptr);
