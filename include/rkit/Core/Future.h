@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FutureProtos.h"
 #include "Optional.h"
 #include "RefCounted.h"
 
@@ -17,23 +18,29 @@ namespace rkit
 		kInvalid,
 	};
 
-	template<class T>
-	struct FutureContainer : public RefCounted
+	struct FutureContainerBase : public RefCounted
 	{
-		void Complete(const T &value);
-		void Complete(T &&value);
-
 		void Fail();
 		void Abort();
 
 		FutureState GetState() const;
-		T &GetResult();
 
 	protected:
 		typedef uint8_t StatePrimitive_t;
 
-		Optional<T> m_result;
 		std::atomic<StatePrimitive_t> m_state;
+	};
+
+	template<class T>
+	struct FutureContainer : public FutureContainerBase
+	{
+		void Complete(const T &value);
+		void Complete(T &&value);
+
+		T &GetResult();
+
+	private:
+		Optional<T> m_result;
 	};
 
 	template<class T>
@@ -51,7 +58,6 @@ namespace rkit
 
 		void Reset();
 
-		Result Init();
 		const RCPtr<FutureContainer<T>> &GetFutureContainer() const;
 
 	private:
@@ -63,13 +69,32 @@ namespace rkit
 
 namespace rkit
 {
+	inline void FutureContainerBase::Fail()
+	{
+		RKIT_ASSERT(this->GetState() == FutureState::kWaiting);
+
+		m_state.store(static_cast<StatePrimitive_t>(FutureState::kFailed), std::memory_order_release);
+	}
+
+	inline void FutureContainerBase::Abort()
+	{
+		RKIT_ASSERT(this->GetState() == FutureState::kWaiting);
+
+		m_state.store(static_cast<StatePrimitive_t>(FutureState::kAborted), std::memory_order_release);
+	}
+
+	inline FutureState FutureContainerBase::GetState() const
+	{
+		return static_cast<FutureState>(m_state.load(std::memory_order_acquire));
+	}
+
 	template<class T>
 	void FutureContainer<T>::Complete(const T &value)
 	{
 		RKIT_ASSERT(this->GetState() == FutureState::kWaiting);
 
 		m_result.Emplace(value);
-		m_state.store(static_cast<StatePrimitive_t>(FutureState::kCompleted), std::memory_order_release);
+		this->m_state.store(static_cast<StatePrimitive_t>(FutureState::kCompleted), std::memory_order_release);
 	}
 
 	template<class T>
@@ -78,29 +103,7 @@ namespace rkit
 		RKIT_ASSERT(this->GetState() == FutureState::kWaiting);
 
 		m_result.Emplace(std::move(value));
-		m_state.store(static_cast<StatePrimitive_t>(FutureState::kCompleted), std::memory_order_release);
-	}
-
-	template<class T>
-	void FutureContainer<T>::Fail()
-	{
-		RKIT_ASSERT(this->GetState() == FutureState::kWaiting);
-
-		m_state.store(static_cast<StatePrimitive_t>(FutureState::kFailed), std::memory_order_release);
-	}
-
-	template<class T>
-	void FutureContainer<T>::Abort()
-	{
-		RKIT_ASSERT(this->GetState() == FutureState::kWaiting);
-
-		m_state.store(static_cast<StatePrimitive_t>(FutureState::kAborted), std::memory_order_release);
-	}
-
-	template<class T>
-	FutureState FutureContainer<T>::GetState() const
-	{
-		return static_cast<FutureState>(m_state.load(std::memory_order_acquire));
+		this->m_state.store(static_cast<StatePrimitive_t>(FutureState::kCompleted), std::memory_order_release);
 	}
 
 	template<class T>
@@ -166,11 +169,5 @@ namespace rkit
 	const RCPtr<FutureContainer<T>> &Future<T>::GetFutureContainer() const
 	{
 		return m_container;
-	}
-
-	template<class T>
-	Result Future<T>::Init()
-	{
-		return New<FutureContainer<T>>(m_container);
 	}
 }

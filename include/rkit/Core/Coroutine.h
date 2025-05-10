@@ -1,8 +1,14 @@
 #pragma once
 
+#include "RefCounted.h"
 #include "Result.h"
 #include "TypeList.h"
 #include "TypeTraits.h"
+
+namespace rkit
+{
+	struct FutureContainerBase;
+}
 
 namespace rkit::coro
 {
@@ -10,8 +16,9 @@ namespace rkit::coro
 	{
 		kResume,
 
-		kStackOverflow,
 		kFailResult,
+
+		kAwait,
 	};
 
 	enum class InstructionType
@@ -64,6 +71,7 @@ namespace rkit::coro
 
 		StackFrameBase *m_frame = nullptr;
 		Disposition m_disposition = Disposition::kResume;
+		RCPtr<FutureContainerBase> m_awaitFuture;
 
 		void *m_userdata = nullptr;
 		PushStackCallback_t m_allocStack = nullptr;
@@ -228,7 +236,7 @@ namespace rkit::coro
 	{
 		kInactive,
 		kSuspended,
-		kFaulted,
+		kBlocked,
 	};
 
 	class Thread
@@ -245,6 +253,7 @@ namespace rkit::coro
 		virtual ThreadState GetState() const = 0;
 
 		virtual Result Resume() = 0;
+		virtual bool TryUnblock() = 0;
 
 	protected:
 		virtual Context &GetContext() = 0;

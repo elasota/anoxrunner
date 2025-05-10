@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rkit/Core/CoreDefs.h"
+#include "rkit/Core/FutureProtos.h"
 #include "rkit/Core/PathProto.h"
 #include "rkit/Core/StreamProtos.h"
 
@@ -28,7 +29,7 @@ namespace anox
 	{
 		virtual ~IGameDataFileSystem() {}
 
-		virtual rkit::Result OpenNamedFileBlocking(rkit::RCPtr<rkit::Job> &openJob, const rkit::Future<rkit::UniquePtr<rkit::ISeekableReadStream>> &outStream, const rkit::CIPathView &path) = 0;
-		virtual rkit::Result OpenNamedFileAsync(rkit::RCPtr<rkit::Job> &openJob, const rkit::Future<rkit::AsyncFileOpenReadResult> &outStream, const rkit::CIPathView &path) = 0;
+		virtual rkit::Result OpenNamedFileBlocking(rkit::RCPtr<rkit::Job> &openJob, const rkit::FutureContainerPtr<rkit::UniquePtr<rkit::ISeekableReadStream>> &outStream, const rkit::CIPathView &path) = 0;
+		virtual rkit::Result OpenNamedFileAsync(rkit::RCPtr<rkit::Job> &openJob, const rkit::FutureContainerPtr<rkit::AsyncFileOpenReadResult> &outStream, const rkit::CIPathView &path) = 0;
 	};
 }

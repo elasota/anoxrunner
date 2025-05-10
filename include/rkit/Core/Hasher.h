@@ -2,6 +2,8 @@
 
 #include "HashValue.h"
 
+#include <type_traits>
+
 namespace rkit
 {
 	template<class T>

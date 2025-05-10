@@ -1,5 +1,6 @@
 #include "CoroThread.h"
 
+#include "rkit/Core/Future.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/Vector.h"
 #include "rkit/Core/Algorithm.h"
@@ -15,6 +16,7 @@ namespace rkit::utils
 		coro::ThreadState GetState() const override;
 
 		Result Resume() override;
+		bool TryUnblock() override;
 
 		Result Initialize(size_t stackSize);
 
@@ -70,35 +72,75 @@ namespace rkit::utils
 
 	coro::ThreadState CoroThreadImpl::GetState() const
 	{
-		if (m_context.m_disposition == coro::Disposition::kStackOverflow)
-			return coro::ThreadState::kFaulted;
-
 		if (m_context.m_frame == nullptr)
 			return coro::ThreadState::kInactive;
 
-		if (m_context.m_disposition == coro::Disposition::kResume)
-			return coro::ThreadState::kSuspended;
+		if (m_context.m_disposition == coro::Disposition::kAwait)
+			return coro::ThreadState::kBlocked;
 
-		return coro::ThreadState::kFaulted;
+		// In all faulted states, treat as suspended and Resume will catch the fault
+		return coro::ThreadState::kSuspended;
 	}
 
 	Result CoroThreadImpl::Resume()
 	{
-		while (m_context.m_disposition == coro::Disposition::kResume)
+		for (;;)
 		{
-			if (m_context.m_frame == nullptr)
-				return ResultCode::kOK;
-
-			coro::StackFrameBase *frame = m_context.m_frame;
-			coro::Code_t ip = frame->m_ip;
-
-			while (ip != nullptr)
+			while (m_context.m_disposition == coro::Disposition::kResume)
 			{
-				ip = ip(&m_context, frame).m_code;
+				if (m_context.m_frame == nullptr)
+					return ResultCode::kOK;
+
+				coro::StackFrameBase *frame = m_context.m_frame;
+				coro::Code_t ip = frame->m_ip;
+
+				while (ip != nullptr)
+				{
+					ip = ip(&m_context, frame).m_code;
+				}
+			}
+
+			switch (m_context.m_disposition)
+			{
+			case coro::Disposition::kFailResult:
+				return m_context.m_result;
+			case coro::Disposition::kAwait:
+				if (!TryUnblock())
+					return ResultCode::kOK;
+				break;
+			default:
+				return ResultCode::kInternalError;
 			}
 		}
 
-		return ResultCode::kNotYetImplemented;
+		return ResultCode::kInternalError;
+	}
+
+	bool CoroThreadImpl::TryUnblock()
+	{
+		RKIT_ASSERT(GetState() == coro::ThreadState::kBlocked);
+		RKIT_ASSERT(m_context.m_awaitFuture.IsValid());
+
+		switch (m_context.m_awaitFuture->GetState())
+		{
+		case FutureState::kCompleted:
+			m_context.m_disposition = coro::Disposition::kResume;
+			m_context.m_awaitFuture.Reset();
+			return true;
+		case FutureState::kFailed:
+		case FutureState::kAborted:
+			m_context.m_disposition = coro::Disposition::kFailResult;
+			m_context.m_result = ResultCode::kOperationFailed;
+			m_context.m_awaitFuture.Reset();
+			return true;
+		case FutureState::kWaiting:
+			return false;
+		default:
+			m_context.m_disposition = coro::Disposition::kFailResult;
+			m_context.m_result = ResultCode::kInternalError;
+			m_context.m_awaitFuture.Reset();
+			return true;
+		};
 	}
 
 	Result CoroThreadImpl::Initialize(size_t stackSize)

@@ -13,9 +13,15 @@ namespace rkit
 	class Optional;
 }
 
+namespace rkit::utils
+{
+	struct IThreadPool;
+}
+
 namespace anox
 {
 	class AnoxResourceManagerBase;
+	struct ICaptureHarness;
 
 	struct IAnoxGame
 	{
@@ -25,7 +31,8 @@ namespace anox
 		virtual rkit::Result RunFrame() = 0;
 		virtual bool IsExiting() const = 0;
 
-		virtual AnoxResourceManagerBase *GetResourceManager() const = 0;
+		virtual ICaptureHarness *GetCaptureHarness() const = 0;
+		virtual rkit::utils::IThreadPool *GetThreadPool() const = 0;
 
 		static rkit::Result Create(rkit::UniquePtr<IAnoxGame> &outGame, const rkit::Optional<uint16_t> &numThreads);
 	};

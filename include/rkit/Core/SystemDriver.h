@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FutureProtos.h"
 #include "PathProto.h"
 #include "StringProto.h"
 #include "StreamProtos.h"
@@ -76,11 +77,11 @@ namespace rkit
 		virtual void AssertionFailure(const char *expr, const char *file, unsigned int line) = 0;
 		virtual void FirstChanceResultFailure(const Result &result) = 0;
 
-		virtual Result AsyncOpenFileRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<UniquePtr<ISeekableReadStream>> &outStream, FileLocation location, const CIPathView &path) = 0;
-		virtual Result AsyncOpenFileReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<UniquePtr<ISeekableReadStream>> &outStream, const OSAbsPathView &path) = 0;
+		virtual Result AsyncOpenFileRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const FutureContainerPtr<UniquePtr<ISeekableReadStream>> &outStream, FileLocation location, const CIPathView &path) = 0;
+		virtual Result AsyncOpenFileReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const FutureContainerPtr<UniquePtr<ISeekableReadStream>> &outStream, const OSAbsPathView &path) = 0;
 
-		virtual Result AsyncOpenFileAsyncRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<AsyncFileOpenReadResult> &outStream, FileLocation location, const CIPathView &path) = 0;
-		virtual Result AsyncOpenFileAsyncReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<AsyncFileOpenReadResult> &outStream, const OSAbsPathView &path) = 0;
+		virtual Result AsyncOpenFileAsyncRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const FutureContainerPtr<AsyncFileOpenReadResult> &outStream, FileLocation location, const CIPathView &path) = 0;
+		virtual Result AsyncOpenFileAsyncReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const FutureContainerPtr<AsyncFileOpenReadResult> &outStream, const OSAbsPathView &path) = 0;
 
 		virtual Result OpenFileRead(UniquePtr<ISeekableReadStream> &outStream, FileLocation location, const CIPathView &path) = 0;
 		virtual Result OpenFileReadAbs(UniquePtr<ISeekableReadStream> &outStream, const OSAbsPathView &path) = 0;

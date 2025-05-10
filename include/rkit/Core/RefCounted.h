@@ -63,12 +63,19 @@ namespace rkit
 	class RCPtr
 	{
 	public:
+		template<class TOther>
+		friend class RCPtr;
+
 		RCPtr();
 		explicit RCPtr(std::nullptr_t);
 		explicit RCPtr(T *ptr);
 		explicit RCPtr(T *ptr, RefCountedTracker *tracker);
 		RCPtr(const RCPtr<T> &other) noexcept;
 		RCPtr(RCPtr<T> &&other) noexcept;
+
+		template<class TOther>
+		RCPtr(const RCPtr<TOther> &other);
+
 		template<class TOther>
 		RCPtr(RCPtr<TOther> &&other);
 
@@ -225,6 +232,16 @@ namespace rkit
 	{
 		other.m_object = nullptr;
 		other.m_tracker = nullptr;
+	}
+
+
+	template<class T>
+	template<class TOther>
+	inline RCPtr<T>::RCPtr(const RCPtr<TOther> &other)
+		: m_object(nullptr)
+		, m_tracker(nullptr)
+	{
+		(*this) = other;
 	}
 
 	template<class T>

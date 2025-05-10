@@ -1120,10 +1120,12 @@ namespace anox
 
 		rkit::RCPtr<rkit::Job> openPipelineCacheJob;
 
-		rkit::Future<rkit::UniquePtr<rkit::ISeekableReadStream>> pipelineStreamFuture;
-		RKIT_CHECK(pipelineStreamFuture.Init());
+		rkit::FutureContainerPtr<rkit::UniquePtr<rkit::ISeekableReadStream>> pipelineStreamFutureContainer;
+		RKIT_CHECK(rkit::New<rkit::FutureContainer<rkit::UniquePtr<rkit::ISeekableReadStream>>>(pipelineStreamFutureContainer));
 
-		RKIT_CHECK(m_fileSystem.OpenNamedFileBlocking(openPipelineCacheJob, pipelineStreamFuture, pipelinesFile));
+		RKIT_CHECK(m_fileSystem.OpenNamedFileBlocking(openPipelineCacheJob, pipelineStreamFutureContainer, pipelinesFile));
+
+		rkit::Future<rkit::UniquePtr<rkit::ISeekableReadStream>> pipelineStreamFuture(pipelineStreamFutureContainer);
 
 		rkit::UniquePtr<rkit::IJobRunner> jobRunner;
 		RKIT_CHECK(rkit::New<CheckPipelinesJob>(jobRunner, *this, pipelineStreamFuture, pipelinesCacheFile));

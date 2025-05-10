@@ -249,6 +249,9 @@ namespace rkit
 		template<class TCandidateKey, class TCandidateValue, class TKeyHasher = Hasher<TCandidateKey>, class TKeyConstructor = DefaultElementConstructor<TKey, TCandidateKey>, class TValueConstructor = DefaultElementConstructor<TValue, TCandidateValue>>
 		Result Set(TCandidateKey &&key, TCandidateValue &&value);
 
+		template<class TCandidateKey, class TCandidateValue, class TKeyConstructor = DefaultElementConstructor<TKey, TCandidateKey>, class TValueConstructor = DefaultElementConstructor<TValue, TCandidateValue>>
+		Result SetPrehashed(HashValue_t hash, TCandidateKey &&key, TCandidateValue &&value);
+
 		HashMapIterator<TKey, TValue, TSize> begin();
 		HashMapIterator<TKey, TValue, TSize> end();
 
@@ -258,8 +261,14 @@ namespace rkit
 		template<class TCandidateKey, class TKeyHasher = Hasher<TCandidateKey>>
 		HashMapIterator<TKey, TValue, TSize> Find(const TCandidateKey &key);
 
+		template<class TCandidateKey>
+		HashMapIterator<TKey, TValue, TSize> FindPrehashed(HashValue_t hashValue, const TCandidateKey &key);
+
 		template<class TCandidateKey, class TKeyHasher = Hasher<TCandidateKey>>
 		HashMapConstIterator<TKey, TValue, TSize> Find(const TCandidateKey &key) const;
+
+		template<class TCandidateKey>
+		HashMapConstIterator<TKey, TValue, TSize> FindPrehashed(HashValue_t hashValue, const TCandidateKey &key) const;
 
 		template<class TCandidateKey, class TKeyHasher = Hasher<TCandidateKey>>
 		bool Remove(const TCandidateKey &key);
@@ -970,8 +979,15 @@ template<class TKey, class TValue, class TSize>
 template<class TCandidateKey, class TCandidateValue, class TKeyHasher, class TKeyConstructor, class TValueConstructor>
 rkit::Result rkit::HashMap<TKey, TValue, TSize>::Set(TCandidateKey &&key, TCandidateValue &&value)
 {
-	HashValue_t hash = TKeyHasher::ComputeHash(0, key);
+	const HashValue_t hash = TKeyHasher::ComputeHash(0, key);
 
+	return SetPrehashed<TCandidateKey, TCandidateValue, TKeyConstructor, TValueConstructor>(hash, std::forward<TCandidateKey>(key), std::forward<TCandidateValue>(value));
+}
+
+template<class TKey, class TValue, class TSize>
+template<class TCandidateKey, class TCandidateValue, class TKeyConstructor, class TValueConstructor>
+rkit::Result rkit::HashMap<TKey, TValue, TSize>::SetPrehashed(HashValue_t hash, TCandidateKey &&key, TCandidateValue &&value)
+{
 	TSize position = 0;
 	if (this->FindKeyPosition<TCandidateKey>(hash, key, position))
 	{
@@ -1039,8 +1055,14 @@ template<class TKey, class TValue, class TSize>
 template<class TCandidateKey, class TKeyHasher>
 rkit::HashMapIterator<TKey, TValue, TSize> rkit::HashMap<TKey, TValue, TSize>::Find(const TCandidateKey &key)
 {
-	HashValue_t keyHash = TKeyHasher::ComputeHash(0, key);
+	const HashValue_t keyHash = TKeyHasher::ComputeHash(0, key);
+	return FindPrehashed<TCandidateKey>(keyHash, key);
+}
 
+template<class TKey, class TValue, class TSize>
+template<class TCandidateKey>
+rkit::HashMapIterator<TKey, TValue, TSize> rkit::HashMap<TKey, TValue, TSize>::FindPrehashed(HashValue_t keyHash, const TCandidateKey &key)
+{
 	TSize position = 0;
 	if (this->FindKeyPosition(keyHash, key, position))
 		return rkit::HashMapIterator<TKey, TValue, TSize>(*this, position);
@@ -1052,8 +1074,15 @@ template<class TKey, class TValue, class TSize>
 template<class TCandidateKey, class TKeyHasher>
 rkit::HashMapConstIterator<TKey, TValue, TSize> rkit::HashMap<TKey, TValue, TSize>::Find(const TCandidateKey &key) const
 {
-	HashValue_t keyHash = TKeyHasher::ComputeHash(0, key);
+	const HashValue_t keyHash = TKeyHasher::ComputeHash(0, key);
 
+	return FindPrehashed<TCandidateKey>(keyHash, key);
+}
+
+template<class TKey, class TValue, class TSize>
+template<class TCandidateKey>
+rkit::HashMapConstIterator<TKey, TValue, TSize> rkit::HashMap<TKey, TValue, TSize>::FindPrehashed(HashValue_t keyHash, const TCandidateKey &key) const
+{
 	TSize position = 0;
 	if (this->FindKeyPosition(keyHash, key, position))
 		return rkit::HashMapConstIterator<TKey, TValue, TSize>(*this, position);

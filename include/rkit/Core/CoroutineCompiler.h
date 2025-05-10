@@ -179,6 +179,251 @@ namespace rkit::coro::compiler
 		return { nullptr };
 	}
 
+#define CORO_CONCAT_2(a, b) a ## b
+#define CORO_CONCAT_1(a, b) CORO_CONCAT_2(a, b)
+#define CORO_CONCAT_LINE(a) CORO_CONCAT_1(a, __LINE__)
+
+
+	template<class TCoroTerminator, size_t TInstructionIndex>
+	struct CoroInstructionResolver
+	{
+		typedef typename TypeListElement<TInstructionIndex, typename TCoroTerminator::InstrList_t>::Resolution_t Resolution_t;
+	};
+
+	enum class NextInstructionDisposition
+	{
+		kContinue,
+		kNextRef0,
+		kThisRef0,
+		kThisRef1,
+		kRepeatLoop,
+	};
+
+	enum class CoroInstructionType
+	{
+		kWhile,
+		kEndWhile,
+		kIf,
+		kElse,
+		kElseIf,
+		kEndIf,
+		kFor,
+		kEndFor,
+		kContinue,
+	};
+
+
+	template<CoroInstructionType TTypeToCheck, CoroInstructionType... TMatches>
+	struct CoroIsInstructionType
+	{
+	};
+
+	template<CoroInstructionType TTypeToCheck, CoroInstructionType TMatch>
+	struct CoroIsInstructionType<TTypeToCheck, TMatch>
+	{
+		static const bool kIsMatch = false;
+	};
+
+	template<CoroInstructionType TTypeToCheck>
+	struct CoroIsInstructionType<TTypeToCheck, TTypeToCheck>
+	{
+		static const bool kIsMatch = true;
+	};
+
+	template<CoroInstructionType TTypeToCheck, CoroInstructionType TFirstMatch, CoroInstructionType... TMatches>
+	struct CoroIsInstructionType<TTypeToCheck, TFirstMatch, TMatches...>
+	{
+		static const bool kIsMatch = CoroIsInstructionType<TTypeToCheck, TMatches...>::kIsMatch;
+	};
+
+	template<CoroInstructionType TTypeToCheck, CoroInstructionType... TMatches>
+	struct CoroIsInstructionType<TTypeToCheck, TTypeToCheck, TMatches...>
+	{
+		static const bool kIsMatch = true;
+	};
+
+
+	template<class TCandidate, class TInstruction, class TScopeInstruction, CoroInstructionType... TCloseInstrTypes>
+	struct CoroScopeCloseChecker
+	{
+		static const bool kIsMatch = (TCandidate::kCoroInstrIndex > TInstruction::kCoroInstrIndex)
+			&& CoroIsInstructionType<TCandidate::kCoroInstrType, TCloseInstrTypes...>::kIsMatch
+			&& IsSameType<TScopeInstruction, typename TCandidate::CoroClosesScope_t>::kValue;
+	};
+
+	template<bool TIsFirstMatch, template<class> class TEvaluator, class TInstructionList>
+	struct CoroFindScopeClosingInstructionIncrement
+	{
+	};
+
+	template<template<class> class TEvaluator, class TFirstInstruction, class... TMoreInstructions>
+	struct CoroFindScopeClosingInstructionIncrement<true, TEvaluator, TypeList<TFirstInstruction, TMoreInstructions...>>
+	{
+		typedef TFirstInstruction Resolution_t;
+	};
+
+	template<template<class> class TEvaluator, class TInstruction>
+	struct CoroFindScopeClosingInstructionIncrement<true, TEvaluator, TypeList<TInstruction>>
+	{
+		typedef TInstruction Resolution_t;
+	};
+
+	template<template<class> class TEvaluator, class TFirstInstruction, class TSecondInstruction, class... TMoreInstructions>
+	struct CoroFindScopeClosingInstructionIncrement<false, TEvaluator, TypeList<TFirstInstruction, TSecondInstruction, TMoreInstructions...>>
+	{
+		typedef typename CoroFindScopeClosingInstructionIncrement<TEvaluator<TSecondInstruction>::kIsMatch, TEvaluator, TypeList<TSecondInstruction, TMoreInstructions...>>::Resolution_t Resolution_t;
+	};
+
+	template<template<class> class TEvaluator, class TFirstInstruction, class TSecondInstruction>
+	struct CoroFindScopeClosingInstructionIncrement<false, TEvaluator, TypeList<TFirstInstruction, TSecondInstruction>>
+	{
+		typedef typename CoroFindScopeClosingInstructionIncrement<TEvaluator<TSecondInstruction>::kIsMatch, TEvaluator, TypeList<TSecondInstruction>>::Resolution_t Resolution_t;
+	};
+
+	template<template<class> class TEvaluator, class TInstructionList>
+	struct CoroFindScopeClosingInstruction
+	{
+	};
+
+	template<template<class> class TEvaluator, class... TInstructions>
+	struct CoroFindScopeClosingInstruction<TEvaluator, TypeList<TInstructions...>>
+	{
+		typedef typename CoroFindScopeClosingInstructionIncrement<false, TEvaluator, TypeList<void, TInstructions...>>::Resolution_t Resolution_t;
+	};
+
+
+	template<CoroInstructionType TInstrType, class TInstr, class TCoroTerminator, int TInstrRefIndex>
+	struct CoroResolveInstrRef
+	{
+	};
+
+	// If instruction ref0 jumps to the first else condition, if present, otherwise to the end
+	template<class TInstr, class TCoroTerminator>
+	struct CoroResolveInstrRef<CoroInstructionType::kIf, TInstr, TCoroTerminator, 0>
+	{
+		template<class TCandidate>
+		using Evaluator = CoroScopeCloseChecker<TCandidate, TInstr, TInstr, CoroInstructionType::kElse, CoroInstructionType::kElseIf, CoroInstructionType::kEndIf>;
+
+		typedef typename CoroFindScopeClosingInstruction<Evaluator, typename TCoroTerminator::InstrList_t>::Resolution_t Resolution_t;
+	};
+
+	// Else ref0 jumps to the end if the if block
+	template<class TInstr, class TCoroTerminator>
+	struct CoroResolveInstrRef<CoroInstructionType::kElse, TInstr, TCoroTerminator, 0>
+	{
+		template<class TCandidate>
+		using Evaluator = CoroScopeCloseChecker<TCandidate, TInstr, typename TInstr::CoroBodyParentScope_t, CoroInstructionType::kEndIf>;
+
+		typedef typename CoroFindScopeClosingInstruction<Evaluator, typename TCoroTerminator::InstrList_t>::Resolution_t Resolution_t;
+	};
+
+	// Else If ref0 exits the "if" block
+	template<class TInstr, class TCoroTerminator>
+	struct CoroResolveInstrRef<CoroInstructionType::kElseIf, TInstr, TCoroTerminator, 0>
+	{
+		template<class TCandidate>
+		using Evaluator = CoroScopeCloseChecker<TCandidate, TInstr, typename TInstr::CoroBodyParentScope_t, CoroInstructionType::kEndIf>;
+
+		typedef typename CoroFindScopeClosingInstruction<Evaluator, typename TCoroTerminator::InstrList_t>::Resolution_t Resolution_t;
+	};
+
+	// Else If ref1 jumps to the next condition or else
+	template<class TInstr, class TCoroTerminator>
+	struct CoroResolveInstrRef<CoroInstructionType::kElseIf, TInstr, TCoroTerminator, 1>
+	{
+		template<class TCandidate>
+		using Evaluator = CoroScopeCloseChecker<TCandidate, TInstr, typename TInstr::CoroBodyParentScope_t, CoroInstructionType::kElse, CoroInstructionType::kElseIf, CoroInstructionType::kEndIf>;
+
+		typedef typename CoroFindScopeClosingInstruction<Evaluator, typename TCoroTerminator::InstrList_t>::Resolution_t Resolution_t;
+	};
+
+	// For ref0 jumps to the end of the for block
+	template<class TInstr, class TCoroTerminator>
+	struct CoroResolveInstrRef<CoroInstructionType::kFor, TInstr, TCoroTerminator, 0>
+	{
+		template<class TCandidate>
+		using Evaluator = CoroScopeCloseChecker<TCandidate, TInstr, typename TInstr::CoroBodyParentScope_t, CoroInstructionType::kEndFor>;
+
+		typedef typename CoroFindScopeClosingInstruction<Evaluator, typename TCoroTerminator::InstrList_t>::Resolution_t Resolution_t;
+	};
+
+	// While ref0 jumps to the end of the for block
+	template<class TInstr, class TCoroTerminator>
+	struct CoroResolveInstrRef<CoroInstructionType::kWhile, TInstr, TCoroTerminator, 0>
+	{
+		template<class TCandidate>
+		using Evaluator = CoroScopeCloseChecker<TCandidate, TInstr, typename TInstr::CoroBodyParentScope_t, CoroInstructionType::kEndWhile>;
+
+		typedef typename CoroFindScopeClosingInstruction<Evaluator, typename TCoroTerminator::InstrList_t>::Resolution_t Resolution_t;
+	};
+
+	template<class TCoroTerminatorLookup, class TInstruction, NextInstructionDisposition TNextDisposition>
+	struct CoroNextInstructionResolver
+	{
+	};
+
+	template<class TCoroTerminatorLookup, class TInstruction>
+	struct CoroNextInstructionResolver<TCoroTerminatorLookup, TInstruction, NextInstructionDisposition::kContinue>
+		: public CoroInstructionResolver<typename TCoroTerminatorLookup::Resolution_t, TInstruction::kCoroInstrIndex + 1>
+	{
+		typedef typename CoroInstructionResolver<typename TCoroTerminatorLookup::Resolution_t, TInstruction::kCoroInstrIndex + 1>::Resolution_t NextInstruction_t;
+
+		static inline CodePtr Resolve()
+		{
+			return { NextInstruction_t::CoroFunction };
+		}
+	};
+
+	template<class TCoroTerminatorLookup, class TInstruction>
+	struct CoroNextInstructionResolver<TCoroTerminatorLookup, TInstruction, NextInstructionDisposition::kNextRef0>
+	{
+		typedef typename CoroInstructionResolver<typename TCoroTerminatorLookup::Resolution_t, TInstruction::kCoroInstrIndex + 1>::Resolution_t NextInstruction_t;
+
+		typedef typename CoroResolveInstrRef<NextInstruction_t::kCoroInstrType, NextInstruction_t, typename TCoroTerminatorLookup::Resolution_t, 0>::Resolution_t ReferencedInstr_t;
+
+		static inline CodePtr Resolve()
+		{
+			return { ReferencedInstr_t::CoroFunction };
+		}
+	};
+
+	template<class TCoroTerminatorLookup, class TInstruction>
+	struct CoroNextInstructionResolver<TCoroTerminatorLookup, TInstruction, NextInstructionDisposition::kThisRef0>
+	{
+		typedef typename CoroResolveInstrRef<TInstruction::kCoroInstrType, TInstruction, typename TCoroTerminatorLookup::Resolution_t, 0>::Resolution_t ReferencedInstr_t;
+
+		static inline CodePtr Resolve()
+		{
+			return { ReferencedInstr_t::CoroFunction };
+		}
+	};
+
+	template<class TCoroTerminatorLookup, class TInstruction>
+	struct CoroNextInstructionResolver<TCoroTerminatorLookup, TInstruction, NextInstructionDisposition::kThisRef1>
+	{
+		typedef typename CoroResolveInstrRef<TInstruction::kCoroInstrType, TInstruction, typename TCoroTerminatorLookup::Resolution_t, 1>::Resolution_t ReferencedInstr_t;
+
+		static inline CodePtr Resolve()
+		{
+			return { ReferencedInstr_t::CoroFunction };
+		}
+	};
+
+	template<class TCoroTerminatorLookup, class TInstruction>
+	struct CoroNextInstructionResolver<TCoroTerminatorLookup, TInstruction, NextInstructionDisposition::kRepeatLoop>
+	{
+		static CodePtr RepeatLoopFunction(Context *CORO_INTERNAL_coroContext, StackFrameBase *CORO_INTERNAL_coroStackFrame)
+		{
+			TInstruction::CoroStepFunction(CORO_INTERNAL_coroContext, CORO_INTERNAL_coroStackFrame);
+			return TInstruction::CoroFunction(CORO_INTERNAL_coroContext, CORO_INTERNAL_coroStackFrame);
+		}
+
+		static inline CodePtr Resolve()
+		{
+			return { RepeatLoopFunction };
+		}
+	};
+
 #if 0
 		struct CoroStackFrameBase
 		{
@@ -226,9 +471,6 @@ namespace rkit::coro::compiler
 		};
 
 
-#define CORO_CONCAT_2(a, b) a ## b
-#define CORO_CONCAT_1(a, b) CORO_CONCAT_2(a, b)
-#define CORO_CONCAT_LINE(a) CORO_CONCAT_1(a, __LINE__)
 
 		template<class TFirst, class TSecond>
 		struct CoroIsSameType
@@ -240,11 +482,6 @@ namespace rkit::coro::compiler
 		struct CoroIsSameType<TType, TType>
 		{
 			static const bool kResult = true;
-		};
-
-		template<class... T>
-		struct CoroTypeList
-		{
 		};
 
 		template<class TTypeList>
@@ -262,182 +499,6 @@ namespace rkit::coro::compiler
 		struct CoroTypeListSize<CoroTypeList<TFirstType, TMoreTypes...>>
 		{
 			static const size_t kSize = CoroTypeListSize<CoroTypeList<TMoreTypes...>>::kSize + 1;
-		};
-
-		template<size_t TIndex, class TTypeList>
-		struct CoroTypeListElement
-		{
-		};
-
-		template<class TFirstType, class... TMoreTypes>
-		struct CoroTypeListElement<0, CoroTypeList<TFirstType, TMoreTypes...>>
-		{
-			typedef TFirstType Resolution_t;
-		};
-
-		template<class TType>
-		struct CoroTypeListElement<0, CoroTypeList<TType>>
-		{
-			typedef TType Resolution_t;
-		};
-
-		template<size_t TIndex, class TFirstType, class... TMoreTypes>
-		struct CoroTypeListElement<TIndex, CoroTypeList<TFirstType, TMoreTypes...>>
-		{
-			typedef typename CoroTypeListElement<TIndex - 1, CoroTypeList<TMoreTypes...>>::Resolution_t Resolution_t;
-		};
-
-		template<class TTypeList, class TAdditional>
-		struct CoroTypeListAppend
-		{
-		};
-
-		template<class... TTypes, class TAdditional>
-		struct CoroTypeListAppend<CoroTypeList<TTypes...>, TAdditional>
-		{
-			typedef CoroTypeList<TTypes..., TAdditional> Type_t;
-		};
-
-		template<CoroInstructionType TTypeToCheck, CoroInstructionType... TMatches>
-		struct CoroIsInstructionType
-		{
-		};
-
-		template<CoroInstructionType TTypeToCheck, CoroInstructionType TMatch>
-		struct CoroIsInstructionType<TTypeToCheck, TMatch>
-		{
-			static const bool kIsMatch = false;
-		};
-
-		template<CoroInstructionType TTypeToCheck>
-		struct CoroIsInstructionType<TTypeToCheck, TTypeToCheck>
-		{
-			static const bool kIsMatch = true;
-		};
-
-		template<CoroInstructionType TTypeToCheck, CoroInstructionType TFirstMatch, CoroInstructionType... TMatches>
-		struct CoroIsInstructionType<TTypeToCheck, TFirstMatch, TMatches...>
-		{
-			static const bool kIsMatch = CoroIsInstructionType<TTypeToCheck, TMatches...>::kIsMatch;
-		};
-
-		template<CoroInstructionType TTypeToCheck, CoroInstructionType... TMatches>
-		struct CoroIsInstructionType<TTypeToCheck, TTypeToCheck, TMatches...>
-		{
-			static const bool kIsMatch = true;
-		};
-
-		template<bool TIsFirstMatch, template<class> class TEvaluator, class TInstructionList>
-		struct CoroFindScopeClosingInstructionIncrement
-		{
-		};
-
-		template<template<class> class TEvaluator, class TFirstInstruction, class... TMoreInstructions>
-		struct CoroFindScopeClosingInstructionIncrement<true, TEvaluator, CoroTypeList<TFirstInstruction, TMoreInstructions...>>
-		{
-			typedef TFirstInstruction Resolution_t;
-		};
-
-		template<template<class> class TEvaluator, class TInstruction>
-		struct CoroFindScopeClosingInstructionIncrement<true, TEvaluator, CoroTypeList<TInstruction>>
-		{
-			typedef TInstruction Resolution_t;
-		};
-
-		template<template<class> class TEvaluator, class TFirstInstruction, class TSecondInstruction, class... TMoreInstructions>
-		struct CoroFindScopeClosingInstructionIncrement<false, TEvaluator, CoroTypeList<TFirstInstruction, TSecondInstruction, TMoreInstructions...>>
-		{
-			typedef typename CoroFindScopeClosingInstructionIncrement<TEvaluator<TSecondInstruction>::kIsMatch, TEvaluator, CoroTypeList<TSecondInstruction, TMoreInstructions...>>::Resolution_t Resolution_t;
-		};
-
-		template<template<class> class TEvaluator, class TFirstInstruction, class TSecondInstruction>
-		struct CoroFindScopeClosingInstructionIncrement<false, TEvaluator, CoroTypeList<TFirstInstruction, TSecondInstruction>>
-		{
-			typedef typename CoroFindScopeClosingInstructionIncrement<TEvaluator<TSecondInstruction>::kIsMatch, TEvaluator, CoroTypeList<TSecondInstruction>>::Resolution_t Resolution_t;
-		};
-
-		template<template<class> class TEvaluator, class TInstructionList>
-		struct CoroFindScopeClosingInstruction
-		{
-		};
-
-		template<template<class> class TEvaluator, class... TInstructions>
-		struct CoroFindScopeClosingInstruction<TEvaluator, CoroTypeList<TInstructions...>>
-		{
-			typedef typename CoroFindScopeClosingInstructionIncrement<false, TEvaluator, CoroTypeList<void, TInstructions...>>::Resolution_t Resolution_t;
-		};
-
-		template<class TCandidate, class TInstruction, class TScopeInstruction, CoroInstructionType... TCloseInstrTypes>
-		struct CoroScopeCloseChecker
-		{
-			static const bool kIsMatch = (TCandidate::kCoroInstrIndex > TInstruction::kCoroInstrIndex)
-				&& CoroIsInstructionType<TCandidate::kCoroInstrType, TCloseInstrTypes...>::kIsMatch
-				&&CoroIsSameType<TScopeInstruction, typename TCandidate::CoroClosesScope_t>::kResult;
-		};
-
-		template<CoroInstructionType TInstrType, class TInstr, class TCoroTerminator, int TInstrRefIndex>
-		struct CoroResolveInstrRef
-		{
-		};
-
-		// If instruction ref0 jumps to the first else condition, if present, otherwise to the end
-		template<class TInstr, class TCoroTerminator>
-		struct CoroResolveInstrRef<CoroInstructionType::kIf, TInstr, TCoroTerminator, 0>
-		{
-			template<class TCandidate>
-			using Evaluator = CoroScopeCloseChecker<TCandidate, TInstr, TInstr, CoroInstructionType::kElse, CoroInstructionType::kElseIf, CoroInstructionType::kEndIf>;
-
-			typedef typename CoroFindScopeClosingInstruction<Evaluator, typename TCoroTerminator::InstrList_t>::Resolution_t Resolution_t;
-		};
-
-		// Else ref0 jumps to the end if the if block
-		template<class TInstr, class TCoroTerminator>
-		struct CoroResolveInstrRef<CoroInstructionType::kElse, TInstr, TCoroTerminator, 0>
-		{
-			template<class TCandidate>
-			using Evaluator = CoroScopeCloseChecker<TCandidate, TInstr, typename TInstr::CoroBodyParentScope_t, CoroInstructionType::kEndIf>;
-
-			typedef typename CoroFindScopeClosingInstruction<Evaluator, typename TCoroTerminator::InstrList_t>::Resolution_t Resolution_t;
-		};
-
-		// Else If ref0 exits the "if" block
-		template<class TInstr, class TCoroTerminator>
-		struct CoroResolveInstrRef<CoroInstructionType::kElseIf, TInstr, TCoroTerminator, 0>
-		{
-			template<class TCandidate>
-			using Evaluator = CoroScopeCloseChecker<TCandidate, TInstr, typename TInstr::CoroBodyParentScope_t, CoroInstructionType::kEndIf>;
-
-			typedef typename CoroFindScopeClosingInstruction<Evaluator, typename TCoroTerminator::InstrList_t>::Resolution_t Resolution_t;
-		};
-
-		// Else If ref1 jumps to the next condition or else
-		template<class TInstr, class TCoroTerminator>
-		struct CoroResolveInstrRef<CoroInstructionType::kElseIf, TInstr, TCoroTerminator, 1>
-		{
-			template<class TCandidate>
-			using Evaluator = CoroScopeCloseChecker<TCandidate, TInstr, typename TInstr::CoroBodyParentScope_t, CoroInstructionType::kElse, CoroInstructionType::kElseIf, CoroInstructionType::kEndIf>;
-
-			typedef typename CoroFindScopeClosingInstruction<Evaluator, typename TCoroTerminator::InstrList_t>::Resolution_t Resolution_t;
-		};
-
-		// For ref0 jumps to the end of the for block
-		template<class TInstr, class TCoroTerminator>
-		struct CoroResolveInstrRef<CoroInstructionType::kFor, TInstr, TCoroTerminator, 0>
-		{
-			template<class TCandidate>
-			using Evaluator = CoroScopeCloseChecker<TCandidate, TInstr, typename TInstr::CoroBodyParentScope_t, CoroInstructionType::kEndFor>;
-
-			typedef typename CoroFindScopeClosingInstruction<Evaluator, typename TCoroTerminator::InstrList_t>::Resolution_t Resolution_t;
-		};
-
-		// While ref0 jumps to the end of the for block
-		template<class TInstr, class TCoroTerminator>
-		struct CoroResolveInstrRef<CoroInstructionType::kWhile, TInstr, TCoroTerminator, 0>
-		{
-			template<class TCandidate>
-			using Evaluator = CoroScopeCloseChecker<TCandidate, TInstr, typename TInstr::CoroBodyParentScope_t, CoroInstructionType::kEndWhile>;
-
-			typedef typename CoroFindScopeClosingInstruction<Evaluator, typename TCoroTerminator::InstrList_t>::Resolution_t Resolution_t;
 		};
 
 
@@ -523,88 +584,6 @@ namespace rkit::coro::compiler
 			CompiledCoro<TCoro>::kNumInstructions,
 			CompiledCoro<TCoro>::InitLocals,
 			CompiledCoro<TCoro>::DestructLocals,
-		};
-
-		enum class NextInstructionDisposition
-		{
-			kContinue,
-			kNextRef0,
-			kThisRef0,
-			kThisRef1,
-			kRepeatLoop,
-		};
-
-		template<class TCoroTerminator, size_t TInstructionIndex>
-		struct CoroInstructionResolver
-		{
-			typedef typename CoroTypeListElement<TInstructionIndex, typename TCoroTerminator::InstrList_t>::Resolution_t Resolution_t;
-		};
-
-		template<class TCoroTerminatorLookup, class TInstruction, NextInstructionDisposition TNextDisposition>
-		struct CoroNextInstructionResolver
-		{
-		};
-
-		template<class TCoroTerminatorLookup, class TInstruction>
-		struct CoroNextInstructionResolver<TCoroTerminatorLookup, TInstruction, NextInstructionDisposition::kContinue>
-			: public CoroInstructionResolver<typename TCoroTerminatorLookup::Resolution_t, TInstruction::kCoroInstrIndex + 1>
-		{
-			typedef typename CoroInstructionResolver<typename TCoroTerminatorLookup::Resolution_t, TInstruction::kCoroInstrIndex + 1>::Resolution_t NextInstruction_t;
-
-			static inline CoroFunctionPtr Resolve()
-			{
-				return { NextInstruction_t::CoroFunction };
-			}
-		};
-
-		template<class TCoroTerminatorLookup, class TInstruction>
-		struct CoroNextInstructionResolver<TCoroTerminatorLookup, TInstruction, NextInstructionDisposition::kNextRef0>
-		{
-			typedef typename CoroInstructionResolver<typename TCoroTerminatorLookup::Resolution_t, TInstruction::kCoroInstrIndex + 1>::Resolution_t NextInstruction_t;
-
-			typedef typename CoroResolveInstrRef<NextInstruction_t::kCoroInstrType, NextInstruction_t, typename TCoroTerminatorLookup::Resolution_t, 0>::Resolution_t ReferencedInstr_t;
-
-			static inline CoroFunctionPtr Resolve()
-			{
-				return { ReferencedInstr_t::CoroFunction };
-			}
-		};
-
-		template<class TCoroTerminatorLookup, class TInstruction>
-		struct CoroNextInstructionResolver<TCoroTerminatorLookup, TInstruction, NextInstructionDisposition::kThisRef0>
-		{
-			typedef typename CoroResolveInstrRef<TInstruction::kCoroInstrType, TInstruction, typename TCoroTerminatorLookup::Resolution_t, 0>::Resolution_t ReferencedInstr_t;
-
-			static inline CoroFunctionPtr Resolve()
-			{
-				return { ReferencedInstr_t::CoroFunction };
-			}
-		};
-
-		template<class TCoroTerminatorLookup, class TInstruction>
-		struct CoroNextInstructionResolver<TCoroTerminatorLookup, TInstruction, NextInstructionDisposition::kThisRef1>
-		{
-			typedef typename CoroResolveInstrRef<TInstruction::kCoroInstrType, TInstruction, typename TCoroTerminatorLookup::Resolution_t, 1>::Resolution_t ReferencedInstr_t;
-
-			static inline CoroFunctionPtr Resolve()
-			{
-				return { ReferencedInstr_t::CoroFunction };
-			}
-		};
-
-		template<class TCoroTerminatorLookup, class TInstruction>
-		struct CoroNextInstructionResolver<TCoroTerminatorLookup, TInstruction, NextInstructionDisposition::kRepeatLoop>
-		{
-			static CoroFunctionPtr RepeatLoopFunction(CoroContext *CORO_INTERNAL_coroContext, CoroStackFrameBase *CORO_INTERNAL_coroStackFrame)
-			{
-				TInstruction::CoroStepFunction(CORO_INTERNAL_coroContext, CORO_INTERNAL_coroStackFrame);
-				return TInstruction::CoroFunction(CORO_INTERNAL_coroContext, CORO_INTERNAL_coroStackFrame);
-			}
-
-			static inline CoroFunctionPtr Resolve()
-			{
-				return { RepeatLoopFunction };
-			}
 		};
 
 		template<class TLocals>
@@ -830,7 +809,7 @@ namespace rkit::coro::compiler
 
 				while (ip != nullptr)
 				{
-					ip = ip(context, frame).m_function;
+					ip = ip(context, frame).m_code;
 				}
 			}
 
@@ -886,8 +865,8 @@ namespace rkit::coro
 #define CORO_INSTR_CONSTANTS(prevInstrTag, thisInstrTag, instrType)	\
 	typedef thisInstrTag ThisInstr_t; \
 	typedef CORO_CONCAT_LINE(prevInstrTag) PrevInstr_t; \
-	typedef CoroTypeListAppend<PrevInstr_t::InstrList_t, ThisInstr_t>::Type_t InstrList_t; \
-	static const CoroInstructionType kCoroInstrType = CoroInstructionType::instrType; \
+	typedef ::rkit::TypeListAppend<PrevInstr_t::InstrList_t, ThisInstr_t>::Type_t InstrList_t; \
+	static const ::rkit::coro::compiler::CoroInstructionType kCoroInstrType = ::rkit::coro::compiler::CoroInstructionType::instrType; \
 	static const size_t kCoroInstrIndex = PrevInstr_t::kCoroInstrIndex + 1;
 
 #define CORO_CONTINUE_BODY_SCOPE	\
@@ -951,14 +930,37 @@ namespace rkit::coro
 		CORO_INSTR_CONSTANTS(CoroEndAt, CORO_CONCAT_LINE(CoroReturn), kReturn)\
 		CORO_CONTINUE_BODY_SCOPE\
 		CORO_FUNCTION_DEF\
-		((void)0)
+			((void)0)
 
 #define CORO_CHECK(expr)	\
-	do {\
-		::rkit::Result RKIT_PP_CONCAT(exprResult_, __LINE__) = (expr);\
-		if (!::rkit::utils::ResultIsOK(RKIT_PP_CONCAT(exprResult_, __LINE__)))\
-			return ::rkit::coro::compiler::FaultWithResult(CORO_INTERNAL_coroContext, RKIT_PP_CONCAT(exprResult_, __LINE__));\
-	} while (false)
+			do {\
+				::rkit::Result RKIT_PP_CONCAT(exprResult_, __LINE__) = (expr);\
+				if (!::rkit::utils::ResultIsOK(RKIT_PP_CONCAT(exprResult_, __LINE__)))\
+					return ::rkit::coro::compiler::FaultWithResult(CORO_INTERNAL_coroContext, RKIT_PP_CONCAT(exprResult_, __LINE__));\
+			} while (false)
+
+#define CORO_AWAIT(expr)	\
+			{ \
+				const ::rkit::RCPtr<::rkit::FutureContainerBase> CORO_CONCAT_LINE(futureContainer) = (expr).GetFutureContainer(); \
+				const ::rkit::coro::Code_t CORO_CONCAT_LINE(nextInstr) = ::rkit::coro::compiler::CoroNextInstructionResolver<CoroTerminatorLookup, ThisInstr_t, ::rkit::coro::compiler::NextInstructionDisposition::kContinue>::Resolve().m_code; \
+				if (CORO_CONCAT_LINE(futureContainer).IsValid() && CORO_CONCAT_LINE(futureContainer)->GetState() == ::rkit::FutureState::kCompleted)\
+					return { CORO_CONCAT_LINE(nextInstr) }; \
+				else \
+				{ \
+					CORO_INTERNAL_coroStackFrame->m_ip = CORO_CONCAT_LINE(nextInstr); \
+					CORO_INTERNAL_coroContext->m_disposition = ::rkit::coro::Disposition::kAwait; \
+					CORO_INTERNAL_coroContext->m_awaitFuture = ::std::move(CORO_CONCAT_LINE(futureContainer));\
+				} \
+				return { nullptr };\
+			} \
+		}\
+	} CORO_CONCAT_LINE(CoroEndAt);\
+	typedef struct CORO_CONCAT_LINE(CoroAwait)\
+	{\
+		CORO_INSTR_CONSTANTS(CoroEndAt, CORO_CONCAT_LINE(CoroAwait), kContinue)\
+		CORO_CONTINUE_BODY_SCOPE\
+		CORO_FUNCTION_DEF\
+		((void)0)
 
 // If/ElseIf/Else/EndIf chains work on the following assumptions
 // Code under the "If", "Else If", and "Else" instructions all have the "If" instruction
@@ -968,8 +970,8 @@ namespace rkit::coro
 // declared, in which case it is void.
 // "Else If", "Else" and "End If" instructions are marked as closing the "If" scope
 #define CORO_IF(condition)	\
-		if (!(condition))\
-			return CoroNextInstructionResolver<CoroTerminatorLookup, ThisInstr_t, NextInstructionDisposition::kNextRef0>::Resolve();\
+			if (!(condition))\
+				return CoroNextInstructionResolver<CoroTerminatorLookup, ThisInstr_t, NextInstructionDisposition::kNextRef0>::Resolve();\
 		CORO_FUNCTION_END\
 	} CORO_CONCAT_LINE(CoroEndAt);\
 	typedef struct CORO_CONCAT_LINE(CoroIf)\
@@ -1117,19 +1119,22 @@ namespace rkit::coro
 		CORO_FUNCTION_DEF\
 		((void)0)
 
-#define CORO_CALL(coro, ...)	\
+#define CORO_CALL(coroExpr, ...)	\
 			{\
-				auto CORO_CONCAT_LINE(CORO_INTERNAL_coroStarter) = (coro)();\
+				auto CORO_CONCAT_LINE(CORO_INTERNAL_coroStarter) = (coroExpr)();\
 				void *CORO_CONCAT_LINE(CORO_INTERNAL_newStackFrame) = CORO_INTERNAL_coroContext->m_allocStack(CORO_INTERNAL_coroContext->m_userdata, CORO_CONCAT_LINE(CORO_INTERNAL_coroStarter).GetMetadata().m_base);\
 				if (!CORO_CONCAT_LINE(CORO_INTERNAL_newStackFrame))\
-					CORO_INTERNAL_coroContext->m_disposition = CoroDisposition::kStackOverflow;\
+				{\
+					CORO_INTERNAL_coroContext->m_disposition = ::rkit::coro::Disposition::kFailResult;\
+					CORO_INTERNAL_coroContext->m_result = ::rkit::ResultCode::kCoroStackOverflow;\
+				}\
 				else\
 				{\
-					CORO_INTERNAL_coroStackFrame->m_ip = CoroNextInstructionResolver<CoroTerminatorLookup, ThisInstr_t, NextInstructionDisposition::kContinue>::Resolve().m_function; \
+					CORO_INTERNAL_coroStackFrame->m_ip = ::rkit::coro::compiler::CoroNextInstructionResolver<CoroTerminatorLookup, ThisInstr_t, ::rkit::coro::compiler::NextInstructionDisposition::kContinue>::Resolve().m_code; \
 					CORO_CONCAT_LINE(CORO_INTERNAL_coroStarter).GetMetadata().m_enterFunction(CORO_CONCAT_LINE(CORO_INTERNAL_newStackFrame), CORO_INTERNAL_coroStackFrame, CORO_CONCAT_LINE(CORO_INTERNAL_coroStarter).GetInstance(), ## __VA_ARGS__); \
-					CORO_INTERNAL_coroContext->m_frame = static_cast<CoroStackFrameBase*>(CORO_CONCAT_LINE(CORO_INTERNAL_newStackFrame)); \
-					CORO_INTERNAL_coroContext->m_disposition = CoroDisposition::kResume; \
+					CORO_INTERNAL_coroContext->m_frame = static_cast<::rkit::coro::StackFrameBase*>(CORO_CONCAT_LINE(CORO_INTERNAL_newStackFrame)); \
 				}\
+				CORO_INTERNAL_coroContext->m_disposition = ::rkit::coro::Disposition::kResume; \
 				return { nullptr };\
 			}\
 		}\

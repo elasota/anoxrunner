@@ -40,7 +40,7 @@ namespace anox
 
 	struct AnoxResourceTracker : public rkit::RefCountedTracker
 	{
-		explicit AnoxResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, rkit::UniquePtr<AnoxResourceBase> &&resource);
+		explicit AnoxResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, uint32_t resourceType, rkit::UniquePtr<AnoxResourceBase> &&resource);
 
 		virtual AnoxResourceKeyType GetKeyType() const = 0;
 
@@ -50,6 +50,7 @@ namespace anox
 		void SucceedLoading();
 
 		rkit::UniquePtr<AnoxResourceBase> m_resource = nullptr;
+		uint32_t m_resourceType = 0;
 
 		rkit::RCPtr<rkit::FutureContainer<AnoxResourceRetrieveResult>> m_pendingFutureContainer;
 
@@ -75,7 +76,7 @@ namespace anox
 	class StringKeyedResourceTracker : public AnoxResourceTracker
 	{
 	public:
-		StringKeyedResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, rkit::UniquePtr<AnoxResourceBase> &&resource);
+		StringKeyedResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, uint32_t resourceType, rkit::UniquePtr<AnoxResourceBase> &&resource);
 
 		rkit::Result SetKey(const rkit::StringView &str);
 		const rkit::StringView &GetKey() const;
@@ -89,7 +90,7 @@ namespace anox
 	class ContentIDKeyedResourceTracker : public AnoxResourceTracker
 	{
 	public:
-		ContentIDKeyedResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, rkit::UniquePtr<AnoxResourceBase> &&resource);
+		ContentIDKeyedResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, uint32_t resourceType, rkit::UniquePtr<AnoxResourceBase> &&resource);
 
 		rkit::Result SetKey(const rkit::data::ContentID &cid);
 		const rkit::data::ContentID &GetKey() const;
@@ -102,7 +103,7 @@ namespace anox
 	class CIPathKeyedResourceTracker : public AnoxResourceTracker
 	{
 	public:
-		CIPathKeyedResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, rkit::UniquePtr<AnoxResourceBase> &&resource);
+		CIPathKeyedResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, uint32_t resourceType, rkit::UniquePtr<AnoxResourceBase> &&resource);
 
 		rkit::Result SetKey(const rkit::CIPathView &cid);
 		const rkit::CIPathView &GetKey() const;
@@ -139,6 +140,31 @@ namespace anox
 	class AnoxResourceManager final : public AnoxResourceManagerBase
 	{
 	public:
+		template<class T>
+		class ResourceKey
+		{
+		public:
+			ResourceKey() = default;
+			ResourceKey(ResourceKey<T> &&other) = default;
+			ResourceKey(const ResourceKey<T> &other) = default;
+
+			explicit ResourceKey(uint32_t resourceType, const T &resourceKey);
+			explicit ResourceKey(uint32_t resourceType, T &&resourceKey);
+
+			ResourceKey<T> &operator=(const ResourceKey<T> &other) = default;
+			ResourceKey<T> &operator=(ResourceKey<T> &&other) = default;
+
+			uint32_t GetResourceType() const;
+			const T &GetResourceKey() const;
+
+			bool operator==(const ResourceKey<T> &other) const;
+			bool operator!=(const ResourceKey<T> &other) const;
+
+		private:
+			uint32_t m_resourceType = 0;
+			T m_resourceKey;
+		};
+
 		AnoxResourceManager(AnoxGameFileSystemBase *fileSystem, rkit::IJobQueue *jobQueue);
 
 		rkit::Result Initialize();
@@ -147,9 +173,9 @@ namespace anox
 		rkit::Result RegisterCIPathKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::CIPathView>> &&factory) override;
 		rkit::Result RegisterStringKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::StringView>> &&factory) override;
 
-		rkit::Result GetContentIDKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::data::ContentID &cid) override;
-		rkit::Result GetCIPathKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::CIPathView &path) override;
-		rkit::Result GetStringKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::StringView &str) override;
+		rkit::Result GetContentIDKeyedResource(rkit::RCPtr<rkit::Job> *loadJob, rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::data::ContentID &cid) override;
+		rkit::Result GetCIPathKeyedResource(rkit::RCPtr<rkit::Job> *loadJob, rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::CIPathView &path) override;
+		rkit::Result GetStringKeyedResource(rkit::RCPtr<rkit::Job> *loadJob, rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::StringView &str) override;
 
 		void UnsyncedUnregisterResource(const AnoxResourceTracker *tracker, bool wasLinked);
 
@@ -163,7 +189,7 @@ namespace anox
 		rkit::Result InternalRegisterLoaderFactory(uint32_t resourceType, AnoxResourceKeyType keyType, rkit::RCPtr<AnoxResourceLoaderFactoryBase> &&factory);
 
 		template<class TKeyedTracker, class TKeyViewType, AnoxResourceKeyType TKeyType>
-		rkit::Result InternalGetResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const TKeyViewType &key, rkit::HashMap<TKeyViewType, AnoxResourceTracker *> *resourceMap);
+		rkit::Result InternalGetResource(rkit::RCPtr<rkit::Job> *outJob, rkit::Future<AnoxResourceRetrieveResult> &loadFuture, const ResourceKey<TKeyViewType> &key, rkit::HashMap<ResourceKey<TKeyViewType>, AnoxResourceTracker *> *resourceMap);
 
 		AnoxGameFileSystemBase *m_fileSystem;
 		rkit::IJobQueue *m_jobQueue;
@@ -171,15 +197,28 @@ namespace anox
 		rkit::HashMap<uint32_t, TypeKeyedFactory> m_factories;
 		rkit::UniquePtr<rkit::IMutex> m_factoryMutex;
 
-		rkit::HashMap<rkit::CIPathView, AnoxResourceTracker *> m_pathKeyedResources;
-		rkit::HashMap<rkit::StringView, AnoxResourceTracker *> m_stringKeyedResources;
-		rkit::HashMap<rkit::data::ContentID, AnoxResourceTracker *> m_contentKeyedResources;
+		rkit::HashMap<ResourceKey<rkit::CIPathView>, AnoxResourceTracker *> m_pathKeyedResources;
+		rkit::HashMap<ResourceKey<rkit::StringView>, AnoxResourceTracker *> m_stringKeyedResources;
+		rkit::HashMap<ResourceKey<rkit::data::ContentID>, AnoxResourceTracker *> m_contentKeyedResources;
 		rkit::RCPtr<AnoxResourceLoaderSynchronizer> m_sync;
 
-		AnoxResourceTracker* m_firstResource = nullptr;
-		AnoxResourceTracker* m_lastResource = nullptr;
+		AnoxResourceTracker *m_firstResource = nullptr;
+		AnoxResourceTracker *m_lastResource = nullptr;
 	};
+}
 
+namespace rkit
+{
+	template<class T>
+	class Hasher<anox::AnoxResourceManager::ResourceKey<T>>
+	{
+	public:
+		static HashValue_t ComputeHash(HashValue_t baseHash, const anox::AnoxResourceManager::ResourceKey<T> &key);
+	};
+}
+
+namespace anox
+{
 	AnoxResourceLoaderSynchronizer::AnoxResourceLoaderSynchronizer(AnoxResourceManager *resManager)
 		: m_resManager(resManager)
 	{
@@ -194,10 +233,11 @@ namespace anox
 	}
 
 
-	AnoxResourceTracker::AnoxResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, rkit::UniquePtr<AnoxResourceBase> &&resource)
+	AnoxResourceTracker::AnoxResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, uint32_t resourceType, rkit::UniquePtr<AnoxResourceBase> &&resource)
 		: RefCountedTracker(0)
 		, m_sync(sync)
 		, m_resource(std::move(resource))
+		, m_resourceType(resourceType)
 	{
 	}
 
@@ -229,6 +269,20 @@ namespace anox
 		rkit::Delete(m_self);
 	}
 
+	void AnoxResourceTracker::FailLoading()
+	{
+		rkit::RCPtr<rkit::FutureContainer<AnoxResourceRetrieveResult>> futureContainerRCPtr;
+
+		{
+			rkit::MutexLock lock(*m_sync->m_resourcesMutex);
+
+			futureContainerRCPtr = std::move(m_pendingFutureContainer);
+			m_pendingFutureContainer.Reset();
+		}
+
+		futureContainerRCPtr->Fail();
+	}
+
 	void AnoxResourceTracker::SucceedLoading()
 	{
 		// Make sure we're keeping hard refs to the resource
@@ -245,7 +299,6 @@ namespace anox
 		}
 
 		futureContainerRCPtr->Complete(std::move(result));
-		
 	}
 
 	AnoxResourceLoadCompletionNotifier::AnoxResourceLoadCompletionNotifier(const rkit::RCPtr<AnoxResourceTracker> &resource)
@@ -255,6 +308,8 @@ namespace anox
 
 	AnoxResourceLoadCompletionNotifier::~AnoxResourceLoadCompletionNotifier()
 	{
+		if (m_resource)
+			m_resource->FailLoading();
 	}
 
 	void AnoxResourceLoadCompletionNotifier::OnLoadCompleted()
@@ -263,8 +318,8 @@ namespace anox
 		m_resource.Reset();
 	}
 
-	CIPathKeyedResourceTracker::CIPathKeyedResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, rkit::UniquePtr<AnoxResourceBase> &&resource)
-		: AnoxResourceTracker(sync, std::move(resource))
+	CIPathKeyedResourceTracker::CIPathKeyedResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, uint32_t resourceType, rkit::UniquePtr<AnoxResourceBase> &&resource)
+		: AnoxResourceTracker(sync, resourceType, std::move(resource))
 	{
 	}
 
@@ -297,11 +352,15 @@ namespace anox
 
 	rkit::Result AnoxProcessJobRunner::Run()
 	{
-		return m_factory->BaseRunProcessingTask(*m_resource, m_keyPtr);
+		rkit::Result processResult = m_factory->BaseRunProcessingTask(*m_resource, m_keyPtr);
+		if (rkit::utils::ResultIsOK(processResult))
+			m_loadCompleter->OnLoadCompleted();
+
+		return processResult;
 	}
 
-	StringKeyedResourceTracker::StringKeyedResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, rkit::UniquePtr<AnoxResourceBase> &&resource)
-		: AnoxResourceTracker(sync, std::move(resource))
+	StringKeyedResourceTracker::StringKeyedResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, uint32_t resourceType, rkit::UniquePtr<AnoxResourceBase> &&resource)
+		: AnoxResourceTracker(sync, resourceType, std::move(resource))
 	{
 	}
 
@@ -323,8 +382,8 @@ namespace anox
 		return AnoxResourceKeyType::kString;
 	}
 
-	ContentIDKeyedResourceTracker::ContentIDKeyedResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, rkit::UniquePtr<AnoxResourceBase> &&resource)
-		: AnoxResourceTracker(sync, std::move(resource))
+	ContentIDKeyedResourceTracker::ContentIDKeyedResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, uint32_t resourceType, rkit::UniquePtr<AnoxResourceBase> &&resource)
+		: AnoxResourceTracker(sync, resourceType, std::move(resource))
 	{
 	}
 
@@ -396,12 +455,12 @@ namespace anox
 	}
 
 	template<class TKeyedTracker, class TKeyViewType, AnoxResourceKeyType TKeyType>
-	rkit::Result AnoxResourceManager::InternalGetResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const TKeyViewType &key, rkit::HashMap<TKeyViewType, AnoxResourceTracker *> *resourceMap)
+	rkit::Result AnoxResourceManager::InternalGetResource(rkit::RCPtr<rkit::Job> *outJob, rkit::Future<AnoxResourceRetrieveResult> &loadFuture, const ResourceKey<TKeyViewType> &key, rkit::HashMap<ResourceKey<TKeyViewType>, AnoxResourceTracker *> *resourceMap)
 	{
 		loadFuture.Reset();
 
-		typedef typename rkit::HashMap<TKeyViewType, AnoxResourceTracker *>::ConstIterator_t MapConstIterator_t;
-		typedef typename rkit::HashMap<TKeyViewType, AnoxResourceTracker *>::Iterator_t MapIterator_t;
+		typedef typename rkit::HashMap<ResourceKey<TKeyViewType>, AnoxResourceTracker *>::ConstIterator_t MapConstIterator_t;
+		typedef typename rkit::HashMap<ResourceKey<TKeyViewType>, AnoxResourceTracker *>::Iterator_t MapIterator_t;
 
 		// These must be before the lock so that if this function fails,
 		// they will be destroyed outside of the lock, since their destruction
@@ -409,9 +468,11 @@ namespace anox
 		rkit::RCPtr<AnoxResourceBase> resourceRCPtr;
 		rkit::RCPtr<IAnoxResourceLoadCompletionNotifier> loadCompleter;
 
+		rkit::HashValue_t hash = rkit::Hasher<ResourceKey<TKeyViewType>>::ComputeHash(0, key);
+
 		rkit::MutexLock resLock(*m_sync->m_resourcesMutex);
 
-		MapIterator_t it = resourceMap->Find(key);
+		MapIterator_t it = resourceMap->FindPrehashed(hash, key);
 		if (it != resourceMap->end())
 		{
 			// Resource is registered
@@ -459,7 +520,7 @@ namespace anox
 		rkit::RCPtr<AnoxResourceLoaderFactoryBase> factory;
 		{
 			rkit::MutexLock factoryLock(*m_factoryMutex);
-			rkit::HashMap<uint32_t, TypeKeyedFactory>::ConstIterator_t factoryIt = m_factories.Find(resourceType);
+			rkit::HashMap<uint32_t, TypeKeyedFactory>::ConstIterator_t factoryIt = m_factories.Find(key.GetResourceType());
 			if (factoryIt == m_factories.end() || factoryIt.Value().m_keyType != TKeyType)
 				return rkit::ResultCode::kInvalidParameter;
 
@@ -473,9 +534,9 @@ namespace anox
 		AnoxResourceBase *resource = resourceUPtr.Get();
 
 		rkit::UniquePtr<TKeyedTracker> keyedTrackerUPtr;
-		RKIT_CHECK(rkit::New<TKeyedTracker>(keyedTrackerUPtr, m_sync, std::move(resourceUPtr)));
+		RKIT_CHECK(rkit::New<TKeyedTracker>(keyedTrackerUPtr, m_sync, key.GetResourceType(), std::move(resourceUPtr)));
 
-		RKIT_CHECK(keyedTrackerUPtr->SetKey(key));
+		RKIT_CHECK(keyedTrackerUPtr->SetKey(key.GetResourceKey()));
 
 		// Create the tracker and form a RC ptr from it immediately.
 		// We need to do this the unregister code is in RCTrackerZero, not
@@ -498,7 +559,7 @@ namespace anox
 
 		rkit::RCPtr<rkit::FutureContainer<AnoxResourceRetrieveResult>> recastContainer;
 
-		RKIT_CHECK(resourceMap->Set(keyedTracker->GetKey(), tracker));
+		RKIT_CHECK(resourceMap->SetPrehashed(hash, ResourceKey<TKeyViewType>(key.GetResourceType(), keyedTracker->GetKey()), tracker));
 
 		// With the load completion notifier set up, any further failures in this function
 		// will trigger a load failure, and the resource is registered now, so we can add it
@@ -530,7 +591,7 @@ namespace anox
 
 			rkit::UniquePtr<rkit::IJobRunner> processJobRunner;
 			RKIT_CHECK(rkit::New<AnoxProcessJobRunner>(processJobRunner, factory, resource, loadCompleter, keyPtr));
-			RKIT_CHECK(m_jobQueue->CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(processJobRunner), processJobDepSpan.ToValueISpan()));
+			RKIT_CHECK(m_jobQueue->CreateJob(outJob, rkit::JobType::kNormalPriority, std::move(processJobRunner), processJobDepSpan.ToValueISpan()));
 		}
 
 		loadFuture = rkit::Future<AnoxResourceRetrieveResult>(std::move(pendingFutureContainer));
@@ -538,19 +599,19 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxResourceManager::GetContentIDKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::data::ContentID &cid)
+	rkit::Result AnoxResourceManager::GetContentIDKeyedResource(rkit::RCPtr<rkit::Job> *outJob, rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::data::ContentID &cid)
 	{
-		return InternalGetResource<ContentIDKeyedResourceTracker, rkit::data::ContentID, AnoxResourceKeyType::kContentID>(loadFuture, resourceType, cid, &m_contentKeyedResources);
+		return InternalGetResource<ContentIDKeyedResourceTracker, rkit::data::ContentID, AnoxResourceKeyType::kContentID>(outJob, loadFuture, ResourceKey<rkit::data::ContentID>(resourceType, cid), &m_contentKeyedResources);
 	}
 
-	rkit::Result AnoxResourceManager::GetCIPathKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::CIPathView &path)
+	rkit::Result AnoxResourceManager::GetCIPathKeyedResource(rkit::RCPtr<rkit::Job> *outJob, rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::CIPathView &path)
 	{
-		return InternalGetResource<CIPathKeyedResourceTracker, rkit::CIPathView, AnoxResourceKeyType::kCIPath>(loadFuture, resourceType, path, &m_pathKeyedResources);
+		return InternalGetResource<CIPathKeyedResourceTracker, rkit::CIPathView, AnoxResourceKeyType::kCIPath>(outJob, loadFuture, ResourceKey<rkit::CIPathView>(resourceType, path), &m_pathKeyedResources);
 	}
 
-	rkit::Result AnoxResourceManager::GetStringKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::StringView &str)
+	rkit::Result AnoxResourceManager::GetStringKeyedResource(rkit::RCPtr<rkit::Job> *outJob, rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::StringView &str)
 	{
-		return InternalGetResource<StringKeyedResourceTracker, rkit::StringView, AnoxResourceKeyType::kString>(loadFuture, resourceType, str, &m_stringKeyedResources);
+		return InternalGetResource<StringKeyedResourceTracker, rkit::StringView, AnoxResourceKeyType::kString>(outJob, loadFuture, ResourceKey<rkit::StringView>(resourceType, str), &m_stringKeyedResources);
 	}
 
 	void AnoxResourceManager::UnsyncedUnregisterResource(const AnoxResourceTracker *tracker, bool wasLinked)
@@ -573,20 +634,59 @@ namespace anox
 			switch (tracker->GetKeyType())
 			{
 			case AnoxResourceKeyType::kCIPath:
-				m_pathKeyedResources.Remove(static_cast<const CIPathKeyedResourceTracker *>(tracker)->GetKey());
+				m_pathKeyedResources.Remove(ResourceKey<rkit::CIPathView>(tracker->m_resourceType, static_cast<const CIPathKeyedResourceTracker *>(tracker)->GetKey()));
 				break;
 
 			case AnoxResourceKeyType::kContentID:
-				m_contentKeyedResources.Remove(static_cast<const ContentIDKeyedResourceTracker *>(tracker)->GetKey());
+				m_contentKeyedResources.Remove(ResourceKey<rkit::data::ContentID>(tracker->m_resourceType, static_cast<const ContentIDKeyedResourceTracker *>(tracker)->GetKey()));
 				break;
 
 			case AnoxResourceKeyType::kString:
-				m_stringKeyedResources.Remove(static_cast<const StringKeyedResourceTracker *>(tracker)->GetKey());
+				m_stringKeyedResources.Remove(ResourceKey<rkit::StringView>(tracker->m_resourceType, static_cast<const StringKeyedResourceTracker *>(tracker)->GetKey()));
 				break;
 			default:
 				break;
 			}
 		}
+	}
+
+
+	template<class T>
+	AnoxResourceManager::ResourceKey<T>::ResourceKey(uint32_t resourceType, const T &resourceKey)
+		: m_resourceType(resourceType)
+		, m_resourceKey(resourceKey)
+	{
+	}
+
+	template<class T>
+	AnoxResourceManager::ResourceKey<T>::ResourceKey(uint32_t resourceType, T &&resourceKey)
+		: m_resourceType(resourceType)
+		, m_resourceKey(std::move(resourceKey))
+	{
+	}
+
+	template<class T>
+	uint32_t AnoxResourceManager::ResourceKey<T>::GetResourceType() const
+	{
+		return m_resourceType;
+	}
+
+	template<class T>
+	const T &AnoxResourceManager::ResourceKey<T>::GetResourceKey() const
+	{
+		return m_resourceKey;
+	}
+
+	template<class T>
+	bool AnoxResourceManager::ResourceKey<T>::operator==(const ResourceKey<T> &other) const
+	{
+		return m_resourceType == other.m_resourceType && m_resourceKey == other.m_resourceKey;
+	}
+
+	template<class T>
+	bool AnoxResourceManager::ResourceKey<T>::operator!=(const ResourceKey<T> &other) const
+	{
+		return !((*this) == other);
 	}
 
 	rkit::Result AnoxResourceManagerBase::Create(rkit::UniquePtr<AnoxResourceManagerBase> &outResLoader, AnoxGameFileSystemBase *fileSystem, rkit::IJobQueue *jobQueue)
@@ -599,5 +699,17 @@ namespace anox
 		outResLoader = std::move(resLoader);
 
 		return rkit::ResultCode::kOK;
+	}
+}
+
+namespace rkit
+{
+	template<class T>
+	HashValue_t Hasher<anox::AnoxResourceManager::ResourceKey<T>>::ComputeHash(HashValue_t baseHash, const anox::AnoxResourceManager::ResourceKey<T> &key)
+	{
+		HashValue_t hash = baseHash;
+		hash = Hasher<uint32_t>::ComputeHash(hash, key.GetResourceType());
+		hash = Hasher<T>::ComputeHash(hash, key.GetResourceKey());
+		return hash;
 	}
 }

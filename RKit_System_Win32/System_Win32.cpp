@@ -284,11 +284,11 @@ namespace rkit
 		void AssertionFailure(const char *expr, const char *file, unsigned int line) override;
 		void FirstChanceResultFailure(const Result &result) override;
 
-		Result AsyncOpenFileRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<UniquePtr<ISeekableReadStream>> &outStream, FileLocation location, const CIPathView &path) override;
-		Result AsyncOpenFileReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<UniquePtr<ISeekableReadStream>> &outStream, const OSAbsPathView &path) override;
+		Result AsyncOpenFileRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const FutureContainerPtr<UniquePtr<ISeekableReadStream>> &outStream, FileLocation location, const CIPathView &path) override;
+		Result AsyncOpenFileReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const FutureContainerPtr<UniquePtr<ISeekableReadStream>> &outStream, const OSAbsPathView &path) override;
 
-		Result AsyncOpenFileAsyncRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<AsyncFileOpenReadResult> &outStream, FileLocation location, const CIPathView &path) override;
-		Result AsyncOpenFileAsyncReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<AsyncFileOpenReadResult> &outStream, const OSAbsPathView &path) override;
+		Result AsyncOpenFileAsyncRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const FutureContainerPtr<AsyncFileOpenReadResult> &outStream, FileLocation location, const CIPathView &path) override;
+		Result AsyncOpenFileAsyncReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const FutureContainerPtr<AsyncFileOpenReadResult> &outStream, const OSAbsPathView &path) override;
 
 		Result OpenFileRead(UniquePtr<ISeekableReadStream> &outStream, FileLocation location, const CIPathView &path) override;
 		Result OpenFileReadAbs(UniquePtr<ISeekableReadStream> &outStream, const OSAbsPathView &path) override;
@@ -368,7 +368,7 @@ namespace rkit
 	class OpenFileReadJobRunner final : public IJobRunner
 	{
 	public:
-		OpenFileReadJobRunner(const Future<UniquePtr<ISeekableReadStream>> &streamFuture, const OSAbsPath &filePath, ISystemDriver &systemDriver);
+		OpenFileReadJobRunner(const FutureContainerPtr<UniquePtr<ISeekableReadStream>> &streamFuture, const OSAbsPath &filePath, ISystemDriver &systemDriver);
 		~OpenFileReadJobRunner();
 
 		Result Run() override;
@@ -376,7 +376,7 @@ namespace rkit
 	private:
 		Result CheckedRun();
 
-		Future<UniquePtr<ISeekableReadStream>> m_streamFuture;
+		FutureContainerPtr<UniquePtr<ISeekableReadStream>> m_streamFuture;
 		OSAbsPath m_filePath;
 		ISystemDriver &m_systemDriver;
 		bool m_completed = false;
@@ -385,7 +385,7 @@ namespace rkit
 	class OpenFileAsyncReadJobRunner final : public IJobRunner
 	{
 	public:
-		OpenFileAsyncReadJobRunner(const Future<AsyncFileOpenReadResult> &streamFuture, const OSAbsPath &filePath, ISystemDriver &systemDriver);
+		OpenFileAsyncReadJobRunner(const FutureContainerPtr<AsyncFileOpenReadResult> &streamFuture, const OSAbsPath &filePath, ISystemDriver &systemDriver);
 		~OpenFileAsyncReadJobRunner();
 
 		Result Run() override;
@@ -393,7 +393,7 @@ namespace rkit
 	private:
 		Result CheckedRun();
 
-		Future<AsyncFileOpenReadResult> m_streamFuture;
+		FutureContainerPtr<AsyncFileOpenReadResult> m_streamFuture;
 		OSAbsPath m_filePath;
 		ISystemDriver &m_systemDriver;
 		bool m_completed = false;
@@ -1300,7 +1300,7 @@ namespace rkit
 		}
 	}
 
-	Result SystemDriver_Win32::AsyncOpenFileRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<UniquePtr<ISeekableReadStream>> &outStream, FileLocation location, const CIPathView &path)
+	Result SystemDriver_Win32::AsyncOpenFileRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const FutureContainerPtr<UniquePtr<ISeekableReadStream>> &outStream, FileLocation location, const CIPathView &path)
 	{
 		OSAbsPath absPath;
 		RKIT_CHECK(ResolveAbsPath(absPath, location, path));
@@ -1308,7 +1308,7 @@ namespace rkit
 		return AsyncOpenFileReadAbs(jobQueue, outOpenJob, dependencyJob, outStream, absPath);
 	}
 
-	Result SystemDriver_Win32::AsyncOpenFileReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<UniquePtr<ISeekableReadStream>> &outStream, const OSAbsPathView &path)
+	Result SystemDriver_Win32::AsyncOpenFileReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const FutureContainerPtr<UniquePtr<ISeekableReadStream>> &outStream, const OSAbsPathView &path)
 	{
 		OSAbsPath pathCopy;
 		RKIT_CHECK(pathCopy.Set(path));
@@ -1321,7 +1321,7 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
-	Result SystemDriver_Win32::AsyncOpenFileAsyncRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<AsyncFileOpenReadResult> &outStream, FileLocation location, const CIPathView &path)
+	Result SystemDriver_Win32::AsyncOpenFileAsyncRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const FutureContainerPtr<AsyncFileOpenReadResult> &outStream, FileLocation location, const CIPathView &path)
 	{
 		OSAbsPath absPath;
 		RKIT_CHECK(ResolveAbsPath(absPath, location, path));
@@ -1329,7 +1329,7 @@ namespace rkit
 		return AsyncOpenFileAsyncReadAbs(jobQueue, outOpenJob, dependencyJob, outStream, absPath);
 	}
 
-	Result SystemDriver_Win32::AsyncOpenFileAsyncReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const Future<AsyncFileOpenReadResult> &outStream, const OSAbsPathView &path)
+	Result SystemDriver_Win32::AsyncOpenFileAsyncReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const FutureContainerPtr<AsyncFileOpenReadResult> &outStream, const OSAbsPathView &path)
 	{
 		OSAbsPath pathCopy;
 		RKIT_CHECK(pathCopy.Set(path));
@@ -1910,25 +1910,25 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
-	OpenFileReadJobRunner::OpenFileReadJobRunner(const Future<UniquePtr<ISeekableReadStream>> &streamFuture, const OSAbsPath &filePath, ISystemDriver &systemDriver)
+	OpenFileReadJobRunner::OpenFileReadJobRunner(const FutureContainerPtr<UniquePtr<ISeekableReadStream>> &streamFuture, const OSAbsPath &filePath, ISystemDriver &systemDriver)
 		: m_streamFuture(streamFuture)
 		, m_filePath(filePath)
 		, m_systemDriver(systemDriver)
 	{
-		RKIT_ASSERT(streamFuture.GetFutureContainer().IsValid());
+		RKIT_ASSERT(streamFuture.IsValid());
 	}
 
 	OpenFileReadJobRunner::~OpenFileReadJobRunner()
 	{
 		if (!m_completed)
-			this->m_streamFuture.GetFutureContainer()->Fail();
+			this->m_streamFuture->Fail();
 	}
 
 	Result OpenFileReadJobRunner::Run()
 	{
 		Result runResult = CheckedRun();
 		if (!utils::ResultIsOK(runResult))
-			m_streamFuture.GetFutureContainer()->Fail();
+			m_streamFuture->Fail();
 
 		return runResult;
 	}
@@ -1939,13 +1939,13 @@ namespace rkit
 		RKIT_CHECK(m_systemDriver.OpenFileReadAbs(stream, m_filePath));
 
 		m_completed = true;
-		m_streamFuture.GetFutureContainer()->Complete(std::move(stream));
+		m_streamFuture->Complete(std::move(stream));
 
 		return ResultCode::kOK;
 	}
 
 
-	OpenFileAsyncReadJobRunner::OpenFileAsyncReadJobRunner(const Future<AsyncFileOpenReadResult> &streamFuture, const OSAbsPath &filePath, ISystemDriver &systemDriver)
+	OpenFileAsyncReadJobRunner::OpenFileAsyncReadJobRunner(const FutureContainerPtr<AsyncFileOpenReadResult> &streamFuture, const OSAbsPath &filePath, ISystemDriver &systemDriver)
 		: m_streamFuture(streamFuture)
 		, m_filePath(filePath)
 		, m_systemDriver(systemDriver)
@@ -1955,7 +1955,7 @@ namespace rkit
 	OpenFileAsyncReadJobRunner::~OpenFileAsyncReadJobRunner()
 	{
 		if (!m_completed)
-			this->m_streamFuture.GetFutureContainer()->Fail();
+			this->m_streamFuture->Fail();
 	}
 
 	Result OpenFileAsyncReadJobRunner::Run()
@@ -1963,7 +1963,7 @@ namespace rkit
 		Result runResult = CheckedRun();
 		if (!utils::ResultIsOK(runResult))
 		{
-			m_streamFuture.GetFutureContainer()->Fail();
+			m_streamFuture->Fail();
 			m_completed = true;
 		}
 
@@ -1976,7 +1976,7 @@ namespace rkit
 		RKIT_CHECK(m_systemDriver.OpenFileAsyncReadAbs(result, m_filePath));
 
 		m_completed = true;
-		m_streamFuture.GetFutureContainer()->Complete(std::move(result));
+		m_streamFuture->Complete(std::move(result));
 
 		return ResultCode::kOK;
 	}

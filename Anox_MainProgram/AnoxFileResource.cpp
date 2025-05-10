@@ -1,6 +1,7 @@
 #include "AnoxFileResource.h"
 #include "AnoxGameFileSystem.h"
 
+#include "rkit/Core/FutureProtos.h"
 #include "rkit/Core/Job.h"
 #include "rkit/Core/JobQueue.h"
 #include "rkit/Core/Future.h"
@@ -157,14 +158,16 @@ namespace anox
 	{
 		rkit::RCPtr<rkit::Job> openJob;
 
-		rkit::Future<rkit::AsyncFileOpenReadResult> openFileFuture;
-		RKIT_CHECK(openFileFuture.Init());
-
 		rkit::CIPath loosePath;
 		RKIT_CHECK(loosePath.AppendComponent("loose"));
 		RKIT_CHECK(loosePath.Append(key));
 
-		RKIT_CHECK(fileSystem.OpenNamedFileAsync(openJob, openFileFuture, loosePath));
+		rkit::FutureContainerPtr<rkit::AsyncFileOpenReadResult> openFileFutureContainer;
+		RKIT_CHECK(rkit::New<rkit::FutureContainer<rkit::AsyncFileOpenReadResult>>(openFileFutureContainer));
+
+		RKIT_CHECK(fileSystem.OpenNamedFileAsync(openJob, openFileFutureContainer, loosePath));
+
+		rkit::Future<rkit::AsyncFileOpenReadResult> openFileFuture(openFileFutureContainer);
 
 		rkit::IJobQueue &jobQueue = fileSystem.GetJobQueue();
 
