@@ -182,9 +182,9 @@ namespace anox
 
 		RKIT_CHECK(jobQueue.CreateJob(&postIOJob, rkit::JobType::kIO, std::move(postIOJobRunner), openJob));
 
-		rkit::StaticArray<rkit::RCPtr<rkit::Job>, 2> completeDeps;
-		completeDeps[0] = postIOJob;
-		completeDeps[1] = ioRequestJob;
+		rkit::StaticArray<rkit::Job *, 2> completeDeps;
+		completeDeps[0] = postIOJob.Get();
+		completeDeps[1] = ioRequestJob.Get();
 
 		RKIT_CHECK(jobQueue.CreateJob(&outJob, rkit::JobType::kNormalPriority, rkit::UniquePtr<rkit::IJobRunner>(), completeDeps.ToSpan()));
 

@@ -136,6 +136,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AnoxCaptureHarness.cpp" />
+    <ClCompile Include="AnoxCommandStack.cpp" />
     <ClCompile Include="AnoxFileResource.cpp" />
     <ClCompile Include="AnoxGameFileSystem.cpp" />
     <ClCompile Include="AnoxFrameDrawer.cpp" />

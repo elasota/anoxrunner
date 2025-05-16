@@ -896,6 +896,26 @@ namespace rkit::coro
 		return CoroNextInstructionResolver<CoroTerminatorLookup, ThisInstr_t, NextInstructionDisposition::kContinue>::Resolve();\
 	}
 
+#define CORO_DECL_METHOD_BASE(name, prefix, suffix, ...)	\
+	typedef void CoroSignature_ ## name(__VA_ARGS__);\
+	prefix ::rkit::coro::MethodStarter<CoroSignature_ ## name> Async ## name() suffix;\
+	struct CoroFunction_ ##name
+
+#define CORO_DECL_METHOD(name, ...)	CORO_DECL_METHOD_BASE(name, , , __VA_ARGS__)
+#define CORO_DECL_METHOD_VIRTUAL(name, ...)	CORO_DECL_METHOD_BASE(name, virtual, , __VA_ARGS__)
+#define CORO_DECL_METHOD_ABSTRACT(name, ...)	CORO_DECL_METHOD_BASE(name, virtual, = 0, __VA_ARGS__)
+
+#define CORO_DECL_METHOD_OVERRIDE(name, ...) \
+	::rkit::coro::MethodStarter<CoroSignature_ ## name> Async ## name() override; \
+	struct CoroFunction_ ## name
+
+#define CORO_DEF_METHOD(cls, name)	\
+	::rkit::coro::MethodStarter<cls::CoroSignature_ ## name> cls::Async ## name()\
+	{\
+		return ::rkit::coro::DeferredMethodStarter<cls, CoroSignature_ ## name, CoroFunction_ ## name>::Dispatch(this);\
+	}\
+	struct cls::CoroFunction_ ## name final : public ::rkit::coro::MethodCoroutine<cls, cls::CoroSignature_ ## name>
+
 #define CORO_BEGIN \
 	typedef ::rkit::coro::compiler::StackFrameBuilder<ClassInstance, Locals, Params> CoroStackFrame;\
 	struct CoroTerminatorLookup; \
@@ -940,19 +960,17 @@ namespace rkit::coro
 			} while (false)
 
 #define CORO_AWAIT(expr)	\
+			::rkit::RCPtr<::rkit::FutureContainerBase> CORO_CONCAT_LINE(futureContainer) = (expr).GetFutureContainer(); \
+			const ::rkit::coro::Code_t CORO_CONCAT_LINE(nextInstr) = ::rkit::coro::compiler::CoroNextInstructionResolver<CoroTerminatorLookup, ThisInstr_t, ::rkit::coro::compiler::NextInstructionDisposition::kContinue>::Resolve().m_code; \
+			if (CORO_CONCAT_LINE(futureContainer).IsValid() && CORO_CONCAT_LINE(futureContainer)->GetState() == ::rkit::FutureState::kCompleted)\
+				return { CORO_CONCAT_LINE(nextInstr) }; \
+			else \
 			{ \
-				const ::rkit::RCPtr<::rkit::FutureContainerBase> CORO_CONCAT_LINE(futureContainer) = (expr).GetFutureContainer(); \
-				const ::rkit::coro::Code_t CORO_CONCAT_LINE(nextInstr) = ::rkit::coro::compiler::CoroNextInstructionResolver<CoroTerminatorLookup, ThisInstr_t, ::rkit::coro::compiler::NextInstructionDisposition::kContinue>::Resolve().m_code; \
-				if (CORO_CONCAT_LINE(futureContainer).IsValid() && CORO_CONCAT_LINE(futureContainer)->GetState() == ::rkit::FutureState::kCompleted)\
-					return { CORO_CONCAT_LINE(nextInstr) }; \
-				else \
-				{ \
-					CORO_INTERNAL_coroStackFrame->m_ip = CORO_CONCAT_LINE(nextInstr); \
-					CORO_INTERNAL_coroContext->m_disposition = ::rkit::coro::Disposition::kAwait; \
-					CORO_INTERNAL_coroContext->m_awaitFuture = ::std::move(CORO_CONCAT_LINE(futureContainer));\
-				} \
-				return { nullptr };\
+				CORO_INTERNAL_coroStackFrame->m_ip = CORO_CONCAT_LINE(nextInstr); \
+				CORO_INTERNAL_coroContext->m_disposition = ::rkit::coro::Disposition::kAwait; \
+				CORO_INTERNAL_coroContext->m_awaitFuture = ::std::move(CORO_CONCAT_LINE(futureContainer));\
 			} \
+			return { nullptr };\
 		}\
 	} CORO_CONCAT_LINE(CoroEndAt);\
 	typedef struct CORO_CONCAT_LINE(CoroAwait)\

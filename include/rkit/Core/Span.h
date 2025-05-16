@@ -90,10 +90,20 @@ namespace rkit
 
 		T &operator[](size_t index) const;
 
-		operator Span<const T>() const;
+		template<class TOther>
+		operator Span<TOther>() const;
 
 		SpanToISpanRefWrapper<T> ToRefISpan() const;
 		SpanToISpanValueWrapper<typename std::remove_const<T>::type> ToValueISpan() const;
+
+		template<class TOther>
+		Span<TOther> ReinterpretCast() const;
+
+		template<class TOther>
+		Span<TOther> StaticCast() const;
+
+		template<class TOther>
+		Span<TOther> ConstCast() const;
 
 	private:
 		T *m_arr;
@@ -424,9 +434,10 @@ T &rkit::Span<T>::operator[](size_t index) const
 }
 
 template<class T>
-rkit::Span<T>::operator Span<const T>() const
+template<class TOther>
+rkit::Span<T>::operator Span<TOther>() const
 {
-	return Span<const T>(m_arr, m_count);
+	return Span<TOther>(m_arr, m_count);
 }
 
 template<class T>
@@ -439,6 +450,35 @@ template<class T>
 rkit::SpanToISpanValueWrapper<typename std::remove_const<T>::type> rkit::Span<T>::ToValueISpan() const
 {
 	return rkit::SpanToISpanValueWrapper<typename std::remove_const<T>::type>(m_arr, m_count);
+}
+
+template<class T>
+template<class TOther>
+rkit::Span<TOther> rkit::Span<T>::ReinterpretCast() const
+{
+	if (sizeof(T) == sizeof(TOther))
+		return rkit::Span<TOther>(reinterpret_cast<TOther *>(m_arr), m_count);
+	else
+	{
+		const size_t thisSize = m_count * sizeof(T);
+		RKIT_ASSERT(thisSize % sizeof(TOther) == 0);
+
+		return rkit::Span<TOther>(reinterpret_cast<TOther *>(m_arr), thisSize / sizeof(TOther));
+	}
+}
+
+template<class T>
+template<class TOther>
+rkit::Span<TOther> rkit::Span<T>::StaticCast() const
+{
+	return rkit::Span<TOther>(static_cast<TOther *>(m_arr), m_count);
+}
+
+template<class T>
+template<class TOther>
+rkit::Span<TOther> rkit::Span<T>::ConstCast() const
+{
+	return rkit::Span<TOther>(const_cast<TOther *>(m_arr), m_count);
 }
 
 template<class T>

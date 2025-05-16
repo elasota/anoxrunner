@@ -48,6 +48,9 @@
     <ClCompile Include="AnoxCaptureHarness.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="AnoxCommandStack.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\anox\AnoxGraphicsSubsystem.h">

@@ -196,6 +196,16 @@ namespace rkit::coro
 		const FrameMetadata<typename SignatureAnalyzer<TSignature>::Parameters_t> &m_metadata;
 	};
 
+	template<class TClass, class TSignature, class TCoroutine>
+	struct DeferredMethodStarter
+	{
+		static MethodStarter<TSignature> Dispatch(TClass *obj)
+		{
+			return MethodStarter<TSignature>(*obj, TCoroutine());
+		}
+	};
+
+
 	template<class TSignature>
 	class FunctionStarter
 	{

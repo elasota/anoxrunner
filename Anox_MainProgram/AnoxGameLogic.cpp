@@ -12,6 +12,7 @@
 #include "rkit/Core/UtilitiesDriver.h"
 
 #include "AnoxCaptureHarness.h"
+#include "AnoxCommandStack.h"
 #include "AnoxResourceManager.h"
 
 namespace anox
@@ -25,24 +26,12 @@ namespace anox
 		rkit::Result RunFrame() override;
 
 	private:
-		typedef void NoParamsSignature();
 
-		typedef void LoadContentIDKeyedResourceSignature(AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::data::ContentID &cid);
-		typedef void LoadCIPathKeyedResourceSignature(AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::CIPathView &path);
-		typedef void LoadStringKeyedResourceSignature(AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::StringView &str);
-
-		rkit::coro::MethodStarter<NoParamsSignature> AsyncStartUp();
-		rkit::coro::MethodStarter<NoParamsSignature> AsyncRunFrame();
-
-		rkit::coro::MethodStarter<LoadContentIDKeyedResourceSignature> AsyncLoadContentIDKeyedResource();
-		rkit::coro::MethodStarter<LoadCIPathKeyedResourceSignature> AsyncLoadCIPathKeyedResource();
-		rkit::coro::MethodStarter<LoadStringKeyedResourceSignature> AsyncLoadStringKeyedResource();
-
-		struct AsyncStartUpCoroutine;
-		struct AsyncRunFrameCoroutine;
-		struct AsyncLoadCIPathKeyedResourceCoroutine;
-		struct AsyncLoadStringKeyedResourceCoroutine;
-		struct AsyncLoadContentIDKeyedResourceCoroutine;
+		CORO_DECL_METHOD(StartUp);
+		CORO_DECL_METHOD(RunFrame);
+		CORO_DECL_METHOD(LoadContentIDKeyedResource, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::data::ContentID &cid);
+		CORO_DECL_METHOD(LoadCIPathKeyedResource, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::CIPathView &path);
+		CORO_DECL_METHOD(LoadStringKeyedResource, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::StringView &str);
 
 		IAnoxGame *m_game;
 		rkit::UniquePtr<rkit::coro::Thread> m_mainCoroThread;
@@ -96,7 +85,7 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	struct AnoxGameLogic::AsyncStartUpCoroutine final : public rkit::coro::MethodCoroutine<AnoxGameLogic, NoParamsSignature>
+	CORO_DEF_METHOD(AnoxGameLogic, StartUp)
 	{
 		struct Locals
 		{
@@ -108,12 +97,11 @@ namespace anox
 		};
 
 		CORO_BEGIN
-			CORO_CALL(self->AsyncLoadCIPathKeyedResource, locals.resLoadResult, anox::resloaders::kRawFileResourceTypeCode, rkit::CIPathView("configs/anox.cfg"));
-
+			CORO_CALL(self->AsyncLoadCIPathKeyedResource, locals.resLoadResult, anox::resloaders::kRawFileResourceTypeCode, rkit::CIPathView("configs/default.cfg"));
 		CORO_END
 	};
 
-	struct AnoxGameLogic::AsyncLoadCIPathKeyedResourceCoroutine final : public rkit::coro::MethodCoroutine<AnoxGameLogic, LoadCIPathKeyedResourceSignature>
+	CORO_DEF_METHOD(AnoxGameLogic, LoadCIPathKeyedResource)
 	{
 		struct Locals
 		{
@@ -135,7 +123,7 @@ namespace anox
 		CORO_END
 	};
 
-	struct AnoxGameLogic::AsyncLoadStringKeyedResourceCoroutine final : public rkit::coro::MethodCoroutine<AnoxGameLogic, LoadStringKeyedResourceSignature>
+	CORO_DEF_METHOD(AnoxGameLogic, LoadStringKeyedResource)
 	{
 		struct Locals
 		{
@@ -157,7 +145,7 @@ namespace anox
 		CORO_END
 	};
 
-	struct AnoxGameLogic::AsyncLoadContentIDKeyedResourceCoroutine final : public rkit::coro::MethodCoroutine<AnoxGameLogic, LoadContentIDKeyedResourceSignature>
+	CORO_DEF_METHOD(AnoxGameLogic, LoadContentIDKeyedResource)
 	{
 		struct Locals
 		{
@@ -179,12 +167,7 @@ namespace anox
 		CORO_END
 	};
 
-	rkit::coro::MethodStarter<AnoxGameLogic::NoParamsSignature> AnoxGameLogic::AsyncStartUp()
-	{
-		return rkit::coro::MethodStarter<AnoxGameLogic::NoParamsSignature>(*this, AsyncStartUpCoroutine());
-	}
-
-	struct AnoxGameLogic::AsyncRunFrameCoroutine final : public rkit::coro::MethodCoroutine<AnoxGameLogic, NoParamsSignature>
+	CORO_DEF_METHOD(AnoxGameLogic, RunFrame)
 	{
 		struct Locals {};
 
@@ -193,27 +176,6 @@ namespace anox
 		CORO_BEGIN
 		CORO_END
 	};
-
-	rkit::coro::MethodStarter<AnoxGameLogic::NoParamsSignature> AnoxGameLogic::AsyncRunFrame()
-	{
-		return rkit::coro::MethodStarter<AnoxGameLogic::NoParamsSignature>(*this, AsyncRunFrameCoroutine());
-	}
-
-	rkit::coro::MethodStarter<AnoxGameLogic::LoadContentIDKeyedResourceSignature> AnoxGameLogic::AsyncLoadContentIDKeyedResource()
-	{
-		return rkit::coro::MethodStarter<AnoxGameLogic::LoadContentIDKeyedResourceSignature>(*this, AsyncLoadContentIDKeyedResourceCoroutine());
-	}
-
-	rkit::coro::MethodStarter<AnoxGameLogic::LoadCIPathKeyedResourceSignature> AnoxGameLogic::AsyncLoadCIPathKeyedResource()
-	{
-		return rkit::coro::MethodStarter<AnoxGameLogic::LoadCIPathKeyedResourceSignature>(*this, AsyncLoadCIPathKeyedResourceCoroutine());
-	}
-
-	rkit::coro::MethodStarter<AnoxGameLogic::LoadStringKeyedResourceSignature> AnoxGameLogic::AsyncLoadStringKeyedResource()
-	{
-		return rkit::coro::MethodStarter<AnoxGameLogic::LoadStringKeyedResourceSignature>(*this, AsyncLoadStringKeyedResourceCoroutine());
-	}
-
 
 	rkit::Result IGameLogic::Create(rkit::UniquePtr<IGameLogic> &outGameLoop, IAnoxGame *game)
 	{
