@@ -11,12 +11,15 @@
 #include "rkit/Core/Path.h"
 #include "rkit/Core/UtilitiesDriver.h"
 
+#include "AnoxFileResource.h"
 #include "AnoxCaptureHarness.h"
 #include "AnoxCommandStack.h"
 #include "AnoxResourceManager.h"
 
 namespace anox
 {
+	class AnoxCommandStackBase;
+
 	class AnoxGameLogic final : public IGameLogic
 	{
 	public:
@@ -32,6 +35,8 @@ namespace anox
 		CORO_DECL_METHOD(LoadContentIDKeyedResource, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::data::ContentID &cid);
 		CORO_DECL_METHOD(LoadCIPathKeyedResource, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::CIPathView &path);
 		CORO_DECL_METHOD(LoadStringKeyedResource, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::StringView &str);
+		CORO_DECL_METHOD(ExecCommandFile, const rkit::CIPathView &path);
+		CORO_DECL_METHOD(RunCommands, AnoxCommandStackBase &commandStack);
 
 		IAnoxGame *m_game;
 		rkit::UniquePtr<rkit::coro::Thread> m_mainCoroThread;
@@ -89,7 +94,6 @@ namespace anox
 	{
 		struct Locals
 		{
-			AnoxResourceRetrieveResult resLoadResult;
 		};
 
 		struct Params
@@ -97,7 +101,48 @@ namespace anox
 		};
 
 		CORO_BEGIN
+			CORO_CALL(self->AsyncExecCommandFile, rkit::CIPathView("configs/default.cfg"));
+
+		CORO_END
+	};
+
+	CORO_DEF_METHOD(AnoxGameLogic, ExecCommandFile)
+	{
+		struct Locals
+		{
+			AnoxResourceRetrieveResult resLoadResult;
+			rkit::UniquePtr<AnoxCommandStackBase> commandStack;
+		};
+
+		struct Params
+		{
+			const rkit::CIPathView path;
+		};
+
+		CORO_BEGIN
+			CORO_CHECK(AnoxCommandStackBase::Create(locals.commandStack, 64 * 1024));
+
 			CORO_CALL(self->AsyncLoadCIPathKeyedResource, locals.resLoadResult, anox::resloaders::kRawFileResourceTypeCode, rkit::CIPathView("configs/default.cfg"));
+
+			CORO_CHECK(locals.commandStack->Parse(locals.resLoadResult.m_resourceHandle.StaticCast<AnoxFileResourceBase>()->GetContents()));
+			CORO_CALL(self->AsyncRunCommands, *locals.commandStack);
+		CORO_END
+	};
+
+
+	CORO_DEF_METHOD(AnoxGameLogic, RunCommands)
+	{
+		struct Locals
+		{
+		};
+
+		struct Params
+		{
+			AnoxCommandStackBase &commandStack;
+		};
+
+		CORO_BEGIN
+			CORO_CHECK(rkit::ResultCode::kNotYetImplemented);
 		CORO_END
 	};
 

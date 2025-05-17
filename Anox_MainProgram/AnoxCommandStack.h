@@ -8,6 +8,9 @@ namespace rkit
 
 	template<class T>
 	struct ISpan;
+
+	template<class T>
+	class Span;
 }
 
 namespace anox
@@ -17,6 +20,7 @@ namespace anox
 	public:
 		virtual ~AnoxCommandStackBase() {}
 
+		virtual rkit::Result Parse(const rkit::Span<const uint8_t>& stream) = 0;
 		virtual rkit::Result Push(const rkit::StringSliceView &strView) = 0;
 		virtual rkit::Result PushMultiple(const rkit::ISpan<rkit::StringSliceView> &spans) = 0;
 

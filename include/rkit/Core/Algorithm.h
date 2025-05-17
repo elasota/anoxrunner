@@ -181,6 +181,13 @@ namespace rkit
 
 	template<class T>
 	int FindLowestSetBit(T value);
+
+	template<class T>
+	void Swap(T &a, T &b);
+
+	template<class T>
+	void ReverseSpanOrder(const Span<T> &spanRef);
+
 }
 
 #include "CoreDefs.h"
@@ -712,3 +719,24 @@ int rkit::FindLowestSetBit(T value)
 {
 	return rkit::priv::FindBitsHelper<T, std::is_integral<T>::value &&std::is_unsigned<T>::value>::FindLowestSetBit(value);
 }
+
+
+template<class T>
+void rkit::Swap(T &a, T &b)
+{
+	T temp = std::move(a);
+	a = std::move(b);
+	b = std::move(temp);
+}
+
+template<class T>
+void rkit::ReverseSpanOrder(const rkit::Span<T> &span)
+{
+	T *elements = span.Ptr();
+	size_t count = span.Count();
+	size_t halfCount = count / 2;
+
+	for (size_t i = 0; i < halfCount; i++)
+		Swap(elements[i], elements[count - 1 - i]);
+}
+

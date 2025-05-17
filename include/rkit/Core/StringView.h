@@ -28,7 +28,6 @@ namespace rkit
 		BaseStringSliceView(const TChar(&charsArray)[TLength]);
 
 		explicit BaseStringSliceView(const Span<const TChar> &span);
-		explicit BaseStringSliceView(const Span<TChar> &span);
 
 		const TChar &operator[](size_t index) const;
 
@@ -108,12 +107,6 @@ rkit::BaseStringSliceView<TChar>::BaseStringSliceView(const TChar(&charsArray)[T
 
 template<class TChar>
 rkit::BaseStringSliceView<TChar>::BaseStringSliceView(const Span<const TChar> &span)
-	: m_span(span)
-{
-}
-
-template<class TChar>
-rkit::BaseStringSliceView<TChar>::BaseStringSliceView(const Span<TChar> &span)
 	: m_span(span)
 {
 }

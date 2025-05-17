@@ -83,6 +83,7 @@ namespace rkit
 		T *Ptr() const;
 		size_t Count() const;
 
+		Span<T> SubSpan(size_t start) const;
 		Span<T> SubSpan(size_t start, size_t size) const;
 
 		SpanIterator<T> begin() const;
@@ -404,6 +405,13 @@ template<class T>
 size_t rkit::Span<T>::Count() const
 {
 	return m_count;
+}
+
+template<class T>
+rkit::Span<T> rkit::Span<T>::SubSpan(size_t start) const
+{
+	RKIT_ASSERT(start <= m_count);
+	return Span<T>(m_arr + start, m_count - start);
 }
 
 template<class T>
