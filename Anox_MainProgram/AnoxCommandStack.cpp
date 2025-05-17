@@ -16,13 +16,17 @@ namespace anox
 		rkit::Result Push(const rkit::StringSliceView &strView) override;
 		rkit::Result PushMultiple(const rkit::ISpan<rkit::StringSliceView> &spans) override;
 
+		bool Pop(rkit::StringView &outString) override;
+
 	private:
-		rkit::Vector<char> m_contents;
+		rkit::Vector<char> m_contentsBuffer;
+		size_t m_contentsSize;
 		size_t m_maxCapacity;
 	};
 
 	AnoxCommandStack::AnoxCommandStack(size_t maxCapacity)
 		: m_maxCapacity(maxCapacity)
+		, m_contentsSize(0)
 	{
 	}
 
@@ -35,6 +39,7 @@ namespace anox
 		rkit::Vector<rkit::StringSliceView> lines;
 
 		size_t endPos = 0;
+		bool isInQuote = false;
 		while (endPos <= stream.Count())
 		{
 			bool isTerminal = false;
@@ -45,7 +50,8 @@ namespace anox
 			}
 			else
 			{
-				char c = stream[endPos];
+				const uint8_t *cptr = &stream[endPos];
+				char c = *cptr;
 				if (c == '\n')
 					isTerminal = true;
 				else if (c == '\r')
@@ -53,6 +59,13 @@ namespace anox
 					isTerminal = true;
 					if (endPos + 1 < stream.Count() && stream[endPos + 1] == '\n')
 						isCRLF = true;
+				}
+				else if (c == '\"')
+					isInQuote = !isInQuote;
+				else if (c == ';')
+				{
+					if (!isInQuote)
+						isTerminal = true;
 				}
 			}
 
@@ -102,7 +115,10 @@ namespace anox
 				endPos++;
 
 			if (isTerminal)
+			{
 				startPos = endPos;
+				isInQuote = false;
+			}
 		}
 
 		rkit::ReverseSpanOrder(lines.ToSpan());
@@ -138,9 +154,10 @@ namespace anox
 		}
 
 		size_t insertPos = 0;
-		RKIT_CHECK(m_contents.Resize(m_contents.Count() + sizeRequired));
+		RKIT_CHECK(m_contentsBuffer.Resize(m_contentsSize + sizeRequired));
+		m_contentsSize += sizeRequired;
 
-		rkit::Span<char> contentsSpan = m_contents.ToSpan();
+		rkit::Span<char> contentsSpan = m_contentsBuffer.ToSpan();
 
 		for (size_t i = 0; i < numSlices; i++)
 		{
@@ -157,9 +174,30 @@ namespace anox
 			insertPos += sizeof(size_t);
 		}
 
-		RKIT_ASSERT(insertPos == m_contents.Count());
+		RKIT_ASSERT(insertPos == m_contentsSize);
 
 		return rkit::ResultCode::kOK;
+	}
+
+
+	bool AnoxCommandStack::Pop(rkit::StringView &outString)
+	{
+		if (m_contentsSize > 0)
+		{
+			rkit::ConstSpan<char> sizeSpan = m_contentsBuffer.ToSpan().SubSpan(m_contentsSize - sizeof(size_t));
+			size_t size = 0;
+			rkit::CopySpanNonOverlapping(rkit::Span<char>(reinterpret_cast<char *>(&size), 1), sizeSpan);
+
+			size_t startPos = m_contentsSize - sizeof(size_t) - size - 1;
+
+			outString = rkit::StringView(&m_contentsBuffer[startPos], size);
+
+			m_contentsSize = startPos;
+
+			return true;
+		}
+
+		return true;
 	}
 
 	rkit::Result AnoxCommandStackBase::Create(rkit::UniquePtr<AnoxCommandStackBase> &stack, size_t maxCapacity)

@@ -41,6 +41,7 @@ namespace anox
 	struct AnoxResourceTracker : public rkit::RefCountedTracker
 	{
 		explicit AnoxResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, uint32_t resourceType, rkit::UniquePtr<AnoxResourceBase> &&resource);
+		virtual ~AnoxResourceTracker() {}
 
 		virtual AnoxResourceKeyType GetKeyType() const = 0;
 

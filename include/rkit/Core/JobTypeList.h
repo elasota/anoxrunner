@@ -67,7 +67,7 @@ namespace rkit::priv
 	JobType JobTypeListHelper<TJobType, TMoreJobTypes...>::Resolve(size_t index)
 	{
 		if (index == 0)
-			return JobType;
+			return TJobType;
 
 		return JobTypeListHelper<TMoreJobTypes...>::Resolve(index - 1);
 	}

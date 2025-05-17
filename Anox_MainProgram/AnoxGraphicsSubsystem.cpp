@@ -1747,7 +1747,7 @@ namespace anox
 
 			size_t Count() const override { return m_span.Count(); }
 
-			rkit::Job *operator[](size_t index) const { return m_span[index].Get(); }
+			rkit::Job *operator[](size_t index) const override { return m_span[index].Get(); }
 
 		private:
 			const rkit::ISpan<rkit::RCPtr<rkit::Job>> &m_span;
@@ -1788,7 +1788,7 @@ namespace anox
 
 			size_t Count() const override { return m_span.Count(); }
 
-			rkit::Job *operator[](size_t index) const { return m_span[index].Get(); }
+			rkit::Job *operator[](size_t index) const override { return m_span[index].Get(); }
 
 		private:
 			const rkit::ISpan<rkit::RCPtr<rkit::Job>> &m_span;

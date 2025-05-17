@@ -131,6 +131,8 @@ namespace anox
 	class AnoxResourceManagerBase
 	{
 	public:
+		virtual ~AnoxResourceManagerBase() {}
+
 		virtual rkit::Result RegisterContentKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::data::ContentID>> &&factory) = 0;
 		virtual rkit::Result RegisterCIPathKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::CIPathView>> &&factory) = 0;
 		virtual rkit::Result RegisterStringKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::StringView>> &&factory) = 0;

@@ -210,6 +210,8 @@ namespace rkit::coro::compiler
 		kFor,
 		kEndFor,
 		kContinue,
+		kCode,
+		kExit,
 	};
 
 
@@ -424,6 +426,35 @@ namespace rkit::coro::compiler
 		}
 	};
 
+	template<bool TIsCorrectInstruction, class TInstr>
+	struct CoroCheckCloseScope
+	{
+	};
+
+	template<class TInstr>
+	struct CoroCheckCloseScope<true, TInstr>
+	{
+		typedef TInstr Type_t;
+	};
+
+	template<class TInstr>
+	struct CoroCloseIf
+	{
+		typedef typename CoroCheckCloseScope<TInstr::kCoroInstrType == CoroInstructionType::kIf, TInstr>::Type_t Type_t;
+	};
+
+	template<class TInstr>
+	struct CoroCloseFor
+	{
+		typedef typename CoroCheckCloseScope<TInstr::kCoroInstrType == CoroInstructionType::kFor, TInstr>::Type_t Type_t;
+	};
+
+	template<class TInstr>
+	struct CoroCloseWhile
+	{
+		typedef typename CoroCheckCloseScope<TInstr::kCoroInstrType == CoroInstructionType::kWhile, TInstr>::Type_t Type_t;
+	};
+
 #if 0
 		struct CoroStackFrameBase
 		{
@@ -499,36 +530,6 @@ namespace rkit::coro::compiler
 		struct CoroTypeListSize<CoroTypeList<TFirstType, TMoreTypes...>>
 		{
 			static const size_t kSize = CoroTypeListSize<CoroTypeList<TMoreTypes...>>::kSize + 1;
-		};
-
-
-		template<bool TIsCorrectInstruction, class TInstr>
-		struct CoroCheckCloseScope
-		{
-		};
-
-		template<class TInstr>
-		struct CoroCheckCloseScope<true, TInstr>
-		{
-			typedef TInstr Type_t;
-		};
-
-		template<class TInstr>
-		struct CoroCloseIf
-		{
-			typedef typename CoroCheckCloseScope<TInstr::kCoroInstrType == CoroInstructionType::kIf, TInstr>::Type_t Type_t;
-		};
-
-		template<class TInstr>
-		struct CoroCloseFor
-		{
-			typedef typename CoroCheckCloseScope<TInstr::kCoroInstrType == CoroInstructionType::kFor, TInstr>::Type_t Type_t;
-		};
-
-		template<class TInstr>
-		struct CoroCloseWhile
-		{
-			typedef typename CoroCheckCloseScope<TInstr::kCoroInstrType == CoroInstructionType::kWhile, TInstr>::Type_t Type_t;
 		};
 
 		template<class TCoro, class TCoroInstrList>
@@ -893,7 +894,7 @@ namespace rkit::coro
 		CORO_LOCALS
 
 #define CORO_FUNCTION_END	\
-		return CoroNextInstructionResolver<CoroTerminatorLookup, ThisInstr_t, NextInstructionDisposition::kContinue>::Resolve();\
+		return ::rkit::coro::compiler::CoroNextInstructionResolver<CoroTerminatorLookup, ThisInstr_t, ::rkit::coro::compiler::NextInstructionDisposition::kContinue>::Resolve();\
 	}
 
 #define CORO_DECL_METHOD_BASE(name, prefix, suffix, ...)	\
@@ -923,7 +924,7 @@ namespace rkit::coro
 	{\
 		typedef CoroFirstInstruction ThisInstr_t; \
 		typedef ::rkit::TypeList<ThisInstr_t> InstrList_t; \
-		static const ::rkit::coro::InstructionType kCoroInstrType = ::rkit::coro::InstructionType::kCode; \
+		static const ::rkit::coro::compiler::CoroInstructionType kCoroInstrType = ::rkit::coro::compiler::CoroInstructionType::kCode; \
 		static const size_t kCoroInstrIndex = 0; \
 		typedef void CoroBodyParentScope_t; \
 		typedef void CoroBodyParentLoop_t; \
@@ -1094,23 +1095,23 @@ namespace rkit::coro
 		typedef void CoroAvailableElseScope_t;\
 		typedef void CoroClosesScope_t;\
 		typedef void CoroClosesLoop_t;\
-		static void CoroStepFunction(CoroContext *, CoroStackFrameBase *)\
+		static void CoroStepFunction(::rkit::coro::Context *, ::rkit::coro::StackFrameBase *)\
 		{\
 		}\
 		CORO_FUNCTION_DEF\
 			if (!(condition))\
-				return CoroNextInstructionResolver<CoroTerminatorLookup, ThisInstr_t, NextInstructionDisposition::kThisRef0>::Resolve();\
+				return ::rkit::coro::compiler::CoroNextInstructionResolver<CoroTerminatorLookup, ThisInstr_t, ::rkit::coro::compiler::NextInstructionDisposition::kThisRef0>::Resolve();\
 
 #define CORO_END_WHILE	\
-			return CoroNextInstructionResolver<CoroTerminatorLookup, CoroBodyParentLoop_t, NextInstructionDisposition::kRepeatLoop>::Resolve();\
+			return ::rkit::coro::compiler::CoroNextInstructionResolver<CoroTerminatorLookup, CoroBodyParentLoop_t, ::rkit::coro::compiler::NextInstructionDisposition::kRepeatLoop>::Resolve();\
 		}\
 	} CORO_CONCAT_LINE(CoroEndAt);\
 	typedef struct CORO_CONCAT_LINE(CoroEndWhile)\
 	{\
 		CORO_INSTR_CONSTANTS(CoroEndAt, CORO_CONCAT_LINE(CoroEndWhile), kEndWhile)\
-		typedef CoroCloseWhile<PrevInstr_t::CoroBodyParentScope_t>::Type_t::PrevInstr_t::CoroBodyParentScope_t CoroBodyParentScope_t;\
-		typedef CoroCloseWhile<PrevInstr_t::CoroBodyParentScope_t>::Type_t::PrevInstr_t::CoroBodyParentLoop_t CoroBodyParentLoop_t;\
-		typedef CoroCloseWhile<PrevInstr_t::CoroBodyParentScope_t>::Type_t::PrevInstr_t::CoroAvailableElseScope_t CoroAvailableElseScope_t;\
+		typedef ::rkit::coro::compiler::CoroCloseWhile<PrevInstr_t::CoroBodyParentScope_t>::Type_t::PrevInstr_t::CoroBodyParentScope_t CoroBodyParentScope_t;\
+		typedef ::rkit::coro::compiler::CoroCloseWhile<PrevInstr_t::CoroBodyParentScope_t>::Type_t::PrevInstr_t::CoroBodyParentLoop_t CoroBodyParentLoop_t;\
+		typedef ::rkit::coro::compiler::CoroCloseWhile<PrevInstr_t::CoroBodyParentScope_t>::Type_t::PrevInstr_t::CoroAvailableElseScope_t CoroAvailableElseScope_t;\
 		typedef PrevInstr_t::CoroBodyParentScope_t CoroClosesScope_t;\
 		typedef PrevInstr_t::CoroBodyParentScope_t CoroClosesLoop_t;\
 		CORO_FUNCTION_DEF

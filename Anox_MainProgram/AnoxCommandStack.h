@@ -24,6 +24,8 @@ namespace anox
 		virtual rkit::Result Push(const rkit::StringSliceView &strView) = 0;
 		virtual rkit::Result PushMultiple(const rkit::ISpan<rkit::StringSliceView> &spans) = 0;
 
+		virtual bool Pop(rkit::StringView &outString) = 0;
+
 		static rkit::Result Create(rkit::UniquePtr<AnoxCommandStackBase> &stack, size_t maxCapacity);
 	};
 }

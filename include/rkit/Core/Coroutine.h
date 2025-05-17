@@ -21,29 +21,6 @@ namespace rkit::coro
 		kAwait,
 	};
 
-	enum class InstructionType
-	{
-		kCode,
-
-		kIf,
-		kElseIf,
-		kElse,
-		kEndIf,
-
-		kWhile,
-		kEndWhile,
-
-		kFor,
-		kEndFor,
-
-		kBreak,
-		kContinue,
-		kReturn,
-
-		kExit,
-	};
-
-
 	struct CodePtr;
 	struct Context;
 	struct StackFrameBase;
