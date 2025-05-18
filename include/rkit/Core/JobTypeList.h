@@ -48,7 +48,7 @@ namespace rkit
 
 #include "RKitAssert.h"
 
-namespace rkit::priv
+namespace rkit { namespace priv
 {
 	inline JobType JobTypeListHelper<>::Resolve(size_t index)
 	{
@@ -71,7 +71,7 @@ namespace rkit::priv
 
 		return JobTypeListHelper<TMoreJobTypes...>::Resolve(index - 1);
 	}
-}
+} } // rkit::priv
 
 namespace rkit
 {

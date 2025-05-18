@@ -14,7 +14,7 @@ namespace rkit
 	class Vector;
 }
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct IRenderDevice;
 	struct IRenderDeviceCaps;
@@ -64,13 +64,13 @@ namespace rkit::render
 		virtual Result EnumerateAdapters(Vector<UniquePtr<IRenderAdapter>> &devices) const = 0;
 		virtual Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, const IRenderDeviceCaps &optionalCaps, const IRenderDeviceCaps &requiredCaps, IRenderAdapter &adapter) = 0;
 	};
-}
+} } // rkit::render
 
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	inline AdapterLUID::AdapterLUID()
 		: m_luid{ 0, 0, 0, 0, 0, 0, 0, 0 }
 	{
 	}
-}
+} } // rkit::render

@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	typedef uint64_t FenceID_t;
-}
+} } } // rkit::render::vulkan

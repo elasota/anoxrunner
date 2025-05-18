@@ -13,7 +13,7 @@
 
 #include "IncludeVulkan.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	struct VulkanDeviceAPI;
 	class VulkanDeviceBase;
@@ -32,4 +32,4 @@ namespace rkit::render::vulkan
 
 		static Result Create(UniquePtr<VulkanQueueProxyBase> &outQueueProxy, IMallocDriver *alloc, CommandQueueType queueType, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI);
 	};
-}
+} } } // rkit::render::vulkan

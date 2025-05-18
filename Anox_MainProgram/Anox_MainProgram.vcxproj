@@ -151,6 +151,7 @@
   <ItemGroup>
     <ClInclude Include="..\include\anox\AnoxGraphicsSubsystem.h" />
     <ClInclude Include="AnoxCaptureHarness.h" />
+    <ClInclude Include="AnoxCommandRegistry.h" />
     <ClInclude Include="AnoxFileResource.h" />
     <ClInclude Include="AnoxFrameDrawer.h" />
     <ClInclude Include="AnoxGameFileSystem.h" />

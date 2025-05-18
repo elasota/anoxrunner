@@ -4,7 +4,7 @@
 #include "VulkanCheck.h"
 #include "VulkanDevice.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	VulkanBinaryCPUWaitableFence::VulkanBinaryCPUWaitableFence(VulkanDeviceBase &device)
 		: m_device(device)
@@ -67,4 +67,4 @@ namespace rkit::render::vulkan
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateSemaphore(m_device.GetDevice(), &semaCreateInfo, m_device.GetAllocCallbacks(), &m_sema));
 		return ResultCode::kOK;
 	}
-}
+} } } // rkit::render::vulkan

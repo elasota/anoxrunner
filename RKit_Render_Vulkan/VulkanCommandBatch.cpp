@@ -23,7 +23,7 @@
 #include "rkit/Core/UniquePtr.h"
 #include "rkit/Core/Vector.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanCommandBatch;
 
@@ -700,4 +700,4 @@ namespace rkit::render::vulkan
 
 		return ResultCode::kOK;
 	}
-};
+} } } // rkit::render::vulkan

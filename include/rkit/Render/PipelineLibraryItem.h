@@ -1,12 +1,8 @@
 #pragma once
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct IPipelineLibrary;
-}
-
-namespace rkit::render
-{
 	struct RenderPassDesc;
 
 	struct IPipelineLibraryItemResolver
@@ -30,11 +26,11 @@ namespace rkit::render
 		const IPipelineLibraryItemResolver *m_itemResolver;
 		const TDesc *m_desc;
 	};
-}
+} } // rkit::render
 
 #include "rkit/Core/RKitAssert.h"
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 
 	template<class TDesc, class TCompiled>
@@ -71,4 +67,4 @@ namespace rkit::render
 
 		return m_itemResolver->ResolveCompiled(*m_desc);
 	}
-}
+} } // rkit::render

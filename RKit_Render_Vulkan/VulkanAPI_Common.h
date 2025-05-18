@@ -4,7 +4,7 @@
 
 #include "rkit/Core/StringView.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	template<int TLine>
 	struct FunctionLoaderLineTag
@@ -97,5 +97,4 @@ public:\
 		InitialResolveFunctionLoader(loaderInfo);\
 		return loaderInfo.m_nextCallback;\
 	}
-
-}
+} } } // rkit::render::vulkan

@@ -5,7 +5,7 @@
 #include "rkit/Core/StringProto.h"
 #include "PipelineLibraryItemProtos.h"
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	template<class TDesc, class TCompiled>
 	class PipelineLibraryItemRef;
@@ -16,4 +16,4 @@ namespace rkit::render
 
 		virtual RenderPassRef_t FindRenderPass(const StringSliceView &name) = 0;
 	};
-}
+} } // rkit::render

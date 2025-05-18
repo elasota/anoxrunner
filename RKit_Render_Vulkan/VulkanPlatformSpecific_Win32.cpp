@@ -16,7 +16,7 @@
 
 #include "rkit/Win32/Display_Win32.h"
 
-namespace rkit::render::vulkan::platform
+namespace rkit { namespace render { namespace vulkan { namespace platform
 {
 	class VulkanSurface_Win32 final : public IVulkanSurface
 	{
@@ -118,6 +118,6 @@ namespace rkit::render::vulkan::platform
 	{
 		return ResultCode::kOK;
 	}
-}
+} } } } // rkit::render::vulkan::platform
 
 #endif

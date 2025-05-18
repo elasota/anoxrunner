@@ -18,7 +18,7 @@
 #include "rkit/Core/UniquePtr.h"
 #include "rkit/Core/Vector.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanRenderPassInstance final : public VulkanRenderPassInstanceBase
 	{
@@ -168,4 +168,4 @@ namespace rkit::render::vulkan
 
 		return ResultCode::kOK;
 	}
-}
+} } } // rkit::render::vulkan

@@ -16,7 +16,7 @@ namespace rkit
 	class UniquePtr;
 }
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct IPipelineLibrary;
 
@@ -46,4 +46,4 @@ namespace rkit::render
 
 		virtual Result GetFinishedPipeline(UniquePtr<IPipelineLibrary> &outPipelineLibrary) = 0;
 	};
-}
+} } // rkit::render

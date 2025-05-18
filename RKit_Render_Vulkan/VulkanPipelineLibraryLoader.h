@@ -11,19 +11,19 @@ namespace rkit
 	struct ISeekableReadStream;
 	struct ISeekableWriteStream;
 	struct ISeekableReadWriteStream;
+
+	namespace data
+	{
+		struct IRenderDataPackage;
+	}
+
+	namespace utils
+	{
+		struct IShadowFile;
+	}
 }
 
-namespace rkit::data
-{
-	struct IRenderDataPackage;
-}
-
-namespace rkit::utils
-{
-	struct IShadowFile;
-}
-
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanDeviceBase;
 
@@ -33,4 +33,4 @@ namespace rkit::render::vulkan
 		static Result Create(VulkanDeviceBase &device, UniquePtr<PipelineLibraryLoaderBase> &loader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
 			UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart);
 	};
-}
+} } } // rkit::render::vulkan

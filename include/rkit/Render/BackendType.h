@@ -1,9 +1,12 @@
 #pragma once
 
-namespace rkit::render
+namespace rkit
 {
-	enum class BackendType
+	namespace render
 	{
-		Vulkan,
-	};
+		enum class BackendType
+		{
+			Vulkan,
+		};
+	}
 }

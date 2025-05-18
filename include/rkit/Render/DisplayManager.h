@@ -11,7 +11,7 @@ namespace rkit
 	class UniquePtr;
 }
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	enum class DisplayMode
 	{
@@ -50,4 +50,4 @@ namespace rkit::render
 		virtual Result CreateDisplay(UniquePtr<IDisplay> &display, DisplayMode displayMode, uint32_t width, uint32_t height) = 0;
 		virtual Result CreateDisplay(UniquePtr<IDisplay> &display, DisplayMode displayMode) = 0;
 	};
-}
+} } // rkit::render

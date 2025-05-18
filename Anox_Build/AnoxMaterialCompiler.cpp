@@ -15,7 +15,7 @@
 
 #include "AnoxTextureCompiler.h"
 
-namespace anox::buildsystem
+namespace anox { namespace buildsystem
 {
 	struct MaterialAnalysisHeader
 	{
@@ -427,4 +427,4 @@ namespace anox::buildsystem
 	{
 		return 1;
 	}
-}
+} } // anox::buildsystem

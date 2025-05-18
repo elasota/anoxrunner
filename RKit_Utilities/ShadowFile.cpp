@@ -12,7 +12,7 @@
 #include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/UniquePtr.h"
 
-namespace rkit::utils::shadowfile
+namespace rkit { namespace utils { namespace shadowfile
 {
 	class ShadowFS;
 	class ShadowFSFile;
@@ -1151,9 +1151,9 @@ namespace rkit::utils::shadowfile
 	{
 		return ResultCode::kNotYetImplemented;
 	}
-}
+} } } // rkit::utils::shadowfile
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	Result ShadowFileBase::Create(UniquePtr<ShadowFileBase> &outShadowFile, ISeekableReadStream &readStream, ISeekableWriteStream *writeStream)
 	{
@@ -1166,4 +1166,4 @@ namespace rkit::utils
 
 		return ResultCode::kOK;
 	}
-}
+} } // rkit::utils

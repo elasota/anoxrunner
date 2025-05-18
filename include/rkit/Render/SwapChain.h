@@ -4,11 +4,7 @@
 
 #include <cstddef>
 
-namespace rkit
-{
-}
-
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct IBaseCommandQueue;
 	struct ISwapChainSyncPoint;
@@ -33,4 +29,4 @@ namespace rkit::render
 		virtual IRenderTargetView *GetRenderTargetViewForFrame(size_t frameIndex) = 0;
 		virtual IImageResource *GetImageForFrame(size_t frameIndex) = 0;
 	};
-}
+} } // rkit::render

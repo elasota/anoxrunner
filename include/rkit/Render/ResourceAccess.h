@@ -6,7 +6,7 @@ namespace rkit
 	class EnumMask;
 }
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	enum class ResourceAccess
 	{
@@ -17,4 +17,4 @@ namespace rkit::render
 	};
 
 	typedef EnumMask<ResourceAccess> ResourceAccessMask_t;
-}
+} } // rkit::render

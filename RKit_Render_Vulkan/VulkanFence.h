@@ -4,7 +4,7 @@
 
 #include "IncludeVulkan.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanDeviceBase;
 
@@ -41,9 +41,9 @@ namespace rkit::render::vulkan
 		VulkanDeviceBase &m_device;
 		VkSemaphore m_sema;
 	};
-}
+} } } // rkit::render::vulkan
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	inline VkFence VulkanBinaryCPUWaitableFence::GetFence() const
 	{
@@ -54,4 +54,4 @@ namespace rkit::render::vulkan
 	{
 		return m_sema;
 	}
-}
+} } } // rkit::render::vulkan

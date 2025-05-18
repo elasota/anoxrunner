@@ -157,7 +157,7 @@ namespace rkit
 	}
 }
 
-namespace rkit::priv
+namespace rkit { namespace priv
 {
 	template<class TSourceType, class TValidTargetTypesTuple, class... TTargetTypes>
 	const RecastRefFunc_t DynamicCastHelper<TSourceType, TValidTargetTypesTuple, TTargetTypes...>::ms_recastRefFuncs[TypeTuple<TTargetTypes...>::kNumTypes] =
@@ -178,4 +178,4 @@ namespace rkit::priv
 	{
 		return nullptr;
 	}
-}
+} } // rkit::priv

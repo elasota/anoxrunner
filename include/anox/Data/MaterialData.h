@@ -7,7 +7,7 @@
 
 #include "rkit/Data/ContentID.h"
 
-namespace anox::data
+namespace anox { namespace data
 {
 	enum class MaterialType
 	{
@@ -65,4 +65,4 @@ namespace anox::data
 		// MaterialBitmapDef m_bitmapDefs
 		// MaterialFrameDef m_frameDefs
 	};
-}
+} } // anox::data

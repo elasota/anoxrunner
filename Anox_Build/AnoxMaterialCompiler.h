@@ -4,7 +4,7 @@
 #include "rkit/BuildSystem/DependencyGraph.h"
 #include "rkit/Core/PathProto.h"
 
-namespace anox::buildsystem
+namespace anox { namespace buildsystem
 {
 	static const uint32_t kFontMaterialNodeID = RKIT_FOURCC('F', 'M', 'T', 'L');
 
@@ -36,4 +36,4 @@ namespace anox::buildsystem
 		rkit::Result RunAnalyzeImage(const rkit::StringView &longName, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 		rkit::Result ResolveShortName(rkit::String &shortName, const rkit::StringView &identifier);
 	};
-}
+} } // anox::buildsystem

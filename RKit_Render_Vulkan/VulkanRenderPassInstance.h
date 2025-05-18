@@ -11,14 +11,14 @@ namespace rkit
 {
 	template<class T>
 	class UniquePtr;
+
+	namespace render
+	{
+		struct RenderPassResources;
+	}
 }
 
-namespace rkit::render
-{
-	struct RenderPassResources;
-}
-
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanDeviceBase;
 
@@ -34,4 +34,4 @@ namespace rkit::render::vulkan
 
 		static Result Create(UniquePtr<VulkanRenderPassInstanceBase> &renderPassInstance, VulkanDeviceBase &device, const RenderPassRef_t &renderPassRef, const RenderPassResources &resources);
 	};
-}
+} } } // rkit::render::vulkan

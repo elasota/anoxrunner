@@ -7,31 +7,34 @@ namespace rkit
 {
 	template<class T>
 	class UniquePtr;
+
+	namespace render
+	{
+		struct ICopyCommandList;
+		struct IGraphicsCommandList;
+		struct IComputeCommandList;
+		struct IGraphicsComputeCommandList;
+
+		struct ICopyCommandBatch;
+		struct IGraphicsCommandBatch;
+		struct IComputeCommandBatch;
+		struct IGraphicsComputeCommandBatch;
+
+		struct IBaseCommandAllocator;
+		struct IInternalCommandAllocator;
+		struct IInternalCommandList;
+
+		struct ICopyCommandAllocator;
+		struct IGraphicsCommandAllocator;
+		struct IComputeCommandAllocator;
+		struct IGraphicsComputeCommandAllocator;
+
+		struct CommandListHandle;
+	}
 }
 
-namespace rkit::render
+namespace rkit { namespace render
 {
-	struct ICopyCommandList;
-	struct IGraphicsCommandList;
-	struct IComputeCommandList;
-	struct IGraphicsComputeCommandList;
-
-	struct ICopyCommandBatch;
-	struct IGraphicsCommandBatch;
-	struct IComputeCommandBatch;
-	struct IGraphicsComputeCommandBatch;
-
-	struct IBaseCommandAllocator;
-	struct IInternalCommandAllocator;
-	struct IInternalCommandList;
-
-	struct ICopyCommandAllocator;
-	struct IGraphicsCommandAllocator;
-	struct IComputeCommandAllocator;
-	struct IGraphicsComputeCommandAllocator;
-
-	struct CommandListHandle;
-
 	struct IInternalCommandAllocator
 	{
 		virtual ~IInternalCommandAllocator() {}
@@ -73,4 +76,4 @@ namespace rkit::render
 
 		virtual Result OpenGraphicsComputeCommandBatch(IGraphicsComputeCommandBatch *&outCommandBatch, bool cpuWaitable) = 0;
 	};
-}
+} } // rkit::render

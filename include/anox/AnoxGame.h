@@ -11,11 +11,11 @@ namespace rkit
 
 	template<class T>
 	class Optional;
-}
 
-namespace rkit::utils
-{
-	struct IThreadPool;
+	namespace utils
+	{
+		struct IThreadPool;
+	}
 }
 
 namespace anox

@@ -13,7 +13,7 @@
 
 #include <cstring>
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanQueueProxy final : public VulkanQueueProxyBase
 	{
@@ -451,4 +451,4 @@ namespace rkit::render::vulkan
 
 		return ResultCode::kOK;
 	}
-}
+} } } // rkit::render::vulkan

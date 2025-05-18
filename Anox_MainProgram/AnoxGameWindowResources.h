@@ -5,10 +5,13 @@
 
 #include "AnoxRenderedWindow.h"
 
-namespace rkit::render
+namespace rkit
 {
-	struct IRenderPassInstance;
-	struct IImageResource;
+	namespace render
+	{
+		struct IRenderPassInstance;
+		struct IImageResource;
+	}
 }
 
 namespace anox

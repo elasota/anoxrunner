@@ -32,7 +32,7 @@
 #include "VulkanRenderPass.h"
 #include "VulkanUtils.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	struct PipelineCacheHeader
 	{
@@ -2415,4 +2415,4 @@ namespace rkit::render::vulkan
 
 		return ResultCode::kOK;
 	}
-}
+} } } // rkit::render::vulkan

@@ -4,7 +4,7 @@
 
 #include "IncludeVulkanCore.h"
 
-namespace rkit::render::vulkan::results
+namespace rkit { namespace render { namespace vulkan { namespace results
 {
 	Result FirstChanceVulkanFailure(VkResult result);
 
@@ -27,7 +27,7 @@ namespace rkit::render::vulkan::results
 	{
 		return ResultTypeEnforcer<T>::PassThroughResult(result);
 	}
-}
+} } } } // rkit::render::vulkan::results
 
 #define RKIT_VK_CHECK(expr) do {\
 	VkResult RKIT_PP_CONCAT(exprResult_, __LINE__) = ::rkit::render::vulkan::results::PassThroughResult((expr));\

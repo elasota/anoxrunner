@@ -4,7 +4,7 @@
 
 #include "IncludeVulkan.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanImageContainer : public IImageResource
 	{
@@ -16,9 +16,9 @@ namespace rkit::render::vulkan
 		VkImage m_image = VK_NULL_HANDLE;
 		VkImageAspectFlags m_allAspectFlags = 0;
 	};
-}
+} } } // rkit::render::vulkan
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	inline VkImage VulkanImageContainer::GetVkImage() const
 	{
@@ -29,4 +29,4 @@ namespace rkit::render::vulkan
 	{
 		return m_allAspectFlags;
 	}
-}
+} } } // rkit::render::vulkan

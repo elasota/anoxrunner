@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <cstddef>
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	struct Sha256DigestBytes
 	{
@@ -42,4 +42,4 @@ namespace rkit::utils
 
 		virtual Sha256DigestBytes SimpleHashBuffer(const void *data, size_t size) const = 0;
 	};
-}
+} } // rkit::utils

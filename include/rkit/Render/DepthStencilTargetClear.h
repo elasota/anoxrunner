@@ -7,7 +7,7 @@
 
 #include <cstdint>
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct DepthStencilTargetClear
 	{
@@ -16,4 +16,4 @@ namespace rkit::render
 		float m_depth = 0.0f;
 		uint32_t m_stencil = 0;
 	};
-}
+} } // rkit::render

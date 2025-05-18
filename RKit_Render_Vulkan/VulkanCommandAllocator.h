@@ -7,7 +7,7 @@
 
 #include <cstdint>
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanDeviceBase;
 	class VulkanQueueProxyBase;
@@ -22,4 +22,4 @@ namespace rkit::render::vulkan
 
 		static Result Create(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, VulkanDeviceBase &device, VulkanQueueProxyBase &queue, CommandQueueType queueType, bool isBundle, uint32_t queueFamily);
 	};
-}
+} } } // rkit::render::vulkan

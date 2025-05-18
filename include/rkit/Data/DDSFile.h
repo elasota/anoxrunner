@@ -3,7 +3,7 @@
 #include "rkit/Core/FourCC.h"
 #include "rkit/Core/Endian.h"
 
-namespace rkit::data
+namespace rkit { namespace data
 {
 	namespace DDSFlags
 	{
@@ -137,4 +137,4 @@ namespace rkit::data
 		endian::LittleUInt32_t m_arraySize;
 		endian::LittleUInt32_t m_miscFlags2;
 	};
-}
+} } // rkit::data

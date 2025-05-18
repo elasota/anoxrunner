@@ -1,8 +1,9 @@
 #pragma once
 
 #include "Coroutine.h"
+#include "CoroutineProtos.h"
 
-namespace rkit::coro::compiler
+namespace rkit { namespace coro { namespace compiler
 {
 	struct EmptyStruct
 	{
@@ -848,9 +849,9 @@ namespace rkit::coro::compiler
 			context.m_frame = newFrame;
 		}
 #endif
-}
+} } } // rkit::coro::compiler
 
-namespace rkit::coro
+namespace rkit { namespace coro
 {
 	template<class TCoroutine>
 	const FrameMetadata<typename TCoroutine::ParameterList> CoroMetadataResolver<TCoroutine>::ms_metadata =
@@ -861,7 +862,7 @@ namespace rkit::coro
 		},
 		::rkit::coro::compiler::FunctionEntryBuilder<TCoroutine, typename TCoroutine::ParameterList>::EnterFunction,
 	};
-}
+} } // rkit::coro
 
 #define CORO_INSTR_CONSTANTS(prevInstrTag, thisInstrTag, instrType)	\
 	typedef thisInstrTag ThisInstr_t; \
@@ -896,19 +897,6 @@ namespace rkit::coro
 #define CORO_FUNCTION_END	\
 		return ::rkit::coro::compiler::CoroNextInstructionResolver<CoroTerminatorLookup, ThisInstr_t, ::rkit::coro::compiler::NextInstructionDisposition::kContinue>::Resolve();\
 	}
-
-#define CORO_DECL_METHOD_BASE(name, prefix, suffix, ...)	\
-	typedef void CoroSignature_ ## name(__VA_ARGS__);\
-	prefix ::rkit::coro::MethodStarter<CoroSignature_ ## name> Async ## name() suffix;\
-	struct CoroFunction_ ##name
-
-#define CORO_DECL_METHOD(name, ...)	CORO_DECL_METHOD_BASE(name, , , __VA_ARGS__)
-#define CORO_DECL_METHOD_VIRTUAL(name, ...)	CORO_DECL_METHOD_BASE(name, virtual, , __VA_ARGS__)
-#define CORO_DECL_METHOD_ABSTRACT(name, ...)	CORO_DECL_METHOD_BASE(name, virtual, = 0, __VA_ARGS__)
-
-#define CORO_DECL_METHOD_OVERRIDE(name, ...) \
-	::rkit::coro::MethodStarter<CoroSignature_ ## name> Async ## name() override; \
-	struct CoroFunction_ ## name
 
 #define CORO_DEF_METHOD(cls, name)	\
 	::rkit::coro::MethodStarter<cls::CoroSignature_ ## name> cls::Async ## name()\

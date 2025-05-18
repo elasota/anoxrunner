@@ -15,7 +15,7 @@ namespace rkit
 	class UniquePtr;
 }
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	struct IShadowFile
 	{
@@ -31,4 +31,4 @@ namespace rkit::utils
 
 		virtual Result CommitChanges() = 0;
 	};
-}
+} } // rkit::utils

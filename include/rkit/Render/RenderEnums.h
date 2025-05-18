@@ -1,6 +1,6 @@
 #pragma once
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	enum class Filter
 	{
@@ -301,4 +301,4 @@ namespace rkit::render
 		Copy,
 	};
 
-}
+} } // rkit::render

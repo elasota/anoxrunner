@@ -18,7 +18,7 @@
 
 #include <CommCtrl.h>
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	class BaseDisplay_Win32 : public IDisplay_Win32
 	{
@@ -1251,4 +1251,4 @@ namespace rkit::render
 
 		return ResultCode::kOK;
 	}
-}
+} } // rkit::render

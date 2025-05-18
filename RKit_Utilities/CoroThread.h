@@ -8,11 +8,11 @@ namespace rkit
 	class UniquePtr;
 }
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	class CoroThreadBase : public coro::Thread
 	{
 	public:
 		static Result Create(UniquePtr<CoroThreadBase> &coroThread, size_t stackSize);
 	};
-}
+} } // rkit::utils

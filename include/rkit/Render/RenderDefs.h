@@ -9,7 +9,7 @@
 
 #include <cstdint>
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct StructureMemberDesc;
 
@@ -37,7 +37,7 @@ namespace rkit::render
 	private:
 		IndexType_t m_index;
 	};
-}
+} } // rkit::render
 
 namespace rkit
 {
@@ -51,7 +51,7 @@ namespace rkit
 	};
 }
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct StructureType;
 
@@ -483,13 +483,13 @@ namespace rkit::render
 
 		const RenderPassDesc* m_renderPass;
 	};
-}
+} } // rkit::render
 
 
 #include <new>
 #include <utility>
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	inline ValueType::ValueType()
 		: m_type(ValueTypeType::Numeric)
@@ -770,4 +770,4 @@ namespace rkit::render
 	{
 		return TDefaultResolver::GetDefault();
 	}
-}
+} } // rkit::render

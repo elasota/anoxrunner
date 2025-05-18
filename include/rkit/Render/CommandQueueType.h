@@ -1,21 +1,24 @@
 #pragma once
 
-namespace rkit::render
+namespace rkit
 {
-	enum class CommandQueueType
+	namespace render
 	{
-		kGraphics,
-		kAsyncCompute,
-		kGraphicsCompute,
-		kCopy,
+		enum class CommandQueueType
+		{
+			kGraphics,
+			kAsyncCompute,
+			kGraphicsCompute,
+			kCopy,
 
-		kCount,
-	};
+			kCount,
+		};
 
-	bool IsQueueTypeCompatible(CommandQueueType from, CommandQueueType to);
+		bool IsQueueTypeCompatible(CommandQueueType from, CommandQueueType to);
+	}
 }
 
-namespace rkit::render
+namespace rkit { namespace render //
 {
 	inline bool IsQueueTypeCompatible(CommandQueueType from, CommandQueueType to)
 	{
@@ -35,4 +38,4 @@ namespace rkit::render
 			return false;
 		}
 	}
-}
+} } // rkit::render

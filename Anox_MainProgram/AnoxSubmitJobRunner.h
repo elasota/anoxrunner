@@ -2,13 +2,16 @@
 
 #include "rkit/Core/CoreDefs.h"
 
-namespace rkit::render
+namespace rkit
 {
-	struct IBaseCommandQueue;
-	struct IGraphicsCommandQueue;
-	struct IGraphicsComputeCommandQueue;
-	struct IComputeCommandQueue;
-	struct ICopyCommandQueue;
+	namespace render
+	{
+		struct IBaseCommandQueue;
+		struct IGraphicsCommandQueue;
+		struct IGraphicsComputeCommandQueue;
+		struct IComputeCommandQueue;
+		struct ICopyCommandQueue;
+	}
 }
 
 

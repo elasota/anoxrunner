@@ -1,6 +1,6 @@
 #pragma once
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct StructureMemberDesc;
 
@@ -11,4 +11,4 @@ namespace rkit::render
 	typedef StringIndex<1> ConfigStringIndex_t;
 	typedef StringIndex<2> TempStringIndex_t;
 	typedef StringIndex<3> ShaderPermutationStringIndex_t;
-}
+} } // rkit::render

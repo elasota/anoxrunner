@@ -1,10 +1,10 @@
 #pragma once
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct RenderPassDesc;
 
 	struct IInternalRenderPass
 	{
 	};
-}
+} } // rkit::render

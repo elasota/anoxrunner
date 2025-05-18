@@ -10,7 +10,7 @@ namespace rkit
 	class UniquePtr;
 }
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanDeviceBase;
 
@@ -24,4 +24,4 @@ namespace rkit::render::vulkan
 
 	private:
 	};
-}
+} } } // rkit::render::vulkan

@@ -3,7 +3,7 @@
 
 #include "rkit/Data/RenderDataHandler.h"
 
-namespace rkit::data
+namespace rkit { namespace data
 {
 	class RenderDataHandler final : public IRenderDataHandler
 	{
@@ -34,4 +34,4 @@ namespace rkit::data
 
 		Result LoadPackage(IReadStream &stream, bool allowTempStrings, data::IRenderDataConfigurator *configurator, UniquePtr<IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *outBinaryContent) const override;
 	};
-}
+} } // rkit::data

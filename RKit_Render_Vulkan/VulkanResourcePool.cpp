@@ -7,7 +7,7 @@
 
 #include "IncludeVulkan.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	template<class T>
 	class ResourcePool final : public IResourcePool<T>
@@ -183,4 +183,4 @@ namespace rkit::render::vulkan
 
 	template Result CreateResourcePool<VkSemaphore>(UniquePtr<IResourcePool<VkSemaphore>> &outPool, const IPooledResourceFactory<VkSemaphore> &factory, bool mutexProtected);
 	template Result CreateResourcePool<VkFence>(UniquePtr<IResourcePool<VkFence>> &outPool, const IPooledResourceFactory<VkFence> &factory, bool mutexProtected);
-}
+} } } // rkit::render::vulkan

@@ -2,7 +2,7 @@
 #include "VulkanAPI.h"
 #include "VulkanCheck.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	RenderVulkanPhysicalDevice::RenderVulkanPhysicalDevice(VkPhysicalDevice physDevice)
 		: m_physDevice(physDevice)
@@ -72,4 +72,4 @@ namespace rkit::render::vulkan
 		outQueueFamilyIndex = qfi.m_queueFamilyIndex;
 		outNumQueues = qfi.m_numQueues;
 	}
-}
+} } } // rkit::render::vulkan

@@ -5,7 +5,7 @@
 #include "rkit/Core/Vector.h"
 #include "rkit/Core/Algorithm.h"
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	class CoroThreadImpl final : public CoroThreadBase
 	{
@@ -215,4 +215,4 @@ namespace rkit::utils
 
 		return ResultCode::kOK;
 	}
-}
+} } // rkit::utils

@@ -19,7 +19,7 @@
 
 #include <cstring>
 
-namespace rkit::buildsystem::rpc_interchange
+namespace rkit { namespace buildsystem { namespace rpc_interchange
 {
 	enum class EntityType
 	{
@@ -165,9 +165,9 @@ namespace rkit::buildsystem::rpc_interchange
 		render::RenderPassDesc m_desc;
 		Vector<const render::RenderTargetDesc *> m_rtDescs;
 	};
-}
+} } } // rkit::buildsystem::rpc_interchange
 
-namespace rkit::buildsystem::rpc_common
+namespace rkit { namespace buildsystem { namespace rpc_common
 {
 	const uint32_t kLibraryIndexID = RKIT_FOURCC('R', 'P', 'L', 'I');
 	const uint32_t kLibraryIndexVersion = 1;
@@ -180,9 +180,9 @@ namespace rkit::buildsystem::rpc_common
 		static Result FormatIndexPath(CIPath &path, const StringView &identifier);
 		static Result FormatCombinedOutputPath(CIPath &path, const StringView &identifier);
 	};
-}
+} } } // rkit::buildsystem::rpc_common
 
-namespace rkit::buildsystem::rpc_analyzer
+namespace rkit { namespace buildsystem { namespace rpc_analyzer
 {
 	class IncludedFileKey
 	{
@@ -385,9 +385,9 @@ namespace rkit::buildsystem::rpc_analyzer
 
 		Vector<UniquePtr<render::InputLayoutVertexFeedDesc>> m_vertexFeedDescs;
 	};
-}
+} } } // rkit::buildsystem::rpc_analyzer
 
-namespace rkit::buildsystem::rpc_combiner
+namespace rkit { namespace buildsystem { namespace rpc_combiner
 {
 	class LibraryCombiner final : public IPipelineLibraryCombiner, public NoCopy
 	{
@@ -423,9 +423,9 @@ namespace rkit::buildsystem::rpc_combiner
 
 		data::IDataDriver *m_dataDriver;
 	};
-}
+} } } // rkit::buildsystem::rpc_combiner
 
-namespace rkit::buildsystem::rpc_compiler
+namespace rkit { namespace buildsystem { namespace rpc_compiler
 {
 	class LibraryCompiler final : public rpc_common::LibraryCompilerBase
 	{
@@ -439,7 +439,7 @@ namespace rkit::buildsystem::rpc_compiler
 
 		IDependencyNodeCompilerFeedback *m_feedback;
 	};
-}
+} } } // rkit::buildsystem::rpc_compiler
 
 namespace rkit
 {
@@ -453,7 +453,7 @@ namespace rkit
 	};
 }
 
-namespace rkit::buildsystem::rpc_common
+namespace rkit { namespace buildsystem { namespace rpc_common
 {
 	Result LibraryCompilerBase::FormatGraphicPipelinePath(CIPath &path, const StringView &identifier, size_t pipelineIndex)
 	{
@@ -486,9 +486,9 @@ namespace rkit::buildsystem::rpc_common
 
 		return path.Set(str);
 	}
-}
+} } } // rkit::buildsystem::rpc_common
 
-namespace rkit::buildsystem::rpc_analyzer
+namespace rkit { namespace buildsystem { namespace rpc_analyzer
 {
 	IncludedFileKey::IncludedFileKey(BuildFileLocation location, const CIPath &str)
 		: m_location(location)
@@ -1376,7 +1376,7 @@ namespace rkit::buildsystem::rpc_analyzer
 
 					RKIT_CHECK(parser.RequireToken(token));
 
-					HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(BaseStringSliceView(token));
+					HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(BaseStringSliceView<char>(token));
 					if (it == m_entities.end())
 					{
 						rkit::log::ErrorFmt("%s [%zu:%zu] Unknown static sampler", filePath, line, col);
@@ -2749,9 +2749,9 @@ namespace rkit::buildsystem::rpc_analyzer
 
 		return ResultCode::kOK;
 	}
-}
+} } } // rkit::buildsystem::rpc_analyzer
 
-namespace rkit::buildsystem::rpc_combiner
+namespace rkit { namespace buildsystem { namespace rpc_combiner
 {
 	LibraryCombiner::LibraryCombiner(data::IDataDriver *dataDriver)
 		: m_dataDriver(dataDriver)
@@ -2861,9 +2861,9 @@ namespace rkit::buildsystem::rpc_combiner
 	{
 		return m_binaryContent[index].ToSpan();
 	}
-}
+} } } // rkit::buildsystem::rpc_combiner
 
-namespace rkit::buildsystem::rpc_compiler
+namespace rkit { namespace buildsystem { namespace rpc_compiler
 {
 	LibraryCompiler::LibraryCompiler(data::IDataDriver *dataDriver, IDependencyNodeCompilerFeedback *feedback)
 		: m_combiner(dataDriver)
@@ -2940,9 +2940,9 @@ namespace rkit::buildsystem::rpc_compiler
 
 		return ResultCode::kOK;
 	}
-}
+} } } // rkit::buildsystem::rpc_compiler
 
-namespace rkit::buildsystem
+namespace rkit { namespace buildsystem
 {
 	RenderPipelineLibraryCompiler::RenderPipelineLibraryCompiler()
 	{
@@ -3014,4 +3014,4 @@ namespace rkit::buildsystem
 
 		return New<rpc_combiner::LibraryCombiner>(outCombiner, dataDriver);
 	}
-}
+} } // rpc::buildsystem

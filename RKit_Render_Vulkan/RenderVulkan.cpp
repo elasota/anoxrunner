@@ -24,7 +24,7 @@
 
 #include <cstring>
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	namespace results
 	{
@@ -1123,6 +1123,6 @@ namespace rkit::render::vulkan
 		m_vkLibrary.Reset();
 		m_instanceExtensions.Reset();
 	}
-}
+} } } // rkit::render::vulkan
 
 RKIT_IMPLEMENT_MODULE("RKit", "Render_Vulkan", ::rkit::render::vulkan::RenderVulkanModule)

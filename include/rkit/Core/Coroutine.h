@@ -10,7 +10,7 @@ namespace rkit
 	struct FutureContainerBase;
 }
 
-namespace rkit::coro
+namespace rkit { namespace coro
 {
 	enum class Disposition
 	{
@@ -211,13 +211,13 @@ namespace rkit::coro
 
 		const FrameMetadata<typename SignatureAnalyzer<TSignature>::Parameters_t> &m_metadata;
 	};
-}
+} } // rkit::coro
 
 #include "Result.h"
 
 #include <utility>
 
-namespace rkit::coro
+namespace rkit { namespace coro
 {
 	enum class ThreadState
 	{
@@ -277,4 +277,4 @@ namespace rkit::coro
 
 		return ResultCode::kOK;
 	}
-}
+} } // rkit::coro

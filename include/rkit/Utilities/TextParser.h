@@ -13,7 +13,7 @@ namespace rkit
 	class Span;
 }
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	struct ITextParser
 	{
@@ -28,4 +28,4 @@ namespace rkit::utils
 		virtual Result RequireToken(Span<const char> &outSpan) = 0;
 		virtual Result ExpectToken(const StringView &str) = 0;
 	};
-}
+} } // rkit::utils

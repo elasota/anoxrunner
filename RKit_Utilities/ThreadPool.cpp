@@ -11,7 +11,7 @@
 
 #include "ThreadPool.h"
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	class ThreadPool final : public ThreadPoolBase
 	{
@@ -218,4 +218,4 @@ namespace rkit::utils
 
 		return ResultCode::kOK;
 	}
-}
+} } // rkit::utils

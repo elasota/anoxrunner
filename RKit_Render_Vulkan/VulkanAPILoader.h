@@ -3,7 +3,7 @@
 #include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/StringProto.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	struct IVulkanAPI;
 	struct FunctionLoaderInfo;
@@ -15,4 +15,4 @@ namespace rkit::render::vulkan
 	};
 
 	Result LoadVulkanAPI(IVulkanAPI &api, const IFunctionResolver &resolver);
-}
+} } } // rkit::render::vulkan

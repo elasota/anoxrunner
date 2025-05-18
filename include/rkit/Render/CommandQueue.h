@@ -18,7 +18,7 @@ namespace rkit
 	class EnumMask;
 }
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct ICopyCommandList;
 	struct IComputeCommandList;
@@ -85,4 +85,4 @@ namespace rkit::render
 	{
 		virtual Result CreateGraphicsComputeCommandAllocator(UniquePtr<IGraphicsComputeCommandAllocator> &outCommandAllocator, bool isBundle) = 0;
 	};
-}
+} } // rkit::render

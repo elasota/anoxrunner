@@ -4,7 +4,7 @@
 
 #include "rkit/Core/EnumMask.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	Result VulkanUtils::ResolveRenderTargetFormat(VkFormat &outVkFormat, RenderTargetFormat rtFormat)
 	{
@@ -169,4 +169,4 @@ namespace rkit::render::vulkan
 
 		return ResultCode::kOK;
 	}
-}
+} } } // rkit::render::vulkan

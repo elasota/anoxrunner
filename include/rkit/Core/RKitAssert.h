@@ -5,9 +5,12 @@
 #define RKIT_VERIFY(n)	((void)(n))
 #else
 
-namespace rkit::priv
+namespace rkit
 {
-	inline void AssertionCheckFunc(bool expr, const char *exprStr, const char *file, unsigned int line);
+	namespace priv
+	{
+		inline void AssertionCheckFunc(bool expr, const char *exprStr, const char *file, unsigned int line);
+	}
 }
 
 #define RKIT_ASSERT(expr)	(::rkit::priv::AssertionCheckFunc(!!(expr), #expr, __FILE__, __LINE__))

@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	enum class TextParserCommentType
 	{
@@ -16,4 +16,4 @@ namespace rkit::utils
 		kC,
 		kSimple,
 	};
-}
+} } // rkit::utils

@@ -6,7 +6,7 @@
 
 #include "VulkanAPI.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	template<class T>
 	struct AutoObjectHandleNullResolver
@@ -49,11 +49,11 @@ namespace rkit::render::vulkan
 		const AutoObjectOwnershipContext<TApi, TOwner> *m_ownerContext;
 		TObjectType m_object;
 	};
-}
+} } } // rkit::render::vulkan
 
 #include <utility>
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 
 	template<class T>
@@ -135,7 +135,7 @@ namespace rkit::render::vulkan
 
 		return *this;
 	}
-}
+} } } // rkit::render::vulkan
 
 #define RKIT_VK_DECLARE_AUTO_TYPE(ownerType, type, api, defaultResolver)	\
 	typedef ::rkit::render::vulkan::AutoObject<ownerType, Vk ## type, PFN_vkDestroy ## type, ::rkit::render::vulkan::api, &::rkit::render::vulkan::api::vkDestroy ##type, defaultResolver> Auto ## type ## _t

@@ -2,7 +2,7 @@
 
 #include "rkit/Core/Stream.h"
 
-namespace rkit::buildsystem
+namespace rkit { namespace buildsystem
 {
 	CopyFileCompiler::CopyFileCompiler()
 	{
@@ -55,4 +55,4 @@ namespace rkit::buildsystem
 	{
 		return 1;
 	}
-}
+} } // rkit::buildsystem

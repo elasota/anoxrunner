@@ -6,7 +6,7 @@ namespace rkit
 	class Span;
 }
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct ISwapChainSyncPoint;
 	struct BarrierGroup;
@@ -33,4 +33,4 @@ namespace rkit::render
 	struct ICopyCommandEncoder : public IBaseCommandEncoder
 	{
 	};
-}
+} } // rkit::render

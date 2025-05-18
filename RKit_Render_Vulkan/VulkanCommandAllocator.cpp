@@ -9,7 +9,7 @@
 #include "VulkanDevice.h"
 #include "IncludeVulkan.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanCommandAllocator final : public VulkanCommandAllocatorBase
 	{
@@ -252,4 +252,4 @@ namespace rkit::render::vulkan
 
 		return ResultCode::kOK;
 	}
-}
+} } } // rkit::render::vulkan

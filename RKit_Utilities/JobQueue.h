@@ -9,7 +9,7 @@ namespace rkit
 	class UniquePtr;
 }
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	Result CreateJobQueue(UniquePtr<IJobQueue> &outJobQueue, IMallocDriver *alloc);
-}
+} } // rkit::utils

@@ -5,7 +5,7 @@
 #include "rkit/Core/FourCC.h"
 #include "rkit/Core/StringProto.h"
 
-namespace anox::buildsystem
+namespace anox { namespace buildsystem
 {
 	static const uint32_t kTextureNodeID = RKIT_FOURCC('A', 'T', 'E', 'X');
 
@@ -32,4 +32,4 @@ namespace anox::buildsystem
 	protected:
 		TextureCompilerBase() {}
 	};
-}
+} } // anox::buildsystem

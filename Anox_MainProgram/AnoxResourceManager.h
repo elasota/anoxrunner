@@ -19,16 +19,19 @@ namespace rkit
 	class Future;
 
 	class Job;
+
+	namespace data
+	{
+		struct ContentID;
+	}
 }
 
-namespace rkit::data
+namespace anox
 {
-	struct ContentID;
-}
-
-namespace anox::resloaders
-{
-	static const uint32_t kRawFileResourceTypeCode = RKIT_FOURCC('F', 'I', 'L', 'E');
+	namespace resloaders
+	{
+		static const uint32_t kRawFileResourceTypeCode = RKIT_FOURCC('F', 'I', 'L', 'E');
+	}
 }
 
 namespace anox

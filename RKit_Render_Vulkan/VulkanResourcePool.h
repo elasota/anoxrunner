@@ -9,7 +9,7 @@ namespace rkit
 	class UniquePtr;
 }
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	template<class T>
 	struct IPooledResourceFactory
@@ -58,13 +58,13 @@ namespace rkit::render::vulkan
 
 	template<class T>
 	Result CreateResourcePool(UniquePtr<IResourcePool<T>> &outPool, const IPooledResourceFactory<T> &factory, bool mutexProtected);
-}
+} } } // rkit::render::vulkan
 
 #include "rkit/Core/Result.h"
 
 #include <utility>
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	template<class T>
 	UniqueResourceRef<T>::UniqueResourceRef()
@@ -167,4 +167,4 @@ namespace rkit::render::vulkan
 	{
 		return m_pool;
 	}
-}
+} } } // rkit::render::vulkan

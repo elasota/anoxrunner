@@ -100,7 +100,7 @@ namespace rkit
 #include <new>
 #include <string.h>
 
-namespace rkit::endian
+namespace rkit { namespace endian
 {
 	template<class T>
 	void BigEndianHelper<T>::SetValue(StaticArray<uint8_t, sizeof(T)> &bytes, T value)
@@ -184,4 +184,4 @@ namespace rkit::endian
 	{
 		return m_bytes;
 	}
-}
+} } // rkit::endian

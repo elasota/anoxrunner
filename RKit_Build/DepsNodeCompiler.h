@@ -11,7 +11,7 @@ namespace rkit
 	class Vector;
 }
 
-namespace rkit::buildsystem
+namespace rkit { namespace buildsystem
 {
 	struct IDependencyNode;
 
@@ -29,4 +29,4 @@ namespace rkit::buildsystem
 	private:
 		static Result HandlePathChunk(Vector<char> &constructedPath, bool &outOK, size_t chunkIndex, IDependencyNode *node, const Span<const char> &chunk);
 	};
-}
+} } // rkit::buildsystem

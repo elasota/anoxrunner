@@ -15,7 +15,7 @@ namespace rkit
 	struct IJobQueue;
 }
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	struct IThreadPool
 	{
@@ -26,4 +26,4 @@ namespace rkit::utils
 		virtual const ISpan<JobType> &GetMainThreadJobTypes() const = 0;
 		virtual const ISpan<JobType> &GetAllJobTypes() const = 0;
 	};
-}
+} } // rkit::utils

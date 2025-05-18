@@ -3,7 +3,7 @@
 
 #include "rkit/Core/LogDriver.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	Result LoadVulkanAPI(IVulkanAPI &api, const IFunctionResolver &resolver)
 	{
@@ -31,4 +31,4 @@ namespace rkit::render::vulkan
 
 		return ResultCode::kOK;
 	}
-}
+} } } // rkit::render::vulkan

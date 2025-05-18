@@ -18,14 +18,14 @@ namespace rkit
 
 	struct IWriteStream;
 	struct IReadStream;
+
+	namespace utils
+	{
+		struct Sha256DigestBytes;
+	}
 }
 
-namespace rkit::utils
-{
-	struct Sha256DigestBytes;
-}
-
-namespace rkit::data
+namespace rkit { namespace data
 {
 	enum class RenderRTTIMainType
 	{
@@ -385,4 +385,4 @@ namespace rkit::data
 
 		virtual Result LoadPackage(IReadStream &stream, bool allowTempStrings, IRenderDataConfigurator *configurator, UniquePtr<IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *outBinaryContent) const = 0;
 	};
-}
+} } // rkit::data

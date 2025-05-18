@@ -10,7 +10,7 @@
 
 #include "rkit/Utilities/TextParser.h"
 
-namespace rkit::buildsystem
+namespace rkit { namespace buildsystem
 {
 	DepsNodeCompiler::DepsNodeCompiler()
 	{
@@ -306,4 +306,4 @@ namespace rkit::buildsystem
 		outOK = true;
 		return ResultCode::kOK;
 	}
-}
+} } // rkit::buildsystem

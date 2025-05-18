@@ -4,7 +4,7 @@
 #include "rkit/BuildSystem/DependencyGraph.h"
 #include "rkit/Render/RenderDefs.h"
 
-namespace rkit::buildsystem
+namespace rkit { namespace buildsystem
 {
 	class CopyFileCompiler final : public IDependencyNodeCompiler
 	{
@@ -17,4 +17,4 @@ namespace rkit::buildsystem
 
 		uint32_t GetVersion() const override;
 	};
-}
+} } // rkit::buildsystem

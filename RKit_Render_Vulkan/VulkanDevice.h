@@ -23,12 +23,12 @@ namespace rkit
 	class Vector;
 }
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	class RenderDeviceCaps;
-}
+} } // rkit::render
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	struct VulkanDeviceAPI;
 	struct VulkanGlobalAPI;
@@ -80,4 +80,4 @@ namespace rkit::render::vulkan
 			const QueueFamilySpec (&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks,
 			const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts);
 	};
-}
+} } } // rkit::render::vulkan

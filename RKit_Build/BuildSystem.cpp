@@ -8,7 +8,7 @@
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/ModuleGlue.h"
 
-namespace rkit::buildsystem
+namespace rkit { namespace buildsystem
 {
 	class BuildSystemDriver final : public rkit::buildsystem::IBuildSystemDriver
 	{
@@ -57,6 +57,6 @@ namespace rkit::buildsystem
 	{
 		return PipelineLibraryCombinerBase::Create(outCombiner);
 	}
-}
+} } // rkit::buildsystem
 
 RKIT_IMPLEMENT_MODULE("RKit", "Build", ::rkit::buildsystem::BuildSystemModule)

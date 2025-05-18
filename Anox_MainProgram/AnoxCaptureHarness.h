@@ -11,11 +11,11 @@ namespace rkit
 
 	template<class T>
 	class Future;
-}
 
-namespace rkit::data
-{
-	struct ContentID;
+	namespace data
+	{
+		struct ContentID;
+	}
 }
 
 namespace anox

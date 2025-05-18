@@ -2,7 +2,7 @@
 
 #include "IncludeWindows.h"
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct IDisplay_Win32 : public IDisplay
 	{
@@ -11,4 +11,4 @@ namespace rkit::render
 		virtual HWND GetHWND() = 0;
 		virtual HINSTANCE GetHINSTANCE() = 0;
 	};
-}
+} } // rkit::render

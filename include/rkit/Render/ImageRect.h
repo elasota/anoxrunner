@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct ImageRect2D
 	{
@@ -11,4 +11,4 @@ namespace rkit::render
 		uint32_t m_width = 0;
 		uint32_t m_height = 0;
 	};
-}
+} } // rkit::render

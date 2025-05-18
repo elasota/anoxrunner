@@ -7,7 +7,7 @@ namespace rkit
 	struct ISeekableWriteStream;
 }
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	class ShadowFileBase : public IShadowFile
 	{
@@ -17,4 +17,4 @@ namespace rkit::utils
 
 		static Result Create(UniquePtr<ShadowFileBase> &shadowFile, ISeekableReadStream &readStream, ISeekableWriteStream *writeStream);
 	};
-}
+} } // rkit::utils

@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <limits>
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	typedef uint64_t TimelinePoint_t;
 
@@ -22,4 +22,4 @@ namespace rkit::render
 	{
 		virtual ~IBinaryGPUWaitableFence() {}
 	};
-}
+} } // rkit::render

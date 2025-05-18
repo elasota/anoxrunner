@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct ISwapChainFrame
 	{
@@ -14,4 +14,4 @@ namespace rkit::render
 
 		virtual size_t GetFrameIndex() const = 0;
 	};
-}
+} } // rkit::render

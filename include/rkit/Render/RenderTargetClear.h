@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <cstddef>
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	union RenderTargetClearValue
 	{
@@ -36,9 +36,9 @@ namespace rkit::render
 		uint32_t m_renderTargetIndex = 0;
 		RenderTargetClearValue m_clearValue = RenderTargetClearValue::Zero();
 	};
-}
+} } // rkit::render
 
-namespace rkit::render::priv
+namespace rkit { namespace render { namespace priv
 {
 	template<class T>
 	struct RenderTargetInitHelper
@@ -49,9 +49,9 @@ namespace rkit::render::priv
 		template<T(RenderTargetClearValue:: *TField)[4]>
 		static RenderTargetClearValue From4(T v0, T v1, T v2, T v3);
 	};
-}
+} } } // rkit::render::priv
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	inline RenderTargetClearValue RenderTargetClearValue::FromFloat64(double v0, double v1)
 	{
@@ -91,9 +91,9 @@ namespace rkit::render
 
 		return result;
 	}
-}
+} } // rkit::render
 
-namespace rkit::render::priv
+namespace rkit { namespace render { namespace priv
 {
 	template<class T>
 	template<T(RenderTargetClearValue:: *TField)[2]>
@@ -116,4 +116,4 @@ namespace rkit::render::priv
 		(result.*TField)[3] = v3;
 		return result;
 	}
-}
+} } } // rkit::render::priv

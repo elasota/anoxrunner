@@ -1,12 +1,15 @@
 #pragma once
 
-namespace rkit::render
+namespace rkit
 {
-	struct IBaseCommandAllocator;
-	struct IGraphicsCommandAllocator;
-	struct IGraphicsComputeCommandAllocator;
-	struct IComputeCommandAllocator;
-	struct ICopyCommandAllocator;
+	namespace render
+	{
+		struct IBaseCommandAllocator;
+		struct IGraphicsCommandAllocator;
+		struct IGraphicsComputeCommandAllocator;
+		struct IComputeCommandAllocator;
+		struct ICopyCommandAllocator;
+	}
 }
 
 

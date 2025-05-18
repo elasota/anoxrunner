@@ -1,9 +1,9 @@
 #pragma once
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct IImageResource
 	{
 		virtual ~IImageResource() {}
 	};
-}
+} } // rkit::render

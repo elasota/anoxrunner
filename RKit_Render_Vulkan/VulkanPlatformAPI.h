@@ -6,7 +6,7 @@
 
 #include "IncludeVulkanPlatformSpecific.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	struct VulkanGlobalPlatformAPI final : public IVulkanAPI
 	{
@@ -49,5 +49,4 @@ namespace rkit::render::vulkan
 		RKIT_VK_API_GOTO(BeginPlatformSpecific);
 		RKIT_VK_API_END;
 	};
-
-}
+} } } // rkit::render::vulkan

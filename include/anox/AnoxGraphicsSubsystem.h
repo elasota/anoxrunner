@@ -14,16 +14,16 @@ namespace rkit
 
 	template<class T>
 	struct ISpan;
-}
 
-namespace rkit::utils
-{
-	struct IThreadPool;
-}
+	namespace utils
+	{
+		struct IThreadPool;
+	}
 
-namespace rkit::data
-{
-	struct IDataDriver;
+	namespace data
+	{
+		struct IDataDriver;
+	}
 }
 
 namespace anox

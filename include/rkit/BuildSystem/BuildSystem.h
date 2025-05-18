@@ -116,20 +116,23 @@ namespace rkit
 
 #include "rkit/Core/Path.h"
 
-namespace rkit::buildsystem
+namespace rkit
 {
-	inline CIPathView GetShaderSourceBasePath()
+	namespace buildsystem
 	{
-		return "rkit/render/src";
-	}
+		inline CIPathView GetShaderSourceBasePath()
+		{
+			return "rkit/render/src";
+		}
 
-	inline CIPathView GetCompiledPipelineIntermediateBasePath()
-	{
-		return "rpll_c/pipe";
-	}
+		inline CIPathView GetCompiledPipelineIntermediateBasePath()
+		{
+			return "rpll_c/pipe";
+		}
 
-	inline CIPathView GetCompiledGlobalsIntermediateBasePath()
-	{
-		return "rpll_c/glob";
+		inline CIPathView GetCompiledGlobalsIntermediateBasePath()
+		{
+			return "rpll_c/glob";
+		}
 	}
 }

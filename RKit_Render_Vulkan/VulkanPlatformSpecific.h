@@ -6,21 +6,21 @@ namespace rkit
 {
 	template<class T>
 	class UniquePtr;
+
+	namespace render
+	{
+		struct IDisplay;
+
+		namespace vulkan
+		{
+			class VulkanDeviceBase;
+
+			struct IVulkanSurface;
+		}
+	}
 }
 
-namespace rkit::render
-{
-	struct IDisplay;
-}
-
-namespace rkit::render::vulkan
-{
-	class VulkanDeviceBase;
-
-	struct IVulkanSurface;
-}
-
-namespace rkit::render::vulkan::platform
+namespace rkit { namespace render { namespace vulkan { namespace platform
 {
 	struct IInstanceExtensionEnumerator
 	{
@@ -36,4 +36,4 @@ namespace rkit::render::vulkan::platform
 	Result AddInstanceExtensions(IInstanceExtensionEnumerator &enumerator);
 	Result AddDeviceExtensions(IDeviceExtensionEnumerator &enumerator);
 	Result CreateSurfaceFromDisplay(UniquePtr<IVulkanSurface> &outSurface, VulkanDeviceBase &device, IDisplay &display);
-}
+} } } } // rkit::render::vulkan::platform

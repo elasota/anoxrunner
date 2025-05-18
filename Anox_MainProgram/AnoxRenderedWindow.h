@@ -12,15 +12,15 @@ namespace rkit
 {
 	template<class T>
 	class RCPtr;
-}
 
-namespace rkit::render
-{
-	struct ISwapChainPrototype;
-	struct IBaseCommandQueue;
-	struct IRenderDevice;
-	struct ISwapChain;
-	struct IDisplay;
+	namespace render
+	{
+		struct ISwapChainPrototype;
+		struct IBaseCommandQueue;
+		struct IRenderDevice;
+		struct ISwapChain;
+		struct IDisplay;
+	}
 }
 
 namespace anox

@@ -10,7 +10,7 @@
 
 #include "rapidjson/document.h"
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	class JsonDocument final : public IJsonDocument
 	{
@@ -392,7 +392,7 @@ namespace rkit::utils
 		JsonDocument::VFObjectHasElement,
 		JsonDocument::VFGetObjectElement,
 	};
-}
+} } // rkit::utils
 
 
 rkit::Result rkit::utils::CreateJsonDocument(UniquePtr<IJsonDocument> &outDocument, IMallocDriver *alloc, IReadStream *readStream)

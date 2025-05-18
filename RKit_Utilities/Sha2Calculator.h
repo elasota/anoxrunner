@@ -2,7 +2,7 @@
 
 #include "rkit/Utilities/Sha2.h"
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	class Sha256Calculator final : public ISha256Calculator
 	{
@@ -22,4 +22,4 @@ namespace rkit::utils
 
 		static uint32_t RotR32(uint32_t v, int bits);
 	};
-}
+} } // rkit::utils

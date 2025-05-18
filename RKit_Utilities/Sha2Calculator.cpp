@@ -1,6 +1,6 @@
 #include "Sha2Calculator.h"
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	const uint32_t Sha256Calculator::kConstants[64] =
 	{
@@ -189,4 +189,4 @@ namespace rkit::utils
 
 		return highBits | lowBits;
 	}
-}
+} } // rkit::utils

@@ -6,7 +6,7 @@ namespace rkit
 	class EnumMask;
 }
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	enum class ImagePlane
 	{
@@ -18,4 +18,4 @@ namespace rkit::render
 	};
 
 	typedef EnumMask<ImagePlane> ImagePlaneMask_t;
-}
+} } // rkit::render

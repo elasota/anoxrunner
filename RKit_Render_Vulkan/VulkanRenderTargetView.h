@@ -12,7 +12,7 @@ namespace rkit
 	class UniquePtr;
 }
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanDeviceBase;
 
@@ -24,4 +24,4 @@ namespace rkit::render::vulkan
 
 		static Result Create(UniquePtr<VulkanRenderTargetViewBase> &outRTV, VulkanDeviceBase &device, VkImage image, VkFormat format, VkImageAspectFlags imageAspectFlags, VkImageViewType imageViewType, uint32_t mipSlice, ImagePlane plane, uint32_t firstArrayElement, uint32_t arraySize);
 	};
-}
+} } } // rkit::render::vulkan

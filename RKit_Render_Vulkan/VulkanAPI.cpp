@@ -1,5 +1,5 @@
 #include "VulkanAPI.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
-}
+} } } // rkit::render::vulkan

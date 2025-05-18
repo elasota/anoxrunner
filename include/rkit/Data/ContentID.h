@@ -5,7 +5,7 @@
 
 #include "rkit/Core/StringProto.h"
 
-namespace rkit::data
+namespace rkit { namespace data
 {
 	struct ContentIDString;
 
@@ -34,7 +34,7 @@ namespace rkit::data
 
 		StringView ToStringView() const;
 	};
-}
+} } // rkit::data
 
 #include "rkit/Core/Hasher.h"
 #include "rkit/Core/StringView.h"
@@ -47,7 +47,7 @@ namespace rkit
 	};
 }
 
-namespace rkit::data
+namespace rkit { namespace data
 {
 	inline bool ContentID::operator==(const ContentID &other) const
 	{
@@ -135,4 +135,4 @@ namespace rkit::data
 	{
 		return StringView(m_chars, kLength);
 	}
-}
+} } // rkit::data

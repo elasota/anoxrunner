@@ -6,7 +6,7 @@
 #include "rkit/Core/UniquePtr.h"
 
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct IDepthStencilView;
 	struct IRenderTargetView;
@@ -23,4 +23,4 @@ namespace rkit::render
 
 		ImageRect2D m_renderArea;
 	};
-}
+} } // rkit::render

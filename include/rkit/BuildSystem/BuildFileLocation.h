@@ -1,13 +1,16 @@
 #pragma once
 
-namespace rkit::buildsystem
+namespace rkit
 {
-	enum class BuildFileLocation
+	namespace buildsystem
 	{
-		kInvalid,
-		kSourceDir,
-		kIntermediateDir,
-		kOutputFiles,
-		kOutputContent,
-	};
+		enum class BuildFileLocation
+		{
+			kInvalid,
+			kSourceDir,
+			kIntermediateDir,
+			kOutputFiles,
+			kOutputContent,
+		};
+	}
 }

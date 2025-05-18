@@ -13,7 +13,7 @@
 
 #include "JobQueue.h"
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	class JobQueue;
 
@@ -1029,7 +1029,7 @@ namespace rkit::utils
 
 		return ResultCode::kOK;
 	}
-}
+} } // rkit::utils
 
 rkit::Result rkit::utils::CreateJobQueue(UniquePtr<IJobQueue> &outJobQueue, IMallocDriver *alloc)
 {

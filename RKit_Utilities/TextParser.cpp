@@ -7,7 +7,7 @@
 
 #include <cstring>
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	struct TextParserLocation
 	{
@@ -92,9 +92,9 @@ namespace rkit::utils
 
 		ParserCharReader m_charReader;
 	};
-}
+} } // rkit::utils
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	ParserCharReader::ParserCharReader(const Span<const char> &chars)
 		: m_chars(chars)
@@ -674,7 +674,7 @@ namespace rkit::utils
 
 		return ResultCode::kOK;
 	}
-}
+} } // rkit::utils
 
 rkit::Result rkit::utils::TextParserBase::Create(const Span<const char> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<TextParserBase> &outParser)
 {

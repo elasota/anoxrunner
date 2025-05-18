@@ -101,10 +101,8 @@ namespace rkit
 	};
 }
 
-namespace rkit::priv
+namespace rkit { namespace priv
 {
-
-
 	template<size_t TIndex, class TFirstType, class... TMoreTypes>
 	typename TupleTypeAtIndex<TIndex - 1, TMoreTypes...>::Type_t &TupleGetAtHelper<TIndex, TFirstType, TMoreTypes...>::GetMutable(TFirstType &firstValue, Tuple<TMoreTypes...> &moreValues)
 	{
@@ -128,7 +126,7 @@ namespace rkit::priv
 	{
 		return firstValue;
 	}
-}
+} } // rkit::priv
 
 namespace rkit
 {

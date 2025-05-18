@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	class QueueMask
 	{
@@ -37,11 +37,11 @@ namespace rkit::render::vulkan
 
 		Bits_t m_bits;
 	};
-}
+} } } // rkit::render::vulkan
 
 #include "rkit/Core/RKitAssert.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	inline QueueMask::QueueMask()
 		: m_bits(0)
@@ -132,4 +132,4 @@ namespace rkit::render::vulkan
 	{
 		return !((*this) == other);
 	}
-}
+} } } // rkit::render::vulkan

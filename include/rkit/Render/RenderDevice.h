@@ -20,14 +20,14 @@ namespace rkit
 
 	template<class T, class TUserdata>
 	class CallbackSpan;
+
+	namespace data
+	{
+		struct IRenderDataPackage;
+	}
 }
 
-namespace rkit::data
-{
-	struct IRenderDataPackage;
-}
-
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct IBaseCommandQueue;
 	struct ICopyCommandQueue;
@@ -80,4 +80,4 @@ namespace rkit::render
 
 		virtual Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, UniquePtr<ISwapChainPrototype> &&prototype, uint8_t numImages, RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) = 0;
 	};
-}
+} } // rkit::render

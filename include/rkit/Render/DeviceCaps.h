@@ -2,7 +2,7 @@
 
 #include "rkit/Core/StaticArray.h"
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	enum class RenderDeviceBoolCap
 	{
@@ -33,9 +33,9 @@ namespace rkit::render
 
 		StaticArray<bool, kNumBoolCaps> m_boolCaps;
 	};
-}
+} } // rkit::render
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	inline RenderDeviceCaps::RenderDeviceCaps()
 	{
@@ -69,4 +69,4 @@ namespace rkit::render
 
 		return true;
 	}
-}
+} } // rkit::render

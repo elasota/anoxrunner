@@ -4,7 +4,7 @@
 #include "VulkanCheck.h"
 #include "VulkanDevice.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanRenderTargetView final : public VulkanRenderTargetViewBase
 	{
@@ -91,4 +91,4 @@ namespace rkit::render::vulkan
 
 		return ResultCode::kOK;
 	}
-}
+} } } // rkit::render::vulkan

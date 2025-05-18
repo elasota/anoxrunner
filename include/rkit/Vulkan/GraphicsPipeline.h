@@ -1,6 +1,6 @@
 #pragma once
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	enum class GraphicPipelineStage
 	{
@@ -9,4 +9,4 @@ namespace rkit::render::vulkan
 
 		Count,
 	};
-}
+} } } // rkit::render::vulkan

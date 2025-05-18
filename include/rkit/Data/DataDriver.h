@@ -2,7 +2,7 @@
 
 #include "rkit/Core/Drivers.h"
 
-namespace rkit::data
+namespace rkit { namespace data
 {
 	struct IRenderDataHandler;
 
@@ -12,4 +12,4 @@ namespace rkit::data
 
 		virtual IRenderDataHandler *GetRenderDataHandler() const = 0;
 	};
-}
+} } // rkit::data

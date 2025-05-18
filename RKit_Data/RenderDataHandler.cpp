@@ -10,7 +10,7 @@
 
 #include "rkit/Utilities/Sha2.h"
 
-namespace rkit::data
+namespace rkit { namespace data
 {
 #define RTTI_ENUM_BEGIN(name)	\
 	namespace render_rtti_ ## name\
@@ -2333,5 +2333,4 @@ namespace rkit::data
 	}
 #undef LINK_INDEXABLE_LIST_TYPE
 
-}
-
+} } // rkit::data

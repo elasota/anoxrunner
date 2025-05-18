@@ -19,7 +19,7 @@
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/Result.h"
 
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanSwapChainFrame final : public ISwapChainFrame
 	{
@@ -433,4 +433,4 @@ namespace rkit::render::vulkan
 
 		return ResultCode::kOK;
 	}
-}
+} } } // rkit::render::vulkan

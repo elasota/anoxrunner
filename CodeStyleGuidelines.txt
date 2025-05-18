@@ -7,12 +7,12 @@ condition).
 
 Braced blocks of code after a "case" are indented 1 level past the case label.
 
-RKIT_CHECK must always be inside braces.  In any other cases, do not use braces
-for single lines of code.
+Code lines consisting of macros, such as RKIT_CHECK, must always be inside braces.
+In any other cases, do not use braces for single lines of code.
 
 Starting braces on empty line.
 
-No "auto" except for lambdas
+No "auto" except for lambdas or when required.
 
 Do not put headers or prototypes in preprocessor blocks that depend on
 RKIT_IS_DEBUG or NDEBUG.
@@ -24,3 +24,14 @@ Do not use new/delete.  Use New/Delete from NewDelete.h.
 Do not use new[]/delete[], use vectors.
 
 Private helper functions and templates go in rkit::priv
+
+
+Nested namespace defs that contain definitions use this syntax:
+namespace A { namespace B { namespace C
+{
+    ...
+} // A::B::C
+
+
+Namespaces must be closed and reopened between declarations and definitions in
+header files.  This is so that includes can be inserted between them easily.

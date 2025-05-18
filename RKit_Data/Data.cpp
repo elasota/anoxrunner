@@ -7,7 +7,7 @@
 
 #include "RenderDataHandler.h"
 
-namespace rkit::data
+namespace rkit { namespace data
 {
 	class DataDriver final : public rkit::data::IDataDriver
 	{
@@ -45,6 +45,6 @@ namespace rkit::data
 	{
 		return m_renderDataHandler.Get();
 	}
-}
+} } // rkit::data
 
 RKIT_IMPLEMENT_MODULE("RKit", "Data", ::rkit::data::DataModule)

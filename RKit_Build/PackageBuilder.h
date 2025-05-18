@@ -2,12 +2,12 @@
 
 #include "rkit/BuildSystem/PackageBuilder.h"
 
-namespace rkit::data
+namespace rkit { namespace data
 {
 	struct IRenderDataHandler;
-}
+} } // rkit::data
 
-namespace rkit::buildsystem
+namespace rkit { namespace buildsystem
 {
 	struct IPackageObjectWriter;
 
@@ -22,4 +22,4 @@ namespace rkit::buildsystem
 	public:
 		static Result Create(UniquePtr<IPackageObjectWriter> &outPackageObjectWriter);
 	};
-}
+} } // rkit::buildsystem

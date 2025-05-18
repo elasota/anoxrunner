@@ -8,13 +8,14 @@ namespace rkit
 	class RCPtr;
 
 	class Job;
+
+	namespace render
+	{
+		struct ISwapChainSyncPoint;
+		struct IBaseCommandBatch;
+	}
 }
 
-namespace rkit::render
-{
-	struct ISwapChainSyncPoint;
-	struct IBaseCommandBatch;
-}
 
 namespace anox
 {

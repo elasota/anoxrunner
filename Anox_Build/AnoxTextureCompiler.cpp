@@ -12,7 +12,7 @@
 
 #include "rkit/Data/DDSFile.h"
 
-namespace anox::buildsystem
+namespace anox { namespace buildsystem
 {
 	namespace priv
 	{
@@ -203,7 +203,7 @@ namespace anox::buildsystem
 		struct PixelPackHelper : public PixelPackHelperBase<TElementType, TNumElements, 0, (TNumElements > 0)>
 		{
 		};
-	}
+	} // anox::buildsystem::priv
 
 	class TextureCompiler final : public TextureCompilerBase
 	{
@@ -232,9 +232,9 @@ namespace anox::buildsystem
 		static bool DispositionHasAlpha(ImageImportDisposition disposition);
 		static bool DispositionHasMipMaps(ImageImportDisposition disposition);
 	};
-}
+} } // anox::buildsystem::priv
 
-namespace anox::buildsystem::priv
+namespace anox { namespace buildsystem { namespace priv
 {
 	template<class TElementType, size_t TIndex, size_t TCount, class TFirstElementValue, class... TMoreElementValues>
 	void SetAtHelper<TElementType, TIndex, TCount, TFirstElementValue, TMoreElementValues...>::SetAt(rkit::StaticArray<TElementType, TCount> &elements, TFirstElementValue firstValue, TMoreElementValues... moreValues)
@@ -424,9 +424,9 @@ namespace anox::buildsystem::priv
 	{
 		return 0;
 	}
-}
+} } } // anox::buildsystem::priv
 
-namespace anox::buildsystem
+namespace anox { namespace buildsystem
 {
 	bool TextureCompiler::HasAnalysisStage() const
 	{
@@ -957,4 +957,5 @@ namespace anox::buildsystem
 	{
 		return rkit::New<TextureCompiler>(outCompiler);
 	}
-}
+} } // anox::buildsystem
+

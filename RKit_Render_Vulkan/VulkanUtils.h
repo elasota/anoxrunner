@@ -11,14 +11,14 @@ namespace rkit
 {
 	template<class T>
 	class EnumMask;
+
+	namespace render
+	{
+		struct ImageRect2D;
+	}
 }
 
-namespace rkit::render
-{
-	struct ImageRect2D;
-}
-
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanUtils
 	{
@@ -32,4 +32,4 @@ namespace rkit::render::vulkan
 		static Result ConvertImageLayout(VkImageLayout &outLayout, ImageLayout imageLayout);
 		static VkRect2D ConvertImageRect(const ImageRect2D &rect);
 	};
-}
+} } } // rkit::render::vulkan

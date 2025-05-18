@@ -20,7 +20,7 @@
 
 #include <glslang/Include/glslang_c_interface.h>
 
-namespace rkit::buildsystem::vulkan
+namespace rkit { namespace buildsystem { namespace vulkan
 {
 	uint32_t CreateNodeTypeIDForStageInt(char c0, char c1, uint8_t pipelineStage)
 	{
@@ -1480,4 +1480,4 @@ namespace rkit::buildsystem::vulkan
 	{
 		return New<RenderPipelineStageCompiler>(outCompiler, PipelineType::Graphics, static_cast<uint32_t>(stage));
 	}
-}
+} } } // rkit::buildsystem::vulkan

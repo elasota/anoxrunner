@@ -11,7 +11,7 @@
 
 #include <cstdint>
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct IBufferResource;
 	struct IImageResource;
@@ -68,4 +68,4 @@ namespace rkit::render
 		Span<BufferMemoryBarrier> m_bufferMemoryBarriers;
 		Span<ImageMemoryBarrier> m_imageMemoryBarriers;
 	};
-}
+} } // rkit::render

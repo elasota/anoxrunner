@@ -10,7 +10,7 @@
 
 #include "rkit/Utilities/Sha2.h"
 
-namespace rkit::buildsystem
+namespace rkit { namespace buildsystem
 {
 	class BinaryBlob final : public IBinaryBlob
 	{
@@ -942,10 +942,7 @@ namespace rkit::buildsystem
 	{
 		return m_sha.FlushToBytes(m_state.m_state);
 	}
-}
 
-namespace rkit::buildsystem
-{
 	BinaryBlobBuilder::BinaryBlobBuilder()
 	{
 	}
@@ -983,4 +980,4 @@ namespace rkit::buildsystem
 	{
 		return New<PackageObjectWriter>(outPackageObjectWriter);
 	}
-}
+} } // rkit::buildsystem

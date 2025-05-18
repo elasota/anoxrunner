@@ -6,14 +6,14 @@ namespace rkit
 {
 	template<class T>
 	class UniquePtr;
+
+	namespace render
+	{
+		struct IRenderPassInstance;
+	}
 }
 
-namespace rkit::render
-{
-	struct IRenderPassInstance;
-}
-
-namespace rkit::render::vulkan
+namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanDeviceBase;
 	class VulkanQueueProxyBase;
@@ -29,4 +29,4 @@ namespace rkit::render::vulkan
 
 		static Result Create(UniquePtr<VulkanCommandBatchBase> &cmdBatch, VulkanDeviceBase &device, VulkanQueueProxyBase &queue, VulkanCommandAllocatorBase &cmdAlloc);
 	};
-};
+} } } // rkit::render::vulkan

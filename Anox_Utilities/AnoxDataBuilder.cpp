@@ -19,7 +19,7 @@
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/SystemDriver.h"
 
-namespace anox::utils
+namespace anox { namespace utils
 {
 	class AnoxDataBuilder final : public IDataBuilder
 	{
@@ -628,4 +628,4 @@ namespace anox::utils
 	{
 		return rkit::New<AnoxDataBuilder>(outDataBuilder, utils);
 	}
-}
+} } // anox::utils

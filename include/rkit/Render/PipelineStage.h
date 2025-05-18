@@ -6,7 +6,7 @@ namespace rkit
 	class EnumMask;
 }
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	enum class PipelineStage
 	{
@@ -21,4 +21,4 @@ namespace rkit::render
 	};
 
 	typedef EnumMask<PipelineStage> PipelineStageMask_t;
-}
+} } // rkit::render

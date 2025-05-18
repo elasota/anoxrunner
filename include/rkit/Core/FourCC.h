@@ -16,7 +16,7 @@ namespace rkit
 	};
 }
 
-namespace rkit::utils
+namespace rkit { namespace utils
 {
 	inline uint32_t ComputeFourCC(char c0, char c1, char c2, char c3)
 	{
@@ -35,6 +35,6 @@ namespace rkit::utils
 		outC2 = static_cast<char>((fourCC >> 16) & 0xff);
 		outC3 = static_cast<char>((fourCC >> 24) & 0xff);
 	}
-}
+} } // rkit::utils
 
 #define RKIT_FOURCC(a, b, c, d) (::rkit::FourCCValue<a, b, c, d>::kValue)

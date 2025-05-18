@@ -11,7 +11,7 @@
 
 #include <glslang/Include/glslang_c_interface.h>
 
-namespace rkit::buildsystem
+namespace rkit { namespace buildsystem
 {
 	class BuildVulkanDriver final : public rkit::buildsystem::IBuildSystemAddOnDriver
 	{
@@ -72,6 +72,6 @@ namespace rkit::buildsystem
 
 		return ResultCode::kOK;
 	}
-}
+} } // rkit::buildsystem
 
 RKIT_IMPLEMENT_MODULE("RKit", "Build_Vulkan", ::rkit::buildsystem::BuildVulkanModule)

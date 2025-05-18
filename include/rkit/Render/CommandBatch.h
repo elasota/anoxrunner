@@ -10,7 +10,7 @@ namespace rkit
 	class EnumMask;
 }
 
-namespace rkit::render
+namespace rkit { namespace render
 {
 	struct ICopyCommandEncoder;
 	struct IComputeCommandEncoder;
@@ -44,4 +44,4 @@ namespace rkit::render
 	struct IGraphicsComputeCommandBatch : public IGraphicsCommandBatch, public IComputeCommandBatch
 	{
 	};
-}
+} } // rkit::render

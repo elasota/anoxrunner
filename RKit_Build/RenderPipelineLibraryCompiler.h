@@ -6,7 +6,7 @@
 
 #include "rkit/Core/FourCC.h"
 
-namespace rkit::buildsystem
+namespace rkit { namespace buildsystem
 {
 	class RenderPipelineLibraryCompiler final : public IDependencyNodeCompiler
 	{
@@ -25,4 +25,4 @@ namespace rkit::buildsystem
 	public:
 		static Result Create(UniquePtr<IPipelineLibraryCombiner> &outPackageObjectWriter);
 	};
-}
+} } // rkit::buildsystem

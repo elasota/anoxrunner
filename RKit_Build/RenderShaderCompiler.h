@@ -3,7 +3,7 @@
 #include "rkit/BuildSystem/BuildFileLocation.h"
 #include "rkit/Core/String.h"
 
-namespace rkit::buildsystem::rsc_interchange
+namespace rkit { namespace buildsystem { namespace rsc_interchange
 {
 	enum class ShaderStage
 	{
@@ -20,4 +20,4 @@ namespace rkit::buildsystem::rsc_interchange
 		String m_path;
 		String m_entryPoint;
 	};
-}
+} } } // rkit::buildsystem::rsc_interchange

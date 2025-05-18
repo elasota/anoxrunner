@@ -27,7 +27,7 @@
 
 #include <algorithm>
 
-namespace rkit::buildsystem
+namespace rkit { namespace buildsystem
 {
 	class NodeTypeKey
 	{
@@ -105,7 +105,7 @@ namespace rkit::buildsystem
 		BuildFileLocation m_inputLocation;
 		StringView m_identifier;
 	};
-}
+} } // rkit::buildsystem
 
 RKIT_DECLARE_BINARY_HASHER(rkit::buildsystem::NodeTypeKey);
 
@@ -283,7 +283,7 @@ rkit::HashValue_t rkit::Hasher<rkit::buildsystem::NodeKey>::ComputeHash(HashValu
 	return value.ComputeHash(baseHash);
 }
 
-namespace rkit::buildsystem
+namespace rkit { namespace buildsystem
 {
 	class BuildSystemInstance;
 	class DependencyNode;
@@ -2971,4 +2971,4 @@ namespace rkit::buildsystem
 	{
 		return StringView(m_chars, kContentStringSize);
 	}
-}
+} } // rkit::buildsystem
