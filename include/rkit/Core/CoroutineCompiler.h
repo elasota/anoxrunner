@@ -91,6 +91,18 @@ namespace rkit { namespace coro { namespace compiler
 		}
 	};
 
+#if RKIT_IS_DEBUG
+	template<class TStackFrame>
+	struct FunctionInspectorBuilder
+	{
+		inline static void InitInspector(TStackFrame *stackFrame)
+		{
+			StackFrameInspector<TStackFrame> *inspector = new (stackFrame->m_base.m_stackInspectorStorage.m_rawBytes) StackFrameInspector<TStackFrame>(stackFrame);
+			stackFrame->m_base.m_stackInspector = inspector;
+		}
+	};
+#endif
+
 	template<class TCoroutine>
 	struct FunctionEntryBuilder<TCoroutine, void>
 	{
@@ -114,8 +126,11 @@ namespace rkit { namespace coro { namespace compiler
 			FunctionEntryLocalsInitializer<NewStackFrame_t, typename TCoroutine::Locals>::InitLocals(newFrame);
 
 			FunctionEntryClassInstanceInitializer<NewStackFrame_t, typename TCoroutine::ClassInstance>::InitClassInstance(newFrame, static_cast<typename TCoroutine::ClassInstance *>(classInstance));
-
 			newFrame->m_base.m_destructFrame = DestructFrame;
+
+#if RKIT_IS_DEBUG
+			FunctionInspectorBuilder<NewStackFrame_t>::InitInspector(newFrame);
+#endif
 		}
 	};
 

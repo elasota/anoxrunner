@@ -10,7 +10,9 @@ namespace anox
 	class AnoxCommandStack final : public AnoxCommandStackBase
 	{
 	public:
-		explicit AnoxCommandStack(size_t maxCapacity);
+		AnoxCommandStack();
+
+		rkit::Result Init(size_t maxCapacity, size_t maxLines);
 
 		rkit::Result Parse(const rkit::Span<const uint8_t> &stream) override;
 		rkit::Result Push(const rkit::StringSliceView &strView) override;
@@ -20,14 +22,23 @@ namespace anox
 
 	private:
 		rkit::Vector<char> m_contentsBuffer;
+		rkit::Vector<rkit::StringView> m_lines;
 		size_t m_contentsSize;
-		size_t m_maxCapacity;
+		size_t m_numLines;
 	};
 
-	AnoxCommandStack::AnoxCommandStack(size_t maxCapacity)
-		: m_maxCapacity(maxCapacity)
-		, m_contentsSize(0)
+	AnoxCommandStack::AnoxCommandStack()
+		: m_contentsSize(0)
+		, m_numLines(0)
 	{
+	}
+
+	rkit::Result AnoxCommandStack::Init(size_t maxCapacity, size_t maxLines)
+	{
+		RKIT_CHECK(m_contentsBuffer.Resize(maxCapacity));
+		RKIT_CHECK(m_lines.Resize(maxLines));
+
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result AnoxCommandStack::Parse(const rkit::Span<const uint8_t> &streamRef)
@@ -123,6 +134,8 @@ namespace anox
 
 		rkit::ReverseSpanOrder(lines.ToSpan());
 
+		RKIT_CHECK(PushMultiple(lines.ToSpan().ToValueISpan()));
+
 		return rkit::ResultCode::kOK;
 	}
 
@@ -133,24 +146,37 @@ namespace anox
 
 	rkit::Result AnoxCommandStack::PushMultiple(const rkit::ISpan<rkit::StringSliceView> &slices)
 	{
-		size_t sizeAvailable = m_maxCapacity;
+		size_t sizeAvailable = m_contentsBuffer.Count() - m_contentsSize;
+		size_t linesAvailable = m_lines.Count() - m_numLines;
 
 		size_t numSlices = slices.Count();
+
+		if (linesAvailable < numSlices)
+		{
+			rkit::log::Error("Not enough command stack space available");
+			return rkit::ResultCode::kOperationFailed;
+		}
 
 		size_t sizeRequired = 0;
 		for (size_t i = 0; i < numSlices; i++)
 		{
 			const rkit::StringSliceView slice = slices[i];
 
-			if (sizeAvailable < sizeof(size_t) + 1)
+			if (sizeAvailable < 1)
+			{
+				rkit::log::Error("Not enough command stack space available");
 				return rkit::ResultCode::kOperationFailed;
+			}
 
-			sizeAvailable -= sizeof(size_t) + 1;
+			sizeAvailable -= 1;
 
 			if (sizeAvailable < slice.Length())
+			{
+				rkit::log::Error("Not enough command stack space available");
 				return rkit::ResultCode::kOperationFailed;
+			}
 
-			sizeRequired += sizeof(size_t) + 1 + slice.Length();
+			sizeRequired += 1 + slice.Length();
 		}
 
 		size_t insertPos = 0;
@@ -162,16 +188,14 @@ namespace anox
 		for (size_t i = 0; i < numSlices; i++)
 		{
 			const rkit::StringSliceView slice = slices[i];
+			const rkit::Span<char> targetSpan = contentsSpan.SubSpan(insertPos, slice.Length());
 
-			rkit::CopySpanNonOverlapping(contentsSpan.SubSpan(insertPos, slice.Length()), slice.ToSpan());
+			rkit::CopySpanNonOverlapping(targetSpan, slice.ToSpan());
 			insertPos += slice.Length();
 			contentsSpan[insertPos] = 0;
 			insertPos++;
 
-			size_t sliceSize = slice.Length();
-			rkit::CopySpanNonOverlapping(contentsSpan.SubSpan(insertPos, sizeof(size_t)), rkit::ConstSpan<char>(reinterpret_cast<char *>(&sliceSize), sizeof(size_t)));
-
-			insertPos += sizeof(size_t);
+			m_lines[m_numLines++] = rkit::StringView(targetSpan.Ptr(), targetSpan.Count());
 		}
 
 		RKIT_ASSERT(insertPos == m_contentsSize);
@@ -182,26 +206,26 @@ namespace anox
 
 	bool AnoxCommandStack::Pop(rkit::StringView &outString)
 	{
-		if (m_contentsSize > 0)
+		if (m_numLines > 0)
 		{
-			rkit::ConstSpan<char> sizeSpan = m_contentsBuffer.ToSpan().SubSpan(m_contentsSize - sizeof(size_t));
-			size_t size = 0;
-			rkit::CopySpanNonOverlapping(rkit::Span<char>(reinterpret_cast<char *>(&size), 1), sizeSpan);
-
-			size_t startPos = m_contentsSize - sizeof(size_t) - size - 1;
-
-			outString = rkit::StringView(&m_contentsBuffer[startPos], size);
-
-			m_contentsSize = startPos;
+			--m_numLines;
+			outString = m_lines[m_numLines];
 
 			return true;
 		}
 
-		return true;
+		return false;
 	}
 
-	rkit::Result AnoxCommandStackBase::Create(rkit::UniquePtr<AnoxCommandStackBase> &stack, size_t maxCapacity)
+	rkit::Result AnoxCommandStackBase::Create(rkit::UniquePtr<AnoxCommandStackBase> &outStack, size_t maxCapacity, size_t maxLines)
 	{
-		return rkit::New<AnoxCommandStack>(stack, maxCapacity);
+		rkit::UniquePtr<AnoxCommandStack> stack;
+		RKIT_CHECK(rkit::New<AnoxCommandStack>(stack));
+
+		RKIT_CHECK(stack->Init(maxCapacity, maxLines));
+
+		outStack = std::move(stack);
+
+		return rkit::ResultCode::kOK;
 	}
 }

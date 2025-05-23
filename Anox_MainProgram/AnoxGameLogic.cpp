@@ -120,7 +120,7 @@ namespace anox
 		};
 
 		CORO_BEGIN
-			CORO_CHECK(AnoxCommandStackBase::Create(locals.commandStack, 64 * 1024));
+			CORO_CHECK(AnoxCommandStackBase::Create(locals.commandStack, 64 * 1024, 1024));
 
 			CORO_CALL(self->AsyncLoadCIPathKeyedResource, locals.resLoadResult, anox::resloaders::kRawFileResourceTypeCode, rkit::CIPathView("configs/default.cfg"));
 

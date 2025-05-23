@@ -26,6 +26,6 @@ namespace anox
 
 		virtual bool Pop(rkit::StringView &outString) = 0;
 
-		static rkit::Result Create(rkit::UniquePtr<AnoxCommandStackBase> &stack, size_t maxCapacity);
+		static rkit::Result Create(rkit::UniquePtr<AnoxCommandStackBase> &stack, size_t maxCapacity, size_t maxLines);
 	};
 }

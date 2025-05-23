@@ -4,6 +4,7 @@
 #include "Result.h"
 #include "TypeList.h"
 #include "TypeTraits.h"
+#include "CoroutineProtos.h"
 
 namespace rkit
 {
@@ -23,7 +24,6 @@ namespace rkit { namespace coro
 
 	struct CodePtr;
 	struct Context;
-	struct StackFrameBase;
 
 	typedef CodePtr(*Code_t) (Context *coroContext, StackFrameBase *coroStackFrame);
 
@@ -32,12 +32,49 @@ namespace rkit { namespace coro
 		Code_t m_code;
 	};
 
+#if RKIT_IS_DEBUG
+	struct StackFrameInspectorBase
+	{
+		virtual ~StackFrameInspectorBase() {}
+	};
+
+	template<class T>
+	struct StackFrameInspector final : public StackFrameInspectorBase
+	{
+		inline explicit StackFrameInspector(T *framePtr)
+			: m_frame(framePtr)
+		{
+		}
+
+		T *m_frame;
+	};
+
+	struct InspectableStackFrameBase
+	{
+		union StackInspectorStorage
+		{
+			inline ~StackInspectorStorage() {}
+
+			StackFrameInspector<void> m_inspector;
+			uint8_t m_rawBytes[sizeof(StackFrameInspector<void>)];
+		};
+
+		inline ~InspectableStackFrameBase() {}
+
+		StackFrameInspectorBase *m_stackInspector;
+		StackInspectorStorage m_stackInspectorStorage;
+		Code_t m_ip;
+		InspectableStackFrameBase *m_prevFrame;
+		void (*m_destructFrame)(InspectableStackFrameBase *stackFrame);
+	};
+#else
 	struct StackFrameBase
 	{
 		Code_t m_ip;
 		StackFrameBase *m_prevFrame;
 		void (*m_destructFrame)(StackFrameBase *stackFrame);
 	};
+#endif
 
 	struct FrameMetadataBase;
 

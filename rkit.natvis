@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+	<Type Name="rkit::Span&lt;*&gt;">
+		<DisplayString>{{count = {m_count}}}</DisplayString>
+		<Expand>
+			<Item Name="[count]">m_count</Item>
+			<ArrayItems>
+				<Size>m_count</Size>
+				<ValuePointer>m_arr</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+	<Type Name="rkit::Vector&lt;*&gt;">
+		<DisplayString>{{count = {m_count}}}</DisplayString>
+		<Expand>
+			<Item Name="[count]">m_count</Item>
+			<Item Name="[capacity]">m_capacity</Item>
+			<ArrayItems>
+				<Size>m_count</Size>
+				<ValuePointer>m_arr</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+	<Type Name="rkit::BaseStringView&lt;char&gt;">
+		<DisplayString>{m_span.m_arr,s}</DisplayString>
+	</Type>
+	<Type Name="rkit::BaseStringSliceView&lt;char&gt;">
+		<DisplayString>{m_span.m_arr,s}</DisplayString>
+	</Type>
+	<Type Name="rkit::BaseStringView&lt;wchar_t&gt;">
+		<DisplayString>{m_span.m_arr,su}</DisplayString>
+	</Type>
+	<Type Name="rkit::BaseStringSliceView&lt;wchar_t&gt;">
+		<DisplayString>{m_span.m_arr,su}</DisplayString>
+	</Type>
+	<Type Name="rkit::coro::InspectableStackFrameBase">
+		<DisplayString>{m_stackInspector}</DisplayString>
+		<Expand>
+			<Item Name="[frame]">m_stackInspector</Item>
+			<Item Name="[ip]">m_ip</Item>
+			<Item Name="[prevFrame]">m_prevFrame ? (m_prevFrame->m_stackInspector) : nullptr</Item>
+		</Expand>
+	</Type>
+</AutoVisualizer>
