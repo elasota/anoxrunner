@@ -18,11 +18,11 @@ namespace anox
 		rkit::Result Push(const rkit::StringSliceView &strView) override;
 		rkit::Result PushMultiple(const rkit::ISpan<rkit::StringSliceView> &spans) override;
 
-		bool Pop(rkit::StringView &outString) override;
+		bool Pop(rkit::Span<char> &outString) override;
 
 	private:
 		rkit::Vector<char> m_contentsBuffer;
-		rkit::Vector<rkit::StringView> m_lines;
+		rkit::Vector<rkit::Span<char>> m_lines;
 		size_t m_contentsSize;
 		size_t m_numLines;
 	};
@@ -72,7 +72,15 @@ namespace anox
 						isCRLF = true;
 				}
 				else if (c == '\"')
-					isInQuote = !isInQuote;
+				{
+					if (isInQuote)
+						isInQuote = false;
+					else
+					{
+						if (endPos == 0 || rkit::IsASCIIWhitespace(static_cast<char>(stream[endPos - 1])))
+							isInQuote = true;
+					}
+				}
 				else if (c == ';')
 				{
 					if (!isInQuote)
@@ -106,11 +114,11 @@ namespace anox
 				}
 
 				// Trim starting whitespace
-				while (lineSpan.Count() > 0 && lineSpan[0] <= ' ')
+				while (lineSpan.Count() > 0 && rkit::IsASCIIWhitespace(lineSpan[0]))
 					lineSpan = lineSpan.SubSpan(1);
 
 				// Trim ending whitespace
-				while (lineSpan.Count() > 0 && lineSpan[lineSpan.Count() - 1] <= ' ')
+				while (lineSpan.Count() > 0 && rkit::IsASCIIWhitespace(lineSpan[lineSpan.Count() - 1]))
 					lineSpan = lineSpan.SubSpan(0, lineSpan.Count() - 1);
 
 				// If there's anything left, add it
@@ -195,7 +203,7 @@ namespace anox
 			contentsSpan[insertPos] = 0;
 			insertPos++;
 
-			m_lines[m_numLines++] = rkit::StringView(targetSpan.Ptr(), targetSpan.Count());
+			m_lines[m_numLines++] = targetSpan;
 		}
 
 		RKIT_ASSERT(insertPos == m_contentsSize);
@@ -204,7 +212,7 @@ namespace anox
 	}
 
 
-	bool AnoxCommandStack::Pop(rkit::StringView &outString)
+	bool AnoxCommandStack::Pop(rkit::Span<char> &outString)
 	{
 		if (m_numLines > 0)
 		{

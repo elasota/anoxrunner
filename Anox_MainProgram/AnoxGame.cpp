@@ -3,8 +3,10 @@
 #include "anox/AnoxFileSystem.h"
 
 #include "AnoxCaptureHarness.h"
+#include "AnoxCommandRegistry.h"
 #include "AnoxGameLogic.h"
 #include "AnoxGameFileSystem.h"
+#include "AnoxKeybindManager.h"
 #include "AnoxResourceManager.h"
 
 #include "rkit/Data/DataDriver.h"
@@ -40,6 +42,8 @@ namespace anox
 
 		ICaptureHarness *GetCaptureHarness() const override;
 		rkit::utils::IThreadPool *GetThreadPool() const override;
+		AnoxCommandRegistryBase *GetCommandRegistry() const override;
+		AnoxKeybindManagerBase *GetKeybindManager() const override;
 
 	private:
 		bool m_isExiting = false;
@@ -47,6 +51,8 @@ namespace anox
 		rkit::UniquePtr<rkit::utils::IThreadPool> m_threadPool;
 		rkit::UniquePtr<AnoxGameFileSystemBase> m_fileSystem;
 		rkit::UniquePtr<AnoxResourceManagerBase> m_resourceManager;
+		rkit::UniquePtr<AnoxCommandRegistryBase> m_commandRegistry;
+		rkit::UniquePtr<AnoxKeybindManagerBase> m_keybindManager;
 		rkit::UniquePtr<IGraphicsSubsystem> m_graphicsSubsystem;
 		rkit::UniquePtr<IGameLogic> m_gameLogic;
 		rkit::UniquePtr<ICaptureHarness> m_captureHarness;
@@ -104,13 +110,18 @@ namespace anox
 
 		RKIT_CHECK(AnoxGameFileSystemBase::Create(m_fileSystem, *m_threadPool->GetJobQueue()));
 		RKIT_CHECK(AnoxResourceManagerBase::Create(m_resourceManager, m_fileSystem.Get(), m_threadPool->GetJobQueue()));
+		RKIT_CHECK(AnoxCommandRegistryBase::Create(m_commandRegistry));
+
+		RKIT_CHECK(AnoxKeybindManagerBase::Create(m_keybindManager));
+		RKIT_CHECK(m_keybindManager->Register(*m_commandRegistry));
 
 		RKIT_CHECK(ICaptureHarness::CreateRealTime(m_captureHarness, *this, *m_resourceManager));
+
+		RKIT_CHECK(IGraphicsSubsystem::Create(m_graphicsSubsystem, *m_fileSystem, *m_dataDriver, *m_threadPool, anox::RenderBackend::kVulkan));
 
 		RKIT_CHECK(IGameLogic::Create(m_gameLogic, this));
 		RKIT_CHECK(m_gameLogic->Start());
 
-		RKIT_CHECK(IGraphicsSubsystem::Create(m_graphicsSubsystem, *m_fileSystem, *m_dataDriver, *m_threadPool, anox::RenderBackend::kVulkan));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -147,6 +158,16 @@ namespace anox
 	rkit::utils::IThreadPool *AnoxGame::GetThreadPool() const
 	{
 		return m_threadPool.Get();
+	}
+
+	AnoxCommandRegistryBase *AnoxGame::GetCommandRegistry() const
+	{
+		return m_commandRegistry.Get();
+	}
+
+	AnoxKeybindManagerBase *AnoxGame::GetKeybindManager() const
+	{
+		return m_keybindManager.Get();
 	}
 
 	rkit::Result anox::IAnoxGame::Create(rkit::UniquePtr<IAnoxGame> &outGame, const rkit::Optional<uint16_t> &numThreads)

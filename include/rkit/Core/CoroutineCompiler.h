@@ -72,9 +72,34 @@ namespace rkit { namespace coro { namespace compiler
 		StackFrameBuilder() = delete;
 	};
 
-	template<class TCoroutine, class TParamList>
-	struct FunctionEntryBuilder
+	template<class TCoroutine>
+	struct FunctionExitBuilder
 	{
+		inline static void DestructFrame(StackFrameBase *stackFrameBase)
+		{
+			typedef typename TCoroutine::CoroStackFrame StackFrame_t;
+
+			StackFrame_t *frame = static_cast<StackFrame_t *>(stackFrameBase);
+
+			frame->~StackFrame_t();
+		}
+	};
+
+	template<bool TConst>
+	struct FunctionEntryConstApplyer
+	{
+	};
+
+	template<>
+	struct FunctionEntryConstApplyer<true>
+	{
+		typedef const void *Type_t;
+	};
+
+	template<>
+	struct FunctionEntryConstApplyer<false>
+	{
+		typedef void *Type_t;
 	};
 
 	template<class TStackFrame, class TClassInstance>
@@ -94,48 +119,34 @@ namespace rkit { namespace coro { namespace compiler
 		}
 	};
 
-	template<class TCoroutine>
-	struct FunctionEntryBuilder<TCoroutine, void>
+	template<bool TConst, class TCoroutine, class TParamList>
+	struct FunctionEntryBuilder
 	{
-		inline static void DestructFrame(StackFrameBase *stackFrameBase)
-		{
-			typedef typename TCoroutine::CoroStackFrame StackFrame_t;
+	};
 
-			StackFrame_t *frame = static_cast<StackFrame_t *>(stackFrameBase);
-
-			frame->~StackFrame_t();
-		}
-
-		inline static void EnterFunction(void *stackFrame, StackFrameBase *prevFrame, void *classInstance)
+	template<bool TConst, class TCoroutine>
+	struct FunctionEntryBuilder<TConst, TCoroutine, void>
+	{
+		inline static void EnterFunction(Context &context, void *stackFrame, StackFrameBase *prevFrame, void *classInstance)
 		{
 			typedef typename TCoroutine::CoroStackFrame NewStackFrame_t;
 
-			new (stackFrame) NewStackFrame_t(classInstance, prevFrame, TCoroutine::CoroFirstInstruction::CoroFunction, DestructFrame);
+			typename FunctionEntryConstApplyer<TConst>::Type_t classInstanceConstified = classInstance;
+
+			new (stackFrame) NewStackFrame_t(classInstanceConstified, prevFrame, TCoroutine::CoroFirstInstruction::CoroFunction, FunctionExitBuilder<TCoroutine>::DestructFrame);
 		}
 	};
 
-	template<class TCoroutine, class... TParams>
-	struct FunctionEntryBuilder<TCoroutine, TypeList<TParams...>>
+	template<bool TConst, class TCoroutine, class... TParams>
+	struct FunctionEntryBuilder<TConst, TCoroutine, TypeList<TParams...>>
 	{
-		inline static void DestructFrame(StackFrameBase *stackFrameBase)
-		{
-			FunctionEntryBuilder<TCoroutine, void>::DestructFrame(stackFrameBase);
-
-			typedef typename TCoroutine::CoroStackFrame StackFrame_t;
-
-			StackFrame_t *frame = static_cast<StackFrame_t *>(stackFrameBase);
-
-			typedef typename TCoroutine::Params ParamsStruct_t;
-			ParamsStruct_t *params = &frame->m_params;
-
-			params->~ParamsStruct_t();
-		}
-
-		inline static void EnterFunction(void *stackFrame, StackFrameBase *prevFrame, void *classInstance, TParams... args)
+		inline static void EnterFunction(Context &context, void *stackFrame, StackFrameBase *prevFrame, void *classInstance, TParams... args)
 		{
 			typedef typename TCoroutine::CoroStackFrame NewStackFrame_t;
 
-			new (stackFrame) NewStackFrame_t(classInstance, prevFrame, TCoroutine::CoroFirstInstruction::CoroFunction, DestructFrame, std::forward<TParams>(args)...);
+			typename FunctionEntryConstApplyer<TConst>::Type_t classInstanceConstified = classInstance;
+
+			new (stackFrame) NewStackFrame_t(classInstanceConstified, prevFrame, TCoroutine::CoroFirstInstruction::CoroFunction, FunctionExitBuilder<TCoroutine>::DestructFrame, std::forward<TParams>(args)...);
 		}
 	};
 
@@ -153,7 +164,7 @@ namespace rkit { namespace coro { namespace compiler
 		return { nullptr };
 	}
 
-	CodePtr FaultWithResult(Context *coroContext, const Result &result)
+	inline CodePtr FaultWithResult(Context *coroContext, const Result &result)
 	{
 		coroContext->m_disposition = Disposition::kFailResult;
 		coroContext->m_result = result;
@@ -194,6 +205,7 @@ namespace rkit { namespace coro { namespace compiler
 		kContinue,
 		kCode,
 		kExit,
+		kReturn,
 	};
 
 
@@ -834,14 +846,15 @@ namespace rkit { namespace coro { namespace compiler
 
 namespace rkit { namespace coro
 {
-	template<class TCoroutine>
-	const FrameMetadata<typename TCoroutine::ParameterList> CoroMetadataResolver<TCoroutine>::ms_metadata =
+	// Coroutine metadata
+	template<bool TConst, class TCoroutine>
+	const FrameMetadata<typename TCoroutine::ParameterList> CoroMetadataResolver<TConst, TCoroutine>::ms_metadata =
 	{
 		{
 			sizeof(typename TCoroutine::CoroStackFrame),
 			alignof(typename TCoroutine::CoroStackFrame),
 		},
-		::rkit::coro::compiler::FunctionEntryBuilder<TCoroutine, typename TCoroutine::ParameterList>::EnterFunction,
+		::rkit::coro::compiler::FunctionEntryBuilder<TConst, TCoroutine, typename TCoroutine::ParameterList>::EnterFunction,
 	};
 } } // rkit::coro
 
@@ -912,7 +925,7 @@ namespace rkit { namespace coro
 	};
 
 #define CORO_RETURN	\
-			return CoroExitFunction(CORO_INTERNAL_coroContext, static_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame));\
+			return ::rkit::coro::compiler::ExitFunction(CORO_INTERNAL_coroContext, static_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame));\
 		}\
 	} CORO_CONCAT_LINE(CoroEndAt);\
 	typedef struct CORO_CONCAT_LINE(CoroReturn)\
@@ -959,7 +972,7 @@ namespace rkit { namespace coro
 // "Else If", "Else" and "End If" instructions are marked as closing the "If" scope
 #define CORO_IF(condition)	\
 			if (!(condition))\
-				return CoroNextInstructionResolver<CoroTerminatorLookup, ThisInstr_t, NextInstructionDisposition::kNextRef0>::Resolve();\
+				return ::rkit::coro::compiler::CoroNextInstructionResolver<CoroTerminatorLookup, ThisInstr_t, ::rkit::coro::compiler::NextInstructionDisposition::kNextRef0>::Resolve();\
 		CORO_FUNCTION_END\
 	} CORO_CONCAT_LINE(CoroEndAt);\
 	typedef struct CORO_CONCAT_LINE(CoroIf)\
@@ -1011,9 +1024,9 @@ namespace rkit { namespace coro
 	typedef struct CORO_CONCAT_LINE(CoroEndIf)\
 	{\
 		CORO_INSTR_CONSTANTS(CoroEndAt, CORO_CONCAT_LINE(CoroEndIf), kEndIf)\
-		typedef CoroCloseIf<PrevInstr_t::CoroBodyParentScope_t>::Type_t::PrevInstr_t::CoroBodyParentScope_t CoroBodyParentScope_t;\
+		typedef ::rkit::coro::compiler::CoroCloseIf<PrevInstr_t::CoroBodyParentScope_t>::Type_t::PrevInstr_t::CoroBodyParentScope_t CoroBodyParentScope_t;\
 		typedef PrevInstr_t::CoroBodyParentLoop_t CoroBodyParentLoop_t;\
-		typedef CoroCloseIf<PrevInstr_t::CoroBodyParentScope_t>::Type_t::PrevInstr_t::CoroAvailableElseScope_t CoroAvailableElseScope_t;\
+		typedef ::rkit::coro::compiler::CoroCloseIf<PrevInstr_t::CoroBodyParentScope_t>::Type_t::PrevInstr_t::CoroAvailableElseScope_t CoroAvailableElseScope_t;\
 		typedef PrevInstr_t::CoroBodyParentScope_t CoroClosesScope_t;\
 		typedef void CoroClosesLoop_t;\
 		CORO_FUNCTION_DEF
@@ -1119,10 +1132,12 @@ namespace rkit { namespace coro
 				else\
 				{\
 					CORO_INTERNAL_coroStackFrame->m_ip = ::rkit::coro::compiler::CoroNextInstructionResolver<CoroTerminatorLookup, ThisInstr_t, ::rkit::coro::compiler::NextInstructionDisposition::kContinue>::Resolve().m_code; \
-					CORO_CONCAT_LINE(CORO_INTERNAL_coroStarter).GetMetadata().m_enterFunction(CORO_CONCAT_LINE(CORO_INTERNAL_newStackFrame), CORO_INTERNAL_coroStackFrame, CORO_CONCAT_LINE(CORO_INTERNAL_coroStarter).GetInstance(), ## __VA_ARGS__); \
+					/* For non-coroutine thunks, enterFunction doesn't push a stack and may overwrite the disposition */ \
+					/* So, we need to update the disposition before calling it. */ \
+					CORO_INTERNAL_coroContext->m_disposition = ::rkit::coro::Disposition::kResume; \
+					CORO_CONCAT_LINE(CORO_INTERNAL_coroStarter).GetMetadata().m_enterFunction(*CORO_INTERNAL_coroContext, CORO_CONCAT_LINE(CORO_INTERNAL_newStackFrame), CORO_INTERNAL_coroStackFrame, CORO_CONCAT_LINE(CORO_INTERNAL_coroStarter).GetInstance(), ## __VA_ARGS__); \
 					CORO_INTERNAL_coroContext->m_frame = static_cast<::rkit::coro::StackFrameBase*>(CORO_CONCAT_LINE(CORO_INTERNAL_newStackFrame)); \
 				}\
-				CORO_INTERNAL_coroContext->m_disposition = ::rkit::coro::Disposition::kResume; \
 				return { nullptr };\
 			}\
 		}\

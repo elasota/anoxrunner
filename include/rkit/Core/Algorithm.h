@@ -188,6 +188,7 @@ namespace rkit
 	template<class T>
 	void ReverseSpanOrder(const Span<T> &spanRef);
 
+	bool IsASCIIWhitespace(char c);
 }
 
 #include "CoreDefs.h"
@@ -740,3 +741,7 @@ void rkit::ReverseSpanOrder(const rkit::Span<T> &span)
 		Swap(elements[i], elements[count - 1 - i]);
 }
 
+inline bool rkit::IsASCIIWhitespace(char c)
+{
+	return (c >= 0 && c <= ' ');
+}

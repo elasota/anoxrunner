@@ -77,13 +77,13 @@ namespace rkit { namespace coro
 	template<>
 	struct EnterFunctionCallbackResolver<void>
 	{
-		typedef void (*Func_t)(void *stackFrameRoot, StackFrameBase *prevFrame, void *classInstance);
+		typedef void (*Func_t)(Context &context, void *stackFrameRoot, StackFrameBase *prevFrame, void *classInstance);
 	};
 
 	template<class... TParams>
 	struct EnterFunctionCallbackResolver<TypeList<TParams...>>
 	{
-		typedef void (*Func_t)(void *stackFrameRoot, StackFrameBase *prevFrame, void *classInstance, TParams... args);
+		typedef void (*Func_t)(Context &context, void *stackFrameRoot, StackFrameBase *prevFrame, void *classInstance, TParams... args);
 	};
 
 	template<class TParamList>
@@ -142,7 +142,7 @@ namespace rkit { namespace coro
 		typedef typename SignatureAnalyzer<TSignature>::Parameters_t ParameterList;
 	};
 
-	template<class TCoroutine>
+	template<bool TConst, class TCoroutine>
 	struct CoroMetadataResolver
 	{
 		static const FrameMetadata<typename TCoroutine::ParameterList> ms_metadata;
@@ -152,17 +152,20 @@ namespace rkit { namespace coro
 	class MethodStarter
 	{
 	public:
+		typedef TSignature Signature_t;
+		typedef FrameMetadata<typename SignatureAnalyzer<TSignature>::Parameters_t> Metadata_t;
+
 		template<class TClass, class TCoroutine>
 		explicit MethodStarter(TClass &instance, const TCoroutine &coroutine)
-			: m_instance(&instance)
-			, m_metadata(CoroMetadataResolver<TCoroutine>::ms_metadata)
+			: m_instance(const_cast<typename std::remove_const<TClass>::type *>(&instance))
+			, m_metadata(&CoroMetadataResolver<std::is_const<TClass>::value, TCoroutine>::ms_metadata)
 		{
 			this->CheckType<TClass>(coroutine);
 		}
 
 		const FrameMetadata<typename SignatureAnalyzer<TSignature>::Parameters_t> &GetMetadata() const
 		{
-			return m_metadata;
+			return *m_metadata;
 		}
 
 		void *GetInstance() const
@@ -170,14 +173,25 @@ namespace rkit { namespace coro
 			return m_instance;
 		}
 
+		static MethodStarter<TSignature> CreateCustom(void *instance, const Metadata_t *metadata)
+		{
+			return MethodStarter<TSignature>(instance, metadata, 1);
+		}
+
 	private:
+		MethodStarter(void *instance, const Metadata_t *metadata, int placeholder)
+			: m_instance(instance)
+			, m_metadata(metadata)
+		{
+		}
+
 		template<class TClass>
 		inline void CheckType(const MethodCoroutine<TClass, TSignature> &coroutine) const
 		{
 		}
 
 		void *m_instance;
-		const FrameMetadata<typename SignatureAnalyzer<TSignature>::Parameters_t> &m_metadata;
+		const FrameMetadata<typename SignatureAnalyzer<TSignature>::Parameters_t> *m_metadata;
 	};
 
 	template<class TClass, class TSignature, class TCoroutine>
@@ -254,8 +268,8 @@ namespace rkit { namespace coro
 	};
 
 	inline StackFrameBase::StackFrameBase(StackFrameBase *prevFrame, Code_t ip, FrameDestructor_t destructFrame)
-		: m_prevFrame(prevFrame)
-		, m_ip(ip)
+		: m_ip(ip)
+		, m_prevFrame(prevFrame)
 		, m_destructFrame(destructFrame)
 	{
 	}
@@ -270,7 +284,7 @@ namespace rkit { namespace coro
 		if (!newFrame)
 			return ResultCode::kCoroStackOverflow;
 
-		starter.GetMetadata().m_enterFunction(newFrame, prevFrame, starter.GetInstance(), std::forward<TArgs>(args)...);
+		starter.GetMetadata().m_enterFunction(context, newFrame, prevFrame, starter.GetInstance(), std::forward<TArgs>(args)...);
 		context.m_frame = static_cast<StackFrameBase *>(newFrame);
 
 		return ResultCode::kOK;
@@ -286,7 +300,7 @@ namespace rkit { namespace coro
 		if (!newFrame)
 			return ResultCode::kCoroStackOverflow;
 
-		starter.GetMetadata().m_enterFunction(newFrame, prevFrame, starter.GetInstance());
+		starter.GetMetadata().m_enterFunction(context, newFrame, prevFrame, starter.GetInstance());
 		context.m_frame = static_cast<StackFrameBase *>(newFrame);
 
 		return ResultCode::kOK;
