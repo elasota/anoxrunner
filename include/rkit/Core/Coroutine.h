@@ -26,55 +26,25 @@ namespace rkit { namespace coro
 	struct Context;
 
 	typedef CodePtr(*Code_t) (Context *coroContext, StackFrameBase *coroStackFrame);
+	typedef void (*FrameDestructor_t)(StackFrameBase *stackFrame);
 
 	struct CodePtr
 	{
 		Code_t m_code;
 	};
 
-#if RKIT_IS_DEBUG
-	struct StackFrameInspectorBase
-	{
-		virtual ~StackFrameInspectorBase() {}
-	};
-
-	template<class T>
-	struct StackFrameInspector final : public StackFrameInspectorBase
-	{
-		inline explicit StackFrameInspector(T *framePtr)
-			: m_frame(framePtr)
-		{
-		}
-
-		T *m_frame;
-	};
-
-	struct InspectableStackFrameBase
-	{
-		union StackInspectorStorage
-		{
-			inline ~StackInspectorStorage() {}
-
-			StackFrameInspector<void> m_inspector;
-			uint8_t m_rawBytes[sizeof(StackFrameInspector<void>)];
-		};
-
-		inline ~InspectableStackFrameBase() {}
-
-		StackFrameInspectorBase *m_stackInspector;
-		StackInspectorStorage m_stackInspectorStorage;
-		Code_t m_ip;
-		InspectableStackFrameBase *m_prevFrame;
-		void (*m_destructFrame)(InspectableStackFrameBase *stackFrame);
-	};
-#else
 	struct StackFrameBase
 	{
+		explicit StackFrameBase(StackFrameBase *prevFrame, Code_t ip, FrameDestructor_t destructFrame);
+
+#if RKIT_IS_DEBUG
+		virtual ~StackFrameBase() {}
+#endif
+
 		Code_t m_ip;
 		StackFrameBase *m_prevFrame;
-		void (*m_destructFrame)(StackFrameBase *stackFrame);
+		FrameDestructor_t m_destructFrame;
 	};
-#endif
 
 	struct FrameMetadataBase;
 
@@ -282,6 +252,13 @@ namespace rkit { namespace coro
 	protected:
 		virtual Context &GetContext() = 0;
 	};
+
+	inline StackFrameBase::StackFrameBase(StackFrameBase *prevFrame, Code_t ip, FrameDestructor_t destructFrame)
+		: m_prevFrame(prevFrame)
+		, m_ip(ip)
+		, m_destructFrame(destructFrame)
+	{
+	}
 
 	template<class TCoroStarter, class... TArgs>
 	Result Thread::EnterFunction(const TCoroStarter &starter, TArgs... args)

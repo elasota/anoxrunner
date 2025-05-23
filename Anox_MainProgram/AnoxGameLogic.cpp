@@ -146,7 +146,7 @@ namespace anox
 			CORO_WHILE(params.commandStack.Pop(locals.line))
 				
 
-				CORO_CHECK(rkit::ResultCode::kNotYetImplemented);
+				//CORO_CHECK(rkit::ResultCode::kNotYetImplemented);
 			CORO_END_WHILE
 		CORO_END
 	};

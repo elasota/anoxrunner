@@ -8,12 +8,7 @@ namespace rkit
 		template<class TSignature>
 		class FunctionStarter;
 
-#if RKIT_IS_DEBUG
-		struct InspectableStackFrameBase;
-		typedef InspectableStackFrameBase StackFrameBase;
-#else
 		struct StackFrameBase;
-#endif
 	}
 }
 

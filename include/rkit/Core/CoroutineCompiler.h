@@ -10,15 +10,28 @@ namespace rkit { namespace coro { namespace compiler
 	};
 
 	template<class TClassInstance>
-	struct CoroOptionalPtrResolver
+	struct CoroClassInstanceBase
 	{
-		typedef TClassInstance *Type_t;
+		explicit CoroClassInstanceBase(void *classInstance)
+			: m_classInstance(static_cast<TClassInstance *>(classInstance))
+		{
+		}
+
+		typedef TClassInstance *ClassInstancePtr_t;
+
+		TClassInstance *m_classInstance;
 	};
 
 	template<>
-	struct CoroOptionalPtrResolver<void>
+	struct CoroClassInstanceBase<void>
 	{
-		typedef EmptyStruct Type_t[1];
+		explicit CoroClassInstanceBase(void *)
+		{
+		}
+
+		// This is a trick to make the m_classInstance in CORO_LOCALS not step into anything
+		typedef void (*ClassInstancePtr_t)();
+		static void m_classInstance();
 	};
 
 
@@ -34,44 +47,33 @@ namespace rkit { namespace coro { namespace compiler
 		typedef EmptyStruct Type_t;
 	};
 
-	template<class TClassInstance, class TLocals, class TParams>
-	struct StackFrameBuilder
+	template<class TClassInstance, class TClassInstanceBase, class TLocals, class TParams>
+	struct StackFrameBuilder final : public TClassInstanceBase, public StackFrameBase
 	{
-		StackFrameBase m_base;	// This must be first
-		typename CoroOptionalPtrResolver<TClassInstance>::Type_t m_classInstance;
-		typename CoroOptionalResolver<TLocals>::Type_t m_locals;
+		template<class... TParamsParams>
+		explicit StackFrameBuilder(void *classInstance, StackFrameBase *prevFrame, Code_t ip, FrameDestructor_t destructFrame, TParamsParams&&... params)
+			: TClassInstanceBase(classInstance)
+			, StackFrameBase(prevFrame, ip, destructFrame)
+			, m_params{ std::forward<TParamsParams>(params)... }
+		{
+		}
+
+		explicit StackFrameBuilder(void *classInstance, StackFrameBase *prevFrame, Code_t ip, FrameDestructor_t destructFrame)
+			: TClassInstanceBase(classInstance)
+			, StackFrameBase(prevFrame, ip, destructFrame)
+		{
+		}
+
 		typename CoroOptionalResolver<TParams>::Type_t m_params;
+		typename CoroOptionalResolver<TLocals>::Type_t m_locals;
+
+	private:
+		StackFrameBuilder() = delete;
 	};
 
 	template<class TCoroutine, class TParamList>
 	struct FunctionEntryBuilder
 	{
-	};
-
-	template<class TStackFrame, class TLocals>
-	struct FunctionEntryLocalsInitializer
-	{
-		inline static void InitLocals(TStackFrame *stackFrame)
-		{
-			new (&stackFrame->m_locals) TLocals();
-		}
-
-		inline static void DestructLocals(TStackFrame *stackFrame)
-		{
-			stackFrame->m_locals.~TLocals();
-		}
-	};
-
-	template<class TStackFrame>
-	struct FunctionEntryLocalsInitializer<TStackFrame, void>
-	{
-		inline static void InitLocals(TStackFrame *stackFrame)
-		{
-		}
-
-		inline static void DestructLocals(TStackFrame *stackFrame)
-		{
-		}
 	};
 
 	template<class TStackFrame, class TClassInstance>
@@ -91,18 +93,6 @@ namespace rkit { namespace coro { namespace compiler
 		}
 	};
 
-#if RKIT_IS_DEBUG
-	template<class TStackFrame>
-	struct FunctionInspectorBuilder
-	{
-		inline static void InitInspector(TStackFrame *stackFrame)
-		{
-			StackFrameInspector<TStackFrame> *inspector = new (stackFrame->m_base.m_stackInspectorStorage.m_rawBytes) StackFrameInspector<TStackFrame>(stackFrame);
-			stackFrame->m_base.m_stackInspector = inspector;
-		}
-	};
-#endif
-
 	template<class TCoroutine>
 	struct FunctionEntryBuilder<TCoroutine, void>
 	{
@@ -110,27 +100,16 @@ namespace rkit { namespace coro { namespace compiler
 		{
 			typedef typename TCoroutine::CoroStackFrame StackFrame_t;
 
-			StackFrame_t *frame = reinterpret_cast<StackFrame_t *>(stackFrameBase);
+			StackFrame_t *frame = static_cast<StackFrame_t *>(stackFrameBase);
 
-			FunctionEntryLocalsInitializer<StackFrame_t, typename TCoroutine::Locals>::DestructLocals(frame);
+			frame->~StackFrame_t();
 		}
 
 		inline static void EnterFunction(void *stackFrame, StackFrameBase *prevFrame, void *classInstance)
 		{
 			typedef typename TCoroutine::CoroStackFrame NewStackFrame_t;
 
-			NewStackFrame_t *newFrame = static_cast<NewStackFrame_t *>(stackFrame);
-			newFrame->m_base.m_prevFrame = prevFrame;
-			newFrame->m_base.m_ip = TCoroutine::CoroFirstInstruction::CoroFunction;
-
-			FunctionEntryLocalsInitializer<NewStackFrame_t, typename TCoroutine::Locals>::InitLocals(newFrame);
-
-			FunctionEntryClassInstanceInitializer<NewStackFrame_t, typename TCoroutine::ClassInstance>::InitClassInstance(newFrame, static_cast<typename TCoroutine::ClassInstance *>(classInstance));
-			newFrame->m_base.m_destructFrame = DestructFrame;
-
-#if RKIT_IS_DEBUG
-			FunctionInspectorBuilder<NewStackFrame_t>::InitInspector(newFrame);
-#endif
+			new (stackFrame) NewStackFrame_t(classInstance, prevFrame, TCoroutine::CoroFirstInstruction::CoroFunction, DestructFrame);
 		}
 	};
 
@@ -143,7 +122,7 @@ namespace rkit { namespace coro { namespace compiler
 
 			typedef typename TCoroutine::CoroStackFrame StackFrame_t;
 
-			StackFrame_t *frame = reinterpret_cast<StackFrame_t *>(stackFrameBase);
+			StackFrame_t *frame = static_cast<StackFrame_t *>(stackFrameBase);
 
 			typedef typename TCoroutine::Params ParamsStruct_t;
 			ParamsStruct_t *params = &frame->m_params;
@@ -155,31 +134,17 @@ namespace rkit { namespace coro { namespace compiler
 		{
 			typedef typename TCoroutine::CoroStackFrame NewStackFrame_t;
 
-			NewStackFrame_t *newFrame = static_cast<NewStackFrame_t *>(stackFrame);
-
-			typedef typename TCoroutine::Params ParamsStruct_t;
-			new (&newFrame->m_params) ParamsStruct_t{ std::forward<TParams>(args)... };
-
-			FunctionEntryBuilder<TCoroutine, void>::EnterFunction(stackFrame, prevFrame, classInstance);
-
-			newFrame->m_base.m_destructFrame = DestructFrame;
+			new (stackFrame) NewStackFrame_t(classInstance, prevFrame, TCoroutine::CoroFirstInstruction::CoroFunction, DestructFrame, std::forward<TParams>(args)...);
 		}
 	};
-
-	template<class T>
-	void FrameDestruct(T &item)
-	{
-		item.~T();
-	}
 
 	template<class TStackFrame>
 	CodePtr ExitFunction(Context *coroContext, TStackFrame *derivedFrame)
 	{
-		FrameDestruct(derivedFrame->m_params);
-		FrameDestruct(derivedFrame->m_locals);
-
-		StackFrameBase *frame = &derivedFrame->m_base;
+		StackFrameBase *frame = derivedFrame;
 		StackFrameBase *prevFrame = frame->m_prevFrame;
+
+		derivedFrame->~TStackFrame();
 
 		coroContext->m_freeStack(coroContext->m_userdata, frame, prevFrame);
 		coroContext->m_frame = prevFrame;
@@ -900,9 +865,9 @@ namespace rkit { namespace coro
 	static constexpr std::nullptr_t CoroFunction = nullptr;\
 
 #define CORO_LOCALS	\
-	Params &params = reinterpret_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame)->m_params;\
-	Locals &locals = reinterpret_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame)->m_locals;\
-	ClassInstance *self = reinterpret_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame)->m_classInstance;
+	Params &params = static_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame)->m_params;\
+	Locals &locals = static_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame)->m_locals;\
+	ClassInstance *self = static_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame)->m_classInstance;
 
 #define CORO_FUNCTION_DEF	\
 	static ::rkit::coro::CodePtr CoroFunction(::rkit::coro::Context *CORO_INTERNAL_coroContext, ::rkit::coro::StackFrameBase *CORO_INTERNAL_coroStackFrame)\
@@ -921,7 +886,7 @@ namespace rkit { namespace coro
 	struct cls::CoroFunction_ ## name final : public ::rkit::coro::MethodCoroutine<cls, cls::CoroSignature_ ## name>
 
 #define CORO_BEGIN \
-	typedef ::rkit::coro::compiler::StackFrameBuilder<ClassInstance, Locals, Params> CoroStackFrame;\
+	typedef ::rkit::coro::compiler::StackFrameBuilder<ClassInstance, ::rkit::coro::compiler::CoroClassInstanceBase<ClassInstance>, Locals, Params> CoroStackFrame;\
 	struct CoroTerminatorLookup; \
 	typedef struct CoroFirstInstruction\
 	{\
@@ -937,7 +902,7 @@ namespace rkit { namespace coro
 		CORO_FUNCTION_DEF
 
 #define CORO_END	\
-			return ::rkit::coro::compiler::ExitFunction(CORO_INTERNAL_coroContext, reinterpret_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame));\
+			return ::rkit::coro::compiler::ExitFunction(CORO_INTERNAL_coroContext, static_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame));\
 		}\
 	} CoroTerminator;\
 	struct CoroTerminatorLookup\
@@ -946,7 +911,7 @@ namespace rkit { namespace coro
 	};
 
 #define CORO_RETURN	\
-			return CoroExitFunction(CORO_INTERNAL_coroContext, reinterpret_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame));\
+			return CoroExitFunction(CORO_INTERNAL_coroContext, static_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame));\
 		}\
 	} CORO_CONCAT_LINE(CoroEndAt);\
 	typedef struct CORO_CONCAT_LINE(CoroReturn)\
