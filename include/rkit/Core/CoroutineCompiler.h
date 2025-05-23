@@ -47,8 +47,9 @@ namespace rkit { namespace coro { namespace compiler
 		typedef EmptyStruct Type_t;
 	};
 
+	// StackFrameBase must be first, since it is used as the base address for stack manipulation!
 	template<class TClassInstance, class TClassInstanceBase, class TLocals, class TParams>
-	struct StackFrameBuilder final : public TClassInstanceBase, public StackFrameBase
+	struct StackFrameBuilder final : public StackFrameBase, public TClassInstanceBase
 	{
 		template<class... TParamsParams>
 		explicit StackFrameBuilder(void *classInstance, StackFrameBase *prevFrame, Code_t ip, FrameDestructor_t destructFrame, TParamsParams&&... params)
