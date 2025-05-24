@@ -61,6 +61,8 @@ namespace anox
 		CORO_DECL_METHOD(RunCommands, AnoxCommandStackBase &commandStack);
 		CORO_DECL_METHOD(RunCommand, AnoxCommandStackBase &commandStack, const rkit::Span<char> &line);
 
+		CORO_DECL_METHOD(Cmd_Exec, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::StringView> &args);
+
 		IAnoxGame *m_game;
 		rkit::UniquePtr<rkit::coro::Thread> m_mainCoroThread;
 	};
@@ -72,6 +74,8 @@ namespace anox
 
 	rkit::Result AnoxGameLogic::Start()
 	{
+		RKIT_CHECK(m_game->GetCommandRegistry()->RegisterCommand("exec", this->AsyncCmd_Exec()));
+
 		RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->CreateCoroThread(m_mainCoroThread, 1 * 1024 * 1024));
 		RKIT_CHECK(m_mainCoroThread->EnterFunction(AsyncStartUp()));
 
@@ -212,9 +216,9 @@ namespace anox
 
 						return rkit::StringView(m_line.Ptr() + startIndex, endIndex - startIndex);
 					}
-
-					startIndex = endIndex + 1;
 				}
+
+				startIndex = endIndex + 1;
 			}
 		}
 
@@ -264,7 +268,7 @@ namespace anox
 		CORO_BEGIN
 			CORO_CHECK(AnoxCommandStackBase::Create(locals.commandStack, 64 * 1024, 1024));
 
-			CORO_CALL(self->AsyncLoadCIPathKeyedResource, locals.resLoadResult, anox::resloaders::kRawFileResourceTypeCode, rkit::CIPathView("configs/default.cfg"));
+			CORO_CALL(self->AsyncLoadCIPathKeyedResource, locals.resLoadResult, anox::resloaders::kRawFileResourceTypeCode, params.path);
 
 			CORO_CHECK(locals.commandStack->Parse(locals.resLoadResult.m_resourceHandle.StaticCast<AnoxFileResourceBase>()->GetContents()));
 			CORO_CALL(self->AsyncRunCommands, *locals.commandStack);
@@ -340,6 +344,31 @@ namespace anox
 			CORO_END_IF
 
 			rkit::log::ErrorFmt("Unknown console command %s", locals.parser.GetCommand().GetChars());
+		CORO_END
+	};
+
+	CORO_DEF_METHOD(AnoxGameLogic, Cmd_Exec)
+	{
+		struct Locals
+		{
+			rkit::CIPath path;
+		};
+
+		struct Params
+		{
+			AnoxCommandStackBase &cmdStack;
+			const rkit::ISpan<rkit::StringView> &args;
+		};
+
+		CORO_BEGIN
+			CORO_IF(params.args.Count() < 1)
+				rkit::log::Error("Usage: exec <file>");
+				CORO_RETURN;
+			CORO_END_IF
+
+			CORO_CHECK(locals.path.Set(params.args[0]));
+
+			CORO_CALL(self->AsyncExecCommandFile, locals.path);
 		CORO_END
 	};
 

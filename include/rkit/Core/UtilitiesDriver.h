@@ -116,5 +116,12 @@ namespace rkit
 		virtual Result CreateCoroThread(UniquePtr<coro::Thread> &thread, size_t stackSize) const = 0;
 
 		virtual Result CreateBlockingReader(UniquePtr<ISeekableReadStream> &outReadStream, UniquePtr<IAsyncReadFile> &&asyncFile, FilePos_t fileSize) const = 0;
+
+		virtual bool ParseDouble(const StringView &str, double &d) const = 0;
+
+		virtual bool ParseInt32(const StringView &str, uint8_t radix, int32_t &i) const = 0;
+		virtual bool ParseInt64(const StringView &str, uint8_t radix, int64_t &i) const = 0;
+		virtual bool ParseUInt32(const StringView &str, uint8_t radix, uint32_t &i) const = 0;
+		virtual bool ParseUInt64(const StringView &str, uint8_t radix, uint64_t &i) const = 0;
 	};
 }

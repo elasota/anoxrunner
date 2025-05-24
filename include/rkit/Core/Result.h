@@ -23,6 +23,7 @@ namespace rkit
 		uint32_t GetExtendedCode() const;
 
 		static Result SoftFault(ResultCode resultCode);
+		Result ConvertToHardFault() const;
 
 	private:
 		Result();
@@ -33,24 +34,17 @@ namespace rkit
 #if RKIT_IS_DEBUG
 		void FirstChanceResultFailure() const;
 #endif
-		struct ResultAndExtCode
-		{
-			ResultCode m_resultCode;
-			uint32_t m_extCode;
-		};
 
-		union Union
-		{
-			ResultAndExtCode m_re;
-			uint64_t m_u64;
-		};
-
-		Union m_u;
+		ResultCode m_resultCode;
+		uint32_t m_extCode;
+		bool m_softFault;
 	};
 }
 
 inline rkit::Result::Result()
-	: m_u { { ResultCode::kOK, 0 } }
+	: m_resultCode(ResultCode::kOK)
+	, m_extCode(0)
+	, m_softFault(false)
 {
 }
 
@@ -60,7 +54,9 @@ inline rkit::Result::Result(ResultCode resultCode)
 }
 
 inline rkit::Result::Result(ResultCode resultCode, uint32_t extCode)
-	: m_u{ { resultCode, extCode } }
+	: m_resultCode(resultCode)
+	, m_extCode(extCode)
+	, m_softFault(false)
 {
 #if RKIT_IS_DEBUG
 	if (!this->IsOK())
@@ -69,34 +65,43 @@ inline rkit::Result::Result(ResultCode resultCode, uint32_t extCode)
 }
 
 inline rkit::Result::Result(ResultCode resultCode, const SoftFaultTag &)
-	: m_u{ { resultCode, static_cast<uint32_t>(0) } }
+	: m_resultCode(resultCode)
+	, m_extCode(0)
+	, m_softFault(true)
 {
 }
 
 inline bool rkit::Result::IsOK() const
 {
-	return m_u.m_u64 == 0;
+	return m_resultCode == ResultCode::kOK && m_extCode == 0;
 }
 
 inline int rkit::Result::ToExitCode() const
 {
-	return -static_cast<int>(m_u.m_re.m_resultCode);
+	return -static_cast<int>(m_resultCode);
 }
 
 inline rkit::ResultCode rkit::Result::GetResultCode() const
 {
-	return m_u.m_re.m_resultCode;
+	return m_resultCode;
 }
-
 
 inline uint32_t rkit::Result::GetExtendedCode() const
 {
-	return m_u.m_re.m_extCode;
+	return m_extCode;
 }
 
 inline rkit::Result rkit::Result::SoftFault(rkit::ResultCode resultCode)
 {
 	return Result(resultCode, SoftFaultTag());
+}
+
+inline rkit::Result rkit::Result::ConvertToHardFault() const
+{
+	if (m_softFault)
+		return Result(m_resultCode, m_extCode);
+	else
+		return (*this);
 }
 
 
@@ -134,7 +139,7 @@ namespace rkit
 #define RKIT_CHECK(expr) do {\
 	::rkit::Result RKIT_PP_CONCAT(exprResult_, __LINE__) = (expr);\
 	if (!RKIT_PP_CONCAT(exprResult_, __LINE__).IsOK())\
-		return RKIT_PP_CONCAT(exprResult_, __LINE__);\
+		return RKIT_PP_CONCAT(exprResult_, __LINE__).ConvertToHardFault();\
 } while (false)
 
 #else

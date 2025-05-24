@@ -14,17 +14,20 @@ namespace rkit
 namespace anox
 {
 	class AnoxCommandRegistryBase;
+	struct IAnoxGame;
 
 	class AnoxKeybindManagerBase
 	{
 	public:
+		typedef uint32_t KeyCode_t;
+
 		virtual ~AnoxKeybindManagerBase() {}
 
-		virtual bool ResolveKeyCode(const rkit::StringSliceView &keyName, uint32_t &outKeyCode) const = 0;
-		virtual bool ResolveKeyName(uint32_t keyCode, char &outSingleChar, rkit::StringSliceView &outName) const = 0;
+		virtual bool ResolveKeyCode(const rkit::StringSliceView &keyName, KeyCode_t &outKeyCode) const = 0;
+		virtual bool ResolveKeyName(KeyCode_t keyCode, char &outSingleChar, rkit::StringSliceView &outName) const = 0;
 
 		virtual rkit::Result Register(AnoxCommandRegistryBase &commandRegistry) = 0;
 
-		static rkit::Result Create(rkit::UniquePtr<AnoxKeybindManagerBase> &outManager);
+		static rkit::Result Create(rkit::UniquePtr<AnoxKeybindManagerBase> &outManager, IAnoxGame &game);
 	};
 }

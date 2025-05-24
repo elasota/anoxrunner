@@ -73,6 +73,11 @@ namespace anox
 		const AnoxRegisteredAlias *FindAlias(const rkit::StringSliceView &name) const;
 		const AnoxRegisteredConsoleVar *FindConsoleVar(const rkit::StringSliceView &name) const;
 
+		virtual rkit::Result TrySetCVar(const AnoxRegisteredConsoleVar &cvar, const rkit::StringSliceView &str, bool &outSetOK) const = 0;
+
+		static bool RequiresEscape(const rkit::StringSliceView &token);
+		static rkit::Result EscapeToken(rkit::String &outString, const rkit::StringSliceView &token);
+
 		static rkit::Result Create(rkit::UniquePtr<AnoxCommandRegistryBase> &outRegistry);
 	};
 }

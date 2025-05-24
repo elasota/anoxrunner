@@ -21,6 +21,8 @@
 #include "TextParser.h"
 #include "ThreadPool.h"
 
+#include "ryu/ryu.h"
+
 namespace rkit
 {
 	namespace utils
@@ -98,6 +100,13 @@ namespace rkit
 
 		Result CreateBlockingReader(UniquePtr<ISeekableReadStream> &outReadStream, UniquePtr<IAsyncReadFile> &&asyncFile, FilePos_t fileSize) const override;
 
+		bool ParseDouble(const StringView &str, double &d) const override;
+
+		bool ParseInt32(const StringView &str, uint8_t radix, int32_t &i) const override;
+		bool ParseInt64(const StringView &str, uint8_t radix, int64_t &i) const override;
+		bool ParseUInt32(const StringView &str, uint8_t radix, uint32_t &i) const override;
+		bool ParseUInt64(const StringView &str, uint8_t radix, uint64_t &i) const override;
+
 	private:
 		static bool ValidateFilePathSlice(const Span<const char> &name, bool permitWildcards);
 
@@ -108,6 +117,17 @@ namespace rkit
 
 		template<class TWChar>
 		static Result TypedConvertUTF8ToUTF16(size_t &outSize, const Span<TWChar> &dest, const Span<const uint8_t> &src);
+
+		static bool TryParseDigit(char c, uint8_t &outDigit);
+
+		template<class TInteger>
+		static bool ParsePositiveInt(const StringView &str, size_t startDigit, uint8_t radix, TInteger &i);
+
+		template<class TInteger>
+		static bool ParseNegativeInt(const StringView &str, size_t startDigit, uint8_t radix, TInteger &i);
+
+		template<class TInteger>
+		static bool ParseSignedInt(const StringView &str, uint8_t radix, TInteger &i);
 
 		utils::Sha256Calculator m_sha256Calculator;
 
@@ -2169,6 +2189,122 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
+	bool UtilitiesDriver::TryParseDigit(char c, uint8_t &outDigit)
+	{
+		if (c >= '0' && c <= '9')
+		{
+			outDigit = c - '0';
+			return true;
+		}
+
+		if (c >= 'a' && c <= 'f')
+		{
+			outDigit = c - 'a' + 0xa;
+			return true;
+		}
+
+		if (c >= 'A' && c <= 'F')
+		{
+			outDigit = c - 'A' + 0xA;
+			return true;
+		}
+
+		return false;
+	}
+
+	template<class TInteger>
+	bool UtilitiesDriver::ParsePositiveInt(const StringView &str, size_t startDigit, uint8_t radixLow, TInteger &i)
+	{
+		TInteger radix = radixLow;
+		if (radix < 2 || radix > 16 || startDigit == str.Length())
+			return false;
+
+		TInteger result = 0;
+
+		const TInteger posMaxLastMajor = std::numeric_limits<TInteger>::max() / radix;
+		const TInteger posMaxDangerZone = std::numeric_limits<TInteger>::max() - radix + 1;
+
+		for (size_t i = startDigit; i < str.Length(); i++)
+		{
+			uint8_t digit = 0;
+			if (!TryParseDigit(str[i], digit))
+				return false;
+
+			if (digit >= radixLow)
+				return false;
+
+			if (result > posMaxLastMajor)
+				return false;	// Overflow
+
+			result *= static_cast<TInteger>(radix);
+			if (result > posMaxDangerZone)
+			{
+				TInteger maxDigit = std::numeric_limits<TInteger>::max() - result;
+				if (digit > maxDigit)
+					return false;
+			}
+
+			result += digit;
+		}
+
+		i = result;
+		return true;
+	}
+
+	template<class TInteger>
+	bool UtilitiesDriver::ParseNegativeInt(const StringView &str, size_t startDigit, uint8_t radixLow, TInteger &i)
+	{
+		int16_t radix = radixLow;
+		if (radix < 2 || radix > 16 || startDigit == str.Length())
+			return false;
+
+		TInteger result = 0;
+
+		const TInteger posMinLastMajor = std::numeric_limits<TInteger>::min() / radix;
+		const TInteger posMinDangerZone = std::numeric_limits<TInteger>::min() + radix - 1;
+
+		for (size_t i = startDigit; i < str.Length(); i++)
+		{
+			uint8_t digit = 0;
+			if (!TryParseDigit(str[i], digit))
+				return false;
+
+			if (digit >= radixLow)
+				return false;
+
+			if (result < posMinLastMajor)
+				return false;	// Overflow
+
+			result *= radix;
+			if (result < posMinDangerZone)
+			{
+				TInteger maxDigit = result - std::numeric_limits<TInteger>::min();
+				if (digit > maxDigit)
+					return false;
+			}
+
+			result -= digit;
+		}
+
+		i = result;
+		return true;
+	}
+
+	template<class TInteger>
+	bool UtilitiesDriver::ParseSignedInt(const StringView &str, uint8_t radix, TInteger &i)
+	{
+		if (str.Length() == 0)
+			return false;
+
+		if (str[0] == '-')
+			return ParseNegativeInt(str, 1, radix, i);
+
+		if (str[0] == '+')
+			return ParsePositiveInt(str, 1, radix, i);
+
+		return ParsePositiveInt(str, 0, radix, i);
+	}
+
 	Result UtilitiesDriver::CreateCoroThread(UniquePtr<coro::Thread> &thread, size_t stackSize) const
 	{
 		UniquePtr<utils::CoroThreadBase> threadBase;
@@ -2182,6 +2318,38 @@ namespace rkit
 	Result UtilitiesDriver::CreateBlockingReader(UniquePtr<ISeekableReadStream> &outReadStream, UniquePtr<IAsyncReadFile> &&asyncFile, FilePos_t fileSize) const
 	{
 		return ResultCode::kNotYetImplemented;
+	}
+
+	bool UtilitiesDriver::ParseDouble(const StringView &str, double &d) const
+	{
+		char *endPtr = nullptr;
+		double result = strtod(str.GetChars(), &endPtr);
+
+		if (endPtr != str.GetChars() + str.Length())
+			return false;
+
+		d = result;
+		return true;
+	}
+
+	bool UtilitiesDriver::ParseInt32(const StringView &str, uint8_t radix, int32_t &i) const
+	{
+		return ParseSignedInt<int32_t>(str, radix, i);
+	}
+
+	bool UtilitiesDriver::ParseInt64(const StringView &str, uint8_t radix, int64_t &i) const
+	{
+		return ParseSignedInt<int64_t>(str, radix, i);
+	}
+
+	bool UtilitiesDriver::ParseUInt32(const StringView &str, uint8_t radix, uint32_t &i) const
+	{
+		return ParsePositiveInt<uint32_t>(str, 0, radix, i);
+	}
+
+	bool UtilitiesDriver::ParseUInt64(const StringView &str, uint8_t radix, uint64_t &i) const
+	{
+		return ParsePositiveInt<uint64_t>(str, 0, radix, i);
 	}
 }
 

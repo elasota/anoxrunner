@@ -112,7 +112,7 @@ namespace anox
 		RKIT_CHECK(AnoxResourceManagerBase::Create(m_resourceManager, m_fileSystem.Get(), m_threadPool->GetJobQueue()));
 		RKIT_CHECK(AnoxCommandRegistryBase::Create(m_commandRegistry));
 
-		RKIT_CHECK(AnoxKeybindManagerBase::Create(m_keybindManager));
+		RKIT_CHECK(AnoxKeybindManagerBase::Create(m_keybindManager, *this));
 		RKIT_CHECK(m_keybindManager->Register(*m_commandRegistry));
 
 		RKIT_CHECK(ICaptureHarness::CreateRealTime(m_captureHarness, *this, *m_resourceManager));

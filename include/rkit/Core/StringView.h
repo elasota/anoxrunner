@@ -50,6 +50,12 @@ namespace rkit
 		bool EndsWith(const BaseStringSliceView<TChar> &other) const;
 		bool EndsWithNoCase(const BaseStringSliceView<TChar> &other) const;
 
+		template<class TComparer>
+		bool Equals(const BaseStringSliceView<TChar> &other, const TComparer &comparer) const;
+		bool Equals(const BaseStringSliceView<TChar> &other) const;
+		bool EqualsNoCase(const BaseStringSliceView<TChar> &other) const;
+
+
 		bool operator==(const BaseStringSliceView<TChar> &other) const;
 		bool operator!=(const BaseStringSliceView<TChar> &other) const;
 
@@ -219,6 +225,38 @@ bool rkit::BaseStringSliceView<TChar>::EndsWith(const BaseStringSliceView<TChar>
 
 template<class TChar>
 bool rkit::BaseStringSliceView<TChar>::EndsWithNoCase(const BaseStringSliceView<TChar> &other) const
+{
+	return EndsWith(other, CharCaseInsensitiveComparer<TChar, InvariantCharCaseAdjuster<TChar>>());
+}
+
+template<class TChar>
+template<class TComparer>
+bool rkit::BaseStringSliceView<TChar>::Equals(const BaseStringSliceView<TChar> &other, const TComparer &comparer) const
+{
+	const size_t cmpLength = other.m_span.Count();
+	if (m_span.Count() != cmpLength)
+		return false;
+
+	const TChar *thisChars = m_span.Ptr();
+	const TChar *otherChars = other.m_span.Ptr();
+
+	for (size_t i = 0; i < cmpLength; i++)
+	{
+		if (TComparer::Compare(thisChars[i], otherChars[i]) != 0)
+			return false;
+	}
+
+	return true;
+}
+
+template<class TChar>
+bool rkit::BaseStringSliceView<TChar>::Equals(const BaseStringSliceView<TChar> &other) const
+{
+	return Equals(other, CharStrictComparer<TChar>());
+}
+
+template<class TChar>
+bool rkit::BaseStringSliceView<TChar>::EqualsNoCase(const BaseStringSliceView<TChar> &other) const
 {
 	return EndsWith(other, CharCaseInsensitiveComparer<TChar, InvariantCharCaseAdjuster<TChar>>());
 }

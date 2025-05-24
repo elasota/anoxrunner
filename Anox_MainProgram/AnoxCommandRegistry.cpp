@@ -17,6 +17,8 @@ namespace anox
 		const AnoxRegisteredAlias *FindAlias(const rkit::StringSliceView &name, rkit::HashValue_t hash) const override;
 		const AnoxRegisteredConsoleVar *FindConsoleVar(const rkit::StringSliceView &name, rkit::HashValue_t hash) const override;
 
+		rkit::Result TrySetCVar(const AnoxRegisteredConsoleVar &cvar, const rkit::StringSliceView &str, bool &outSetOK) const override;
+
 	private:
 		rkit::HashMap<rkit::String, AnoxRegisteredCommand> m_commands;
 		rkit::HashMap<rkit::String, AnoxRegisteredAlias> m_aliases;
@@ -98,6 +100,43 @@ namespace anox
 			return &it.Value();
 	}
 
+	rkit::Result AnoxCommandRegistry::TrySetCVar(const AnoxRegisteredConsoleVar &cvar, const rkit::StringSliceView &str, bool &outSetOK) const
+	{
+		rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
+
+		switch (cvar.m_varType)
+		{
+		default:
+			return rkit::ResultCode::kInternalError;
+		}
+	}
+
+	bool AnoxCommandRegistryBase::RequiresEscape(const rkit::StringSliceView &token)
+	{
+		for (char c : token)
+		{
+			if (rkit::IsASCIIWhitespace(c))
+				return true;
+		}
+
+		return false;
+	}
+
+	rkit::Result AnoxCommandRegistryBase::EscapeToken(rkit::String &outString, const rkit::StringSliceView &token)
+	{
+		rkit::StringConstructionBuffer cbuf;
+		RKIT_CHECK(cbuf.Allocate(token.Length() + 2));
+
+		rkit::Span<char> chars = cbuf.GetSpan();
+		chars[0] = '\"';
+		chars[chars.Count() - 1] = '\"';
+
+		rkit::CopySpanNonOverlapping(chars.SubSpan(1, chars.Count() - 2), token.ToSpan());
+
+		outString = rkit::String(std::move(cbuf));
+
+		return rkit::ResultCode::kOK;
+	}
 
 	rkit::Result AnoxCommandRegistryBase::Create(rkit::UniquePtr<AnoxCommandRegistryBase> &outRegistry)
 	{

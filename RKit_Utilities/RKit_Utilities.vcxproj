@@ -42,6 +42,7 @@
     <Import Project="..\Debug.props" />
     <Import Project="..\rapidjson_export.props" />
     <Import Project="..\zlib_export.props" />
+    <Import Project="..\ryu_export.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -49,6 +50,7 @@
     <Import Project="..\Common.props" />
     <Import Project="..\rapidjson_export.props" />
     <Import Project="..\zlib_export.props" />
+    <Import Project="..\ryu_export.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -142,6 +144,9 @@
     <ClInclude Include="ThreadPool.h" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ryu\ryu.vcxproj">
+      <Project>{25d16cb3-56ad-4b67-81e8-4644295cb263}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\zlib\zlib.vcxproj">
       <Project>{1819d6ae-1d9c-45af-881c-7350b6638b29}</Project>
     </ProjectReference>
