@@ -17,3 +17,7 @@
 	path = thirdparty/zlib
 	url = https://github.com/madler/zlib
 	branch = develop
+[submodule "thirdparty/ryu"]
+	path = thirdparty/ryu
+	url = https://github.com/ulfjack/ryu
+	branch = master
