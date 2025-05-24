@@ -67,9 +67,7 @@ namespace rkit
 		if (size == 0)
 			return nullptr;
 
-		_ASSERTE(_CrtCheckMemory());
 		void *ptr = malloc(size);
-		_ASSERTE(_CrtCheckMemory());
 
 		return ptr;
 	}
