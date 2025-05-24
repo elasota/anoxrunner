@@ -187,8 +187,7 @@ namespace anox
 			sizeRequired += 1 + slice.Length();
 		}
 
-		size_t insertPos = 0;
-		RKIT_CHECK(m_contentsBuffer.Resize(m_contentsSize + sizeRequired));
+		size_t insertPos = m_contentsSize;
 		m_contentsSize += sizeRequired;
 
 		rkit::Span<char> contentsSpan = m_contentsBuffer.ToSpan();
