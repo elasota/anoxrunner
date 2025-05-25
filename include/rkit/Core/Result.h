@@ -142,6 +142,12 @@ namespace rkit
 		return RKIT_PP_CONCAT(exprResult_, __LINE__).ConvertToHardFault();\
 } while (false)
 
+#define RKIT_CHECK_SOFT(expr) do {\
+	::rkit::Result RKIT_PP_CONCAT(exprResult_, __LINE__) = (expr);\
+	if (!RKIT_PP_CONCAT(exprResult_, __LINE__).IsOK())\
+		return RKIT_PP_CONCAT(exprResult_, __LINE__);\
+} while (false)
+
 #else
 
 namespace rkit

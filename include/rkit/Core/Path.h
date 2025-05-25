@@ -41,16 +41,27 @@ namespace rkit
 	template<uint32_t TTraitFlags>
 	struct DefaultPathTraits
 	{
+		// Type of a character
 		typedef char Char_t;
+
+		// Canonical delimiter
 		static const Char_t kDefaultDelimiter = '/';
+
+		// Encoding
 		static const PathEncoding kEncoding = PathEncoding::kUTF8;
 
+		// Returns true if the specified character is a delimiter
 		static bool IsDelimiter(Char_t ch);
-		static PathValidationResult ValidateComponent(const BaseStringSliceView<Char_t> &span, bool isAbsolute, bool isFirst);
-		static void MakeComponentValid(const Span<Char_t> &span, bool isAbsolute, bool isFirst);
 
+		// Checks if a component is valid and canonical
+		static PathValidationResult ValidateComponent(const BaseStringSliceView<Char_t> &span, bool isAbsolute, bool isFirst);
+
+		// Converts a span from its original encoding to a new encoding
 		template<class TOriginalChar, PathEncoding TSrcEncoding>
 		static size_t ConvertSpan(const Span<Char_t> &destSpan, const ConstSpan<TOriginalChar> &srcSpan);
+
+		// Converts a component to a canonical component
+		static void MakeComponentValid(const Span<Char_t> &component, bool isAbsolute, bool isFirst);
 	};
 
 #if RKIT_PLATFORM == RKIT_PLATFORM_WIN32
@@ -74,7 +85,7 @@ namespace rkit
 
 		static bool IsDelimiter(Char_t ch);
 		static PathValidationResult ValidateComponent(const BaseStringSliceView<Char_t> &span, bool isAbsolute, bool isFirst);
-		static void MakeComponentValid(const Span<Char_t> &span, bool isAbsolute, bool isFirst);
+		static void MakeComponentValid(const Span<Char_t> &component, bool isAbsolute, bool isFirst);
 	};
 
 	#define RKIT_OS_PATH_LITERAL(value) L ## value
@@ -228,6 +239,8 @@ namespace rkit
 		static PathValidationResult Validate(const BaseStringSliceView<Char_t> &str);
 
 	private:
+		Result SetConvert(const BaseStringSliceView<Char_t> &str);
+
 		BaseString<Char_t> m_path;
 	};
 }
@@ -298,23 +311,23 @@ namespace rkit
 	}
 
 	template<uint32_t TTraitFlags>
-	inline void DefaultPathTraits<TTraitFlags>::MakeComponentValid(const Span<Char_t> &span, bool isAbsolute, bool isFirst)
+	template<class TOriginalChar, PathEncoding TSrcEncoding>
+	size_t DefaultPathTraits<TTraitFlags>::ConvertSpan(const Span<Char_t> &destSpan, const ConstSpan<TOriginalChar> &srcSpan)
+	{
+		return PathEncodingConverter<Char_t, kEncoding, TOriginalChar, TSrcEncoding>::ConvertSpan(destSpan, srcSpan);
+	}
+
+	template<uint32_t TTraitFlags>
+	inline void DefaultPathTraits<TTraitFlags>::MakeComponentValid(const Span<Char_t> &component, bool isAbsolute, bool isFirst)
 	{
 		if (TTraitFlags & PathTraitFlags::kIsCaseInsensitive)
 		{
-			for (Char_t &ch : span)
+			for (Char_t &ch : component)
 			{
 				if (ch >= 'A' && ch <= 'Z')
 					ch = (ch - 'A') + 'a';
 			}
 		}
-	}
-
-	template<uint32_t TTraitFlags>
-	template<class TOriginalChar, PathEncoding TSrcEncoding>
-	size_t DefaultPathTraits<TTraitFlags>::ConvertSpan(const Span<Char_t> &destSpan, const ConstSpan<TOriginalChar> &srcSpan)
-	{
-		return PathEncodingConverter<Char_t, kEncoding, TOriginalChar, TSrcEncoding>::ConvertSpan(destSpan, srcSpan);
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -732,10 +745,12 @@ namespace rkit
 		chars[m_path.Length()] = kDefaultDelimiter;
 
 		Span<Char_t> newComponentSpan = chars.SubSpan(m_path.Length() + 1, chars.Count() - m_path.Length() - 1);
-		CopySpanNonOverlapping(newComponentSpan, str.ToSpan());
 
+		CopySpanNonOverlapping(newComponentSpan, str.ToSpan());
 		if (validationResult == PathValidationResult::kConvertible)
+		{
 			TPathTraits::MakeComponentValid(newComponentSpan, TIsAbsolute, false);
+		}
 
 		m_path.Clear();
 		m_path = BaseString<Char_t>(std::move(scBuf));
@@ -814,7 +829,7 @@ namespace rkit
 		case PathValidationResult::kValid:
 			return m_path.Set(str);
 		case PathValidationResult::kConvertible:
-			RKIT_ASSERT(false);	// fixme
+			return SetConvert(str);
 		default:
 			return ResultCode::kInvalidParameter;
 		}
@@ -1012,6 +1027,68 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
+	Result BasePath<TIsAbsolute, TPathTraits>::SetConvert(const BaseStringSliceView<Char_t> &str)
+	{
+		if (str.Length() == 0)
+		{
+			m_path.Clear();
+			return ResultCode::kOK;
+		}
+
+		size_t numComponents = 0;
+		size_t numComponentCharacters = 0;
+
+		size_t startPos = 0;
+
+		for (size_t scanPos = 0; scanPos <= str.Length(); scanPos++)
+		{
+			if (scanPos == str.Length() || TPathTraits::IsDelimiter(str[scanPos]))
+			{
+				numComponents++;
+				numComponentCharacters += scanPos - startPos;
+
+				startPos = scanPos + 1;
+			}
+		}
+
+		BaseStringConstructionBuffer<Char_t> stringBuffer;
+		RKIT_CHECK(stringBuffer.Allocate(numComponents - 1 + numComponentCharacters));
+
+		Span<Char_t> stringSpan = stringBuffer.GetSpan();
+
+		startPos = 0;
+
+		size_t outPos = 0;
+		for (size_t scanPos = 0; scanPos <= str.Length(); scanPos++)
+		{
+			const bool isEnd = (scanPos == str.Length());
+			const bool isDelimiter = !isEnd && TPathTraits::IsDelimiter(str[scanPos]);
+
+			if (isEnd || isDelimiter)
+			{
+				const BaseStringSliceView<Char_t> slice = str.SubString(startPos, scanPos - startPos);
+				Span<Char_t> outSpan = stringSpan.SubSpan(outPos, slice.Length());
+
+				CopySpanNonOverlapping(outSpan, slice.ToSpan());
+				TPathTraits::MakeComponentValid(outSpan, TIsAbsolute, scanPos == 0);
+
+				outPos += slice.Length();
+
+				startPos = scanPos + 1;
+			}
+
+			if (isDelimiter)
+				stringSpan[outPos++] = kDefaultDelimiter;
+		}
+
+		RKIT_ASSERT(outPos == stringSpan.Count());
+
+		m_path = BaseString<Char_t>(std::move(stringBuffer));
+
+		return ResultCode::kOK;
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
 	inline HashValue_t Hasher<BasePath<TIsAbsolute, TPathTraits>>::ComputeHash(HashValue_t baseHash, const BasePath<TIsAbsolute, TPathTraits> &value)
 	{
 		return Hasher<BaseString<typename TPathTraits::Char_t>>::ComputeHash(baseHash, value.ToString());
@@ -1065,10 +1142,9 @@ namespace rkit
 		return PathValidationResult::kInvalid;
 	}
 
-	inline void OSPathTraits::MakeComponentValid(const Span<Char_t> &span, bool isAbsolute, bool isFirst)
+	inline void OSPathTraits::MakeComponentValid(const Span<Char_t> &outComponent, bool isAbsolute, bool isFirst)
 	{
 	}
 };
 
-
-#endif
+#endif	// RKIT_PLATFORM == RKIT_PLATFORM_WIN32

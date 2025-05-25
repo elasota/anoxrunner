@@ -352,6 +352,7 @@ namespace anox
 		struct Locals
 		{
 			rkit::CIPath path;
+			rkit::CIPath relPath;
 		};
 
 		struct Params
@@ -361,13 +362,32 @@ namespace anox
 		};
 
 		CORO_BEGIN
-			CORO_IF(params.args.Count() < 1)
+			if (params.args.Count() < 1)
+			{
 				rkit::log::Error("Usage: exec <file>");
 				CORO_RETURN;
-			CORO_END_IF
+			}
 
 			CORO_CHECK(locals.path.Set(rkit::CIPathView("configs")));
-			CORO_CHECK(locals.path.Append(rkit::CIPathView(params.args[0])));
+
+			rkit::StringView configPathStr = params.args[0];
+			rkit::PathValidationResult validationResult = rkit::CIPath::Validate(configPathStr);
+			rkit::CIPathView configRelPath;
+
+			if (validationResult == rkit::PathValidationResult::kValid)
+				configRelPath = rkit::CIPathView(configPathStr);
+			else if (validationResult == rkit::PathValidationResult::kConvertible)
+			{
+				CORO_CHECK(locals.relPath.Set(configPathStr));
+				configRelPath = locals.relPath;
+			}
+			else
+			{
+				rkit::log::Error("Malformed exec file path");
+				CORO_RETURN;
+			}
+
+			CORO_CHECK(locals.path.Append(configRelPath));
 
 			CORO_CALL(self->AsyncExecCommandFile, params.cmdStack, locals.path);
 		CORO_END

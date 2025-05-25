@@ -915,25 +915,17 @@ namespace rkit { namespace coro
 		typedef void CoroClosesLoop_t; \
 		CORO_FUNCTION_DEF
 
+#define CORO_RETURN	\
+			return ::rkit::coro::compiler::ExitFunction(CORO_INTERNAL_coroContext, static_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame))\
+
 #define CORO_END	\
-			return ::rkit::coro::compiler::ExitFunction(CORO_INTERNAL_coroContext, static_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame));\
+			CORO_RETURN;\
 		}\
 	} CoroTerminator;\
 	struct CoroTerminatorLookup\
 	{\
 		typedef CoroTerminator Resolution_t;\
 	};
-
-#define CORO_RETURN	\
-			return ::rkit::coro::compiler::ExitFunction(CORO_INTERNAL_coroContext, static_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame));\
-		}\
-	} CORO_CONCAT_LINE(CoroEndAt);\
-	typedef struct CORO_CONCAT_LINE(CoroReturn)\
-	{\
-		CORO_INSTR_CONSTANTS(CoroEndAt, CORO_CONCAT_LINE(CoroReturn), kReturn)\
-		CORO_CONTINUE_BODY_SCOPE\
-		CORO_FUNCTION_DEF\
-			((void)0)
 
 #define CORO_CHECK(expr)	\
 			do {\
