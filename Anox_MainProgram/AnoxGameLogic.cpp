@@ -57,7 +57,7 @@ namespace anox
 		CORO_DECL_METHOD(LoadContentIDKeyedResource, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::data::ContentID &cid);
 		CORO_DECL_METHOD(LoadCIPathKeyedResource, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::CIPathView &path);
 		CORO_DECL_METHOD(LoadStringKeyedResource, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::StringView &str);
-		CORO_DECL_METHOD(ExecCommandFile, AnoxCommandStackBase &, const rkit::CIPathView &path);
+		CORO_DECL_METHOD(ExecCommandFile, AnoxCommandStackBase &commandStack, const rkit::CIPathView &path);
 		CORO_DECL_METHOD(RunCommands, AnoxCommandStackBase &commandStack);
 		CORO_DECL_METHOD(RunCommand, AnoxCommandStackBase &commandStack, const rkit::Span<char> &line);
 
@@ -231,7 +231,37 @@ namespace anox
 
 	rkit::Result AnoxGameLogic::InsertAlias(AnoxCommandStackBase &commandStack, const AnoxRegisteredAlias &alias)
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		size_t endPos = alias.m_text.Length();
+
+		size_t scanPos = endPos;
+
+		while (scanPos > 0)
+		{
+			scanPos--;
+
+			size_t startPos = scanPos;
+
+			bool isSplit = false;
+			if (scanPos == 0)
+			{
+				isSplit = true;
+			}
+			else if (alias.m_text[scanPos] == ';')
+			{
+				isSplit = true;
+				startPos++;
+			}
+
+			if (isSplit)
+			{
+				rkit::StringSliceView slice = alias.m_text.SubString(startPos, endPos - startPos);
+
+				RKIT_CHECK(commandStack.Push(slice));
+				endPos = startPos;
+			}
+		}
+
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result AnoxGameLogic::ApplyConsoleVar(const AnoxRegisteredConsoleVar &consoleVar, const rkit::ISpan<rkit::StringView> &args)
@@ -251,6 +281,8 @@ namespace anox
 
 		CORO_BEGIN
 			CORO_CALL(self->AsyncExecCommandFile, *self->m_commandStack, rkit::CIPathView("configs/default.cfg"));
+			CORO_CHECK(self->m_commandStack->Push("d1"));
+			CORO_CALL(self->AsyncRunCommands, *self->m_commandStack);
 		CORO_END
 	};
 
