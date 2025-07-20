@@ -21,18 +21,12 @@ namespace rkit
 		kValid,
 	};
 
-	enum class PathEncoding
-	{
-		kUTF8,
-		kUTF16,
-	};
-
-	template<class TDestChar, PathEncoding TDestEncoding, class TSrcChar, PathEncoding TSrcEncoding>
+	template<class TDestChar, CharacterEncoding TDestEncoding, class TSrcChar, CharacterEncoding TSrcEncoding>
 	struct PathEncodingConverter
 	{
 	};
 
-	template<class TChar, PathEncoding TEncoding>
+	template<class TChar, CharacterEncoding TEncoding>
 	struct PathEncodingConverter<TChar, TEncoding, TChar, TEncoding>
 	{
 		static size_t ConvertSpan(const Span<TChar> &destSpan, const ConstSpan<TChar> &srcSpan);
@@ -48,16 +42,16 @@ namespace rkit
 		static const Char_t kDefaultDelimiter = '/';
 
 		// Encoding
-		static const PathEncoding kEncoding = PathEncoding::kUTF8;
+		static const CharacterEncoding kEncoding = CharacterEncoding::kUTF8;
 
 		// Returns true if the specified character is a delimiter
 		static bool IsDelimiter(Char_t ch);
 
 		// Checks if a component is valid and canonical
-		static PathValidationResult ValidateComponent(const BaseStringSliceView<Char_t> &span, bool isAbsolute, bool isFirst);
+		static PathValidationResult ValidateComponent(const BaseStringSliceView<Char_t, kEncoding> &span, bool isAbsolute, bool isFirst);
 
 		// Converts a span from its original encoding to a new encoding
-		template<class TOriginalChar, PathEncoding TSrcEncoding>
+		template<class TOriginalChar, CharacterEncoding TSrcEncoding>
 		static size_t ConvertSpan(const Span<Char_t> &destSpan, const ConstSpan<TOriginalChar> &srcSpan);
 
 		// Converts a component to a canonical component
@@ -66,13 +60,13 @@ namespace rkit
 
 #if RKIT_PLATFORM == RKIT_PLATFORM_WIN32
 	template<>
-	struct PathEncodingConverter<char, PathEncoding::kUTF8, wchar_t, PathEncoding::kUTF16>
+	struct PathEncodingConverter<char, CharacterEncoding::kUTF8, wchar_t, CharacterEncoding::kUTF16>
 	{
 		static size_t ConvertSpan(const Span<char> &destSpan, const ConstSpan<wchar_t> &srcSpan);
 	};
 
 	template<>
-	struct PathEncodingConverter<wchar_t, PathEncoding::kUTF16, char, PathEncoding::kUTF8>
+	struct PathEncodingConverter<wchar_t, CharacterEncoding::kUTF16, char, CharacterEncoding::kUTF8>
 	{
 		static size_t ConvertSpan(const Span<wchar_t> &destSpan, const ConstSpan<char> &srcSpan);
 	};
@@ -81,10 +75,10 @@ namespace rkit
 	{
 		typedef wchar_t Char_t;
 		static const Char_t kDefaultDelimiter = '\\';
-		static const PathEncoding kEncoding = PathEncoding::kUTF16;
+		static const CharacterEncoding kEncoding = CharacterEncoding::kUTF16;
 
 		static bool IsDelimiter(Char_t ch);
-		static PathValidationResult ValidateComponent(const BaseStringSliceView<Char_t> &span, bool isAbsolute, bool isFirst);
+		static PathValidationResult ValidateComponent(const BaseStringSliceView<Char_t, kEncoding> &span, bool isAbsolute, bool isFirst);
 		static void MakeComponentValid(const Span<Char_t> &component, bool isAbsolute, bool isFirst);
 	};
 
@@ -99,7 +93,7 @@ namespace rkit
 	public:
 		typedef typename TPathTraits::Char_t Char_t;
 		static const Char_t kDefaultDelimiter = TPathTraits::kDefaultDelimiter;
-		typedef BaseStringSliceView<Char_t> Component_t;
+		typedef BaseStringSliceView<Char_t, TPathTraits::kEncoding> Component_t;
 
 		BasePathIterator() = delete;
 
@@ -111,14 +105,18 @@ namespace rkit
 		BasePathIterator<TIsAbsolute, TPathTraits> &operator--();
 		BasePathIterator<TIsAbsolute, TPathTraits> operator--(int);
 
-		BaseStringSliceView<typename TPathTraits::Char_t> operator*() const;
+		BaseStringSliceView<typename TPathTraits::Char_t, TPathTraits::kEncoding> operator*() const;
 
 		bool operator==(const BasePathIterator<TIsAbsolute, TPathTraits> &other) const;
 		bool operator!=(const BasePathIterator<TIsAbsolute, TPathTraits> &other) const;
 
 	private:
+		void UpdateEndPos();
+
 		const BasePath<TIsAbsolute, TPathTraits> &m_path;
+
 		size_t m_strPos;
+		size_t m_endPos;
 	};
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -126,12 +124,13 @@ namespace rkit
 	{
 	public:
 		typedef typename TPathTraits::Char_t Char_t;
+		static const CharacterEncoding kEncoding = TPathTraits::kEncoding;
 		static const Char_t kDefaultDelimiter = TPathTraits::kDefaultDelimiter;
-		typedef BaseStringSliceView<Char_t> Component_t;
-		typedef BaseStringSliceView<Char_t> LastComponent_t;
+		typedef BaseStringSliceView<Char_t, TPathTraits::kEncoding> Component_t;
+		typedef BaseStringSliceView<Char_t, TPathTraits::kEncoding> LastComponent_t;
 
 		BasePathSliceView();
-		explicit BasePathSliceView(const BaseStringSliceView<Char_t> &slice);
+		explicit BasePathSliceView(const BaseStringSliceView<Char_t, TPathTraits::kEncoding> &slice);
 
 		template<size_t TLength>
 		BasePathSliceView(const Char_t(&charsArray)[TLength]);
@@ -147,7 +146,7 @@ namespace rkit
 		size_t NumComponents() const;
 		LastComponent_t LastComponent() const;
 
-		BaseStringSliceView<Char_t> ToStringSliceView() const;
+		BaseStringSliceView<Char_t, TPathTraits::kEncoding> ToStringSliceView() const;
 
 		bool operator==(const BasePathSliceView<TIsAbsolute, TPathTraits> &path) const;
 		bool operator!=(const BasePathSliceView<TIsAbsolute, TPathTraits> &path) const;
@@ -159,7 +158,7 @@ namespace rkit
 		bool operator>=(const BasePathSliceView<TIsAbsolute, TPathTraits> &path) const;
 
 	private:
-		BaseStringSliceView<Char_t> m_view;
+		BaseStringSliceView<Char_t, kEncoding> m_view;
 	};
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -168,18 +167,19 @@ namespace rkit
 	public:
 		typedef typename TPathTraits::Char_t Char_t;
 		static const Char_t kDefaultDelimiter = TPathTraits::kDefaultDelimiter;
-		typedef BaseStringSliceView<Char_t> Component_t;
-		typedef BaseStringView<Char_t> LastComponent_t;
+		static const CharacterEncoding kEncoding = TPathTraits::kEncoding;
+		typedef BaseStringSliceView<Char_t, TPathTraits::kEncoding> Component_t;
+		typedef BaseStringView<Char_t, TPathTraits::kEncoding> LastComponent_t;
 
 		BasePathView();
-		explicit BasePathView(const BaseStringView<Char_t> &slice);
+		explicit BasePathView(const BaseStringView<Char_t, TPathTraits::kEncoding> &slice);
 
 		template<size_t TLength>
 		BasePathView(const Char_t(&charsArray)[TLength]);
 
 		LastComponent_t LastComponent() const;
 
-		BaseStringView<Char_t> ToStringView() const;
+		BaseStringView<Char_t, TPathTraits::kEncoding> ToStringView() const;
 	};
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -189,10 +189,11 @@ namespace rkit
 		friend class BasePathIterator<TIsAbsolute, TPathTraits>;
 
 		typedef typename TPathTraits::Char_t Char_t;
+		static const CharacterEncoding kEncoding = TPathTraits::kEncoding;
 		static const Char_t kDefaultDelimiter = TPathTraits::kDefaultDelimiter;
-		typedef BaseStringSliceView<Char_t> Component_t;
+		typedef BaseStringSliceView<Char_t, kEncoding> Component_t;
 		typedef BasePathView<TIsAbsolute, TPathTraits> View_t;
-		typedef BaseString<Char_t> String_t;
+		typedef BaseString<Char_t, kEncoding> String_t;
 
 		BasePath();
 		BasePath(const BasePath<TIsAbsolute, TPathTraits> &other);
@@ -207,7 +208,7 @@ namespace rkit
 		BasePathIterator<TIsAbsolute, TPathTraits> begin() const;
 		BasePathIterator<TIsAbsolute, TPathTraits> end() const;
 
-		Result AppendComponent(const BaseStringSliceView<Char_t> &str);
+		Result AppendComponent(const BaseStringSliceView<Char_t, TPathTraits::kEncoding> &str);
 		Result Append(const BasePathView<false, TPathTraits> &str);
 
 		Component_t operator[](size_t index) const;
@@ -215,13 +216,13 @@ namespace rkit
 		BasePathSliceView<false, TPathTraits> RelSlice(size_t firstComponent, size_t numComponents) const;
 		size_t NumComponents() const;
 
-		const BaseString<Char_t> &ToString() const;
+		const BaseString<Char_t, TPathTraits::kEncoding> &ToString() const;
 
-		Result Set(const BaseStringSliceView<Char_t> &str);
+		Result Set(const Component_t &str);
 		Result Set(const BasePathSliceView<TIsAbsolute, TPathTraits> &path);
 
-		template<class TOtherChar, PathEncoding TOtherPathEncoding>
-		Result SetFromEncodedString(const BaseStringView<TOtherChar> &str);
+		template<class TOtherChar, CharacterEncoding TOtherPathEncoding>
+		Result SetFromEncodedString(const BaseStringView<TOtherChar, TOtherPathEncoding> &str);
 
 		Result SetFromUTF8(const StringView &str);
 
@@ -236,12 +237,19 @@ namespace rkit
 		const Char_t *CStr() const;
 		size_t Length() const;
 
-		static PathValidationResult Validate(const BaseStringSliceView<Char_t> &str);
+		static PathValidationResult Validate(const BaseStringSliceView<Char_t, kEncoding> &str);
+
+		bool operator<(const BasePath<TIsAbsolute, TPathTraits> &other);
+		bool operator>(const BasePath<TIsAbsolute, TPathTraits> &other);
+		bool operator<=(const BasePath<TIsAbsolute, TPathTraits> &other);
+		bool operator>=(const BasePath<TIsAbsolute, TPathTraits> &other);
+		bool operator==(const BasePath<TIsAbsolute, TPathTraits> &other);
+		bool operator!=(const BasePath<TIsAbsolute, TPathTraits> &other);
 
 	private:
-		Result SetConvert(const BaseStringSliceView<Char_t> &str);
+		Result SetConvert(const BaseStringSliceView<Char_t, kEncoding> &str);
 
-		BaseString<Char_t> m_path;
+		BaseString<Char_t, kEncoding> m_path;
 	};
 }
 
@@ -267,7 +275,7 @@ namespace rkit
 
 namespace rkit
 {
-	template<class TChar, PathEncoding TEncoding>
+	template<class TChar, CharacterEncoding TEncoding>
 	size_t PathEncodingConverter<TChar, TEncoding, TChar, TEncoding>::ConvertSpan(const Span<TChar> &destSpan, const ConstSpan<TChar> &srcSpan)
 	{
 		const size_t amountToCopy = Min(destSpan.Count(), srcSpan.Count());
@@ -282,7 +290,7 @@ namespace rkit
 	}
 
 	template<uint32_t TTraitFlags>
-	inline PathValidationResult DefaultPathTraits<TTraitFlags>::ValidateComponent(const BaseStringSliceView<Char_t> &span, bool isAbsolute, bool isFirst)
+	inline PathValidationResult DefaultPathTraits<TTraitFlags>::ValidateComponent(const BaseStringSliceView<Char_t, kEncoding> &span, bool isAbsolute, bool isFirst)
 	{
 		bool requiresFixup = false;
 
@@ -311,7 +319,7 @@ namespace rkit
 	}
 
 	template<uint32_t TTraitFlags>
-	template<class TOriginalChar, PathEncoding TSrcEncoding>
+	template<class TOriginalChar, CharacterEncoding TSrcEncoding>
 	size_t DefaultPathTraits<TTraitFlags>::ConvertSpan(const Span<Char_t> &destSpan, const ConstSpan<TOriginalChar> &srcSpan)
 	{
 		return PathEncodingConverter<Char_t, kEncoding, TOriginalChar, TSrcEncoding>::ConvertSpan(destSpan, srcSpan);
@@ -334,13 +342,15 @@ namespace rkit
 	BasePathIterator<TIsAbsolute, TPathTraits>::BasePathIterator(const BasePath<TIsAbsolute, TPathTraits> &path, size_t pos)
 		: m_path(path)
 		, m_strPos(pos)
+		, m_endPos(0)
 	{
+		this->UpdateEndPos();
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	BasePathIterator<TIsAbsolute, TPathTraits> &BasePathIterator<TIsAbsolute, TPathTraits>::operator++()
+	void BasePathIterator<TIsAbsolute, TPathTraits>::UpdateEndPos()
 	{
-		const BaseString<Char_t> &str = m_path.ToString();
+		const BaseString<Char_t, TPathTraits::kEncoding> &str = m_path.ToString();
 		const size_t length = str.Length();
 		const Char_t *chars = str.CStr();
 
@@ -352,7 +362,18 @@ namespace rkit
 				break;
 		}
 
-		m_strPos = strPos;
+		m_endPos = strPos;
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	BasePathIterator<TIsAbsolute, TPathTraits> &BasePathIterator<TIsAbsolute, TPathTraits>::operator++()
+	{
+		const BaseString<Char_t, TPathTraits::kEncoding> &str = m_path.ToString();
+
+		RKIT_ASSERT(m_strPos < str.Length());
+
+		m_strPos = m_endPos + 1;
+		this->UpdateEndPos();
 
 		return *this;
 	}
@@ -396,23 +417,11 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	BaseStringSliceView<typename TPathTraits::Char_t> BasePathIterator<TIsAbsolute, TPathTraits>::operator*() const
+	BaseStringSliceView<typename TPathTraits::Char_t, TPathTraits::kEncoding> BasePathIterator<TIsAbsolute, TPathTraits>::operator*() const
 	{
-		const BaseString<Char_t> &str = m_path.ToString();
-		const size_t length = str.Length();
-		const Char_t *chars = str.CStr();
+		const BaseString<Char_t, TPathTraits::kEncoding> &str = m_path.ToString();
 
-		size_t endPos = m_strPos;
-
-		while (endPos < length)
-		{
-			if (chars[endPos] == kDefaultDelimiter)
-				break;
-
-			endPos++;
-		}
-
-		return str.SubString(m_strPos, endPos - m_strPos);
+		return str.SubString(m_strPos, m_endPos - m_strPos);
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -433,7 +442,7 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	BasePathSliceView<TIsAbsolute, TPathTraits>::BasePathSliceView(const BaseStringSliceView<Char_t> &view)
+	BasePathSliceView<TIsAbsolute, TPathTraits>::BasePathSliceView(const BaseStringSliceView<Char_t, TPathTraits::kEncoding> &view)
 		: m_view(view)
 	{
 		RKIT_ASSERT((BasePath<TIsAbsolute, TPathTraits>::Validate(m_view) == PathValidationResult::kValid));
@@ -508,7 +517,7 @@ namespace rkit
 			scanPos++;
 		}
 
-		BaseStringSliceView<Char_t> slice = m_view.SubString(0, scanPos);
+		BaseStringSliceView<Char_t, kEncoding> slice = m_view.SubString(0, scanPos);
 		return BasePathSliceView<TIsAbsolute, TPathTraits>(slice);
 	}
 
@@ -591,7 +600,7 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	BaseStringSliceView<typename BasePathSliceView<TIsAbsolute, TPathTraits>::Char_t> BasePathSliceView<TIsAbsolute, TPathTraits>::ToStringSliceView() const
+	BaseStringSliceView<typename TPathTraits::Char_t, TPathTraits::kEncoding> BasePathSliceView<TIsAbsolute, TPathTraits>::ToStringSliceView() const
 	{
 		return m_view;
 	}
@@ -638,7 +647,7 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	BasePathView<TIsAbsolute, TPathTraits>::BasePathView(const BaseStringView<Char_t> &slice)
+	BasePathView<TIsAbsolute, TPathTraits>::BasePathView(const BaseStringView<Char_t, TPathTraits::kEncoding> &slice)
 		: BasePathSliceView<TIsAbsolute, TPathTraits>(slice)
 	{
 	}
@@ -659,10 +668,10 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	BaseStringView<typename BasePathView<TIsAbsolute, TPathTraits>::Char_t> BasePathView<TIsAbsolute, TPathTraits>::ToStringView() const
+	BaseStringView<typename BasePathView<TIsAbsolute, TPathTraits>::Char_t, TPathTraits::kEncoding> BasePathView<TIsAbsolute, TPathTraits>::ToStringView() const
 	{
-		const BaseStringSliceView<Char_t> stringSlice = this->ToStringSliceView();
-		return BaseStringView<Char_t>(stringSlice.GetChars(), stringSlice.Length());
+		const BaseStringSliceView<Char_t, kEncoding> stringSlice = this->ToStringSliceView();
+		return BaseStringView<Char_t, kEncoding>(stringSlice.GetChars(), stringSlice.Length());
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -721,7 +730,7 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	Result BasePath<TIsAbsolute, TPathTraits>::AppendComponent(const BaseStringSliceView<Char_t> &str)
+	Result BasePath<TIsAbsolute, TPathTraits>::AppendComponent(const BaseStringSliceView<Char_t, TPathTraits::kEncoding> &str)
 	{
 		if (m_path.Length() == 0)
 			return m_path.Set(str);
@@ -753,7 +762,7 @@ namespace rkit
 		}
 
 		m_path.Clear();
-		m_path = BaseString<Char_t>(std::move(scBuf));
+		m_path = BaseString<Char_t, kEncoding>(std::move(scBuf));
 
 		return ResultCode::kOK;
 	}
@@ -784,7 +793,7 @@ namespace rkit
 		CopySpanNonOverlapping(chars.SubSpan(m_path.Length() + 1, chars.Count() - m_path.Length() - 1), str.ToStringView().ToSpan());
 
 		m_path.Clear();
-		m_path = BaseString<Char_t>(std::move(scBuf));
+		m_path = BaseString<Char_t, kEncoding>(std::move(scBuf));
 
 		return ResultCode::kOK;
 	}
@@ -816,13 +825,13 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	const BaseString<typename BasePath<TIsAbsolute, TPathTraits>::Char_t> &BasePath<TIsAbsolute, TPathTraits>::ToString() const
+	const BaseString<typename BasePath<TIsAbsolute, TPathTraits>::Char_t, TPathTraits::kEncoding> &BasePath<TIsAbsolute, TPathTraits>::ToString() const
 	{
 		return m_path;
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	Result BasePath<TIsAbsolute, TPathTraits>::Set(const BaseStringSliceView<Char_t> &str)
+	Result BasePath<TIsAbsolute, TPathTraits>::Set(const Component_t &str)
 	{
 		switch (Validate(str))
 		{
@@ -842,8 +851,8 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	template<class TOtherChar, PathEncoding TOtherPathEncoding>
-	Result BasePath<TIsAbsolute, TPathTraits>::SetFromEncodedString(const BaseStringView<TOtherChar> &str)
+	template<class TOtherChar, CharacterEncoding TOtherPathEncoding>
+	Result BasePath<TIsAbsolute, TPathTraits>::SetFromEncodedString(const BaseStringView<TOtherChar, TOtherPathEncoding> &str)
 	{
 		if (str.Length() == 0)
 		{
@@ -855,7 +864,7 @@ namespace rkit
 		RKIT_CHECK(constructionBuffer.Allocate(str.Length()));
 
 		PathEncodingConverter<Char_t, TPathTraits::kEncoding, TOtherChar, TOtherPathEncoding>::ConvertSpan(constructionBuffer.GetSpan(), str.ToSpan());
-		BaseString<Char_t> newStr(std::move(constructionBuffer));
+		BaseString<Char_t, TPathTraits::kEncoding> newStr(std::move(constructionBuffer));
 
 		return Set(newStr);
 	}
@@ -864,7 +873,7 @@ namespace rkit
 	template<bool TIsAbsolute, class TPathTraits>
 	Result BasePath<TIsAbsolute, TPathTraits>::SetFromUTF8(const StringView &str)
 	{
-		return SetFromEncodedString<char, PathEncoding::kUTF8>(str);
+		return SetFromEncodedString<char, CharacterEncoding::kUTF8>(str);
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -884,7 +893,7 @@ namespace rkit
 			return ResultCode::kOK;
 		}
 
-		const BaseStringView<typename TOtherPathTraits::Char_t> &otherStr = path.ToStringView();
+		const BaseStringView<typename TOtherPathTraits::Char_t, TOtherPathTraits::kEncoding> &otherStr = path.ToStringView();
 		const ConstSpan<typename TOtherPathTraits::Char_t> otherCharsSpan = otherStr.ToSpan();
 
 		size_t newSize = 0;
@@ -939,7 +948,7 @@ namespace rkit
 					const bool isFirst = (emitPos == 0);
 					const bool isLast = (scanPos == otherCharsSpan.Count());
 
-					PathValidationResult validationResult = TPathTraits::ValidateComponent(BaseStringSliceView<Char_t>(outChunkSpan), TIsAbsolute, isFirst);
+					PathValidationResult validationResult = TPathTraits::ValidateComponent(BaseStringSliceView<Char_t, kEncoding>(outChunkSpan), TIsAbsolute, isFirst);
 
 					switch (validationResult)
 					{
@@ -961,7 +970,7 @@ namespace rkit
 			}
 		}
 
-		m_path = BaseString<Char_t>(std::move(scBuf));
+		m_path = BaseString<Char_t, kEncoding>(std::move(scBuf));
 
 		return ResultCode::kOK;
 	}
@@ -985,7 +994,7 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	PathValidationResult BasePath<TIsAbsolute, TPathTraits>::Validate(const BaseStringSliceView<Char_t> &str)
+	PathValidationResult BasePath<TIsAbsolute, TPathTraits>::Validate(const BaseStringSliceView<Char_t, kEncoding> &str)
 	{
 		if (str.Length() == 0)
 			return PathValidationResult::kValid;
@@ -1006,7 +1015,7 @@ namespace rkit
 				if (scanPos != str.Length() && str[scanPos] != kDefaultDelimiter)
 					requiresFixup = true;
 
-				const BaseStringSliceView<Char_t> slice = str.SubString(startPos, scanPos - startPos);
+				const BaseStringSliceView<Char_t, kEncoding> slice = str.SubString(startPos, scanPos - startPos);
 
 				const PathValidationResult result = TPathTraits::ValidateComponent(slice, TIsAbsolute, isFirst);
 
@@ -1027,7 +1036,68 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	Result BasePath<TIsAbsolute, TPathTraits>::SetConvert(const BaseStringSliceView<Char_t> &str)
+	bool BasePath<TIsAbsolute, TPathTraits>::operator<(const BasePath<TIsAbsolute, TPathTraits> &other)
+	{
+		BasePathIterator<TIsAbsolute, TPathTraits> thisIt = this->begin();
+		BasePathIterator<TIsAbsolute, TPathTraits> thisEnd = this->end();
+		BasePathIterator<TIsAbsolute, TPathTraits> otherIt = other.begin();
+		BasePathIterator<TIsAbsolute, TPathTraits> otherEnd = other.end();
+
+		for (;;)
+		{
+			if (otherIt == otherEnd)
+				return false;
+
+			if (thisIt == thisEnd)
+				return true;
+
+			BaseStringSliceView<typename TPathTraits::Char_t, TPathTraits::kEncoding> thisSlice = *thisIt;
+			BaseStringSliceView<typename TPathTraits::Char_t, TPathTraits::kEncoding> otherSlice = *otherIt;
+
+			Ordering comparison = thisSlice.Compare(otherSlice);
+
+			if (comparison == Ordering::kLess)
+				return true;
+			else if (comparison == Ordering::kGreater)
+				return false;
+
+			++thisIt;
+			++otherIt;
+		}
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	bool BasePath<TIsAbsolute, TPathTraits>::operator>(const BasePath<TIsAbsolute, TPathTraits> &other)
+	{
+		return other < *this;
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	bool BasePath<TIsAbsolute, TPathTraits>::operator<=(const BasePath<TIsAbsolute, TPathTraits> &other)
+	{
+		return !(other < (*this));
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	bool BasePath<TIsAbsolute, TPathTraits>::operator>=(const BasePath<TIsAbsolute, TPathTraits> &other)
+	{
+		return !((*this) < other);
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	bool BasePath<TIsAbsolute, TPathTraits>::operator==(const BasePath<TIsAbsolute, TPathTraits> &other)
+	{
+		return m_path == other.m_path;
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	bool BasePath<TIsAbsolute, TPathTraits>::operator!=(const BasePath<TIsAbsolute, TPathTraits> &other)
+	{
+		return !((*this) == other);
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	Result BasePath<TIsAbsolute, TPathTraits>::SetConvert(const BaseStringSliceView<Char_t, kEncoding> &str)
 	{
 		if (str.Length() == 0)
 		{
@@ -1066,7 +1136,7 @@ namespace rkit
 
 			if (isEnd || isDelimiter)
 			{
-				const BaseStringSliceView<Char_t> slice = str.SubString(startPos, scanPos - startPos);
+				const BaseStringSliceView<Char_t, kEncoding> slice = str.SubString(startPos, scanPos - startPos);
 				Span<Char_t> outSpan = stringSpan.SubSpan(outPos, slice.Length());
 
 				CopySpanNonOverlapping(outSpan, slice.ToSpan());
@@ -1083,7 +1153,7 @@ namespace rkit
 
 		RKIT_ASSERT(outPos == stringSpan.Count());
 
-		m_path = BaseString<Char_t>(std::move(stringBuffer));
+		m_path = BaseString<Char_t, kEncoding>(std::move(stringBuffer));
 
 		return ResultCode::kOK;
 	}
@@ -1091,13 +1161,13 @@ namespace rkit
 	template<bool TIsAbsolute, class TPathTraits>
 	inline HashValue_t Hasher<BasePath<TIsAbsolute, TPathTraits>>::ComputeHash(HashValue_t baseHash, const BasePath<TIsAbsolute, TPathTraits> &value)
 	{
-		return Hasher<BaseString<typename TPathTraits::Char_t>>::ComputeHash(baseHash, value.ToString());
+		return Hasher<BaseString<typename TPathTraits::Char_t, TPathTraits::kEncoding>>::ComputeHash(baseHash, value.ToString());
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
 	inline HashValue_t Hasher<BasePathView<TIsAbsolute, TPathTraits>>::ComputeHash(HashValue_t baseHash, const BasePathView<TIsAbsolute, TPathTraits> &value)
 	{
-		return Hasher<BaseStringView<typename TPathTraits::Char_t>>::ComputeHash(baseHash, value.ToStringView());
+		return Hasher<BaseStringView<typename TPathTraits::Char_t, TPathTraits::kEncoding>>::ComputeHash(baseHash, value.ToStringView());
 	}
 }
 
@@ -1107,7 +1177,7 @@ namespace rkit
 
 namespace rkit
 {
-	inline size_t PathEncodingConverter<char, PathEncoding::kUTF8, wchar_t, PathEncoding::kUTF16>::ConvertSpan(const Span<char> &destSpan, const ConstSpan<wchar_t> &srcSpan)
+	inline size_t PathEncodingConverter<char, CharacterEncoding::kUTF8, wchar_t, CharacterEncoding::kUTF16>::ConvertSpan(const Span<char> &destSpan, const ConstSpan<wchar_t> &srcSpan)
 	{
 		Span<uint8_t> retypedDestSpan = Span<uint8_t>(reinterpret_cast<uint8_t *>(destSpan.Ptr()), destSpan.Count());
 
@@ -1118,7 +1188,7 @@ namespace rkit
 		return sz;
 	}
 
-	inline size_t PathEncodingConverter<wchar_t, PathEncoding::kUTF16, char, PathEncoding::kUTF8>::ConvertSpan(const Span<wchar_t> &destSpan, const ConstSpan<char> &srcSpan)
+	inline size_t PathEncodingConverter<wchar_t, CharacterEncoding::kUTF16, char, CharacterEncoding::kUTF8>::ConvertSpan(const Span<wchar_t> &destSpan, const ConstSpan<char> &srcSpan)
 	{
 		size_t sz = 0;
 		ConstSpan<uint8_t> retypedSrcSpan = ConstSpan<uint8_t>(reinterpret_cast<const uint8_t *>(srcSpan.Ptr()), srcSpan.Count());
@@ -1134,7 +1204,7 @@ namespace rkit
 		return ch == '/' || ch == '\\';
 	}
 
-	inline PathValidationResult OSPathTraits::ValidateComponent(const BaseStringSliceView<Char_t> &span, bool isAbsolute, bool isFirst)
+	inline PathValidationResult OSPathTraits::ValidateComponent(const BaseStringSliceView<Char_t, kEncoding> &span, bool isAbsolute, bool isFirst)
 	{
 		if (GetDrivers().m_utilitiesDriver->IsPathComponentValidOnWindows(span, isAbsolute, isFirst, false))
 			return PathValidationResult::kValid;

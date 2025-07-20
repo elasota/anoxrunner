@@ -39,18 +39,18 @@ namespace rkit { namespace buildsystem { namespace rpc_interchange
 
 		virtual EntityType GetEntityType() const = 0;
 
-		Result SetName(const StringView &str)
+		Result SetName(const AsciiStringView &str)
 		{
 			return m_name.Set(str);
 		}
 
-		const String &GetName() const
+		const AsciiString &GetName() const
 		{
 			return m_name;
 		}
 
 	private:
-		String m_name;
+		AsciiString m_name;
 	};
 
 	class StaticSamplerEntity final : public Entity
@@ -356,7 +356,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		Vector<AnalyzerIncludeStack> m_includeStack;
 		IDependencyNodeCompilerFeedback *m_feedback;
 
-		HashMap<String, UniquePtr<rpc_interchange::Entity>> m_entities;
+		HashMap<AsciiString, UniquePtr<rpc_interchange::Entity>> m_entities;
 		StringPoolBuilder m_globalStringPool;
 
 		HashMap<render::GlobalStringIndex_t, render::ConfigStringIndex_t> m_configNameToKey;
@@ -767,7 +767,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		Span<const char> entityNameSpan;
 		RKIT_CHECK(ExpectIdentifier(blamePath, entityNameSpan, parser));
 
-		String entityName;
+		AsciiString entityName;
 		RKIT_CHECK(entityName.Set(entityNameSpan));
 
 		if (m_entities.Find(entityName) != m_entities.end())
@@ -1376,7 +1376,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 					RKIT_CHECK(parser.RequireToken(token));
 
-					HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(BaseStringSliceView<char>(token));
+					HashMap<AsciiString, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(AsciiStringSliceView(token));
 					if (it == m_entities.end())
 					{
 						rkit::log::ErrorFmt("%s [%zu:%zu] Unknown static sampler", filePath, line, col);
@@ -1426,7 +1426,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		const data::RenderRTTIStructType *shaderDescRTTI = m_dataDriver->GetRenderDataHandler()->GetShaderDescRTTI();
 		const data::RenderRTTIStructType *depthStencilOperationDescRTTI = m_dataDriver->GetRenderDataHandler()->GetDepthStencilOperationDescRTTI();
 
-		HashMap<String, const render::RenderOperationDesc *> nameToRODesc;
+		HashMap<AsciiString, const render::RenderOperationDesc *> nameToRODesc;
 
 		for (;;)
 		{
@@ -1454,7 +1454,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					if (IsToken(token, "}"))
 						break;
 
-					HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(StringSliceView(token));
+					HashMap<AsciiString, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(AsciiStringSliceView(token));
 
 					if (it == m_entities.end())
 					{
@@ -1487,7 +1487,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 					RKIT_CHECK(CheckValidIdentifier(filePath, token, parser));
 
-					String rtName;
+					AsciiString rtName;
 					RKIT_CHECK(rtName.Set(token));
 
 					UniquePtr<render::RenderOperationDesc> roDesc;
@@ -1523,7 +1523,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				parser.GetLocation(line, col);
 				RKIT_CHECK(parser.RequireToken(token));
 
-				HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(StringSliceView(token));
+				HashMap<AsciiString, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(AsciiStringSliceView(token));
 				if (it == m_entities.end())
 				{
 					rkit::log::ErrorFmt("%s [%zu:%zu] Unknown input layout identifier", filePath, line, col);
@@ -1578,7 +1578,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				parser.GetLocation(line, col);
 				RKIT_CHECK(parser.RequireToken(token));
 
-				HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(StringSliceView(token));
+				HashMap<AsciiString, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(AsciiStringSliceView(token));
 				if (it == m_entities.end())
 				{
 					rkit::log::ErrorFmt("%s [%zu:%zu] Unknown execute in pass identifier", filePath, line, col);
@@ -1649,7 +1649,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 			RKIT_CHECK(gp.GetRenderOperations().Resize(numRenderTargets));
 
-			for (HashMapKeyValueView<String, const render::RenderOperationDesc *> kv : nameToRODesc)
+			for (HashMapKeyValueView<AsciiString, const render::RenderOperationDesc *> kv : nameToRODesc)
 			{
 				render::TempStringIndex_t nameStr;
 				RKIT_CHECK(IndexString(kv.Key().ToSpan(), nameStr));
@@ -2163,7 +2163,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			}
 		}
 
-		HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(StringSliceView(token));
+		HashMap<AsciiString, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(AsciiStringSliceView(token));
 		if (it == m_entities.end())
 		{
 			size_t line = 0;

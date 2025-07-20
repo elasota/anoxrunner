@@ -86,7 +86,7 @@ namespace rkit
 		bool ContainsWildcards(const StringSliceView &str) const override;
 		bool MatchesWildcard(const StringSliceView &candidate, const StringSliceView &wildcard) const override;
 
-		bool DefaultIsPathComponentValid(const BaseStringSliceView<char> &span, bool isFirst, bool allowWildcards) const override;
+		bool DefaultIsPathComponentValid(const BaseStringSliceView<char, CharacterEncoding::kUTF8> &span, bool isFirst, bool allowWildcards) const override;
 
 		Result ConvertUTF16ToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const uint16_t> &src) const override;
 		Result ConvertUTF16WCharToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const wchar_t> &src) const override;
@@ -94,7 +94,7 @@ namespace rkit
 		Result ConvertUTF8ToUTF16(size_t &outSize, const Span<uint16_t> &dest, const Span<const uint8_t> &src) const override;
 		Result ConvertUTF8ToUTF16WChar(size_t &outSize, const Span<wchar_t> &dest, const Span<const uint8_t> &src) const override;
 
-		bool IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const override;
+		bool IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t, CharacterEncoding::kUTF16> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const override;
 
 		Result CreateCoroThread(UniquePtr<coro::Thread> &thread, size_t stackSize) const override;
 
@@ -1708,7 +1708,7 @@ namespace rkit
 		return MatchesWildcardWithMinLiteralCount(candidateRef, wildcardRef, minLiteralChars);
 	}
 
-	bool UtilitiesDriver::DefaultIsPathComponentValid(const BaseStringSliceView<char> &span, bool isFirst, bool allowWildcards) const
+	bool UtilitiesDriver::DefaultIsPathComponentValid(const BaseStringSliceView<char, CharacterEncoding::kUTF8> &span, bool isFirst, bool allowWildcards) const
 	{
 		if (span[span.Length() - 1] == '.')
 		{
@@ -1897,7 +1897,7 @@ namespace rkit
 		return TypedConvertUTF8ToUTF16(outSize, dest, src);
 	}
 
-	bool UtilitiesDriver::IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const
+	bool UtilitiesDriver::IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t, CharacterEncoding::kUTF16> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const
 	{
 		if (isAbsolute && isFirst)
 		{

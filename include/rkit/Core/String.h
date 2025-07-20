@@ -15,9 +15,6 @@ namespace rkit
 	class Span;
 
 	template<class TChar>
-	class BaseStringView;
-
-	template<class TChar>
 	class StringStorage final : public NoCopy
 	{
 	public:
@@ -61,12 +58,12 @@ namespace rkit
 		size_t m_numChars;
 	};
 
-	template<class TChar, size_t TStaticSize>
+	template<class TChar, CharacterEncoding TEncoding, size_t TStaticSize>
 	class BaseString
 	{
 	public:
-		typedef BaseStringView<TChar> View_t;
-		typedef BaseStringSliceView<TChar> SliceView_t;
+		typedef BaseStringView<TChar, TEncoding> View_t;
+		typedef BaseStringSliceView<TChar, TEncoding> SliceView_t;
 
 		BaseString();
 		BaseString(const BaseString &other);
@@ -89,6 +86,10 @@ namespace rkit
 
 		Result MakeLower();
 		Result MakeUpper();
+
+		bool StartsWith(const SliceView_t &strView) const;
+		bool StartsWith(const Span<const TChar> &span) const;
+		bool StartsWith(TChar ch) const;
 
 		bool EndsWith(const SliceView_t &strView) const;
 		bool EndsWith(const Span<const TChar> &span) const;
@@ -142,11 +143,11 @@ namespace rkit
 
 namespace rkit
 {
-	template<class TChar, size_t TStaticSize>
-	struct Hasher<BaseString<TChar, TStaticSize> > : public DefaultSpanHasher<BaseString<TChar, TStaticSize> >
+	template<class TChar, CharacterEncoding TEncoding, size_t TStaticSize>
+	struct Hasher<BaseString<TChar, TEncoding, TStaticSize> > : public DefaultSpanHasher<BaseString<TChar, TEncoding, TStaticSize> >
 	{
 	public:
-		static HashValue_t ComputeHash(HashValue_t baseHash, const BaseString<TChar, TStaticSize> &str);
+		static HashValue_t ComputeHash(HashValue_t baseHash, const BaseString<TChar, TEncoding, TStaticSize> &str);
 	};
 }
 
@@ -279,8 +280,8 @@ void rkit::BaseStringConstructionBuffer<TChar>::Detach()
 }
 
 
-template<class TChar, size_t TStaticSize>
-rkit::BaseString<TChar, TStaticSize>::BaseString()
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::BaseString<TChar, TEncoding, TStaticSize>::BaseString()
 	: m_chars(nullptr)
 	, m_length(0)
 {
@@ -289,8 +290,8 @@ rkit::BaseString<TChar, TStaticSize>::BaseString()
 }
 
 
-template<class TChar, size_t TStaticSize>
-rkit::BaseString<TChar, TStaticSize>::BaseString(const BaseString &other)
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::BaseString<TChar, TEncoding, TStaticSize>::BaseString(const BaseString &other)
 	: m_chars(nullptr)
 	, m_length(other.m_length)
 {
@@ -306,8 +307,8 @@ rkit::BaseString<TChar, TStaticSize>::BaseString(const BaseString &other)
 	}
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::BaseString<TChar, TStaticSize>::BaseString(BaseString &&other) noexcept
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::BaseString<TChar, TEncoding, TStaticSize>::BaseString(BaseString &&other) noexcept
 	: m_length(other.m_length)
 {
 	if (other.IsStaticString())
@@ -321,8 +322,8 @@ rkit::BaseString<TChar, TStaticSize>::BaseString(BaseString &&other) noexcept
 	other.UnsafeReset();
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::BaseString<TChar, TStaticSize>::BaseString(BaseStringConstructionBuffer<TChar> &&other) noexcept
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::BaseString<TChar, TEncoding, TStaticSize>::BaseString(BaseStringConstructionBuffer<TChar> &&other) noexcept
 	: m_chars(nullptr)
 	, m_length(0)
 {
@@ -332,14 +333,14 @@ rkit::BaseString<TChar, TStaticSize>::BaseString(BaseStringConstructionBuffer<TC
 	(*this) = std::move(other);
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::BaseString<TChar, TStaticSize>::~BaseString()
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::BaseString<TChar, TEncoding, TStaticSize>::~BaseString()
 {
 	Evict();
 }
 
-template<class TChar, size_t TStaticSize>
-void rkit::BaseString<TChar, TStaticSize>::CopyStaticStringFromOther(const BaseString &other)
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+void rkit::BaseString<TChar, TEncoding, TStaticSize>::CopyStaticStringFromOther(const BaseString &other)
 {
 	const size_t length = other.m_length;
 	RKIT_ASSERT(length < TStaticSize);
@@ -348,8 +349,8 @@ void rkit::BaseString<TChar, TStaticSize>::CopyStaticStringFromOther(const BaseS
 	m_staticString[length] = static_cast<TChar>(0);
 }
 
-template<class TChar, size_t TStaticSize>
-void rkit::BaseString<TChar, TStaticSize>::Evict()
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+void rkit::BaseString<TChar, TEncoding, TStaticSize>::Evict()
 {
 	if (!IsStaticString())
 	{
@@ -358,8 +359,8 @@ void rkit::BaseString<TChar, TStaticSize>::Evict()
 	}
 }
 
-template<class TChar, size_t TStaticSize>
-void rkit::BaseString<TChar, TStaticSize>::UnsafeReset()
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+void rkit::BaseString<TChar, TEncoding, TStaticSize>::UnsafeReset()
 {
 	m_chars = m_staticString;
 	m_length = 0;
@@ -367,8 +368,8 @@ void rkit::BaseString<TChar, TStaticSize>::UnsafeReset()
 }
 
 
-template<class TChar, size_t TStaticSize>
-rkit::BaseString<TChar, TStaticSize> &rkit::BaseString<TChar, TStaticSize>::operator=(const BaseString &other)
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::BaseString<TChar, TEncoding, TStaticSize> &rkit::BaseString<TChar, TEncoding, TStaticSize>::operator=(const BaseString &other)
 {
 	if (this != &other)
 	{
@@ -391,8 +392,8 @@ rkit::BaseString<TChar, TStaticSize> &rkit::BaseString<TChar, TStaticSize>::oper
 	return *this;
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::BaseString<TChar, TStaticSize> &rkit::BaseString<TChar, TStaticSize>::operator=(BaseString &&other) noexcept
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::BaseString<TChar, TEncoding, TStaticSize> &rkit::BaseString<TChar, TEncoding, TStaticSize>::operator=(BaseString &&other) noexcept
 {
 	Evict();
 
@@ -411,8 +412,8 @@ rkit::BaseString<TChar, TStaticSize> &rkit::BaseString<TChar, TStaticSize>::oper
 	return *this;
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::BaseString<TChar, TStaticSize> &rkit::BaseString<TChar, TStaticSize>::operator=(BaseStringConstructionBuffer<TChar> &&other) noexcept
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::BaseString<TChar, TEncoding, TStaticSize> &rkit::BaseString<TChar, TEncoding, TStaticSize>::operator=(BaseStringConstructionBuffer<TChar> &&other) noexcept
 {
 	Evict();
 
@@ -434,14 +435,14 @@ rkit::BaseString<TChar, TStaticSize> &rkit::BaseString<TChar, TStaticSize>::oper
 	return *this;
 }
 
-template<class TChar, size_t TStaticSize>
-size_t rkit::BaseString<TChar, TStaticSize>::Length() const
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+size_t rkit::BaseString<TChar, TEncoding, TStaticSize>::Length() const
 {
 	return m_length;
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::Result rkit::BaseString<TChar, TStaticSize>::Format(const TChar *fmt, ...)
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::Format(const TChar *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
@@ -468,8 +469,8 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::Format(const TChar *fmt, ...)
 	return ResultCode::kOK;
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::Result rkit::BaseString<TChar, TStaticSize>::CreateStringConstructionBufferCallback(void *userdata, size_t numChars, void *&outBuffer)
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::CreateStringConstructionBufferCallback(void *userdata, size_t numChars, void *&outBuffer)
 {
 	FormatOversizeHelper *helper = static_cast<FormatOversizeHelper *>(userdata);
 	helper->m_isOversized = true;
@@ -482,46 +483,46 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::CreateStringConstructionBuffe
 	return ResultCode::kOK;
 }
 
-template<class TChar, size_t TStaticSize>
-const TChar *rkit::BaseString<TChar, TStaticSize>::CStr() const
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+const TChar *rkit::BaseString<TChar, TEncoding, TStaticSize>::CStr() const
 {
 	return m_chars;
 }
 
-template<class TChar, size_t TStaticSize>
-void rkit::BaseString<TChar, TStaticSize>::Clear()
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+void rkit::BaseString<TChar, TEncoding, TStaticSize>::Clear()
 {
 	Evict();
 	UnsafeReset();
 }
 
 
-template<class TChar, size_t TStaticSize>
-rkit::BaseStringSliceView<TChar> rkit::BaseString<TChar, TStaticSize>::SubString(size_t start, size_t length) const
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::BaseStringSliceView<TChar, TEncoding> rkit::BaseString<TChar, TEncoding, TStaticSize>::SubString(size_t start, size_t length) const
 {
-	return rkit::BaseStringSliceView<TChar>(*this).SubString(start, length);
+	return rkit::BaseStringSliceView<TChar, TEncoding>(*this).SubString(start, length);
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::Span<const TChar> rkit::BaseString<TChar, TStaticSize>::ToSpan() const
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::Span<const TChar> rkit::BaseString<TChar, TEncoding, TStaticSize>::ToSpan() const
 {
 	return static_cast<SliceView_t>(*this).ToSpan();
 }
 
-template<class TChar, size_t TStaticSize>
-bool rkit::BaseString<TChar, TStaticSize>::IsStaticString() const
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+bool rkit::BaseString<TChar, TEncoding, TStaticSize>::IsStaticString() const
 {
 	return m_chars == m_staticString;
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::Result rkit::BaseString<TChar, TStaticSize>::Set(const BaseStringSliceView<TChar> &strView)
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::Set(const BaseStringSliceView<TChar, TEncoding> &strView)
 {
 	return Set(strView.ToSpan());
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::Result rkit::BaseString<TChar, TStaticSize>::Set(const Span<const TChar> &strSpan)
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::Set(const Span<const TChar> &strSpan)
 {
 	if (strSpan.Count() == 0)
 	{
@@ -543,7 +544,7 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::Set(const Span<const TChar> &
 		}
 	}
 
-	BaseString<TChar, TStaticSize> newString;
+	BaseString<TChar, TEncoding, TStaticSize> newString;
 
 	Span<TChar> uninitSpan;
 	RKIT_CHECK(CreateAndReturnUninitializedSpan(newString, strSpan.Count(), uninitSpan));
@@ -555,8 +556,8 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::Set(const Span<const TChar> &
 	return ResultCode::kOK;
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::Result rkit::BaseString<TChar, TStaticSize>::Append(const Span<const TChar> &span)
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::Append(const Span<const TChar> &span)
 {
 	if (span.Count() == 0)
 		return ResultCode::kOK;
@@ -569,7 +570,7 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::Append(const Span<const TChar
 	if (combinedLength < TStaticSize)
 	{
 		// Existing length will also be under static size
-		memcpy(m_staticString + m_length, span.Ptr(), span.Count() * sizeof(TChar));
+		::memcpy(m_staticString + m_length, span.Ptr(), span.Count() * sizeof(TChar));
 		m_staticString[combinedLength] = static_cast<TChar>(0);
 
 		m_length = combinedLength;
@@ -577,7 +578,7 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::Append(const Span<const TChar
 	else
 	{
 		// New string won't fit
-		BaseString<TChar, TStaticSize> newString;
+		BaseString<TChar, TEncoding, TStaticSize> newString;
 
 		Span<TChar> uninitSpan;
 		RKIT_CHECK(CreateAndReturnUninitializedSpan(newString, combinedLength, uninitSpan));
@@ -591,22 +592,22 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::Append(const Span<const TChar
 	return ResultCode::kOK;
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::Result rkit::BaseString<TChar, TStaticSize>::Append(const BaseStringSliceView<TChar> &strView)
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::Append(const BaseStringSliceView<TChar, TEncoding> &strView)
 {
 	return this->Append(strView.ToSpan());
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::Result rkit::BaseString<TChar, TStaticSize>::Append(TChar ch)
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::Append(TChar ch)
 {
 	return this->Append(Span<const TChar>(&ch, 1));
 }
 
 
-template<class TChar, size_t TStaticSize>
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
 template<class TAdjustFunc>
-rkit::Result rkit::BaseString<TChar, TStaticSize>::ChangeCase(const TAdjustFunc &adjuster)
+rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::ChangeCase(const TAdjustFunc &adjuster)
 {
 	size_t length = m_length;
 
@@ -635,85 +636,106 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::ChangeCase(const TAdjustFunc 
 	return ResultCode::kOK;
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::Result rkit::BaseString<TChar, TStaticSize>::MakeLower()
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::MakeLower()
 {
 	return ChangeCase(InvariantCharCaseAdjuster<TChar>::ToLower);
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::Result rkit::BaseString<TChar, TStaticSize>::MakeUpper()
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::MakeUpper()
 {
 	return ChangeCase(InvariantCharCaseAdjuster<TChar>::ToUpper);
 }
 
-template<class TChar, size_t TStaticSize>
-bool rkit::BaseString<TChar, TStaticSize>::EndsWith(const BaseStringSliceView<TChar> &strView) const
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+bool rkit::BaseString<TChar, TEncoding, TStaticSize>::StartsWith(const BaseStringSliceView<TChar, TEncoding> &strView) const
 {
-	return this->EndsWith(strView.ToSpan());
+	return this->StartsWith(strView.ToSpan());
 }
 
-template<class TChar, size_t TStaticSize>
-bool rkit::BaseString<TChar, TStaticSize>::EndsWith(const Span<const TChar> &span) const
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+bool rkit::BaseString<TChar, TEncoding, TStaticSize>::StartsWith(const Span<const TChar> &span) const
 {
 	if (m_length < span.Count())
 		return false;
 
-	return !memcmp(this->CStr() + m_length - span.Count(), span.Ptr(), sizeof(TChar) * span.Count());
+	return !::memcmp(this->CStr(), span.Ptr(), sizeof(TChar) * span.Count());
 }
 
-template<class TChar, size_t TStaticSize>
-bool rkit::BaseString<TChar, TStaticSize>::EndsWith(TChar ch) const
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+bool rkit::BaseString<TChar, TEncoding, TStaticSize>::StartsWith(TChar ch) const
+{
+	return this->StartsWith(Span<const TChar>(&ch, 1));
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+bool rkit::BaseString<TChar, TEncoding, TStaticSize>::EndsWith(const BaseStringSliceView<TChar, TEncoding> &strView) const
+{
+	return this->EndsWith(strView.ToSpan());
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+bool rkit::BaseString<TChar, TEncoding, TStaticSize>::EndsWith(const Span<const TChar> &span) const
+{
+	if (m_length < span.Count())
+		return false;
+
+	return !::memcmp(this->CStr() + m_length - span.Count(), span.Ptr(), sizeof(TChar) * span.Count());
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+bool rkit::BaseString<TChar, TEncoding, TStaticSize>::EndsWith(TChar ch) const
 {
 	return this->EndsWith(Span<const TChar>(&ch, 1));
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::BaseString<TChar, TStaticSize>::operator View_t() const
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::BaseString<TChar, TEncoding, TStaticSize>::operator View_t() const
 {
 	return View_t(m_chars, m_length);
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::BaseString<TChar, TStaticSize>::operator SliceView_t() const
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::BaseString<TChar, TEncoding, TStaticSize>::operator SliceView_t() const
 {
 	return SliceView_t(m_chars, m_length);
 }
 
-template<class TChar, size_t TStaticSize>
-bool rkit::BaseString<TChar, TStaticSize>::operator==(const BaseStringSliceView<TChar> &other) const
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+bool rkit::BaseString<TChar, TEncoding, TStaticSize>::operator==(const BaseStringSliceView<TChar, TEncoding> &other) const
 {
 	return static_cast<SliceView_t>(*this) == other;
 }
 
-template<class TChar, size_t TStaticSize>
-bool rkit::BaseString<TChar, TStaticSize>::operator==(const BaseString &other) const
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+bool rkit::BaseString<TChar, TEncoding, TStaticSize>::operator==(const BaseString &other) const
 {
 	return (*this) == static_cast<SliceView_t>(other);
 }
 
-template<class TChar, size_t TStaticSize>
-bool rkit::BaseString<TChar, TStaticSize>::operator!=(const BaseStringSliceView<TChar> &other) const
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+bool rkit::BaseString<TChar, TEncoding, TStaticSize>::operator!=(const BaseStringSliceView<TChar, TEncoding> &other) const
 {
 	return !((*this) == other);
 }
 
-template<class TChar, size_t TStaticSize>
-bool rkit::BaseString<TChar, TStaticSize>::operator!=(const BaseString &other) const
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+bool rkit::BaseString<TChar, TEncoding, TStaticSize>::operator!=(const BaseString &other) const
 {
 	return !((*this) == other);
 }
 
 
-template<class TChar, size_t TStaticSize>
-const TChar &rkit::BaseString<TChar, TStaticSize>::operator[](size_t index) const
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+const TChar &rkit::BaseString<TChar, TEncoding, TStaticSize>::operator[](size_t index) const
 {
 	RKIT_ASSERT(index < m_length);
 	return CStr()[index];
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::Result rkit::BaseString<TChar, TStaticSize>::CreateAndReturnUninitializedSpan(BaseString &outStr, size_t numChars, Span<TChar> &outSpan)
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::CreateAndReturnUninitializedSpan(BaseString &outStr, size_t numChars, Span<TChar> &outSpan)
 {
 	outStr = BaseString();
 
@@ -741,8 +763,8 @@ rkit::Result rkit::BaseString<TChar, TStaticSize>::CreateAndReturnUninitializedS
 	return ResultCode::kOK;
 }
 
-template<class TChar, size_t TStaticSize>
-rkit::HashValue_t rkit::Hasher<rkit::BaseString<TChar, TStaticSize> >::ComputeHash(HashValue_t baseHash, const BaseString<TChar, TStaticSize> &str)
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::HashValue_t rkit::Hasher<rkit::BaseString<TChar, TEncoding, TStaticSize> >::ComputeHash(HashValue_t baseHash, const BaseString<TChar, TEncoding, TStaticSize> &str)
 {
-	return Hasher<BaseStringView<TChar> >::ComputeHash(baseHash, str);
+	return Hasher<BaseStringView<TChar, TEncoding> >::ComputeHash(baseHash, str);
 }

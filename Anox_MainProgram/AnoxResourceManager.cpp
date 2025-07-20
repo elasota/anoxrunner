@@ -18,6 +18,8 @@
 
 #include "AnoxFileResource.h"
 
+#include <algorithm>
+
 // NOTES ON OWNERSHIP AND REFCOUNT BEHAVIOR:
 // Load Jobs -> AnoxResourceLoadCompletionNotifier -> AnoxResourceLoadFutureContainer -> AnoxResourceTracker
 //
@@ -177,6 +179,8 @@ namespace anox
 		rkit::Result GetContentIDKeyedResource(rkit::RCPtr<rkit::Job> *loadJob, rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::data::ContentID &cid) override;
 		rkit::Result GetCIPathKeyedResource(rkit::RCPtr<rkit::Job> *loadJob, rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::CIPathView &path) override;
 		rkit::Result GetStringKeyedResource(rkit::RCPtr<rkit::Job> *loadJob, rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::StringView &str) override;
+
+		rkit::Result EnumerateCIPathKeyedResources(const rkit::CIPathView &basePath, rkit::Vector<rkit::CIPath> &outFiles, rkit::Vector<rkit::CIPath> &outDirectories) const override;
 
 		void UnsyncedUnregisterResource(const AnoxResourceTracker *tracker, bool wasLinked);
 
@@ -613,6 +617,11 @@ namespace anox
 	rkit::Result AnoxResourceManager::GetStringKeyedResource(rkit::RCPtr<rkit::Job> *outJob, rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::StringView &str)
 	{
 		return InternalGetResource<StringKeyedResourceTracker, rkit::StringView, AnoxResourceKeyType::kString>(outJob, loadFuture, ResourceKey<rkit::StringView>(resourceType, str), &m_stringKeyedResources);
+	}
+
+	rkit::Result AnoxResourceManager::EnumerateCIPathKeyedResources(const rkit::CIPathView &basePath, rkit::Vector<rkit::CIPath> &outFiles, rkit::Vector<rkit::CIPath> &outDirectories) const
+	{
+		return rkit::ResultCode::kNotYetImplemented;
 	}
 
 	void AnoxResourceManager::UnsyncedUnregisterResource(const AnoxResourceTracker *tracker, bool wasLinked)

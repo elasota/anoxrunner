@@ -46,7 +46,7 @@ rkit::Result anox::ExtractDATProgram::Run()
 	}
 
 	rkit::OSAbsPath inPath;
-	RKIT_CHECK((inPath.SetFromEncodedString<char, rkit::PathEncoding::kUTF8>(args[0])));
+	RKIT_CHECK((inPath.SetFromEncodedString<char, rkit::CharacterEncoding::kUTF8>(args[0])));
 
 	rkit::UniquePtr<rkit::ISeekableReadStream> datFileStream;
 	rkit::Result openResult = rkit::GetDrivers().m_systemDriver->OpenFileReadAbs(datFileStream, inPath);
@@ -75,7 +75,7 @@ rkit::Result anox::ExtractDATProgram::Run()
 
 
 		rkit::OSAbsPath outPath;
-		RKIT_CHECK((outPath.SetFromEncodedString<char, rkit::PathEncoding::kUTF8>(args[1])));
+		RKIT_CHECK((outPath.SetFromEncodedString<char, rkit::CharacterEncoding::kUTF8>(args[1])));
 
 		rkit::log::LogInfo(fh.GetFilePath().GetChars());
 
@@ -83,7 +83,7 @@ rkit::Result anox::ExtractDATProgram::Run()
 			return rkit::ResultCode::kNotYetImplemented;	// fix path handling here
 
 		rkit::OSRelPath fpath;
-		RKIT_CHECK((fpath.SetFromEncodedString<char, rkit::PathEncoding::kUTF8>(fh.GetFilePath())));
+		RKIT_CHECK((fpath.SetFromEncodedString<char, rkit::CharacterEncoding::kUTF8>(fh.GetFilePath())));
 
 		RKIT_CHECK(outPath.Append(fpath));
 

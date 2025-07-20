@@ -15,6 +15,7 @@
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <OpenMPSupport>false</OpenMPSupport>
     </ClCompile>
+    <Link />
   </ItemDefinitionGroup>
   <ItemGroup />
 </Project>

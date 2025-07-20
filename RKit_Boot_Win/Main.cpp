@@ -57,10 +57,21 @@ namespace rkit
 		ModuleAPI_Win32 m_moduleAPI;
 	};
 
-	static rkit::Drivers g_drivers_Win32;
-	static rkit::ModuleDriver_Win32 g_moduleDriver;
-	static rkit::MallocDriver_Win32 g_mallocDriver;
-	static rkit::ConsoleLogDriver_Win32 g_consoleLogDriver;
+	struct Win32Globals
+	{
+		rkit::Drivers m_drivers;
+		rkit::ModuleDriver_Win32 m_moduleDriver;
+		rkit::MallocDriver_Win32 m_mallocDriver;
+		rkit::ConsoleLogDriver_Win32 m_consoleLogDriver;
+	};
+
+	struct alignas(alignof(Win32Globals)) Win32GlobalsBuffer
+	{
+		uint8_t m_bytes[sizeof(Win32Globals)];
+	};
+
+	static Win32GlobalsBuffer g_winGlobalsBuffer;
+	static Win32Globals &g_winGlobals = *reinterpret_cast<Win32Globals *>(g_winGlobalsBuffer.m_bytes);
 
 	void *MallocDriver_Win32::Alloc(size_t size)
 	{
@@ -106,7 +117,7 @@ namespace rkit
 	IModule *ModuleDriver_Win32::LoadModule(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams)
 	{
 		// Base module driver does no deduplication
-		IMallocDriver *mallocDriver = g_drivers_Win32.m_mallocDriver;
+		IMallocDriver *mallocDriver = g_winGlobals.m_drivers.m_mallocDriver;
 
 		char *nameBuf = static_cast<char *>(mallocDriver->Alloc(strlen(moduleName) + strlen("????_.dll") + 1));
 		if (!nameBuf)
@@ -222,7 +233,7 @@ namespace rkit
 	{
 		typedef void (*initProc_t)(void *);
 
-		m_moduleAPI.m_drivers = &g_drivers_Win32;
+		m_moduleAPI.m_drivers = &g_winGlobals.m_drivers;
 		m_moduleAPI.m_initFunction = nullptr;
 		m_moduleAPI.m_shutdownFunction = nullptr;
 
@@ -251,7 +262,7 @@ namespace rkit
 
 	const Drivers &rkit::GetDrivers()
 	{
-		return g_drivers_Win32;
+		return g_winGlobals.m_drivers;
 	}
 }
 
@@ -259,17 +270,19 @@ static int WinMainCommon(HINSTANCE hInstance)
 {
 	setlocale(LC_ALL, "C");
 
-	rkit::Drivers *drivers = &rkit::g_drivers_Win32;
+	new (rkit::g_winGlobalsBuffer.m_bytes) rkit::Win32Globals();
 
-	drivers->m_mallocDriver.m_obj = &rkit::g_mallocDriver;
-	drivers->m_moduleDriver.m_obj = &rkit::g_moduleDriver;
+	rkit::Drivers *drivers = &rkit::g_winGlobals.m_drivers;
+
+	drivers->m_mallocDriver.m_obj = &rkit::g_winGlobals.m_mallocDriver;
+	drivers->m_moduleDriver.m_obj = &rkit::g_winGlobals.m_moduleDriver;
 
 #if RKIT_IS_DEBUG
-	drivers->m_logDriver.m_obj = &rkit::g_consoleLogDriver;
+	drivers->m_logDriver.m_obj = &rkit::g_winGlobals.m_consoleLogDriver;
 #endif
 
-	rkit::WString modulePathStr;
-	rkit::WString moduleDirStr;
+	rkit::WString16 modulePathStr;
+	rkit::WString16 moduleDirStr;
 
 	{
 		DWORD requiredSize = 16;
@@ -321,12 +334,12 @@ static int WinMainCommon(HINSTANCE hInstance)
 		modulePathStr.Clear();
 		moduleDirStr.Clear();
 
-		systemModule = ::rkit::g_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "System_Win32", &systemParams);
+		systemModule = ::rkit::g_winGlobals.m_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "System_Win32", &systemParams);
 		if (!systemModule)
 			return rkit::utils::ResultToExitCode(rkit::Result(rkit::ResultCode::kModuleLoadFailed));
 	}
 
-	rkit::IModule *programLauncherModule = ::rkit::g_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "ProgramLauncher", nullptr);
+	rkit::IModule *programLauncherModule = ::rkit::g_winGlobals.m_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "ProgramLauncher", nullptr);
 	if (!programLauncherModule)
 	{
 		systemModule->Unload();
@@ -350,6 +363,8 @@ static int WinMainCommon(HINSTANCE hInstance)
 
 	programLauncherModule->Unload();
 	systemModule->Unload();
+
+	rkit::g_winGlobals.~Win32Globals();
 
 	return rkit::utils::ResultToExitCode(result);
 }

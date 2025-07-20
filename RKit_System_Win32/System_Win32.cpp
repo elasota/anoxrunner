@@ -350,8 +350,8 @@ namespace rkit
 		UniquePtr<AsyncIOThread_Win32> m_asioThread;
 		LPWSTR *m_argvW;
 
-		WString m_exePathStr;
-		WString m_programDirStr;
+		WString16 m_exePathStr;
+		WString16 m_programDirStr;
 
 		OSAbsPath m_gameDirectoryOverride;
 		OSAbsPath m_settingsDirectory;
@@ -1003,7 +1003,7 @@ namespace rkit
 	{
 		RKIT_CHECK(ConvUtil_Win32::UTF16ToUTF8(m_findData.cFileName, m_fileNameUTF8));
 
-		outItem.m_fileName = OSRelPathView(WStringView(m_findData.cFileName, wcslen(m_findData.cFileName)));
+		outItem.m_fileName = OSRelPathView(WString16View(m_findData.cFileName, wcslen(m_findData.cFileName)));
 		outItem.m_attribs.m_isDirectory = ((m_findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0);
 		outItem.m_attribs.m_fileSize = (static_cast<FilePos_t>(m_findData.nFileSizeHigh) << 32) + m_findData.nFileSizeLow;
 		outItem.m_attribs.m_fileTime = ConvUtil_Win32::FileTimeToUTCMSec(m_findData.ftLastWriteTime);
@@ -1679,7 +1679,7 @@ namespace rkit
 		CoTaskMemFree(docsPath);
 
 		OSAbsPath osPath;
-		RKIT_CHECK(osPath.Set(WString(std::move(docsPathStrBuf))));
+		RKIT_CHECK(osPath.Set(WString16(std::move(docsPathStrBuf))));
 
 		OSRelPath settingsSubPath;
 		RKIT_CHECK(settingsSubPath.SetFromUTF8(path));

@@ -9,7 +9,7 @@ namespace rkit
 {
 	struct SystemModuleInitParameters_Win32 : public ModuleInitParameters
 	{
-		explicit SystemModuleInitParameters_Win32(const HINSTANCE &hinstance, WString &&executablePath, WString &&programDir)
+		explicit SystemModuleInitParameters_Win32(const HINSTANCE &hinstance, WString16 &&executablePath, WString16 &&programDir)
 			: m_hinst(hinstance)
 			, m_executablePath(std::move(executablePath))
 			, m_programDir(std::move(programDir))
@@ -17,7 +17,7 @@ namespace rkit
 		}
 
 		HINSTANCE m_hinst;
-		WString m_executablePath;
-		WString m_programDir;
+		WString16 m_executablePath;
+		WString16 m_programDir;
 	};
 }
