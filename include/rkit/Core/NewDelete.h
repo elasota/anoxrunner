@@ -1,10 +1,90 @@
 #pragma once
 
+#include "OpaquePairing.h"
 
 #include <limits>
 #include <utility>
 #include <new>
 #include <type_traits>
+
+namespace rkit
+{
+	template<class TImpl>
+	class Opaque;
+
+	template<class TImpl>
+	class OpaqueImplementation;
+
+	namespace priv
+	{
+		template<class T>
+		struct NonOpaqueSizeAlignResolver
+		{
+			static constexpr size_t GetSize()
+			{
+				return sizeof(T);
+			}
+
+			static constexpr size_t GetAlign()
+			{
+				return alignof(T);
+			}
+		};
+
+		template<class TBase, class TImpl>
+		struct OpaqueSizeAlignResolver
+		{
+		public:
+			inline void CheckOpaque()
+			{
+				OpaqueImplementation<TBase> *opaqueImpl = static_cast<TImpl *>(nullptr);
+				Opaque<TImpl> *opaque = static_cast<TBase *>(nullptr);
+
+				(void)opaqueImpl;
+				(void)opaque;
+			}
+
+		public:
+			static constexpr size_t GetSize()
+			{
+				CheckOpaque();
+				return sizeof(OpaquePairing<TBase, TImpl>);
+			}
+
+			static constexpr size_t GetAlign()
+			{
+				CheckOpaque();
+				return alignof(OpaquePairing<TBase, TImpl>);
+			}
+		};
+
+		template<class TType>
+		constexpr NonOpaqueSizeAlignResolver<TType> IsOpaqueChecker(TType *, void *)
+		{
+			return NonOpaqueSizeAlignResolver<TType>();
+		}
+
+		template<class TType, class TImpl>
+		constexpr OpaqueSizeAlignResolver<TType, TImpl> IsOpaqueChecker(TType *type, Opaque<TImpl> *)
+		{
+			return OpaqueSizeAlignResolver<TType, TImpl>();
+		}
+
+		template<class TType>
+		struct NewSizeAlignResolver
+		{
+			static constexpr size_t GetSize()
+			{
+				return IsOpaqueChecker(static_cast<TType *>(nullptr), static_cast<TType *>(nullptr)).GetSize();
+			}
+
+			static constexpr size_t GetAlign()
+			{
+				return IsOpaqueChecker(static_cast<TType *>(nullptr), static_cast<TType *>(nullptr)).GetAlign();
+			}
+		};
+	}
+}
 
 namespace rkit
 {
@@ -46,7 +126,7 @@ namespace rkit
 template<class TType, class TPtrType, class... TArgs>
 inline rkit::Result rkit::NewWithAlloc(UniquePtr<TPtrType> &objPtr, IMallocDriver *alloc, TArgs&& ...args)
 {
-	void *mem = alloc->Alloc(sizeof(TType));
+	void *mem = alloc->Alloc(priv::NewSizeAlignResolver<TType>::GetSize());
 	if (!mem)
 		return ResultCode::kOutOfMemory;
 
@@ -65,7 +145,7 @@ inline rkit::Result rkit::New(UniquePtr<TPtrType> &objPtr, TArgs&& ...args)
 template<class TType, class TPtrType>
 rkit::Result rkit::NewWithAlloc(UniquePtr<TPtrType> &objPtr, IMallocDriver *alloc)
 {
-	void *mem = alloc->Alloc(sizeof(TType));
+	void *mem = alloc->Alloc(priv::NewSizeAlignResolver<TType>::GetSize());
 	if (!mem)
 		return ResultCode::kOutOfMemory;
 
