@@ -1587,7 +1587,7 @@ namespace rkit { namespace buildsystem
 
 		utils::Sha256DigestBytes digest = calculator->FlushToBytes(streamingState.m_state);
 
-		static_assert(sizeof(digest.m_data) == sizeof(outContentID.m_data));
+		static_assert(sizeof(digest.m_data) == sizeof(outContentID.m_data), "Digest size was wrong");
 
 		memcpy(outContentID.m_data, digest.m_data, sizeof(digest.m_data));
 

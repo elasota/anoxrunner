@@ -26,19 +26,34 @@ namespace anox
 		public:
 			explicit Archive(rkit::IMallocDriver *alloc);
 
-			rkit::Result Open(rkit::UniquePtr<rkit::ISeekableReadStream> &&stream);
+			rkit::Result Open(rkit::UniquePtr<rkit::ISeekableReadStream> &&stream, bool allowBrokenFilePaths);
 
-			FileHandle FindFile(const rkit::StringSliceView &fileName) const override;
+			FileHandle FindFile(const rkit::StringSliceView &fileName, bool allowDirectories) const override;
 
 		private:
+			class DirectoryTreeBuilder;
+
 			struct FileInfo
 			{
 				FileInfo();
 
-				rkit::StringView m_name;
+				rkit::StringView m_fullPath;
+				rkit::StringSliceView m_fileName;
 				uint32_t m_filePosition;
 				uint32_t m_compressedSize;
 				uint32_t m_uncompressedSize;
+			};
+
+			struct DirectoryInfo
+			{
+				DirectoryInfo();
+				
+				rkit::StringSliceView m_fullPath;
+				rkit::StringSliceView m_name;
+				uint32_t m_firstFile;
+				uint32_t m_numFiles;
+				uint32_t m_firstSubDirectory;
+				uint32_t m_numSubDirectories;
 			};
 
 			uint32_t GetNumFiles() const override;
@@ -46,6 +61,13 @@ namespace anox
 			rkit::Result OpenFileByIndex(uint32_t fileIndex, rkit::UniquePtr<rkit::ISeekableReadStream> &outStream) const override;
 			uint32_t GetFileSizeByIndex(uint32_t fileIndex) const override;
 			rkit::StringView GetFilePathByIndex(uint32_t fileIndex) const override;
+			rkit::StringSliceView GetDirectoryPathByIndex(uint32_t fileIndex) const override;
+
+			FileHandle GetDirectoryByIndex(uint32_t dirIndex) const override;
+			uint32_t GetDirectoryFirstFile(uint32_t dirIndex) const override;
+			uint32_t GetDirectoryFirstSubDir(uint32_t dirIndex) const override;
+			uint32_t GetDirectoryFileCount(uint32_t dirIndex) const override;
+			uint32_t GetDirectorySubDirCount(uint32_t dirIndex) const override;
 
 			static size_t FixBrokenFilePath(char *chars, size_t len);
 			static rkit::Result CheckName(const rkit::Span<const char> &name);
@@ -53,6 +75,7 @@ namespace anox
 
 			rkit::SharedPtr<rkit::IMutexProtectedReadStream> m_stream;
 			rkit::Vector<FileInfo> m_files;
+			rkit::Vector<DirectoryInfo> m_directories;
 			rkit::Vector<char> m_fileNameChars;
 
 			rkit::IMallocDriver *m_alloc;

@@ -330,10 +330,7 @@ bool rkit::BaseStringSliceView<TChar, TEncoding>::operator!=(const BaseStringSli
 template<class TChar, rkit::CharacterEncoding TEncoding>
 bool rkit::BaseStringSliceView<TChar, TEncoding>::operator<(const BaseStringSliceView<TChar, TEncoding> &other) const
 {
-	if (m_span.Count() != other.m_span.Count())
-		return m_span.Count() < other.m_span.Count();
-
-	const size_t length = m_span.Count();
+	const size_t length = rkit::Min(m_span.Count(), other.m_span.Count());
 	const TChar *charsA = m_span.Ptr();
 	const TChar *charsB = other.m_span.Ptr();
 
@@ -343,7 +340,7 @@ bool rkit::BaseStringSliceView<TChar, TEncoding>::operator<(const BaseStringSlic
 			return charsA[i] < charsB[i];
 	}
 
-	return false;
+	return m_span.Count() < other.m_span.Count();
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding>

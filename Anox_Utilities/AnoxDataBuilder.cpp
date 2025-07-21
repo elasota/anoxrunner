@@ -68,7 +68,7 @@ namespace anox { namespace utils
 
 		static rkit::Result StripTrailingPathSeparators(rkit::String &str);
 
-		bool FindFileInArchive(const rkit::CIPathView &path, const MountedArchive *&outArchive, afs::FileHandle &outFileHandle);
+		bool FindFileInArchive(const rkit::CIPathView &path, bool allowDirectories, const MountedArchive *&outArchive, afs::FileHandle &outFileHandle);
 
 		rkit::OSAbsPath m_sourceDir;
 		rkit::OSAbsPath m_intermedDir;
@@ -273,10 +273,11 @@ namespace anox { namespace utils
 		if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kSourceDir)
 		{
 			afs::FileHandle fileHandle;
-			const MountedArchive *archive;
-			if (FindFileInArchive(path, archive, fileHandle))
+			const MountedArchive *archive = nullptr;
+			if (FindFileInArchive(path, allowDirectories, archive, fileHandle))
 			{
 				attribs = archive->m_fileAttribs;
+				attribs.m_isDirectory = fileHandle.IsDirectory();
 				exists = true;
 				isInArchive = true;
 			}
@@ -361,7 +362,7 @@ namespace anox { namespace utils
 		{
 			afs::FileHandle fileHandle;
 			const MountedArchive *archive;
-			if (FindFileInArchive(path, archive, fileHandle))
+			if (FindFileInArchive(path, false, archive, fileHandle))
 				return fileHandle.Open(outStream);
 
 			rkit::OSRelPath relPath;
@@ -501,12 +502,83 @@ namespace anox { namespace utils
 					}
 				}
 			}
+
+			if (path.NumComponents() >= 1)
+			{
+				rkit::StringSliceView firstComponent = path[0];
+
+				for (const MountedArchive &archive : m_afsArchives)
+				{
+					if (archive.m_archiveName == firstComponent)
+					{
+						afs::FileHandle dirHandle;
+						if (path.NumComponents() == 1)
+							dirHandle = archive.m_archive->GetRootDirectory();
+						else
+						{
+							rkit::StringSliceView remainder = path.ToStringView().SubString(firstComponent.Length() + 1);
+							afs::FileHandle dirHandle = archive.m_archive->FindFile(remainder, true);
+						}
+
+						if (dirHandle.IsValid() && dirHandle.IsDirectory())
+						{
+							rkit::CIPath basePath;
+							RKIT_CHECK(basePath.Set(firstComponent));
+
+							if (listFiles)
+							{
+								const uint32_t numFiles = dirHandle.GetNumFiles();
+								for (uint32_t i = 0; i < numFiles; i++)
+								{
+									afs::FileHandle subHandle = dirHandle.GetFileByIndex(i);
+									RKIT_ASSERT(subHandle.IsValid() && !subHandle.IsDirectory());
+
+									rkit::CIPath subPath;
+									RKIT_CHECK(subPath.Set(subHandle.GetFilePath()));
+
+									rkit::buildsystem::FileStatus fileStatus;
+
+									fileStatus.m_filePath = basePath;
+									RKIT_CHECK(fileStatus.m_filePath.Append(subPath));
+
+									fileStatus.m_fileSize = subHandle.GetFileSize();
+									fileStatus.m_fileTime = archive.m_fileAttribs.m_fileTime;
+									fileStatus.m_isDirectory = false;
+									fileStatus.m_location = inputFileLocation;
+
+									RKIT_CHECK(callback(userdata, fileStatus.ToView()));
+								}
+							}
+							if (listDirectories)
+							{
+								const uint32_t numDirs = dirHandle.GetNumSubdirectories();
+								for (uint32_t i = 0; i < numDirs; i++)
+								{
+									afs::FileHandle subHandle = dirHandle.GetSubdirectoryByIndex(i);
+									RKIT_ASSERT(subHandle.IsValid() && subHandle.IsDirectory());
+
+									rkit::buildsystem::FileStatus fileStatus;
+									RKIT_CHECK(fileStatus.m_filePath.Set(subHandle.GetFilePath()));
+									fileStatus.m_fileSize = 0;
+									fileStatus.m_fileTime = archive.m_fileAttribs.m_fileTime;
+									fileStatus.m_isDirectory = true;
+									fileStatus.m_location = inputFileLocation;
+
+									RKIT_CHECK(callback(userdata, fileStatus.ToView()));
+								}
+							}
+						}
+
+						break;
+					}
+				}
+			}
 		}
 
 		return rkit::ResultCode::kOK;
 	}
 
-	bool AnoxFileSystem::FindFileInArchive(const rkit::CIPathView &path, const MountedArchive *&outArchive, afs::FileHandle &outFileHandle)
+	bool AnoxFileSystem::FindFileInArchive(const rkit::CIPathView &path, bool allowDirectories, const MountedArchive *&outArchive, afs::FileHandle &outFileHandle)
 	{
 		rkit::Optional<size_t> firstSlashPos;
 
@@ -532,7 +604,7 @@ namespace anox { namespace utils
 			{
 				if (archive.m_archiveName == archiveName)
 				{
-					outFileHandle = archive.m_archive->FindFile(itemName);
+					outFileHandle = archive.m_archive->FindFile(itemName, allowDirectories);
 					if (outFileHandle.IsValid())
 					{
 						outArchive = &archive;
@@ -540,6 +612,21 @@ namespace anox { namespace utils
 					}
 
 					break;
+				}
+			}
+		}
+		else
+		{
+			if (allowDirectories)
+			{
+				for (const MountedArchive &archive : m_afsArchives)
+				{
+					if (archive.m_archiveName == pathStr)
+					{
+						outFileHandle = afs::FileHandle(archive.m_archive.Get(), 0, true);
+						outArchive = &archive;
+						return true;
+					}
 				}
 			}
 		}

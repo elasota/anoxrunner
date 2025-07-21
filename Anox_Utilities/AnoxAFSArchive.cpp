@@ -2,15 +2,206 @@
 
 #include "anox/AFSFormat.h"
 
+#include "rkit/Core/HashTable.h"
 #include "rkit/Core/LogDriver.h"
+#include "rkit/Core/Optional.h"
 #include "rkit/Core/SharedPtr.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/UtilitiesDriver.h"
+
+#include <algorithm>
 
 namespace anox
 {
 	namespace afs
 	{
+		class Archive::DirectoryTreeBuilder
+		{
+		public:
+			static rkit::Result BuildFileTree(rkit::Vector<FileInfo> &files, rkit::Vector<DirectoryInfo> &directories);
+
+		private:
+			struct Directory
+			{
+				rkit::Vector<FileInfo> m_files;
+				rkit::Vector<Directory> m_subDirectories;
+
+				rkit::StringSliceView m_fullDirPath;
+				rkit::StringSliceView m_name;
+				rkit::HashMap<rkit::StringSliceView, size_t> m_subDirectoriesByName;
+				rkit::HashMap<rkit::StringSliceView, size_t> m_filesByName;
+			};
+
+			static rkit::Result RecursiveInsertFile(Directory &dir, const FileInfo &file, size_t sliceStart);
+			static rkit::Result InsertFile(Directory &dir, const FileInfo &file, const rkit::StringSliceView &nameSlice);
+			static rkit::Result InsertDirectory(Directory &dir, Directory *&outDirectory, const rkit::StringSliceView &fullDirPath, const rkit::StringSliceView &nameSlice);
+			static void RecursiveSortAndCountDirectories(Directory &dir, size_t &outNumFiles, size_t &outNumDirectories);
+			static void RecursiveUnrollDirectory(rkit::Vector<FileInfo> &files, size_t &numFiles, rkit::Vector<DirectoryInfo> &directories, size_t &numDirectories, const Directory &dir, size_t placementIndex);
+
+			static bool SortCompareFile(const FileInfo &a, const FileInfo &b);
+			static bool SortCompareDirectory(const Directory &a, const Directory &b);
+		};
+
+		rkit::Result Archive::DirectoryTreeBuilder::BuildFileTree(rkit::Vector<FileInfo> &files, rkit::Vector<DirectoryInfo> &directories)
+		{
+			Directory rootDirectory;
+
+			for (const FileInfo &file : files)
+			{
+				RKIT_CHECK(RecursiveInsertFile(rootDirectory, file, 0));
+			}
+
+			size_t numFiles = 0;
+			size_t numDirectories = 1;
+			RecursiveSortAndCountDirectories(rootDirectory, numFiles, numDirectories);
+
+			files.Reset();
+
+			RKIT_CHECK(files.Resize(numFiles));
+			RKIT_CHECK(directories.Resize(numDirectories));
+
+			numFiles = 0;
+			numDirectories = 1;
+			RecursiveUnrollDirectory(files, numFiles, directories, numDirectories, rootDirectory, 0);
+
+			return rkit::ResultCode::kOK;
+		}
+
+		void Archive::DirectoryTreeBuilder::RecursiveSortAndCountDirectories(Directory &dir, size_t &outNumFiles, size_t &outNumDirectories)
+		{
+			std::sort(dir.m_files.begin(), dir.m_files.end(), SortCompareFile);
+			std::sort(dir.m_subDirectories.begin(), dir.m_subDirectories.end(), SortCompareDirectory);
+
+			outNumFiles += dir.m_files.Count();
+			outNumDirectories += dir.m_subDirectories.Count();
+
+			for (Directory &subDir : dir.m_subDirectories)
+				RecursiveSortAndCountDirectories(subDir, outNumFiles, outNumDirectories);
+		}
+
+		void Archive::DirectoryTreeBuilder::RecursiveUnrollDirectory(rkit::Vector<FileInfo> &files, size_t &numFiles, rkit::Vector<DirectoryInfo> &directories, size_t &numDirectories, const Directory &dir, size_t placementIndex)
+		{
+			const size_t firstFile = numFiles;
+			const size_t firstDir = numDirectories;
+			const size_t dirNumFiles = dir.m_files.Count();
+			const size_t dirNumSubDirs = dir.m_subDirectories.Count();
+
+			DirectoryInfo &dirInfo = directories[placementIndex];
+
+			dirInfo.m_firstFile = static_cast<uint32_t>(firstFile);
+			dirInfo.m_numFiles = static_cast<uint32_t>(dirNumFiles);
+			dirInfo.m_firstSubDirectory = static_cast<uint32_t>(firstDir);
+			dirInfo.m_numSubDirectories = static_cast<uint32_t>(dirNumSubDirs);
+			dirInfo.m_fullPath = dir.m_fullDirPath;
+			dirInfo.m_name = dir.m_name;
+
+			numFiles += dirNumFiles;
+			numDirectories += dirNumSubDirs;
+
+			for (size_t i = 0; i < dirNumFiles; i++)
+				files[i + firstFile] = dir.m_files[i];
+
+			for (size_t i = 0; i < dirNumSubDirs; i++)
+				RecursiveUnrollDirectory(files, numFiles, directories, numDirectories, dir.m_subDirectories[i], firstDir + i);
+		}
+
+		bool Archive::DirectoryTreeBuilder::SortCompareFile(const FileInfo &a, const FileInfo &b)
+		{
+			return a.m_fileName < b.m_fileName;
+		}
+
+		bool Archive::DirectoryTreeBuilder::SortCompareDirectory(const Directory &a, const Directory &b)
+		{
+			return a.m_name < b.m_name;
+		}
+
+		rkit::Result Archive::DirectoryTreeBuilder::RecursiveInsertFile(Directory &dir, const FileInfo &file, size_t sliceStart)
+		{
+			rkit::StringView fullName = file.m_fullPath;
+			rkit::Optional<size_t> slashPos;
+
+			for (size_t i = sliceStart; i < fullName.Length(); i++)
+			{
+				if (fullName[i] == '/')
+				{
+					slashPos = i;
+					break;
+				}
+			}
+
+			if (slashPos.IsSet())
+			{
+				Directory *subDirectory = nullptr;
+				RKIT_CHECK(InsertDirectory(dir, subDirectory, fullName.SubString(0, slashPos.Get()), fullName.SubString(sliceStart, slashPos.Get() - sliceStart)));
+				RKIT_CHECK(RecursiveInsertFile(*subDirectory, file, slashPos.Get() + 1));
+			}
+			else
+			{
+				FileInfo filledFile = file;
+				filledFile.m_fileName = fullName.SubString(sliceStart);
+				RKIT_CHECK(InsertFile(dir, filledFile, fullName.SubString(sliceStart)));
+			}
+
+			return rkit::ResultCode::kOK;
+		}
+
+		rkit::Result Archive::DirectoryTreeBuilder::InsertFile(Directory &dir, const FileInfo &file, const rkit::StringSliceView &nameSlice)
+		{
+			if (nameSlice.Length() == 0)
+				return rkit::ResultCode::kDataError;
+
+			rkit::HashValue_t nameHash = rkit::Hasher<rkit::StringSliceView>::ComputeHash(0, nameSlice);
+
+			if (dir.m_subDirectoriesByName.FindPrehashed(nameHash, nameSlice) != dir.m_subDirectoriesByName.end())
+				return rkit::ResultCode::kDataError;
+
+			rkit::HashMap<rkit::StringSliceView, size_t>::ConstIterator_t it = dir.m_filesByName.FindPrehashed(nameHash, nameSlice);
+
+			if (it != dir.m_filesByName.end())
+				return rkit::ResultCode::kDataError;
+
+			// New file
+			size_t fileIndex = dir.m_files.Count();
+
+			RKIT_CHECK(dir.m_files.Append(file));
+
+			RKIT_CHECK(dir.m_filesByName.SetPrehashed(nameHash, nameSlice, fileIndex));
+
+			return rkit::ResultCode::kOK;
+		}
+
+		rkit::Result Archive::DirectoryTreeBuilder::InsertDirectory(Directory &dir, Directory *&outDirectory, const rkit::StringSliceView &fullDirPath, const rkit::StringSliceView &nameSlice)
+		{
+			if (nameSlice.Length() == 0)
+				return rkit::ResultCode::kDataError;
+
+			rkit::HashValue_t nameHash = rkit::Hasher<rkit::StringSliceView>::ComputeHash(0, nameSlice);
+
+			if (dir.m_filesByName.FindPrehashed(nameHash, nameSlice) != dir.m_filesByName.end())
+				return rkit::ResultCode::kDataError;
+
+			rkit::HashMap<rkit::StringSliceView, size_t>::ConstIterator_t it = dir.m_subDirectoriesByName.FindPrehashed(nameHash, nameSlice);
+
+			if (it != dir.m_subDirectoriesByName.end())
+			{
+				outDirectory = &dir.m_subDirectories[it.Value()];
+				return rkit::ResultCode::kOK;
+			}
+
+			// New directory
+			size_t dirIndex = dir.m_subDirectories.Count();
+			RKIT_CHECK(dir.m_subDirectories.Append(Directory()));
+
+			Directory *newDir = &dir.m_subDirectories[dirIndex];
+			newDir->m_fullDirPath = fullDirPath;
+			newDir->m_name = nameSlice;
+
+			RKIT_CHECK(dir.m_subDirectoriesByName.SetPrehashed(nameHash, nameSlice, dirIndex));
+
+			outDirectory = newDir;
+			return rkit::ResultCode::kOK;
+		}
+
 		Archive::Archive(rkit::IMallocDriver *alloc)
 			: m_files(alloc)
 			, m_fileNameChars(alloc)
@@ -18,7 +209,7 @@ namespace anox
 		{
 		}
 
-		rkit::Result Archive::Open(rkit::UniquePtr<rkit::ISeekableReadStream> &&movedStream)
+		rkit::Result Archive::Open(rkit::UniquePtr<rkit::ISeekableReadStream> &&movedStream, bool allowBrokenFilePaths)
 		{
 			rkit::UniquePtr<rkit::ISeekableReadStream> stream(std::move(movedStream));
 
@@ -70,13 +261,17 @@ namespace anox
 				char *charsWriteLoc = m_fileNameChars.GetBuffer() + filePathWritePos;
 				memcpy(charsWriteLoc, fileData.m_filePath, filePathLen);
 
-				filePathLen = FixBrokenFilePath(charsWriteLoc, filePathLen);
+				if (!allowBrokenFilePaths)
+					filePathLen = FixBrokenFilePath(charsWriteLoc, filePathLen);
 
 				charsWriteLoc[filePathLen] = '\0';
 
-				fileInfo.m_name = rkit::StringView(charsWriteLoc, filePathLen);
+				fileInfo.m_fullPath = rkit::StringView(charsWriteLoc, filePathLen);
 
-				RKIT_CHECK(CheckName(fileInfo.m_name.ToSpan()));
+				if (!allowBrokenFilePaths)
+				{
+					RKIT_CHECK(CheckName(fileInfo.m_fullPath.ToSpan()));
+				}
 
 				fileInfo.m_filePosition = fileData.m_location.Get();
 				fileInfo.m_compressedSize = fileData.m_compressedSize.Get();
@@ -98,13 +293,15 @@ namespace anox
 					c = '/';
 			}
 
+			RKIT_CHECK(DirectoryTreeBuilder::BuildFileTree(m_files, m_directories));
+
 			// Finally wrap stream
 			RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->CreateMutexProtectedReadStream(m_stream, std::move(stream)));
 
 			return rkit::ResultCode::kOK;
 		}
 
-		FileHandle Archive::FindFile(const rkit::StringSliceView &fileName) const
+		FileHandle Archive::FindFile(const rkit::StringSliceView &fileName, bool allowDirectories) const
 		{
 			size_t numFiles = m_files.Count();
 
@@ -112,8 +309,8 @@ namespace anox
 			{
 				const FileInfo &finfo = m_files[i];
 
-				if (finfo.m_name == fileName)
-					return FileHandle(this, static_cast<uint32_t>(i));
+				if (finfo.m_fullPath == fileName)
+					return FileHandle(this, static_cast<uint32_t>(i), false);
 			}
 
 			return FileHandle();
@@ -150,8 +347,39 @@ namespace anox
 
 		rkit::StringView Archive::GetFilePathByIndex(uint32_t fileIndex) const
 		{
-			return m_files[fileIndex].m_name;
+			return m_files[fileIndex].m_fullPath;
 		}
+
+		rkit::StringSliceView Archive::GetDirectoryPathByIndex(uint32_t fileIndex) const
+		{
+			return m_directories[fileIndex].m_fullPath;
+		}
+
+		FileHandle Archive::GetDirectoryByIndex(uint32_t dirIndex) const
+		{
+			return FileHandle(this, dirIndex, true);
+		}
+
+		uint32_t Archive::GetDirectoryFirstFile(uint32_t dirIndex) const
+		{
+			return m_directories[dirIndex].m_firstFile;
+		}
+
+		uint32_t Archive::GetDirectoryFirstSubDir(uint32_t dirIndex) const
+		{
+			return m_directories[dirIndex].m_firstSubDirectory;
+		}
+
+		uint32_t Archive::GetDirectoryFileCount(uint32_t dirIndex) const
+		{
+			return m_directories[dirIndex].m_numFiles;
+		}
+
+		uint32_t Archive::GetDirectorySubDirCount(uint32_t dirIndex) const
+		{
+			return m_directories[dirIndex].m_numSubDirectories;
+		}
+
 
 		uint32_t Archive::GetNumFiles() const
 		{
@@ -160,13 +388,21 @@ namespace anox
 
 		FileHandle Archive::GetFileByIndex(uint32_t fileIndex) const
 		{
-			return FileHandle(this, fileIndex);
+			return FileHandle(this, fileIndex, false);
 		}
 
 		Archive::FileInfo::FileInfo()
 			: m_filePosition(0)
 			, m_compressedSize(0)
 			, m_uncompressedSize(0)
+		{
+		}
+
+		Archive::DirectoryInfo::DirectoryInfo()
+			: m_firstFile(0)
+			, m_numFiles(0)
+			, m_firstSubDirectory(0)
+			, m_numSubDirectories(0)
 		{
 		}
 

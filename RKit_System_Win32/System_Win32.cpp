@@ -1345,7 +1345,7 @@ namespace rkit
 	Result SystemDriver_Win32::OpenFileRead(UniquePtr<ISeekableReadStream> &outStream, FileLocation location, const CIPathView &path)
 	{
 		OSAbsPath absPath;
-		RKIT_CHECK(ResolveAbsPath(absPath, location, path));
+		RKIT_CHECK_SOFT(ResolveAbsPath(absPath, location, path));
 
 		return OpenFileReadAbs(outStream, absPath);
 	}
@@ -1353,7 +1353,7 @@ namespace rkit
 	Result SystemDriver_Win32::OpenFileReadAbs(UniquePtr<ISeekableReadStream> &outStream, const OSAbsPathView &path)
 	{
 		UniquePtr<File_Win32> file;
-		RKIT_CHECK(OpenFileGeneral(file, path, false, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, 0));
+		RKIT_CHECK_SOFT(OpenFileGeneral(file, path, false, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, 0));
 
 		outStream = std::move(file);
 		return ResultCode::kOK;
