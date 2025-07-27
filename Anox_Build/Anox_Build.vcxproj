@@ -135,11 +135,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AnoxBSPMapCompiler.cpp" />
     <ClCompile Include="AnoxBuild.cpp" />
     <ClCompile Include="AnoxMaterialCompiler.cpp" />
     <ClCompile Include="AnoxTextureCompiler.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AnoxBSPMapCompiler.h" />
     <ClInclude Include="AnoxMaterialCompiler.h" />
     <ClInclude Include="AnoxTextureCompiler.h" />
   </ItemGroup>

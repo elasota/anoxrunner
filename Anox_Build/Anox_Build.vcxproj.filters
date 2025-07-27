@@ -24,12 +24,18 @@
     <ClCompile Include="AnoxTextureCompiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="AnoxBSPMapCompiler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AnoxMaterialCompiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="AnoxTextureCompiler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="AnoxBSPMapCompiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

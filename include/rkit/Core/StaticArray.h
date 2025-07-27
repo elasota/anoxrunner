@@ -14,6 +14,7 @@ namespace rkit
 		StaticArray();
 		StaticArray(const StaticArray<T, TSize> &other) = default;
 		StaticArray(StaticArray<T, TSize> &&other) = default;
+
 		~StaticArray();
 
 		StaticArray<T, TSize> &operator=(const StaticArray<T, TSize> &other);

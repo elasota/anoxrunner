@@ -20,6 +20,11 @@
 
 #define RKIT_STATIC_ASSERT(expr) static_assert((expr), #expr)
 
+#if RKIT_IS_DEBUG
+#define RKIT_DEBUG_ONLY(...) __VA_ARGS__
+#else
+#define RKIT_DEBUG_ONLY(...)
+#endif
 
 #ifdef _MSC_VER
 #pragma warning(error:4715)	// Not all control paths return a value

@@ -83,6 +83,8 @@
     <ClCompile Include="System_Win32.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\include\rkit\Math\BitOps.h" />
+    <ClInclude Include="..\include\rkit\Math\UInt128.h" />
     <ClInclude Include="..\include\rkit\Win32\Win32ModuleInitParameters.h" />
     <ClInclude Include="..\include\rkit\Win32\Win32PlatformDriver.h" />
     <ClInclude Include="ConvUtil.h" />

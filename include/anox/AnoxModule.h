@@ -4,5 +4,5 @@
 
 namespace anox
 {
-	static uint32_t kAnoxNamespaceID = 0x786f6e41;
+	static const uint32_t kAnoxNamespaceID = 0x786f6e41;
 }

@@ -112,7 +112,21 @@ namespace rkit
 
 		if (pos > m_filePos)
 		{
-			return ResultCode::kNotYetImplemented;
+			uint8_t scrap[2048];
+
+			rkit::FilePos_t remaining = pos - m_filePos;
+			while (remaining > 0)
+			{
+				rkit::FilePos_t thisChunkSize = remaining;
+				if (thisChunkSize > sizeof(scrap))
+					thisChunkSize = sizeof(scrap);
+
+				RKIT_CHECK(ReadAll(scrap, static_cast<size_t>(thisChunkSize)));
+
+				remaining -= thisChunkSize;
+			}
+
+			RKIT_ASSERT(Tell() == pos);
 		}
 
 		return ResultCode::kOK;
@@ -153,7 +167,17 @@ namespace rkit
 
 	Result DeflateDecompressStream::RestartDecompression()
 	{
-		return ResultCode::kNotYetImplemented;
+		if (m_streamInitialized)
+		{
+			RKIT_CHECK(m_seekable->SeekStart(0));
+
+			inflateEnd(&m_zstream);
+			m_streamInitialized = false;
+
+			m_filePos = 0;
+		}
+
+		return ResultCode::kOK;
 	}
 
 	FilePos_t DeflateDecompressStream::Tell() const

@@ -73,6 +73,8 @@ namespace rkit
 
 		Ordering Compare(const BaseStringSliceView<TChar, TEncoding> &other) const;
 
+		bool Validate() const;
+
 	private:
 		Span<const TChar> m_span;
 	};
@@ -92,6 +94,7 @@ namespace rkit
 }
 
 #include "CharCompare.h"
+#include "CharacterEncodingValidator.h"
 #include "Hasher.h"
 #include "StringUtil.h"
 
@@ -365,6 +368,13 @@ template<class TChar, rkit::CharacterEncoding TEncoding>
 rkit::Ordering rkit::BaseStringSliceView<TChar, TEncoding>::Compare(const BaseStringSliceView<TChar, TEncoding> &other) const
 {
 	return CharCompare<TChar, TEncoding>::Compare(m_span, other.m_span);
+}
+
+
+template<class TChar, rkit::CharacterEncoding TEncoding>
+bool rkit::BaseStringSliceView<TChar, TEncoding>::Validate() const
+{
+	return rkit::CharacterEncodingValidator<TEncoding>::ValidateSpan(m_span);
 }
 
 template<class TChar>

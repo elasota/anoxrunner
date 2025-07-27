@@ -41,5 +41,11 @@
     <ClInclude Include="Win32AsyncIOThread.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\rkit\Math\BitOps.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\rkit\Math\UInt128.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -222,9 +222,9 @@ namespace rkit
 		Result Set(const BasePathSliceView<TIsAbsolute, TPathTraits> &path);
 
 		template<class TOtherChar, CharacterEncoding TOtherPathEncoding>
-		Result SetFromEncodedString(const BaseStringView<TOtherChar, TOtherPathEncoding> &str);
+		Result SetFromEncodedString(const BaseStringSliceView<TOtherChar, TOtherPathEncoding> &str);
 
-		Result SetFromUTF8(const StringView &str);
+		Result SetFromUTF8(const StringSliceView &str);
 
 		template<class TOtherPathTraits>
 		Result ConvertFrom(const BasePathView<TIsAbsolute, TOtherPathTraits> &path);
@@ -852,7 +852,7 @@ namespace rkit
 
 	template<bool TIsAbsolute, class TPathTraits>
 	template<class TOtherChar, CharacterEncoding TOtherPathEncoding>
-	Result BasePath<TIsAbsolute, TPathTraits>::SetFromEncodedString(const BaseStringView<TOtherChar, TOtherPathEncoding> &str)
+	Result BasePath<TIsAbsolute, TPathTraits>::SetFromEncodedString(const BaseStringSliceView<TOtherChar, TOtherPathEncoding> &str)
 	{
 		if (str.Length() == 0)
 		{
@@ -871,7 +871,7 @@ namespace rkit
 
 
 	template<bool TIsAbsolute, class TPathTraits>
-	Result BasePath<TIsAbsolute, TPathTraits>::SetFromUTF8(const StringView &str)
+	Result BasePath<TIsAbsolute, TPathTraits>::SetFromUTF8(const StringSliceView &str)
 	{
 		return SetFromEncodedString<char, CharacterEncoding::kUTF8>(str);
 	}

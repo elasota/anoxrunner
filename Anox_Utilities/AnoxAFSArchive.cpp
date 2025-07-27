@@ -5,6 +5,7 @@
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/Optional.h"
+#include "rkit/Core/QuickSort.h"
 #include "rkit/Core/SharedPtr.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/UtilitiesDriver.h"
@@ -69,8 +70,8 @@ namespace anox
 
 		void Archive::DirectoryTreeBuilder::RecursiveSortAndCountDirectories(Directory &dir, size_t &outNumFiles, size_t &outNumDirectories)
 		{
-			std::sort(dir.m_files.begin(), dir.m_files.end(), SortCompareFile);
-			std::sort(dir.m_subDirectories.begin(), dir.m_subDirectories.end(), SortCompareDirectory);
+			rkit::QuickSort(dir.m_files.begin(), dir.m_files.end(), SortCompareFile);
+			rkit::QuickSort(dir.m_subDirectories.begin(), dir.m_subDirectories.end(), SortCompareDirectory);
 
 			outNumFiles += dir.m_files.Count();
 			outNumDirectories += dir.m_subDirectories.Count();

@@ -318,6 +318,12 @@ namespace anox { namespace buildsystem { namespace priv
 	template<class TPixelElement, size_t TElementsPerPixel>
 	rkit::Result TextureCompilerImage<TPixelElement, TElementsPerPixel>::Initialize(uint32_t width, uint32_t height)
 	{
+		if (width == 0 || height == 0)
+		{
+			rkit::log::Error("Image had 0 dimension");
+			return rkit::ResultCode::kDataError;
+		}
+
 		const size_t pitch = width;
 
 		size_t numElements = 0;
@@ -514,7 +520,170 @@ namespace anox { namespace buildsystem
 
 	rkit::Result TextureCompiler::CompileTGA(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		enum class TGADataType
+		{
+			kEmpty = 0,
+			kUncompressedPalette = 1,
+			kUncompressedColor = 2,
+			kRLEPalette = 9,
+			kRLEColor = 10,
+		};
+
+		struct TGAHeader
+		{
+			uint8_t m_identSize;
+			uint8_t m_colorMapType;
+			uint8_t m_dataType;
+			rkit::endian::LittleUInt16_t m_colorMapStart;
+			rkit::endian::LittleUInt16_t m_colorMapLength;
+			uint8_t m_colorMapEntrySizeBits;
+			rkit::endian::LittleUInt16_t m_imageOriginX;
+			rkit::endian::LittleUInt16_t m_imageOriginY;
+			rkit::endian::LittleUInt16_t m_imageWidth;
+			rkit::endian::LittleUInt16_t m_imageHeight;
+			uint8_t m_pixelSizeBits;
+			uint8_t m_imageDescriptor;
+		};
+
+		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
+		RKIT_CHECK(feedback->OpenInput(depsNode->GetInputFileLocation(), shortName, stream));
+
+		TGAHeader tgaHeader;
+		RKIT_CHECK(stream->ReadAll(&tgaHeader, sizeof(tgaHeader)));
+
+		RKIT_CHECK(stream->SeekCurrent(tgaHeader.m_identSize));
+
+		if (tgaHeader.m_colorMapLength.Get() > 0)
+		{
+			rkit::log::Error("Color mapped TGA not supported");
+			return rkit::ResultCode::kNotYetImplemented;
+		}
+
+		uint32_t width = tgaHeader.m_imageWidth.Get();
+		uint32_t height = tgaHeader.m_imageHeight.Get();
+
+		priv::TextureCompilerImage<uint8_t, 4> image;
+		RKIT_CHECK(image.Initialize(width, height));
+
+		if (tgaHeader.m_pixelSizeBits % 8 != 0)
+		{
+			rkit::log::Error("TGA bit format not supported");
+			return rkit::ResultCode::kNotYetImplemented;
+		}
+
+		const uint8_t pixelSizeBytes = tgaHeader.m_pixelSizeBits / 8;
+		size_t decompressedSizePixels = 0;
+		RKIT_CHECK(rkit::SafeMul<size_t>(decompressedSizePixels, width, height));
+
+		size_t decompressedSizeBytes = 0;
+		RKIT_CHECK(rkit::SafeMul<size_t>(decompressedSizeBytes, decompressedSizePixels, pixelSizeBytes));
+
+		rkit::Vector<uint8_t> decompressedImageData;
+		RKIT_CHECK(decompressedImageData.Resize(decompressedSizeBytes));
+
+		{
+			if (tgaHeader.m_dataType == static_cast<uint8_t>(TGADataType::kUncompressedColor))
+			{
+				RKIT_CHECK(stream->ReadAll(decompressedImageData.GetBuffer(), decompressedImageData.Count()));
+			}
+			else if (tgaHeader.m_dataType == static_cast<uint8_t>(TGADataType::kRLEColor))
+			{
+				size_t remainingPixelsToDecompress = decompressedSizePixels;
+				uint8_t *outBytes = decompressedImageData.GetBuffer();
+
+				while (remainingPixelsToDecompress > 0)
+				{
+					uint8_t packetHeaderAndFirstPixel[32];
+					RKIT_CHECK(stream->ReadAll(packetHeaderAndFirstPixel, pixelSizeBytes + 1));
+
+					const uint8_t additionalPixelsToOutput = (packetHeaderAndFirstPixel[0] & 0x7f);
+
+					memcpy(outBytes, packetHeaderAndFirstPixel + 1, pixelSizeBytes);
+
+					outBytes += pixelSizeBytes;
+					remainingPixelsToDecompress--;
+
+					if (remainingPixelsToDecompress < additionalPixelsToOutput)
+					{
+						rkit::log::Error("Compressed data overran target buffer");
+						return rkit::ResultCode::kDataError;
+					}
+
+					if (packetHeaderAndFirstPixel[0] & 0x80)
+					{
+						// RLE packet
+						bool isRepeatByte = true;
+						for (uint8_t i = 1; i < pixelSizeBytes; i++)
+						{
+							if (packetHeaderAndFirstPixel[1] != packetHeaderAndFirstPixel[1 + i])
+							{
+								isRepeatByte = false;
+								break;
+							}
+						}
+
+						if (isRepeatByte)
+						{
+							memset(outBytes, packetHeaderAndFirstPixel[1], pixelSizeBytes * additionalPixelsToOutput);
+						}
+						else
+						{
+							for (uint8_t i = 0; i < additionalPixelsToOutput; i++)
+								memcpy(outBytes + i * additionalPixelsToOutput, packetHeaderAndFirstPixel + 1, pixelSizeBytes);
+						}
+					}
+					else
+					{
+						// Raw packet
+						RKIT_CHECK(stream->ReadAll(outBytes, additionalPixelsToOutput *pixelSizeBytes));
+					}
+
+					outBytes += pixelSizeBytes * additionalPixelsToOutput;
+					remainingPixelsToDecompress -= additionalPixelsToOutput;
+				}
+			}
+		}
+
+		for (uint32_t y = 0; y < height; y++)
+		{
+			const rkit::Span<priv::TextureCompilerPixel<uint8_t, 4>> outScanline = image.GetScanline(height - 1 - y);
+			RKIT_ASSERT(outScanline.Count() >= width);
+
+			priv::TextureCompilerPixel<uint8_t, 4> *outScanlinePixels = outScanline.Ptr();
+			const uint8_t *inScanlineBytes = decompressedImageData.GetBuffer() + static_cast<size_t>(y) * width * pixelSizeBytes;
+
+			switch (tgaHeader.m_pixelSizeBits)
+			{
+			case 24:
+				{
+					for (size_t i = 0; i < width; i++)
+					{
+						const uint8_t *inBytes = inScanlineBytes + (i * 3);
+						outScanlinePixels[i].Set(inBytes[0], inBytes[1], inBytes[2], 0xff);
+					}
+				}
+				break;
+			case 32:
+				{
+					for (size_t i = 0; i < width; i++)
+					{
+						const uint8_t *inBytes = inScanlineBytes + (i * 4);
+						outScanlinePixels[i].Set(inBytes[0], inBytes[1], inBytes[2], inBytes[3]);
+					}
+				}
+				break;
+			default:
+				rkit::log::Error("TGA bit size unsupported");
+				return rkit::ResultCode::kNotYetImplemented;
+			}
+		}
+
+		rkit::Vector<priv::TextureCompilerImage<uint8_t, 4>> images;
+
+		size_t numLevels = 0;
+		RKIT_CHECK(GenerateMipMaps(images, (rkit::Span<priv::TextureCompilerImage<uint8_t, 4>>(&image, 1)), numLevels, disposition));
+
+		return ExportDDS(images.ToSpan(), numLevels, 1, depsNode, feedback, disposition);
 	}
 
 	rkit::Result TextureCompiler::CompilePCX(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
@@ -630,7 +799,7 @@ namespace anox { namespace buildsystem
 					return rkit::ResultCode::kMalformedFile;
 				}
 
-				static_assert(sizeof(vgaPalette) == 768);
+				static_assert(sizeof(vgaPalette) == 768, "VGA palette is the wrong size");
 				RKIT_CHECK(stream->ReadAll(vgaPalette, sizeof(vgaPalette)));
 
 				palette = rkit::Span<RGBTriplet_t>(vgaPalette, 256);
@@ -919,6 +1088,8 @@ namespace anox { namespace buildsystem
 		{
 		case ImageImportDisposition::kWorldAlphaBlend:
 		case ImageImportDisposition::kWorldAlphaTested:
+		case ImageImportDisposition::kWorldAlphaBlendNoMip:
+		case ImageImportDisposition::kWorldAlphaTestedNoMip:
 		case ImageImportDisposition::kGraphicTransparent:
 			return true;
 		default:
@@ -930,9 +1101,9 @@ namespace anox { namespace buildsystem
 	{
 		switch (disposition)
 		{
-		case ImageImportDisposition::kWorldAlphaBlend:
-		case ImageImportDisposition::kWorldAlphaTested:
-			return true;
+		//case ImageImportDisposition::kWorldAlphaBlend:
+		//case ImageImportDisposition::kWorldAlphaTested:
+		//	return true;
 		default:
 			return false;
 		}

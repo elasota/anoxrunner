@@ -27,5 +27,7 @@ namespace rkit { namespace utils
 
 		virtual Result RequireToken(Span<const char> &outSpan) = 0;
 		virtual Result ExpectToken(const StringView &str) = 0;
+
+		virtual Result SetSimpleDelimiters(const Span<const char> &delimiters) = 0;
 	};
 } } // rkit::utils

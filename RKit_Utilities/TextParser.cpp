@@ -4,6 +4,7 @@
 #include "rkit/Core/NoCopy.h"
 
 #include "rkit/Core/LogDriver.h"
+#include "rkit/Core/Vector.h"
 
 #include <cstring>
 
@@ -62,6 +63,8 @@ namespace rkit { namespace utils
 		Result ReadSimpleToken(Span<const char> &outSpan);
 		Result ReadCToken(Span<const char> &outSpan);
 
+		Result SetSimpleDelimiters(const Span<const char> &delimiters) override;
+
 		Result SkipWhitespace() override;
 		Result ReadToken(bool &haveToken, Span<const char> &outSpan) override;
 		Result ReadToEndOfLine(Span<const char> &outSpan) override;
@@ -85,6 +88,7 @@ namespace rkit { namespace utils
 
 		utils::TextParserCommentType m_commentType;
 		utils::TextParserLexerType m_lexType;
+		Vector<char> m_simpleDelimiters;
 
 		bool m_isInLineComment;
 		bool m_isInCBlockComment;
@@ -329,6 +333,8 @@ namespace rkit { namespace utils
 		size_t startLoc = m_charReader.GetLocation().m_pos;
 		size_t endLoc = startLoc;
 
+		Span<const char> simpleDelimiters = m_simpleDelimiters.ToSpan();
+
 		for (;;)
 		{
 			char c;
@@ -336,6 +342,26 @@ namespace rkit { namespace utils
 				break;
 
 			endLoc = m_charReader.GetLocation().m_pos;
+
+			bool isSimpleDelimiter = false;
+			for (char sdc : simpleDelimiters)
+			{
+				if (sdc == c)
+				{
+					isSimpleDelimiter = true;
+					break;
+				}
+			}
+
+			if (isSimpleDelimiter)
+			{
+				if (endLoc == startLoc)
+				{
+					m_charReader.SkipOne();
+					endLoc++;
+				}
+				break;
+			}
 
 			RKIT_CHECK(SkipWhitespace());
 			if (endLoc != m_charReader.GetLocation().m_pos)
@@ -442,6 +468,16 @@ namespace rkit { namespace utils
 		outSpan = m_charReader.GetSpan(startLoc, endLoc - startLoc);
 
 		return ResultCode::kOK;
+	}
+
+
+	Result TextParser::SetSimpleDelimiters(const Span<const char> &delimiters)
+	{
+		m_simpleDelimiters.Reset();
+		RKIT_CHECK(m_simpleDelimiters.Reserve(delimiters.Count()));
+		RKIT_CHECK(m_simpleDelimiters.Append(delimiters));
+
+		return rkit::ResultCode::kOK;
 	}
 
 	Result TextParser::SkipWhitespace()

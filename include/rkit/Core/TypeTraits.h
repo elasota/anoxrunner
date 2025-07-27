@@ -42,4 +42,16 @@ namespace rkit
 	struct RemoveConstVolatile : public RemoveConst<typename RemoveVolatile<TType>::Type_t>
 	{
 	};
+
+	template<class TType>
+	struct RemoveRef
+	{
+		typedef TType Type_t;
+	};
+
+	template<class TType>
+	struct RemoveRef<TType&>
+	{
+		typedef TType Type_t;
+	};
 }

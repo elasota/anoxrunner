@@ -9,6 +9,7 @@
 
 #include "rkit/Render/BackendType.h"
 
+#include "AnoxBSPMapCompiler.h"
 #include "AnoxMaterialCompiler.h"
 #include "AnoxTextureCompiler.h"
 
@@ -50,7 +51,16 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 
 		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kFontMaterialNodeID, std::move(matCompiler)));
 
-		RKIT_CHECK(instance->RegisterNodeTypeByExtension("fontmaterial", kAnoxNamespaceID, buildsystem::kFontMaterialNodeID));
+		RKIT_CHECK(instance->RegisterNodeTypeByExtension(buildsystem::MaterialCompiler::GetFontMaterialExtension(), kAnoxNamespaceID, buildsystem::kFontMaterialNodeID));
+	}
+
+	{
+		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler;
+		RKIT_CHECK(rkit::New<buildsystem::MaterialCompiler>(matCompiler));
+
+		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kWorldMaterialNodeID, std::move(matCompiler)));
+
+		RKIT_CHECK(instance->RegisterNodeTypeByExtension(buildsystem::MaterialCompiler::GetWorldMaterialExtension(), kAnoxNamespaceID, buildsystem::kWorldMaterialNodeID));
 	}
 
 	{
@@ -58,6 +68,15 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 		RKIT_CHECK(buildsystem::TextureCompilerBase::Create(texCompiler));
 
 		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kTextureNodeID, std::move(texCompiler)));
+	}
+
+	{
+		rkit::UniquePtr<buildsystem::BSPMapCompilerBase> mapCompiler;
+		RKIT_CHECK(buildsystem::BSPMapCompilerBase::Create(mapCompiler));
+
+		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kBSPMapNodeID, std::move(mapCompiler)));
+
+		RKIT_CHECK(instance->RegisterNodeTypeByExtension("bsp", kAnoxNamespaceID, buildsystem::kBSPMapNodeID));
 	}
 
 	RKIT_CHECK(instance->RegisterNodeTypeByExtension("cfg", rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kCopyFileNodeID));

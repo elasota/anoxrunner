@@ -15,6 +15,7 @@ namespace anox { namespace data
 		kInterform,
 		kWhiteNoise,
 		kSingle,
+		kMissing,
 
 		kCount,
 	};

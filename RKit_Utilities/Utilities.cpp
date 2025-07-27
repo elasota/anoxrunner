@@ -102,10 +102,10 @@ namespace rkit
 
 		bool ParseDouble(const StringView &str, double &d) const override;
 
-		bool ParseInt32(const StringView &str, uint8_t radix, int32_t &i) const override;
-		bool ParseInt64(const StringView &str, uint8_t radix, int64_t &i) const override;
-		bool ParseUInt32(const StringView &str, uint8_t radix, uint32_t &i) const override;
-		bool ParseUInt64(const StringView &str, uint8_t radix, uint64_t &i) const override;
+		bool ParseInt32(const StringSliceView &str, uint8_t radix, int32_t &i) const override;
+		bool ParseInt64(const StringSliceView &str, uint8_t radix, int64_t &i) const override;
+		bool ParseUInt32(const StringSliceView &str, uint8_t radix, uint32_t &i) const override;
+		bool ParseUInt64(const StringSliceView &str, uint8_t radix, uint64_t &i) const override;
 
 	private:
 		static bool ValidateFilePathSlice(const Span<const char> &name, bool permitWildcards);
@@ -121,13 +121,13 @@ namespace rkit
 		static bool TryParseDigit(char c, uint8_t &outDigit);
 
 		template<class TInteger>
-		static bool ParsePositiveInt(const StringView &str, size_t startDigit, uint8_t radix, TInteger &i);
+		static bool ParsePositiveInt(const StringSliceView &str, size_t startDigit, uint8_t radix, TInteger &i);
 
 		template<class TInteger>
-		static bool ParseNegativeInt(const StringView &str, size_t startDigit, uint8_t radix, TInteger &i);
+		static bool ParseNegativeInt(const StringSliceView &str, size_t startDigit, uint8_t radix, TInteger &i);
 
 		template<class TInteger>
-		static bool ParseSignedInt(const StringView &str, uint8_t radix, TInteger &i);
+		static bool ParseSignedInt(const StringSliceView &str, uint8_t radix, TInteger &i);
 
 		utils::Sha256Calculator m_sha256Calculator;
 
@@ -2213,7 +2213,7 @@ namespace rkit
 	}
 
 	template<class TInteger>
-	bool UtilitiesDriver::ParsePositiveInt(const StringView &str, size_t startDigit, uint8_t radixLow, TInteger &i)
+	bool UtilitiesDriver::ParsePositiveInt(const StringSliceView &str, size_t startDigit, uint8_t radixLow, TInteger &i)
 	{
 		TInteger radix = radixLow;
 		if (radix < 2 || radix > 16 || startDigit == str.Length())
@@ -2252,7 +2252,7 @@ namespace rkit
 	}
 
 	template<class TInteger>
-	bool UtilitiesDriver::ParseNegativeInt(const StringView &str, size_t startDigit, uint8_t radixLow, TInteger &i)
+	bool UtilitiesDriver::ParseNegativeInt(const StringSliceView &str, size_t startDigit, uint8_t radixLow, TInteger &i)
 	{
 		int16_t radix = radixLow;
 		if (radix < 2 || radix > 16 || startDigit == str.Length())
@@ -2291,7 +2291,7 @@ namespace rkit
 	}
 
 	template<class TInteger>
-	bool UtilitiesDriver::ParseSignedInt(const StringView &str, uint8_t radix, TInteger &i)
+	bool UtilitiesDriver::ParseSignedInt(const StringSliceView &str, uint8_t radix, TInteger &i)
 	{
 		if (str.Length() == 0)
 			return false;
@@ -2332,22 +2332,22 @@ namespace rkit
 		return true;
 	}
 
-	bool UtilitiesDriver::ParseInt32(const StringView &str, uint8_t radix, int32_t &i) const
+	bool UtilitiesDriver::ParseInt32(const StringSliceView &str, uint8_t radix, int32_t &i) const
 	{
 		return ParseSignedInt<int32_t>(str, radix, i);
 	}
 
-	bool UtilitiesDriver::ParseInt64(const StringView &str, uint8_t radix, int64_t &i) const
+	bool UtilitiesDriver::ParseInt64(const StringSliceView &str, uint8_t radix, int64_t &i) const
 	{
 		return ParseSignedInt<int64_t>(str, radix, i);
 	}
 
-	bool UtilitiesDriver::ParseUInt32(const StringView &str, uint8_t radix, uint32_t &i) const
+	bool UtilitiesDriver::ParseUInt32(const StringSliceView &str, uint8_t radix, uint32_t &i) const
 	{
 		return ParsePositiveInt<uint32_t>(str, 0, radix, i);
 	}
 
-	bool UtilitiesDriver::ParseUInt64(const StringView &str, uint8_t radix, uint64_t &i) const
+	bool UtilitiesDriver::ParseUInt64(const StringSliceView &str, uint8_t radix, uint64_t &i) const
 	{
 		return ParsePositiveInt<uint64_t>(str, 0, radix, i);
 	}

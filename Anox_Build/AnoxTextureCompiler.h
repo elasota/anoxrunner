@@ -9,13 +9,16 @@ namespace anox { namespace buildsystem
 {
 	static const uint32_t kTextureNodeID = RKIT_FOURCC('A', 'T', 'E', 'X');
 
-	enum class ImageImportDisposition
+	enum class ImageImportDisposition : int
 	{
 		kWorldAlphaBlend,
 		kWorldAlphaTested,
+		kWorldAlphaBlendNoMip,
+		kWorldAlphaTestedNoMip,
 		kGraphicTransparent,
 		kGraphicOpaque,
 		kInterformPalette,
+		kInterformFrame,
 
 		kCount,
 	};

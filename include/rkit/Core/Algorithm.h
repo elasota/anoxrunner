@@ -7,11 +7,71 @@ namespace rkit
 	template<class T>
 	class Span;
 
-	template<class T>
+	template<class TLeft, class TRight>
 	struct DefaultComparer
 	{
-		static int Compare(const T &a, const T &b);
-		static bool CompareEqual(const T &a, const T &b);
+		static int Compare(const TLeft &a, const TRight &b);
+		static bool CompareEqual(const TLeft &a, const TRight &b);
+		static bool CompareLess(const TLeft &a, const TRight &b);
+	};
+
+	template<class TLeft, class TRight>
+	struct StrongComparer : public DefaultComparer<TLeft, TRight>
+	{
+	};
+
+	struct DefaultComparePred
+	{
+		template<class TLeft, class TRight>
+		int operator()(const TLeft &a, const TRight &b) const
+		{
+			return DefaultComparer<TLeft, TRight>::Compare(a, b);
+		}
+	};
+
+	struct DefaultCompareEqualPred
+	{
+		template<class TLeft, class TRight>
+		bool operator()(const TLeft &a, const TRight &b) const
+		{
+			return DefaultComparer<TLeft, TRight>::CompareEqual(a, b);
+		}
+	};
+
+	struct DefaultCompareLessPred
+	{
+		template<class TLeft, class TRight>
+		bool operator()(const TLeft &a, const TRight &b) const
+		{
+			return DefaultComparer<TLeft, TRight>::CompareLess(a, b);
+		}
+	};
+
+	struct StrongComparePred
+	{
+		template<class TLeft, class TRight>
+		int operator()(const TLeft &a, const TRight &b) const
+		{
+			return StrongComparer<TLeft, TRight>::CompareEqual(a, b);
+		}
+	};
+
+	struct StrongCompareEqualPred
+	{
+		template<class TLeft, class TRight>
+		bool operator()(const TLeft &a, const TRight &b) const
+		{
+			return StrongComparer<TLeft, TRight>::CompareEqual(a, b);
+		}
+	};
+
+	struct StrongCompareLessPred
+	{
+		template<class TLeft, class TRight>
+		bool operator()(const TLeft &a, const TRight &b) const
+		{
+			return StrongComparer<TLeft, TRight>::CompareLess(a, b);
+		}
 	};
 
 	namespace priv
@@ -161,22 +221,22 @@ namespace rkit
 	template<class T>
 	void MoveSpan(const Span<T> &dest, const Span<T> &src);
 
-	template<class T, class TComparer = DefaultComparer<T>>
+	template<class T, class TComparer = DefaultComparer<T, T>>
 	bool CompareSpansEqual(const Span<const T> &dest, const Span<const T> &src);
 
-	template<class T, class TComparer = DefaultComparer<T>>
+	template<class T, class TComparer = DefaultComparer<T, T>>
 	bool CompareSpansEqual(const Span<const T> &dest, const Span<T> &src);
 
-	template<class T, class TComparer = DefaultComparer<T>>
+	template<class T, class TComparer = DefaultComparer<T, T>>
 	bool CompareSpansEqual(const Span<T> &dest, const Span<const T> &src);
 
-	template<class T, class TComparer = DefaultComparer<T>>
+	template<class T, class TComparer = DefaultComparer<T, T>>
 	int CompareSpans(const Span<const T> &dest, const Span<const T> &src);
 
-	template<class T, class TComparer = DefaultComparer<T>>
+	template<class T, class TComparer = DefaultComparer<T, T>>
 	int CompareSpans(const Span<T> &dest, const Span<const T> &src);
 
-	template<class T, class TComparer = DefaultComparer<T>>
+	template<class T, class TComparer = DefaultComparer<T, T>>
 	int CompareSpans(const Span<const T> &dest, const Span<T> &src);
 
 	template<class T>
@@ -260,8 +320,8 @@ T rkit::Max(const T &a, const T &b)
 	return a;
 }
 
-template<class T>
-int rkit::DefaultComparer<T>::Compare(const T &a, const T &b)
+template<class TLeft, class TRight>
+int rkit::DefaultComparer<TLeft, TRight>::Compare(const TLeft &a, const TRight &b)
 {
 	if (a < b)
 		return -1;
@@ -270,10 +330,16 @@ int rkit::DefaultComparer<T>::Compare(const T &a, const T &b)
 	return 0;
 }
 
-template<class T>
-bool rkit::DefaultComparer<T>::CompareEqual(const T &a, const T &b)
+template<class TLeft, class TRight>
+bool rkit::DefaultComparer<TLeft, TRight>::CompareEqual(const TLeft &a, const TRight &b)
 {
 	return a == b;
+}
+
+template<class TLeft, class TRight>
+bool rkit::DefaultComparer<TLeft, TRight>::CompareLess(const TLeft &a, const TRight &b)
+{
+	return a < b;
 }
 
 // Signed integers
