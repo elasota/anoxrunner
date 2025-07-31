@@ -89,7 +89,7 @@ namespace rkit { namespace data
 	{
 		endian::LittleUInt32_t m_pixelFormatSize;
 		endian::LittleUInt32_t m_pixelFormatFlags;
-		endian::LittleUInt32_t m_fourCC;
+		endian::BigUInt32_t m_fourCC;
 		endian::LittleUInt32_t m_rgbBitCount;
 		endian::LittleUInt32_t m_rBitMask;
 		endian::LittleUInt32_t m_gBitMask;
@@ -109,7 +109,7 @@ namespace rkit { namespace data
 	{
 		static const uint32_t kExpectedMagic = RKIT_FOURCC('D', 'D', 'S', ' ');
 
-		endian::LittleUInt32_t m_magic;
+		endian::BigUInt32_t m_magic;
 		endian::LittleUInt32_t m_headerSizeMinus4;
 		endian::LittleUInt32_t m_ddsFlags;
 		endian::LittleUInt32_t m_height;

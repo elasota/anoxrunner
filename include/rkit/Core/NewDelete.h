@@ -86,6 +86,8 @@ namespace rkit
 	}
 }
 
+#include "Result.h"
+
 namespace rkit
 {
 	struct IMallocDriver;

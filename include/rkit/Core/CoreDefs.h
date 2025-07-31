@@ -40,6 +40,8 @@
 	#define RKIT_USE_CLASS_RESULT 0
 #endif
 
+#define RKIT_SIMD_ALIGNMENT	16
+
 #if RKIT_USE_CLASS_RESULT
 
 namespace rkit

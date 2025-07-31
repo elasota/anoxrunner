@@ -8,10 +8,10 @@ namespace rkit
 	struct FourCCValue
 	{
 		static const uint32_t kValue = static_cast<uint32_t>(
-			(static_cast<uint32_t>(C0) << 0) |
-			(static_cast<uint32_t>(C1) << 8) |
-			(static_cast<uint32_t>(C2) << 16) |
-			(static_cast<uint32_t>(C3) << 24)
+			(static_cast<uint32_t>(C0) << 24) |
+			(static_cast<uint32_t>(C1) << 16) |
+			(static_cast<uint32_t>(C2) << 8) |
+			(static_cast<uint32_t>(C3) << 0)
 			);
 	};
 }
@@ -21,19 +21,19 @@ namespace rkit { namespace utils
 	inline uint32_t ComputeFourCC(char c0, char c1, char c2, char c3)
 	{
 		return static_cast<uint32_t>(
-			(static_cast<uint32_t>(c0) << 0) |
-			(static_cast<uint32_t>(c1) << 8) |
-			(static_cast<uint32_t>(c2) << 16) |
-			(static_cast<uint32_t>(c3) << 24)
+			(static_cast<uint32_t>(static_cast<uint8_t>(c0)) << 24) |
+			(static_cast<uint32_t>(static_cast<uint8_t>(c1)) << 16) |
+			(static_cast<uint32_t>(static_cast<uint8_t>(c2)) << 8) |
+			(static_cast<uint32_t>(static_cast<uint8_t>(c3)) << 0)
 			);
 	}
 
 	inline void ExtractFourCC(uint32_t fourCC, char &outC0, char &outC1, char &outC2, char &outC3)
 	{
-		outC0 = static_cast<char>((fourCC >> 0) & 0xff);
-		outC1 = static_cast<char>((fourCC >> 8) & 0xff);
-		outC2 = static_cast<char>((fourCC >> 16) & 0xff);
-		outC3 = static_cast<char>((fourCC >> 24) & 0xff);
+		outC0 = static_cast<char>(static_cast<uint8_t>((fourCC >> 24) & 0xff));
+		outC1 = static_cast<char>(static_cast<uint8_t>((fourCC >> 16) & 0xff));
+		outC2 = static_cast<char>(static_cast<uint8_t>((fourCC >> 8 ) & 0xff));
+		outC3 = static_cast<char>(static_cast<uint8_t>((fourCC >> 0 ) & 0xff));
 	}
 } } // rkit::utils
 

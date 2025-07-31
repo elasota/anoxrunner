@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "rkit/Core/FourCC.h"
+
 namespace rkit
 {
 	struct IModule;
@@ -9,7 +11,7 @@ namespace rkit
 
 	struct IModuleDriver
 	{
-		static const uint32_t kDefaultNamespace = 0x74694b52;
+		static const uint32_t kDefaultNamespace = RKIT_FOURCC('R', 'K', 'i', 't');
 
 		virtual ~IModuleDriver() {}
 

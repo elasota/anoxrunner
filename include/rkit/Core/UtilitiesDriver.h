@@ -22,6 +22,8 @@ namespace rkit
 		struct ISha256Calculator;
 		struct IThreadPool;
 		struct IShadowFile;
+		struct IImage;
+		struct ImageSpec;
 	}
 
 	template<class T>
@@ -123,5 +125,7 @@ namespace rkit
 		virtual bool ParseInt64(const StringSliceView &str, uint8_t radix, int64_t &i) const = 0;
 		virtual bool ParseUInt32(const StringSliceView &str, uint8_t radix, uint32_t &i) const = 0;
 		virtual bool ParseUInt64(const StringSliceView &str, uint8_t radix, uint64_t &i) const = 0;
+
+		virtual Result CreateImage(const utils::ImageSpec &spec, UniquePtr<utils::IImage> &image) const = 0;
 	};
 }

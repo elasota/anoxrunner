@@ -8,9 +8,14 @@
 #include "rkit/Core/StaticArray.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/String.h"
+#include "rkit/Core/UtilitiesDriver.h"
 #include "rkit/Core/Vector.h"
 
 #include "rkit/Data/DDSFile.h"
+
+#include "rkit/Png/PngDriver.h"
+
+#include "rkit/Utilities/Image.h"
 
 namespace anox { namespace buildsystem
 {
@@ -208,6 +213,8 @@ namespace anox { namespace buildsystem
 	class TextureCompiler final : public TextureCompilerBase
 	{
 	public:
+		explicit TextureCompiler(rkit::png::IPngDriver &pngDriver);
+
 		bool HasAnalysisStage() const override;
 
 		rkit::Result RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
@@ -218,7 +225,7 @@ namespace anox { namespace buildsystem
 	private:
 		static rkit::Result CompileTGA(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
 		static rkit::Result CompilePCX(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
-		static rkit::Result CompilePNG(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
+		static rkit::Result CompilePNG(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
 
 		template<class TElementType, size_t TNumElements>
 		static rkit::Result GenerateMipMaps(rkit::Vector<priv::TextureCompilerImage<TElementType, TNumElements>> &resultImages, const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &sourceImages, size_t &outNumLevels, ImageImportDisposition disposition);
@@ -231,6 +238,8 @@ namespace anox { namespace buildsystem
 
 		static bool DispositionHasAlpha(ImageImportDisposition disposition);
 		static bool DispositionHasMipMaps(ImageImportDisposition disposition);
+
+		rkit::png::IPngDriver &m_pngDriver;
 	};
 } } // anox::buildsystem::priv
 
@@ -434,6 +443,11 @@ namespace anox { namespace buildsystem { namespace priv
 
 namespace anox { namespace buildsystem
 {
+	TextureCompiler::TextureCompiler(rkit::png::IPngDriver &pngDriver)
+		: m_pngDriver(pngDriver)
+	{
+	}
+
 	bool TextureCompiler::HasAnalysisStage() const
 	{
 		return false;
@@ -509,7 +523,7 @@ namespace anox { namespace buildsystem
 			return CompilePCX(depsNode, feedback, path, disposition);
 
 		if (extension == ".png")
-			return CompilePNG(depsNode, feedback, path, disposition);
+			return CompilePNG(depsNode, feedback, m_pngDriver, path, disposition);
 
 		if (extension == ".tga")
 			return CompileTGA(depsNode, feedback, path, disposition);
@@ -589,7 +603,7 @@ namespace anox { namespace buildsystem
 			else if (tgaHeader.m_dataType == static_cast<uint8_t>(TGADataType::kRLEColor))
 			{
 				size_t remainingPixelsToDecompress = decompressedSizePixels;
-				uint8_t *outBytes = decompressedImageData.GetBuffer();
+				rkit::Span<uint8_t> outBytes = decompressedImageData.ToSpan();
 
 				while (remainingPixelsToDecompress > 0)
 				{
@@ -598,9 +612,9 @@ namespace anox { namespace buildsystem
 
 					const uint8_t additionalPixelsToOutput = (packetHeaderAndFirstPixel[0] & 0x7f);
 
-					memcpy(outBytes, packetHeaderAndFirstPixel + 1, pixelSizeBytes);
+					rkit::CopySpanNonOverlapping(outBytes.SubSpan(0, pixelSizeBytes), rkit::ConstSpan<uint8_t>(packetHeaderAndFirstPixel + 1, pixelSizeBytes));
 
-					outBytes += pixelSizeBytes;
+					outBytes = outBytes.SubSpan(pixelSizeBytes);
 					remainingPixelsToDecompress--;
 
 					if (remainingPixelsToDecompress < additionalPixelsToOutput)
@@ -624,21 +638,25 @@ namespace anox { namespace buildsystem
 
 						if (isRepeatByte)
 						{
-							memset(outBytes, packetHeaderAndFirstPixel[1], pixelSizeBytes * additionalPixelsToOutput);
+							rkit::Span<uint8_t> spanToFill = outBytes.SubSpan(0, pixelSizeBytes * additionalPixelsToOutput);
+							const uint8_t fillValue = packetHeaderAndFirstPixel[1];
+							for (uint8_t &byteToFill : spanToFill)
+								byteToFill = fillValue;
 						}
 						else
 						{
 							for (uint8_t i = 0; i < additionalPixelsToOutput; i++)
-								memcpy(outBytes + i * additionalPixelsToOutput, packetHeaderAndFirstPixel + 1, pixelSizeBytes);
+								rkit::CopySpanNonOverlapping(outBytes.SubSpan(i * pixelSizeBytes, pixelSizeBytes), rkit::ConstSpan<uint8_t>(packetHeaderAndFirstPixel + 1, pixelSizeBytes));
 						}
 					}
 					else
 					{
 						// Raw packet
-						RKIT_CHECK(stream->ReadAll(outBytes, additionalPixelsToOutput *pixelSizeBytes));
+						rkit::Span<uint8_t> rawPacketSpan = outBytes.SubSpan(0, additionalPixelsToOutput * pixelSizeBytes);
+						RKIT_CHECK(stream->ReadAll(rawPacketSpan.Ptr(), rawPacketSpan.Count()));
 					}
 
-					outBytes += pixelSizeBytes * additionalPixelsToOutput;
+					outBytes = outBytes.SubSpan(pixelSizeBytes * additionalPixelsToOutput);
 					remainingPixelsToDecompress -= additionalPixelsToOutput;
 				}
 			}
@@ -649,7 +667,6 @@ namespace anox { namespace buildsystem
 			const rkit::Span<priv::TextureCompilerPixel<uint8_t, 4>> outScanline = image.GetScanline(height - 1 - y);
 			RKIT_ASSERT(outScanline.Count() >= width);
 
-			priv::TextureCompilerPixel<uint8_t, 4> *outScanlinePixels = outScanline.Ptr();
 			const uint8_t *inScanlineBytes = decompressedImageData.GetBuffer() + static_cast<size_t>(y) * width * pixelSizeBytes;
 
 			switch (tgaHeader.m_pixelSizeBits)
@@ -659,7 +676,7 @@ namespace anox { namespace buildsystem
 					for (size_t i = 0; i < width; i++)
 					{
 						const uint8_t *inBytes = inScanlineBytes + (i * 3);
-						outScanlinePixels[i].Set(inBytes[0], inBytes[1], inBytes[2], 0xff);
+						outScanline[i].Set(inBytes[0], inBytes[1], inBytes[2], 0xff);
 					}
 				}
 				break;
@@ -668,7 +685,7 @@ namespace anox { namespace buildsystem
 					for (size_t i = 0; i < width; i++)
 					{
 						const uint8_t *inBytes = inScanlineBytes + (i * 4);
-						outScanlinePixels[i].Set(inBytes[0], inBytes[1], inBytes[2], inBytes[3]);
+						outScanline[i].Set(inBytes[0], inBytes[1], inBytes[2], inBytes[3]);
 					}
 				}
 				break;
@@ -848,9 +865,65 @@ namespace anox { namespace buildsystem
 		return ExportDDS(images.ToSpan(), numLevels, 1, depsNode, feedback, disposition);
 	}
 
-	rkit::Result TextureCompiler::CompilePNG(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
+	rkit::Result TextureCompiler::CompilePNG(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
+		RKIT_CHECK(feedback->OpenInput(depsNode->GetInputFileLocation(), shortName, stream));
+
+		rkit::UniquePtr<rkit::utils::IImage> pngImage;
+		RKIT_CHECK(pngDriver.LoadPNG(*stream, pngImage));
+
+		if (pngImage->GetPixelPacking() != rkit::utils::PixelPacking::kUInt8)
+			return rkit::ResultCode::kDataError;
+
+		const uint32_t width = pngImage->GetWidth();
+		const uint32_t height = pngImage->GetHeight();
+
+		priv::TextureCompilerImage<uint8_t, 4> tcImage;
+		RKIT_CHECK(tcImage.Initialize(pngImage->GetWidth(), pngImage->GetHeight()));
+
+		for (uint32_t y = 0; y < height; y++)
+		{
+			rkit::Span<priv::TextureCompilerPixel<uint8_t, 4>> outScanline = tcImage.GetScanline(y);
+			const void *inScanline = pngImage->GetScanline(y);
+
+			switch (pngImage->GetNumChannels())
+			{
+			case 1:
+				for (size_t x = 0; x < width; x++)
+				{
+					const uint8_t grayscaleValue = static_cast<const uint8_t *>(inScanline)[x];
+					priv::TextureCompilerPixel<uint8_t, 4> &pixel = outScanline[x];
+					pixel.Set(grayscaleValue, grayscaleValue, grayscaleValue, 255);
+				}
+				break;
+			case 3:
+				for (size_t x = 0; x < width; x++)
+				{
+					const uint8_t *rgbValue = static_cast<const uint8_t *>(inScanline) + (x * 3);
+					priv::TextureCompilerPixel<uint8_t, 4> &pixel = outScanline[x];
+					pixel.Set(rgbValue[0], rgbValue[1], rgbValue[2], 255);
+				}
+				break;
+			case 4:
+				for (size_t x = 0; x < width; x++)
+				{
+					const uint8_t *rgbaValue = static_cast<const uint8_t *>(inScanline) + (x * 4);
+					priv::TextureCompilerPixel<uint8_t, 4> &pixel = outScanline[x];
+					pixel.Set(rgbaValue[0], rgbaValue[1], rgbaValue[2], rgbaValue[3]);
+				}
+				break;
+			default:
+				return rkit::ResultCode::kInternalError;
+			}
+		}
+
+		rkit::Vector<priv::TextureCompilerImage<uint8_t, 4>> images;
+
+		size_t numLevels = 0;
+		RKIT_CHECK(GenerateMipMaps(images, rkit::Span<priv::TextureCompilerImage<uint8_t, 4>>(&tcImage, 1), numLevels, disposition));
+
+		return ExportDDS(images.ToSpan(), numLevels, 1, depsNode, feedback, disposition);
 	}
 
 	template<class TElementType, size_t TNumElements>
@@ -1124,9 +1197,9 @@ namespace anox { namespace buildsystem
 		return result.Format("%s.%i", imagePath.GetChars(), static_cast<int>(disposition));
 	}
 
-	rkit::Result TextureCompilerBase::Create(rkit::UniquePtr<TextureCompilerBase> &outCompiler)
+	rkit::Result TextureCompilerBase::Create(rkit::UniquePtr<TextureCompilerBase> &outCompiler, rkit::png::IPngDriver &pngDriver)
 	{
-		return rkit::New<TextureCompiler>(outCompiler);
+		return rkit::New<TextureCompiler>(outCompiler, pngDriver);
 	}
 } } // anox::buildsystem
 

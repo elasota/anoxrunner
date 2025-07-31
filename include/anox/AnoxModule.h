@@ -1,8 +1,8 @@
 #pragma once
 
-#include <cstdint>
+#include "rkit/Core/FourCC.h"
 
 namespace anox
 {
-	static const uint32_t kAnoxNamespaceID = 0x786f6e41;
+	static const uint32_t kAnoxNamespaceID = RKIT_FOURCC('A', 'n', 'o', 'x');
 }

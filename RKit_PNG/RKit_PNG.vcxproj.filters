@@ -15,28 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\thirdparty\zlib\adler32.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\thirdparty\zlib\crc32.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\thirdparty\zlib\inffast.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\thirdparty\zlib\inflate.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\thirdparty\zlib\inftrees.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\thirdparty\zlib\trees.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\thirdparty\zlib\zutil.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\thirdparty\zlib\deflate.c">
+    <ClCompile Include="PngModule.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

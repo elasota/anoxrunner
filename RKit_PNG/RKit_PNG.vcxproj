@@ -18,21 +18,11 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\thirdparty\zlib\adler32.c" />
-    <ClCompile Include="..\thirdparty\zlib\crc32.c" />
-    <ClCompile Include="..\thirdparty\zlib\deflate.c" />
-    <ClCompile Include="..\thirdparty\zlib\inffast.c" />
-    <ClCompile Include="..\thirdparty\zlib\inflate.c" />
-    <ClCompile Include="..\thirdparty\zlib\inftrees.c" />
-    <ClCompile Include="..\thirdparty\zlib\trees.c" />
-    <ClCompile Include="..\thirdparty\zlib\zutil.c" />
-  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{1819d6ae-1d9c-45af-881c-7350b6638b29}</ProjectGuid>
-    <RootNamespace>zlib</RootNamespace>
+    <ProjectGuid>{333998bd-a9a8-4ffd-ba5a-daff538c778b}</ProjectGuid>
+    <RootNamespace>RKitPNG</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -69,27 +59,27 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\Common.props" />
     <Import Project="..\Debug.props" />
-    <Import Project="..\zlib_internal.props" />
+    <Import Project="..\Common.props" />
+    <Import Project="..\libpng_export.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Common.props" />
     <Import Project="..\Release.props" />
-    <Import Project="..\zlib_internal.props" />
+    <Import Project="..\libpng_export.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\Common.props" />
     <Import Project="..\Debug.props" />
-    <Import Project="..\zlib_internal.props" />
+    <Import Project="..\Common.props" />
+    <Import Project="..\libpng_export.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Common.props" />
     <Import Project="..\Release.props" />
-    <Import Project="..\zlib_internal.props" />
+    <Import Project="..\libpng_export.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -115,8 +105,6 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
@@ -143,11 +131,17 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="PngModule.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\libpng\libpng.vcxproj">
+      <Project>{d6cf5214-3d01-4a4c-adff-dd4f81ec71c3}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

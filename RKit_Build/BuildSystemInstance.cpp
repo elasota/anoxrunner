@@ -634,6 +634,7 @@ namespace rkit { namespace buildsystem
 		Result ProcessTopDepCheck();
 		Result CheckNodeFilesAndVersion(DependencyNode *node);
 		Result CheckNodeNodeDependencies(DependencyNode *node);
+		Result StratifyRelevantNodes();
 
 		static Result ResolveCachedFileStatusCallback(void *userdata, const FileStatusView &status);
 
@@ -2079,7 +2080,10 @@ namespace rkit { namespace buildsystem
 			}
 		}
 
-		// Step 2: Compile (NOTE: relevant nodes list may be added during this)
+		// Step 2: Stratify relevant nodes
+		RKIT_CHECK(StratifyRelevantNodes());
+
+		// Step 3: Compile (NOTE: relevant nodes list may be added during this)
 		for (size_t ri = 0; ri < m_relevantNodes.Count(); ri++)
 		{
 			DependencyNode *node = m_relevantNodes[m_relevantNodes.Count() - 1 - ri];
@@ -2094,13 +2098,13 @@ namespace rkit { namespace buildsystem
 			}
 		}
 
-		// Step 3: Run post-build actions
+		// Step 4: Run post-build actions
 		for (size_t i = 0; i < m_postBuildActions.Count(); i++)
 		{
 			RKIT_CHECK(m_postBuildActions[i]->Run());
 		}
 
-		// Step 4: Copy CAS files
+		// Step 5: Copy CAS files
 		for (size_t i = 0; i < m_relevantNodes.Count(); i++)
 		{
 			const DependencyNode *node = m_relevantNodes[i];
@@ -2111,7 +2115,7 @@ namespace rkit { namespace buildsystem
 			}
 		}
 
-		// Step 5: Write updated state
+		// Step 6: Write updated state
 		RKIT_CHECK(SaveCache());
 
 		return ResultCode::kOK;
@@ -2549,6 +2553,57 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(AddRelevantNode(nodeDepNode));
 		RKIT_CHECK(m_depCheckStack.Append(nodeDepNode));
+
+		return ResultCode::kOK;
+	}
+
+
+	Result BuildSystemInstance::StratifyRelevantNodes()
+	{
+		Vector<DependencyNode *> thisStrataNodes;
+		Vector<DependencyNode *> nextStrataNodes;
+		HashMap<DependencyNode *, size_t> nodeStratas;
+
+		Vector<Vector<DependencyNode *>> nodeStrataBuckets;
+
+		RKIT_CHECK(thisStrataNodes.Append(m_rootNodes.ToSpan()));
+
+		size_t currentStrata = 0;
+		while (thisStrataNodes.Count() > 0)
+		{
+			for (DependencyNode *node : thisStrataNodes)
+			{
+				RKIT_CHECK(nodeStratas.Set(node, currentStrata));
+
+				for (const NodeDependencyInfo &nodeDepInfo : node->GetNodeDependencies())
+				{
+					RKIT_CHECK(nextStrataNodes.Append(static_cast<DependencyNode *>(nodeDepInfo.m_node)));
+				}
+			}
+
+			rkit::Swap(thisStrataNodes, nextStrataNodes);
+			nextStrataNodes.Reset();
+
+			currentStrata++;
+		}
+
+		RKIT_CHECK(nodeStrataBuckets.Resize(currentStrata));
+
+		for (DependencyNode *node : m_relevantNodes)
+		{
+			HashMap<DependencyNode *, size_t>::ConstIterator_t strataIt = nodeStratas.Find(node);
+
+			RKIT_ASSERT(strataIt != nodeStratas.end());
+
+			RKIT_CHECK(nodeStrataBuckets[strataIt.Value()].Append(node));
+		}
+
+		m_relevantNodes.ShrinkToSize(0);
+
+		for (const Vector<DependencyNode *> &bucket : nodeStrataBuckets)
+		{
+			RKIT_CHECK(m_relevantNodes.Append(bucket.ToSpan()));
+		}
 
 		return ResultCode::kOK;
 	}

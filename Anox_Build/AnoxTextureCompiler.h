@@ -5,6 +5,10 @@
 #include "rkit/Core/FourCC.h"
 #include "rkit/Core/StringProto.h"
 
+namespace rkit { namespace png {
+	struct IPngDriver;
+} } // rkit::png
+
 namespace anox { namespace buildsystem
 {
 	static const uint32_t kTextureNodeID = RKIT_FOURCC('A', 'T', 'E', 'X');
@@ -26,7 +30,7 @@ namespace anox { namespace buildsystem
 	class TextureCompilerBase : public rkit::buildsystem::IDependencyNodeCompiler
 	{
 	public:
-		static rkit::Result Create(rkit::UniquePtr<TextureCompilerBase> &outCompiler);
+		static rkit::Result Create(rkit::UniquePtr<TextureCompilerBase> &outCompiler, rkit::png::IPngDriver &pngDriver);
 
 		static rkit::Result CreateImportIdentifier(rkit::String &identifier, const rkit::StringView &imagePath, ImageImportDisposition disposition);
 

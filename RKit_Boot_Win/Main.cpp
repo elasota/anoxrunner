@@ -127,8 +127,7 @@ namespace rkit
 		strcat(nameBuf, moduleName);
 		strcat(nameBuf, ".dll");
 
-		for (int i = 0; i < 4; i++)
-			nameBuf[i] = static_cast<char>((moduleNamespace >> (i * 8)) & 0xff);
+		rkit::utils::ExtractFourCC(moduleNamespace, nameBuf[0], nameBuf[1], nameBuf[2], nameBuf[3]);
 
 		void *moduleMemory = mallocDriver->Alloc(sizeof(Module_Win32));
 		if (!moduleMemory)

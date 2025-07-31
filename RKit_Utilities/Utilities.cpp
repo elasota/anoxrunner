@@ -14,6 +14,7 @@
 #include "DeflateDecompressStream.h"
 #include "JobQueue.h"
 #include "Json.h"
+#include "Image.h"
 #include "MutexProtectedStream.h"
 #include "RangeLimitedReadStream.h"
 #include "Sha2Calculator.h"
@@ -106,6 +107,8 @@ namespace rkit
 		bool ParseInt64(const StringSliceView &str, uint8_t radix, int64_t &i) const override;
 		bool ParseUInt32(const StringSliceView &str, uint8_t radix, uint32_t &i) const override;
 		bool ParseUInt64(const StringSliceView &str, uint8_t radix, uint64_t &i) const override;
+
+		Result CreateImage(const utils::ImageSpec &spec, UniquePtr<utils::IImage> &image) const override;
 
 	private:
 		static bool ValidateFilePathSlice(const Span<const char> &name, bool permitWildcards);
@@ -2350,6 +2353,14 @@ namespace rkit
 	bool UtilitiesDriver::ParseUInt64(const StringSliceView &str, uint8_t radix, uint64_t &i) const
 	{
 		return ParsePositiveInt<uint64_t>(str, 0, radix, i);
+	}
+
+	Result UtilitiesDriver::CreateImage(const utils::ImageSpec &spec, UniquePtr<utils::IImage> &image) const
+	{
+		UniquePtr<utils::ImageBase> imageBase;
+		RKIT_CHECK(utils::ImageBase::Create(spec, imageBase));
+		image = std::move(imageBase);
+		return ResultCode::kOK;
 	}
 }
 

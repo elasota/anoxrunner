@@ -32,10 +32,6 @@ namespace rkit
 		static voidpf AllocCallback(voidpf opaque, uInt items, uInt size);
 		static void FreeCallback(voidpf opaque, voidpf address);
 
-		alloc_func zalloc;  /* used to allocate the internal state */
-		free_func  zfree;   /* used to free the internal state */
-		voidpf     opaque;  /* private data object passed to zalloc and zfree */
-
 		Result SeekRelativeTo(FilePos_t pos, FileOffset_t offset);
 		Result RestartDecompression();
 

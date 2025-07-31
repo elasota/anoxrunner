@@ -217,6 +217,8 @@ namespace anox { namespace buildsystem
 		MaterialAnalysisHeader analysisHeader = {};
 		MaterialAnalysisDynamicData dynamicData = {};
 
+		analysisHeader.m_magic = MaterialAnalysisHeader::kExpectedMagic;
+		analysisHeader.m_version = MaterialAnalysisHeader::kExpectedVersion;
 		analysisHeader.m_materialType = data::MaterialType::kAnimation;
 		analysisHeader.m_bilinear = true;
 		analysisHeader.m_mipMapped = false;

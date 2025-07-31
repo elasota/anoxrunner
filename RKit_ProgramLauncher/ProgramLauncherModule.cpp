@@ -85,14 +85,12 @@ namespace rkit
 			if (namespaceStr.Length() > 4)
 				return ResultCode::kConfigInvalid;
 
-			uint32_t namespaceID = 0;
-			for (size_t i = 0; i < namespaceStr.Length(); i++)
-			{
-				uint32_t namespaceByte = static_cast<uint8_t>(namespaceStr[i]);
-				namespaceID |= static_cast<uint32_t>(namespaceByte << (i * 8));
-			}
+			char namespaceChars[4] = { 0, 0, 0, 0 };
 
-			outNamespaceID = namespaceID;
+			for (size_t i = 0; i < namespaceStr.Length() && i < 4; i++)
+				namespaceChars[i] = namespaceStr[i];
+
+			outNamespaceID = utils::ComputeFourCC(namespaceChars[0], namespaceChars[1], namespaceChars[2], namespaceChars[3]);
 
 			return ResultCode::kOK;
 		}
@@ -513,17 +511,14 @@ namespace rkit
 
 	void ProgramModule::Shutdown()
 	{
+		SafeDelete(ms_moduleConfig);
+
 		if (ms_trackedModuleDriver)
 		{
 			// Unload all tracked modules
 			ms_trackedModuleDriver->UnloadAllTrackedModules();
 
 			ms_trackedModuleDriver->Uninstall();
-			SafeDelete(ms_trackedModuleDriver);
-		}
-
-		if (ms_moduleConfig)
-		{
 			SafeDelete(ms_trackedModuleDriver);
 		}
 	}

@@ -146,7 +146,8 @@ namespace rkit { namespace utils
 
 	void Sha256Calculator::FinalizeStreamingState(Sha256StreamingState &state) const
 	{
-		uint8_t padBytes[64];
+		const size_t kMaxPadding = 8 + 2 + 64;
+		uint8_t padBytes[kMaxPadding];
 		size_t padLength = 0;
 
 		uint64_t codedLength = state.m_length;
@@ -154,22 +155,22 @@ namespace rkit { namespace utils
 		for (int i = 0; i < 8; i++)
 		{
 			padLength++;
-			padBytes[64 - padLength] = static_cast<uint8_t>(codedLength & 0xffu);
+			padBytes[kMaxPadding - padLength] = static_cast<uint8_t>(codedLength & 0xffu);
 			codedLength >>= 8;
 		}
 
 		padLength++;
-		padBytes[64 - padLength] = 0;
+		padBytes[kMaxPadding - padLength] = 0;
 
 		while ((state.m_length + padLength) % 64 != 0)
 		{
 			padLength++;
-			padBytes[64 - padLength] = 0;
+			padBytes[kMaxPadding - padLength] = 0;
 		}
 
-		padBytes[64 - padLength] = 0x80;
+		padBytes[kMaxPadding - padLength] = 0x80;
 
-		AppendStreamingState(state, padBytes + 64 - padLength, padLength);
+		AppendStreamingState(state, padBytes + kMaxPadding - padLength, padLength);
 	}
 
 	Sha256DigestBytes Sha256Calculator::SimpleHashBuffer(const void *data, size_t size) const

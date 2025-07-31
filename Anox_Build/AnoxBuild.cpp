@@ -5,7 +5,11 @@
 #include "rkit/BuildSystem/DependencyGraph.h"
 
 #include "rkit/Core/DriverModuleStub.h"
+#include "rkit/Core/LogDriver.h"
+#include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/ModuleGlue.h"
+
+#include "rkit/Png/PngDriver.h"
 
 #include "rkit/Render/BackendType.h"
 
@@ -27,6 +31,8 @@ namespace anox
 
 		uint32_t GetDriverNamespaceID() const override { return anox::kAnoxNamespaceID; }
 		rkit::StringView GetDriverName() const override { return "Build"; }
+
+		rkit::png::IPngDriver *m_pngDriver = nullptr;
 	};
 
 	typedef rkit::CustomDriverModuleStub<BuildDriver> BuildModule;
@@ -36,6 +42,22 @@ namespace anox
 
 rkit::Result anox::BuildDriver::InitDriver(const rkit::DriverInitParameters *)
 {
+	if (!rkit::GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, "PNG"))
+	{
+		rkit::log::Error("PNG module missing");
+		return rkit::ResultCode::kModuleLoadFailed;
+	}
+
+	rkit::ICustomDriver *pngDriver = rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, "PNG");
+
+	if (!pngDriver)
+	{
+		rkit::log::Error("PNG driver failed to load");
+		return rkit::ResultCode::kModuleLoadFailed;
+	}
+
+	m_pngDriver = static_cast<rkit::png::IPngDriver *>(pngDriver);
+
 	return rkit::ResultCode::kOK;
 }
 
@@ -65,7 +87,7 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 
 	{
 		rkit::UniquePtr<buildsystem::TextureCompilerBase> texCompiler;
-		RKIT_CHECK(buildsystem::TextureCompilerBase::Create(texCompiler));
+		RKIT_CHECK(buildsystem::TextureCompilerBase::Create(texCompiler, *m_pngDriver));
 
 		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kTextureNodeID, std::move(texCompiler)));
 	}

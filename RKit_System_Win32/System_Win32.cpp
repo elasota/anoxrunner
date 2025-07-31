@@ -1628,7 +1628,7 @@ namespace rkit
 			outAttribs = FileAttributes();
 			outAttribs.m_isDirectory = true;
 			return ResultCode::kOK;
-		}
+		} 
 
 		HANDLE hFile = CreateFileW(path.GetChars(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 

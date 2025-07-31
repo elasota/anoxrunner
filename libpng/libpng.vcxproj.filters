@@ -15,28 +15,46 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\thirdparty\zlib\adler32.c">
+    <ClCompile Include="..\thirdparty\libpng\png.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\thirdparty\zlib\crc32.c">
+    <ClCompile Include="..\thirdparty\libpng\pngerror.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\thirdparty\zlib\inffast.c">
+    <ClCompile Include="..\thirdparty\libpng\pngmem.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\thirdparty\zlib\inflate.c">
+    <ClCompile Include="..\thirdparty\libpng\pngread.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\thirdparty\zlib\inftrees.c">
+    <ClCompile Include="..\thirdparty\libpng\pngset.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\thirdparty\zlib\trees.c">
+    <ClCompile Include="..\thirdparty\libpng\pngwutil.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\thirdparty\zlib\zutil.c">
+    <ClCompile Include="..\thirdparty\libpng\pngrtran.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\thirdparty\zlib\deflate.c">
+    <ClCompile Include="..\thirdparty\libpng\pngtrans.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\thirdparty\libpng\pngrio.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\thirdparty\libpng\pngget.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\thirdparty\libpng\pngrutil.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\thirdparty\libpng\pngwrite.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\thirdparty\libpng\pngwio.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\thirdparty\libpng\pngwtran.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
