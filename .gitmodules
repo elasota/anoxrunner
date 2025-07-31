@@ -21,3 +21,7 @@
 	path = thirdparty/ryu
 	url = https://github.com/ulfjack/ryu
 	branch = master
+[submodule "thirdparty/libpng"]
+	path = thirdparty/libpng
+	url = https://github.com/pnggroup/libpng.git
+	branch = libpng16
