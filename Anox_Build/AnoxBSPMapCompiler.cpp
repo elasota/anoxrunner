@@ -208,6 +208,8 @@ namespace anox { namespace buildsystem
 		static rkit::Result CopyLightmapTree(priv::LightmapTree &newTree, const priv::LightmapTree &oldTree, rkit::Vector<size_t> &stack, bool &outCopiedOK);
 		static rkit::Result ExportLightmaps(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback,
 			BSPDataCollection &bsp, const rkit::Vector<BSPFaceStats> &faceStats, const rkit::Vector<rkit::UniquePtr<priv::LightmapTree>> &lightmapTrees);
+		static bool LightmapFitsInNode(const priv::LightmapTreeNode &node, uint16_t width, uint16_t height);
+
 
 		static rkit::Result LoadBSPData(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, BSPDataCollection &bsp, rkit::Vector<LumpLoader> &loaders);
 
@@ -676,7 +678,7 @@ namespace anox { namespace buildsystem
 				continue;
 			}
 
-			if (node.m_isOccupied || node.m_width < width || node.m_height < height)
+			if (node.m_isOccupied || !LightmapFitsInNode(node, width, height))
 			{
 				// Doesn't fit in this node
 				if (stackDepth == 0)
@@ -917,7 +919,7 @@ namespace anox { namespace buildsystem
 							else
 							{
 								for (size_t channel = 0; channel < 3; channel++)
-									outTexel[channel] = rgb[channel];
+									outTexel[channel] = static_cast<uint8_t>(rgb[channel]);
 								outTexel[3] = 255;
 							}
 						}
@@ -953,7 +955,7 @@ namespace anox { namespace buildsystem
 			ddsHeader.m_ddsFlags = ddsFlags;
 			ddsHeader.m_height = atlasHeight;
 			ddsHeader.m_width = atlasWidth;
-			ddsHeader.m_pitchOrLinearSize = atlasPitch;
+			ddsHeader.m_pitchOrLinearSize = static_cast<uint32_t>(atlasPitch);
 			ddsHeader.m_depth = 1;
 			ddsHeader.m_mipMapCount = 1;
 
@@ -973,11 +975,32 @@ namespace anox { namespace buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
-	uint32_t BSPMapCompiler::GetVersion() const
+	bool BSPMapCompiler::LightmapFitsInNode(const priv::LightmapTreeNode &node, uint16_t width, uint16_t height)
 	{
-		return 3;
+		const uint16_t nodeDimensions[] = { node.m_width, node.m_height };
+		const uint16_t candidateDimensions[] = { width, height };
+
+		const uint16_t minimumMargin = 2;
+
+		for (int i = 0; i < 2; i++)
+		{
+			const uint16_t nodeDimension = nodeDimensions[i];
+			const uint16_t candidateDimension = candidateDimensions[i];
+
+			if (candidateDimension > nodeDimension)
+				return false;
+
+			if (candidateDimension < nodeDimension && (nodeDimension - candidateDimension) < minimumMargin)
+				return false;
+		}
+
+		return true;
 	}
 
+	uint32_t BSPMapCompiler::GetVersion() const
+	{
+		return 4;
+	}
 
 	template<class TStructure>
 	BSPMapCompiler::LumpLoader::LumpLoader(BSPLumpIndex lumpIndex, rkit::Vector<TStructure> &arr)
