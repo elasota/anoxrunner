@@ -88,7 +88,6 @@
     <ClCompile Include="JobQueue.cpp" />
     <ClCompile Include="Json.cpp" />
     <ClCompile Include="MutexProtectedStream.cpp" />
-    <ClCompile Include="PngLoader.cpp" />
     <ClCompile Include="RangeLimitedReadStream.cpp" />
     <ClCompile Include="Sha2Calculator.cpp" />
     <ClCompile Include="ShadowFile.cpp" />

@@ -51,9 +51,6 @@
     <ClCompile Include="CoroThread.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="PngLoader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Image.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
