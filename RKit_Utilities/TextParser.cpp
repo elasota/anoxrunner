@@ -339,7 +339,10 @@ namespace rkit { namespace utils
 		{
 			char c;
 			if (!m_charReader.PeekOne(c))
+			{
+				endLoc = m_charReader.GetLocation().m_pos;
 				break;
+			}
 
 			endLoc = m_charReader.GetLocation().m_pos;
 
