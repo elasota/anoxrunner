@@ -10,6 +10,7 @@ namespace rkit
 }
 
 #include "Algorithm.h"
+#include "SmoothSort.h"
 #include "TypeTraits.h"
 
 namespace rkit { namespace priv
@@ -42,6 +43,9 @@ namespace rkit { namespace priv
 	{
 		if (itBeginRef == itEndRef)
 			return;
+
+		if (depth > 20)
+			SmoothSortImpl<TIter, TPredicate>(itBeginRef, itEndRef, pred);
 
 		const TIter itBegin = itBeginRef;
 		const TIter itEnd = itEndRef;
