@@ -86,7 +86,7 @@ namespace rkit { namespace coro { namespace priv {
 	{
 		rkit::Result result = TCaller::Call(*static_cast<TClass *>(classInstance), std::forward<TParams>(params)...);
 
-		if (!result.IsOK())
+		if (!rkit::utils::ResultIsOK(result))
 		{
 			context.m_disposition = Disposition::kFailResult;
 			context.m_result = result;

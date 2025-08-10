@@ -234,7 +234,7 @@ namespace rkit { namespace png {
 		png_voidp ioPtr = png_get_io_ptr(png);
 		Result result = static_cast<PngLoader *>(ioPtr)->m_stream.ReadAll(buffer, sz);
 
-		if (!result.IsOK())
+		if (!rkit::utils::ResultIsOK(result))
 			png_error(png, "Read error");
 	}
 

@@ -189,4 +189,6 @@ namespace rkit
 		return RKIT_PP_CONCAT(exprResult_, __LINE__);\
 } while (false)
 
+#define RKIT_CHECK_SOFT(expr) RKIT_CHECK(expr)
+
 #endif
