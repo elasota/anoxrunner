@@ -115,7 +115,7 @@ namespace rkit
 
 		void Normalize();
 
-		HashMap<TKey, TValue, TSize> &m_hashMap;
+		HashMap<TKey, TValue, TSize> *m_hashMapPtr;
 		TSize m_offset;
 	};
 
@@ -136,6 +136,8 @@ namespace rkit
 
 		HashMapKeyValueView<TKey, const TValue> operator*() const;
 
+		HashMapConstIterator<TKey, TValue, TSize> &operator=(const HashMapConstIterator<TKey, TValue, TSize> &other) = default;
+
 		const TKey &Key() const;
 		const TValue &Value() const;
 
@@ -146,7 +148,7 @@ namespace rkit
 
 		void Normalize();
 
-		const HashMap<TKey, TValue, TSize> &m_hashMap;
+		const HashMap<TKey, TValue, TSize> *m_hashMapPtr;
 		TSize m_offset;
 	};
 
@@ -359,13 +361,13 @@ rkit::HashMapIterator<TKey, TValue, TSize> rkit::HashMapIterator<TKey, TValue, T
 	m_offset++;
 	this->Normalize();
 
-	return HashMapIterator<TKey, TValue, TSize>(m_hashMap, oldOffset);
+	return HashMapIterator<TKey, TValue, TSize>(*m_hashMapPtr, oldOffset);
 }
 
 template<class TKey, class TValue, class TSize>
 bool rkit::HashMapIterator<TKey, TValue, TSize>::operator==(const HashMapIterator<TKey, TValue, TSize> &other) const
 {
-	return m_offset == other.m_offset && (&m_hashMap) == (&other.m_hashMap);
+	return m_offset == other.m_offset && m_hashMapPtr == other.m_hashMapPtr;
 }
 
 template<class TKey, class TValue, class TSize>
@@ -395,20 +397,20 @@ rkit::HashMapKeyValueView<TKey, TValue> rkit::HashMapIterator<TKey, TValue, TSiz
 template<class TKey, class TValue, class TSize>
 const TKey &rkit::HashMapIterator<TKey, TValue, TSize>::Key() const
 {
-	RKIT_ASSERT(m_offset < m_hashMap.m_capacity && m_hashMap.GetOccupancyAt(m_offset));
-	return m_hashMap.m_keys[m_offset];
+	RKIT_ASSERT(m_offset < m_hashMapPtr->m_capacity && m_hashMapPtr->GetOccupancyAt(m_offset));
+	return m_hashMapPtr->m_keys[m_offset];
 }
 
 template<class TKey, class TValue, class TSize>
 TValue &rkit::HashMapIterator<TKey, TValue, TSize>::Value() const
 {
-	RKIT_ASSERT(m_offset < m_hashMap.m_capacity && m_hashMap.GetOccupancyAt(m_offset));
-	return *m_hashMap.m_values.GetValuePtrAt(m_offset);
+	RKIT_ASSERT(m_offset < m_hashMapPtr->m_capacity && m_hashMapPtr->GetOccupancyAt(m_offset));
+	return *m_hashMapPtr->m_values.GetValuePtrAt(m_offset);
 }
 
 template<class TKey, class TValue, class TSize>
 rkit::HashMapIterator<TKey, TValue, TSize>::HashMapIterator(HashMap<TKey, TValue, TSize> &hashMap, TSize offset)
-	: m_hashMap(hashMap)
+	: m_hashMapPtr(&hashMap)
 	, m_offset(offset)
 {
 }
@@ -416,12 +418,12 @@ rkit::HashMapIterator<TKey, TValue, TSize>::HashMapIterator(HashMap<TKey, TValue
 template<class TKey, class TValue, class TSize>
 void rkit::HashMapIterator<TKey, TValue, TSize>::Normalize()
 {
-	TSize capacity = m_hashMap.m_capacity;
+	TSize capacity = m_hashMapPtr->m_capacity;
 	TSize offset = m_offset;
 
 	while (offset < capacity)
 	{
-		if (m_hashMap.GetOccupancyAt(offset))
+		if (m_hashMapPtr->GetOccupancyAt(offset))
 			break;
 
 		offset++;
@@ -433,7 +435,7 @@ void rkit::HashMapIterator<TKey, TValue, TSize>::Normalize()
 // HashMapConstIterator
 template<class TKey, class TValue, class TSize>
 rkit::HashMapConstIterator<TKey, TValue, TSize>::HashMapConstIterator(const HashMapIterator<TKey, TValue, TSize> &other)
-	: m_hashMap(other.m_hashMap)
+	: m_hashMapPtr(other.m_hashMapPtr)
 	, m_offset(other.m_offset)
 {
 }
@@ -454,13 +456,13 @@ template<class TKey, class TValue, class TSize>
 	m_offset++;
 	this->Normalize();
 
-	return HashMapConstIterator<TKey, TValue, TSize>(m_hashMap, oldOffset);
+	return HashMapConstIterator<TKey, TValue, TSize>(*m_hashMapPtr, oldOffset);
 }
 
 template<class TKey, class TValue, class TSize>
 bool rkit::HashMapConstIterator<TKey, TValue, TSize>::operator==(const HashMapConstIterator<TKey, TValue, TSize> &other) const
 {
-	return m_offset == other.m_offset && (&m_hashMap) == (&other.m_hashMap);
+	return m_offset == other.m_offset && m_hashMapPtr == other.m_hashMapPtr;
 }
 
 template<class TKey, class TValue, class TSize>
@@ -478,20 +480,20 @@ rkit::HashMapKeyValueView<TKey, const TValue> rkit::HashMapConstIterator<TKey, T
 template<class TKey, class TValue, class TSize>
 const TKey &rkit::HashMapConstIterator<TKey, TValue, TSize>::Key() const
 {
-	RKIT_ASSERT(m_offset < m_hashMap.m_capacity && m_hashMap.GetOccupancyAt(m_offset));
-	return m_hashMap.m_keys[m_offset];
+	RKIT_ASSERT(m_offset < m_hashMapPtr->m_capacity && m_hashMapPtr->GetOccupancyAt(m_offset));
+	return m_hashMapPtr->m_keys[m_offset];
 }
 
 template<class TKey, class TValue, class TSize>
 const TValue &rkit::HashMapConstIterator<TKey, TValue, TSize>::Value() const
 {
-	RKIT_ASSERT(m_offset < m_hashMap.m_capacity && m_hashMap.GetOccupancyAt(m_offset));
-	return *m_hashMap.m_values.GetValuePtrAt(m_offset);
+	RKIT_ASSERT(m_offset < m_hashMapPtr->m_capacity && m_hashMapPtr->GetOccupancyAt(m_offset));
+	return *m_hashMapPtr->m_values.GetValuePtrAt(m_offset);
 }
 
 template<class TKey, class TValue, class TSize>
 rkit::HashMapConstIterator<TKey, TValue, TSize>::HashMapConstIterator(const HashMap<TKey, TValue, TSize> &hashMap, TSize offset)
-	: m_hashMap(hashMap)
+	: m_hashMapPtr(&hashMap)
 	, m_offset(offset)
 {
 }
@@ -499,12 +501,12 @@ rkit::HashMapConstIterator<TKey, TValue, TSize>::HashMapConstIterator(const Hash
 template<class TKey, class TValue, class TSize>
 void rkit::HashMapConstIterator<TKey, TValue, TSize>::Normalize()
 {
-	TSize capacity = m_hashMap.m_capacity;
+	TSize capacity = m_hashMapPtr->m_capacity;
 	TSize offset = m_offset;
 
 	while (offset < capacity)
 	{
-		if (m_hashMap.GetOccupancyAt(offset))
+		if (m_hashMapPtr->GetOccupancyAt(offset))
 			break;
 
 		offset++;

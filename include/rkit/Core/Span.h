@@ -95,6 +95,7 @@ namespace rkit
 		operator Span<TOther>() const;
 
 		SpanToISpanRefWrapper<T> ToRefISpan() const;
+		SpanToISpanRefWrapper<const T> ToConstRefISpan() const;
 		SpanToISpanValueWrapper<typename std::remove_const<T>::type> ToValueISpan() const;
 
 		template<class TOther>
@@ -452,6 +453,12 @@ template<class T>
 rkit::SpanToISpanRefWrapper<T> rkit::Span<T>::ToRefISpan() const
 {
 	return rkit::SpanToISpanRefWrapper<T>(m_arr, m_count);
+}
+
+template<class T>
+rkit::SpanToISpanRefWrapper<const T> rkit::Span<T>::ToConstRefISpan() const
+{
+	return rkit::SpanToISpanRefWrapper<const T>(m_arr, m_count);
 }
 
 template<class T>

@@ -162,7 +162,8 @@ namespace rkit
 	template<class T>
 	Tuple<T> &Tuple<T>::operator=(Tuple<T> &&other)
 	{
-		m_value = std::move(other);
+		m_value = std::move(other.m_value);
+		return *this;
 	}
 
 	template<class T>

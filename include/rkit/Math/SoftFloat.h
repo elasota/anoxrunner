@@ -227,6 +227,7 @@ namespace rkit { namespace math
 		bool operator!=(const SoftFloat32 &other) const;
 
 		static SoftFloat32 FromBits(uint32_t bits);
+		uint32_t ToBits() const;
 
 		SoftFloat64 ToFloat64() const;
 		SoftFloat80 ToFloat80() const;
@@ -1956,6 +1957,11 @@ namespace rkit { namespace math
 	{
 		const priv::float32_t value = { bits };
 		return SoftFloat32(value);
+	}
+
+	uint32_t SoftFloat32::ToBits() const
+	{
+		return m_f.v;
 	}
 
 	SoftFloat64 SoftFloat32::ToFloat64() const

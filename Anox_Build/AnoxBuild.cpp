@@ -94,11 +94,25 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 
 	{
 		rkit::UniquePtr<buildsystem::BSPMapCompilerBase> mapCompiler;
-		RKIT_CHECK(buildsystem::BSPMapCompilerBase::Create(mapCompiler));
+		RKIT_CHECK(buildsystem::BSPMapCompilerBase::CreateMapCompiler(mapCompiler));
 
 		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kBSPMapNodeID, std::move(mapCompiler)));
 
 		RKIT_CHECK(instance->RegisterNodeTypeByExtension("bsp", kAnoxNamespaceID, buildsystem::kBSPMapNodeID));
+	}
+
+	{
+		rkit::UniquePtr<buildsystem::BSPMapCompilerBase> lightingCompiler;
+		RKIT_CHECK(buildsystem::BSPMapCompilerBase::CreateLightingCompiler(lightingCompiler));
+
+		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kBSPLightmapNodeID, std::move(lightingCompiler)));
+	}
+
+	{
+		rkit::UniquePtr<buildsystem::BSPMapCompilerBase> bspGeoCompiler;
+		RKIT_CHECK(buildsystem::BSPMapCompilerBase::CreateGeometryCompiler(bspGeoCompiler));
+
+		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kBSPGeometryID, std::move(bspGeoCompiler)));
 	}
 
 	RKIT_CHECK(instance->RegisterNodeTypeByExtension("cfg", rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kCopyFileNodeID));

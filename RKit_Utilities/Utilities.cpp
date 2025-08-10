@@ -1713,6 +1713,9 @@ namespace rkit
 
 	bool UtilitiesDriver::DefaultIsPathComponentValid(const BaseStringSliceView<char, CharacterEncoding::kUTF8> &span, bool isFirst, bool allowWildcards) const
 	{
+		if (span.Length() == 0)
+			return false;
+
 		if (span[span.Length() - 1] == '.')
 		{
 			// Check paths ending with periods

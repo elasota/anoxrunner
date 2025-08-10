@@ -46,16 +46,18 @@ namespace rkit { namespace priv
 
 		if (depth > 20)
 			SmoothSortImpl<TIter, TPredicate>(itBeginRef, itEndRef, pred);
+		else
+		{
+			const TIter itBegin = itBeginRef;
+			const TIter itEnd = itEndRef;
 
-		const TIter itBegin = itBeginRef;
-		const TIter itEnd = itEndRef;
+			const TIter pivot = QuickSortPartition<TIter, TPredicate>(itBegin, itEnd, pred);
+			TIter nextAfterPivot = pivot;
+			++nextAfterPivot;
 
-		const TIter pivot = QuickSortPartition<TIter, TPredicate>(itBegin, itEnd, pred);
-		TIter nextAfterPivot = pivot;
-		++nextAfterPivot;
-
-		QuickSortRecursive<TIter, TPredicate>(itBegin, pivot, pred, depth + 1);
-		QuickSortRecursive<TIter, TPredicate>(nextAfterPivot, itEnd, pred, depth + 1);
+			QuickSortRecursive<TIter, TPredicate>(itBegin, pivot, pred, depth + 1);
+			QuickSortRecursive<TIter, TPredicate>(nextAfterPivot, itEnd, pred, depth + 1);
+		}
 	}
 } } // rkit::priv
 
