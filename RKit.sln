@@ -49,6 +49,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Anox_MainProgram", "Anox_Ma
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RKit_Build_Vulkan", "RKit_Build_Vulkan\RKit_Build_Vulkan.vcxproj", "{78FC9983-7D03-4D47-96DE-365B01A87B3B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{92DD0E11-FDB9-4430-A822-263D675EC9B2} = {92DD0E11-FDB9-4430-A822-263D675EC9B2}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RKit_Data", "RKit_Data\RKit_Data.vcxproj", "{5970AF8B-FEF0-451A-8122-94EFB6AC1CBB}"
 EndProject
@@ -66,6 +69,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RKit_PNG", "RKit_PNG\RKit_PNG.vcxproj", "{333998BD-A9A8-4FFD-BA5A-DAFF538C778B}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libpng", "libpng\libpng.vcxproj", "{D6CF5214-3D01-4A4C-ADFF-DD4F81EC71C3}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RKit_ShaderC_DLL", "RKit_ShaderC_DLL\RKit_ShaderC_DLL.vcxproj", "{92DD0E11-FDB9-4430-A822-263D675EC9B2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -203,6 +208,14 @@ Global
 		{D6CF5214-3D01-4A4C-ADFF-DD4F81EC71C3}.Release|x64.Build.0 = Release|x64
 		{D6CF5214-3D01-4A4C-ADFF-DD4F81EC71C3}.Release|x86.ActiveCfg = Release|Win32
 		{D6CF5214-3D01-4A4C-ADFF-DD4F81EC71C3}.Release|x86.Build.0 = Release|Win32
+		{92DD0E11-FDB9-4430-A822-263D675EC9B2}.Debug|x64.ActiveCfg = Debug|x64
+		{92DD0E11-FDB9-4430-A822-263D675EC9B2}.Debug|x64.Build.0 = Debug|x64
+		{92DD0E11-FDB9-4430-A822-263D675EC9B2}.Debug|x86.ActiveCfg = Debug|Win32
+		{92DD0E11-FDB9-4430-A822-263D675EC9B2}.Debug|x86.Build.0 = Debug|Win32
+		{92DD0E11-FDB9-4430-A822-263D675EC9B2}.Release|x64.ActiveCfg = Release|x64
+		{92DD0E11-FDB9-4430-A822-263D675EC9B2}.Release|x64.Build.0 = Release|x64
+		{92DD0E11-FDB9-4430-A822-263D675EC9B2}.Release|x86.ActiveCfg = Release|Win32
+		{92DD0E11-FDB9-4430-A822-263D675EC9B2}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

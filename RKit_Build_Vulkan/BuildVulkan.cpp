@@ -10,6 +10,7 @@
 #include "VulkanRenderPipelineCompiler.h"
 
 #include <glslang/Include/glslang_c_interface.h>
+#include "rkit/ShaderC/ShaderC_DLL.h"
 
 namespace rkit { namespace buildsystem
 {
@@ -27,13 +28,30 @@ namespace rkit { namespace buildsystem
 		rkit::StringView GetDriverName() const override { return "Build_Vulkan"; }
 
 		bool m_isGlslangInitialized = false;
+
+		IModule *m_shaderCModule = nullptr;
+		const vulkan::GlslCApi *m_glslc = nullptr;
 	};
 
 	typedef rkit::CustomDriverModuleStub<BuildVulkanDriver> BuildVulkanModule;
 
 	rkit::Result BuildVulkanDriver::InitDriver(const DriverInitParameters *initParams)
 	{
-		if (!glslang_initialize_process())
+		vulkan::ShaderCApiGroup apiGroup = {};
+
+		vulkan::ShaderCModuleInitParameters shaderCInitParams = {};
+		shaderCInitParams.m_outApiGroup = &apiGroup;
+
+		m_shaderCModule = GetDrivers().m_moduleDriver->LoadModule(kDefaultNamespace, "ShaderC_DLL", &shaderCInitParams);
+		if (!m_shaderCModule)
+		{
+			rkit::log::Error("ShaderC module failed to load");
+			return rkit::ResultCode::kOperationFailed;
+		}
+
+		m_glslc = apiGroup.m_glslApi;
+
+		if (!m_glslc->glslang_initialize_process())
 		{
 			rkit::log::Error("glslang failed to init");
 			return rkit::ResultCode::kOperationFailed;
@@ -48,9 +66,12 @@ namespace rkit { namespace buildsystem
 	{
 		if (m_isGlslangInitialized)
 		{
-			glslang_finalize_process();
+			m_glslc->glslang_finalize_process();
 			m_isGlslangInitialized = false;
 		}
+
+		if (m_shaderCModule)
+			m_shaderCModule->Unload();
 	}
 
 	Result BuildVulkanDriver::RegisterBuildSystemAddOn(IBuildSystemInstance *instance)
@@ -65,7 +86,7 @@ namespace rkit { namespace buildsystem
 			render::vulkan::GraphicPipelineStage stage = static_cast<render::vulkan::GraphicPipelineStage>(i);
 
 			UniquePtr<buildsystem::IDependencyNodeCompiler> stageCompiler;
-			RKIT_CHECK(rkit::buildsystem::vulkan::CreateGraphicsPipelineStageCompiler(stage, stageCompiler));
+			RKIT_CHECK(rkit::buildsystem::vulkan::CreateGraphicsPipelineStageCompiler(m_glslc, stage, stageCompiler));
 
 			RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kDefaultNamespace, vulkan::CreateNodeTypeIDForStage(stage), std::move(stageCompiler)));
 		}

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "CoreDefs.h"
+
 #include <cstdint>
 
 namespace rkit

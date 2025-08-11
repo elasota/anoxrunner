@@ -18,10 +18,14 @@
 #include "rkit/Core/Path.h"
 #include "rkit/Core/Stream.h"
 
+#include "rkit/ShaderC/ShaderC_DLL.h"
+
 #include <glslang/Include/glslang_c_interface.h>
 
 namespace rkit { namespace buildsystem { namespace vulkan
 {
+	struct GlslCApi;
+
 	uint32_t CreateNodeTypeIDForStageInt(char c0, char c1, uint8_t pipelineStage)
 	{
 		char c2 = static_cast<char>('0' + pipelineStage / 10);
@@ -59,7 +63,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 	class RenderPipelineStageBuildJob final : public PipelineCompilerBase
 	{
 	public:
-		RenderPipelineStageBuildJob(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback, PipelineType pipelineType);
+		RenderPipelineStageBuildJob(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback, const GlslCApi *glslc, PipelineType pipelineType);
 
 		Result AddIncludePath(String &&str);
 
@@ -126,6 +130,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		Vector<String> m_includePaths;	// Must be separator-terminated
 
 		IMallocDriver *m_alloc;
+		const GlslCApi *m_glslc;
 
 		IDependencyNode *m_depsNode;
 		IDependencyNodeCompilerFeedback *m_feedback;
@@ -144,7 +149,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 	class RenderPipelineStageCompiler final : public IDependencyNodeCompiler, public PipelineCompilerBase
 	{
 	public:
-		explicit RenderPipelineStageCompiler(PipelineType pipelineType, uint32_t stage);
+		explicit RenderPipelineStageCompiler(const GlslCApi *glslc, PipelineType pipelineType, uint32_t stage);
 
 		bool HasAnalysisStage() const override;
 		Result RunAnalysis(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback) override;
@@ -157,6 +162,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 		PipelineType m_pipelineType;
 		uint32_t m_stageUInt;
+		const GlslCApi *m_glslc;
 	};
 
 	class RenderPipelineCompiler final : public IDependencyNodeCompiler, public PipelineCompilerBase
@@ -447,13 +453,14 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		return m_extraBinaryContent[index].ToSpan();
 	}
 
-	RenderPipelineStageBuildJob::RenderPipelineStageBuildJob(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback, PipelineType pipelineType)
+	RenderPipelineStageBuildJob::RenderPipelineStageBuildJob(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback, const GlslCApi *glslc, PipelineType pipelineType)
 		: m_depsNode(depsNode)
 		, m_feedback(feedback)
 		, m_pipelineType(pipelineType)
 		, m_glslangStage(GLSLANG_STAGE_COUNT)
 		, m_alloc(GetDrivers().m_mallocDriver)
 		, m_glslangResource{}
+		, m_glslc(glslc)
 	{
 	}
 
@@ -732,14 +739,14 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		input.callbacks_ctx = this;
 		input.resource = &m_glslangResource;
 
-		glslang_shader_t *shader = glslang_shader_create(&input);
+		glslang_shader_t *shader = m_glslc->glslang_shader_create(&input);
 		if (!shader)
 			return ResultCode::kOperationFailed;
 
-		if (!glslang_shader_preprocess(shader, &input) || !glslang_shader_parse(shader, &input))
+		if (!m_glslc->glslang_shader_preprocess(shader, &input) || !m_glslc->glslang_shader_parse(shader, &input))
 		{
-			const char *infoLog = glslang_shader_get_info_log(shader);
-			const char *infoDebugLog = glslang_shader_get_info_debug_log(shader);
+			const char *infoLog = m_glslc->glslang_shader_get_info_log(shader);
+			const char *infoDebugLog = m_glslc->glslang_shader_get_info_debug_log(shader);
 
 			if (infoLog && infoLog[0])
 				rkit::log::Error(infoLog);
@@ -747,23 +754,23 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			if (infoDebugLog && infoDebugLog[0])
 				rkit::log::Error(infoDebugLog);
 
-			glslang_shader_delete(shader);
+			m_glslc->glslang_shader_delete(shader);
 			return ResultCode::kOperationFailed;
 		}
 
-		glslang_program_t *program = glslang_program_create();
+		glslang_program_t *program = m_glslc->glslang_program_create();
 		if (!program)
 		{
-			glslang_shader_delete(shader);
+			m_glslc->glslang_shader_delete(shader);
 			return ResultCode::kOperationFailed;
 		}
 
-		glslang_program_add_shader(program, shader);
+		m_glslc->glslang_program_add_shader(program, shader);
 
-		if (!glslang_program_link(program, GLSLANG_MSG_DEFAULT_BIT))
+		if (!m_glslc->glslang_program_link(program, GLSLANG_MSG_DEFAULT_BIT))
 		{
-			const char *infoLog = glslang_program_get_info_log(program);
-			const char *infoDebugLog = glslang_program_get_info_debug_log(program);
+			const char *infoLog = m_glslc->glslang_program_get_info_log(program);
+			const char *infoDebugLog = m_glslc->glslang_program_get_info_debug_log(program);
 
 			if (infoLog && infoLog[0])
 				rkit::log::Error(infoLog);
@@ -771,25 +778,25 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			if (infoDebugLog && infoDebugLog[0])
 				rkit::log::Error(infoDebugLog);
 
-			glslang_program_delete(program);
-			glslang_shader_delete(shader);
+			m_glslc->glslang_program_delete(program);
+			m_glslc->glslang_shader_delete(shader);
 			return ResultCode::kOperationFailed;
 		}
 
-		glslang_program_SPIRV_generate(program, m_glslangStage);
+		m_glslc->glslang_program_SPIRV_generate(program, m_glslangStage);
 
-		size_t spvSize = glslang_program_SPIRV_get_size(program);
+		size_t spvSize = m_glslc->glslang_program_SPIRV_get_size(program);
 
 		RKIT_CHECK(m_resultSPV.Resize(spvSize));
 		if (spvSize > 0)
-			glslang_program_SPIRV_get(program, &m_resultSPV[0]);
+			m_glslc->glslang_program_SPIRV_get(program, &m_resultSPV[0]);
 
-		const char *spvMessages = glslang_program_SPIRV_get_messages(program);
+		const char *spvMessages = m_glslc->glslang_program_SPIRV_get_messages(program);
 		if (spvMessages && spvMessages[0])
 			rkit::log::LogInfo(spvMessages);
 
-		glslang_program_delete(program);
-		glslang_shader_delete(shader);
+		m_glslc->glslang_program_delete(program);
+		m_glslc->glslang_shader_delete(shader);
 
 		return ResultCode::kOK;
 	}
@@ -1347,9 +1354,10 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		header_name = m_name.CStr();
 	}
 
-	RenderPipelineStageCompiler::RenderPipelineStageCompiler(PipelineType pipelineType, uint32_t stage)
+	RenderPipelineStageCompiler::RenderPipelineStageCompiler(const GlslCApi *glslc, PipelineType pipelineType, uint32_t stage)
 		: m_pipelineType(pipelineType)
 		, m_stageUInt(stage)
+		, m_glslc(glslc)
 	{
 	}
 
@@ -1384,7 +1392,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 			render::vulkan::GraphicPipelineStage stage = static_cast<render::vulkan::GraphicPipelineStage>(m_stageUInt);
 
-			RenderPipelineStageBuildJob buildJob(depsNode, feedback, m_pipelineType);
+			RenderPipelineStageBuildJob buildJob(depsNode, feedback, m_glslc, m_pipelineType);
 			RKIT_CHECK(buildJob.RunGraphics(package.Get(), pipelineDesc, stage));
 
 			CIPath outPath;
@@ -1476,8 +1484,8 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		return New<RenderPipelineCompiler>(outCompiler, PipelineType::Graphics);
 	}
 
-	Result CreateGraphicsPipelineStageCompiler(render::vulkan::GraphicPipelineStage stage, UniquePtr<IDependencyNodeCompiler> &outCompiler)
+	Result CreateGraphicsPipelineStageCompiler(const GlslCApi *glslc, render::vulkan::GraphicPipelineStage stage, UniquePtr<IDependencyNodeCompiler> &outCompiler)
 	{
-		return New<RenderPipelineStageCompiler>(outCompiler, PipelineType::Graphics, static_cast<uint32_t>(stage));
+		return New<RenderPipelineStageCompiler>(outCompiler, glslc, PipelineType::Graphics, static_cast<uint32_t>(stage));
 	}
 } } } // rkit::buildsystem::vulkan
