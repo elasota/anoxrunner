@@ -102,6 +102,8 @@
     <ClInclude Include="..\include\rkit\Core\DriverModuleStub.h" />
     <ClInclude Include="..\include\rkit\Core\Drivers.h" />
     <ClInclude Include="..\include\rkit\Core\Endian.h" />
+    <ClInclude Include="..\include\rkit\Core\Format.h" />
+    <ClInclude Include="..\include\rkit\Core\FormatProtos.h" />
     <ClInclude Include="..\include\rkit\Core\Hasher.h" />
     <ClInclude Include="..\include\rkit\Core\HashTable.h" />
     <ClInclude Include="..\include\rkit\Core\HashValue.h" />

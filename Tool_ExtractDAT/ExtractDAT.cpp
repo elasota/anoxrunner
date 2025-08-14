@@ -77,7 +77,7 @@ rkit::Result anox::ExtractDATProgram::Run()
 		rkit::OSAbsPath outPath;
 		RKIT_CHECK((outPath.SetFromEncodedString<char, rkit::CharacterEncoding::kUTF8>(args[1])));
 
-		rkit::log::LogInfo(fh.GetFilePath().GetChars());
+		rkit::log::LogInfo(fh.GetFilePath());
 
 		if (true)
 			return rkit::ResultCode::kNotYetImplemented;	// fix path handling here

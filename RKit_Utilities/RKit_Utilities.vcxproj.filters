@@ -200,5 +200,11 @@
     <ClInclude Include="Image.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\rkit\Core\Format.h">
+      <Filter>Header Files\rkit</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\rkit\Core\FormatProtos.h">
+      <Filter>Header Files\rkit</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

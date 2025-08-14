@@ -71,4 +71,29 @@ namespace rkit
 	{
 		typedef TypeList<TTypes..., TAdditional> Type_t;
 	};
+
+	template<class TTypeListA, class TTypeListB>
+	struct TypeListConcat
+	{
+	};
+
+	template<class TTypeListA>
+	struct TypeListConcat<TTypeListA, TypeList<>>
+	{
+		typedef TTypeListA Type_t;
+	};
+
+	template<class TTypeListA, class TOnlyType>
+	struct TypeListConcat<TTypeListA, TypeList<TOnlyType>>
+	{
+		typedef typename TypeListAppend<TTypeListA, TOnlyType>::Type_t Type_t;
+	};
+
+	template<class TTypeListA, class TFirstType, class... TMoreTypes>
+	struct TypeListConcat<TTypeListA, TypeList<TFirstType, TMoreTypes...>>
+	{
+		typedef typename TypeListConcat<
+			typename TypeListAppend<TTypeListA, TFirstType>::Type_t,
+			TypeList<TMoreTypes...>>::Type_t Type_t;
+	};
 }

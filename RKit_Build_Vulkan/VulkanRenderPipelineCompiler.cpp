@@ -749,10 +749,10 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			const char *infoDebugLog = m_glslc->glslang_shader_get_info_debug_log(shader);
 
 			if (infoLog && infoLog[0])
-				rkit::log::Error(infoLog);
+				rkit::log::Error(StringView::FromCString(infoLog));
 
 			if (infoDebugLog && infoDebugLog[0])
-				rkit::log::Error(infoDebugLog);
+				rkit::log::Error(StringView::FromCString(infoDebugLog));
 
 			m_glslc->glslang_shader_delete(shader);
 			return ResultCode::kOperationFailed;
@@ -773,10 +773,10 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			const char *infoDebugLog = m_glslc->glslang_program_get_info_debug_log(program);
 
 			if (infoLog && infoLog[0])
-				rkit::log::Error(infoLog);
+				rkit::log::Error(StringView::FromCString(infoLog));
 
 			if (infoDebugLog && infoDebugLog[0])
-				rkit::log::Error(infoDebugLog);
+				rkit::log::Error(StringView::FromCString(infoDebugLog));
 
 			m_glslc->glslang_program_delete(program);
 			m_glslc->glslang_shader_delete(shader);
@@ -793,7 +793,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 		const char *spvMessages = m_glslc->glslang_program_SPIRV_get_messages(program);
 		if (spvMessages && spvMessages[0])
-			rkit::log::LogInfo(spvMessages);
+			rkit::log::LogInfo(StringView::FromCString(spvMessages));
 
 		m_glslc->glslang_program_delete(program);
 		m_glslc->glslang_shader_delete(shader);

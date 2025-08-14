@@ -354,7 +354,7 @@ namespace anox
 			}
 
 			if (!setOK)
-				rkit::log::ErrorFmt("Failed to set '%s' to '%s'", args[0].GetChars(), args[1].GetChars());
+				rkit::log::ErrorFmt("Failed to set '{0}' to '{1}'", args[0].GetChars(), args[1].GetChars());
 
 			return rkit::ResultCode::kOK;
 		}

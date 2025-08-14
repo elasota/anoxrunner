@@ -1,4 +1,5 @@
 #include "rkit/Core/DriverModuleStub.h"
+#include "rkit/Core/Format.h"
 #include "rkit/Core/UtilitiesDriver.h"
 #include "rkit/Core/ModuleGlue.h"
 #include "rkit/Core/NewDelete.h"
@@ -70,8 +71,6 @@ namespace rkit
 
 		const utils::ISha256Calculator *GetSha256Calculator() const override;
 
-		Result VFormatString(char *buffer, size_t bufferSize, void *oversizedUserdata, AllocateDynamicStringCallback_t oversizedCallback, size_t &outLength, const char *fmt, va_list list) const override;
-
 		Result SetProgramName(const StringView &str) override;
 		StringView GetProgramName() const override;
 
@@ -110,6 +109,16 @@ namespace rkit
 
 		Result CreateImage(const utils::ImageSpec &spec, UniquePtr<utils::IImage> &image) const override;
 
+		void FormatSignedInt(IFormatStringWriter<char> &writer, intmax_t value) const override;
+		void FormatUnsignedInt(IFormatStringWriter<char> &writer, uintmax_t value) const override;
+		void FormatFloat(IFormatStringWriter<char> &writer, float f) const override;
+		void FormatDouble(IFormatStringWriter<char> &writer, double f) const override;
+		void FormatCString(IFormatStringWriter<char> &writer, const char *str) const override;
+		void WFormatCString(IFormatStringWriter<wchar_t> &writer, const wchar_t *str) const override;
+
+		void FormatString(IFormatStringWriter<char> &writer, const StringSliceView &fmt, const FormatParameterList<char> &paramList) const override;
+		void FormatString(IFormatStringWriter<wchar_t> &writer, const WStringSliceView &fmt, const FormatParameterList<wchar_t> &paramList) const override;
+
 	private:
 		static bool ValidateFilePathSlice(const Span<const char> &name, bool permitWildcards);
 
@@ -131,6 +140,9 @@ namespace rkit
 
 		template<class TInteger>
 		static bool ParseSignedInt(const StringSliceView &str, uint8_t radix, TInteger &i);
+
+		template<class TChar, CharacterEncoding TEncoding>
+		static void FormatStringImpl(IFormatStringWriter<TChar> &writer, const BaseStringSliceView<TChar, TEncoding> &fmtRef, const FormatParameterList<TChar> &paramListRef);
 
 		utils::Sha256Calculator m_sha256Calculator;
 
@@ -534,43 +546,6 @@ namespace rkit
 	const utils::ISha256Calculator *UtilitiesDriver::GetSha256Calculator() const
 	{
 		return &m_sha256Calculator;
-	}
-
-	Result UtilitiesDriver::VFormatString(char *buffer, size_t bufferSize, void *oversizedUserdata, AllocateDynamicStringCallback_t oversizedCallback, size_t &outLength, const char *fmt, va_list list) const
-	{
-		if (bufferSize > std::numeric_limits<int>::max())
-			bufferSize = std::numeric_limits<int>::max();
-
-		va_list firstAttemptList;
-		va_copy(firstAttemptList, list);
-
-		int formattedLength = vsnprintf(buffer, bufferSize, fmt, firstAttemptList);
-		va_end(firstAttemptList);
-
-		if (formattedLength < 0 || formattedLength == std::numeric_limits<int>::max())
-			return ResultCode::kFormatError;
-
-		if (static_cast<size_t>(formattedLength) < bufferSize)
-		{
-			outLength = static_cast<size_t>(formattedLength);
-			return ResultCode::kOK;
-		}
-
-		void *newBuffer = nullptr;
-		RKIT_CHECK(oversizedCallback(oversizedUserdata, static_cast<size_t>(formattedLength), newBuffer));
-
-		va_list secondAttemptList;
-		va_copy(secondAttemptList, list);
-
-		int formattedLength2 = vsnprintf(static_cast<char *>(newBuffer), static_cast<size_t>(formattedLength) + 1, fmt, secondAttemptList);
-
-		va_end(secondAttemptList);
-
-		if (formattedLength2 != formattedLength)
-			return ResultCode::kInternalError;
-
-		outLength = static_cast<size_t>(formattedLength);
-		return ResultCode::kOK;
 	}
 
 	Result UtilitiesDriver::SetProgramName(const StringView &str)
@@ -2364,6 +2339,210 @@ namespace rkit
 		RKIT_CHECK(utils::ImageBase::Create(spec, imageBase));
 		image = std::move(imageBase);
 		return ResultCode::kOK;
+	}
+
+	void UtilitiesDriver::FormatSignedInt(IFormatStringWriter<char> &writer, intmax_t value) const
+	{
+		if (value == 0)
+		{
+			writer.WriteChars(ConstSpan<char>("0", 1));
+			return;
+		}
+
+		const size_t kMaxChars = ((sizeof(value) * 8) + 2) / 3 + 1;
+		char outChars[kMaxChars];
+
+		const char *kDigits = "0123456789";
+
+		size_t strStartPos = kMaxChars;
+
+		if (value < 0)
+		{
+			while (value != 0)
+			{
+				const intmax_t remainder = (value % 10);
+				value = value / 10;
+
+				--strStartPos;
+				outChars[strStartPos] = kDigits[-remainder];
+			}
+			--strStartPos;
+			outChars[strStartPos] = '-';
+		}
+		else
+		{
+			while (value != 0)
+			{
+				const intmax_t remainder = (value % 10);
+				value = value / 10;
+
+				--strStartPos;
+				outChars[strStartPos] = kDigits[remainder];
+			}
+		}
+
+		writer.WriteChars(ConstSpan<char>(outChars + strStartPos, kMaxChars - strStartPos));
+	}
+
+	void UtilitiesDriver::FormatUnsignedInt(IFormatStringWriter<char> &writer, uintmax_t value) const
+	{
+		if (value == 0)
+		{
+			writer.WriteChars(ConstSpan<char>("0", 1));
+			return;
+		}
+
+		const size_t kMaxChars = ((sizeof(value) * 8) + 2) / 3;
+		char outChars[kMaxChars];
+
+		const char *kDigits = "0123456789";
+
+		size_t strStartPos = kMaxChars;
+
+		while (value != 0)
+		{
+			const uintmax_t remainder = (value % 10u);
+			value = value / 10u;
+
+			--strStartPos;
+			outChars[strStartPos] = kDigits[remainder];
+		}
+
+		writer.WriteChars(ConstSpan<char>(outChars + strStartPos, kMaxChars - strStartPos));
+	}
+
+	void UtilitiesDriver::FormatFloat(IFormatStringWriter<char> &writer, float f) const
+	{
+		char floatChars[16];
+		int nChars = f2s_buffered_n(f, floatChars);
+
+		writer.WriteChars(ConstSpan<char>(floatChars, static_cast<size_t>(nChars)));
+	}
+
+	void UtilitiesDriver::FormatDouble(IFormatStringWriter<char> &writer, double f) const
+	{
+		char doubleChars[25];
+		int nChars = d2s_buffered_n(f, doubleChars);
+
+		writer.WriteChars(ConstSpan<char>(doubleChars, static_cast<size_t>(nChars)));
+	}
+
+	void UtilitiesDriver::FormatCString(IFormatStringWriter<char> &writer, const char *str) const
+	{
+		writer.WriteChars(ConstSpan<char>(str, strlen(str)));
+	}
+
+	void UtilitiesDriver::WFormatCString(IFormatStringWriter<wchar_t> &writer, const wchar_t *str) const
+	{
+		writer.WriteChars(ConstSpan<wchar_t>(str, wcslen(str)));
+	}
+
+	template<class TChar, CharacterEncoding TEncoding>
+	void UtilitiesDriver::FormatStringImpl(IFormatStringWriter<TChar> &writer, const BaseStringSliceView<TChar, TEncoding> &fmtRef, const FormatParameterList<TChar> &paramListRef)
+	{
+		const BaseStringSliceView<TChar, TEncoding> fmt = fmtRef;
+		const FormatParameterList<TChar> paramList = paramListRef;
+
+		const size_t fmtStringLength = fmt.Length();
+
+		const size_t mul10Limit = paramListRef.Count() / 10u;
+
+		size_t scanPos = 0;
+		size_t contiguousStart = 0;
+		size_t numUnindexedArgs = 0;
+		for (;;)
+		{
+			if (scanPos == fmtStringLength || fmt[scanPos] == '{')
+			{
+				const size_t contiguousLength = scanPos - contiguousStart;
+				if (contiguousLength > 0)
+					writer.WriteChars(fmt.SubString(contiguousStart, contiguousLength).ToSpan());
+
+				if (scanPos == fmtStringLength)
+					break;
+
+				scanPos++;
+				bool isValid = true;
+				bool isIndexed = false;
+
+				size_t argIndex = 0;
+				for (;;)
+				{
+					if (scanPos == fmtStringLength)
+					{
+						isValid = false;
+						break;
+					}
+
+					const TChar nextCh = fmt[scanPos];
+					if (nextCh == '}')
+					{
+						scanPos++;
+						contiguousStart = scanPos;
+						break;
+					}
+					else if (nextCh >= '0' && nextCh <= '9')
+					{
+						if (isValid)
+						{
+							isIndexed = true;
+							if (argIndex > mul10Limit)
+								isValid = false;
+							else
+							{
+								argIndex *= 10u;
+
+								const uint8_t digit = (nextCh - '0');
+								if (digit >= paramList.Count() - argIndex)
+									isValid = false;
+								else
+									argIndex += digit;
+							}
+						}
+					}
+					else
+						isValid = false;
+
+					scanPos++;
+				}
+
+				if (isValid && !isIndexed)
+				{
+					if (paramList.Count() <= numUnindexedArgs)
+						isValid = false;
+					else
+					{
+						argIndex = numUnindexedArgs;
+						numUnindexedArgs++;
+					}
+				}
+
+				if (!isValid)
+				{
+					const TChar invalidText[] = { '<', 'I', 'N', 'V', 'A', 'L', 'I', 'D', '>' };
+					const size_t kNumInvalidChars = sizeof(invalidText) / sizeof(TChar);
+
+					writer.WriteChars(ConstSpan<TChar>(invalidText, kNumInvalidChars));
+				}
+				else
+				{
+					const FormatParameter<TChar> &formatParam = paramList[argIndex];
+					formatParam.m_formatCallback(writer, formatParam.m_dataPtr);
+				}
+			}
+			else
+				scanPos++;
+		}
+	}
+
+	void UtilitiesDriver::FormatString(IFormatStringWriter<char> &writer, const StringSliceView &fmt, const FormatParameterList<char> &paramList) const
+	{
+		FormatStringImpl(writer, fmt, paramList);
+	}
+
+	void UtilitiesDriver::FormatString(IFormatStringWriter<wchar_t> &writer, const WStringSliceView &fmt, const FormatParameterList<wchar_t> &paramList) const
+	{
+		FormatStringImpl(writer, fmt, paramList);
 	}
 }
 

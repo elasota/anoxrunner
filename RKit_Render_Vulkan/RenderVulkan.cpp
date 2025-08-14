@@ -770,11 +770,11 @@ namespace rkit { namespace render { namespace vulkan
 	void RenderVulkanDriver::DebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *data)
 	{
 		if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
-			rkit::log::Error(data->pMessage);
+			rkit::log::Error(StringView::FromCString(data->pMessage));
 		else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-			rkit::log::Warning(data->pMessage);
+			rkit::log::Warning(StringView::FromCString(data->pMessage));
 		else
-			rkit::log::LogInfo(data->pMessage);
+			rkit::log::LogInfo(StringView::FromCString(data->pMessage));
 	}
 
 	RenderVulkanDriver::QueryItem::QueryItem(const StringView &name, bool isRequired)

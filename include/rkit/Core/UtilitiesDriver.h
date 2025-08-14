@@ -3,6 +3,7 @@
 #include "rkit/Core/StringProto.h"
 #include "rkit/Core/StreamProtos.h"
 #include "rkit/Core/HashValue.h"
+#include "rkit/Core/FormatProtos.h"
 
 #include "rkit/Utilities/TextParserProtos.h"
 
@@ -25,6 +26,9 @@ namespace rkit
 		struct IImage;
 		struct ImageSpec;
 	}
+
+	template<class TChar>
+	struct IFormatStringWriter;
 
 	template<class T>
 	class UniquePtr;
@@ -88,8 +92,6 @@ namespace rkit
 
 		virtual const utils::ISha256Calculator *GetSha256Calculator() const = 0;
 
-		virtual Result VFormatString(char *buffer, size_t bufferSize, void *oversizedUserdata, AllocateDynamicStringCallback_t oversizedCallback, size_t &outLength, const char *fmt, va_list list) const = 0;
-
 		virtual Result SetProgramName(const StringView &str) = 0;
 		virtual StringView GetProgramName() const = 0;
 
@@ -127,5 +129,15 @@ namespace rkit
 		virtual bool ParseUInt64(const StringSliceView &str, uint8_t radix, uint64_t &i) const = 0;
 
 		virtual Result CreateImage(const utils::ImageSpec &spec, UniquePtr<utils::IImage> &image) const = 0;
+
+		virtual void FormatSignedInt(IFormatStringWriter<char> &writer, intmax_t value) const = 0;
+		virtual void FormatUnsignedInt(IFormatStringWriter<char> &writer, uintmax_t value) const = 0;
+		virtual void FormatFloat(IFormatStringWriter<char> &writer, float f) const = 0;
+		virtual void FormatDouble(IFormatStringWriter<char> &writer, double f) const = 0;
+		virtual void FormatCString(IFormatStringWriter<char> &writer, const char *str) const = 0;
+		virtual void WFormatCString(IFormatStringWriter<wchar_t> &writer, const wchar_t *str) const = 0;
+
+		virtual void FormatString(IFormatStringWriter<char> &writer, const StringSliceView &fmt, const FormatParameterList<char> &paramList) const = 0;
+		virtual void FormatString(IFormatStringWriter<wchar_t> &writer, const WStringSliceView &fmt, const FormatParameterList<wchar_t> &paramList) const = 0;
 	};
 }

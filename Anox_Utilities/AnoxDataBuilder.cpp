@@ -689,7 +689,7 @@ namespace anox { namespace utils
 
 					if (!rkit::utils::ResultIsOK(openResult))
 					{
-						rkit::log::ErrorFmt("Failed to open archive %s", scanItem.m_fileName.GetChars());
+						rkit::log::ErrorFmt("Failed to open archive");
 						return openResult;
 					}
 

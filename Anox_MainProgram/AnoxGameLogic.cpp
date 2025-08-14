@@ -375,7 +375,7 @@ namespace anox
 				CORO_RETURN;
 			CORO_END_IF
 
-			rkit::log::ErrorFmt("Unknown console command %s", locals.parser.GetCommand().GetChars());
+			rkit::log::ErrorFmt("Unknown console command {}", locals.parser.GetCommand().GetChars());
 		CORO_END
 	};
 

@@ -51,6 +51,9 @@ namespace rkit { namespace buildsystem
 
 		m_glslc = apiGroup.m_glslApi;
 
+		if (!m_glslc)
+			return rkit::ResultCode::kInternalError;
+
 		if (!m_glslc->glslang_initialize_process())
 		{
 			rkit::log::Error("glslang failed to init");

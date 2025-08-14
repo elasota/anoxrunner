@@ -197,7 +197,7 @@ namespace rkit
 
 		BasePath();
 		BasePath(const BasePath<TIsAbsolute, TPathTraits> &other);
-		BasePath(BasePath<TIsAbsolute, TPathTraits> &&other);
+		BasePath(BasePath<TIsAbsolute, TPathTraits> &&other) noexcept;
 
 		BasePath<TIsAbsolute, TPathTraits> &operator=(const BasePath<TIsAbsolute, TPathTraits> &other);
 		BasePath<TIsAbsolute, TPathTraits> &operator=(BasePath<TIsAbsolute, TPathTraits> &&other);
@@ -686,7 +686,7 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	BasePath<TIsAbsolute, TPathTraits>::BasePath(BasePath<TIsAbsolute, TPathTraits> &&other)
+	BasePath<TIsAbsolute, TPathTraits>::BasePath(BasePath<TIsAbsolute, TPathTraits> &&other) noexcept
 		: m_path(std::move(other.m_path))
 	{
 	}

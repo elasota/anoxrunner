@@ -7,6 +7,18 @@
 #include <cstdint>
 #include <cstddef>
 
+namespace rkit { namespace priv {
+	template<class TChar, CharacterEncoding TEncoding>
+	struct StringFormatHelper : IFormatStringWriter<TChar>
+	{
+		Span<TChar> m_charsBuffer;
+		size_t m_charsRequired = 0;
+		bool m_overflowed = false;
+
+		void WriteChars(const Span<const TChar> &chars) override;
+	};
+} }
+
 namespace rkit
 {
 	struct IMallocDriver;
@@ -114,23 +126,18 @@ namespace rkit
 		const TChar *CStr() const;
 		size_t Length() const;
 
-		Result Format(const TChar *fmt, ...);
+		template<class... TArgs>
+		Result Format(const BaseStringSliceView<TChar, TEncoding> &fmt, const TArgs &...args);
+
+		Result VFormat(const BaseStringSliceView<TChar, TEncoding> &fmt, const FormatParameterList<TChar> &formatParams);
 
 	private:
-		struct FormatOversizeHelper
-		{
-			BaseStringConstructionBuffer<TChar> m_constructionBuffer;
-			bool m_isOversized = false;
-		};
-
 		bool IsStaticString() const;
 		void CopyStaticStringFromOther(const BaseString &other);
 		void Evict();
 		void UnsafeReset();
 
 		static Result CreateAndReturnUninitializedSpan(BaseString &outStr, size_t numChars, Span<TChar> &outSpan);
-
-		static Result CreateStringConstructionBufferCallback(void *userdata, size_t numChars, void *&outBuffer);
 
 		const TChar *m_chars;
 		size_t m_length;
@@ -153,7 +160,9 @@ namespace rkit
 
 #include "RKitAssert.h"
 #include "Algorithm.h"
+#include "Format.h"
 #include "MallocDriver.h"
+#include "StaticArray.h"
 #include "StringView.h"
 #include "UtilitiesDriver.h"
 #include "Result.h"
@@ -279,6 +288,29 @@ void rkit::BaseStringConstructionBuffer<TChar>::Detach()
 	m_numChars = 0;
 }
 
+template<class TChar, rkit::CharacterEncoding TEncoding>
+void rkit::priv::StringFormatHelper<TChar, TEncoding>::WriteChars(const Span<const TChar> &chars)
+{
+	if (chars.Count() == 0)
+		return;
+
+	size_t available = 0;
+	if (m_charsBuffer.Count() >= m_charsRequired)
+		available = m_charsBuffer.Count() - m_charsRequired;
+
+	if (chars.Count() <= available)
+		CopySpanNonOverlapping(m_charsBuffer.SubSpan(m_charsRequired, chars.Count()), chars);
+
+	size_t numericallyAvailable = std::numeric_limits<size_t>::max() - m_charsRequired;
+
+	if (chars.Count() > numericallyAvailable)
+	{
+		m_overflowed = true;
+		m_charsRequired = std::numeric_limits<size_t>::max();
+	}
+	else
+		m_charsRequired += chars.Count();
+}
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
 rkit::BaseString<TChar, TEncoding, TStaticSize>::BaseString()
@@ -442,43 +474,55 @@ size_t rkit::BaseString<TChar, TEncoding, TStaticSize>::Length() const
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
-rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::Format(const TChar *fmt, ...)
+template<class... TParams>
+rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::Format(const BaseStringSliceView<TChar, TEncoding> &fmt, const TParams &...params)
 {
-	va_list args;
-	va_start(args, fmt);
-
-	FormatOversizeHelper oversizeHelper;
-
-	size_t length = 0;
-	Result formatResult = GetDrivers().m_utilitiesDriver->VFormatString(m_staticString, TStaticSize, &oversizeHelper, CreateStringConstructionBufferCallback, length, fmt, args);
-
-	va_end(args);
-
-	RKIT_CHECK(formatResult);
-
-	if (oversizeHelper.m_isOversized)
-		(*this) = std::move(oversizeHelper.m_constructionBuffer);
-	else
-	{
-		Evict();
-		m_chars = m_staticString;
-	}
-
-	m_length = length;
-
-	return ResultCode::kOK;
+	return VFormat(fmt, CreateFormatParameterList<TChar, TParams...>(params...));
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
-rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::CreateStringConstructionBufferCallback(void *userdata, size_t numChars, void *&outBuffer)
+rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::VFormat(const BaseStringSliceView<TChar, TEncoding> &fmt, const FormatParameterList<TChar> &args)
 {
-	FormatOversizeHelper *helper = static_cast<FormatOversizeHelper *>(userdata);
-	helper->m_isOversized = true;
+	size_t charsRequired = 0;
+	{
+		// Formatting into the static buffer is permitted so we need to use a temp
+		StaticArray<TChar, TStaticSize - 1> tempStaticBuffer;
 
-	RKIT_CHECK(helper->m_constructionBuffer.Allocate(numChars));
+		priv::StringFormatHelper<TChar, TEncoding> formatHelper;
 
-	Span<TChar> span = helper->m_constructionBuffer.GetSpan();
-	outBuffer = span.Ptr();
+		formatHelper.m_charsBuffer = tempStaticBuffer.ToSpan();
+
+		GetDrivers().m_utilitiesDriver->FormatString(formatHelper, fmt, args);
+		if (formatHelper.m_overflowed)
+			return rkit::ResultCode::kOutOfMemory;
+
+		if (formatHelper.m_charsRequired <= formatHelper.m_charsBuffer.Count())
+		{
+			Evict();
+			CopySpanNonOverlapping<TChar>(Span<TChar>(m_staticString, formatHelper.m_charsRequired), tempStaticBuffer.ToSpan().SubSpan(0, formatHelper.m_charsRequired));
+			m_staticString[formatHelper.m_charsRequired] = static_cast<TChar>(0);
+			m_chars = m_staticString;
+			m_length = formatHelper.m_charsRequired;
+			return rkit::ResultCode::kOK;
+		}
+
+		charsRequired = formatHelper.m_charsRequired;
+	}
+
+	BaseStringConstructionBuffer<TChar> constructionBuffer;
+	RKIT_CHECK(constructionBuffer.Allocate(charsRequired));
+
+	{
+		priv::StringFormatHelper<TChar, TEncoding> formatHelper;
+
+		formatHelper.m_charsBuffer = constructionBuffer.GetSpan();
+
+		GetDrivers().m_utilitiesDriver->FormatString(formatHelper, fmt, args);
+		RKIT_ASSERT(!formatHelper.m_overflowed);
+		RKIT_ASSERT(formatHelper.m_charsRequired == charsRequired);
+	}
+
+	(*this) = std::move(constructionBuffer);
 
 	return ResultCode::kOK;
 }

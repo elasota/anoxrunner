@@ -611,7 +611,7 @@ namespace anox { namespace buildsystem
 
 		if (lumpSize % structureSize != 0)
 		{
-			rkit::log::ErrorFmt("Size of lump %i was invalid", static_cast<int>(lumpIndex));
+			rkit::log::ErrorFmt("Size of lump {} was invalid", static_cast<int>(lumpIndex));
 			return rkit::ResultCode::kDataError;
 		}
 
@@ -2369,7 +2369,7 @@ namespace anox { namespace buildsystem
 
 		if (!bspStream.IsValid())
 		{
-			rkit::log::ErrorFmt("Failed to open '%s'", identifier.GetChars());
+			rkit::log::ErrorFmt("Failed to open '{}'", identifier.GetChars());
 			return rkit::ResultCode::kFileOpenError;
 		}
 

@@ -35,8 +35,22 @@ namespace rkit
 
 	struct ConsoleLogDriver_Win32 final : public ILogDriver
 	{
-		void LogMessage(LogSeverity severity, const char *msg) override;
-		void VLogMessage(LogSeverity severity, const char *fmt, va_list arg) override;
+		void LogMessage(LogSeverity severity, const rkit::StringSliceView &msg) override;
+		void VLogMessage(LogSeverity severity, const rkit::StringSliceView &fmt, const FormatParameterList<char> &args) override;
+
+		static void FormatMessageToFile(FILE *f, const rkit::StringSliceView &fmt, const FormatParameterList<char> &args);
+
+	private:
+		class FileOutputFormatter final : public IFormatStringWriter<char>
+		{
+		public:
+			explicit FileOutputFormatter(FILE *f);
+
+			void WriteChars(const ConstSpan<char> &chars) override;
+
+		private:
+			FILE *m_f;
+		};
 	};
 
 	class Module_Win32 final : public IModule
@@ -165,50 +179,65 @@ namespace rkit
 		return module;
 	}
 
-	void ConsoleLogDriver_Win32::LogMessage(LogSeverity severity, const char *msg)
+	void ConsoleLogDriver_Win32::LogMessage(LogSeverity severity, const StringSliceView &msg)
 	{
 		if (severity == LogSeverity::kInfo)
 		{
-			fputs(msg, stdout);
+			fwrite(msg.GetChars(), 1, msg.Length(), stdout);
 			fputc('\n', stdout);
 		}
 		else if (severity == LogSeverity::kWarning)
 		{
 			fputs("WARNING: ", stderr);
-			fputs(msg, stdout);
+			fwrite(msg.GetChars(), 1, msg.Length(), stdout);
 			fputc('\n', stderr);
 		}
 		else if (severity == LogSeverity::kError)
 		{
 			fputs("ERROR: ", stderr);
-			fputs(msg, stdout);
+			fwrite(msg.GetChars(), 1, msg.Length(), stdout);
 			fputc('\n', stderr);
 		}
-
 	}
 
-	void ConsoleLogDriver_Win32::VLogMessage(LogSeverity severity, const char *fmt, va_list arg)
+	void ConsoleLogDriver_Win32::VLogMessage(LogSeverity severity, const StringSliceView &fmt, const FormatParameterList<char> &args)
 	{
-		va_list argCopy;
-		va_copy(argCopy, arg);
-
 		if (severity == LogSeverity::kInfo)
 		{
-			vfprintf(stdout, fmt, argCopy);
+			FormatMessageToFile(stdout, fmt, args);
 			fputc('\n', stdout);
 		}
 		else if (severity == LogSeverity::kWarning)
 		{
 			fputs("WARNING: ", stderr);
-			vfprintf(stderr, fmt, argCopy);
+			FormatMessageToFile(stdout, fmt, args);
 			fputc('\n', stderr);
 		}
 		else if (severity == LogSeverity::kError)
 		{
 			fputs("ERROR: ", stderr);
-			vfprintf(stderr, fmt, argCopy);
+			FormatMessageToFile(stderr, fmt, args);
 			fputc('\n', stderr);
 		}
+	}
+
+
+	void ConsoleLogDriver_Win32::FormatMessageToFile(FILE *f, const rkit::StringSliceView &fmt, const FormatParameterList<char> &args)
+	{
+		FileOutputFormatter outputFormatter(f);
+
+		GetDrivers().m_utilitiesDriver->FormatString(outputFormatter, fmt, args);
+	}
+
+
+	ConsoleLogDriver_Win32::FileOutputFormatter::FileOutputFormatter(FILE *f)
+		: m_f(f)
+	{
+	}
+
+	void ConsoleLogDriver_Win32::FileOutputFormatter::WriteChars(const ConstSpan<char> &chars)
+	{
+		fwrite(chars.Ptr(), 1, chars.Count(), m_f);
 	}
 
 	Module_Win32::Module_Win32(HMODULE hmodule, FARPROC initFunc, IMallocDriver *mallocDriver)

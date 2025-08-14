@@ -210,13 +210,13 @@ namespace rkit { namespace png {
 
 	void PNGCBAPI PngLoader::StaticErrorCB(png_structp png, png_const_charp msg)
 	{
-		rkit::log::Error(msg);
+		rkit::log::Error(rkit::StringView::FromCString(msg));
 		png_longjmp(png, 1);
 	}
 
 	void PNGCBAPI PngLoader::StaticWarnCB(png_structp png, png_const_charp msg)
 	{
-		rkit::log::Warning(msg);
+		rkit::log::Warning(rkit::StringView::FromCString(msg));
 	}
 
 	png_voidp PNGCBAPI PngLoader::StaticAllocCB(png_structp png, png_alloc_size_t sz)

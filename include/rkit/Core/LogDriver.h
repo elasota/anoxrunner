@@ -1,6 +1,7 @@
 #pragma once
 
 #include "StringProto.h"
+#include "FormatProtos.h"
 
 #include <cstddef>
 #include <stdarg.h>
@@ -18,78 +19,67 @@ namespace rkit
 	{
 		virtual ~ILogDriver() {}
 
-		virtual void LogMessage(LogSeverity severity, const char *msg) = 0;
-		virtual void VLogMessage(LogSeverity severity, const char *fmt, va_list arg) = 0;
+		virtual void LogMessage(LogSeverity severity, const rkit::StringSliceView &msg) = 0;
+		virtual void VLogMessage(LogSeverity severity, const rkit::StringSliceView &msg, const FormatParameterList<char> &args) = 0;
 	};
 }
 
 #include "Drivers.h"
+#include "Format.h"
 
 namespace rkit
 {
 	namespace log
 	{
-		inline void VMessageFmt(LogSeverity severity, const char *fmt, va_list args)
+		inline void VMessageFmt(LogSeverity severity, const rkit::StringSliceView &fmt, const FormatParameterList<char> &args)
 		{
 			if (ILogDriver *logDriver = GetDrivers().m_logDriver)
 				logDriver->VLogMessage(severity, fmt, args);
 		}
 
-		inline void MessageFmt(LogSeverity severity, const char *fmt, ...)
+		template<class... TArgs>
+		inline void MessageFmt(LogSeverity severity, const rkit::StringSliceView &fmt, const TArgs &... args)
 		{
-			va_list args;
-
-			va_start(args, fmt);
-			VMessageFmt(severity, fmt, args);
-			va_end(args);
+			VMessageFmt(severity, fmt, CreateFormatParameterList<char>(args...));
 		}
 
-		inline void Message(LogSeverity severity, const char *str)
+		inline void Message(LogSeverity severity, const rkit::StringSliceView &msg)
 		{
 			if (ILogDriver *logDriver = GetDrivers().m_logDriver)
-				logDriver->LogMessage(severity, str);
+				logDriver->LogMessage(severity, msg);
 		}
 
-		inline void Error(const char *str)
+		inline void Error(const rkit::StringSliceView &msg)
 		{
-			Message(LogSeverity::kError, str);
+			Message(LogSeverity::kError, msg);
 		}
 
-		inline void ErrorFmt(const char *fmt, ...)
+		template<class... TArgs>
+		inline void ErrorFmt(const rkit::StringSliceView &fmt, const TArgs &...args)
 		{
-			va_list args;
-
-			va_start(args, fmt);
-			VMessageFmt(LogSeverity::kError, fmt, args);
-			va_end(args);
+			VMessageFmt(LogSeverity::kError, fmt, CreateFormatParameterList<char>(args...));
 		}
 
-		inline void Warning(const char *str)
+		inline void Warning(const rkit::StringSliceView &msg)
 		{
-			Message(LogSeverity::kWarning, str);
+			Message(LogSeverity::kWarning, msg);
 		}
 
-		inline void LogWarningFmt(const char *fmt, ...)
+		template<class... TArgs>
+		inline void LogWarningFmt(const rkit::StringSliceView &fmt, const TArgs &...args)
 		{
-			va_list args;
-
-			va_start(args, fmt);
-			VMessageFmt(LogSeverity::kWarning, fmt, args);
-			va_end(args);
+			VMessageFmt(LogSeverity::kWarning, fmt, CreateFormatParameterList<char>(args...));
 		}
 
-		inline void LogInfo(const char *str)
+		inline void LogInfo(const rkit::StringSliceView &msg)
 		{
-			Message(LogSeverity::kInfo, str);
+			Message(LogSeverity::kInfo, msg);
 		}
 
-		inline void LogInfoFmt(const char *fmt, ...)
+		template<class... TArgs>
+		inline void LogInfoFmt(const rkit::StringSliceView &fmt, const TArgs &...args)
 		{
-			va_list args;
-
-			va_start(args, fmt);
-			VMessageFmt(LogSeverity::kInfo, fmt, args);
-			va_end(args);
+			VMessageFmt(LogSeverity::kInfo, fmt, CreateFormatParameterList<char>(args...));
 		}
 	}
 }

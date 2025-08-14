@@ -2772,7 +2772,7 @@ namespace rkit { namespace buildsystem
 
 		if (!utils::ResultIsOK(openResult))
 		{
-			rkit::log::ErrorFmt("Failed to open output file '%s'", fullPath.CStr());
+			rkit::log::ErrorFmt("Failed to open output file '%s'", path.GetChars());
 			return ResultCode::kFileOpenError;
 		}
 

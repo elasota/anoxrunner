@@ -35,7 +35,7 @@ namespace rkit
 		struct OpaqueSizeAlignResolver
 		{
 		public:
-			inline void CheckOpaque()
+			inline static void CheckOpaque()
 			{
 				OpaqueImplementation<TBase> *opaqueImpl = static_cast<TImpl *>(nullptr);
 				Opaque<TImpl> *opaque = static_cast<TBase *>(nullptr);
