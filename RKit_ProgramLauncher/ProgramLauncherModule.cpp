@@ -316,7 +316,7 @@ namespace rkit
 
 		void UnloadAllTrackedModules();
 
-		IModule *LoadModule(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters* initParams) override;
+		IModule *LoadModuleInternal(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters* initParams, IMallocDriver &mallocDriver) override;
 
 		void Uninstall();
 
@@ -377,7 +377,7 @@ namespace rkit
 			m_lastModule->Unload();
 	}
 
-	IModule *TrackedModuleDriver::LoadModule(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams)
+	IModule *TrackedModuleDriver::LoadModuleInternal(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams, IMallocDriver &mallocDriver)
 	{
 		StringView moduleNameStringView = StringView(moduleName, strlen(moduleName));
 		TrackedModule *scanModule = m_firstModule;
@@ -395,20 +395,18 @@ namespace rkit
 		if (!utils::ResultIsOK(strSetResult))
 			return nullptr;
 
-		IMallocDriver *mallocDriver = GetDrivers().m_mallocDriver;
-
-		void *moduleMem = mallocDriver->Alloc(sizeof(TrackedModule));
+		void *moduleMem = mallocDriver.Alloc(sizeof(TrackedModule));
 		if (!moduleMem)
 			return nullptr;
 
 		IModule *module = m_moduleDriver->LoadModule(moduleNamespace, moduleName, initParams);
 		if (!module)
 		{
-			mallocDriver->Free(moduleMem);
+			mallocDriver.Free(moduleMem);
 			return nullptr;
 		}
 
-		TrackedModule *newModule = new (moduleMem) TrackedModule(module, m_lastModule, mallocDriver, moduleNamespace, std::move(nameStr), this);
+		TrackedModule *newModule = new (moduleMem) TrackedModule(module, m_lastModule, &mallocDriver, moduleNamespace, std::move(nameStr), this);
 		if (!m_firstModule)
 			m_firstModule = newModule;
 

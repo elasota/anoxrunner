@@ -42,6 +42,16 @@
 
 #define RKIT_SIMD_ALIGNMENT	16
 
+#ifdef __STDCPP_DEFAULT_NEW_ALIGNMENT__
+namespace rkit { namespace mem {
+	constexpr size_t kDefaultAllocAlignment = __STDCPP_DEFAULT_NEW_ALIGNMENT__;
+} }
+#else
+namespace rkit { namespace mem {
+	constexpr size_t kDefaultAllocAlignment = RKIT_SIMD_ALIGNMENT;
+} }
+#endif
+
 #if RKIT_USE_CLASS_RESULT
 
 namespace rkit

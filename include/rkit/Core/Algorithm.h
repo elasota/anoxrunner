@@ -175,6 +175,7 @@ namespace rkit
 		struct FindBitsHelper<T, true>
 		{
 			static int FindLowestSetBit(T value);
+			static int FindHighestSetBit(T value);
 		};
 	}
 
@@ -241,6 +242,9 @@ namespace rkit
 
 	template<class T>
 	int FindLowestSetBit(T value);
+
+	template<class T>
+	int FindHighestSetBit(T value);
 
 	template<class T>
 	void Swap(T &a, T &b);
@@ -634,7 +638,6 @@ void rkit::priv::SpanOpsHelper<T, false>::MoveSpan(const Span<T> &dest, const Sp
 	return priv::ApplyToSpanNonOverlapping<T, T, priv::MoveAssignSpanOp<T> >(dest, src);
 }
 
-
 template<class T>
 int rkit::priv::FindBitsHelper<T, true>::FindLowestSetBit(T value)
 {
@@ -643,6 +646,19 @@ int rkit::priv::FindBitsHelper<T, true>::FindLowestSetBit(T value)
 
 	int result = 0;
 	while (((value >> result) & 1) == 0)
+		result++;
+
+	return result;
+}
+
+template<class T>
+int rkit::priv::FindBitsHelper<T, true>::FindHighestSetBit(T value)
+{
+	if (value == 0)
+		return -1;
+
+	int result = 0;
+	while ((value >> result) != 1)
 		result++;
 
 	return result;
@@ -785,6 +801,12 @@ template<class T>
 int rkit::FindLowestSetBit(T value)
 {
 	return rkit::priv::FindBitsHelper<T, std::is_integral<T>::value &&std::is_unsigned<T>::value>::FindLowestSetBit(value);
+}
+
+template<class T>
+int rkit::FindHighestSetBit(T value)
+{
+	return rkit::priv::FindBitsHelper<T, std::is_integral<T>::value &&std::is_unsigned<T>::value>::FindHighestSetBit(value);
 }
 
 

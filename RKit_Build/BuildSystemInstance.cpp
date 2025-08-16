@@ -2083,7 +2083,7 @@ namespace rkit { namespace buildsystem
 		// Step 2: Stratify relevant nodes
 		RKIT_CHECK(StratifyRelevantNodes());
 
-		// Step 3: Compile (NOTE: relevant nodes list may be added during this)
+		// Step 3: Compile (NOTE: relevant nodes list may grow during this)
 		for (size_t ri = 0; ri < m_relevantNodes.Count(); ri++)
 		{
 			DependencyNode *node = m_relevantNodes[m_relevantNodes.Count() - 1 - ri];
@@ -2092,7 +2092,7 @@ namespace rkit { namespace buildsystem
 
 			if (node->GetDependencyState() == DependencyState::NotCompiled)
 			{
-				rkit::log::LogInfoFmt("Build Compile : %s %s %s", FourCCToPrintable(node->GetDependencyNodeNamespace()).GetChars(), FourCCToPrintable(node->GetDependencyNodeType()).GetChars(), node->GetIdentifier().GetChars());
+				rkit::log::LogInfoFmt("Build Compile : {} {} {}", FourCCToPrintable(node->GetDependencyNodeNamespace()).GetChars(), FourCCToPrintable(node->GetDependencyNodeType()).GetChars(), node->GetIdentifier().GetChars());
 				RKIT_CHECK(node->RunCompile(this));
 				node->SetState(DependencyState::UpToDate);
 			}
