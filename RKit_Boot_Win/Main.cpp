@@ -8,6 +8,10 @@
 #include "rkit/Core/String.h"
 #include "rkit/Core/Vector.h"
 
+#include "rkit/Mem/MemMapDriver.h"
+#include "rkit/Mem/MemModule.h"
+#include "rkit/Mem/SimpleMemMapMallocDriver.h"
+
 #include "rkit/Win32/SystemModuleInitParameters_Win32.h"
 #include "rkit/Win32/ModuleAPI_Win32.h"
 #include "rkit/Win32/IncludeWindows.h"
@@ -16,21 +20,11 @@
 #include <clocale>
 #include <new>
 
-#include <crtdbg.h>
-
 namespace rkit
 {
-	struct MallocDriver_Win32 final : public IMallocDriver
-	{
-		void *Alloc(size_t size) override;
-		void *Realloc(void *ptr, size_t size) override;
-		void Free(void *ptr) override;
-		void CheckIntegrity() override;
-	};
-
 	struct ModuleDriver_Win32 final : public IModuleDriver
 	{
-		IModule *LoadModule(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams) override;
+		IModule *LoadModuleInternal(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams, IMallocDriver &mallocDriver) override;
 	};
 
 	struct ConsoleLogDriver_Win32 final : public ILogDriver
@@ -51,6 +45,25 @@ namespace rkit
 		private:
 			FILE *m_f;
 		};
+	};
+
+	class MemMapDriver_Win32 final : public mem::IMemMapDriver
+	{
+	public:
+		MemMapDriver_Win32();
+
+		size_t GetNumPageTypes() const override;
+		const mem::MemMapPageTypeProperties &GetPageType(size_t pageTypeIndex) const override;
+
+		bool CreateMapping(mem::MemMapPageRange &outPageRange, size_t size, size_t pageTypeIndex, mem::MemMapState initialState) override;
+		bool CreateMappingAt(mem::MemMapPageRange &outPageRange, void *baseAddress, size_t size, size_t pageTypeIndex, mem::MemMapState initialState) override;
+		bool ChangeState(void *startAddress, size_t size, size_t pageTypeIndex, mem::MemMapState oldState, mem::MemMapState newState) override;
+		void ReleaseMapping(const mem::MemMapPageRange &pageRange) override;
+
+	private:
+		mem::MemMapPageTypeProperties m_defaultPageProperties;
+
+		bool InternalCreateMappingAt(mem::MemMapPageRange &outPageRange, void *baseAddress, size_t size, size_t pageTypeIndex, mem::MemMapState initialState) const;
 	};
 
 	class Module_Win32 final : public IModule
@@ -75,8 +88,8 @@ namespace rkit
 	{
 		rkit::Drivers m_drivers;
 		rkit::ModuleDriver_Win32 m_moduleDriver;
-		rkit::MallocDriver_Win32 m_mallocDriver;
 		rkit::ConsoleLogDriver_Win32 m_consoleLogDriver;
+		rkit::MemMapDriver_Win32 m_memMapDriver;
 	};
 
 	struct alignas(alignof(Win32Globals)) Win32GlobalsBuffer
@@ -87,53 +100,10 @@ namespace rkit
 	static Win32GlobalsBuffer g_winGlobalsBuffer;
 	static Win32Globals &g_winGlobals = *reinterpret_cast<Win32Globals *>(g_winGlobalsBuffer.m_bytes);
 
-	void *MallocDriver_Win32::Alloc(size_t size)
-	{
-		if (size == 0)
-			return nullptr;
-
-		void *ptr = malloc(size);
-
-		return ptr;
-	}
-
-	void *MallocDriver_Win32::Realloc(void *ptr, size_t size)
-	{
-		if (ptr == nullptr)
-		{
-			if (size == 0)
-				return nullptr;
-
-			return malloc(size);
-		}
-		else
-		{
-			if (size == 0)
-			{
-				free(ptr);
-				return nullptr;
-			}
-			else
-				return realloc(ptr, size);
-		}
-	}
-
-	void MallocDriver_Win32::Free(void *ptr)
-	{
-		free(ptr);
-	}
-
-	void MallocDriver_Win32::CheckIntegrity()
-	{
-		_ASSERTE(_CrtCheckMemory());
-	}
-
-	IModule *ModuleDriver_Win32::LoadModule(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams)
+	IModule *ModuleDriver_Win32::LoadModuleInternal(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams, IMallocDriver &mallocDriver)
 	{
 		// Base module driver does no deduplication
-		IMallocDriver *mallocDriver = g_winGlobals.m_drivers.m_mallocDriver;
-
-		char *nameBuf = static_cast<char *>(mallocDriver->Alloc(strlen(moduleName) + strlen("????_.dll") + 1));
+		char *nameBuf = static_cast<char *>(mallocDriver.Alloc(strlen(moduleName) + strlen("????_.dll") + 1));
 		if (!nameBuf)
 			return nullptr;
 
@@ -143,19 +113,19 @@ namespace rkit
 
 		rkit::utils::ExtractFourCC(moduleNamespace, nameBuf[0], nameBuf[1], nameBuf[2], nameBuf[3]);
 
-		void *moduleMemory = mallocDriver->Alloc(sizeof(Module_Win32));
+		void *moduleMemory = mallocDriver.Alloc(sizeof(Module_Win32));
 		if (!moduleMemory)
 		{
-			mallocDriver->Free(nameBuf);
+			mallocDriver.Free(nameBuf);
 			return nullptr;
 		}
 
 		HMODULE hmodule = LoadLibraryA(nameBuf);
-		mallocDriver->Free(nameBuf);
+		mallocDriver.Free(nameBuf);
 
 		if (hmodule == nullptr)
 		{
-			mallocDriver->Free(moduleMemory);
+			mallocDriver.Free(moduleMemory);
 			return nullptr;
 		}
 
@@ -163,11 +133,11 @@ namespace rkit
 		if (initFunc == nullptr)
 		{
 			FreeLibrary(hmodule);
-			mallocDriver->Free(moduleMemory);
+			mallocDriver.Free(moduleMemory);
 			return nullptr;
 		}
 
-		IModule* module = new (moduleMemory) Module_Win32(hmodule, initFunc, mallocDriver);
+		IModule* module = new (moduleMemory) Module_Win32(hmodule, initFunc, &mallocDriver);
 
 		Result initResult = module->Init(initParams);
 		if (!utils::ResultIsOK(initResult))
@@ -240,6 +210,130 @@ namespace rkit
 		fwrite(chars.Ptr(), 1, chars.Count(), m_f);
 	}
 
+
+	MemMapDriver_Win32::MemMapDriver_Win32()
+		: m_defaultPageProperties{}
+	{
+		m_defaultPageProperties.m_supportsState[static_cast<size_t>(mem::MemMapState::kRead)] = true;
+		m_defaultPageProperties.m_supportsState[static_cast<size_t>(mem::MemMapState::kNoAccess)] = true;
+		m_defaultPageProperties.m_supportsState[static_cast<size_t>(mem::MemMapState::kReadWrite)] = true;
+		m_defaultPageProperties.m_supportsState[static_cast<size_t>(mem::MemMapState::kReserved)] = true;
+
+		SYSTEM_INFO sysInfo;
+		::GetSystemInfo(&sysInfo);
+
+		m_defaultPageProperties.m_allocationGranularityPO2 = rkit::FindHighestSetBit(sysInfo.dwAllocationGranularity);
+		m_defaultPageProperties.m_pageSizePO2 = rkit::FindHighestSetBit(sysInfo.dwPageSize);
+	}
+
+	size_t MemMapDriver_Win32::GetNumPageTypes() const
+	{
+		return 1;
+	}
+
+	const mem::MemMapPageTypeProperties &MemMapDriver_Win32::GetPageType(size_t pageTypeIndex) const
+	{
+		RKIT_ASSERT(pageTypeIndex == 0);
+		return m_defaultPageProperties;
+	}
+
+	bool MemMapDriver_Win32::CreateMapping(mem::MemMapPageRange &outPageRange, size_t size, size_t pageTypeIndex, mem::MemMapState initialState)
+	{
+		return InternalCreateMappingAt(outPageRange, nullptr, size, pageTypeIndex, initialState);
+	}
+
+	bool MemMapDriver_Win32::CreateMappingAt(mem::MemMapPageRange &outPageRange, void *baseAddress, size_t size, size_t pageTypeIndex, mem::MemMapState initialState)
+	{
+		return InternalCreateMappingAt(outPageRange, baseAddress, size, pageTypeIndex, initialState);
+	}
+
+	bool MemMapDriver_Win32::InternalCreateMappingAt(mem::MemMapPageRange &outPageRange, void *baseAddress, size_t size, size_t pageTypeIndex, mem::MemMapState initialState) const
+	{
+		if (pageTypeIndex != 0)
+			return false;
+
+		const size_t allocGranularity = static_cast<size_t>(1) << m_defaultPageProperties.m_allocationGranularityPO2;
+		const size_t allocMask = allocGranularity - 1;
+
+		const size_t sizeGranularity = static_cast<size_t>(1) << m_defaultPageProperties.m_pageSizePO2;
+		const size_t sizeMask = sizeGranularity - 1;
+
+		if ((reinterpret_cast<uintptr_t>(baseAddress) & allocMask) != 0)
+			return false;
+
+		if ((size & sizeMask) != 0)
+			return false;
+
+		DWORD allocType = (MEM_COMMIT | MEM_RESERVE);
+		DWORD initialProtect = 0;
+
+		switch (initialState)
+		{
+		case mem::MemMapState::kReserved:
+			allocType = MEM_RESERVE;
+			break;
+		case mem::MemMapState::kRead:
+			initialProtect = PAGE_READONLY;
+			break;
+		case mem::MemMapState::kReadWrite:
+			initialProtect = PAGE_READWRITE;
+			break;
+		case mem::MemMapState::kNoAccess:
+			initialProtect = PAGE_NOACCESS;
+			break;
+		default:
+			return false;
+		}
+
+		LPVOID addr = VirtualAlloc(baseAddress, size, allocType, initialProtect);
+		if (!addr)
+			return false;
+
+		outPageRange.m_base = addr;
+		outPageRange.m_size = size;
+		return true;
+	}
+
+
+	bool MemMapDriver_Win32::ChangeState(void *startAddress, size_t size, size_t pageTypeIndex, mem::MemMapState oldState, mem::MemMapState newState)
+	{
+		if (oldState == newState)
+			return true;
+
+		DWORD newProtect = 0;
+		switch (newState)
+		{
+		case mem::MemMapState::kReserved:
+			return !!VirtualFree(startAddress, size, MEM_DECOMMIT);
+		case mem::MemMapState::kRead:
+			newProtect = PAGE_READONLY;
+			break;
+		case mem::MemMapState::kReadWrite:
+			newProtect = PAGE_READWRITE;
+			break;
+		case mem::MemMapState::kNoAccess:
+			newProtect = PAGE_NOACCESS;
+			break;
+		default:
+			return false;
+		}
+
+		if (oldState == mem::MemMapState::kReserved)
+			return !!VirtualAlloc(startAddress, size, MEM_COMMIT, newProtect);
+		else
+		{
+			DWORD oldProtect = 0;
+			return !!VirtualProtect(startAddress, size, newProtect, &oldProtect);
+		}
+	}
+
+	void MemMapDriver_Win32::ReleaseMapping(const mem::MemMapPageRange &pageRange)
+	{
+		BOOL succeeded = VirtualFree(pageRange.m_base, 0, MEM_RELEASE);
+		RKIT_ASSERT(succeeded);
+		(void)succeeded;
+	}
+
 	Module_Win32::Module_Win32(HMODULE hmodule, FARPROC initFunc, IMallocDriver *mallocDriver)
 		: m_hmodule(hmodule)
 		, m_initFunc(initFunc)
@@ -302,8 +396,19 @@ static int WinMainCommon(HINSTANCE hInstance)
 
 	rkit::Drivers *drivers = &rkit::g_winGlobals.m_drivers;
 
-	drivers->m_mallocDriver.m_obj = &rkit::g_winGlobals.m_mallocDriver;
+	rkit::mem::SimpleMemMapMallocDriver bootMallocDriver(rkit::g_winGlobals.m_memMapDriver);
+
+	drivers->m_mallocDriver.m_obj = &bootMallocDriver;
 	drivers->m_moduleDriver.m_obj = &rkit::g_winGlobals.m_moduleDriver;
+
+	rkit::mem::MemModuleInitParameters memModuleParams = {};
+	memModuleParams.m_mmapDriver = &rkit::g_winGlobals.m_memMapDriver;
+
+	rkit::IModule *memModule = drivers->m_moduleDriver->LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "Mem", &memModuleParams);
+	if (!memModule)
+	{
+		return rkit::utils::ResultToExitCode(rkit::Result(rkit::ResultCode::kModuleLoadFailed));
+	}
 
 #if RKIT_IS_DEBUG
 	drivers->m_logDriver.m_obj = &rkit::g_winGlobals.m_consoleLogDriver;
@@ -367,7 +472,7 @@ static int WinMainCommon(HINSTANCE hInstance)
 			return rkit::utils::ResultToExitCode(rkit::Result(rkit::ResultCode::kModuleLoadFailed));
 	}
 
-	rkit::IModule *programLauncherModule = ::rkit::g_winGlobals.m_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "ProgramLauncher", nullptr);
+	rkit::IModule *programLauncherModule = ::rkit::g_winGlobals.m_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "ProgramLauncher");
 	if (!programLauncherModule)
 	{
 		systemModule->Unload();
@@ -391,6 +496,8 @@ static int WinMainCommon(HINSTANCE hInstance)
 
 	programLauncherModule->Unload();
 	systemModule->Unload();
+
+	memModule->Unload();
 
 	rkit::g_winGlobals.~Win32Globals();
 

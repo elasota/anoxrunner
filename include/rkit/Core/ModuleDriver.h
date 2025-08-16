@@ -15,11 +15,25 @@ namespace rkit
 
 		virtual ~IModuleDriver() {}
 
-		virtual IModule *LoadModule(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams) = 0;
+		IModule *LoadModule(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams);
+		IModule *LoadModule(uint32_t moduleNamespace, const char *moduleName);
 
-		inline IModule *LoadModule(uint32_t moduleNamespace, const char *moduleName)
-		{
-			return this->LoadModule(moduleNamespace, moduleName, nullptr);
-		}
+	protected:
+		virtual IModule *LoadModuleInternal(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams, IMallocDriver &mallocDriver) = 0;
 	};
+}
+
+#include "rkit/Core/Drivers.h"
+
+namespace rkit
+{
+	inline IModule *IModuleDriver::LoadModule(uint32_t moduleNamespace, const char *moduleName)
+	{
+		return this->LoadModule(moduleNamespace, moduleName, nullptr);
+	}
+
+	inline IModule *IModuleDriver::LoadModule(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams)
+	{
+		return this->LoadModuleInternal(moduleNamespace, moduleName, initParams, *GetDrivers().m_mallocDriver);
+	}
 }

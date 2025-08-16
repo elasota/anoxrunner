@@ -469,7 +469,7 @@ namespace anox { namespace buildsystem
 		{
 			if (dotPosition == 0)
 			{
-				rkit::log::ErrorFmt("Texture job '%s' was invalid", identifier.GetChars());
+				rkit::log::ErrorFmt("Texture job '{}' was invalid", identifier.GetChars());
 				return rkit::ResultCode::kInternalError;
 			}
 
@@ -481,7 +481,7 @@ namespace anox { namespace buildsystem
 			char digit = identifier[dotPosition];
 			if (digit < '0' || digit > '9')
 			{
-				rkit::log::ErrorFmt("Texture job '%s' was invalid", identifier.GetChars());
+				rkit::log::ErrorFmt("Texture job '{}' was invalid", identifier.GetChars());
 				return rkit::ResultCode::kInternalError;
 			}
 
@@ -489,7 +489,7 @@ namespace anox { namespace buildsystem
 
 			if (dispositionUInt >= static_cast<uint32_t>(ImageImportDisposition::kCount))
 			{
-				rkit::log::ErrorFmt("Texture job '%s' was invalid", identifier.GetChars());
+				rkit::log::ErrorFmt("Texture job '{}' was invalid", identifier.GetChars());
 				return rkit::ResultCode::kInternalError;
 			}
 		}
@@ -504,7 +504,7 @@ namespace anox { namespace buildsystem
 		{
 			if (dotPosition == 0)
 			{
-				rkit::log::ErrorFmt("Texture job '%s' was invalid", identifier.GetChars());
+				rkit::log::ErrorFmt("Texture job '{}' was invalid", identifier.GetChars());
 				return rkit::ResultCode::kInternalError;
 			}
 
@@ -528,7 +528,7 @@ namespace anox { namespace buildsystem
 		if (extension == ".tga")
 			return CompileTGA(depsNode, feedback, path, disposition);
 
-		rkit::log::ErrorFmt("Texture job '%s' used an unsupported format", identifier.GetChars());
+		rkit::log::ErrorFmt("Texture job '{}' used an unsupported format", identifier.GetChars());
 		return rkit::ResultCode::kOperationFailed;
 	}
 
@@ -716,13 +716,13 @@ namespace anox { namespace buildsystem
 
 		if (pcxHeader.m_numColorPlanes != 1 && pcxHeader.m_numColorPlanes != 3 && pcxHeader.m_numColorPlanes != 4)
 		{
-			rkit::log::ErrorFmt("PCX file '%s' has an unsupported number of planes", shortName.GetChars());
+			rkit::log::ErrorFmt("PCX file '{}' has an unsupported number of planes", shortName.GetChars());
 			return rkit::ResultCode::kMalformedFile;
 		}
 
 		if (pcxHeader.m_bitsPerPlane != 8)
 		{
-			rkit::log::ErrorFmt("PCX file '%s' has an unsupported bits per plane", shortName.GetChars());
+			rkit::log::ErrorFmt("PCX file '{}' has an unsupported bits per plane", shortName.GetChars());
 			return rkit::ResultCode::kMalformedFile;
 		}
 
@@ -731,13 +731,13 @@ namespace anox { namespace buildsystem
 
 		if (scanLinePitch == 0)
 		{
-			rkit::log::ErrorFmt("PCX file '%s' has zero size", shortName.GetChars());
+			rkit::log::ErrorFmt("PCX file '{}' has zero size", shortName.GetChars());
 			return rkit::ResultCode::kMalformedFile;
 		}
 
 		if (pcxHeader.m_minX.Get() > pcxHeader.m_maxX.Get() || pcxHeader.m_minY.Get() > pcxHeader.m_maxY.Get())
 		{
-			rkit::log::ErrorFmt("PCX file '%s' has invalid dimensions", shortName.GetChars());
+			rkit::log::ErrorFmt("PCX file '{}' has invalid dimensions", shortName.GetChars());
 			return rkit::ResultCode::kMalformedFile;
 		}
 
@@ -746,7 +746,7 @@ namespace anox { namespace buildsystem
 
 		if (scanLinePlanePitch < width)
 		{
-			rkit::log::ErrorFmt("PCX file '%s' has invalid pitch", shortName.GetChars());
+			rkit::log::ErrorFmt("PCX file '{}' has invalid pitch", shortName.GetChars());
 			return rkit::ResultCode::kMalformedFile;
 		}
 
@@ -777,7 +777,7 @@ namespace anox { namespace buildsystem
 
 					if (count > bytesRemaining)
 					{
-						rkit::log::ErrorFmt("PCX file '%s' RLE data was corrupted", shortName.GetChars());
+						rkit::log::ErrorFmt("PCX file '{}' RLE data was corrupted", shortName.GetChars());
 						return rkit::ResultCode::kMalformedFile;
 					}
 				}
@@ -812,7 +812,7 @@ namespace anox { namespace buildsystem
 
 				if (checkByte != 12)
 				{
-					rkit::log::ErrorFmt("PCX file '%s' palette check byte was invalid", shortName.GetChars());
+					rkit::log::ErrorFmt("PCX file '{}' palette check byte was invalid", shortName.GetChars());
 					return rkit::ResultCode::kMalformedFile;
 				}
 
@@ -838,7 +838,7 @@ namespace anox { namespace buildsystem
 					uint8_t elementValue = inScanline[x];
 					if (elementValue > palette.Count())
 					{
-						rkit::log::ErrorFmt("PCX file '%s' had an out-of-range value", shortName.GetChars());
+						rkit::log::ErrorFmt("PCX file '{}' had an out-of-range value", shortName.GetChars());
 						return rkit::ResultCode::kMalformedFile;
 					}
 

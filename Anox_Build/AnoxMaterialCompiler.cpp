@@ -891,7 +891,7 @@ namespace anox { namespace buildsystem
 
 			if (analysisHeader.m_magic != MaterialAnalysisHeader::kExpectedMagic || analysisHeader.m_version != MaterialAnalysisHeader::kExpectedVersion)
 			{
-				rkit::log::ErrorFmt("Material '%s' analysis file was invalid", depsNode->GetIdentifier().GetChars());
+				rkit::log::ErrorFmt("Material '{}' analysis file was invalid", depsNode->GetIdentifier().GetChars());
 				return rkit::ResultCode::kOperationFailed;
 			}
 
