@@ -13,9 +13,11 @@
 #include "rkit/Core/Pair.h"
 #include "rkit/Core/QuickSort.h"
 #include "rkit/Core/Stream.h"
-#include "rkit/Math/SoftFloat.h"
 
+#include "rkit/Data/ContentID.h"
 #include "rkit/Data/DDSFile.h"
+
+#include "rkit/Math/SoftFloat.h"
 
 
 #include <cmath>
@@ -310,6 +312,7 @@ namespace anox { namespace buildsystem
 		{
 			rkit::Vector<data::BSPMaterial> m_materials;
 			rkit::Vector<char> m_materialNameChars;
+			rkit::Vector<rkit::data::ContentID> m_lightmaps;
 			rkit::Vector<data::BSPNormal> m_normals;
 			rkit::Vector<data::BSPPlane> m_planes;
 			rkit::Vector<data::BSPTreeNode> m_treeNodes;
@@ -366,7 +369,7 @@ namespace anox { namespace buildsystem
 		static rkit::Result InitLightmapTree(priv::LightmapTree &tree, uint32_t expansionLevel, bool xAxisDominant);
 		static rkit::Result CopyLightmapTree(priv::LightmapTree &newTree, const priv::LightmapTree &oldTree, rkit::Vector<size_t> &stack, bool &outCopiedOK);
 		static rkit::Result ExportLightmaps(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback,
-			BSPDataCollection &bsp, const rkit::Vector<BSPFaceStats> &faceStats, const rkit::Vector<rkit::UniquePtr<priv::LightmapTree>> &lightmapTrees);
+			rkit::Vector<rkit::data::ContentID> &outContentIDs, const BSPDataCollection &bsp, const rkit::Vector<BSPFaceStats> &faceStats, const rkit::Vector<rkit::UniquePtr<priv::LightmapTree>> &lightmapTrees);
 		static bool LightmapFitsInNode(const priv::LightmapTreeNode &node, uint16_t width, uint16_t height);
 
 		static rkit::Result BuildGeometry(BSPOutput &bspOutput, const BSPDataCollection &bsp,
@@ -2407,6 +2410,7 @@ namespace anox { namespace buildsystem
 		{
 			CreateVectorSerializer(bspOutput.m_materials),
 			CreateVectorSerializer(bspOutput.m_materialNameChars),
+			CreateVectorSerializer(bspOutput.m_lightmaps),
 			CreateVectorSerializer(bspOutput.m_normals),
 			CreateVectorSerializer(bspOutput.m_planes),
 			CreateVectorSerializer(bspOutput.m_treeNodes),
@@ -2564,9 +2568,11 @@ namespace anox { namespace buildsystem
 		}
 
 		rkit::Vector<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions;
+		rkit::Vector<rkit::data::ContentID> lightmapContentIDs;
 
 		{
 			RKIT_CHECK(lightmapDimensions.Resize(lightmapTrees.Count()));
+			RKIT_CHECK(lightmapContentIDs.Resize(lightmapTrees.Count()));
 
 			for (size_t lightmapIndex = 0; lightmapIndex < lightmapTrees.Count(); lightmapIndex++)
 			{
@@ -2586,7 +2592,7 @@ namespace anox { namespace buildsystem
 				lightmapDimensions[lightmapIndex] = rkit::Pair<uint16_t, uint16_t>(tree.m_nodes[0].m_width, tree.m_nodes[0].m_height);
 			}
 
-			RKIT_CHECK(ExportLightmaps(depsNode, feedback, bsp, faceStats, lightmapTrees));
+			RKIT_CHECK(ExportLightmaps(depsNode, feedback, lightmapContentIDs, bsp, faceStats, lightmapTrees));
 
 			lightmapTrees.Reset();
 		}
@@ -2608,12 +2614,15 @@ namespace anox { namespace buildsystem
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
 		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, outPath, outStream));
 
+		bspOutput.m_lightmaps = std::move(lightmapContentIDs);
+
 		RKIT_CHECK(WriteBSPModel(bspOutput, *outStream));
 
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result BSPMapCompilerBase2::ExportLightmaps(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, BSPDataCollection &bsp, const rkit::Vector<BSPFaceStats> &faceStats, const rkit::Vector<rkit::UniquePtr<priv::LightmapTree>> &lightmapTrees)
+	rkit::Result BSPMapCompilerBase2::ExportLightmaps(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback,
+		rkit::Vector<rkit::data::ContentID> &outContentIDs, const BSPDataCollection &bsp, const rkit::Vector<BSPFaceStats> &faceStats, const rkit::Vector<rkit::UniquePtr<priv::LightmapTree>> &lightmapTrees)
 	{
 		size_t numLightmaps = lightmapTrees.Count();
 
@@ -2738,8 +2747,10 @@ namespace anox { namespace buildsystem
 			rkit::CIPath outPath;
 			RKIT_CHECK(outPath.Set(outPathStr));
 
+			const rkit::buildsystem::BuildFileLocation outLocation = rkit::buildsystem::BuildFileLocation::kIntermediateDir;
+
 			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
-			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outStream));
+			RKIT_CHECK(feedback->OpenOutput(outLocation, outPath, outStream));
 
 			rkit::data::DDSHeader ddsHeader = {};
 
@@ -2775,6 +2786,10 @@ namespace anox { namespace buildsystem
 
 			RKIT_CHECK(outStream->WriteAll(&ddsHeader, sizeof(ddsHeader)));
 			RKIT_CHECK(outStream->WriteAll(atlasBytes.GetBuffer(), atlasBytes.Count()));
+
+			outStream.Reset();
+
+			RKIT_CHECK(feedback->IndexCAS(outLocation, outPath, outContentIDs[lmi]));
 		}
 
 		return rkit::ResultCode::kOK;
