@@ -2105,6 +2105,7 @@ namespace rkit { namespace buildsystem
 		}
 
 		// Step 5: Copy CAS files
+		rkit::log::LogInfo("Updating CAS files...");
 		for (size_t i = 0; i < m_relevantNodes.Count(); i++)
 		{
 			const DependencyNode *node = m_relevantNodes[i];
