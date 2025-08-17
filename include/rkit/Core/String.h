@@ -60,13 +60,14 @@ namespace rkit
 		~BaseStringConstructionBuffer();
 
 		Result Allocate(size_t numChars);
+		Result Allocate(size_t numChars, IMallocDriver *alloc);
 
 		Span<TChar> GetSpan() const;
 
 		void Detach();
 
 	private:
-		TChar *m_chars;
+		StringStorage<TChar> *m_stringStorage;
 		size_t m_numChars;
 	};
 
@@ -241,7 +242,7 @@ size_t rkit::StringStorage<TChar>::ComputePaddedBaseSize()
 
 template<class TChar>
 rkit::BaseStringConstructionBuffer<TChar>::BaseStringConstructionBuffer()
-	: m_chars(nullptr)
+	: m_stringStorage(nullptr)
 	, m_numChars(0)
 {
 }
@@ -249,10 +250,18 @@ rkit::BaseStringConstructionBuffer<TChar>::BaseStringConstructionBuffer()
 template<class TChar>
 rkit::BaseStringConstructionBuffer<TChar>::~BaseStringConstructionBuffer()
 {
+	if (m_stringStorage)
+		m_stringStorage->DecRef();
 }
 
 template<class TChar>
 rkit::Result rkit::BaseStringConstructionBuffer<TChar>::Allocate(size_t numChars)
+{
+	return Allocate(numChars, GetDrivers().m_mallocDriver);
+}
+
+template<class TChar>
+rkit::Result rkit::BaseStringConstructionBuffer<TChar>::Allocate(size_t numChars, IMallocDriver *alloc)
 {
 	if (numChars == std::numeric_limits<size_t>::max())
 		return ResultCode::kOutOfMemory;
@@ -260,16 +269,16 @@ rkit::Result rkit::BaseStringConstructionBuffer<TChar>::Allocate(size_t numChars
 	size_t stringStorageObjSize = 0;
 	RKIT_CHECK(StringStorage<TChar>::ComputeSize(numChars + 1, stringStorageObjSize));
 
-	IMallocDriver *alloc = GetDrivers().m_mallocDriver;
-
 	void *stringStorageMem = alloc->Alloc(stringStorageObjSize);
 	if (!stringStorageMem)
 		return ResultCode::kOutOfMemory;
 
 	StringStorage<TChar> *stringStorage = new (stringStorageMem) StringStorage<TChar>(alloc);
 
-	m_chars = stringStorage->GetFirstCharAddress();
-	m_chars[numChars] = static_cast<TChar>(0);
+	TChar *chars = stringStorage->GetFirstCharAddress();
+	chars[numChars] = static_cast<TChar>(0);
+
+	m_stringStorage = stringStorage;
 	m_numChars = numChars;
 
 	return ResultCode::kOK;
@@ -278,13 +287,13 @@ rkit::Result rkit::BaseStringConstructionBuffer<TChar>::Allocate(size_t numChars
 template<class TChar>
 rkit::Span<TChar> rkit::BaseStringConstructionBuffer<TChar>::GetSpan() const
 {
-	return Span<TChar>(m_chars, m_numChars);
+	return Span<TChar>(m_stringStorage->GetFirstCharAddress(), m_numChars);
 }
 
 template<class TChar>
 void rkit::BaseStringConstructionBuffer<TChar>::Detach()
 {
-	m_chars = nullptr;
+	m_stringStorage = nullptr;
 	m_numChars = 0;
 }
 
