@@ -565,7 +565,7 @@ namespace rkit { namespace utils
 
 		if (span.Count() != str.Length() || memcmp(span.Ptr(), str.GetChars(), span.Count()))
 		{
-			rkit::log::ErrorFmt("[%zu:%zu] Expected '%s'", line, col, str.GetChars());
+			rkit::log::ErrorFmt("[{}:{}] Expected '{}'", line, col, str.GetChars());
 			return ResultCode::kTextParsingFailed;
 		}
 

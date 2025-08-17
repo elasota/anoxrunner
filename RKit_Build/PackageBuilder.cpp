@@ -327,7 +327,7 @@ namespace rkit { namespace buildsystem
 				{
 					if (errIt.Value() == it.Value())
 					{
-						rkit::log::ErrorFmt("Config key '%s' was defined as multiple conflicting types", errIt.Key().CStr());
+						rkit::log::ErrorFmt("Config key '{}' was defined as multiple conflicting types", errIt.Key().CStr());
 						break;
 					}
 				}

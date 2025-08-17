@@ -2263,7 +2263,7 @@ namespace rkit { namespace buildsystem
 
 		if (compilerIt == m_nodeCompilers.end())
 		{
-			rkit::log::ErrorFmt("Unknown dependency node type %u / %u", static_cast<unsigned int>(nodeNamespace), static_cast<unsigned int>(nodeType));
+			rkit::log::ErrorFmt("Unknown dependency node type {} / {}", static_cast<unsigned int>(nodeNamespace), static_cast<unsigned int>(nodeType));
 			return ResultCode::kInvalidParameter;
 		}
 
@@ -2355,7 +2355,7 @@ namespace rkit { namespace buildsystem
 			{
 				if (node->GetCompiler()->HasAnalysisStage())
 				{
-					rkit::log::LogInfoFmt("Build Analysis: %s %s %s", FourCCToPrintable(node->GetDependencyNodeNamespace()).GetChars(), FourCCToPrintable(node->GetDependencyNodeType()).GetChars(), node->GetIdentifier().GetChars());
+					rkit::log::LogInfoFmt("Build Analysis: {} {} {}", FourCCToPrintable(node->GetDependencyNodeNamespace()).GetChars(), FourCCToPrintable(node->GetDependencyNodeType()).GetChars(), node->GetIdentifier().GetChars());
 					RKIT_CHECK(node->RunAnalysis(this));
 				}
 
@@ -2772,7 +2772,7 @@ namespace rkit { namespace buildsystem
 
 		if (!utils::ResultIsOK(openResult))
 		{
-			rkit::log::ErrorFmt("Failed to open output file '%s'", path.GetChars());
+			rkit::log::ErrorFmt("Failed to open output file '{}'", path.GetChars());
 			return ResultCode::kFileOpenError;
 		}
 
@@ -2833,7 +2833,7 @@ namespace rkit { namespace buildsystem
 			HashMap<data::ContentID, CASSource>::ConstIterator_t it = m_casSources.Find(contentID);
 			if (it == m_casSources.end())
 			{
-				rkit::log::ErrorFmt("Couldn't find CAS source for content '%s'", contentIDString.ToStringView().GetChars());
+				rkit::log::ErrorFmt("Couldn't find CAS source for content '{}'", contentIDString.ToStringView().GetChars());
 				return ResultCode::kInternalError;
 			}
 
@@ -2856,7 +2856,7 @@ namespace rkit { namespace buildsystem
 
 			if (!inStream.IsValid())
 			{
-				rkit::log::ErrorFmt("Couldn't open CAS source '%s'", it.Value().m_path.CStr());
+				rkit::log::ErrorFmt("Couldn't open CAS source '{}'", it.Value().m_path.CStr());
 				return ResultCode::kInternalError;
 			}
 
@@ -2957,7 +2957,7 @@ namespace rkit { namespace buildsystem
 
 	void BuildSystemInstance::ErrorBlameNode(DependencyNode *node, const StringView &msg)
 	{
-		rkit::log::ErrorFmt("Node %s: %s", node->GetIdentifier().GetChars(), msg.GetChars());
+		rkit::log::ErrorFmt("Node {}: {}", node->GetIdentifier().GetChars(), msg.GetChars());
 	}
 
 	Result BuildSystemInstance::ConstructIntermediatePath(OSAbsPath &outStr, const CIPathView &path) const

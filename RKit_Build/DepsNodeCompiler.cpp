@@ -33,7 +33,7 @@ namespace rkit { namespace buildsystem
 
 		if (!stream.Get())
 		{
-			rkit::log::ErrorFmt("Failed to open deps file '%s'", depsNode->GetIdentifier().GetChars());
+			rkit::log::ErrorFmt("Failed to open deps file '{}'", depsNode->GetIdentifier().GetChars());
 			return ResultCode::kFileOpenError;
 		}
 
@@ -105,7 +105,7 @@ namespace rkit { namespace buildsystem
 				{
 					if (!isFirst)
 					{
-						rkit::log::ErrorFmt("%zu:%zu: '.' path element may only be the first element", line, col);
+						rkit::log::ErrorFmt("{}:{}: '.' path element may only be the first element", line, col);
 						return ResultCode::kMalformedFile;
 					}
 
@@ -132,7 +132,7 @@ namespace rkit { namespace buildsystem
 
 						if (CIPath::Validate(chunkSlice) == PathValidationResult::kInvalid)
 						{
-							rkit::log::ErrorFmt("%zu:%zu: Path is invalid", line, col);
+							rkit::log::ErrorFmt("{}:{}: Path is invalid", line, col);
 							return ResultCode::kMalformedFile;
 						}
 
@@ -218,14 +218,14 @@ namespace rkit { namespace buildsystem
 
 				if (haveAnyWildcards && !exists)
 				{
-					rkit::log::ErrorFmt("%zu:%zu: Input file was not found", line, col);
+					rkit::log::ErrorFmt("{}:{}: Input file was not found", line, col);
 					return ResultCode::kMalformedFile;
 				}
 
 				StringSliceView extStrView;
 				if (!utils->FindFilePathExtension(path[path.NumComponents() - 1], extStrView))
 				{
-					rkit::log::ErrorFmt("%zu:%zu: Path has no extension", line, col);
+					rkit::log::ErrorFmt("{}:{}: Path has no extension", line, col);
 					return ResultCode::kMalformedFile;
 				}
 
@@ -233,7 +233,7 @@ namespace rkit { namespace buildsystem
 				uint32_t nodeType = 0;
 				if (!feedback->FindNodeTypeByFileExtension(extStrView, nodeNamespace, nodeType))
 				{
-					rkit::log::ErrorFmt("%zu:%zu: Unrecognized file extension: '%s'", line, col, extStrView.GetChars());
+					rkit::log::ErrorFmt("{}:{}: Unrecognized file extension: '{}'", line, col, extStrView.GetChars());
 					return ResultCode::kMalformedFile;
 				}
 

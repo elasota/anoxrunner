@@ -30,7 +30,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		Result FirstChanceVulkanFailure(VkResult result)
 		{
-			rkit::log::ErrorFmt("Vulkan error %x", static_cast<unsigned int>(result));
+			rkit::log::ErrorFmt("Vulkan error {}", static_cast<unsigned int>(result));
 			return utils::CreateResultWithExtCode(ResultCode::kGraphicsAPIException, static_cast<uint32_t>(result));
 		}
 	}
@@ -624,7 +624,7 @@ namespace rkit { namespace render { namespace vulkan
 			{
 				if (queryItem.m_required)
 				{
-					rkit::log::ErrorFmt("Missing required Vulkan device extension %s", queryItem.m_name.GetChars());
+					rkit::log::ErrorFmt("Missing required Vulkan device extension {}", queryItem.m_name.GetChars());
 					return ResultCode::kOperationFailed;
 				}
 			}
@@ -942,7 +942,7 @@ namespace rkit { namespace render { namespace vulkan
 			{
 				if (requestedLayer.m_required)
 				{
-					rkit::log::ErrorFmt("Missing required Vulkan layer %s", requestedLayer.m_name.GetChars());
+					rkit::log::ErrorFmt("Missing required Vulkan layer {}", requestedLayer.m_name.GetChars());
 					return ResultCode::kOperationFailed;
 				}
 				else
@@ -980,7 +980,7 @@ namespace rkit { namespace render { namespace vulkan
 			{
 				if (requestedExtension.m_required)
 				{
-					rkit::log::ErrorFmt("Missing required Vulkan extension %s", requestedExtension.m_name.GetChars());
+					rkit::log::ErrorFmt("Missing required Vulkan extension {}", requestedExtension.m_name.GetChars());
 					return ResultCode::kOperationFailed;
 				}
 				else

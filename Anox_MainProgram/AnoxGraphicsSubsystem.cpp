@@ -815,13 +815,13 @@ namespace anox
 		{
 			if (!m_gfxSettings.ResolveConfigEnum(keyName, resolution.m_mainType, resolution.m_value))
 			{
-				rkit::log::ErrorFmt("Enum config key '%s' in the pipeline cache was unresolvable", keyName.GetChars());
+				rkit::log::ErrorFmt("Enum config key '{}' in the pipeline cache was unresolvable", keyName.GetChars());
 				return rkit::ResultCode::kConfigInvalid;
 			}
 
 			if (resolution.m_mainType != expectedMainType)
 			{
-				rkit::log::ErrorFmt("Enum config key '%s' in the pipeline cache was the wrong type", keyName.GetChars());
+				rkit::log::ErrorFmt("Enum config key '{}' in the pipeline cache was the wrong type", keyName.GetChars());
 				return rkit::ResultCode::kConfigInvalid;
 			}
 
@@ -840,7 +840,7 @@ namespace anox
 
 		if (!m_gfxSettings.ResolveConfigFloat(keyName, outValue))
 		{
-			rkit::log::ErrorFmt("Float config key '%s' in the pipeline cache was unresolvable", keyName.GetChars());
+			rkit::log::ErrorFmt("Float config key '{}' in the pipeline cache was unresolvable", keyName.GetChars());
 			return rkit::ResultCode::kConfigInvalid;
 		}
 
@@ -856,7 +856,7 @@ namespace anox
 
 		if (!m_gfxSettings.ResolveConfigSInt(keyName, outValue))
 		{
-			rkit::log::ErrorFmt("SInt config key '%s' in the pipeline cache was unresolvable", keyName.GetChars());
+			rkit::log::ErrorFmt("SInt config key '{}' in the pipeline cache was unresolvable", keyName.GetChars());
 			return rkit::ResultCode::kConfigInvalid;
 		}
 
@@ -872,7 +872,7 @@ namespace anox
 
 		if (!m_gfxSettings.ResolveConfigUInt(keyName, outValue))
 		{
-			rkit::log::ErrorFmt("UInt config key '%s' in the pipeline cache was unresolvable", keyName.GetChars());
+			rkit::log::ErrorFmt("UInt config key '{}' in the pipeline cache was unresolvable", keyName.GetChars());
 			return rkit::ResultCode::kConfigInvalid;
 		}
 

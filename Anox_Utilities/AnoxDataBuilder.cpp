@@ -121,7 +121,7 @@ namespace anox { namespace utils
 
 				if (!stream.IsValid())
 				{
-					rkit::log::ErrorFmt("Failed to open pipeline '%s' for merge", product.m_filePath.GetChars());
+					rkit::log::ErrorFmt("Failed to open pipeline '{}' for merge", product.m_filePath.GetChars());
 					return rkit::ResultCode::kOperationFailed;
 				}
 

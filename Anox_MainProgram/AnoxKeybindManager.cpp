@@ -280,7 +280,7 @@ namespace anox
 		KeyCode_t keyCode = 0;
 		if (!ResolveKeyCode(args[0], keyCode))
 		{
-			rkit::log::ErrorFmt("Unknown key %s", args[0].GetChars());
+			rkit::log::ErrorFmt("Unknown key {}", args[0].GetChars());
 			return rkit::ResultCode::kOK;
 		}
 
@@ -290,7 +290,7 @@ namespace anox
 
 		if (args.Count() == 1)
 		{
-			rkit::log::LogInfoFmt("Keybind for '%s': %s", args[0].GetChars(), keyBind->m_cmd.CStr());
+			rkit::log::LogInfoFmt("Keybind for '{}': {}", args[0].GetChars(), keyBind->m_cmd.CStr());
 		}
 		else
 		{
@@ -316,7 +316,7 @@ namespace anox
 		KeyCode_t keyCode = 0;
 		if (!ResolveKeyCode(args[0], keyCode))
 		{
-			rkit::log::ErrorFmt("Unknown key %s", args[0].GetChars());
+			rkit::log::ErrorFmt("Unknown key {}", args[0].GetChars());
 			return rkit::ResultCode::kOK;
 		}
 

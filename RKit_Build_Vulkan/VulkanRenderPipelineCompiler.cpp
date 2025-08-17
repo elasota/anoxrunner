@@ -340,7 +340,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 				if (!stream.IsValid())
 				{
-					rkit::log::ErrorFmt("Failed to open SPV input %s", spvPath.CStr());
+					rkit::log::ErrorFmt("Failed to open SPV input {}", spvPath.CStr());
 					return ResultCode::kOperationFailed;
 				}
 
@@ -1456,7 +1456,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 	Result PipelineCompilerBase::FormatGraphicsPipelineStageFilePath(CIPath &path, const CIPathView &inPath, render::vulkan::GraphicPipelineStage stage)
 	{
 		String str;
-		RKIT_CHECK(str.Format("vk_pl_g_%i/%s", static_cast<int>(stage), inPath.GetChars()));
+		RKIT_CHECK(str.Format("vk_pl_g_{}/{}", static_cast<int>(stage), inPath.GetChars()));
 
 		RKIT_CHECK(path.Set(str));
 

@@ -2388,17 +2388,17 @@ namespace anox { namespace buildsystem
 
 	rkit::Result BSPMapCompilerBase2::FormatLightmapPath(rkit::String &path, const rkit::StringView &identifier, size_t lightmapIndex)
 	{
-		return path.Format("ax_bsp/%s_lm%zu.dds", identifier.GetChars(), lightmapIndex);
+		return path.Format("ax_bsp/{}_lm{}.dds", identifier.GetChars(), lightmapIndex);
 	}
 
 	rkit::Result BSPMapCompilerBase2::FormatModelPath(rkit::String &path, const rkit::StringView &identifier)
 	{
-		return path.Format("ax_bsp/%s.bspmodel", identifier.GetChars());
+		return path.Format("ax_bsp/{}.bspmodel", identifier.GetChars());
 	}
 
 	rkit::Result BSPMapCompilerBase2::FormatFaceStatsPath(rkit::String &path, const rkit::StringView &identifier)
 	{
-		return path.Format("ax_bsp/%s.facestats", identifier.GetChars());
+		return path.Format("ax_bsp/{}.facestats", identifier.GetChars());
 	}
 
 	rkit::Result BSPMapCompilerBase2::WriteBSPModel(const BSPOutput &bspOutput, rkit::IWriteStream &outStream)
@@ -2804,7 +2804,7 @@ namespace anox { namespace buildsystem
 
 	uint32_t BSPMapCompiler::GetVersion() const
 	{
-		return 2;
+		return 3;
 	}
 
 	template<class TStructure>

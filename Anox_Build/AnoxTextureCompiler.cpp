@@ -1189,12 +1189,12 @@ namespace anox { namespace buildsystem
 
 	rkit::Result TextureCompilerBase::ResolveIntermediatePath(rkit::String &outString, const rkit::StringView &identifierWithDisposition)
 	{
-		return outString.Format("ax_tex/%s.dds", identifierWithDisposition.GetChars());
+		return outString.Format("ax_tex/{}.dds", identifierWithDisposition.GetChars());
 	}
 
 	rkit::Result TextureCompilerBase::CreateImportIdentifier(rkit::String &result, const rkit::StringView &imagePath, ImageImportDisposition disposition)
 	{
-		return result.Format("%s.%i", imagePath.GetChars(), static_cast<int>(disposition));
+		return result.Format("{}.{}", imagePath.GetChars(), static_cast<int>(disposition));
 	}
 
 	rkit::Result TextureCompilerBase::Create(rkit::UniquePtr<TextureCompilerBase> &outCompiler, rkit::png::IPngDriver &pngDriver)

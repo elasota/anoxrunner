@@ -170,7 +170,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 		}
 		else
 		{
-			rkit::log::ErrorFmt("Unknown argument %s", arg.GetChars());
+			rkit::log::ErrorFmt("Unknown argument {}", arg.GetChars());
 			return rkit::ResultCode::kInvalidParameter;
 		}
 #endif

@@ -627,7 +627,7 @@ namespace anox { namespace buildsystem
 	rkit::Result MaterialCompiler::ConstructAnalysisPath(rkit::CIPath &analysisPath, MaterialNodeType nodeType, const rkit::StringView &identifier)
 	{
 		rkit::String pathStr;
-		RKIT_CHECK(pathStr.Format("anox/mat/%i/%s.a", static_cast<int>(nodeType), identifier.GetChars()));
+		RKIT_CHECK(pathStr.Format("anox/mat/{}/{}.a", static_cast<int>(nodeType), identifier.GetChars()));
 
 		RKIT_CHECK(analysisPath.Set(pathStr));
 
@@ -637,7 +637,7 @@ namespace anox { namespace buildsystem
 	rkit::Result MaterialCompiler::ConstructOutputPath(rkit::CIPath &outputPath, MaterialNodeType nodeType, const rkit::StringView &identifier)
 	{
 		rkit::String pathStr;
-		RKIT_CHECK(pathStr.Format("anox/mat/%i/%s", static_cast<int>(nodeType), identifier.GetChars()));
+		RKIT_CHECK(pathStr.Format("anox/mat/{}/{}", static_cast<int>(nodeType), identifier.GetChars()));
 
 		RKIT_CHECK(outputPath.Set(pathStr));
 
@@ -765,7 +765,7 @@ namespace anox { namespace buildsystem
 
 		if (!extPos.IsSet())
 		{
-			rkit::log::ErrorFmt("Material '%s' didn't end with a material extension", identifier.GetChars());
+			rkit::log::ErrorFmt("Material '{}' didn't end with a material extension", identifier.GetChars());
 			return rkit::ResultCode::kInternalError;
 		}
 

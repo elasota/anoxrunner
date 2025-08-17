@@ -2280,7 +2280,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		chars[kNumChars] = '\0';
 
-		return path.Format("%s/pl_%zu/p_%zu.bin", chars.GetBuffer(), pipelineIndex, permutationIndex);
+		return path.Format("{}/pl_{}/p_{}.bin", chars.GetBuffer(), pipelineIndex, permutationIndex);
 	}
 
 	template<class T, class TDefaultResolver>

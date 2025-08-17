@@ -458,7 +458,7 @@ namespace rkit { namespace buildsystem { namespace rpc_common
 	Result LibraryCompilerBase::FormatGraphicPipelinePath(CIPath &path, const StringView &identifier, size_t pipelineIndex)
 	{
 		String str;
-		RKIT_CHECK(str.Format("rpll/g_%zu/%s", pipelineIndex, identifier.GetChars()));
+		RKIT_CHECK(str.Format("rpll/g_{}/{}", pipelineIndex, identifier.GetChars()));
 
 		return path.Set(str);
 	}
@@ -466,7 +466,7 @@ namespace rkit { namespace buildsystem { namespace rpc_common
 	Result LibraryCompilerBase::FormatGlobalsPath(CIPath &path, const StringView &identifier)
 	{
 		String str;
-		RKIT_CHECK(str.Format("rpll/globs/%s", identifier.GetChars()));
+		RKIT_CHECK(str.Format("rpll/globs/{}", identifier.GetChars()));
 
 		return path.Set(str);
 	}
@@ -474,7 +474,7 @@ namespace rkit { namespace buildsystem { namespace rpc_common
 	Result LibraryCompilerBase::FormatIndexPath(CIPath &path, const StringView &identifier)
 	{
 		String str;
-		RKIT_CHECK(str.Format("rpll/idx/%s", identifier.GetChars()));
+		RKIT_CHECK(str.Format("rpll/idx/{}", identifier.GetChars()));
 
 		return path.Set(str);
 	}
@@ -482,7 +482,7 @@ namespace rkit { namespace buildsystem { namespace rpc_common
 	Result LibraryCompilerBase::FormatCombinedOutputPath(CIPath &path, const StringView &identifier)
 	{
 		String str;
-		RKIT_CHECK(str.Format("rpll/out/%s", identifier.GetChars()));
+		RKIT_CHECK(str.Format("rpll/out/{}", identifier.GetChars()));
 
 		return path.Set(str);
 	}
@@ -667,7 +667,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					return ResultCode::kOK;
 				}
 
-				rkit::log::ErrorFmt("Could not open input file '%s'", item.m_path.CStr());
+				rkit::log::ErrorFmt("Could not open input file '{}'", item.m_path.CStr());
 				return ResultCode::kFileOpenError;
 			}
 		}
@@ -747,12 +747,12 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			parseResult = ParseEntity(path, parser, &LibraryAnalyzer::ParseRenderPass);
 		else
 		{
-			rkit::log::ErrorFmt("%s [%zu:%zu] Invalid directive", path, line, col);
+			rkit::log::ErrorFmt("{} [{}:{}] Invalid directive", path, line, col);
 			return ResultCode::kMalformedFile;
 		}
 
 		if (!utils::ResultIsOK(parseResult))
-			rkit::log::ErrorFmt("%s [%zu:%zu] Directive parsing failed", path, line, col);
+			rkit::log::ErrorFmt("{} [{}:{}] Directive parsing failed", path, line, col);
 
 		return parseResult;
 	}
@@ -772,7 +772,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		if (m_entities.Find(entityName) != m_entities.end())
 		{
-			rkit::log::ErrorFmt("%s [%zu:%zu] Object with this name already exists", blamePath, line, col);
+			rkit::log::ErrorFmt("{} [{}:{}] Object with this name already exists", blamePath, line, col);
 			return ResultCode::kMalformedFile;
 		}
 
@@ -836,7 +836,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			{
 				if (pcDesc->m_name == tsi)
 				{
-					rkit::log::ErrorFmt("%s [%zu:%zu] Push constant with this name already exists", blamePath, line, col);
+					rkit::log::ErrorFmt("{} [{}:{}] Push constant with this name already exists", blamePath, line, col);
 					return ResultCode::kMalformedFile;
 				}
 			}
@@ -891,7 +891,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			{
 				if (smDesc->m_name == tsi)
 				{
-					rkit::log::ErrorFmt("%s [%zu:%zu] Struct member with this name already exists", blamePath, line, col);
+					rkit::log::ErrorFmt("{} [{}:{}] Struct member with this name already exists", blamePath, line, col);
 					return ResultCode::kMalformedFile;
 				}
 			}
@@ -1007,7 +1007,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 								break;
 							else
 							{
-								rkit::log::ErrorFmt("%s [%zu:%zu] Unknown field for input feed", blamePath, line, col);
+								rkit::log::ErrorFmt("{} [{}:{}] Unknown field for input feed", blamePath, line, col);
 								return ResultCode::kMalformedFile;
 							}
 						}
@@ -1020,7 +1020,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					{
 						if (hasSequentialMappings)
 						{
-							rkit::log::ErrorFmt("%s [%zu:%zu] Can't mix numbered and sequential input feed mappings", blamePath, line, col);
+							rkit::log::ErrorFmt("{} [{}:{}] Can't mix numbered and sequential input feed mappings", blamePath, line, col);
 							return ResultCode::kMalformedFile;
 						}
 
@@ -1030,7 +1030,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 						{
 							if (existingMapping.m_feedDesc->m_inputSlot == feedMapping.m_feedDesc->m_inputSlot)
 							{
-								rkit::log::ErrorFmt("%s [%zu:%zu] Multiple feeds mapped to the same slot", blamePath, line, col);
+								rkit::log::ErrorFmt("{} [{}:{}] Multiple feeds mapped to the same slot", blamePath, line, col);
 								return ResultCode::kMalformedFile;
 							}
 						}
@@ -1039,7 +1039,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					{
 						if (hasNumberedMappings)
 						{
-							rkit::log::ErrorFmt("%s [%zu:%zu] Can't mix numbered and sequential input feed mappings", blamePath, line, col);
+							rkit::log::ErrorFmt("{} [{}:{}] Can't mix numbered and sequential input feed mappings", blamePath, line, col);
 							return ResultCode::kMalformedFile;
 						}
 
@@ -1047,7 +1047,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 						if (slotIndex == std::numeric_limits<uint32_t>::max())
 						{
-							rkit::log::ErrorFmt("%s [%zu:%zu] Too many input slots", blamePath, line, col);
+							rkit::log::ErrorFmt("{} [{}:{}] Too many input slots", blamePath, line, col);
 							return ResultCode::kMalformedFile;
 						}
 
@@ -1116,7 +1116,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 							if (!inputFeedMapping)
 							{
-								rkit::log::ErrorFmt("%s [%zu:%zu] Unknown input feed", blamePath, line, col);
+								rkit::log::ErrorFmt("{} [{}:{}] Unknown input feed", blamePath, line, col);
 								return ResultCode::kMalformedFile;
 							}
 						}
@@ -1143,20 +1143,20 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 						}
 						else
 						{
-							rkit::log::ErrorFmt("%s [%zu:%zu] Invalid field for vertex input", blamePath, line, col);
+							rkit::log::ErrorFmt("{} [{}:{}] Invalid field for vertex input", blamePath, line, col);
 							return ResultCode::kMalformedFile;
 						}
 					}
 
 					if (!inputFeedMapping)
 					{
-						rkit::log::ErrorFmt("%s [%zu:%zu] No input feeds were defined", blamePath, line, col);
+						rkit::log::ErrorFmt("{} [{}:{}] No input feeds were defined", blamePath, line, col);
 						return ResultCode::kMalformedFile;
 					}
 
 					if (!haveInputSourcesType)
 					{
-						rkit::log::ErrorFmt("%s [%zu:%zu] No input source type was defined", blamePath, line, col);
+						rkit::log::ErrorFmt("{} [{}:{}] No input source type was defined", blamePath, line, col);
 						return ResultCode::kMalformedFile;
 					}
 
@@ -1168,7 +1168,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 						if (inputFeedMapping->m_strideIsSetAutomatically && autoStride != inputFeedMapping->m_feedDesc->m_byteStride.m_u.m_value)
 						{
-							rkit::log::ErrorFmt("%s [%zu:%zu] Automatic stride mismatch", blamePath, line, col);
+							rkit::log::ErrorFmt("{} [{}:{}] Automatic stride mismatch", blamePath, line, col);
 							return ResultCode::kMalformedFile;
 						}
 
@@ -1183,7 +1183,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			}
 			else
 			{
-				rkit::log::ErrorFmt("%s [%zu:%zu] Invalid entry type in InputLayout", blamePath, line, col);
+				rkit::log::ErrorFmt("{} [{}:{}] Invalid entry type in InputLayout", blamePath, line, col);
 				return ResultCode::kMalformedFile;
 			}
 		}
@@ -1193,7 +1193,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			if (!feedMapping.m_strideIsSet)
 			{
 				parser.GetLocation(line, col);
-				rkit::log::ErrorFmt("%s [%zu:%zu] Feed mapping '%s' had no stride", blamePath, line, col, feedMapping.m_name.CStr());
+				rkit::log::ErrorFmt("{} [{}:{}] Feed mapping '{}' had no stride", blamePath, line, col, feedMapping.m_name.CStr());
 				return ResultCode::kMalformedFile;
 			}
 		}
@@ -1228,7 +1228,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			{
 				if (existingDesc->m_name == descNameIndex)
 				{
-					rkit::log::ErrorFmt("%s [%zu:%zu] Descriptor with that name already exists", filePath, line, col);
+					rkit::log::ErrorFmt("{} [{}:{}] Descriptor with that name already exists", filePath, line, col);
 					return ResultCode::kMalformedFile;
 				}
 			}
@@ -1254,7 +1254,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				{
 					if (typeWasSpecified)
 					{
-						rkit::log::ErrorFmt("%s [%zu:%zu] Type was already specified", filePath, line, col);
+						rkit::log::ErrorFmt("{} [{}:{}] Type was already specified", filePath, line, col);
 						return ResultCode::kMalformedFile;
 					}
 
@@ -1280,7 +1280,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 					if (descType == render::DescriptorType::Count)
 					{
-						rkit::log::ErrorFmt("%s [%zu:%zu] Invalid descriptor type", filePath, line, col);
+						rkit::log::ErrorFmt("{} [{}:{}] Invalid descriptor type", filePath, line, col);
 						return ResultCode::kMalformedFile;
 					}
 
@@ -1303,7 +1303,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 							if (descDesc->m_valueType.m_type != render::ValueTypeType::Numeric && descDesc->m_valueType.m_type != render::ValueTypeType::VectorNumeric)
 							{
-								rkit::log::ErrorFmt("%s [%zu:%zu] Invalid type for texture", filePath, line, col);
+								rkit::log::ErrorFmt("{} [{}:{}] Invalid type for texture", filePath, line, col);
 								return ResultCode::kMalformedFile;
 							}
 
@@ -1345,7 +1345,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 							if (arraySize < 2)
 							{
-								rkit::log::ErrorFmt("%s [%zu:%zu] Invalid descriptor array size", filePath, line, col);
+								rkit::log::ErrorFmt("{} [{}:{}] Invalid descriptor array size", filePath, line, col);
 								return ResultCode::kMalformedFile;
 							}
 
@@ -1359,14 +1359,14 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				{
 					if (!typeWasSpecified)
 					{
-						rkit::log::ErrorFmt("%s [%zu:%zu] Static sampler must be after type", filePath, line, col);
+						rkit::log::ErrorFmt("{} [{}:{}] Static sampler must be after type", filePath, line, col);
 						return ResultCode::kMalformedFile;
 					}
 
 					DescriptorTypeClassification classification = ClassifyDescriptorType(descDesc->m_descriptorType);
 					if (classification != DescriptorTypeClassification::Texture)
 					{
-						rkit::log::ErrorFmt("%s [%zu:%zu] Static sampler is only valid for texture types", filePath, line, col);
+						rkit::log::ErrorFmt("{} [{}:{}] Static sampler is only valid for texture types", filePath, line, col);
 						return ResultCode::kMalformedFile;
 					}
 
@@ -1379,13 +1379,13 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					HashMap<AsciiString, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(AsciiStringSliceView(token));
 					if (it == m_entities.end())
 					{
-						rkit::log::ErrorFmt("%s [%zu:%zu] Unknown static sampler", filePath, line, col);
+						rkit::log::ErrorFmt("{} [{}:{}] Unknown static sampler", filePath, line, col);
 						return ResultCode::kMalformedFile;
 					}
 
 					if (it.Value()->GetEntityType() != rpc_interchange::EntityType::StaticSampler)
 					{
-						rkit::log::ErrorFmt("%s [%zu:%zu] Value wasn't a static sampler", filePath, line, col);
+						rkit::log::ErrorFmt("{} [{}:{}] Value wasn't a static sampler", filePath, line, col);
 						return ResultCode::kMalformedFile;
 					}
 
@@ -1395,14 +1395,14 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				}
 				else
 				{
-					rkit::log::ErrorFmt("%s [%zu:%zu] Invalid descriptor desc property", filePath, line, col);
+					rkit::log::ErrorFmt("{} [{}:{}] Invalid descriptor desc property", filePath, line, col);
 					return ResultCode::kMalformedFile;
 				}
 			}
 
 			if (!typeWasSpecified)
 			{
-				rkit::log::ErrorFmt("%s [%zu:%zu] Descriptor missing type", filePath, line, col);
+				rkit::log::ErrorFmt("{} [{}:{}] Descriptor missing type", filePath, line, col);
 				return ResultCode::kMalformedFile;
 			}
 
@@ -1458,13 +1458,13 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 					if (it == m_entities.end())
 					{
-						rkit::log::ErrorFmt("%s [%zu:%zu] Couldn't resolve descriptor layout", filePath, line, col);
+						rkit::log::ErrorFmt("{} [{}:{}] Couldn't resolve descriptor layout", filePath, line, col);
 						return ResultCode::kMalformedFile;
 					}
 
 					if (it.Value()->GetEntityType() != rpc_interchange::EntityType::DescriptorLayout)
 					{
-						rkit::log::ErrorFmt("%s [%zu:%zu] Value wasn't a descriptor layout", filePath, line, col);
+						rkit::log::ErrorFmt("{} [{}:{}] Value wasn't a descriptor layout", filePath, line, col);
 						return ResultCode::kMalformedFile;
 					}
 
@@ -1497,7 +1497,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 					if (nameToRODesc.Find(rtName) != nameToRODesc.end())
 					{
-						rkit::log::ErrorFmt("%s [%zu:%zu] Render target '%s' was specified multiple times", filePath, line, col, rtName.CStr());
+						rkit::log::ErrorFmt("{} [{}:{}] Render target '{}' was specified multiple times", filePath, line, col, rtName.CStr());
 						return ResultCode::kMalformedFile;
 					}
 
@@ -1526,13 +1526,13 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				HashMap<AsciiString, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(AsciiStringSliceView(token));
 				if (it == m_entities.end())
 				{
-					rkit::log::ErrorFmt("%s [%zu:%zu] Unknown input layout identifier", filePath, line, col);
+					rkit::log::ErrorFmt("{} [{}:{}] Unknown input layout identifier", filePath, line, col);
 					return ResultCode::kMalformedFile;
 				}
 
 				if (it.Value()->GetEntityType() != rpc_interchange::EntityType::InputLayout)
 				{
-					rkit::log::ErrorFmt("%s [%zu:%zu] Value wasn't an input layout", filePath, line, col);
+					rkit::log::ErrorFmt("{} [{}:{}] Value wasn't an input layout", filePath, line, col);
 					return ResultCode::kMalformedFile;
 				}
 
@@ -1581,13 +1581,13 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				HashMap<AsciiString, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(AsciiStringSliceView(token));
 				if (it == m_entities.end())
 				{
-					rkit::log::ErrorFmt("%s [%zu:%zu] Unknown execute in pass identifier", filePath, line, col);
+					rkit::log::ErrorFmt("{} [{}:{}] Unknown execute in pass identifier", filePath, line, col);
 					return ResultCode::kMalformedFile;
 				}
 
 				if (it.Value()->GetEntityType() != rpc_interchange::EntityType::RenderPass)
 				{
-					rkit::log::ErrorFmt("%s [%zu:%zu] Value wasn't a render pass", filePath, line, col);
+					rkit::log::ErrorFmt("{} [{}:{}] Value wasn't a render pass", filePath, line, col);
 					return ResultCode::kMalformedFile;
 				}
 
@@ -1610,7 +1610,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			size_t line = 0;
 			size_t col = 0;
 			parser.GetLocation(line, col);
-			rkit::log::ErrorFmt("%s [%zu:%zu] Pipeline did not specify ExecuteInPass", filePath, line, col);
+			rkit::log::ErrorFmt("{} [{}:{}] Pipeline did not specify ExecuteInPass", filePath, line, col);
 			return ResultCode::kMalformedFile;
 		}
 
@@ -1619,7 +1619,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			size_t line = 0;
 			size_t col = 0;
 			parser.GetLocation(line, col);
-			rkit::log::ErrorFmt("%s [%zu:%zu] Pipeline has depth/stencil operations but there is no depth/stencil in the corresponding render pass", filePath, line, col);
+			rkit::log::ErrorFmt("{} [{}:{}] Pipeline has depth/stencil operations but there is no depth/stencil in the corresponding render pass", filePath, line, col);
 			return ResultCode::kMalformedFile;
 		}
 
@@ -1671,7 +1671,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					size_t line = 0;
 					size_t col = 0;
 					parser.GetLocation(line, col);
-					rkit::log::ErrorFmt("%s [%zu:%zu] Pipeline target '%s' didn't exist in the render pass", filePath, line, col, kv.Key().CStr());
+					rkit::log::ErrorFmt("{} [{}:{}] Pipeline target '{}' didn't exist in the render pass", filePath, line, col, kv.Key().CStr());
 				}
 			}
 
@@ -1815,7 +1815,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		utils->NormalizeFilePath(path.GetChars());
 		if (!utils->ValidateFilePath(path.GetChars(), false))
 		{
-			rkit::log::ErrorFmt("%s [%zu:%zu] Invalid file path", blamePath, line, col);
+			rkit::log::ErrorFmt("{} [{}:{}] Invalid file path", blamePath, line, col);
 			return ResultCode::kMalformedFile;
 		}
 
@@ -1882,7 +1882,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		switch (inputSourcesType.m_type)
 		{
 		case render::ValueTypeType::CompoundNumeric:
-			rkit::log::ErrorFmt("%s [%zu:%zu] Matrix types aren't allowed in vertex inputs", blamePath, line, col);
+			rkit::log::ErrorFmt("{} [{}:{}] Matrix types aren't allowed in vertex inputs", blamePath, line, col);
 			return ResultCode::kMalformedFile;
 
 		case render::ValueTypeType::VectorNumeric:
@@ -2067,7 +2067,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 			if (!isValid)
 			{
-				rkit::log::ErrorFmt("%s [%zu:%zu] Expected identifier", blamePath, line, col);
+				rkit::log::ErrorFmt("{} [{}:{}] Expected identifier", blamePath, line, col);
 				return ResultCode::kMalformedFile;
 			}
 		}
@@ -2169,7 +2169,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			size_t line = 0;
 			size_t col = 0;
 			parser.GetLocation(line, col);
-			rkit::log::ErrorFmt("%s [%zu:%zu] Unknown type identifier", blamePath, line, col);
+			rkit::log::ErrorFmt("{} [{}:{}] Unknown type identifier", blamePath, line, col);
 			return ResultCode::kMalformedFile;
 		}
 
@@ -2180,7 +2180,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			size_t line = 0;
 			size_t col = 0;
 			parser.GetLocation(line, col);
-			rkit::log::ErrorFmt("%s [%zu:%zu] Identifier does not resolve to a structure", blamePath, line, col);
+			rkit::log::ErrorFmt("{} [{}:{}] Identifier does not resolve to a structure", blamePath, line, col);
 			return ResultCode::kMalformedFile;
 		}
 
@@ -2212,7 +2212,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 			if (configKey.m_mainType != mainType)
 			{
-				rkit::log::ErrorFmt("%s [%zu:%zu] Config key was already used for a different type", blamePath, line, col);
+				rkit::log::ErrorFmt("{} [{}:{}] Config key was already used for a different type", blamePath, line, col);
 				return ResultCode::kMalformedFile;
 			}
 
@@ -2274,19 +2274,19 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				digit = (c - 'A') + 0xA;
 			else
 			{
-				rkit::log::ErrorFmt("%s [%zu:%zu] Expected numeric constant", blamePath, blameLine, blameCol);
+				rkit::log::ErrorFmt("{} [{}:{}] Expected numeric constant", blamePath, blameLine, blameCol);
 				return ResultCode::kMalformedFile;
 			}
 
 			if (result >= maxBeforeMultiply)
 			{
-				rkit::log::ErrorFmt("%s [%zu:%zu] Integer constant overflow", blamePath, blameLine, blameCol);
+				rkit::log::ErrorFmt("{} [{}:{}] Integer constant overflow", blamePath, blameLine, blameCol);
 				return ResultCode::kMalformedFile;
 			}
 
 			if (digit >= base)
 			{
-				rkit::log::ErrorFmt("%s [%zu:%zu] Invalid digit in numeric constant", blamePath, blameLine, blameCol);
+				rkit::log::ErrorFmt("{} [{}:{}] Invalid digit in numeric constant", blamePath, blameLine, blameCol);
 				return ResultCode::kMalformedFile;
 			}
 
@@ -2294,7 +2294,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 			if (max - result < digit)
 			{
-				rkit::log::ErrorFmt("%s [%zu:%zu] Integer constant overflow", blamePath, blameLine, blameCol);
+				rkit::log::ErrorFmt("{} [{}:{}] Integer constant overflow", blamePath, blameLine, blameCol);
 				return ResultCode::kMalformedFile;
 			}
 
@@ -2318,7 +2318,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		if (token.Count() == 0 || token[0] != '\"')
 		{
-			rkit::log::ErrorFmt("%s [%zu:%zu] Expected string constant", blamePath, line, col);
+			rkit::log::ErrorFmt("{} [{}:{}] Expected string constant", blamePath, line, col);
 			return ResultCode::kMalformedFile;
 		}
 
@@ -2365,7 +2365,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		{
 			if (!isConfigurable)
 			{
-				rkit::log::ErrorFmt("%s [%zu:%zu] Option is not configurable", blamePath, line, col);
+				rkit::log::ErrorFmt("{} [{}:{}] Option is not configurable", blamePath, line, col);
 				return ResultCode::kMalformedFile;
 			}
 
@@ -2386,7 +2386,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			}
 		}
 
-		rkit::log::ErrorFmt("%s [%zu:%zu] Invalid value", blamePath, line, col);
+		rkit::log::ErrorFmt("{} [{}:{}] Invalid value", blamePath, line, col);
 		return ResultCode::kMalformedFile;
 	}
 
@@ -2421,7 +2421,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			number = 1;
 		else
 		{
-			rkit::log::ErrorFmt("%s [%zu:%zu] Invalid boolean value", blamePath, line, col);
+			rkit::log::ErrorFmt("{} [{}:{}] Invalid boolean value", blamePath, line, col);
 			return ResultCode::kMalformedFile;
 		}
 
@@ -2522,7 +2522,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		if (!resolvedField)
 		{
-			rkit::log::ErrorFmt("%s [%zu:%zu] Invalid field", blamePath, line, col);
+			rkit::log::ErrorFmt("{} [{}:{}] Invalid field", blamePath, line, col);
 			return ResultCode::kMalformedFile;
 		}
 
@@ -2783,7 +2783,7 @@ namespace rkit { namespace buildsystem { namespace rpc_combiner
 
 				if (m_graphicPipelineNames.Contains(nameStrView))
 				{
-					rkit::log::ErrorFmt("Duplicate graphic pipeline name '%s'", nameStrView.GetChars());
+					rkit::log::ErrorFmt("Duplicate graphic pipeline name '{}'", nameStrView.GetChars());
 					return ResultCode::kOperationFailed;
 				}
 				else

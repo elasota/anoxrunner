@@ -24,7 +24,7 @@ namespace rkit { namespace render { namespace vulkan
 
 			if (!foundFunction && !loaderInfo.m_isOptional)
 			{
-				rkit::log::ErrorFmt("Failed to find required Vulkan function %s", loaderInfo.m_fnName.GetChars());
+				rkit::log::ErrorFmt("Failed to find required Vulkan function {}", loaderInfo.m_fnName.GetChars());
 				return ResultCode::kModuleLoadFailed;
 			}
 		}
