@@ -1,6 +1,8 @@
 #pragma once
 
 #include "rkit/Core/CoreDefs.h"
+#include "rkit/Core/CoroutineProtos.h"
+#include "rkit/Core/StringProto.h"
 
 #include <cstdint>
 
@@ -37,6 +39,8 @@ namespace anox
 		virtual rkit::utils::IThreadPool *GetThreadPool() const = 0;
 		virtual AnoxCommandRegistryBase *GetCommandRegistry() const = 0;
 		virtual AnoxKeybindManagerBase *GetKeybindManager() const = 0;
+
+		CORO_DECL_METHOD_ABSTRACT(RestartGame, const rkit::StringView &initialMapName);
 
 		static rkit::Result Create(rkit::UniquePtr<IAnoxGame> &outGame, const rkit::Optional<uint16_t> &numThreads);
 	};

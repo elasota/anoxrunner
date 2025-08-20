@@ -2,6 +2,7 @@
 #include "anox/AnoxGraphicsSubsystem.h"
 #include "anox/AnoxFileSystem.h"
 
+#include "AnoxConfigurationState.h"
 #include "AnoxCaptureHarness.h"
 #include "AnoxCommandRegistry.h"
 #include "AnoxGameLogic.h"
@@ -11,6 +12,8 @@
 
 #include "rkit/Data/DataDriver.h"
 
+#include "rkit/Core/Coroutine.h"
+#include "rkit/Core/CoroutineCompiler.h"
 #include "rkit/Core/Drivers.h"
 #include "rkit/Core/DriverModuleInitParams.h"
 #include "rkit/Core/LogDriver.h"
@@ -44,6 +47,8 @@ namespace anox
 		rkit::utils::IThreadPool *GetThreadPool() const override;
 		AnoxCommandRegistryBase *GetCommandRegistry() const override;
 		AnoxKeybindManagerBase *GetKeybindManager() const override;
+
+		CORO_DECL_METHOD_OVERRIDE(RestartGame);
 
 	private:
 		bool m_isExiting = false;
@@ -115,7 +120,8 @@ namespace anox
 		RKIT_CHECK(AnoxKeybindManagerBase::Create(m_keybindManager, *this));
 		RKIT_CHECK(m_keybindManager->Register(*m_commandRegistry));
 
-		RKIT_CHECK(ICaptureHarness::CreateRealTime(m_captureHarness, *this, *m_resourceManager));
+		rkit::UniquePtr<IConfigurationState> emptyConfig;
+		RKIT_CHECK(ICaptureHarness::CreateRealTime(m_captureHarness, *this, *m_resourceManager, std::move(emptyConfig)));
 
 		RKIT_CHECK(IGraphicsSubsystem::Create(m_graphicsSubsystem, *m_fileSystem, *m_dataDriver, *m_threadPool, anox::RenderBackend::kVulkan));
 
@@ -169,6 +175,28 @@ namespace anox
 	{
 		return m_keybindManager.Get();
 	}
+
+	CORO_DEF_METHOD(AnoxGame, RestartGame)
+	{
+		struct Params
+		{
+			const rkit::StringView mapName;
+		};
+
+		struct Locals
+		{
+		};
+
+		CORO_BEGIN
+			CORO_CHECK(self->m_captureHarness->TerminateSession());
+
+			self->m_captureHarness.Reset();
+
+			rkit::UniquePtr<IConfigurationState> newGameConfig;
+			CORO_CHECK(self->m_gameLogic->CreateNewGame(newGameConfig, params.mapName));
+			CORO_CHECK(ICaptureHarness::CreateRealTime(self->m_captureHarness, *self, *self->m_resourceManager, std::move(newGameConfig)));
+		CORO_END
+	};
 
 	rkit::Result anox::IAnoxGame::Create(rkit::UniquePtr<IAnoxGame> &outGame, const rkit::Optional<uint16_t> &numThreads)
 	{

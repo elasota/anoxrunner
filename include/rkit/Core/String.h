@@ -1,8 +1,12 @@
 #pragma once
 
+#include "Algorithm.h"
 #include "Atomic.h"
 #include "NoCopy.h"
 #include "StringProto.h"
+
+// Might need to move this one?
+#include "Format.h"
 
 #include <cstdint>
 #include <cstddef>
@@ -73,6 +77,7 @@ namespace rkit
 
 	template<class TChar, CharacterEncoding TEncoding, size_t TStaticSize>
 	class BaseString
+		: public rkit::CompareWithOrderingOperatorsMixin<BaseString<TChar, TEncoding, TStaticSize>, BaseStringSliceViewComparer<TChar, TEncoding>>
 	{
 	public:
 		typedef BaseStringView<TChar, TEncoding> View_t;
@@ -110,12 +115,6 @@ namespace rkit
 
 		operator View_t() const;
 		operator SliceView_t() const;
-
-		bool operator==(const SliceView_t &other) const;
-		bool operator==(const BaseString &other) const;
-
-		bool operator!=(const SliceView_t &other) const;
-		bool operator!=(const BaseString &other) const;
 
 		const TChar &operator[](size_t index) const;
 
@@ -754,31 +753,6 @@ rkit::BaseString<TChar, TEncoding, TStaticSize>::operator SliceView_t() const
 {
 	return SliceView_t(m_chars, m_length);
 }
-
-template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
-bool rkit::BaseString<TChar, TEncoding, TStaticSize>::operator==(const BaseStringSliceView<TChar, TEncoding> &other) const
-{
-	return static_cast<SliceView_t>(*this) == other;
-}
-
-template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
-bool rkit::BaseString<TChar, TEncoding, TStaticSize>::operator==(const BaseString &other) const
-{
-	return (*this) == static_cast<SliceView_t>(other);
-}
-
-template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
-bool rkit::BaseString<TChar, TEncoding, TStaticSize>::operator!=(const BaseStringSliceView<TChar, TEncoding> &other) const
-{
-	return !((*this) == other);
-}
-
-template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
-bool rkit::BaseString<TChar, TEncoding, TStaticSize>::operator!=(const BaseString &other) const
-{
-	return !((*this) == other);
-}
-
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
 const TChar &rkit::BaseString<TChar, TEncoding, TStaticSize>::operator[](size_t index) const

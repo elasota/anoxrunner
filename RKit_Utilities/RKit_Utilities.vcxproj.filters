@@ -206,5 +206,8 @@
     <ClInclude Include="..\include\rkit\Core\FormatProtos.h">
       <Filter>Header Files\rkit</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\rkit\Core\TypeTaggedUnion.h">
+      <Filter>Header Files\rkit</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

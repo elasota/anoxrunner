@@ -130,6 +130,7 @@
     <ClInclude Include="..\include\rkit\Core\StringProto.h" />
     <ClInclude Include="..\include\rkit\Core\SystemDriver.h" />
     <ClInclude Include="..\include\rkit\Core\Timestamp.h" />
+    <ClInclude Include="..\include\rkit\Core\TypeTaggedUnion.h" />
     <ClInclude Include="..\include\rkit\Core\Unicode.h" />
     <ClInclude Include="..\include\rkit\Core\UniquePtr.h" />
     <ClInclude Include="..\include\rkit\Core\UtilitiesDriver.h" />

@@ -348,7 +348,7 @@ namespace rkit
 		if (m_isInitialized)
 			m_moduleAPI.m_shutdownFunction();
 
-		FreeLibrary(m_hmodule);
+		::FreeLibrary(m_hmodule);
 	}
 
 	Result Module_Win32::Init(const ModuleInitParameters *initParams)
@@ -391,6 +391,8 @@ namespace rkit
 static int WinMainCommon(HINSTANCE hInstance)
 {
 	setlocale(LC_ALL, "C");
+
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
 	new (rkit::g_winGlobalsBuffer.m_bytes) rkit::Win32Globals();
 
@@ -501,7 +503,10 @@ static int WinMainCommon(HINSTANCE hInstance)
 
 	rkit::g_winGlobals.~Win32Globals();
 
-	return rkit::utils::ResultToExitCode(result);
+	_CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_DEBUG);
+	_CrtDumpMemoryLeaks();
+
+	return 0;
 }
 
 

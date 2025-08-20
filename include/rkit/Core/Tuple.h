@@ -128,6 +128,8 @@ namespace rkit { namespace priv
 	}
 } } // rkit::priv
 
+#include <utility>
+
 namespace rkit
 {
 	template<class T>

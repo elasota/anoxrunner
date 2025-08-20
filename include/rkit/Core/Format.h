@@ -182,6 +182,7 @@ namespace rkit { namespace priv {
 } }
 
 #include "Span.h"
+#include "Drivers.h"
 #include "UtilitiesDriver.h"
 
 namespace rkit
@@ -212,8 +213,6 @@ namespace rkit
 		return FormatParameterList<TChar>(m_formatters, TSize);
 	}
 }
-
-
 
 namespace rkit { namespace priv {
 	template<class TChar, class TType>

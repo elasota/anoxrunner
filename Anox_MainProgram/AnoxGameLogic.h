@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rkit/Core/CoreDefs.h"
+#include "rkit/Core/StringProto.h"
 
 namespace rkit
 {
@@ -11,6 +12,7 @@ namespace rkit
 namespace anox
 {
 	struct IAnoxGame;
+	struct IConfigurationState;
 
 	class IGameLogic
 	{
@@ -19,6 +21,9 @@ namespace anox
 
 		virtual rkit::Result Start() = 0;
 		virtual rkit::Result RunFrame() = 0;
+
+		virtual rkit::Result CreateNewGame(rkit::UniquePtr<IConfigurationState> &outConfig, const rkit::StringSliceView &mapName) = 0;
+		virtual rkit::Result SaveGame(rkit::UniquePtr<IConfigurationState> &outConfig) = 0;
 
 		static rkit::Result Create(rkit::UniquePtr<IGameLogic> &outGameLoop, IAnoxGame *game);
 	};

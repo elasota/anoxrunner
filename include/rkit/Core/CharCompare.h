@@ -42,6 +42,12 @@ namespace rkit
 		{
 			static Ordering Compare(const wchar_t *str1, const wchar_t *str2, size_t len);
 		};
+
+		template<>
+		struct CharCompareByValue<char, CharacterEncoding::kASCII>
+		{
+			static Ordering Compare(const char *str1, const char *str2, size_t len);
+		};
 	}
 
 	template<class TChar, CharacterEncoding TEncoding>
@@ -121,5 +127,10 @@ namespace rkit
 	inline Ordering priv::CharCompareByValue<wchar_t, CharacterEncoding::kUTF16>::Compare(const wchar_t *str1, const wchar_t *str2, size_t len)
 	{
 		return priv::CharCompareAs<wchar_t, uint16_t>::Compare(str1, str2, len);
+	}
+
+	inline Ordering priv::CharCompareByValue<char, CharacterEncoding::kASCII>::Compare(const char *str1, const char *str2, size_t len)
+	{
+		return priv::CharCompareAs<char, uint8_t>::Compare(str1, str2, len);
 	}
 }

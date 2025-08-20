@@ -13,6 +13,9 @@ namespace rkit
 	class BaseStringSliceView;
 
 	template<class TChar, CharacterEncoding TEncoding>
+	struct BaseStringSliceViewComparer;
+
+	template<class TChar, CharacterEncoding TEncoding>
 	class BaseStringView;
 
 	template<class TChar, CharacterEncoding TEncoding>

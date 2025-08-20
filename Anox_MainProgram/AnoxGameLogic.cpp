@@ -15,8 +15,10 @@
 #include "AnoxCaptureHarness.h"
 #include "AnoxCommandRegistry.h"
 #include "AnoxCommandStack.h"
+#include "AnoxConfigurationSaver.h"
 #include "AnoxFileResource.h"
 #include "AnoxResourceManager.h"
+#include "AnoxGlobalVars.h"
 
 namespace anox
 {
@@ -29,6 +31,9 @@ namespace anox
 
 		rkit::Result Start() override;
 		rkit::Result RunFrame() override;
+
+		rkit::Result CreateNewGame(rkit::UniquePtr<IConfigurationState> &outConfig, const rkit::StringSliceView &mapName) override;
+		rkit::Result SaveGame(rkit::UniquePtr<IConfigurationState> &outConfig) override;
 
 	private:
 		class DestructiveSpanArgParser final : public rkit::ISpan<rkit::StringView>
@@ -62,10 +67,13 @@ namespace anox
 		CORO_DECL_METHOD(RunCommand, AnoxCommandStackBase &commandStack, const rkit::Span<char> &line);
 
 		CORO_DECL_METHOD(Cmd_Exec, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::StringView> &args);
+		CORO_DECL_METHOD(Cmd_Map, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::StringView> &args);
 
 		IAnoxGame *m_game;
 		rkit::UniquePtr<rkit::coro::Thread> m_mainCoroThread;
 		rkit::UniquePtr<AnoxCommandStackBase> m_commandStack;
+
+		rkit::UniquePtr<game::GlobalVars> m_globalVars;
 	};
 
 	AnoxGameLogic::AnoxGameLogic(IAnoxGame *game)
@@ -76,6 +84,7 @@ namespace anox
 	rkit::Result AnoxGameLogic::Start()
 	{
 		RKIT_CHECK(m_game->GetCommandRegistry()->RegisterCommand("exec", this->AsyncCmd_Exec()));
+		RKIT_CHECK(m_game->GetCommandRegistry()->RegisterCommand("map", this->AsyncCmd_Map()));
 
 		RKIT_CHECK(AnoxCommandStackBase::Create(m_commandStack, 64 * 1024, 1024));
 
@@ -120,6 +129,25 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
+	rkit::Result AnoxGameLogic::CreateNewGame(rkit::UniquePtr<IConfigurationState> &outConfig, const rkit::StringSliceView &mapName)
+	{
+		rkit::UniquePtr<game::GlobalVars> globalVars;
+		RKIT_CHECK(rkit::New<game::GlobalVars>(globalVars));
+
+		RKIT_CHECK(globalVars->m_mapName.Set(mapName));
+
+		rkit::UniquePtr<IConfigurationState> globalVarsConfig;
+		RKIT_CHECK(globalVars->Save(globalVarsConfig));
+
+
+
+		return rkit::ResultCode::kNotYetImplemented;
+	}
+
+	rkit::Result AnoxGameLogic::SaveGame(rkit::UniquePtr<IConfigurationState> &outConfig)
+	{
+		return rkit::ResultCode::kNotYetImplemented;
+	}
 
 	AnoxGameLogic::DestructiveSpanArgParser::DestructiveSpanArgParser()
 		: m_count(0)
@@ -422,6 +450,48 @@ namespace anox
 			CORO_CHECK(locals.path.Append(configRelPath));
 
 			CORO_CALL(self->AsyncExecCommandFile, params.cmdStack, locals.path);
+		CORO_END
+	};
+
+	CORO_DEF_METHOD(AnoxGameLogic, Cmd_Map)
+	{
+		struct Locals
+		{
+			rkit::CIPath path;
+			rkit::CIPath relPath;
+		};
+
+		struct Params
+		{
+			AnoxCommandStackBase &cmdStack;
+			const rkit::ISpan<rkit::StringView> &args;
+		};
+
+		CORO_BEGIN
+			if (params.args.Count() < 1)
+			{
+				rkit::log::Error("Usage: map <map name>");
+				CORO_RETURN;
+			}
+
+			rkit::StringView mapNameStr = params.args[0];
+
+			for (char c : mapNameStr)
+			{
+				if (c >= 'a' && c <= 'z')
+					continue;
+				if (c >= 'A' && c <= 'Z')
+					continue;
+				if (c >= '0' && c <= '9')
+					continue;
+				if (c == '_')
+					continue;
+
+				rkit::log::Error("Malformed map file path");
+				CORO_RETURN;
+			}
+
+			CORO_CALL(self->m_game->AsyncRestartGame, mapNameStr);
 		CORO_END
 	};
 

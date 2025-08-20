@@ -20,12 +20,15 @@ namespace anox
 
 		rkit::Result Initialize();
 
+
 		rkit::Result GetConfigurationState(const IConfigurationState **outConfigStatePtr) override;
 		rkit::Result GetSessionState(const IConfigurationState **outConfigStatePtr) override;
 
 		rkit::Result GetContentIDKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::data::ContentID &cid) override;
 		rkit::Result GetCIPathKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::CIPathView &path) override;
 		rkit::Result GetStringKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::StringView &str) override;
+
+		rkit::Result TerminateSession() override;
 
 	private:
 		IAnoxGame &m_game;
@@ -68,7 +71,13 @@ namespace anox
 		return m_resManager.GetStringKeyedResource(nullptr, loadFuture, resourceType, str);
 	}
 
-	rkit::Result ICaptureHarness::CreateRealTime(rkit::UniquePtr<ICaptureHarness> &outHarness, IAnoxGame &game, AnoxResourceManagerBase &resManager)
+	rkit::Result AnoxRealTimeCaptureHarness::TerminateSession()
+	{
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result ICaptureHarness::CreateRealTime(rkit::UniquePtr<ICaptureHarness> &outHarness, IAnoxGame &game,
+		AnoxResourceManagerBase &resManager, rkit::UniquePtr<IConfigurationState> &&initialConfiguration)
 	{
 		rkit::UniquePtr<AnoxRealTimeCaptureHarness> harness;
 		RKIT_CHECK(rkit::New<AnoxRealTimeCaptureHarness>(harness, game, resManager));

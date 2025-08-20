@@ -1,8 +1,10 @@
 #pragma once
 
+#include "Algorithm.h"
 #include "CharacterEncoding.h"
 #include "Ordering.h"
 #include "Span.h"
+#include "StringProto.h"
 
 #include <cstddef>
 #include <type_traits>
@@ -19,7 +21,13 @@ namespace rkit
 	}
 
 	template<class TChar, CharacterEncoding TEncoding>
-	class BaseStringSliceView
+	struct BaseStringSliceViewComparer
+	{
+		static Ordering Compare(const BaseStringSliceView<TChar, TEncoding> &a, const BaseStringSliceView<TChar, TEncoding> &b);
+	};
+
+	template<class TChar, CharacterEncoding TEncoding>
+	class BaseStringSliceView : public CompareWithOrderingOperatorsMixin<BaseStringSliceView<TChar, TEncoding>, BaseStringSliceViewComparer<TChar, TEncoding>>
 	{
 	public:
 		BaseStringSliceView();
@@ -38,10 +46,7 @@ namespace rkit
 
 		Span<const TChar> ToSpan() const;
 
-		SpanIterator<TChar> begin();
 		SpanIterator<const TChar> begin() const;
-
-		SpanIterator<TChar> end();
 		SpanIterator<const TChar> end() const;
 
 		const TChar *GetChars() const;
@@ -61,15 +66,6 @@ namespace rkit
 		bool Equals(const BaseStringSliceView<TChar, TEncoding> &other, const TComparer &comparer) const;
 		bool Equals(const BaseStringSliceView<TChar, TEncoding> &other) const;
 		bool EqualsNoCase(const BaseStringSliceView<TChar, TEncoding> &other) const;
-
-		bool operator==(const BaseStringSliceView<TChar, TEncoding> &other) const;
-		bool operator!=(const BaseStringSliceView<TChar, TEncoding> &other) const;
-
-		bool operator<(const BaseStringSliceView<TChar, TEncoding> &other) const;
-		bool operator<=(const BaseStringSliceView<TChar, TEncoding> &other) const;
-
-		bool operator>(const BaseStringSliceView<TChar, TEncoding> &other) const;
-		bool operator>=(const BaseStringSliceView<TChar, TEncoding> &other) const;
 
 		Ordering Compare(const BaseStringSliceView<TChar, TEncoding> &other) const;
 
@@ -97,6 +93,12 @@ namespace rkit
 #include "CharacterEncodingValidator.h"
 #include "Hasher.h"
 #include "StringUtil.h"
+
+template<class TChar, rkit::CharacterEncoding TEncoding>
+rkit::Ordering rkit::BaseStringSliceViewComparer<TChar, TEncoding>::Compare(const BaseStringSliceView<TChar, TEncoding> &a, const BaseStringSliceView<TChar, TEncoding> &b)
+{
+	return CharCompare<TChar, TEncoding>::Compare(a.ToSpan(), b.ToSpan());
+}
 
 template<class TChar, rkit::CharacterEncoding TEncoding>
 rkit::BaseStringSliceView<TChar, TEncoding>::BaseStringSliceView()
@@ -171,23 +173,10 @@ rkit::Span<const TChar> rkit::BaseStringSliceView<TChar, TEncoding>::ToSpan() co
 	return m_span;
 }
 
-
-template<class TChar, rkit::CharacterEncoding TEncoding>
-rkit::SpanIterator<TChar> rkit::BaseStringSliceView<TChar, TEncoding>::begin()
-{
-	return ToSpan().begin();
-}
-
 template<class TChar, rkit::CharacterEncoding TEncoding>
 rkit::SpanIterator<const TChar> rkit::BaseStringSliceView<TChar, TEncoding>::begin() const
 {
 	return ToSpan().begin();
-}
-
-template<class TChar, rkit::CharacterEncoding TEncoding>
-rkit::SpanIterator<TChar> rkit::BaseStringSliceView<TChar, TEncoding>::end()
-{
-	return ToSpan().end();
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding>
@@ -303,65 +292,6 @@ template<class TChar, rkit::CharacterEncoding TEncoding>
 bool rkit::BaseStringSliceView<TChar, TEncoding>::EqualsNoCase(const BaseStringSliceView<TChar, TEncoding> &other) const
 {
 	return EndsWith(other, CharCaseInsensitiveComparer<TChar, InvariantCharCaseAdjuster<TChar>>());
-}
-
-template<class TChar, rkit::CharacterEncoding TEncoding>
-bool rkit::BaseStringSliceView<TChar, TEncoding>::operator==(const BaseStringSliceView<TChar, TEncoding> &other) const
-{
-	if (m_span.Count() != other.m_span.Count())
-		return false;
-
-	const size_t length = m_span.Count();
-	const TChar *charsA = m_span.Ptr();
-	const TChar *charsB = other.m_span.Ptr();
-
-	for (size_t i = 0; i < length; i++)
-	{
-		if (charsA[i] != charsB[i])
-			return false;
-	}
-
-	return true;
-}
-
-template<class TChar, rkit::CharacterEncoding TEncoding>
-bool rkit::BaseStringSliceView<TChar, TEncoding>::operator!=(const BaseStringSliceView<TChar, TEncoding> &other) const
-{
-	return !((*this) == other);
-}
-
-template<class TChar, rkit::CharacterEncoding TEncoding>
-bool rkit::BaseStringSliceView<TChar, TEncoding>::operator<(const BaseStringSliceView<TChar, TEncoding> &other) const
-{
-	const size_t length = rkit::Min(m_span.Count(), other.m_span.Count());
-	const TChar *charsA = m_span.Ptr();
-	const TChar *charsB = other.m_span.Ptr();
-
-	for (size_t i = 0; i < length; i++)
-	{
-		if (charsA[i] != charsB[i])
-			return charsA[i] < charsB[i];
-	}
-
-	return m_span.Count() < other.m_span.Count();
-}
-
-template<class TChar, rkit::CharacterEncoding TEncoding>
-bool rkit::BaseStringSliceView<TChar, TEncoding>::operator<=(const BaseStringSliceView<TChar, TEncoding> &other) const
-{
-	return !((*this) > other);
-}
-
-template<class TChar, rkit::CharacterEncoding TEncoding>
-bool rkit::BaseStringSliceView<TChar, TEncoding>::operator>(const BaseStringSliceView<TChar, TEncoding> &other) const
-{
-	return other < (*this);
-}
-
-template<class TChar, rkit::CharacterEncoding TEncoding>
-bool rkit::BaseStringSliceView<TChar, TEncoding>::operator>=(const BaseStringSliceView<TChar, TEncoding> &other) const
-{
-	return !((*this) < other);
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding>
