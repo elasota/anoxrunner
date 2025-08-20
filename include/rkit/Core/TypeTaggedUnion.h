@@ -184,8 +184,8 @@ namespace rkit { namespace priv {
 	{
 		if (typeIndex == 0)
 			return pred(a.m_value, b.m_value);
-
-		return TypeTaggedUnionOperator<TMoreTypes...>::Compare(typeIndex - 1, a.m_moreValues, b.m_moreValues, pred);
+		else
+			return TypeTaggedUnionOperator<TMoreTypes...>::Compare(typeIndex - 1, a.m_moreValues, b.m_moreValues, pred);
 	}
 
 	template<class TFirstType, class... TMoreTypes>
@@ -193,8 +193,8 @@ namespace rkit { namespace priv {
 	{
 		if (typeIndex == 0)
 			u.m_value.~TFirstType();
-
-		return TypeTaggedUnionOperator<TMoreTypes...>::Destruct(typeIndex - 1, u.m_moreValues);
+		else
+			TypeTaggedUnionOperator<TMoreTypes...>::Destruct(typeIndex - 1, u.m_moreValues);
 	}
 
 	template<class TFirstType, class... TMoreTypes>
@@ -202,8 +202,8 @@ namespace rkit { namespace priv {
 	{
 		if (typeIndex == 0)
 			a.m_value = std::move(b.m_value);
-
-		TypeTaggedUnionOperator<TMoreTypes...>::MoveAssign(typeIndex - 1, a.m_moreValues, std::move(b.m_moreValues));
+		else
+			TypeTaggedUnionOperator<TMoreTypes...>::MoveAssign(typeIndex - 1, a.m_moreValues, std::move(b.m_moreValues));
 	}
 
 	template<class TFirstType, class... TMoreTypes>
@@ -211,8 +211,8 @@ namespace rkit { namespace priv {
 	{
 		if (typeIndex == 0)
 			new (&a.m_value) TFirstType(std::move(b.m_value));
-
-		TypeTaggedUnionOperator<TMoreTypes...>::MoveConstruct(typeIndex - 1, a.m_moreValues, std::move(b.m_moreValues));
+		else
+			TypeTaggedUnionOperator<TMoreTypes...>::MoveConstruct(typeIndex - 1, a.m_moreValues, std::move(b.m_moreValues));
 	}
 } }
 
@@ -290,6 +290,7 @@ namespace rkit
 		: m_type(static_cast<TEnum>(0))
 		, m_value()
 	{
+		(*this) = std::move(other);
 	}
 
 	template<class TEnum, class... TTypes>
@@ -306,6 +307,16 @@ namespace rkit
 		, m_value()
 	{
 		(*this) = other;
+	}
+
+
+	template<class TEnum, class... TTypes>
+	template<class TOther>
+	TypeTaggedUnion<TEnum, TTypes...>::TypeTaggedUnion(TOther &&other)
+		: m_type(static_cast<TEnum>(0))
+		, m_value()
+	{
+		(*this) = std::move(other);
 	}
 
 	template<class TEnum, class... TTypes>
@@ -343,7 +354,7 @@ namespace rkit
 	TypeTaggedUnion<TEnum, TTypes...> &TypeTaggedUnion<TEnum, TTypes...>::operator=(TypeTaggedUnion &&other)
 	{
 		if (m_type == other.m_type)
-			priv::TypeTaggedUnionOperator<TTypes...>::MoveAssign(static_cast<size_t>(m_type), *this, std::move(other));
+			priv::TypeTaggedUnionOperator<TTypes...>::MoveAssign(static_cast<size_t>(m_type), m_value, std::move(other.m_value));
 		else
 		{
 			// Have to move-construct in case the source is currently contained by this value
@@ -351,11 +362,11 @@ namespace rkit
 			temp.DestructUnion();
 
 			temp.m_type = other.m_type;
-			priv::TypeTaggedUnionContainer<TTypes...>::MoveConstruct(static_cast<size_t>(temp.m_type), temp.m_value, std::move(other));
+			priv::TypeTaggedUnionOperator<TTypes...>::MoveConstruct(static_cast<size_t>(temp.m_type), temp.m_value, std::move(other.m_value));
 
 			DestructUnion();
 			m_type = other.m_type;
-			priv::TypeTaggedUnionContainer<TTypes...>::MoveConstruct(static_cast<size_t>(m_type), m_value, std::move(temp));
+			priv::TypeTaggedUnionOperator<TTypes...>::MoveConstruct(static_cast<size_t>(m_type), m_value, std::move(temp.m_value));
 		}
 
 		return *this;

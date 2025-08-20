@@ -30,6 +30,13 @@ namespace anox { namespace priv {
 		template<class TPred>
 		static bool CompareWithPred(const ConfigBuilderKeyValueTable &a, const ConfigBuilderKeyValueTable &b, const TPred &pred);
 	};
+
+	template<class TSrc, class TDest>
+	struct ConfigReadWriteConverter
+	{
+		static IConfigurationValueView Read(const void *value);
+		static rkit::Result Write(void *value, const IConfigurationValueView &src);
+	};
 } }
 
 namespace anox
@@ -99,29 +106,108 @@ namespace anox
 		IConfigurationValueView GetRoot() const override;
 
 	private:
-		static IConfigurationValueView CreateViewOfValue(const ConfigBuilderValue_t &value);
-		static ConfigurationValueType GetTypeCB(const IConfigurationValueView &view);
-		static uint64_t GetUInt64CB(const IConfigurationValueView &view);
-		static int64_t GetInt64CB(const IConfigurationValueView &view);
-		static double GetFloat64CB(const IConfigurationValueView &view);
-		static rkit::StringView GetStringCB(const IConfigurationValueView &view);
-		static rkit::CallbackSpan<IConfigurationValueView, const void *> GetArrayCB(const IConfigurationValueView &view);
-
-		static IConfigurationValueView GetArrayElementCB(void const* const& userdata, size_t index);
-
-		static rkit::Optional<IConfigurationValueView> GetValueFromKeyCB(const IConfigurationValueView &view, const IConfigurationValueView &key);
-		static rkit::CallbackSpan<IConfigurationKeyValuePair, const void *> GetKeyValuePairsCB(const IConfigurationValueView &view);
-		static rkit::CallbackSpan<IConfigurationValueView, const void *> GetKeysCB(const IConfigurationValueView &view);
-
-		static IConfigurationKeyValuePair GetKeyValueTableKeyValuePairCB(void const *const &userdata, size_t index);
-		static IConfigurationValueView GetKeyValueTableKeyCB(void const *const &userdata, size_t index);
-
 		ConfigBuilderValue_t m_root;
+	};
 
-		static IConfigurationKeyValueTableFuncs ms_keyValueTableFuncs;
+	template<class T>
+	struct ConfigValueReadWrite
+	{
+	};
+
+	template<>
+	struct ConfigValueReadWrite<rkit::String>
+	{
+		static IConfigurationValueView Read(const rkit::String &value);
+		static rkit::Result Write(rkit::String &value, const IConfigurationValueView &src);
+	};
+
+	template<>
+	struct ConfigValueReadWrite<ConfigBuilderValue_t>
+	{
+		static IConfigurationValueView Read(const ConfigBuilderValue_t &value);
+		static rkit::Result Write(ConfigBuilderValue_t &value, const IConfigurationValueView &src);
+	};
+
+	class ConfigValueReadWriteParam
+	{
+	public:
+		typedef IConfigurationValueView (*ReadFunc_t)(const void *value);
+		typedef rkit::Result (*WriteFunc_t)(void *value, const IConfigurationValueView &src);
+
+		template<class T>
+		ConfigValueReadWriteParam(T &ref);
+
+		IConfigurationValueView Read() const;
+		rkit::Result Write(const IConfigurationValueView &value) const;
+
+	private:
+		ConfigValueReadWriteParam() = delete;
+		ConfigValueReadWriteParam(const ConfigValueReadWriteParam &) = delete;
+
+		template<class T>
+		static IConfigurationValueView AutoReadCB(const void *value);
+
+		template<class T>
+		static rkit::Result AutoWriteCB(void *value, const IConfigurationValueView &src);
+
+		void *m_value;
+		ReadFunc_t m_readFunc;
+		WriteFunc_t m_writeFunc;
+	};
+
+	struct IConfigKeyValueTableSerializer
+	{
+		virtual rkit::Result SerializeField(const rkit::StringSliceView &key, const ConfigValueReadWriteParam &value) = 0;
+	};
+
+	class ConfigBuilderKeyValueTableWriter final : public IConfigKeyValueTableSerializer
+	{
+	public:
+		explicit ConfigBuilderKeyValueTableWriter(ConfigBuilderKeyValueTable &keyValueTable);
+
+		rkit::Result SerializeField(const rkit::StringSliceView &key, const ConfigValueReadWriteParam &value) override;
+
+	private:
+		ConfigBuilderKeyValueTableWriter() = delete;
+
+		ConfigBuilderKeyValueTable &m_keyValueTable;
 	};
 }
 
 namespace anox
 {
+	inline ConfigBuilderKeyValueTableWriter::ConfigBuilderKeyValueTableWriter(ConfigBuilderKeyValueTable &keyValueTable)
+		: m_keyValueTable(keyValueTable)
+	{
+	}
+
+	template<class T>
+	ConfigValueReadWriteParam::ConfigValueReadWriteParam(T &ref)
+		: m_value(&ref)
+		, m_readFunc(AutoReadCB<T>)
+		, m_writeFunc(AutoWriteCB<T>)
+	{
+	}
+
+	inline IConfigurationValueView ConfigValueReadWriteParam::Read() const
+	{
+		return m_readFunc(m_value);
+	}
+
+	inline rkit::Result ConfigValueReadWriteParam::Write(const IConfigurationValueView &value) const
+	{
+		return m_writeFunc(m_value, value);
+	}
+
+	template<class T>
+	IConfigurationValueView ConfigValueReadWriteParam::AutoReadCB(const void *value)
+	{
+		return ConfigValueReadWrite<T>::Read(*static_cast<const T *>(value));
+	}
+
+	template<class T>
+	static rkit::Result ConfigValueReadWriteParam::AutoWriteCB(void *value, const IConfigurationValueView &src)
+	{
+		return ConfigValueReadWrite<T>::Write(*static_cast<T *>(value), src);
+	}
 }

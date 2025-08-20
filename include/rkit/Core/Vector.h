@@ -6,6 +6,22 @@
 #include <cstddef>
 #include <limits>
 
+namespace rkit { namespace priv {
+	template<class T>
+	struct VectorItemCopier
+	{
+		static void Construct(T *dest, const T &src);
+		static void Assign(T *dest, const T &src);
+	};
+
+	template<class T>
+	struct VectorItemMover
+	{
+		static void Construct(T *dest, T &src);
+		static void Assign(T *dest, T &src);
+	};
+} }
+
 namespace rkit
 {
 	struct IMallocDriver;
@@ -32,6 +48,11 @@ namespace rkit
 		Result Resize(size_t size);
 		Result Reserve(size_t size);
 		void ShrinkToSize(size_t size);
+
+		Result InsertAt(size_t index, const T &item);
+		Result InsertAt(size_t index, T &&item);
+		Result InsertAt(size_t index, const Span<const T> &items);
+		Result InsertAtMove(size_t index, const Span<T> &items);
 
 		Result Append(const T &item);
 		Result Append(T &&item);
@@ -65,6 +86,9 @@ namespace rkit
 		Vector(const Vector &) = delete;
 		Vector &operator=(const Vector &) = delete;
 
+		template<class TBehavior, class TSrcItem>
+		Result InsertWithBehavior(size_t index, const Span<TSrcItem> &items);
+
 		Result Reallocate(size_t newCapacity);
 		Result EnsureCapacityForOneMore();
 		Result EnsureCapacityForMore(size_t extra);
@@ -83,6 +107,33 @@ namespace rkit
 
 #include <new>
 #include <utility>
+
+namespace rkit { namespace priv {
+
+	template<class T>
+	void VectorItemCopier<T>::Construct(T *dest, const T &src)
+	{
+		new (dest) T(src);
+	}
+
+	template<class T>
+	void VectorItemCopier<T>::Assign(T *dest, const T &src)
+	{
+		(*dest) = src;
+	}
+
+	template<class T>
+	void VectorItemMover<T>::Construct(T *dest, T &src)
+	{
+		new (dest) T(std::move(src));
+	}
+
+	template<class T>
+	void VectorItemMover<T>::Assign(T *dest, T &src)
+	{
+		(*dest) = std::move(src);
+	}
+} }
 
 namespace rkit
 {
@@ -199,59 +250,122 @@ namespace rkit
 		}
 	}
 
+	template<class T>
+	Result Vector<T>::InsertAt(size_t index, const T &item)
+	{
+		return InsertAt(index, Span<const T>(&item, 1));
+	}
+
+	template<class T>
+	Result Vector<T>::InsertAt(size_t index, T &&item)
+	{
+		return InsertAtMove(index, Span<T>(&item, 1));
+	}
+
+	template<class T>
+	Result Vector<T>::InsertAt(size_t index, const Span<const T> &items)
+	{
+		return InsertWithBehavior<priv::VectorItemCopier<T>>(index, items);
+	}
+
+	template<class T>
+	Result Vector<T>::InsertAtMove(size_t index, const Span<T> &items)
+	{
+		return InsertWithBehavior<priv::VectorItemMover<T>>(index, items);
+	}
 
 	template<class T>
 	Result Vector<T>::Append(const T &item)
 	{
-		RKIT_CHECK(EnsureCapacityForOneMore());
+		return InsertAt(m_count, item);
+	}
 
-		new (m_arr + m_count) T(item);
-		m_count++;
-
-		return ResultCode::kOK;
+	template<class T>
+	Result Vector<T>::Append(T &&item)
+	{
+		return InsertAt(m_count, std::move(item));
 	}
 
 	template<class T>
 	Result Vector<T>::Append(const Span<const T> &items)
 	{
-		RKIT_CHECK(EnsureCapacityForMore(items.Count()));
-
-		T *arr = m_arr;
-		const T *itemsPtr = items.Ptr();
-		const size_t count = items.Count();
-		const size_t initialCount = m_count;
-		for (size_t i = 0; i < count; i++)
-			new (arr + initialCount + i) T(itemsPtr[i]);
-
-		m_count = initialCount + count;
-		return ResultCode::kOK;
+		return InsertAt(m_count, items);
 	}
 
 	template<class T>
 	Result Vector<T>::AppendMove(const Span<T> &items)
 	{
-		RKIT_CHECK(EnsureCapacityForMore(items.Count()));
-
-		T *arr = m_arr;
-		T *itemsPtr = items.Ptr();
-		const size_t count = items.Count();
-		const size_t initialCount = m_count;
-		for (size_t i = 0; i < count; i++)
-			new (arr + initialCount + i) T(std::move(itemsPtr[i]));
-
-		m_count = initialCount + count;
-		return ResultCode::kOK;
+		return InsertAtMove(m_count, items);
 	}
 
-
 	template<class T>
-	Result Vector<T>::Append(T &&item)
+	template<class TBehavior, class TSrcItem>
+	Result Vector<T>::InsertWithBehavior(size_t index, const Span<TSrcItem> &items)
 	{
-		RKIT_CHECK(EnsureCapacityForOneMore());
+		RKIT_ASSERT(index <= m_count);
 
-		new (m_arr + m_count) T(std::move(item));
-		m_count++;
+		T *oldArr = m_arr;
+		const size_t oldCount = m_count;
 
+		TSrcItem *itemsPtr = items.Ptr();
+		const size_t itemsCount = items.Count();
+
+		if (oldCount > 0 && itemsPtr >= oldArr && itemsPtr < (oldArr + oldCount))
+		{
+			// Inserting existing items
+			size_t srcIndex = itemsPtr - oldArr;
+			RKIT_CHECK(EnsureCapacityForMore(itemsCount));
+
+			itemsPtr = m_arr + srcIndex;
+
+			if (srcIndex >= index)
+				itemsPtr += itemsCount;
+		}
+		else
+		{
+			RKIT_CHECK(EnsureCapacityForMore(itemsCount));
+		}
+
+		T *newArr = m_arr;
+		const size_t newCount = m_count + itemsCount;
+
+		const size_t relocateCount = oldCount - index;
+		const size_t relocateConstructCount = (itemsCount < relocateCount) ? itemsCount : relocateCount;
+		const size_t relocateConstructStop = newCount - relocateConstructCount;
+		const size_t relocateAssignStop = newCount - relocateCount;
+
+		size_t relocatePos = newCount;
+		while (relocatePos > relocateConstructStop)
+		{
+			relocatePos--;
+			new (newArr + relocatePos) T(std::move(newArr[relocatePos - itemsCount]));
+		}
+		while (relocatePos > relocateAssignStop)
+		{
+			relocatePos--;
+			newArr[relocatePos] = std::move(newArr[relocatePos - itemsCount]);
+		}
+
+		size_t assignCount = oldCount - index;
+		size_t constructCount = 0;
+
+		if (assignCount > itemsCount)
+			assignCount = itemsCount;
+
+		size_t i = 0;
+		while (i < assignCount)
+		{
+			TBehavior::Assign(&newArr[index + i], itemsPtr[i]);
+			i++;
+		}
+
+		while (i < itemsCount)
+		{
+			TBehavior::Construct(&newArr[index + i], itemsPtr[i]);
+			i++;
+		}
+
+		m_count = newCount;
 		return ResultCode::kOK;
 	}
 
@@ -352,7 +466,7 @@ namespace rkit
 		if (countToAdd > maxCountToAdd)
 			countToAdd = maxCountToAdd;
 
-		if (countToAdd < 8)
+		if (countToAdd < kInitialAllocSize)
 			return ResultCode::kOutOfMemory;
 
 		return Reallocate(m_capacity + countToAdd);
@@ -363,6 +477,9 @@ namespace rkit
 	{
 		if (m_capacity - m_count >= extra)
 			return ResultCode::kOK;
+
+		if (extra == 1)
+			return EnsureCapacityForOneMore();
 
 		constexpr size_t kMaxCount = std::numeric_limits<size_t>::max() / sizeof(T);
 		const size_t kInitialAllocSize = 8;

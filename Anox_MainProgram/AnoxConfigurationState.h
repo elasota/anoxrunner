@@ -40,7 +40,7 @@ namespace anox
 		uint64_t (*m_getUInt64)(const IConfigurationValueView &view);
 		int64_t (*m_getInt64)(const IConfigurationValueView &view);
 		double (*m_getFloat64)(const IConfigurationValueView &view);
-		rkit::StringView (*m_getString)(const IConfigurationValueView &view);
+		rkit::StringSliceView (*m_getString)(const IConfigurationValueView &view);
 		rkit::CallbackSpan<IConfigurationValueView, const void*> (*m_getArray)(const IConfigurationValueView &view);
 		const IConfigurationKeyValueTableFuncs *m_keyValueTableFuncs;
 	};

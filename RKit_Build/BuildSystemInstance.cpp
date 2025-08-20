@@ -241,8 +241,8 @@ rkit::HashValue_t rkit::buildsystem::DirectoryScanKey::ComputeHash(HashValue_t b
 
 rkit::buildsystem::NodeKey::NodeKey(const NodeTypeKey &nodeTypeKey, BuildFileLocation inputLocation, const StringView &identifier)
 	: m_typeKey(nodeTypeKey)
-	, m_identifier(identifier)
 	, m_inputLocation(inputLocation)
+	, m_identifier(identifier)
 {
 }
 
@@ -448,7 +448,7 @@ namespace rkit { namespace buildsystem
 
 			void MarkOutputFileFinished(size_t productIndex, BuildFileLocation location, const CIPathView &path);
 
-			Result CheckFault() const;
+			Result CheckFault() const override;
 
 		private:
 			Result CheckedMarkOutputFileFinished(size_t productIndex, BuildFileLocation location, const CIPathView &path);
@@ -701,8 +701,8 @@ namespace rkit { namespace buildsystem
 
 	DependencyNode::DependencyNode(IDependencyNodeCompiler *compiler, uint32_t nodeNamespace, uint32_t nodeType, Vector<uint8_t> &&content, BuildFileLocation inputLocation)
 		: m_compiler(compiler)
-		, m_inputLocation(inputLocation)
 		, m_nodeType(nodeType)
+		, m_inputLocation(inputLocation)
 		, m_nodeNamespace(nodeNamespace)
 		, m_dependencyState(DependencyState::NotAnalyzedOrCompiled)
 		, m_checkNodeIndex(0)
