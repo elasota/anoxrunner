@@ -195,6 +195,8 @@ namespace anox
 			rkit::UniquePtr<IConfigurationState> newGameConfig;
 			CORO_CHECK(self->m_gameLogic->CreateNewGame(newGameConfig, params.mapName));
 			CORO_CHECK(ICaptureHarness::CreateRealTime(self->m_captureHarness, *self, *self->m_resourceManager, std::move(newGameConfig)));
+
+			CORO_CALL(self->m_gameLogic->AsyncStartSession);
 		CORO_END
 	};
 

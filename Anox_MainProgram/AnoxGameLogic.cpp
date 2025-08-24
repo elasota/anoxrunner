@@ -10,6 +10,7 @@
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/Path.h"
+#include "rkit/Core/String.h"
 #include "rkit/Core/UtilitiesDriver.h"
 
 #include "AnoxCaptureHarness.h"
@@ -65,6 +66,7 @@ namespace anox
 		CORO_DECL_METHOD(ExecCommandFile, AnoxCommandStackBase &commandStack, const rkit::CIPathView &path);
 		CORO_DECL_METHOD(RunCommands, AnoxCommandStackBase &commandStack);
 		CORO_DECL_METHOD(RunCommand, AnoxCommandStackBase &commandStack, const rkit::Span<char> &line);
+		CORO_DECL_METHOD_OVERRIDE(StartSession);
 
 		CORO_DECL_METHOD(Cmd_Exec, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::StringView> &args);
 		CORO_DECL_METHOD(Cmd_Map, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::StringView> &args);
@@ -139,9 +141,9 @@ namespace anox
 		rkit::UniquePtr<IConfigurationState> globalVarsConfig;
 		RKIT_CHECK(globalVars->Save(globalVarsConfig));
 
+		outConfig = std::move(globalVarsConfig);
 
-
-		return rkit::ResultCode::kNotYetImplemented;
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result AnoxGameLogic::SaveGame(rkit::UniquePtr<IConfigurationState> &outConfig)
@@ -558,6 +560,45 @@ namespace anox
 			CORO_AWAIT(locals.resLoadResult);
 
 			params.loadResult = locals.resLoadResult.GetResult();
+		CORO_END
+	};
+
+
+	CORO_DEF_METHOD(AnoxGameLogic, StartSession)
+	{
+		struct Locals
+		{
+			const IConfigurationState *configState = nullptr;
+		};
+
+		struct Params {};
+
+		CORO_BEGIN
+			CORO_CHECK(self->m_game->GetCaptureHarness()->GetConfigurationState(locals.configState));
+
+			IConfigurationValueView root = locals.configState->GetRoot();
+
+			IConfigurationKeyValueTableView kvt;
+			CORO_CHECK(root.Get(kvt));
+
+			IConfigurationValueView mapNameValue;
+			CORO_CHECK(kvt.GetValueFromKey("mapName", mapNameValue));
+
+			rkit::StringSliceView mapName;
+			CORO_CHECK(mapNameValue.Get(mapName));
+
+			for (char c : mapName)
+			{
+				if (c >= 'a' && c <= 'z')
+					continue;
+				if (c >= '0' && c <= '9')
+					continue;
+
+				rkit::log::Error("Invalid map name");
+				CORO_CHECK(rkit::ResultCode::kDataError);
+			}
+
+			//CORO_CALL(ChangeMap(mapName));
 		CORO_END
 	};
 

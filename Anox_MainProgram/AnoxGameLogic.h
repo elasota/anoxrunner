@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rkit/Core/CoreDefs.h"
+#include "rkit/Core/Coroutine.h"
 #include "rkit/Core/StringProto.h"
 
 namespace rkit
@@ -24,6 +25,8 @@ namespace anox
 
 		virtual rkit::Result CreateNewGame(rkit::UniquePtr<IConfigurationState> &outConfig, const rkit::StringSliceView &mapName) = 0;
 		virtual rkit::Result SaveGame(rkit::UniquePtr<IConfigurationState> &outConfig) = 0;
+
+		CORO_DECL_METHOD_ABSTRACT(StartSession);
 
 		static rkit::Result Create(rkit::UniquePtr<IGameLogic> &outGameLoop, IAnoxGame *game);
 	};

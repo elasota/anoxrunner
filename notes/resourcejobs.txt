@@ -1,0 +1,9 @@
+Resource jobs have 3 parts:
+- CreateIOJob: Creates the job that will load the resource
+- RunProcessingTask: Runs any resource processing tasks
+
+
+Signalled jobs:
+All jobs are started when their dependency jobs complete.
+
+Normally, that means that a job must be started by being a dependency of another job.  An alternative is using a "signalled" job which instead creates a "signaller" that can be used to manually complete a placeholder job.  If the signaller is destroyed without being signalled done, then the placeholder job fails instead.

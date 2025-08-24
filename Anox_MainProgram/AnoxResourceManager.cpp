@@ -10,13 +10,13 @@
 #include "rkit/Core/UniquePtr.h"
 #include "rkit/Core/String.h"
 #include "rkit/Core/SystemDriver.h"
-#include "rkit/Core/Future.h"
 #include "rkit/Core/Path.h"
 #include "rkit/Core/Vector.h"
 
 #include "rkit/Data/ContentID.h"
 
 #include "AnoxFileResource.h"
+#include "AnoxBSPModelResource.h"
 
 #include <algorithm>
 
@@ -115,6 +115,33 @@ namespace anox
 	private:
 		rkit::CIPath m_key;
 		rkit::CIPathView m_keyView;
+	};
+
+	class AnoxFireSignalJobRunner final : public rkit::IJobRunner
+	{
+	public:
+		AnoxFireSignalJobRunner(const rkit::RCPtr<rkit::JobSignaller> &doneSignaller);
+
+		rkit::Result Run() override;
+
+	private:
+		rkit::RCPtr<rkit::JobSignaller> m_doneSignaller;
+	};
+
+	class AnoxAnalysisJobRunner final : public rkit::IJobRunner
+	{
+	public:
+		AnoxAnalysisJobRunner(const rkit::RCPtr<AnoxResourceLoaderFactoryBase> &factory, AnoxResourceBase *resource,
+			const void *keyPtr, rkit::IJobQueue *jobQueue, const rkit::RCPtr<rkit::JobSignaller> &analysisDoneSignaller);
+
+		rkit::Result Run() override;
+
+	private:
+		rkit::RCPtr<AnoxResourceLoaderFactoryBase> m_factory;
+		AnoxResourceBase *m_resource;
+		rkit::IJobQueue *m_jobQueue;
+		rkit::RCPtr<rkit::JobSignaller> m_doneSignaller;
+		const void *m_keyPtr;
 	};
 
 	class AnoxProcessJobRunner final : public rkit::IJobRunner
@@ -346,6 +373,49 @@ namespace anox
 		return AnoxResourceKeyType::kCIPath;
 	}
 
+	AnoxFireSignalJobRunner::AnoxFireSignalJobRunner(const rkit::RCPtr<rkit::JobSignaller> &doneSignaller)
+		: m_doneSignaller(doneSignaller)
+	{
+	}
+
+	rkit::Result AnoxFireSignalJobRunner::Run()
+	{
+		m_doneSignaller->SignalDone(rkit::ResultCode::kOK);
+		return rkit::ResultCode::kOK;
+	}
+
+	AnoxAnalysisJobRunner::AnoxAnalysisJobRunner(const rkit::RCPtr<AnoxResourceLoaderFactoryBase> &factory, AnoxResourceBase *resource,
+		const void *keyPtr, rkit::IJobQueue *jobQueue, const rkit::RCPtr<rkit::JobSignaller> &doneSignaller)
+		: m_factory(factory)
+		, m_resource(resource)
+		, m_keyPtr(keyPtr)
+		, m_doneSignaller(doneSignaller)
+		, m_jobQueue(jobQueue)
+	{
+	}
+
+	rkit::Result AnoxAnalysisJobRunner::Run()
+	{
+		rkit::RCPtr<rkit::Job> preprocessJob;
+		rkit::Result result = m_factory->BaseRunAnalysisTask(*m_resource, m_keyPtr, preprocessJob);
+
+		if (rkit::utils::ResultIsOK(result) && preprocessJob.IsValid())
+		{
+			rkit::RCPtr<rkit::Job> signalDoneAfterPreprocessJob;
+
+			rkit::UniquePtr<rkit::IJobRunner> fireSignalRunner;
+			RKIT_CHECK(rkit::New<AnoxFireSignalJobRunner>(fireSignalRunner, m_doneSignaller));
+
+			RKIT_CHECK(m_jobQueue->CreateJob(&signalDoneAfterPreprocessJob, rkit::JobType::kNormalPriority, std::move(fireSignalRunner), preprocessJob));
+		}
+		else
+		{
+			m_doneSignaller->SignalDone(result);
+		}
+
+		return rkit::ResultCode::kOK;
+	}
+
 	AnoxProcessJobRunner::AnoxProcessJobRunner(const rkit::RCPtr<AnoxResourceLoaderFactoryBase> &factory, AnoxResourceBase *resource,
 		const rkit::RCPtr<IAnoxResourceLoadCompletionNotifier> &loadCompleter, const void *keyPtr)
 		: m_factory(factory)
@@ -423,10 +493,19 @@ namespace anox
 
 		RKIT_CHECK(m_sync->Init());
 
-		rkit::RCPtr<AnoxFileResourceLoaderBase> fileLoader;
-		RKIT_CHECK(AnoxFileResourceLoaderBase::Create(fileLoader));
+		{
+			rkit::RCPtr<AnoxFileResourceLoaderBase> fileLoader;
+			RKIT_CHECK(AnoxFileResourceLoaderBase::Create(fileLoader));
 
-		RKIT_CHECK(RegisterCIPathKeyedLoaderFactory(resloaders::kRawFileResourceTypeCode, std::move(fileLoader)));
+			RKIT_CHECK(RegisterCIPathKeyedLoaderFactory(resloaders::kRawFileResourceTypeCode, std::move(fileLoader)));
+		}
+
+		{
+			rkit::RCPtr<AnoxBSPModelResourceLoaderBase> bspLoader;
+			RKIT_CHECK(AnoxBSPModelResourceLoaderBase::Create(bspLoader));
+
+			RKIT_CHECK(RegisterCIPathKeyedLoaderFactory(resloaders::kBSPModelResourceTypeCode, std::move(bspLoader)));
+		}
 
 		return rkit::ResultCode::kOK;
 	}
@@ -589,14 +668,34 @@ namespace anox
 
 		RKIT_CHECK(factory->BaseCreateIOJob(resourceRCPtr, *m_fileSystem, keyPtr, ioJob));
 
+		rkit::RCPtr<rkit::Job> analysisDoneJob;
+
 		{
-			rkit::Span<rkit::RCPtr<rkit::Job>> processJobDepSpan;
+			rkit::RCPtr<rkit::JobSignaller> analysisDoneSignaller;
+
+			RKIT_CHECK(m_jobQueue->CreateSignalledJob(analysisDoneSignaller, analysisDoneJob));
+
+			rkit::ConstSpan<rkit::RCPtr<rkit::Job>> analysisJobDepSpan;
 			if (ioJob.IsValid())
+				analysisJobDepSpan = rkit::Span<rkit::RCPtr<rkit::Job>>(&ioJob, 1);
+
+			rkit::UniquePtr<rkit::IJobRunner> analysisJobRunner;
+			RKIT_CHECK(rkit::New<AnoxAnalysisJobRunner>(analysisJobRunner, factory, resource, keyPtr, m_jobQueue, analysisDoneSignaller));
+			RKIT_CHECK(m_jobQueue->CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(analysisJobRunner), analysisJobDepSpan));
+		}
+
+		{
+			// If the analysis job exists, then it will wait for the IO job, otherwise
+			// the process job waits for it
+			rkit::ConstSpan<rkit::RCPtr<rkit::Job>> processJobDepSpan;
+			if (analysisDoneJob.IsValid())
+				processJobDepSpan = rkit::Span<rkit::RCPtr<rkit::Job>>(&analysisDoneJob, 1);
+			else if (ioJob.IsValid())
 				processJobDepSpan = rkit::Span<rkit::RCPtr<rkit::Job>>(&ioJob, 1);
 
 			rkit::UniquePtr<rkit::IJobRunner> processJobRunner;
 			RKIT_CHECK(rkit::New<AnoxProcessJobRunner>(processJobRunner, factory, resource, loadCompleter, keyPtr));
-			RKIT_CHECK(m_jobQueue->CreateJob(outJob, rkit::JobType::kNormalPriority, std::move(processJobRunner), processJobDepSpan.ToValueISpan()));
+			RKIT_CHECK(m_jobQueue->CreateJob(outJob, rkit::JobType::kNormalPriority, std::move(processJobRunner), processJobDepSpan));
 		}
 
 		loadFuture = rkit::Future<AnoxResourceRetrieveResult>(std::move(pendingFutureContainer));

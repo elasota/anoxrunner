@@ -13,8 +13,9 @@
 
 namespace anox
 {
-	// Open -> Post IO Job       IO Complete
-	//             ^-----> IO Request --^
+	// Job chart:
+	// Open -> Post IO Job         (Signaller) -> IO Complete
+	//             `-----> IO Request --^
 	class AnoxFileResourcePostIOLoadJobRunner;
 
 	class AnoxFileResource : public AnoxFileResourceBase
@@ -182,11 +183,7 @@ namespace anox
 
 		RKIT_CHECK(jobQueue.CreateJob(&postIOJob, rkit::JobType::kIO, std::move(postIOJobRunner), openJob));
 
-		rkit::StaticArray<rkit::Job *, 2> completeDeps;
-		completeDeps[0] = postIOJob.Get();
-		completeDeps[1] = ioRequestJob.Get();
-
-		RKIT_CHECK(jobQueue.CreateJob(&outJob, rkit::JobType::kNormalPriority, rkit::UniquePtr<rkit::IJobRunner>(), completeDeps.ToSpan()));
+		RKIT_CHECK(jobQueue.CreateJob(&outJob, rkit::JobType::kNormalPriority, rkit::UniquePtr<rkit::IJobRunner>(), ioRequestJob));
 
 		return rkit::ResultCode::kOK;
 	}

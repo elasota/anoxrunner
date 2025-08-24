@@ -1,5 +1,7 @@
 #include "AnoxCaptureHarness.h"
 
+#include "AnoxConfigurationState.h"
+
 #include "anox/AnoxGame.h"
 
 #include "rkit/Core/Future.h"
@@ -16,13 +18,12 @@ namespace anox
 	class AnoxRealTimeCaptureHarness final : public ICaptureHarness
 	{
 	public:
-		AnoxRealTimeCaptureHarness(IAnoxGame &game, AnoxResourceManagerBase &resManager);
+		AnoxRealTimeCaptureHarness(IAnoxGame &game, AnoxResourceManagerBase &resManager, rkit::UniquePtr<IConfigurationState> &&initialConfiguration);
 
 		rkit::Result Initialize();
 
-
-		rkit::Result GetConfigurationState(const IConfigurationState **outConfigStatePtr) override;
-		rkit::Result GetSessionState(const IConfigurationState **outConfigStatePtr) override;
+		rkit::Result GetConfigurationState(const IConfigurationState *&outConfigStatePtr) override;
+		rkit::Result GetSessionState(const IConfigurationState *&outConfigStatePtr) override;
 
 		rkit::Result GetContentIDKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::data::ContentID &cid) override;
 		rkit::Result GetCIPathKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::CIPathView &path) override;
@@ -33,11 +34,13 @@ namespace anox
 	private:
 		IAnoxGame &m_game;
 		AnoxResourceManagerBase &m_resManager;
+		rkit::UniquePtr<IConfigurationState> m_initialConfiguration;
 	};
 
-	AnoxRealTimeCaptureHarness::AnoxRealTimeCaptureHarness(IAnoxGame &game, AnoxResourceManagerBase &resManager)
+	AnoxRealTimeCaptureHarness::AnoxRealTimeCaptureHarness(IAnoxGame &game, AnoxResourceManagerBase &resManager, rkit::UniquePtr<IConfigurationState> &&initialConfiguration)
 		: m_game(game)
 		, m_resManager(resManager)
+		, m_initialConfiguration(std::move(initialConfiguration))
 	{
 	}
 
@@ -46,12 +49,13 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxRealTimeCaptureHarness::GetConfigurationState(const IConfigurationState **outConfigStatePtr)
+	rkit::Result AnoxRealTimeCaptureHarness::GetConfigurationState(const IConfigurationState *&outConfigStatePtr)
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		outConfigStatePtr = m_initialConfiguration.Get();
+		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxRealTimeCaptureHarness::GetSessionState(const IConfigurationState **outConfigStatePtr)
+	rkit::Result AnoxRealTimeCaptureHarness::GetSessionState(const IConfigurationState *&outConfigStatePtr)
 	{
 		return rkit::ResultCode::kNotYetImplemented;
 	}
@@ -80,7 +84,7 @@ namespace anox
 		AnoxResourceManagerBase &resManager, rkit::UniquePtr<IConfigurationState> &&initialConfiguration)
 	{
 		rkit::UniquePtr<AnoxRealTimeCaptureHarness> harness;
-		RKIT_CHECK(rkit::New<AnoxRealTimeCaptureHarness>(harness, game, resManager));
+		RKIT_CHECK(rkit::New<AnoxRealTimeCaptureHarness>(harness, game, resManager, std::move(initialConfiguration)));
 
 		RKIT_CHECK(harness->Initialize());
 

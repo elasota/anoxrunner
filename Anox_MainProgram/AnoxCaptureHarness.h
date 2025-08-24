@@ -31,8 +31,8 @@ namespace anox
 	{
 		virtual ~ICaptureHarness() {}
 
-		virtual rkit::Result GetConfigurationState(const IConfigurationState **outConfigStatePtr) = 0;
-		virtual rkit::Result GetSessionState(const IConfigurationState **outConfigStatePtr) = 0;
+		virtual rkit::Result GetConfigurationState(const IConfigurationState *&outConfigStatePtr) = 0;
+		virtual rkit::Result GetSessionState(const IConfigurationState *&outConfigStatePtr) = 0;
 
 		virtual rkit::Result GetContentIDKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::data::ContentID &cid) = 0;
 		virtual rkit::Result GetCIPathKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::CIPathView &path) = 0;
