@@ -111,6 +111,9 @@ namespace rkit
 		template<class TOther>
 		RCPtr<TOther> ConstCast() const;
 
+		template<class TField>
+		RCPtr<TField> FieldRef(TField T::* fieldRef) const;
+
 	private:
 		T *m_object;
 		RefCountedTracker *m_tracker;
@@ -433,6 +436,16 @@ namespace rkit
 	RCPtr<TOther> RCPtr<T>::ConstCast() const
 	{
 		return RCPtr<TOther>(const_cast<TOther *>(m_object), m_tracker);
+	}
+
+	template<class T>
+	template<class TField>
+	RCPtr<TField> RCPtr<T>::FieldRef(TField T:: *fieldRef) const
+	{
+		RKIT_ASSERT(m_object != nullptr);
+		TField *field = &(m_object->*fieldRef);
+
+		return RCPtr<TField>(field, m_tracker);
 	}
 
 	template<class T>

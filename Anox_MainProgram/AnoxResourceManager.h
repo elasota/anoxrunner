@@ -52,77 +52,45 @@ namespace anox
 		rkit::RCPtr<AnoxResourceBase> m_resourceHandle;
 	};
 
-	struct IAnoxResourceLoadCompletionNotifier
+	struct AnoxResourceLoaderBase : public rkit::RefCounted
 	{
-		virtual void OnLoadCompleted() = 0;
-	};
+		virtual ~AnoxResourceLoaderBase() {}
 
-	struct AnoxResourceLoaderFactoryBase : public rkit::RefCounted
-	{
-		virtual ~AnoxResourceLoaderFactoryBase() {}
-
-		virtual rkit::Result BaseCreateIOJob(const rkit::RCPtr<AnoxResourceBase> &resource, AnoxGameFileSystemBase &fileSystem, const void *keyPtr, rkit::RCPtr<rkit::Job> &outJob) = 0;
-		virtual rkit::Result BaseRunAnalysisTask(AnoxResourceBase &resource, const void *keyPtr, rkit::RCPtr<rkit::Job> &outPreprocessJob) = 0;
-		virtual rkit::Result BaseRunProcessingTask(AnoxResourceBase &resource, const void *keyPtr) = 0;
-		virtual rkit::Result BaseCreateResourceObject(rkit::UniquePtr<AnoxResourceBase> &outResource) = 0;
+		virtual rkit::Result BaseCreateLoadJob(const rkit::RCPtr<AnoxResourceBase> &resource, AnoxGameFileSystemBase &fileSystem, const void *keyPtr, rkit::RCPtr<rkit::Job> &outJob) const = 0;
+		virtual rkit::Result BaseCreateResourceObject(rkit::UniquePtr<AnoxResourceBase> &outResource) const = 0;
 	};
 
 	template<class TKeyType>
-	struct AnoxKeyedResourceLoader : public AnoxResourceLoaderFactoryBase
+	struct AnoxKeyedResourceLoader : public AnoxResourceLoaderBase
 	{
 	public:
-		virtual rkit::Result Base2CreateIOJob(const rkit::RCPtr<AnoxResourceBase> &resource, AnoxGameFileSystemBase &fileSystem, const TKeyType &key, rkit::RCPtr<rkit::Job> &outJob) = 0;
-		virtual rkit::Result Base2RunAnalysisTask(AnoxResourceBase &resource, const TKeyType &key, rkit::RCPtr<rkit::Job> &outPreprocessJob) = 0;
-		virtual rkit::Result Base2RunProcessingTask(AnoxResourceBase &resource, const TKeyType &key) = 0;
+		virtual rkit::Result Base2CreateLoadJob(const rkit::RCPtr<AnoxResourceBase> &resource, AnoxGameFileSystemBase &fileSystem, const TKeyType &key, rkit::RCPtr<rkit::Job> &outJob) const = 0;
 
 	private:
-		rkit::Result BaseCreateIOJob(const rkit::RCPtr<AnoxResourceBase> &resource, AnoxGameFileSystemBase &fileSystem, const void *keyPtr, rkit::RCPtr<rkit::Job> &outJob) override
+		rkit::Result BaseCreateLoadJob(const rkit::RCPtr<AnoxResourceBase> &resource, AnoxGameFileSystemBase &fileSystem, const void *keyPtr, rkit::RCPtr<rkit::Job> &outJob) const override
 		{
-			return this->Base2CreateIOJob(resource, fileSystem, *static_cast<const TKeyType *>(keyPtr), outJob);
-		}
-
-		rkit::Result BaseRunAnalysisTask(AnoxResourceBase &resource, const void *keyPtr, rkit::RCPtr<rkit::Job> &outPreprocessJob) override
-		{
-			return this->Base2RunAnalysisTask(resource, *static_cast<const TKeyType *>(keyPtr), outPreprocessJob);
-		}
-
-		rkit::Result BaseRunProcessingTask(AnoxResourceBase &resource, const void *keyPtr) override
-		{
-			return this->Base2RunProcessingTask(resource, *static_cast<const TKeyType *>(keyPtr));
+			return this->Base2CreateLoadJob(resource, fileSystem, *static_cast<const TKeyType *>(keyPtr), outJob);
 		}
 	};
 
 	template<class TKeyType, class TResourceType>
 	struct AnoxTypedResourceLoader : public AnoxKeyedResourceLoader<TKeyType>
 	{
-		virtual rkit::Result CreateIOJob(const rkit::RCPtr<TResourceType> &resource, AnoxGameFileSystemBase& fileSystem, const TKeyType &key, rkit::RCPtr<rkit::Job> &outJob) = 0;
-		virtual rkit::Result RunAnalysisTask(TResourceType &resource, const TKeyType &key, rkit::RCPtr<rkit::Job> &outPreprocessJob) { return rkit::ResultCode::kOK; }
-		virtual rkit::Result RunProcessingTask(TResourceType &resource, const TKeyType &key) = 0;
-		virtual rkit::Result CreateResourceObject(rkit::UniquePtr<TResourceType> &outResource) = 0;
+		virtual rkit::Result CreateLoadJob(const rkit::RCPtr<TResourceType> &resource, AnoxGameFileSystemBase& fileSystem, const TKeyType &key, rkit::RCPtr<rkit::Job> &outJob) const = 0;
+		virtual rkit::Result CreateResourceObject(rkit::UniquePtr<TResourceType> &outResource) const = 0;
 
 	private:
-		rkit::Result Base2CreateIOJob(const rkit::RCPtr<AnoxResourceBase> &resource, AnoxGameFileSystemBase &fileSystem, const TKeyType &key, rkit::RCPtr<rkit::Job> &outJob) override
+		rkit::Result Base2CreateLoadJob(const rkit::RCPtr<AnoxResourceBase> &resource, AnoxGameFileSystemBase &fileSystem, const TKeyType &key, rkit::RCPtr<rkit::Job> &outJob) const override
 		{
-			return this->CreateIOJob(resource.StaticCast<TResourceType>(), fileSystem, key, outJob);
+			return this->CreateLoadJob(resource.StaticCast<TResourceType>(), fileSystem, key, outJob);
 		}
 
-		rkit::Result Base2RunAnalysisTask(AnoxResourceBase &resource, const TKeyType &key, rkit::RCPtr<rkit::Job> &outPreprocessJob) override
-		{
-			return this->RunAnalysisTask(static_cast<TResourceType &>(resource), key, outPreprocessJob);
-		}
-
-		rkit::Result Base2RunProcessingTask(AnoxResourceBase &resource, const TKeyType &key) override
-		{
-			return this->RunProcessingTask(static_cast<TResourceType &>(resource), key);
-		}
-
-		rkit::Result BaseCreateResourceObject(rkit::UniquePtr<AnoxResourceBase> &outResource) override
+		rkit::Result BaseCreateResourceObject(rkit::UniquePtr<AnoxResourceBase> &outResource) const override
 		{
 			rkit::UniquePtr<TResourceType> resource;
 			RKIT_CHECK(this->CreateResourceObject(resource));
 
 			outResource = std::move(resource);
-
 			return rkit::ResultCode::kOK;
 		}
 	};
@@ -150,9 +118,9 @@ namespace anox
 	public:
 		virtual ~AnoxResourceManagerBase() {}
 
-		virtual rkit::Result RegisterContentKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::data::ContentID>> &&factory) = 0;
-		virtual rkit::Result RegisterCIPathKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::CIPathView>> &&factory) = 0;
-		virtual rkit::Result RegisterStringKeyedLoaderFactory(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::StringView>> &&factory) = 0;
+		virtual rkit::Result RegisterContentKeyedLoader(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::data::ContentID>> &&factory) = 0;
+		virtual rkit::Result RegisterCIPathKeyedLoader(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::CIPathView>> &&factory) = 0;
+		virtual rkit::Result RegisterStringKeyedLoader(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::StringView>> &&factory) = 0;
 
 		virtual rkit::Result GetContentIDKeyedResource(rkit::RCPtr<rkit::Job> *outJob, rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::data::ContentID &cid) = 0;
 		virtual rkit::Result GetCIPathKeyedResource(rkit::RCPtr<rkit::Job> *outJob, rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::CIPathView &path) = 0;

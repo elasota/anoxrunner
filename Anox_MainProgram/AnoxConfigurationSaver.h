@@ -206,7 +206,7 @@ namespace anox
 	}
 
 	template<class T>
-	static rkit::Result ConfigValueReadWriteParam::AutoWriteCB(void *value, const IConfigurationValueView &src)
+	rkit::Result ConfigValueReadWriteParam::AutoWriteCB(void *value, const IConfigurationValueView &src)
 	{
 		return ConfigValueReadWrite<T>::Write(*static_cast<T *>(value), src);
 	}

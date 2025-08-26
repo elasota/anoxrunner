@@ -60,6 +60,7 @@ namespace anox
 
 		CORO_DECL_METHOD(StartUp);
 		CORO_DECL_METHOD(RunFrame);
+		CORO_DECL_METHOD(LoadMap, const rkit::StringSliceView &mapName);
 		CORO_DECL_METHOD(LoadContentIDKeyedResource, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::data::ContentID &cid);
 		CORO_DECL_METHOD(LoadCIPathKeyedResource, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::CIPathView &path);
 		CORO_DECL_METHOD(LoadStringKeyedResource, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::StringView &str);
@@ -563,6 +564,30 @@ namespace anox
 		CORO_END
 	};
 
+	CORO_DEF_METHOD(AnoxGameLogic, LoadMap)
+	{
+		struct Locals
+		{
+			AnoxResourceRetrieveResult loadResult;
+			rkit::CIPath path;
+		};
+
+		struct Params
+		{
+			rkit::StringSliceView mapName;
+		};
+
+		CORO_BEGIN
+			rkit::String fullPathStr;
+			CORO_CHECK(fullPathStr.Format("ax_bsp/maps/{}.bsp.bspmodel", params.mapName));
+
+			CORO_CHECK(locals.path.Set(fullPathStr));
+
+			CORO_CALL(self->AsyncLoadCIPathKeyedResource, locals.loadResult, anox::resloaders::kBSPModelResourceTypeCode, locals.path);
+
+			int n = 0;
+		CORO_END
+	};
 
 	CORO_DEF_METHOD(AnoxGameLogic, StartSession)
 	{
@@ -598,7 +623,7 @@ namespace anox
 				CORO_CHECK(rkit::ResultCode::kDataError);
 			}
 
-			//CORO_CALL(ChangeMap(mapName));
+			CORO_CALL(self->AsyncLoadMap, mapName);
 		CORO_END
 	};
 

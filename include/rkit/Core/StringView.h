@@ -26,6 +26,9 @@ namespace rkit
 		static Ordering Compare(const BaseStringSliceView<TChar, TEncoding> &a, const BaseStringSliceView<TChar, TEncoding> &b);
 	};
 
+	template<class T>
+	struct IFormatStringWriter;
+
 	template<class TChar, CharacterEncoding TEncoding>
 	class BaseStringSliceView : public CompareWithOrderingOperatorsMixin<BaseStringSliceView<TChar, TEncoding>, BaseStringSliceViewComparer<TChar, TEncoding>>
 	{
@@ -71,6 +74,8 @@ namespace rkit
 
 		bool Validate() const;
 
+		void FormatValue(IFormatStringWriter<TChar> &writer) const;
+
 	private:
 		Span<const TChar> m_span;
 	};
@@ -86,12 +91,15 @@ namespace rkit
 		BaseStringView(const TChar(&charsArray)[TLength]);
 
 		static BaseStringView FromCString(const TChar *chars);
+
+		void FormatValue(IFormatStringWriter<TChar> &writer) const;
 	};
 }
 
 #include "CharCompare.h"
 #include "CharacterEncodingValidator.h"
 #include "Hasher.h"
+#include "Format.h"
 #include "StringUtil.h"
 
 template<class TChar, rkit::CharacterEncoding TEncoding>
@@ -307,9 +315,14 @@ bool rkit::BaseStringSliceView<TChar, TEncoding>::Validate() const
 	return rkit::CharacterEncodingValidator<TEncoding>::ValidateSpan(m_span);
 }
 
+template<class TChar, rkit::CharacterEncoding TEncoding>
+void rkit::BaseStringSliceView<TChar, TEncoding>::FormatValue(IFormatStringWriter<TChar> &writer) const
+{
+	writer.WriteChars(m_span);
+}
+
 template<class TChar>
 const TChar rkit::BaseStringPrivate::NullTerminatedStringHelper<TChar>::kDefaultNullTerminator = static_cast<TChar>(0);
-
 
 template<class TChar, rkit::CharacterEncoding TEncoding>
 struct rkit::Hasher<rkit::BaseStringSliceView<TChar, TEncoding>>
@@ -372,4 +385,11 @@ rkit::BaseStringView<TChar, TEncoding> rkit::BaseStringView<TChar, TEncoding>::F
 		length++;
 
 	return BaseStringView<TChar, TEncoding>(chars, length);
+}
+
+
+template<class TChar, rkit::CharacterEncoding TEncoding>
+void rkit::BaseStringView<TChar, TEncoding>::FormatValue(IFormatStringWriter<TChar> &writer) const
+{
+	rkit::BaseStringSliceView<TChar, TEncoding>::FormatValue(writer, *this);
 }

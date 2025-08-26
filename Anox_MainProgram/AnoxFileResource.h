@@ -18,7 +18,6 @@ namespace anox
 		static rkit::Result Create(rkit::RCPtr<AnoxFileResourceLoaderBase> &resLoader);
 	};
 
-
 	class AnoxFileResourceBase : public AnoxResourceBase
 	{
 	public:
