@@ -543,7 +543,7 @@ namespace anox
 		resourceRCPtr = rkit::RCPtr<AnoxResourceBase>(resource, tracker);
 
 		// Now that resourceRCPtr is set, failure will cause the mutex to be unlocked, followed by
-
+		// re-lock and unregistration of the resource by resourceRCPtr
 		rkit::RCPtr<rkit::FutureContainer<AnoxResourceRetrieveResult>> pendingFutureContainer;
 		RKIT_CHECK(rkit::New<rkit::FutureContainer<AnoxResourceRetrieveResult>>(pendingFutureContainer));
 
