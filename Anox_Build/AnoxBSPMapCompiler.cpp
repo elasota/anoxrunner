@@ -308,41 +308,6 @@ namespace anox { namespace buildsystem
 			const BSPHeader &m_header;
 		};
 
-		struct BSPOutput
-		{
-			rkit::Vector<data::BSPMaterial> m_materials;
-			rkit::Vector<char> m_materialNameChars;
-			rkit::Vector<rkit::data::ContentID> m_lightmaps;
-			rkit::Vector<data::BSPNormal> m_normals;
-			rkit::Vector<data::BSPPlane> m_planes;
-			rkit::Vector<data::BSPTreeNode> m_treeNodes;
-			rkit::Vector<uint8_t> m_treeNodeSplitBits;
-			rkit::Vector<data::BSPTreeLeaf> m_leafs;
-			rkit::Vector<data::BSPBrush> m_brushes;
-			rkit::Vector<data::BSPBrushSide> m_brushSides;
-			rkit::Vector<data::BSPDrawVertex> m_drawVerts;
-			rkit::Vector<data::BSPDrawFace> m_drawFaces;
-			rkit::Vector<data::BSPDrawMaterialGroup> m_materialGroups;
-			rkit::Vector<data::BSPDrawLightmapGroup> m_lightmapGroups;
-			rkit::Vector<data::BSPDrawModelGroup> m_modelGroups;
-			rkit::Vector<data::BSPDrawCluster> m_drawClusters;
-			rkit::Vector<data::BSPModel> m_models;
-			rkit::Vector<data::BSPModelDrawCluster> m_modelDrawClusters;
-			rkit::Vector<rkit::endian::LittleUInt16_t> m_leafBrushes;
-			rkit::Vector<rkit::endian::LittleUInt16_t> m_leafFaces;
-			rkit::Vector<rkit::endian::LittleUInt16_t> m_triIndexes;
-		};
-
-		struct VectorSerializer
-		{
-			typedef rkit::Result (*WriterCallback_t)(const void *vectorPtr, rkit::IWriteStream &stream);
-			typedef size_t (*GetSizeCallback_t)(const void *vectorPtr);
-
-			const void *m_vectorPtr;
-			WriterCallback_t m_writerCallback;
-			GetSizeCallback_t m_getSizeCallback;
-		};
-
 		struct FaceStatsHeader
 		{
 			uint32_t m_numFaces = 0;
@@ -353,6 +318,18 @@ namespace anox { namespace buildsystem
 		{
 			uint32_t m_expansionLevel = 0;
 			uint32_t m_numNodes = 0;
+		};
+
+		class VectorWriterVisitor
+		{
+		public:
+			explicit VectorWriterVisitor(rkit::IWriteStream &stream);
+
+			template<class T>
+			rkit::Result VisitMember(const rkit::Vector<T> &vector) const;
+
+		private:
+			rkit::IWriteStream &m_stream;
 		};
 
 		template<class TStructure>
@@ -372,17 +349,14 @@ namespace anox { namespace buildsystem
 			rkit::Vector<rkit::data::ContentID> &outContentIDs, const BSPDataCollection &bsp, const rkit::Vector<BSPFaceStats> &faceStats, const rkit::Vector<rkit::UniquePtr<priv::LightmapTree>> &lightmapTrees);
 		static bool LightmapFitsInNode(const priv::LightmapTreeNode &node, uint16_t width, uint16_t height);
 
-		static rkit::Result BuildGeometry(BSPOutput &bspOutput, const BSPDataCollection &bsp,
+		static rkit::Result BuildGeometry(data::BSPDataChunks &bspOutput, const BSPDataCollection &bsp,
 			rkit::ConstSpan<BSPFaceStats> stats, rkit::Span<size_t> faceModelIndex,
 			rkit::ConstSpan<size_t> texInfoToUniqueTexIndex, rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions);
 
-		static rkit::Result BuildMaterials(BSPOutput &bspOutput, rkit::ConstSpan<rkit::CIPath> paths);
+		static rkit::Result BuildMaterials(data::BSPDataChunks &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 
 		static rkit::Result LoadBSPData(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, BSPDataCollection &bsp, rkit::Vector<LumpLoader> &loaders);
-		static rkit::Result WriteBSPModel(const BSPOutput &bspOutput, rkit::IWriteStream &outStream);
-
-		template<class T>
-		static VectorSerializer CreateVectorSerializer(const rkit::Vector<T> &arr);
+		static rkit::Result WriteBSPModel(const data::BSPDataChunks &bspOutput, rkit::IWriteStream &outStream);
 
 		template<class T>
 		static rkit::Result WriteVectorCB(const void *vectorPtr, rkit::IWriteStream &stream);
@@ -404,6 +378,8 @@ namespace anox { namespace buildsystem
 		rkit::Result RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
 
 		uint32_t GetVersion() const override;
+
+		static rkit::Result FormatWorldMaterialPath(rkit::String &str, const rkit::StringSliceView &textureName);
 	};
 
 	class BSPLightingCompiler final : public BSPMapCompilerBase2
@@ -1583,7 +1559,7 @@ namespace anox { namespace buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result BSPMapCompilerBase2::BuildGeometry(BSPOutput &bspOutput,
+	rkit::Result BSPMapCompilerBase2::BuildGeometry(data::BSPDataChunks &bspOutput,
 		const BSPDataCollection &bsp, rkit::ConstSpan<BSPFaceStats> stats,
 		rkit::Span<size_t> faceModelIndex, rkit::ConstSpan<size_t> texInfoToUniqueTexIndex,
 		rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions)
@@ -2335,26 +2311,28 @@ namespace anox { namespace buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result BSPMapCompilerBase2::BuildMaterials(BSPOutput &bspOutput, rkit::ConstSpan<rkit::CIPath> paths)
+	rkit::Result BSPMapCompilerBase2::BuildMaterials(data::BSPDataChunks &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		RKIT_CHECK(bspOutput.m_materials.Resize(paths.Count()));
 
 		for (size_t materialIndex = 0; materialIndex < paths.Count(); materialIndex++)
 		{
-			data::BSPMaterial &bspMat = bspOutput.m_materials[materialIndex];
-			bspMat = {};
-
 			const rkit::CIPath &path = paths[materialIndex];
 
-			if (path.Length() > 256 || path.Length() == 0)
+			rkit::String materialIdentifier;
+			RKIT_CHECK(BSPMapCompiler::FormatWorldMaterialPath(materialIdentifier, path.ToString()));
+
+			rkit::CIPath compiledMaterialPath;
+			RKIT_CHECK(MaterialCompiler::ConstructOutputPath(compiledMaterialPath, MaterialCompiler::MaterialNodeType::kWorld, materialIdentifier));
+
+			rkit::data::ContentID contentID = {};
+
+			if (path != "null")
 			{
-				rkit::log::Error("Material name is invalid");
-				return rkit::ResultCode::kDataError;
+				RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, contentID));
 			}
 
-			bspMat.m_nameLengthMinusOne = static_cast<uint8_t>(path.Length() - 1);
-
-			RKIT_CHECK(bspOutput.m_materialNameChars.Append(path.ToString().ToSpan()));
+			bspOutput.m_materials[materialIndex] = contentID;
 		}
 
 		return rkit::ResultCode::kOK;
@@ -2404,76 +2382,19 @@ namespace anox { namespace buildsystem
 		return path.Format("ax_bsp/{}.facestats", identifier.GetChars());
 	}
 
-	rkit::Result BSPMapCompilerBase2::WriteBSPModel(const BSPOutput &bspOutput, rkit::IWriteStream &outStream)
+	rkit::Result BSPMapCompilerBase2::WriteBSPModel(const data::BSPDataChunks &bspOutput, rkit::IWriteStream &outStream)
 	{
-		const VectorSerializer serializers[] =
-		{
-			CreateVectorSerializer(bspOutput.m_materials),
-			CreateVectorSerializer(bspOutput.m_materialNameChars),
-			CreateVectorSerializer(bspOutput.m_lightmaps),
-			CreateVectorSerializer(bspOutput.m_normals),
-			CreateVectorSerializer(bspOutput.m_planes),
-			CreateVectorSerializer(bspOutput.m_treeNodes),
-			CreateVectorSerializer(bspOutput.m_treeNodeSplitBits),
-			CreateVectorSerializer(bspOutput.m_leafs),
-			CreateVectorSerializer(bspOutput.m_brushes),
-			CreateVectorSerializer(bspOutput.m_brushSides),
-			CreateVectorSerializer(bspOutput.m_drawVerts),
-			CreateVectorSerializer(bspOutput.m_drawFaces),
-			CreateVectorSerializer(bspOutput.m_materialGroups),
-			CreateVectorSerializer(bspOutput.m_lightmapGroups),
-			CreateVectorSerializer(bspOutput.m_modelGroups),
-			CreateVectorSerializer(bspOutput.m_drawClusters),
-			CreateVectorSerializer(bspOutput.m_models),
-			CreateVectorSerializer(bspOutput.m_modelDrawClusters),
-			CreateVectorSerializer(bspOutput.m_leafBrushes),
-			CreateVectorSerializer(bspOutput.m_leafFaces),
-			CreateVectorSerializer(bspOutput.m_triIndexes),
-		};
-
-		const size_t kNumSerializers = sizeof(serializers) / sizeof(serializers[0]);
-
 		data::BSPFile bspFile = {};
 		bspFile.m_fourCC = data::BSPFile::kFourCC;
 		bspFile.m_version = data::BSPFile::kVersion;
 
-		rkit::endian::LittleUInt32_t counts[kNumSerializers] = {};
-
-		for (size_t i = 0; i < kNumSerializers; i++)
-		{
-			const VectorSerializer &serializer = serializers[i];
-
-			const size_t count = serializer.m_getSizeCallback(serializer.m_vectorPtr);
-
-			if (count >= std::numeric_limits<uint32_t>::max())
-			{
-				rkit::log::Error("Numeric overflow");
-				return rkit::ResultCode::kIntegerOverflow;
-			}
-
-			counts[i] = static_cast<uint32_t>(count);
-		}
-
 		RKIT_CHECK(outStream.WriteAll(&bspFile, sizeof(bspFile)));
-		RKIT_CHECK(outStream.WriteAll(counts, sizeof(counts)));
 
-		for (const VectorSerializer &serializer : serializers)
-		{
-			RKIT_CHECK(serializer.m_writerCallback(serializer.m_vectorPtr, outStream));
-		}
+		VectorWriterVisitor visitor(outStream);
+
+		RKIT_CHECK(bspOutput.VisitAllChunks(visitor));
 
 		return rkit::ResultCode::kOK;
-	}
-
-	template<class T>
-	BSPMapCompiler::VectorSerializer BSPMapCompilerBase2::CreateVectorSerializer(const rkit::Vector<T> &arr)
-	{
-		VectorSerializer result = {};
-		result.m_vectorPtr = &arr;
-		result.m_getSizeCallback = GetVectorSizeCB<T>;
-		result.m_writerCallback = WriteVectorCB<T>;
-
-		return result;
 	}
 
 	template<class T>
@@ -2488,6 +2409,33 @@ namespace anox { namespace buildsystem
 	{
 		const rkit::Vector<T> &vec = *static_cast<const rkit::Vector<T> *>(vectorPtr);
 		return vec.Count();
+	}
+
+	BSPMapCompilerBase2::VectorWriterVisitor::VectorWriterVisitor(rkit::IWriteStream &stream)
+		: m_stream(stream)
+	{
+	}
+
+	template<class T>
+	rkit::Result BSPMapCompilerBase2::VectorWriterVisitor::VisitMember(const rkit::Vector<T> &vector) const
+	{
+		rkit::endian::LittleUInt32_t count;
+		if (vector.Count() > std::numeric_limits<uint32_t>::max())
+			return rkit::ResultCode::kIntegerOverflow;
+
+		count = static_cast<uint32_t>(vector.Count());
+
+		RKIT_CHECK(m_stream.WriteAll(&count, sizeof(count)));
+
+		if (vector.Count() > 0)
+		{
+			const void *dataPtr = vector.GetBuffer();
+			size_t count = vector.Count();
+
+			RKIT_CHECK(m_stream.WriteAll(dataPtr, count * sizeof(T)));
+		}
+
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result BSPMapCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
@@ -2600,10 +2548,10 @@ namespace anox { namespace buildsystem
 		rkit::Vector<size_t> faceModelIndex;
 		RKIT_CHECK(faceModelIndex.Resize(bsp.m_faces.Count()));
 
-		BSPOutput bspOutput;
+		data::BSPDataChunks bspOutput;
 		RKIT_CHECK(BuildGeometry(bspOutput, bsp, faceStats.ToSpan(), faceModelIndex.ToSpan(), texInfoToUniqueTexture.ToSpan(), lightmapDimensions.ToSpan()));
 
-		RKIT_CHECK(BuildMaterials(bspOutput, uniqueTextures.ToSpan()));
+		RKIT_CHECK(BuildMaterials(bspOutput, uniqueTextures.ToSpan(), feedback));
 
 		rkit::String outPathStr;
 		RKIT_CHECK(FormatModelPath(outPathStr, depsNode->GetIdentifier()));
@@ -2819,7 +2767,12 @@ namespace anox { namespace buildsystem
 
 	uint32_t BSPMapCompiler::GetVersion() const
 	{
-		return 3;
+		return 5;
+	}
+
+	rkit::Result BSPMapCompiler::FormatWorldMaterialPath(rkit::String &str, const rkit::StringSliceView &textureName)
+	{
+		return str.Format("textures/{}.{}", textureName, MaterialCompiler::GetWorldMaterialExtension());
 	}
 
 	template<class TStructure>

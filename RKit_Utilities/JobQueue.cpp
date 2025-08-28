@@ -155,6 +155,7 @@ namespace rkit { namespace utils
 		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<RCPtr<Job> > &dependencies) override;
 
 		Result CreateSignalledJob(RCPtr<JobSignaller> &outSignaler, RCPtr<Job> &outJob) override;
+		Result CreateSignalJobRunner(UniquePtr<IJobRunner> &outJobRunner, const RCPtr<JobSignaller> &signaller) override;
 
 		// Wait for work or for a specific job.
 		// wakeEvent: Event to use for waking up the thread
@@ -179,6 +180,17 @@ namespace rkit { namespace utils
 			kSpecifiedJobReturned,				// Specified job is runnable, return value is the job
 			kTerminated,						// Thread pool is shutting down, no job returned
 			kQueuedJob,							// Returned a queued job
+		};
+
+		class SignalJobRunner final : public IJobRunner
+		{
+		public:
+			explicit SignalJobRunner(const RCPtr<JobSignaller> &signaller);
+
+			Result Run() override;
+
+		private:
+			RCPtr<JobSignaller> m_signaller;
 		};
 
 		Pair<RCPtr<Job>, WaitResultType> WaitForWorkOrJob(const ISpan<JobType> &jobTypes, bool waitIfDepleted, IEvent *wakeEvent, IEvent *terminatedEvent, JobImpl *jobToWaitFor);
@@ -366,6 +378,17 @@ namespace rkit { namespace utils
 		return m_wakeDisposition;
 	}
 
+	JobQueue::SignalJobRunner::SignalJobRunner(const RCPtr<JobSignaller> &signaller)
+		: m_signaller(signaller)
+	{
+		RKIT_ASSERT(signaller.IsValid());
+	}
+
+	Result JobQueue::SignalJobRunner::Run()
+	{
+		m_signaller->SignalDone(ResultCode::kOK);
+		return ResultCode::kOK;
+	}
 
 	JobQueue::JobQueue(IMallocDriver *alloc)
 		: m_alloc(alloc)
@@ -572,6 +595,11 @@ namespace rkit { namespace utils
 		outJob = std::move(resultJob);
 
 		return ResultCode::kOK;
+	}
+
+	Result JobQueue::CreateSignalJobRunner(UniquePtr<IJobRunner> &outJobRunner, const RCPtr<JobSignaller> &signaller)
+	{
+		return New<SignalJobRunner>(outJobRunner, signaller);
 	}
 
 	void JobQueue::AddRunnableJob(const RCPtr<JobImpl> &job, JobType jobType)

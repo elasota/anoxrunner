@@ -32,6 +32,8 @@ namespace anox
 	{
 		static const uint32_t kRawFileResourceTypeCode = RKIT_FOURCC('F', 'I', 'L', 'E');
 		static const uint32_t kBSPModelResourceTypeCode = RKIT_FOURCC('B', 'S', 'P', 'M');
+		static const uint32_t kWorldMaterialTypeCode = RKIT_FOURCC('M', 'T', 'L', 'W');
+		static const uint32_t kTextureResourceTypeCode = RKIT_FOURCC('T', 'X', 'T', 'R');
 	}
 }
 
@@ -56,7 +58,7 @@ namespace anox
 	{
 		virtual ~AnoxResourceLoaderBase() {}
 
-		virtual rkit::Result BaseCreateLoadJob(const rkit::RCPtr<AnoxResourceBase> &resource, AnoxGameFileSystemBase &fileSystem, const void *keyPtr, rkit::RCPtr<rkit::Job> &outJob) const = 0;
+		virtual rkit::Result BaseCreateLoadJob(const rkit::RCPtr<AnoxResourceBase> &resource, AnoxResourceManagerBase &resManager, AnoxGameFileSystemBase &fileSystem, const void *keyPtr, rkit::RCPtr<rkit::Job> &outJob) const = 0;
 		virtual rkit::Result BaseCreateResourceObject(rkit::UniquePtr<AnoxResourceBase> &outResource) const = 0;
 	};
 
@@ -64,25 +66,25 @@ namespace anox
 	struct AnoxKeyedResourceLoader : public AnoxResourceLoaderBase
 	{
 	public:
-		virtual rkit::Result Base2CreateLoadJob(const rkit::RCPtr<AnoxResourceBase> &resource, AnoxGameFileSystemBase &fileSystem, const TKeyType &key, rkit::RCPtr<rkit::Job> &outJob) const = 0;
+		virtual rkit::Result Base2CreateLoadJob(const rkit::RCPtr<AnoxResourceBase> &resource, AnoxResourceManagerBase &resManager, AnoxGameFileSystemBase &fileSystem, const TKeyType &key, rkit::RCPtr<rkit::Job> &outJob) const = 0;
 
 	private:
-		rkit::Result BaseCreateLoadJob(const rkit::RCPtr<AnoxResourceBase> &resource, AnoxGameFileSystemBase &fileSystem, const void *keyPtr, rkit::RCPtr<rkit::Job> &outJob) const override
+		rkit::Result BaseCreateLoadJob(const rkit::RCPtr<AnoxResourceBase> &resource, AnoxResourceManagerBase &resManager, AnoxGameFileSystemBase &fileSystem, const void *keyPtr, rkit::RCPtr<rkit::Job> &outJob) const override
 		{
-			return this->Base2CreateLoadJob(resource, fileSystem, *static_cast<const TKeyType *>(keyPtr), outJob);
+			return this->Base2CreateLoadJob(resource, resManager, fileSystem, *static_cast<const TKeyType *>(keyPtr), outJob);
 		}
 	};
 
 	template<class TKeyType, class TResourceType>
 	struct AnoxTypedResourceLoader : public AnoxKeyedResourceLoader<TKeyType>
 	{
-		virtual rkit::Result CreateLoadJob(const rkit::RCPtr<TResourceType> &resource, AnoxGameFileSystemBase& fileSystem, const TKeyType &key, rkit::RCPtr<rkit::Job> &outJob) const = 0;
+		virtual rkit::Result CreateLoadJob(const rkit::RCPtr<TResourceType> &resource, AnoxResourceManagerBase &resManager, AnoxGameFileSystemBase& fileSystem, const TKeyType &key, rkit::RCPtr<rkit::Job> &outJob) const = 0;
 		virtual rkit::Result CreateResourceObject(rkit::UniquePtr<TResourceType> &outResource) const = 0;
 
 	private:
-		rkit::Result Base2CreateLoadJob(const rkit::RCPtr<AnoxResourceBase> &resource, AnoxGameFileSystemBase &fileSystem, const TKeyType &key, rkit::RCPtr<rkit::Job> &outJob) const override
+		rkit::Result Base2CreateLoadJob(const rkit::RCPtr<AnoxResourceBase> &resource, AnoxResourceManagerBase &resManager, AnoxGameFileSystemBase &fileSystem, const TKeyType &key, rkit::RCPtr<rkit::Job> &outJob) const override
 		{
-			return this->CreateLoadJob(resource.StaticCast<TResourceType>(), fileSystem, key, outJob);
+			return this->CreateLoadJob(resource.StaticCast<TResourceType>(), resManager, fileSystem, key, outJob);
 		}
 
 		rkit::Result BaseCreateResourceObject(rkit::UniquePtr<AnoxResourceBase> &outResource) const override

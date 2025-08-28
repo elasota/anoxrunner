@@ -25,6 +25,14 @@ namespace anox { namespace buildsystem
 	class MaterialCompiler final : public rkit::buildsystem::IDependencyNodeCompiler
 	{
 	public:
+		enum class MaterialNodeType
+		{
+			kFont,
+			kWorld,
+
+			kCount,
+		};
+
 		bool HasAnalysisStage() const override;
 
 		rkit::Result RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
@@ -35,18 +43,11 @@ namespace anox { namespace buildsystem
 
 		uint32_t GetVersion() const override;
 
+		static rkit::Result ConstructOutputPath(rkit::CIPath &analysisPath, MaterialNodeType nodeType, const rkit::StringView &identifier);
+
 	private:
-		enum class MaterialNodeType
-		{
-			kFont,
-			kWorld,
-
-			kCount,
-		};
-
 		static rkit::Result MaterialNodeTypeFromFourCC(MaterialNodeType &outNodeType, uint32_t nodeTypeFourCC);
 		static rkit::Result ConstructAnalysisPath(rkit::CIPath &analysisPath, MaterialNodeType nodeType, const rkit::StringView &identifier);
-		static rkit::Result ConstructOutputPath(rkit::CIPath &analysisPath, MaterialNodeType nodeType, const rkit::StringView &identifier);
 
 		rkit::Result RunAnalyzeATD(const rkit::StringView &name, rkit::UniquePtr<rkit::ISeekableReadStream> &&atdStream, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 		rkit::Result RunAnalyzeImage(const rkit::StringView &longName, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);

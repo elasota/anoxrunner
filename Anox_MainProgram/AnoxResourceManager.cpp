@@ -116,17 +116,6 @@ namespace anox
 		rkit::CIPathView m_keyView;
 	};
 
-	class AnoxFireSignalJobRunner final : public rkit::IJobRunner
-	{
-	public:
-		AnoxFireSignalJobRunner(const rkit::RCPtr<rkit::JobSignaller> &doneSignaller);
-
-		rkit::Result Run() override;
-
-	private:
-		rkit::RCPtr<rkit::JobSignaller> m_doneSignaller;
-	};
-
 	class AnoxCompleteResourceLoadJobRunner final : public rkit::IJobRunner
 	{
 	public:
@@ -343,18 +332,6 @@ namespace anox
 	{
 		return AnoxResourceKeyType::kCIPath;
 	}
-
-	AnoxFireSignalJobRunner::AnoxFireSignalJobRunner(const rkit::RCPtr<rkit::JobSignaller> &doneSignaller)
-		: m_doneSignaller(doneSignaller)
-	{
-	}
-
-	rkit::Result AnoxFireSignalJobRunner::Run()
-	{
-		m_doneSignaller->SignalDone(rkit::ResultCode::kOK);
-		return rkit::ResultCode::kOK;
-	}
-
 
 	AnoxCompleteResourceLoadJobRunner::AnoxCompleteResourceLoadJobRunner(const rkit::RCPtr<AnoxResourceLoadCompletionNotifier> &loadCompleter)
 		: m_loadCompleter(loadCompleter)
@@ -600,11 +577,11 @@ namespace anox
 		// And now that the safeguards are set, we can unlock
 		resLock.Unlock();
 
-		// Add the load jobs
+		// Add the load job
 		rkit::RCPtr<rkit::Job> loadJob;
 		const void *keyPtr = &keyedTracker->GetKey();
 
-		RKIT_CHECK(loader->BaseCreateLoadJob(resourceRCPtr, *m_fileSystem, keyPtr, loadJob));
+		RKIT_CHECK(loader->BaseCreateLoadJob(resourceRCPtr, *this, *m_fileSystem, keyPtr, loadJob));
 
 		{
 			rkit::ConstSpan<rkit::RCPtr<rkit::Job>> completeJobDepSpan;

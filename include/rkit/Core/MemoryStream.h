@@ -41,6 +41,9 @@ namespace rkit
 		Result SeekCurrent(FileOffset_t pos) override;
 		Result SeekEnd(FileOffset_t pos) override;
 
+		FilePos_t Tell() const override;
+		FilePos_t GetSize() const override;
+
 	private:
 		FixedSizeMemoryStream m_stream;
 	};
@@ -104,6 +107,7 @@ inline rkit::Result rkit::FixedSizeMemoryStream::WritePartial(const void *data, 
 
 inline rkit::Result rkit::FixedSizeMemoryStream::Flush()
 {
+	return ResultCode::kOK;
 }
 
 inline rkit::Result rkit::FixedSizeMemoryStream::SeekStart(FilePos_t pos)
@@ -184,3 +188,12 @@ inline rkit::Result rkit::ReadOnlyMemoryStream::SeekEnd(FileOffset_t pos)
 	return m_stream.SeekEnd(pos);
 }
 
+inline rkit::FilePos_t rkit::ReadOnlyMemoryStream::Tell() const
+{
+	return m_stream.Tell();
+}
+
+inline rkit::FilePos_t rkit::ReadOnlyMemoryStream::GetSize() const
+{
+	return m_stream.GetSize();
+}

@@ -391,5 +391,5 @@ rkit::BaseStringView<TChar, TEncoding> rkit::BaseStringView<TChar, TEncoding>::F
 template<class TChar, rkit::CharacterEncoding TEncoding>
 void rkit::BaseStringView<TChar, TEncoding>::FormatValue(IFormatStringWriter<TChar> &writer) const
 {
-	rkit::BaseStringSliceView<TChar, TEncoding>::FormatValue(writer, *this);
+	static_cast<rkit::BaseStringSliceView<TChar, TEncoding>>(*this).FormatValue(writer);
 }

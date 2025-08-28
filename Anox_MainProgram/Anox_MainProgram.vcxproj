@@ -169,6 +169,7 @@
     <ClInclude Include="AnoxGraphicsJob.h" />
     <ClInclude Include="AnoxKeybindManager.h" />
     <ClInclude Include="AnoxLoadEntireFileJob.h" />
+    <ClInclude Include="AnoxMaterialResource.h" />
     <ClInclude Include="AnoxPeriodicResources.h" />
     <ClInclude Include="AnoxRecordJobRunner.h" />
     <ClInclude Include="AnoxRenderedWindow.h" />

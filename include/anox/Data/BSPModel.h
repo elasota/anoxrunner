@@ -35,11 +35,6 @@ namespace anox { namespace data {
 		rkit::endian::LittleUInt16_t m_numLeafDrawSurfaces;
 	};
 
-	struct BSPMaterial
-	{
-		uint8_t m_nameLengthMinusOne;
-	};
-
 	struct BSPNormal
 	{
 		rkit::endian::LittleFloat32_t m_xyz[3];
@@ -115,5 +110,74 @@ namespace anox { namespace data {
 		rkit::endian::LittleFloat32_t m_origin[3];
 
 		uint8_t m_rootIsLeaf;
+	};
+} }
+
+#include "rkit/Core/Vector.h"
+
+namespace anox { namespace data {
+	struct BSPDataChunks
+	{
+		rkit::Vector<rkit::data::ContentID> m_materials;
+		rkit::Vector<rkit::data::ContentID> m_lightmaps;
+		rkit::Vector<data::BSPNormal> m_normals;
+		rkit::Vector<data::BSPPlane> m_planes;
+		rkit::Vector<data::BSPTreeNode> m_treeNodes;
+		rkit::Vector<uint8_t> m_treeNodeSplitBits;
+		rkit::Vector<data::BSPTreeLeaf> m_leafs;
+		rkit::Vector<data::BSPBrush> m_brushes;
+		rkit::Vector<data::BSPBrushSide> m_brushSides;
+		rkit::Vector<data::BSPDrawVertex> m_drawVerts;
+		rkit::Vector<data::BSPDrawFace> m_drawFaces;
+		rkit::Vector<data::BSPDrawMaterialGroup> m_materialGroups;
+		rkit::Vector<data::BSPDrawLightmapGroup> m_lightmapGroups;
+		rkit::Vector<data::BSPDrawModelGroup> m_modelGroups;
+		rkit::Vector<data::BSPDrawCluster> m_drawClusters;
+		rkit::Vector<data::BSPModel> m_models;
+		rkit::Vector<data::BSPModelDrawCluster> m_modelDrawClusters;
+		rkit::Vector<rkit::endian::LittleUInt16_t> m_leafBrushes;
+		rkit::Vector<rkit::endian::LittleUInt16_t> m_leafFaces;
+		rkit::Vector<rkit::endian::LittleUInt16_t> m_triIndexes;
+
+		template<class TVisitor>
+		rkit::Result VisitAllChunks(const TVisitor &visitor)
+		{
+			return BSPDataChunks::StaticVisitAllChunks<BSPDataChunks, TVisitor>(*this, visitor);
+		}
+
+		template<class TVisitor>
+		rkit::Result VisitAllChunks(const TVisitor &visitor) const
+		{
+			return BSPDataChunks::StaticVisitAllChunks<const BSPDataChunks, TVisitor>(*this, visitor);
+		}
+
+
+	private:
+		template<class TSelf, class TVisitor>
+		static rkit::Result StaticVisitAllChunks(TSelf &self, const TVisitor &visitor)
+		{
+			RKIT_CHECK(visitor.VisitMember(self.m_materials));
+			RKIT_CHECK(visitor.VisitMember(self.m_lightmaps));
+			RKIT_CHECK(visitor.VisitMember(self.m_normals));
+			RKIT_CHECK(visitor.VisitMember(self.m_planes));
+			RKIT_CHECK(visitor.VisitMember(self.m_treeNodes));
+			RKIT_CHECK(visitor.VisitMember(self.m_treeNodeSplitBits));
+			RKIT_CHECK(visitor.VisitMember(self.m_leafs));
+			RKIT_CHECK(visitor.VisitMember(self.m_brushes));
+			RKIT_CHECK(visitor.VisitMember(self.m_brushSides));
+			RKIT_CHECK(visitor.VisitMember(self.m_drawVerts));
+			RKIT_CHECK(visitor.VisitMember(self.m_drawFaces));
+			RKIT_CHECK(visitor.VisitMember(self.m_materialGroups));
+			RKIT_CHECK(visitor.VisitMember(self.m_lightmapGroups));
+			RKIT_CHECK(visitor.VisitMember(self.m_modelGroups));
+			RKIT_CHECK(visitor.VisitMember(self.m_drawClusters));
+			RKIT_CHECK(visitor.VisitMember(self.m_models));
+			RKIT_CHECK(visitor.VisitMember(self.m_modelDrawClusters));
+			RKIT_CHECK(visitor.VisitMember(self.m_leafBrushes));
+			RKIT_CHECK(visitor.VisitMember(self.m_leafFaces));
+			RKIT_CHECK(visitor.VisitMember(self.m_triIndexes));
+
+			return rkit::ResultCode::kOK;
+		}
 	};
 } }

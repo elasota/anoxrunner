@@ -36,7 +36,7 @@ namespace anox
 	class AnoxFileResourceLoader final : public AnoxFileResourceLoaderBase
 	{
 	public:
-		rkit::Result CreateLoadJob(const rkit::RCPtr<AnoxFileResourceBase> &resource, AnoxGameFileSystemBase &fileSystem, const rkit::CIPathView &key, rkit::RCPtr<rkit::Job> &outJob) const override;
+		rkit::Result CreateLoadJob(const rkit::RCPtr<AnoxFileResourceBase> &resource, AnoxResourceManagerBase &resManager, AnoxGameFileSystemBase &fileSystem, const rkit::CIPathView &key, rkit::RCPtr<rkit::Job> &outJob) const override;
 		rkit::Result CreateResourceObject(rkit::UniquePtr<AnoxFileResourceBase> &outResource) const override;
 	};
 
@@ -49,7 +49,7 @@ namespace anox
 		return m_fileBytes.ToSpan();
 	}
 
-	rkit::Result AnoxFileResourceLoader::CreateLoadJob(const rkit::RCPtr<AnoxFileResourceBase> &resource, AnoxGameFileSystemBase &fileSystem, const rkit::CIPathView &key, rkit::RCPtr<rkit::Job> &outJob) const
+	rkit::Result AnoxFileResourceLoader::CreateLoadJob(const rkit::RCPtr<AnoxFileResourceBase> &resource, AnoxResourceManagerBase &resManager, AnoxGameFileSystemBase &fileSystem, const rkit::CIPathView &key, rkit::RCPtr<rkit::Job> &outJob) const
 	{
 		rkit::RCPtr<rkit::Job> openJob;
 

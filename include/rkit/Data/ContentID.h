@@ -17,6 +17,9 @@ namespace rkit { namespace data
 
 		ContentIDString ToString() const;
 
+		static ContentID Null();
+		bool IsNull() const;
+
 		bool operator==(const ContentID &other) const;
 		bool operator!=(const ContentID &other) const;
 
@@ -91,7 +94,16 @@ namespace rkit { namespace data
 		return !((*this) < other);
 	}
 
+	inline ContentID ContentID::Null()
+	{
+		ContentID result = {};
+		return result;
+	}
 
+	inline bool ContentID::IsNull() const
+	{
+		return (*this) == Null();
+	}
 
 	inline ContentIDString ContentID::ToString() const
 	{
