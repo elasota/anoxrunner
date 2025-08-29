@@ -110,6 +110,27 @@ namespace anox
 		m_self.Reset();
 	}
 
+	static rkit::Result CreateLoadEntireFileJobFromOpenJob(rkit::RCPtr<rkit::Job> &outJob, const rkit::RCPtr<rkit::Vector<uint8_t>> &blob,
+		rkit::IJobQueue &jobQueue, const rkit::RCPtr<rkit::Job> &openJob, const rkit::FutureContainerPtr<rkit::AsyncFileOpenReadResult> &openFileFutureContainer)
+	{
+		rkit::Future<rkit::AsyncFileOpenReadResult> openFileFuture(openFileFutureContainer);
+
+		rkit::RCPtr<rkit::JobSignaller> signaller;
+		rkit::RCPtr<rkit::Job> ioRequestJob;
+		RKIT_CHECK(jobQueue.CreateSignalledJob(signaller, ioRequestJob));
+
+		rkit::UniquePtr<rkit::IJobRunner> postIOJobRunner;
+		rkit::RCPtr<rkit::Job> postIOJob;
+
+		RKIT_CHECK(rkit::New<AnoxFileResourcePostIOLoadJobRunner>(postIOJobRunner, jobQueue, blob, openFileFuture, std::move(signaller)));
+
+		RKIT_CHECK(jobQueue.CreateJob(&postIOJob, rkit::JobType::kIO, std::move(postIOJobRunner), openJob));
+
+		RKIT_CHECK(jobQueue.CreateJob(&outJob, rkit::JobType::kNormalPriority, rkit::UniquePtr<rkit::IJobRunner>(), ioRequestJob));
+
+		return rkit::ResultCode::kOK;
+	}
+
 	rkit::Result CreateLoadEntireFileJob(rkit::RCPtr<rkit::Job> &outJob, const rkit::RCPtr<rkit::Vector<uint8_t>> &blob, AnoxGameFileSystemBase &fileSystem, const rkit::CIPathView &path)
 	{
 		rkit::RCPtr<rkit::Job> openJob;
@@ -119,23 +140,18 @@ namespace anox
 
 		RKIT_CHECK(fileSystem.OpenNamedFileAsync(openJob, openFileFutureContainer, path));
 
-		rkit::Future<rkit::AsyncFileOpenReadResult> openFileFuture(openFileFutureContainer);
+		return CreateLoadEntireFileJobFromOpenJob(outJob, blob, fileSystem.GetJobQueue(), openJob, openFileFutureContainer);
+	}
 
-		rkit::IJobQueue &jobQueue = fileSystem.GetJobQueue();
+	rkit::Result CreateLoadEntireFileJob(rkit::RCPtr<rkit::Job> &outJob, const rkit::RCPtr<rkit::Vector<uint8_t>> &blob, AnoxGameFileSystemBase &fileSystem, const rkit::data::ContentID &contentID)
+	{
+		rkit::RCPtr<rkit::Job> openJob;
 
-		rkit::RCPtr<rkit::JobSignaller> signaller;
-		rkit::RCPtr<rkit::Job> ioRequestJob;
-		RKIT_CHECK(jobQueue.CreateSignalledJob(signaller, ioRequestJob));
+		rkit::FutureContainerPtr<rkit::AsyncFileOpenReadResult> openFileFutureContainer;
+		RKIT_CHECK(rkit::New<rkit::FutureContainer<rkit::AsyncFileOpenReadResult>>(openFileFutureContainer));
 
-		rkit::UniquePtr<rkit::IJobRunner> postIOJobRunner;
-		rkit::RCPtr<rkit::Job> postIOJob;
+		RKIT_CHECK(fileSystem.OpenContentFileAsync(openJob, openFileFutureContainer, contentID));
 
-		RKIT_CHECK(rkit::New<AnoxFileResourcePostIOLoadJobRunner>(postIOJobRunner, fileSystem.GetJobQueue(), blob, openFileFuture, std::move(signaller)));
-
-		RKIT_CHECK(jobQueue.CreateJob(&postIOJob, rkit::JobType::kIO, std::move(postIOJobRunner), openJob));
-
-		RKIT_CHECK(jobQueue.CreateJob(&outJob, rkit::JobType::kNormalPriority, rkit::UniquePtr<rkit::IJobRunner>(), ioRequestJob));
-
-		return rkit::ResultCode::kOK;
+		return CreateLoadEntireFileJobFromOpenJob(outJob, blob, fileSystem.GetJobQueue(), openJob, openFileFutureContainer);
 	}
 }

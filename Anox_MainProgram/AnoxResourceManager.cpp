@@ -16,7 +16,9 @@
 #include "rkit/Data/ContentID.h"
 
 #include "AnoxFileResource.h"
+#include "AnoxMaterialResource.h"
 #include "AnoxBSPModelResource.h"
+#include "AnoxTextureResource.h"
 
 #include <algorithm>
 
@@ -415,6 +417,20 @@ namespace anox
 			RKIT_CHECK(AnoxBSPModelResourceLoaderBase::Create(bspLoaderFactory));
 
 			RKIT_CHECK(RegisterCIPathKeyedLoader(resloaders::kBSPModelResourceTypeCode, std::move(bspLoaderFactory)));
+		}
+
+		{
+			rkit::RCPtr<AnoxTextureResourceLoaderBase> texLoader;
+			RKIT_CHECK(AnoxTextureResourceLoaderBase::Create(texLoader));
+
+			RKIT_CHECK(RegisterContentKeyedLoader(resloaders::kTextureResourceTypeCode, std::move(texLoader)));
+		}
+
+		{
+			rkit::RCPtr<AnoxMaterialResourceLoaderBase> worldMaterialLoader;
+			RKIT_CHECK(AnoxMaterialResourceLoaderBase::Create(worldMaterialLoader, data::MaterialResourceType::kWorld));
+
+			RKIT_CHECK(RegisterContentKeyedLoader(resloaders::kWorldMaterialTypeCode, std::move(worldMaterialLoader)));
 		}
 
 		return rkit::ResultCode::kOK;

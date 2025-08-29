@@ -1,5 +1,7 @@
 #include "AnoxGameFileSystem.h"
 
+#include "rkit/Data/ContentID.h"
+
 #include "rkit/Core/Drivers.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/SystemDriver.h"
@@ -14,6 +16,7 @@ namespace anox
 
 		rkit::Result OpenNamedFileBlocking(rkit::RCPtr<rkit::Job> &openJob, const rkit::FutureContainerPtr<rkit::UniquePtr<rkit::ISeekableReadStream>> &outStream, const rkit::CIPathView &path) override;
 		rkit::Result OpenNamedFileAsync(rkit::RCPtr<rkit::Job> &openJob, const rkit::FutureContainerPtr<rkit::AsyncFileOpenReadResult> &outStream, const rkit::CIPathView &path) override;
+		rkit::Result OpenContentFileAsync(rkit::RCPtr<rkit::Job> &openJob, const rkit::FutureContainerPtr<rkit::AsyncFileOpenReadResult> &outStream, const rkit::data::ContentID &contentID) override;
 
 		rkit::IJobQueue &GetJobQueue() const override;
 
@@ -42,6 +45,18 @@ namespace anox
 		rkit::CIPath fullPath;
 		RKIT_CHECK(fullPath.Set(rkit::CIPathView("files")));
 		RKIT_CHECK(fullPath.Append(path));
+
+		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->AsyncOpenFileAsyncRead(m_jobQueue, openJob, nullptr, outStream, rkit::FileLocation::kGameDirectory, fullPath));
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result AnoxGameFileSystem::OpenContentFileAsync(rkit::RCPtr<rkit::Job> &openJob, const rkit::FutureContainerPtr<rkit::AsyncFileOpenReadResult> &outStream, const rkit::data::ContentID &contentID)
+	{
+		rkit::data::ContentIDString contentIDString = contentID.ToString();
+
+		rkit::CIPath fullPath;
+		RKIT_CHECK(fullPath.Set(rkit::CIPathView("content")));
+		RKIT_CHECK(fullPath.Append(rkit::CIPathView(contentIDString.ToStringView())));
 
 		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->AsyncOpenFileAsyncRead(m_jobQueue, openJob, nullptr, outStream, rkit::FileLocation::kGameDirectory, fullPath));
 		return rkit::ResultCode::kOK;

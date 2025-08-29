@@ -174,15 +174,15 @@ namespace anox { namespace buildsystem
 		return true;
 	}
 
-	rkit::Result MaterialCompiler::MaterialNodeTypeFromFourCC(MaterialNodeType &outNodeType, uint32_t nodeTypeFourCC)
+	rkit::Result MaterialCompiler::MaterialNodeTypeFromFourCC(data::MaterialResourceType &outNodeType, uint32_t nodeTypeFourCC)
 	{
 		switch (nodeTypeFourCC)
 		{
 		case anox::buildsystem::kFontMaterialNodeID:
-			outNodeType = MaterialNodeType::kFont;
+			outNodeType = data::MaterialResourceType::kFont;
 			break;
 		case anox::buildsystem::kWorldMaterialNodeID:
-			outNodeType = MaterialNodeType::kWorld;
+			outNodeType = data::MaterialResourceType::kWorld;
 			break;
 		default:
 			return rkit::ResultCode::kInternalError;
@@ -602,7 +602,7 @@ namespace anox { namespace buildsystem
 			RKIT_CHECK(TextureCompilerBase::CreateImportIdentifier(imageImport.m_identifier, imageImport.m_identifier, imageImport.m_disposition));
 		}
 
-		MaterialNodeType nodeType = MaterialNodeType::kCount;
+		data::MaterialResourceType nodeType = data::MaterialResourceType::kCount;
 
 		RKIT_CHECK(MaterialNodeTypeFromFourCC(nodeType, depsNode->GetDependencyNodeType()));
 
@@ -624,7 +624,7 @@ namespace anox { namespace buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result MaterialCompiler::ConstructAnalysisPath(rkit::CIPath &analysisPath, MaterialNodeType nodeType, const rkit::StringView &identifier)
+	rkit::Result MaterialCompiler::ConstructAnalysisPath(rkit::CIPath &analysisPath, data::MaterialResourceType nodeType, const rkit::StringView &identifier)
 	{
 		rkit::String pathStr;
 		RKIT_CHECK(pathStr.Format("anox/mat/{}/{}.a", static_cast<int>(nodeType), identifier.GetChars()));
@@ -634,7 +634,7 @@ namespace anox { namespace buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result MaterialCompiler::ConstructOutputPath(rkit::CIPath &outputPath, MaterialNodeType nodeType, const rkit::StringView &identifier)
+	rkit::Result MaterialCompiler::ConstructOutputPath(rkit::CIPath &outputPath, data::MaterialResourceType nodeType, const rkit::StringView &identifier)
 	{
 		rkit::String pathStr;
 		RKIT_CHECK(pathStr.Format("anox/mat/{}/{}", static_cast<int>(nodeType), identifier.GetChars()));
@@ -657,19 +657,19 @@ namespace anox { namespace buildsystem
 
 		ImageImportDisposition disposition = ImageImportDisposition::kCount;
 
-		MaterialNodeType nodeType = MaterialNodeType::kCount;
+		data::MaterialResourceType nodeType = data::MaterialResourceType::kCount;
 
 		RKIT_CHECK(MaterialNodeTypeFromFourCC(nodeType, depsNode->GetDependencyNodeType()));
 
 		// Don't fill in width and height
 		switch (nodeType)
 		{
-		case MaterialNodeType::kFont:
+		case data::MaterialResourceType::kFont:
 			analysisHeader.m_bilinear = false;
 			analysisHeader.m_mipMapped = false;
 			disposition = ImageImportDisposition::kGraphicTransparent;
 			break;
-		case MaterialNodeType::kWorld:
+		case data::MaterialResourceType::kWorld:
 			analysisHeader.m_bilinear = true;
 			analysisHeader.m_mipMapped = true;
 			disposition = ImageImportDisposition::kWorldAlphaTested;
@@ -726,7 +726,7 @@ namespace anox { namespace buildsystem
 		analysisHeader.m_materialType = data::MaterialType::kMissing;
 		analysisHeader.m_colorType = data::MaterialColorType::kRGBA;
 
-		MaterialNodeType nodeType = MaterialNodeType::kCount;
+		data::MaterialResourceType nodeType = data::MaterialResourceType::kCount;
 
 		RKIT_CHECK(MaterialNodeTypeFromFourCC(nodeType, depsNode->GetDependencyNodeType()));
 
@@ -873,7 +873,7 @@ namespace anox { namespace buildsystem
 			size_t m_uniqueIndex = 0;
 		};
 
-		MaterialNodeType nodeType = MaterialNodeType::kCount;
+		data::MaterialResourceType nodeType = data::MaterialResourceType::kCount;
 
 		RKIT_CHECK(MaterialNodeTypeFromFourCC(nodeType, depsNode->GetDependencyNodeType()));
 

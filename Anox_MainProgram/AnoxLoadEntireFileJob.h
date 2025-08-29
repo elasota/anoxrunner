@@ -13,6 +13,11 @@ namespace rkit
 
 	template<class T>
 	class Vector;
+
+	namespace data
+	{
+		struct ContentID;
+	}
 }
 
 namespace anox
@@ -23,4 +28,7 @@ namespace anox
 	// the completion job
 	rkit::Result CreateLoadEntireFileJob(rkit::RCPtr<rkit::Job> &outJob, const rkit::RCPtr<rkit::Vector<uint8_t>> &blob,
 		AnoxGameFileSystemBase &fileSystem, const rkit::CIPathView &path);
+
+	rkit::Result CreateLoadEntireFileJob(rkit::RCPtr<rkit::Job> &outJob, const rkit::RCPtr<rkit::Vector<uint8_t>> &blob,
+		AnoxGameFileSystemBase &fileSystem, const rkit::data::ContentID &contentID);
 }

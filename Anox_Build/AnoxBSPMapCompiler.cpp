@@ -2323,7 +2323,7 @@ namespace anox { namespace buildsystem
 			RKIT_CHECK(BSPMapCompiler::FormatWorldMaterialPath(materialIdentifier, path.ToString()));
 
 			rkit::CIPath compiledMaterialPath;
-			RKIT_CHECK(MaterialCompiler::ConstructOutputPath(compiledMaterialPath, MaterialCompiler::MaterialNodeType::kWorld, materialIdentifier));
+			RKIT_CHECK(MaterialCompiler::ConstructOutputPath(compiledMaterialPath, data::MaterialResourceType::kWorld, materialIdentifier));
 
 			rkit::data::ContentID contentID = {};
 

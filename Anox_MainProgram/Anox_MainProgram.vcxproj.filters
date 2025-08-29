@@ -75,6 +75,12 @@
     <ClCompile Include="AnoxLoadEntireFileJob.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="AnoxTextureResource.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="AnoxMaterialResource.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\anox\AnoxGraphicsSubsystem.h">
@@ -132,6 +138,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="AnoxMaterialResource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="AnoxTextureResource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

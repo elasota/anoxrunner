@@ -21,6 +21,11 @@ namespace rkit
 
 	class Job;
 	struct IJobQueue;
+
+	namespace data
+	{
+		struct ContentID;
+	}
 }
 
 namespace anox
@@ -31,5 +36,6 @@ namespace anox
 
 		virtual rkit::Result OpenNamedFileBlocking(rkit::RCPtr<rkit::Job> &openJob, const rkit::FutureContainerPtr<rkit::UniquePtr<rkit::ISeekableReadStream>> &outStream, const rkit::CIPathView &path) = 0;
 		virtual rkit::Result OpenNamedFileAsync(rkit::RCPtr<rkit::Job> &openJob, const rkit::FutureContainerPtr<rkit::AsyncFileOpenReadResult> &outStream, const rkit::CIPathView &path) = 0;
+		virtual rkit::Result OpenContentFileAsync(rkit::RCPtr<rkit::Job> &openJob, const rkit::FutureContainerPtr<rkit::AsyncFileOpenReadResult> &outStream, const rkit::data::ContentID &path) = 0;
 	};
 }
