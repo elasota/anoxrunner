@@ -12,6 +12,7 @@
 #include "rkit/Render/SwapChainFrame.h"
 
 #include "rkit/Core/Job.h"
+#include "rkit/Core/JobDependencyList.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/Vector.h"
 
@@ -173,7 +174,7 @@ namespace anox
 		rkit::UniquePtr<ISubmitJobRunner> acquireJobRunner;
 		RKIT_CHECK(rkit::New<AcquireJobRunner>(acquireJobRunner, *this, displayResources));
 
-		RKIT_CHECK(graphicsSubsystem.CreateAndQueueSubmitJob(&displayResources->m_acquireJob, LogicalQueueType::kPresentation, std::move(acquireJobRunner)));
+		RKIT_CHECK(graphicsSubsystem.CreateAndQueueSubmitJob(&displayResources->m_acquireJob, LogicalQueueType::kPresentation, std::move(acquireJobRunner), rkit::JobDependencyList()));
 
 		m_currentPerDisplayResources = displayResources;
 
@@ -189,7 +190,7 @@ namespace anox
 		RKIT_CHECK(rkit::New<PresentJobRunner>(presentJobRunner, *this, m_currentPerDisplayResources));
 
 		rkit::RCPtr<rkit::Job> presentJob;
-		RKIT_CHECK(graphicsSubsystem.CreateAndQueueSubmitJob(&presentJob, LogicalQueueType::kPresentation, std::move(presentJobRunner)));
+		RKIT_CHECK(graphicsSubsystem.CreateAndQueueSubmitJob(&presentJob, LogicalQueueType::kPresentation, std::move(presentJobRunner), rkit::JobDependencyList()));
 
 		m_currentPerDisplayResources.Reset();
 

@@ -24,7 +24,7 @@ namespace anox
 	class AnoxBSPModelResourceLoader final : public AnoxBSPModelResourceLoaderBase
 	{
 	public:
-		rkit::Result CreateLoadJob(const rkit::RCPtr<AnoxBSPModelResourceBase> &resource, AnoxResourceManagerBase &resManager, AnoxGameFileSystemBase &fileSystem, const rkit::CIPathView &key, rkit::RCPtr<rkit::Job> &outJob) const override;
+		rkit::Result CreateLoadJob(const rkit::RCPtr<AnoxBSPModelResourceBase> &resource, const AnoxResourceLoaderSystems &systems, const rkit::CIPathView &key, rkit::RCPtr<rkit::Job> &outJob) const override;
 		rkit::Result CreateResourceObject(rkit::UniquePtr<AnoxBSPModelResourceBase> &outResource) const override;
 	};
 
@@ -75,7 +75,7 @@ namespace anox
 	private:
 	};
 
-	rkit::Result AnoxBSPModelResourceLoader::CreateLoadJob(const rkit::RCPtr<AnoxBSPModelResourceBase> &resourceBase, AnoxResourceManagerBase &resManager, AnoxGameFileSystemBase &fileSystem, const rkit::CIPathView &key, rkit::RCPtr<rkit::Job> &outJob) const
+	rkit::Result AnoxBSPModelResourceLoader::CreateLoadJob(const rkit::RCPtr<AnoxBSPModelResourceBase> &resourceBase, const AnoxResourceLoaderSystems &systems, const rkit::CIPathView &key, rkit::RCPtr<rkit::Job> &outJob) const
 	{
 		// Jobs:
 		// - Load file job
@@ -84,6 +84,7 @@ namespace anox
 		// - Process job
 		rkit::RCPtr<AnoxBSPModelResource> resource = resourceBase.StaticCast<AnoxBSPModelResource>();
 
+		AnoxGameFileSystemBase &fileSystem = *systems.m_fileSystem;
 		rkit::IJobQueue &jobQueue = fileSystem.GetJobQueue();
 
 		rkit::RCPtr<AnoxBSPModelResourceLoaderState> loaderState;
@@ -97,7 +98,7 @@ namespace anox
 		RKIT_CHECK(CreateLoadEntireFileJob(loadFileJob, loaderState.FieldRef(&AnoxBSPModelResourceLoaderState::m_bspFileContents), fileSystem, key));
 
 		rkit::UniquePtr<rkit::IJobRunner> analysisJobRunner;
-		RKIT_CHECK(rkit::New<AnoxBSPLoaderAnalyzeJob>(analysisJobRunner, resource, loaderState, jobQueue, resManager, waitForDependenciesSignaller));
+		RKIT_CHECK(rkit::New<AnoxBSPLoaderAnalyzeJob>(analysisJobRunner, resource, loaderState, jobQueue, *systems.m_resManager, waitForDependenciesSignaller));
 
 		rkit::RCPtr<rkit::Job> analysisJob;
 		RKIT_CHECK(fileSystem.GetJobQueue().CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(analysisJobRunner), loadFileJob));

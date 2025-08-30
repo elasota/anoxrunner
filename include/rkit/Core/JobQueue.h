@@ -40,19 +40,14 @@ namespace rkit
 		kCount,
 	};
 
+	// This should not be constructed, since it can create additional temporaries
+	class JobDependencyList;
+
 	struct IJobQueue
 	{
 		virtual ~IJobQueue() {}
 
-		virtual Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<Job *> &dependencies) = 0;
-		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const Span<Job *> &dependencies);
-		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, Job *dependency);
-
-		virtual Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<RCPtr<Job> > &dependencies) = 0;
-		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const Span<const RCPtr<Job> > &dependencies);
-		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const RCPtr<Job> &dependency);
-
-		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, std::nullptr_t dependencies);
+		virtual Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const JobDependencyList &dependencies) = 0;
 
 		virtual Result CreateSignalledJob(RCPtr<JobSignaller> &outSignaler, RCPtr<Job> &outJob) = 0;
 
@@ -76,38 +71,5 @@ namespace rkit
 	};
 }
 
-#include "RefCounted.h"
-
-namespace rkit
-{
-	inline Result IJobQueue::CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const Span<Job *> &dependencies)
-	{
-		return this->CreateJob(outJob, jobType, std::move(jobRunner), dependencies.ToValueISpan());
-	}
-
-	inline Result IJobQueue::CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, Job *dependency)
-	{
-		if (dependency != nullptr)
-			return this->CreateJob(outJob, jobType, std::move(jobRunner), Span<Job *>(&dependency, 1));
-		else
-			return this->CreateJob(outJob, jobType, std::move(jobRunner), nullptr);
-	}
-
-	inline Result IJobQueue::CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const Span<const RCPtr<Job> > &dependencies)
-	{
-		return this->CreateJob(outJob, jobType, std::move(jobRunner), dependencies.ToValueISpan());
-	}
-
-	inline Result IJobQueue::CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const RCPtr<Job> &dependency)
-	{
-		if (dependency.IsValid())
-			return this->CreateJob(outJob, jobType, std::move(jobRunner), Span<const RCPtr<Job>>(&dependency, 1));
-		else
-			return this->CreateJob(outJob, jobType, std::move(jobRunner), nullptr);
-	}
-
-	inline Result IJobQueue::CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, std::nullptr_t dependencies)
-	{
-		return this->CreateJob(outJob, jobType, std::move(jobRunner), Span<Job *>());
-	}
-}
+// Include JobDependencyList since it's nearly always needed for this
+#include "rkit/Core/JobDependencyList.h"

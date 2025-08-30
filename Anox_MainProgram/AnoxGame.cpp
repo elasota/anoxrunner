@@ -125,6 +125,8 @@ namespace anox
 
 		RKIT_CHECK(IGraphicsSubsystem::Create(m_graphicsSubsystem, *m_fileSystem, *m_dataDriver, *m_threadPool, anox::RenderBackend::kVulkan));
 
+		m_resourceManager->SetGraphicsSubsystem(m_graphicsSubsystem.Get());
+
 		RKIT_CHECK(IGameLogic::Create(m_gameLogic, this));
 		RKIT_CHECK(m_gameLogic->Start());
 
@@ -138,7 +140,11 @@ namespace anox
 
 		RKIT_CHECK(m_graphicsSubsystem->RetireOldestFrame());
 
-		RKIT_CHECK(m_gameLogic->RunFrame());
+		rkit::Optional<rkit::render::DisplayMode> displayMode = m_graphicsSubsystem->GetDisplayMode();
+		if (displayMode.IsSet() && displayMode.Get() != rkit::render::DisplayMode::kSplash)
+		{
+			RKIT_CHECK(m_gameLogic->RunFrame());
+		}
 
 		RKIT_CHECK(m_graphicsSubsystem->StartRendering());
 

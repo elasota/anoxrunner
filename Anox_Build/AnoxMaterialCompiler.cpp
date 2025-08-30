@@ -992,6 +992,6 @@ namespace anox { namespace buildsystem
 
 	uint32_t MaterialCompiler::GetVersion() const
 	{
-		return 2;
+		return 3;
 	}
 } } // anox::buildsystem

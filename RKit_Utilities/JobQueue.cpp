@@ -151,8 +151,7 @@ namespace rkit { namespace utils
 		explicit JobQueue(IMallocDriver *alloc);
 		~JobQueue();
 
-		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<Job *> &dependencies) override;
-		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<RCPtr<Job> > &dependencies) override;
+		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const JobDependencyList &dependencies) override;
 
 		Result CreateSignalledJob(RCPtr<JobSignaller> &outSignaler, RCPtr<Job> &outJob) override;
 		Result CreateSignalJobRunner(UniquePtr<IJobRunner> &outJobRunner, const RCPtr<JobSignaller> &signaller) override;
@@ -493,11 +492,11 @@ namespace rkit { namespace utils
 		wti.m_jobWait.Unlink();
 	}
 
-	Result JobQueue::CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<Job *> &dependencies)
+	Result JobQueue::CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const JobDependencyList &dependencies)
 	{
 		UniquePtr<IJobRunner> jobRunnerTemp(std::move(jobRunner));
 
-		size_t numDependencies = dependencies.Count();
+		size_t numDependencies = dependencies.GetSpan().Count();
 
 		RCPtr<JobImpl> resultJob;
 		RKIT_CHECK(NewWithAlloc<JobImpl>(resultJob, m_alloc, *this, std::move(jobRunnerTemp), numDependencies, jobType));
@@ -509,7 +508,7 @@ namespace rkit { namespace utils
 		{
 			MutexLock lock(*m_depGraphMutex);
 
-			for (Job *job : dependencies)
+			for (Job *job : dependencies.GetSpan())
 			{
 				if (static_cast<JobImpl *>(job)->m_dgJobCompleted)
 					resultJob->m_numWaitingDependencies--;
@@ -524,13 +523,13 @@ namespace rkit { namespace utils
 
 			if (!isAborted)
 			{
-				for (Job *job : dependencies)
+				for (Job *job : dependencies.GetSpan())
 				{
 					if (!static_cast<JobImpl *>(job)->m_dgJobCompleted)
 						RKIT_CHECK(static_cast<JobImpl *>(job)->ReserveDownstreamDependency());
 				}
 
-				for (Job *job : dependencies)
+				for (Job *job : dependencies.GetSpan())
 				{
 					if (!static_cast<JobImpl *>(job)->m_dgJobCompleted)
 						*(static_cast<JobImpl *>(job)->GetLastDownstreamDependency()) = resultJob;
@@ -553,35 +552,6 @@ namespace rkit { namespace utils
 
 		return ResultCode::kOK;
 	}
-
-	Result JobQueue::CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const ISpan<RCPtr<Job> > &dependencies)
-	{
-		struct SpanConverter final : public rkit::ISpan<rkit::Job *>
-		{
-			explicit SpanConverter(const ISpan<RCPtr<Job> > &baseSpan)
-				: m_baseSpan(baseSpan)
-			{
-			}
-
-			size_t Count() const override
-			{
-				return m_baseSpan.Count();
-			}
-
-			rkit::Job *operator[](size_t index) const
-			{
-				return m_baseSpan[index].Get();
-			}
-
-		private:
-			const ISpan<RCPtr<Job> > &m_baseSpan;
-		};
-
-		SpanConverter spanConverter(dependencies);
-
-		return CreateJob(outJob, jobType, std::move(jobRunner), spanConverter);
-	}
-
 
 	Result JobQueue::CreateSignalledJob(RCPtr<JobSignaller> &outSignaler, RCPtr<Job> &outJob)
 	{

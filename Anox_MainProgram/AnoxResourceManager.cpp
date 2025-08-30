@@ -171,6 +171,8 @@ namespace anox
 
 		rkit::Result EnumerateCIPathKeyedResources(const rkit::CIPathView &basePath, rkit::Vector<rkit::CIPath> &outFiles, rkit::Vector<rkit::CIPath> &outDirectories) const override;
 
+		void SetGraphicsSubsystem(IGraphicsSubsystem *graphicSubsystem) override;
+
 		void UnsyncedUnregisterResource(const AnoxResourceTracker *tracker, bool wasLinked);
 
 	private:
@@ -195,6 +197,8 @@ namespace anox
 		rkit::HashMap<ResourceKey<rkit::StringView>, AnoxResourceTracker *> m_stringKeyedResources;
 		rkit::HashMap<ResourceKey<rkit::data::ContentID>, AnoxResourceTracker *> m_contentKeyedResources;
 		rkit::RCPtr<AnoxResourceLoaderSynchronizer> m_sync;
+
+		IGraphicsSubsystem *m_graphicsSubsystem = nullptr;
 
 		AnoxResourceTracker *m_firstResource = nullptr;
 		AnoxResourceTracker *m_lastResource = nullptr;
@@ -597,7 +601,14 @@ namespace anox
 		rkit::RCPtr<rkit::Job> loadJob;
 		const void *keyPtr = &keyedTracker->GetKey();
 
-		RKIT_CHECK(loader->BaseCreateLoadJob(resourceRCPtr, *this, *m_fileSystem, keyPtr, loadJob));
+		AnoxResourceLoaderSystems systems =
+		{
+			this,
+			m_fileSystem,
+			m_graphicsSubsystem
+		};
+
+		RKIT_CHECK(loader->BaseCreateLoadJob(resourceRCPtr, systems, keyPtr, loadJob));
 
 		{
 			rkit::ConstSpan<rkit::RCPtr<rkit::Job>> completeJobDepSpan;
@@ -632,6 +643,11 @@ namespace anox
 	rkit::Result AnoxResourceManager::EnumerateCIPathKeyedResources(const rkit::CIPathView &basePath, rkit::Vector<rkit::CIPath> &outFiles, rkit::Vector<rkit::CIPath> &outDirectories) const
 	{
 		return rkit::ResultCode::kNotYetImplemented;
+	}
+
+	void AnoxResourceManager::SetGraphicsSubsystem(IGraphicsSubsystem *graphicsSubsystem)
+	{
+		m_graphicsSubsystem = graphicsSubsystem;
 	}
 
 	void AnoxResourceManager::UnsyncedUnregisterResource(const AnoxResourceTracker *tracker, bool wasLinked)

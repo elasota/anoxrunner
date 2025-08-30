@@ -50,7 +50,7 @@ namespace anox { namespace data
 		static const uint32_t kExpectedMagic = RKIT_FOURCC('A', 'M', 'T', 'L');
 		static const uint32_t kExpectedVersion = 1;
 
-		rkit::endian::LittleUInt32_t m_magic;
+		rkit::endian::BigUInt32_t m_magic;
 		rkit::endian::LittleUInt32_t m_version;
 		rkit::endian::LittleUInt32_t m_width;
 		rkit::endian::LittleUInt32_t m_height;

@@ -18,6 +18,8 @@
 
 #include "rkit/Core/EnumMask.h"
 #include "rkit/Core/Job.h"
+#include "rkit/Core/JobDependencyList.h"
+#include "rkit/Core/JobQueue.h"
 #include "rkit/Core/Result.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/SpanProtos.h"
@@ -158,9 +160,9 @@ namespace anox
 		rkit::UniquePtr<RecordTestCommandsJobRunner> recordJobRunner;
 		RKIT_CHECK(rkit::New<RecordTestCommandsJobRunner>(recordJobRunner, submitJobRunner->GetCmdBatchRef(), perDisplayResources));
 
-		RKIT_CHECK(graphicsSubsystem.CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kGraphics, std::move(recordJobRunner), rkit::Span<rkit::RCPtr<rkit::Job>>(&perDisplayResources->m_acquireJob, 1).ToValueISpan()));
+		RKIT_CHECK(graphicsSubsystem.CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kGraphics, std::move(recordJobRunner), rkit::Span<rkit::RCPtr<rkit::Job>>(&perDisplayResources->m_acquireJob, 1)));
 
-		RKIT_CHECK(graphicsSubsystem.CreateAndQueueSubmitJob(&submitJob, LogicalQueueType::kGraphics, std::move(submitJobRunner), rkit::Span<rkit::RCPtr<rkit::Job>>(&recordJob, 1).ToValueISpan()));
+		RKIT_CHECK(graphicsSubsystem.CreateAndQueueSubmitJob(&submitJob, LogicalQueueType::kGraphics, std::move(submitJobRunner), rkit::Span<rkit::RCPtr<rkit::Job>>(&recordJob, 1)));
 
 		return rkit::ResultCode::kOK;
 	}
