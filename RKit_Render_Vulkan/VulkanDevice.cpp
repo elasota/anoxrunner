@@ -77,7 +77,11 @@ namespace rkit { namespace render { namespace vulkan
 
 		Result CreateSwapChainPrototype(UniquePtr<ISwapChainPrototype> &outSwapChainPrototype, IDisplay &display) override;
 
-		Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, UniquePtr<ISwapChainPrototype> &&prototype, uint8_t numImages, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) override;
+		Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, UniquePtr<ISwapChainPrototype> &&prototype, uint8_t numImages,
+			render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) override;
+
+		Result CreateTexturePrototype(UniquePtr<ITexturePrototype> &outTexturePrototype, const TextureSpec &textureSpec,
+			const EnumMask<TextureUsageFlag> &usage, const ConstSpan<IBaseCommandQueue *> &restrictedQueues) override;
 
 		Result LoadDeviceAPI();
 		Result CreatePools();
@@ -598,6 +602,12 @@ namespace rkit { namespace render { namespace vulkan
 		outSwapChain = std::move(vkSwapChain);
 
 		return ResultCode::kOK;
+	}
+
+	Result VulkanDevice::CreateTexturePrototype(UniquePtr<ITexturePrototype> &outTexturePrototype, const TextureSpec &textureSpec,
+		const EnumMask<TextureUsageFlag> &usage, const ConstSpan<IBaseCommandQueue *> &restrictedQueues)
+	{
+		return ResultCode::kNotYetImplemented;
 	}
 
 	Result VulkanDevice::LoadDeviceAPI()

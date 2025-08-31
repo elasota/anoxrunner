@@ -6,6 +6,9 @@
 
 namespace rkit
 {
+	template<class T>
+	class Span;
+
 	class FixedSizeMemoryStream final : public ISeekableReadWriteStream
 	{
 	public:
@@ -33,6 +36,7 @@ namespace rkit
 	class ReadOnlyMemoryStream final : public ISeekableReadStream
 	{
 	public:
+		explicit ReadOnlyMemoryStream(const Span<const uint8_t> &data);
 		explicit ReadOnlyMemoryStream(const void *data, size_t size);
 
 		Result ReadPartial(void *data, size_t count, size_t &outCountRead) override;
@@ -49,6 +53,7 @@ namespace rkit
 	};
 }
 
+#include "Span.h"
 #include "Result.h"
 
 #include <cstring>
@@ -161,6 +166,11 @@ inline rkit::FilePos_t rkit::FixedSizeMemoryStream::Tell() const
 inline rkit::FilePos_t rkit::FixedSizeMemoryStream::GetSize() const
 {
 	return m_size;
+}
+
+inline rkit::ReadOnlyMemoryStream::ReadOnlyMemoryStream(const Span<const uint8_t> &data)
+	: m_stream(const_cast<uint8_t *>(data.Ptr()), data.Count())
+{
 }
 
 inline rkit::ReadOnlyMemoryStream::ReadOnlyMemoryStream(const void *data, size_t size)

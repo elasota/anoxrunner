@@ -285,6 +285,23 @@ namespace rkit { namespace render
 		Count,
 	};
 
+	enum class TextureFormat
+	{
+		RGBA_UNorm8,
+		RGBA_UNorm8_sRGB,
+
+		Count,
+	};
+
+	enum class TextureUsageFlag
+	{
+		kCopySrc,
+		kCopyDest,
+		kSampled,
+
+		kCount,
+	};
+
 	enum class DepthStencilFormat
 	{
 		DepthFloat32,

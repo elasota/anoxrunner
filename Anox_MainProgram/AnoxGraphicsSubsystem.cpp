@@ -24,7 +24,8 @@
 #include "rkit/Render/RenderPassInstance.h"
 #include "rkit/Render/RenderPassResources.h"
 #include "rkit/Render/SwapChain.h"
-#include "rkit/Render/TexturePrototype.h"
+#include "rkit/Render/Texture.h"
+#include "rkit/Render/TextureSpec.h"
 
 #include "rkit/Utilities/ThreadPool.h"
 
@@ -42,6 +43,7 @@
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/Job.h"
 #include "rkit/Core/LogDriver.h"
+#include "rkit/Core/MemoryStream.h"
 #include "rkit/Core/Mutex.h"
 #include "rkit/Core/MutexLock.h"
 #include "rkit/Core/ModuleDriver.h"
@@ -71,10 +73,10 @@ namespace anox
 	class Texture final : public ITexture, public rkit::RefCounted
 	{
 	public:
-		void SetPrototype(rkit::UniquePtr<rkit::render::TexturePrototype> &&prototype);
+		void SetPrototype(rkit::UniquePtr<rkit::render::ITexturePrototype> &&prototype);
 
 	private:
-		rkit::UniquePtr<rkit::render::TexturePrototype> m_prototype;
+		rkit::UniquePtr<rkit::render::ITexturePrototype> m_prototype;
 	};
 
 	class GraphicsSubsystem final : public IGraphicsSubsystem, public rkit::NoCopy
@@ -100,7 +102,7 @@ namespace anox
 		rkit::Result CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies) override;
 		rkit::Result CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<ISubmitJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies) override;
 
-		rkit::Result CreateAsyncCreateTextureJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<ITexture> &outTexture, rkit::Vector<uint8_t> &&textureData, const rkit::JobDependencyList &dependencies) override;
+		rkit::Result CreateAsyncCreateTextureJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<ITexture> &outTexture, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData, const rkit::JobDependencyList &dependencies) override;
 
 		void MarkSetupStepCompleted();
 		void MarkSetupStepFailed();
@@ -296,14 +298,14 @@ namespace anox
 		class AllocateTextureStorageAndPostCopyJobRunner final : public rkit::IJobRunner
 		{
 		public:
-			explicit AllocateTextureStorageAndPostCopyJobRunner(GraphicsSubsystem &graphicsSubsystem, rkit::Vector<uint8_t> &&textureData,
+			explicit AllocateTextureStorageAndPostCopyJobRunner(GraphicsSubsystem &graphicsSubsystem, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData,
 				const rkit::RCPtr<rkit::JobSignaller> &doneCopyingSignaller);
 
 			rkit::Result Run() override;
 
 		private:
 			GraphicsSubsystem &m_graphicsSubsystem;
-			rkit::Vector<uint8_t> m_textureData;
+			const rkit::RCPtr<rkit::Vector<uint8_t>> m_textureData;
 			rkit::RCPtr<rkit::JobSignaller> m_doneCopyingSignaller;
 		};
 
@@ -796,16 +798,58 @@ namespace anox
 	}
 
 
-	GraphicsSubsystem::AllocateTextureStorageAndPostCopyJobRunner::AllocateTextureStorageAndPostCopyJobRunner(GraphicsSubsystem &graphicsSubsystem, rkit::Vector<uint8_t> &&textureData,
+	GraphicsSubsystem::AllocateTextureStorageAndPostCopyJobRunner::AllocateTextureStorageAndPostCopyJobRunner(GraphicsSubsystem &graphicsSubsystem, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData,
 		const rkit::RCPtr<rkit::JobSignaller> &doneCopyingSignaller)
 		: m_graphicsSubsystem(graphicsSubsystem)
-		, m_textureData(std::move(textureData))
+		, m_textureData(textureData)
 		, m_doneCopyingSignaller(doneCopyingSignaller)
 	{
 	}
 
 	rkit::Result GraphicsSubsystem::AllocateTextureStorageAndPostCopyJobRunner::Run()
 	{
+		rkit::render::TextureSpec spec = {};
+
+		rkit::data::DDSHeader ddsHeader = {};
+		rkit::data::DDSExtendedHeader extHeader = {};
+
+		rkit::ReadOnlyMemoryStream memStream(this->m_textureData.Get()->ToSpan());
+
+		RKIT_CHECK(memStream.ReadAll(&ddsHeader, sizeof(ddsHeader)));
+
+		const bool isExtended = (ddsHeader.m_pixelFormat.m_pixelFormatFlags.Get() & rkit::data::DDSPixelFormatFlags::kFourCC)
+			&& (ddsHeader.m_pixelFormat.m_fourCC.Get() == rkit::data::DDSFourCCs::kExtended);
+
+		if (isExtended)
+		{
+			RKIT_CHECK(memStream.ReadAll(&extHeader, sizeof(extHeader)));
+		}
+
+		if (ddsHeader.m_magic.Get() != rkit::data::DDSHeader::kExpectedMagic
+			|| ddsHeader.m_headerSizeMinus4.Get() != (sizeof(ddsHeader) - 4u))
+			return rkit::ResultCode::kDataError;
+
+		const uint32_t ddsFlags = ddsHeader.m_ddsFlags.Get();
+		const uint32_t width = ddsHeader.m_width.Get();
+		const uint32_t height = ddsHeader.m_height.Get();
+		const uint32_t depth = ddsHeader.m_depth.Get();
+		const uint32_t levels = ddsHeader.m_mipMapCount.Get();
+		const uint32_t pitchOrLinearSize = ddsHeader.m_pitchOrLinearSize.Get();
+
+		if (width == 0 || height == 0)
+			return rkit::ResultCode::kDataError;
+
+		const uint32_t maxLevels = static_cast<uint32_t>(rkit::Max(rkit::FindHighestSetBit(width), rkit::FindHighestSetBit(height)) + 1);
+
+		const rkit::data::DDSPixelFormat &pixelFormat = ddsHeader.m_pixelFormat;
+
+		const uint32_t caps1 = ddsHeader.m_caps.Get();
+		const uint32_t caps2 = ddsHeader.m_caps2.Get();
+		const uint32_t caps3 = ddsHeader.m_caps3.Get();
+		const uint32_t caps4 = ddsHeader.m_caps4.Get();
+
+		rkit::UniquePtr<rkit::render::ITexturePrototype> prototype;
+		//m_graphicsSubsystem.m_renderDevice->CreateTexturePrototype(prototype, 
 		return rkit::ResultCode::kNotYetImplemented;
 	}
 
@@ -1807,7 +1851,7 @@ namespace anox
 		return this->CreateAndQueueJob(outJob, queueType, std::move(runSubmitJobRunner), dependencies, &LogicalQueueBase::m_lastSubmitJob);
 	}
 
-	rkit::Result GraphicsSubsystem::CreateAsyncCreateTextureJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<ITexture> &outTexture, rkit::Vector<uint8_t> &&textureData, const rkit::JobDependencyList &dependencies)
+	rkit::Result GraphicsSubsystem::CreateAsyncCreateTextureJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<ITexture> &outTexture, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData, const rkit::JobDependencyList &dependencies)
 	{
 		rkit::RCPtr<Texture> texture;
 		RKIT_CHECK(rkit::New<Texture>(texture));

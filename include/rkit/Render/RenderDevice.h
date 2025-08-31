@@ -18,8 +18,14 @@ namespace rkit
 	template<class T>
 	struct ISpan;
 
+	template<class T>
+	class Span;
+
 	template<class T, class TUserdata>
 	class CallbackSpan;
+
+	template<class T>
+	class EnumMask;
 
 	namespace data
 	{
@@ -42,6 +48,8 @@ namespace rkit { namespace render
 	struct IRenderDeviceCaps;
 	struct ISwapChainPrototype;
 	struct ISwapChain;
+	struct ITexturePrototype;
+	struct TextureSpec;
 	struct IDisplay;
 	struct ICopyCommandAllocator;
 	struct IComputeCommandAllocator;
@@ -77,7 +85,9 @@ namespace rkit { namespace render
 			UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart) = 0;
 
 		virtual Result CreateSwapChainPrototype(UniquePtr<ISwapChainPrototype> &outSwapChainPrototype, IDisplay &display) = 0;
-
 		virtual Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, UniquePtr<ISwapChainPrototype> &&prototype, uint8_t numImages, RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) = 0;
+
+		virtual Result CreateTexturePrototype(UniquePtr<ITexturePrototype> &outTexturePrototype, const TextureSpec &textureSpec,
+			const EnumMask<TextureUsageFlag> &usage, const Span<IBaseCommandQueue * const> &restrictedQueues) = 0;
 	};
 } } // rkit::render

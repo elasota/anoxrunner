@@ -38,7 +38,7 @@ namespace anox
 		rkit::RCPtr<rkit::Job> loadJob;
 		RKIT_CHECK(CreateLoadEntireFileJob(loadJob, state.FieldRef(&AnoxTextureResourceLoaderState::m_data), *systems.m_fileSystem, key));
 
-		RKIT_CHECK(systems.m_graphicsSystem->CreateAsyncCreateTextureJob(&outJob, resource.StaticCast<AnoxTextureResource>()->m_texture, std::move(state->m_data), loadJob));
+		RKIT_CHECK(systems.m_graphicsSystem->CreateAsyncCreateTextureJob(&outJob, resource.StaticCast<AnoxTextureResource>()->m_texture, state.FieldRef(&AnoxTextureResourceLoaderState::m_data), loadJob));
 
 		return rkit::ResultCode::kOK;
 	}
