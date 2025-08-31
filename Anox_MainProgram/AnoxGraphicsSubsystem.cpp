@@ -817,7 +817,9 @@ namespace anox
 
 		RKIT_CHECK(memStream.ReadAll(&ddsHeader, sizeof(ddsHeader)));
 
-		const bool isExtended = (ddsHeader.m_pixelFormat.m_pixelFormatFlags.Get() & rkit::data::DDSPixelFormatFlags::kFourCC)
+		const bool isExtended =
+			(ddsHeader.m_ddsFlags.Get() & rkit::data::DDSFlags::kPixelFormat)
+			&& (ddsHeader.m_pixelFormat.m_pixelFormatFlags.Get() & rkit::data::DDSPixelFormatFlags::kFourCC)
 			&& (ddsHeader.m_pixelFormat.m_fourCC.Get() == rkit::data::DDSFourCCs::kExtended);
 
 		if (isExtended)
@@ -825,31 +827,167 @@ namespace anox
 			RKIT_CHECK(memStream.ReadAll(&extHeader, sizeof(extHeader)));
 		}
 
+		const size_t headerSize = static_cast<size_t>(memStream.Tell());
+
 		if (ddsHeader.m_magic.Get() != rkit::data::DDSHeader::kExpectedMagic
 			|| ddsHeader.m_headerSizeMinus4.Get() != (sizeof(ddsHeader) - 4u))
 			return rkit::ResultCode::kDataError;
 
 		const uint32_t ddsFlags = ddsHeader.m_ddsFlags.Get();
-		const uint32_t width = ddsHeader.m_width.Get();
-		const uint32_t height = ddsHeader.m_height.Get();
-		const uint32_t depth = ddsHeader.m_depth.Get();
-		const uint32_t levels = ddsHeader.m_mipMapCount.Get();
+		const uint32_t width = (ddsFlags & rkit::data::DDSFlags::kWidth) ? ddsHeader.m_width.Get() : 1;
+		const uint32_t height = (ddsFlags & rkit::data::DDSFlags::kHeight) ? ddsHeader.m_height.Get() : 1;
+		const uint32_t depth = (ddsFlags & rkit::data::DDSFlags::kDepth) ? ddsHeader.m_depth.Get() : 1;
+		const uint32_t levels = (ddsFlags & rkit::data::DDSFlags::kMipMapCount) ? ddsHeader.m_depth.Get() : 1;
 		const uint32_t pitchOrLinearSize = ddsHeader.m_pitchOrLinearSize.Get();
 
-		if (width == 0 || height == 0)
+		if (width == 0 || height == 0 || depth == 0)
 			return rkit::ResultCode::kDataError;
 
 		const uint32_t maxLevels = static_cast<uint32_t>(rkit::Max(rkit::FindHighestSetBit(width), rkit::FindHighestSetBit(height)) + 1);
-
-		const rkit::data::DDSPixelFormat &pixelFormat = ddsHeader.m_pixelFormat;
+		if (levels > maxLevels)
+			return rkit::ResultCode::kDataError;
 
 		const uint32_t caps1 = ddsHeader.m_caps.Get();
 		const uint32_t caps2 = ddsHeader.m_caps2.Get();
 		const uint32_t caps3 = ddsHeader.m_caps3.Get();
 		const uint32_t caps4 = ddsHeader.m_caps4.Get();
 
+		rkit::render::TextureFormat textureFormat = rkit::render::TextureFormat::Count;
+
+		uint32_t arraySize = 1;
+		uint32_t cubeSides = 1;
+
+		uint32_t pixelBlockWidth = 1;
+		uint32_t pixelBlockHeight = 1;
+		uint32_t pixelBlockSizeBytes = 0;
+
+		uint32_t maxDimension = 0;
+		uint32_t maxLayers = 1;
+
+		if (cubeSides == 1)
+		{
+			if (depth == 1)
+				maxDimension = m_graphicsSubsystem.GetDevice()->GetCaps().GetUInt32Cap(rkit::render::RenderDeviceUInt32Cap::kMaxTexture2DSize);
+			else
+				maxDimension = m_graphicsSubsystem.GetDevice()->GetCaps().GetUInt32Cap(rkit::render::RenderDeviceUInt32Cap::kMaxTexture3DSize);
+		}
+		else
+		{
+			maxDimension = m_graphicsSubsystem.GetDevice()->GetCaps().GetUInt32Cap(rkit::render::RenderDeviceUInt32Cap::kMaxTextureCubeSize);
+		}
+
+		if (ddsFlags & rkit::data::DDSFlags::kPixelFormat)
+		{
+			const rkit::data::DDSPixelFormat &pixelFormat = ddsHeader.m_pixelFormat;
+
+			const uint32_t pixelFormatFlags = (pixelFormat.m_pixelFormatFlags.Get());
+
+			if (pixelFormatFlags & rkit::data::DDSPixelFormatFlags::kFourCC)
+			{
+			}
+			else
+			{
+				const uint32_t rMask = pixelFormat.m_rBitMask.Get();
+				const uint32_t gMask = pixelFormat.m_gBitMask.Get();
+				const uint32_t bMask = pixelFormat.m_bBitMask.Get();
+				const uint32_t aMask = pixelFormat.m_aBitMask.Get();
+
+				const uint32_t bitCount = pixelFormat.m_rgbBitCount.Get();
+
+				const uint32_t rgbaFlags = (rkit::data::DDSPixelFormatFlags::kRGB | rkit::data::DDSPixelFormatFlags::kAlphaPixels);
+				if ((pixelFormatFlags & rgbaFlags) == rgbaFlags
+					&& bitCount == 32
+					&& rMask == 0x000000ff
+					&& gMask == 0x0000ff00
+					&& bMask == 0x00ff0000
+					&& aMask == 0xff000000)
+				{
+					textureFormat = rkit::render::TextureFormat::RGBA_UNorm8;
+				}
+
+				if (textureFormat != rkit::render::TextureFormat::Count && (ddsFlags & rkit::data::DDSFlags::kPitch))
+				{
+					pixelBlockSizeBytes = bitCount / 8u;
+					if (pitchOrLinearSize % pixelBlockSizeBytes != 0 || pitchOrLinearSize / pixelBlockSizeBytes != width)
+						return rkit::ResultCode::kDataError;
+				}
+			}
+		}
+
+		if (textureFormat == rkit::render::TextureFormat::Count)
+			return rkit::ResultCode::kDataError;
+
+		if (width > maxDimension || height > maxDimension || depth > maxDimension || arraySize > maxLayers)
+		{
+			return rkit::ResultCode::kDataError;
+		}
+
+		rkit::render::TextureSpec textureSpec = {};
+		textureSpec.m_format = textureFormat;
+		textureSpec.m_width = width;
+		textureSpec.m_height = height;
+		textureSpec.m_depth = depth;
+		textureSpec.m_mipLevels = levels;
+		textureSpec.m_arrayLayers = arraySize;
+
+		size_t totalBytesRequired = 0;
+
+		for (uint32_t level = 0; level < levels; level++)
+		{
+			const uint32_t levelWidth = rkit::Max<uint32_t>(width >> level, 1);
+			const uint32_t levelHeight = rkit::Max<uint32_t>(height >> level, 1);
+			const uint32_t levelDepth = rkit::Max<uint32_t>(depth >> level, 1);
+
+			const uint32_t levelBlockCols = (levelWidth + pixelBlockWidth - 1) / pixelBlockWidth;
+			const uint32_t levelBlockRows = (levelHeight + pixelBlockHeight - 1) / pixelBlockHeight;
+
+			const uint32_t multipliers[] =
+			{
+				levelBlockCols,
+				levelBlockRows,
+				pixelBlockSizeBytes,
+				levelDepth,
+				arraySize,
+				cubeSides,
+			};
+
+			size_t levelBytesRequired = 1;
+			if (level == 0)
+			{
+				for (uint32_t multiplier : multipliers)
+				{
+					if (std::numeric_limits<size_t>::max() / levelBytesRequired < multiplier)
+						return rkit::ResultCode::kDataError;
+
+					levelBytesRequired *= multiplier;
+				}
+			}
+			else
+			{
+				for (uint32_t multiplier : multipliers)
+					levelBytesRequired *= multiplier;
+			}
+
+			RKIT_CHECK(rkit::SafeAdd<size_t>(totalBytesRequired, levelBytesRequired, totalBytesRequired));
+		}
+
+		const size_t textureDataSize = m_textureData->Count() - static_cast<size_t>(headerSize);
+		if (textureDataSize < totalBytesRequired)
+			return rkit::ResultCode::kDataError;
+
+		rkit::render::TextureResourceSpec resSpec = {};
+		resSpec.m_usage.Add({ rkit::render::TextureUsageFlag::kCopyDest, rkit::render::TextureUsageFlag::kSampled });
+
+		rkit::StaticArray<rkit::render::IBaseCommandQueue *, 2> usedQueuesList;
+		usedQueuesList[0] = m_graphicsSubsystem.m_dmaQueue;
+		usedQueuesList[1] = m_graphicsSubsystem.m_graphicsQueue;
+
+		rkit::Span<rkit::render::IBaseCommandQueue *> usedQueues = usedQueuesList.ToSpan();
+		if (usedQueues[0] == usedQueues[1])
+			usedQueues = usedQueues.SubSpan(0, 1);
+
 		rkit::UniquePtr<rkit::render::ITexturePrototype> prototype;
-		//m_graphicsSubsystem.m_renderDevice->CreateTexturePrototype(prototype, 
+		RKIT_CHECK(m_graphicsSubsystem.m_renderDevice->CreateTexturePrototype(prototype, textureSpec, resSpec, usedQueues));
 		return rkit::ResultCode::kNotYetImplemented;
 	}
 
@@ -1185,6 +1323,8 @@ namespace anox
 
 		rkit::render::RenderDeviceCaps requiredCaps;
 		rkit::render::RenderDeviceCaps optionalCaps;
+
+		requiredCaps.SetUInt32Cap(rkit::render::RenderDeviceUInt32Cap::kMaxTexture2DSize, 1024);
 
 		rkit::UniquePtr<rkit::render::IRenderDevice> device;
 		RKIT_CHECK(renderDriver->CreateDevice(device, queueRequests.ToSpan(), requiredCaps, optionalCaps, *adapters[0]));

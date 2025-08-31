@@ -81,7 +81,7 @@ namespace rkit { namespace render { namespace vulkan
 			render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) override;
 
 		Result CreateTexturePrototype(UniquePtr<ITexturePrototype> &outTexturePrototype, const TextureSpec &textureSpec,
-			const EnumMask<TextureUsageFlag> &usage, const ConstSpan<IBaseCommandQueue *> &restrictedQueues) override;
+			const TextureResourceSpec &resSpec, const ConstSpan<IBaseCommandQueue *> &restrictedQueues) override;
 
 		Result LoadDeviceAPI();
 		Result CreatePools();
@@ -605,7 +605,7 @@ namespace rkit { namespace render { namespace vulkan
 	}
 
 	Result VulkanDevice::CreateTexturePrototype(UniquePtr<ITexturePrototype> &outTexturePrototype, const TextureSpec &textureSpec,
-		const EnumMask<TextureUsageFlag> &usage, const ConstSpan<IBaseCommandQueue *> &restrictedQueues)
+		const TextureResourceSpec &resSpec, const ConstSpan<IBaseCommandQueue *> &restrictedQueues)
 	{
 		return ResultCode::kNotYetImplemented;
 	}

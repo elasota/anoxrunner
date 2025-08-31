@@ -486,16 +486,16 @@ template<class T>
 T rkit::Min(const T &a, const T &b)
 {
 	if (b > a)
-		return b;
-	return a;
+		return a;
+	return b;
 }
 
 template<class T>
 T rkit::Max(const T &a, const T &b)
 {
 	if (b < a)
-		return b;
-	return a;
+		return a;
+	return b;
 }
 
 template<class TLeft, class TRight>

@@ -62,7 +62,7 @@ namespace rkit { namespace render
 		virtual ~IRenderDriver() {}
 
 		virtual Result EnumerateAdapters(Vector<UniquePtr<IRenderAdapter>> &devices) const = 0;
-		virtual Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, const IRenderDeviceCaps &optionalCaps, const IRenderDeviceCaps &requiredCaps, IRenderAdapter &adapter) = 0;
+		virtual Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, const IRenderDeviceCaps &requiredCaps, const IRenderDeviceCaps &optionalCaps, IRenderAdapter &adapter) = 0;
 	};
 } } // rkit::render
 

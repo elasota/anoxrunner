@@ -118,7 +118,7 @@ namespace rkit { namespace render { namespace vulkan
 		bool IsInstanceExtensionEnabled(const char *layerName, const StringView &extName) const;
 
 		Result EnumerateAdapters(Vector<UniquePtr<IRenderAdapter>> &adapters) const override;
-		Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, const IRenderDeviceCaps &optionalCaps, const IRenderDeviceCaps &requiredCaps, IRenderAdapter &adapter) override;
+		Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, const IRenderDeviceCaps &requiredCaps, const IRenderDeviceCaps &optionalCaps, IRenderAdapter &adapter) override;
 
 		const VulkanGlobalAPI &GetGlobalAPI() const;
 		const VulkanInstanceAPI &GetInstanceAPI() const;
@@ -146,17 +146,22 @@ namespace rkit { namespace render { namespace vulkan
 			bool m_isAvailableInBase = false;
 		};
 
-		class FeatureSyncer
+		class CapsSyncer
 		{
 		public:
-			FeatureSyncer(const RenderDeviceCaps &availableCaps, VkPhysicalDeviceFeatures &enabledFeatures, const VkPhysicalDeviceFeatures &supportedFeatures);
+			CapsSyncer(const RenderDeviceCaps &wantedCaps, RenderDeviceCaps &grantedCaps,
+				VkPhysicalDeviceFeatures &enabledFeatures, const VkPhysicalDeviceFeatures &supportedFeatures,
+				const VkPhysicalDeviceLimits &limits);
 
-			void SyncOptionalCap(RenderDeviceBoolCap cap, VkBool32 (VkPhysicalDeviceFeatures::*featureFlag)) const;
+			void SyncFeature(RenderDeviceBoolCap cap, VkBool32 (VkPhysicalDeviceFeatures::*featureFlag)) const;
+			void SyncLimit(RenderDeviceUInt32Cap cap, uint32_t limit) const;
 
 		private:
-			const RenderDeviceCaps &m_availableCaps;
+			const RenderDeviceCaps &m_wantedCaps;
+			RenderDeviceCaps &m_grantedCaps;
 			VkPhysicalDeviceFeatures &m_enabledFeatures;
 			const VkPhysicalDeviceFeatures &m_supportedFeatures;
+			const VkPhysicalDeviceLimits &m_limits;
 		};
 
 		class InstanceExtensionEnumerator final : public platform::IInstanceExtensionEnumerator
@@ -494,13 +499,8 @@ namespace rkit { namespace render { namespace vulkan
 		return ResultCode::kOK;
 	}
 
-	Result RenderVulkanDriver::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, const IRenderDeviceCaps &optionalCaps, const IRenderDeviceCaps &requiredCaps, IRenderAdapter &adapter)
+	Result RenderVulkanDriver::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, const IRenderDeviceCaps &requiredCaps, const IRenderDeviceCaps &optionalCaps, IRenderAdapter &adapter)
 	{
-		render::RenderDeviceCaps enabledCaps;
-
-		enabledCaps.RaiseTo(optionalCaps);
-		enabledCaps.RaiseTo(requiredCaps);
-
 		RenderVulkanAdapter &vkAdapter = static_cast<RenderVulkanAdapter &>(adapter);
 
 		RCPtr<RenderVulkanPhysicalDevice> rPhysDevice(&vkAdapter.GetPhysicalDevice());
@@ -510,18 +510,31 @@ namespace rkit { namespace render { namespace vulkan
 		VkPhysicalDeviceFeatures supportedFeatures = {};
 		m_vki.vkGetPhysicalDeviceFeatures(physDevice, &supportedFeatures);
 
+		VkPhysicalDeviceProperties deviceProperties = {};
+		m_vki.vkGetPhysicalDeviceProperties(physDevice, &deviceProperties);
+
 		VkPhysicalDeviceFeatures enabledFeatures = {};
 
-		if (!enabledCaps.MeetsOrExceeds(requiredCaps))
+		render::RenderDeviceCaps wantedCaps;
+		wantedCaps.RaiseTo(optionalCaps);
+		wantedCaps.RaiseTo(requiredCaps);
+
+		render::RenderDeviceCaps grantedCaps;
+
+		CapsSyncer syncer(wantedCaps, grantedCaps, enabledFeatures, supportedFeatures, deviceProperties.limits);
+
+		syncer.SyncFeature(RenderDeviceBoolCap::kIndependentBlend, &VkPhysicalDeviceFeatures::independentBlend);
+		syncer.SyncLimit(RenderDeviceUInt32Cap::kMaxTexture1DSize, deviceProperties.limits.maxImageDimension1D);
+		syncer.SyncLimit(RenderDeviceUInt32Cap::kMaxTexture2DSize, deviceProperties.limits.maxImageDimension2D);
+		syncer.SyncLimit(RenderDeviceUInt32Cap::kMaxTexture3DSize, deviceProperties.limits.maxImageDimension3D);
+		syncer.SyncLimit(RenderDeviceUInt32Cap::kMaxTextureCubeSize, deviceProperties.limits.maxImageDimensionCube);
+		syncer.SyncLimit(RenderDeviceUInt32Cap::kMaxTextureArrayLayers, deviceProperties.limits.maxImageArrayLayers);
+
+		if (!grantedCaps.MeetsOrExceeds(requiredCaps))
 		{
 			rkit::log::Error("Device failed to meet capability requirements");
 			return ResultCode::kOperationFailed;
 		}
-
-		FeatureSyncer syncer(enabledCaps, enabledFeatures, supportedFeatures);
-
-		syncer.SyncOptionalCap(RenderDeviceBoolCap::kIndependentBlend, &VkPhysicalDeviceFeatures::independentBlend);
-
 
 		Vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 		VulkanDeviceBase::QueueFamilySpec queueFamilySpecs[static_cast<size_t>(CommandQueueType::kCount)];
@@ -641,7 +654,7 @@ namespace rkit { namespace render { namespace vulkan
 		VkDevice device = VK_NULL_HANDLE;
 		RKIT_VK_CHECK(m_vki.vkCreateDevice(rPhysDevice->GetPhysDevice(), &devCreateInfo, GetAllocCallbacks(), &device));
 
-		Result wrapDeviceResult = VulkanDeviceBase::CreateDevice(outDevice, m_vkg, m_vki, m_vkg_p, m_vki_p, m_vkInstance, device, queueFamilySpecs, GetAllocCallbacks(), enabledCaps, rPhysDevice, std::move(enabledExts));
+		Result wrapDeviceResult = VulkanDeviceBase::CreateDevice(outDevice, m_vkg, m_vki, m_vkg_p, m_vki_p, m_vkInstance, device, queueFamilySpecs, GetAllocCallbacks(), grantedCaps, rPhysDevice, std::move(enabledExts));
 		if (!utils::ResultIsOK(wrapDeviceResult))
 		{
 			m_vki.vkDestroyDevice(device, GetAllocCallbacks());
@@ -785,23 +798,39 @@ namespace rkit { namespace render { namespace vulkan
 	{
 	}
 
-	RenderVulkanDriver::FeatureSyncer::FeatureSyncer(const RenderDeviceCaps &availableCaps, VkPhysicalDeviceFeatures &enabledFeatures, const VkPhysicalDeviceFeatures &supportedFeatures)
-		: m_availableCaps(availableCaps)
+	RenderVulkanDriver::CapsSyncer::CapsSyncer(const RenderDeviceCaps &wantedCaps, RenderDeviceCaps &grantedCaps,
+		VkPhysicalDeviceFeatures &enabledFeatures, const VkPhysicalDeviceFeatures &supportedFeatures,
+		const VkPhysicalDeviceLimits &limits)
+		: m_wantedCaps(wantedCaps)
+		, m_grantedCaps(grantedCaps)
 		, m_enabledFeatures(enabledFeatures)
 		, m_supportedFeatures(supportedFeatures)
+		, m_limits(limits)
 	{
 	}
 
-	void RenderVulkanDriver::FeatureSyncer::SyncOptionalCap(RenderDeviceBoolCap cap, VkBool32(VkPhysicalDeviceFeatures:: *featureFlag)) const
+	void RenderVulkanDriver::CapsSyncer::SyncFeature(RenderDeviceBoolCap cap, VkBool32(VkPhysicalDeviceFeatures:: *featureFlag)) const
 	{
-		if (m_availableCaps.GetBoolCap(cap))
+		if (m_wantedCaps.GetBoolCap(cap))
 		{
 			const VkBool32 *supportedLoc = &(m_supportedFeatures.*featureFlag);
 			VkBool32 *enabledLoc = &(m_enabledFeatures.*featureFlag);
 
 			if (*supportedLoc)
+			{
 				*enabledLoc = VK_TRUE;
+				m_grantedCaps.SetBoolCap(cap, true);
+			}
 		}
+	}
+
+	void RenderVulkanDriver::CapsSyncer::SyncLimit(RenderDeviceUInt32Cap cap, uint32_t limit) const
+	{
+		const uint32_t wantedAmount = m_wantedCaps.GetUInt32Cap(cap);
+		if (wantedAmount < limit)
+			m_grantedCaps.SetUInt32Cap(cap, wantedAmount);
+		else
+			m_grantedCaps.SetUInt32Cap(cap, limit);
 	}
 
 	RenderVulkanDriver::InstanceExtensionEnumerator::InstanceExtensionEnumerator(Vector<QueryItem> &layers, Vector<QueryItem> &extensions)

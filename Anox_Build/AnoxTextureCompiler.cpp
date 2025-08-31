@@ -1034,7 +1034,7 @@ namespace anox { namespace buildsystem
 		}
 		else
 		{
-			uint32_t pitch = (images[0].GetWidth() * pixelSize + 3) / 4;
+			uint32_t pitch = (images[0].GetWidth() * pixelSize);
 			ddsHeader.m_pitchOrLinearSize = pitch;
 		}
 
@@ -1184,7 +1184,7 @@ namespace anox { namespace buildsystem
 
 	uint32_t TextureCompiler::GetVersion() const
 	{
-		return 1;
+		return 2;
 	}
 
 	rkit::Result TextureCompilerBase::ResolveIntermediatePath(rkit::String &outString, const rkit::StringView &identifierWithDisposition)

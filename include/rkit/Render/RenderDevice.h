@@ -50,6 +50,7 @@ namespace rkit { namespace render
 	struct ISwapChain;
 	struct ITexturePrototype;
 	struct TextureSpec;
+	struct TextureResourceSpec;
 	struct IDisplay;
 	struct ICopyCommandAllocator;
 	struct IComputeCommandAllocator;
@@ -88,6 +89,6 @@ namespace rkit { namespace render
 		virtual Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, UniquePtr<ISwapChainPrototype> &&prototype, uint8_t numImages, RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) = 0;
 
 		virtual Result CreateTexturePrototype(UniquePtr<ITexturePrototype> &outTexturePrototype, const TextureSpec &textureSpec,
-			const EnumMask<TextureUsageFlag> &usage, const Span<IBaseCommandQueue * const> &restrictedQueues) = 0;
+			const TextureResourceSpec &resourceSpec, const Span<IBaseCommandQueue * const> &restrictedQueues) = 0;
 	};
 } } // rkit::render
