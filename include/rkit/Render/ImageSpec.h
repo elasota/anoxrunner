@@ -4,7 +4,7 @@
 #include "rkit/Render/RenderEnums.h"
 
 namespace rkit { namespace render {
-	struct TextureSpec
+	struct ImageSpec
 	{
 		TextureFormat m_format = TextureFormat::Count;
 		bool m_cubeMap = false;
@@ -17,7 +17,7 @@ namespace rkit { namespace render {
 		uint32_t m_arrayLayers = 1;
 	};
 
-	struct TextureResourceSpec
+	struct ImageResourceSpec
 	{
 		EnumMask<TextureUsageFlag> m_usage;
 		bool m_linearLayout = false;

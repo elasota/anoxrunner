@@ -14,6 +14,10 @@
 #include "rkit/Render/CommandQueue.h"
 #include "rkit/Render/DeviceCaps.h"
 #include "rkit/Render/DisplayManager.h"
+#include "rkit/Render/HeapSpec.h"
+#include "rkit/Render/ImageResource.h"
+#include "rkit/Render/ImageSpec.h"
+#include "rkit/Render/Memory.h"
 #include "rkit/Render/PipelineLibrary.h"
 #include "rkit/Render/PipelineLibraryItem.h"
 #include "rkit/Render/PipelineLibraryItemProtos.h"
@@ -24,8 +28,6 @@
 #include "rkit/Render/RenderPassInstance.h"
 #include "rkit/Render/RenderPassResources.h"
 #include "rkit/Render/SwapChain.h"
-#include "rkit/Render/Texture.h"
-#include "rkit/Render/TextureSpec.h"
 
 #include "rkit/Utilities/ThreadPool.h"
 
@@ -73,10 +75,10 @@ namespace anox
 	class Texture final : public ITexture, public rkit::RefCounted
 	{
 	public:
-		void SetPrototype(rkit::UniquePtr<rkit::render::ITexturePrototype> &&prototype);
+		void SetPrototype(rkit::UniquePtr<rkit::render::IImagePrototype> &&prototype);
 
 	private:
-		rkit::UniquePtr<rkit::render::ITexturePrototype> m_prototype;
+		rkit::UniquePtr<rkit::render::IImagePrototype> m_prototype;
 	};
 
 	class GraphicsSubsystem final : public IGraphicsSubsystem, public rkit::NoCopy
@@ -808,7 +810,7 @@ namespace anox
 
 	rkit::Result GraphicsSubsystem::AllocateTextureStorageAndPostCopyJobRunner::Run()
 	{
-		rkit::render::TextureSpec spec = {};
+		rkit::render::ImageSpec spec = {};
 
 		rkit::data::DDSHeader ddsHeader = {};
 		rkit::data::DDSExtendedHeader extHeader = {};
@@ -922,7 +924,7 @@ namespace anox
 			return rkit::ResultCode::kDataError;
 		}
 
-		rkit::render::TextureSpec textureSpec = {};
+		rkit::render::ImageSpec textureSpec = {};
 		textureSpec.m_format = textureFormat;
 		textureSpec.m_width = width;
 		textureSpec.m_height = height;
@@ -975,19 +977,25 @@ namespace anox
 		if (textureDataSize < totalBytesRequired)
 			return rkit::ResultCode::kDataError;
 
-		rkit::render::TextureResourceSpec resSpec = {};
+		rkit::render::ImageResourceSpec resSpec = {};
 		resSpec.m_usage.Add({ rkit::render::TextureUsageFlag::kCopyDest, rkit::render::TextureUsageFlag::kSampled });
 
 		rkit::StaticArray<rkit::render::IBaseCommandQueue *, 2> usedQueuesList;
-		usedQueuesList[0] = m_graphicsSubsystem.m_dmaQueue;
-		usedQueuesList[1] = m_graphicsSubsystem.m_graphicsQueue;
+		usedQueuesList[0] = m_graphicsSubsystem.m_logicalQueues[static_cast<size_t>(LogicalQueueType::kDMA)]->GetBaseCommandQueue();
+		usedQueuesList[1] = m_graphicsSubsystem.m_logicalQueues[static_cast<size_t>(LogicalQueueType::kGraphics)]->GetBaseCommandQueue();
 
-		rkit::Span<rkit::render::IBaseCommandQueue *> usedQueues = usedQueuesList.ToSpan();
-		if (usedQueues[0] == usedQueues[1])
-			usedQueues = usedQueues.SubSpan(0, 1);
+		rkit::UniquePtr<rkit::render::IImagePrototype> prototype;
+		RKIT_CHECK(m_graphicsSubsystem.m_renderDevice->CreateImagePrototype(prototype, textureSpec, resSpec, usedQueuesList.ToSpan()));
 
-		rkit::UniquePtr<rkit::render::ITexturePrototype> prototype;
-		RKIT_CHECK(m_graphicsSubsystem.m_renderDevice->CreateTexturePrototype(prototype, textureSpec, resSpec, usedQueues));
+		// Find a good heap
+		rkit::render::HeapSpec heapSpec = {};
+		heapSpec.m_allowBuffers = false;
+		heapSpec.m_allowNonRTDSImages = true;
+
+		rkit::Optional<rkit::render::HeapKey> heapKey = prototype->GetMemoryRequirements().FindSuitableHeap(heapSpec);
+		if (!heapKey.IsSet())
+			return rkit::ResultCode::kInternalError;
+
 		return rkit::ResultCode::kNotYetImplemented;
 	}
 

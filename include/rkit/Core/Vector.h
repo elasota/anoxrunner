@@ -45,6 +45,7 @@ namespace rkit
 		~Vector();
 
 		void RemoveRange(size_t firstArg, size_t numArgs);
+		Result ResetAndResize(size_t size);
 		Result Resize(size_t size);
 		Result Reserve(size_t size);
 		void ShrinkToSize(size_t size);
@@ -220,6 +221,34 @@ namespace rkit
 			new (m_arr + m_count) T();
 			m_count++;
 		}
+
+		return ResultCode::kOK;
+	}
+
+	template<class T>
+	Result Vector<T>::ResetAndResize(size_t size)
+	{
+		Reset();
+
+		constexpr size_t kMaxCount = std::numeric_limits<size_t>::max() / sizeof(T);
+
+		if (size > kMaxCount)
+			return ResultCode::kOutOfMemory;
+
+		void *newMem = m_alloc->Alloc(size * sizeof(T));
+		if (!newMem)
+			return ResultCode::kOutOfMemory;
+
+		T *newArr = static_cast<T *>(newMem);
+		size_t count = m_count;
+
+		m_arr = newArr;
+
+		m_capacity = size;
+		m_count = size;
+
+		for (size_t i = 0; i < size; i++)
+			new (newArr + i) T();
 
 		return ResultCode::kOK;
 	}

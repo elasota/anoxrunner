@@ -343,7 +343,7 @@ namespace rkit { namespace render { namespace vulkan
 			img = VK_NULL_HANDLE;
 
 		RKIT_CHECK(m_rtvs.Resize(imageCount));
-		RKIT_CHECK(m_imageResources.Resize(imageCount));
+		RKIT_CHECK(m_imageResources.ResetAndResize(imageCount));
 
 		RKIT_CHECK(m_swapChainFrames.Resize(imageCount));
 

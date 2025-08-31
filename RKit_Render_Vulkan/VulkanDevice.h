@@ -26,6 +26,7 @@ namespace rkit
 namespace rkit { namespace render
 {
 	class RenderDeviceCaps;
+	struct HeapSpec;
 } } // rkit::render
 
 namespace rkit { namespace render { namespace vulkan
@@ -73,11 +74,15 @@ namespace rkit { namespace render { namespace vulkan
 		virtual VulkanQueueProxyBase &GetQueueByID(size_t queueID) = 0;
 		virtual size_t GetQueueCount() const = 0;
 
+		virtual bool MemoryTypeMeetsHeapSpec(uint32_t memoryType, const HeapSpec &heapSpec) const = 0;
+		virtual bool MemoryTypeIsSubset(uint32_t candidateType, uint32_t largerType) const = 0;
+
 		static Result CreateDevice(UniquePtr<IRenderDevice> &outDevice,
 			const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki,
 			const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p,
 			VkInstance inst, VkDevice device,
 			const QueueFamilySpec (&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks,
-			const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts);
+			const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts,
+			const VkPhysicalDeviceMemoryProperties &memProperties);
 	};
 } } } // rkit::render::vulkan

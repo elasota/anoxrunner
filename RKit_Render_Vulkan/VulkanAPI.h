@@ -23,6 +23,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_API(vkEnumerateDeviceExtensionProperties);
 		RKIT_VK_API(vkGetPhysicalDeviceProperties);
 		RKIT_VK_API(vkGetPhysicalDeviceQueueFamilyProperties);
+		RKIT_VK_API(vkGetPhysicalDeviceMemoryProperties);
 		RKIT_VK_API(vkCreateDevice);
 		RKIT_VK_API(vkDestroyDevice);
 		RKIT_VK_API(vkGetDeviceProcAddr);
@@ -60,7 +61,9 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_API(vkDestroyRenderPass);
 		RKIT_VK_API(vkGetPipelineCacheData);
 		RKIT_VK_API(vkMergePipelineCaches);
+		RKIT_VK_API(vkCreateImage);
 		RKIT_VK_API(vkDestroyImage);
+		RKIT_VK_API(vkGetImageMemoryRequirements);
 		RKIT_VK_API(vkDeviceWaitIdle);
 		RKIT_VK_API(vkWaitForFences);
 		RKIT_VK_API(vkResetFences);

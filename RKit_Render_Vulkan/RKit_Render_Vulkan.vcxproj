@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -142,6 +142,7 @@
     <ClCompile Include="VulkanCommandAllocator.cpp" />
     <ClCompile Include="VulkanCommandBatch.cpp" />
     <ClCompile Include="VulkanFence.cpp" />
+    <ClCompile Include="VulkanMemoryRequirements.cpp" />
     <ClCompile Include="VulkanPipelineLibraryLoader.cpp" />
     <ClCompile Include="VulkanPlatformSpecific_Win32.cpp" />
     <ClCompile Include="VulkanQueueProxy.cpp" />
@@ -154,6 +155,7 @@
     <ClCompile Include="VulkanRenderTargetView.cpp" />
     <ClCompile Include="VulkanResourcePool.cpp" />
     <ClCompile Include="VulkanSwapChain.cpp" />
+    <ClCompile Include="VulkanImageResource.cpp" />
     <ClCompile Include="VulkanUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -171,6 +173,7 @@
     <ClInclude Include="VulkanDevice.h" />
     <ClInclude Include="VulkanFence.h" />
     <ClInclude Include="VulkanImageResource.h" />
+    <ClInclude Include="VulkanMemoryRequirements.h" />
     <ClInclude Include="VulkanPhysDevice.h" />
     <ClInclude Include="VulkanPipelineLibraryLoader.h" />
     <ClInclude Include="VulkanPlatformAPI.h" />
@@ -180,6 +183,7 @@
     <ClInclude Include="VulkanResourcePool.h" />
     <ClInclude Include="VulkanSwapChain.h" />
     <ClInclude Include="VulkanSync.h" />
+    <ClInclude Include="VulkanImage.h" />
     <ClInclude Include="VulkanUtils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

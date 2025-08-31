@@ -513,6 +513,9 @@ namespace rkit { namespace render { namespace vulkan
 		VkPhysicalDeviceProperties deviceProperties = {};
 		m_vki.vkGetPhysicalDeviceProperties(physDevice, &deviceProperties);
 
+		VkPhysicalDeviceMemoryProperties memProperties = {};
+		m_vki.vkGetPhysicalDeviceMemoryProperties(physDevice, &memProperties);
+
 		VkPhysicalDeviceFeatures enabledFeatures = {};
 
 		render::RenderDeviceCaps wantedCaps;
@@ -654,7 +657,7 @@ namespace rkit { namespace render { namespace vulkan
 		VkDevice device = VK_NULL_HANDLE;
 		RKIT_VK_CHECK(m_vki.vkCreateDevice(rPhysDevice->GetPhysDevice(), &devCreateInfo, GetAllocCallbacks(), &device));
 
-		Result wrapDeviceResult = VulkanDeviceBase::CreateDevice(outDevice, m_vkg, m_vki, m_vkg_p, m_vki_p, m_vkInstance, device, queueFamilySpecs, GetAllocCallbacks(), grantedCaps, rPhysDevice, std::move(enabledExts));
+		Result wrapDeviceResult = VulkanDeviceBase::CreateDevice(outDevice, m_vkg, m_vki, m_vkg_p, m_vki_p, m_vkInstance, device, queueFamilySpecs, GetAllocCallbacks(), grantedCaps, rPhysDevice, std::move(enabledExts), memProperties);
 		if (!utils::ResultIsOK(wrapDeviceResult))
 		{
 			m_vki.vkDestroyDevice(device, GetAllocCallbacks());
