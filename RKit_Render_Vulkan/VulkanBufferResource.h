@@ -44,7 +44,7 @@ namespace rkit { namespace render { namespace vulkan {
 		void DetachBuffer();
 
 		static Result Create(UniquePtr<VulkanBufferPrototype> &outImagePrototype, VulkanDeviceBase &device,
-			const BufferSpec &bufferSpec, const BufferResourceSpec &resourceSpec, const ConstSpan<IBaseCommandQueue *> &restrictedQueues);
+			const BufferSpec &bufferSpec, const BufferResourceSpec &resourceSpec, const ConstSpan<IBaseCommandQueue *> &concurrentQueues);
 
 	private:
 		VulkanDeviceBase &m_device;

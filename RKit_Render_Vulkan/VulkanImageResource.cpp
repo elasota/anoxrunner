@@ -49,7 +49,7 @@ namespace rkit { namespace render { namespace vulkan {
 	}
 
 	Result VulkanImagePrototype::Create(UniquePtr<VulkanImagePrototype> &outImagePrototype, VulkanDeviceBase &device,
-		const ImageSpec &imageSpec, const ImageResourceSpec &resourceSpec, const ConstSpan<IBaseCommandQueue *> &restrictedQueues)
+		const ImageSpec &imageSpec, const ImageResourceSpec &resourceSpec, const ConstSpan<IBaseCommandQueue *> &concurrentQueues)
 	{
 		VkImageCreateInfo createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -104,13 +104,13 @@ namespace rkit { namespace render { namespace vulkan {
 
 		Vector<uint32_t> restrictedQueueFamilies;
 
-		if (restrictedQueues.Count() == 0)
-			createInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+		if (concurrentQueues.Count() == 0)
+			createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		else
 		{
-			createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			createInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
 
-			for (IBaseCommandQueue *queue : restrictedQueues)
+			for (IBaseCommandQueue *queue : concurrentQueues)
 			{
 				VulkanQueueProxyBase *internalQueue = static_cast<VulkanQueueProxyBase *>(queue->ToInternalCommandQueue());
 

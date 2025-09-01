@@ -1444,7 +1444,7 @@ namespace anox
 				});
 
 			rkit::UniquePtr<rkit::render::IBufferPrototype> prototype;
-			RKIT_CHECK(m_renderDevice->CreateBufferPrototype(prototype, uploadBufferSpec, uploadBufferResSpec, rkit::ConstSpan<rkit::render::IBaseCommandQueue *>()));
+			RKIT_CHECK(m_renderDevice->CreateBufferPrototype(prototype, uploadBufferSpec, uploadBufferResSpec));
 
 			rkit::render::HeapSpec heapSpec = {};
 			heapSpec.m_cpuAccessible = true;

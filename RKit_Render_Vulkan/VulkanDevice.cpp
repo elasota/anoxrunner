@@ -682,10 +682,10 @@ namespace rkit { namespace render { namespace vulkan
 
 
 	Result VulkanDevice::CreateBufferPrototype(UniquePtr<IBufferPrototype> &outBufferPrototype, const BufferSpec &bufferSpec,
-		const BufferResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &restrictedQueues)
+		const BufferResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &concurrentQueues)
 	{
 		UniquePtr<VulkanBufferPrototype> prototype;
-		RKIT_CHECK(VulkanBufferPrototype::Create(prototype, *this, bufferSpec, resourceSpec, restrictedQueues));
+		RKIT_CHECK(VulkanBufferPrototype::Create(prototype, *this, bufferSpec, resourceSpec, concurrentQueues));
 
 		outBufferPrototype = std::move(prototype);
 
@@ -717,10 +717,10 @@ namespace rkit { namespace render { namespace vulkan
 	}
 
 	Result VulkanDevice::CreateImagePrototype(UniquePtr<IImagePrototype> &outImagePrototype, const ImageSpec &imageSpec,
-		const ImageResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &restrictedQueues)
+		const ImageResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &concurrentQueues)
 	{
 		UniquePtr<VulkanImagePrototype> prototype;
-		RKIT_CHECK(VulkanImagePrototype::Create(prototype, *this, imageSpec, resourceSpec, restrictedQueues));
+		RKIT_CHECK(VulkanImagePrototype::Create(prototype, *this, imageSpec, resourceSpec, concurrentQueues));
 
 		outImagePrototype = std::move(prototype);
 

@@ -111,5 +111,27 @@ namespace rkit { namespace render
 
 		virtual bool SupportsInitialTextureData() const = 0;
 		virtual bool SupportsInitialBufferData() const = 0;
+
+		Result CreateBufferPrototype(UniquePtr<IBufferPrototype> &outBufferPrototype, const BufferSpec &bufferSpec,
+			const BufferResourceSpec &resourceSpec);
+		Result CreateImagePrototype(UniquePtr<IImagePrototype> &outImagePrototype, const ImageSpec &imageSpec,
+			const ImageResourceSpec &resourceSpec);
 	};
 } } // rkit::render
+
+#include "rkit/Core/Result.h"
+#include "rkit/Core/Span.h"
+
+namespace rkit { namespace render {
+	inline Result IRenderDevice::CreateBufferPrototype(UniquePtr<IBufferPrototype> &outBufferPrototype, const BufferSpec &bufferSpec,
+		const BufferResourceSpec &resourceSpec)
+	{
+		return this->CreateBufferPrototype(outBufferPrototype, bufferSpec, resourceSpec, Span<IBaseCommandQueue *const>());
+	}
+
+	inline Result IRenderDevice::CreateImagePrototype(UniquePtr<IImagePrototype> &outImagePrototype, const ImageSpec &imageSpec,
+		const ImageResourceSpec &resourceSpec)
+	{
+		return this->CreateImagePrototype(outImagePrototype, imageSpec, resourceSpec, Span<IBaseCommandQueue *const>());
+	}
+} }
