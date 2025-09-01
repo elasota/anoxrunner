@@ -2,9 +2,12 @@
 
 #include "VulkanAPI.h"
 #include "VulkanAPILoader.h"
+#include "VulkanBufferResource.h"
 #include "VulkanCommandAllocator.h"
 #include "VulkanCheck.h"
 #include "VulkanFence.h"
+#include "VulkanHeapKey.h"
+#include "VulkanMemoryHeap.h"
 #include "VulkanPipelineLibraryLoader.h"
 #include "VulkanPlatformAPI.h"
 #include "VulkanSwapChain.h"
@@ -16,6 +19,7 @@
 #include "VulkanImageResource.h"
 
 #include "rkit/Render/HeapSpec.h"
+#include "rkit/Render/HeapKey.h"
 #include "rkit/Render/DeviceCaps.h"
 
 #include "rkit/Core/SystemDriver.h"
@@ -81,12 +85,23 @@ namespace rkit { namespace render { namespace vulkan
 		bool MemoryTypeIsSubset(uint32_t candidateType, uint32_t largerType) const override;
 
 		Result CreateSwapChainPrototype(UniquePtr<ISwapChainPrototype> &outSwapChainPrototype, IDisplay &display) override;
-
 		Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, UniquePtr<ISwapChainPrototype> &&prototype, uint8_t numImages,
 			render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) override;
 
+		Result CreateBufferPrototype(UniquePtr<IBufferPrototype> &outBufferPrototype, const BufferSpec &bufferSpec,
+			const BufferResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &restrictedQueues) override;
+		Result CreateBuffer(UniquePtr<IBufferResource> &outImage, UniquePtr<IBufferPrototype> &&bufferPrototype,
+			const MemoryRegion &memRegion, const Span<const uint8_t> &initialData) override;
+
 		Result CreateImagePrototype(UniquePtr<IImagePrototype> &outImagePrototype, const ImageSpec &imageSpec,
 			const ImageResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &restrictedQueues) override;
+		Result CreateImage(UniquePtr<IImageResource> &outImage, UniquePtr<IImagePrototype> &&imagePrototype,
+			const MemoryRegion &memRegion, const Span<const uint8_t> &initialData) override;
+
+		Result CreateMemoryHeap(UniquePtr<IMemoryHeap> &outHeap, const HeapKey &heapKey, GPUMemorySize_t size) override;
+
+		bool SupportsInitialTextureData() const override;
+		bool SupportsInitialBufferData() const override;
 
 		Result LoadDeviceAPI();
 		Result CreatePools();
@@ -665,6 +680,42 @@ namespace rkit { namespace render { namespace vulkan
 		return ResultCode::kOK;
 	}
 
+
+	Result VulkanDevice::CreateBufferPrototype(UniquePtr<IBufferPrototype> &outBufferPrototype, const BufferSpec &bufferSpec,
+		const BufferResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &restrictedQueues)
+	{
+		UniquePtr<VulkanBufferPrototype> prototype;
+		RKIT_CHECK(VulkanBufferPrototype::Create(prototype, *this, bufferSpec, resourceSpec, restrictedQueues));
+
+		outBufferPrototype = std::move(prototype);
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanDevice::CreateBuffer(UniquePtr<IBufferResource> &outBuffer, UniquePtr<IBufferPrototype> &&bufferPrototypeRef,
+		const MemoryRegion &memRegion, const Span<const uint8_t> &initialData)
+	{
+		RKIT_ASSERT(initialData.Count() == 0);
+
+		UniquePtr<IBufferPrototype> bufferPrototype = std::move(bufferPrototypeRef);
+
+		RKIT_ASSERT(bufferPrototype.IsValid());
+		RKIT_ASSERT(memRegion.GetHeap() != nullptr);
+
+		VulkanBufferPrototype &prototype = *static_cast<VulkanBufferPrototype *>(bufferPrototype.Get());
+		const VulkanMemoryHeap &heap = *static_cast<const VulkanMemoryHeap *>(memRegion.GetHeap());
+
+		const VkBuffer buffer = prototype.GetBuffer();
+
+		RKIT_VK_CHECK(m_vkd.vkBindBufferMemory(m_device, buffer, heap.GetDeviceMemory(), static_cast<VkDeviceSize>(memRegion.GetOffset())));
+
+		RKIT_CHECK(New<VulkanBuffer>(outBuffer, *this, buffer));
+
+		prototype.DetachBuffer();
+
+		return ResultCode::kOK;
+	}
+
 	Result VulkanDevice::CreateImagePrototype(UniquePtr<IImagePrototype> &outImagePrototype, const ImageSpec &imageSpec,
 		const ImageResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &restrictedQueues)
 	{
@@ -673,7 +724,79 @@ namespace rkit { namespace render { namespace vulkan
 
 		outImagePrototype = std::move(prototype);
 
-		return rkit::ResultCode::kOK;
+		return ResultCode::kOK;
+	}
+
+	Result VulkanDevice::CreateImage(UniquePtr<IImageResource> &outImage, UniquePtr<IImagePrototype> &&imagePrototypeRef,
+		const MemoryRegion &memRegion, const Span<const uint8_t> &initialData)
+	{
+		RKIT_ASSERT(initialData.Count() == 0);
+
+		UniquePtr<IImagePrototype> imagePrototype = std::move(imagePrototypeRef);
+
+		RKIT_ASSERT(imagePrototype.IsValid());
+		RKIT_ASSERT(memRegion.GetHeap() != nullptr);
+
+		VulkanImagePrototype &prototype = *static_cast<VulkanImagePrototype *>(imagePrototype.Get());
+		const VulkanMemoryHeap &heap = *static_cast<const VulkanMemoryHeap *>(memRegion.GetHeap());
+
+		const VkImage image = prototype.GetImage();
+
+		RKIT_VK_CHECK(m_vkd.vkBindImageMemory(m_device, image, heap.GetDeviceMemory(), static_cast<VkDeviceSize>(memRegion.GetOffset())));
+
+		RKIT_CHECK(New<VulkanImage>(outImage, *this, image, prototype.GetAllAspectFlags()));
+
+		prototype.DetachImage();
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanDevice::CreateMemoryHeap(UniquePtr<IMemoryHeap> &outHeap, const HeapKey &heapKey, GPUMemorySize_t size)
+	{
+		UniquePtr<VulkanMemoryHeap> memoryHeap;
+
+		if (size > std::numeric_limits<VkDeviceSize>::max())
+			return ResultCode::kOutOfMemory;
+
+		VulkanHeapKey vkHeapKey = DecodeHeapKey(heapKey);
+		RKIT_ASSERT(vkHeapKey.m_memoryType < m_memProperties.memoryTypeCount);
+
+		VkMemoryAllocateInfo allocInfo = {};
+		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocInfo.allocationSize = static_cast<VkDeviceSize>(size);
+
+		allocInfo.memoryTypeIndex = vkHeapKey.m_memoryType;
+
+		VkMemoryPropertyFlags memFlags = m_memProperties.memoryTypes[vkHeapKey.m_memoryType].propertyFlags;
+
+		VkDeviceMemory deviceMemory;
+		RKIT_VK_CHECK(m_vkd.vkAllocateMemory(m_device, &allocInfo, m_allocCallbacks, &deviceMemory));
+
+		UniquePtr<VulkanMemoryHeap> vkHeap;
+		Result createResult = New<VulkanMemoryHeap>(vkHeap, *this, deviceMemory, size, (memFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0);
+
+		if (!utils::ResultIsOK(createResult))
+			m_vkd.vkFreeMemory(m_device, deviceMemory, m_allocCallbacks);
+
+		if (vkHeapKey.m_cpuAccessible)
+		{
+			RKIT_ASSERT(memFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+			RKIT_CHECK(vkHeap->MapMemory());
+		}
+
+		outHeap = std::move(vkHeap);
+
+		return createResult;
+	}
+
+	bool VulkanDevice::SupportsInitialTextureData() const
+	{
+		return false;
+	}
+
+	bool VulkanDevice::SupportsInitialBufferData() const
+	{
+		return false;
 	}
 
 	Result VulkanDevice::LoadDeviceAPI()

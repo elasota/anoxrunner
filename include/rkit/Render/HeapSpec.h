@@ -15,5 +15,6 @@ namespace rkit { namespace render {
 		bool m_allowBuffers = false;
 		bool m_allowRTDSImages = false;
 		bool m_allowNonRTDSImages = false;
+		bool m_cpuAccessible = false;
 	};
 } }

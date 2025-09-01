@@ -26,6 +26,19 @@ namespace rkit
 	typedef AtomicInt<uint32_t> AtomicUInt32_t;
 	typedef AtomicInt<int64_t> AtomicInt64_t;
 	typedef AtomicInt<int32_t> AtomicInt32_t;
+
+	template<class T>
+	struct AtomicPtr
+	{
+	public:
+		typedef T *ValueType_t;
+
+		AtomicPtr();
+		explicit AtomicPtr(T *initialValue);
+
+	private:
+		std::atomic<T *> m_value;
+	};
 }
 
 template<class T>
@@ -50,4 +63,17 @@ template<class T>
 T rkit::AtomicInt<T>::Decrement()
 {
 	return m_value.fetch_sub(1);
+}
+
+
+template<class T>
+rkit::AtomicPtr<T>::AtomicPtr()
+	: m_value(nullptr)
+{
+}
+
+template<class T>
+rkit::AtomicPtr<T>::AtomicPtr(T *initialValue)
+	: m_value(initialValue)
+{
 }

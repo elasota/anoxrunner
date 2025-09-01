@@ -15,10 +15,24 @@
 
 namespace rkit { namespace render { namespace vulkan {
 
-	VulkanImagePrototype::VulkanImagePrototype(VulkanDeviceBase &device, VkImage image)
+	VulkanImage::VulkanImage(VulkanDeviceBase &device, VkImage image, VkImageAspectFlags allAspectFlags)
+		: m_device(device)
+	{
+		m_allAspectFlags = allAspectFlags;
+		m_image = image;
+	}
+
+	VulkanImage::~VulkanImage()
+	{
+		if (m_image != VK_NULL_HANDLE)
+			m_device.GetDeviceAPI().vkDestroyImage(m_device.GetDevice(), m_image, m_device.GetAllocCallbacks());
+	}
+
+	VulkanImagePrototype::VulkanImagePrototype(VulkanDeviceBase &device, VkImage image, VkImageAspectFlags allAspects)
 		: m_device(device)
 		, m_image(image)
 		, m_memRequirements { &device }
+		, m_allAspects(allAspects)
 	{
 		m_device.GetDeviceAPI().vkGetImageMemoryRequirements(m_device.GetDevice(), image, &m_memRequirements.m_memReqs);
 	}
@@ -127,7 +141,9 @@ namespace rkit { namespace render { namespace vulkan {
 		VkImage image = VK_NULL_HANDLE;
 		RKIT_VK_CHECK(device.GetDeviceAPI().vkCreateImage(device.GetDevice(), &createInfo, device.GetAllocCallbacks(), &image));
 
-		Result createResult = rkit::New<VulkanImagePrototype>(outImagePrototype, device, image);
+		VkImageAspectFlags allAspects = VK_IMAGE_ASPECT_COLOR_BIT;
+
+		Result createResult = rkit::New<VulkanImagePrototype>(outImagePrototype, device, image, allAspects);
 
 		if (!utils::ResultIsOK(createResult))
 			device.GetDeviceAPI().vkDestroyImage(device.GetDevice(), image, device.GetAllocCallbacks());

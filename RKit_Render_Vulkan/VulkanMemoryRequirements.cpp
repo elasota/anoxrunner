@@ -1,9 +1,11 @@
 #include "VulkanMemoryRequirements.h"
 
 #include "rkit/Math/BitOps.h"
+#include "rkit/Render/HeapSpec.h"
 #include "rkit/Render/Memory.h"
 
 #include "VulkanDevice.h"
+#include "VulkanHeapKey.h"
 
 namespace rkit { namespace render { namespace vulkan {
 	namespace VulkanMemoryRequirementsFuncs
@@ -38,7 +40,11 @@ namespace rkit { namespace render { namespace vulkan {
 			if (!bestMemType.IsSet())
 				return rkit::Optional<HeapKey>();
 
-			return HeapKey(bestMemType.Get());
+			VulkanHeapKey vkHeapKey = {};
+			vkHeapKey.m_memoryType = bestMemType.Get();
+			vkHeapKey.m_cpuAccessible = (heapSpec.m_cpuAccessible ? 1 : 0);
+
+			return EncodeHeapKey(vkHeapKey);
 		}
 	}
 

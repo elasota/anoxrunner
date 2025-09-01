@@ -9,6 +9,8 @@
 #include "anox/AnoxFileSystem.h"
 #include "anox/AnoxGraphicsSubsystem.h"
 
+#include "rkit/Render/BufferSpec.h"
+#include "rkit/Render/BufferResource.h"
 #include "rkit/Render/CommandAllocator.h"
 #include "rkit/Render/CommandBatch.h"
 #include "rkit/Render/CommandQueue.h"
@@ -32,6 +34,7 @@
 #include "rkit/Utilities/ThreadPool.h"
 
 #include "rkit/Data/DataDriver.h"
+#include "rkit/Data/DDSFile.h"
 #include "rkit/Data/RenderDataHandler.h"
 
 #include "rkit/Core/Algorithm.h"
@@ -61,8 +64,6 @@
 #include "rkit/Core/UtilitiesDriver.h"
 #include "rkit/Core/Vector.h"
 
-#include "rkit/Data/DDSFile.h"
-
 #include "AnoxGameWindowResources.h"
 #include "AnoxRenderedWindow.h"
 #include "AnoxTexture.h"
@@ -75,10 +76,10 @@ namespace anox
 	class Texture final : public ITexture, public rkit::RefCounted
 	{
 	public:
-		void SetPrototype(rkit::UniquePtr<rkit::render::IImagePrototype> &&prototype);
+		void SetRenderResource(rkit::UniquePtr<rkit::render::IImageResource> &&resource);
 
 	private:
-		rkit::UniquePtr<rkit::render::IImagePrototype> m_prototype;
+		rkit::UniquePtr<rkit::render::IImageResource> m_resource;
 	};
 
 	class GraphicsSubsystem final : public IGraphicsSubsystem, public rkit::NoCopy
@@ -300,13 +301,16 @@ namespace anox
 		class AllocateTextureStorageAndPostCopyJobRunner final : public rkit::IJobRunner
 		{
 		public:
-			explicit AllocateTextureStorageAndPostCopyJobRunner(GraphicsSubsystem &graphicsSubsystem, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData,
+			explicit AllocateTextureStorageAndPostCopyJobRunner(GraphicsSubsystem &graphicsSubsystem,
+				const rkit::RCPtr<Texture> &texture,
+				const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData,
 				const rkit::RCPtr<rkit::JobSignaller> &doneCopyingSignaller);
 
 			rkit::Result Run() override;
 
 		private:
 			GraphicsSubsystem &m_graphicsSubsystem;
+			const rkit::RCPtr<Texture> m_texture;
 			const rkit::RCPtr<rkit::Vector<uint8_t>> m_textureData;
 			rkit::RCPtr<rkit::JobSignaller> m_doneCopyingSignaller;
 		};
@@ -396,9 +400,21 @@ namespace anox
 			rkit::render::IBaseCommandBatch* m_frameEndBatch = nullptr;
 			rkit::RCPtr<rkit::Job> m_frameEndJob;
 
+			size_t m_asyncUploadHeapHighMark = 0;
+			size_t m_asyncUploadHeapLowMark = 0;
+
 			rkit::StaticArray<FrameSyncPointCommandListHandler, static_cast<size_t>(rkit::render::CommandQueueType::kCount)> m_commandListHandlers;
 
 			void Reset();
+		};
+
+		struct UploadTask
+		{
+			size_t m_mappedSizeRequired = 0;
+			size_t m_alignmentRequired = 0;
+
+			rkit::RCPtr<void> m_uploadObject;
+			rkit::RCPtr<rkit::JobSignaller> m_doneSignaller;
 		};
 
 		rkit::Result CreateAndQueueJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<rkit::IJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies, rkit::RCPtr<rkit::Job> (LogicalQueueBase::*queueMember));
@@ -414,6 +430,8 @@ namespace anox
 		rkit::Result CreateGameDisplayAndDevice(const rkit::StringView &renderModule, const rkit::CIPathView &pipelinesFile, const rkit::CIPathView &pipelinesCacheFile, bool canUpdatePipelineCache);
 
 		rkit::Result WaitForRenderingTasks();
+
+		rkit::Result PostTextureUploadJob(const rkit::RCPtr<Texture> &texture, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData, size_t textureDataOffset, const rkit::RCPtr<rkit::JobSignaller> &doneSignaller);
 
 		rkit::Optional<rkit::render::DisplayMode> m_currentDisplayMode;
 		rkit::render::DisplayMode m_desiredDisplayMode = rkit::render::DisplayMode::kSplash;
@@ -490,7 +508,23 @@ namespace anox
 		rkit::UniquePtr<rkit::IEvent> m_prevFrameWaitTerminateEvent;
 
 		rkit::UniquePtr<IFrameDrawer> m_frameDrawer;
+
+		bool m_enableAsyncUpload = false;
+
+		rkit::UniquePtr<rkit::IMutex> m_asyncUploadMutex;
+		rkit::Vector<UploadTask> m_waitingUploadTasks;
+
+		rkit::UniquePtr<rkit::render::IMemoryHeap> m_asyncUploadHeap;
+		rkit::UniquePtr<rkit::render::IBufferResource> m_asyncUploadBuffer;
+		size_t m_asyncUploadHeapLowMark = 0;
+		size_t m_asyncUploadHeapHighMark = 0;
 	};
+
+
+	void Texture::SetRenderResource(rkit::UniquePtr<rkit::render::IImageResource> &&resource)
+	{
+		m_resource = std::move(resource);
+	}
 
 	GraphicsSubsystem::CheckPipelinesJob::CheckPipelinesJob(GraphicsSubsystem &graphicsSubsystem, const rkit::Future<rkit::UniquePtr<rkit::ISeekableReadStream>> &stream, const rkit::CIPathView &pipelinesCacheFileName)
 		: m_graphicsSubsystem(graphicsSubsystem)
@@ -800,9 +834,13 @@ namespace anox
 	}
 
 
-	GraphicsSubsystem::AllocateTextureStorageAndPostCopyJobRunner::AllocateTextureStorageAndPostCopyJobRunner(GraphicsSubsystem &graphicsSubsystem, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData,
+	GraphicsSubsystem::AllocateTextureStorageAndPostCopyJobRunner::AllocateTextureStorageAndPostCopyJobRunner(
+		GraphicsSubsystem &graphicsSubsystem,
+		const rkit::RCPtr<Texture> &texture,
+		const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData,
 		const rkit::RCPtr<rkit::JobSignaller> &doneCopyingSignaller)
 		: m_graphicsSubsystem(graphicsSubsystem)
+		, m_texture(texture)
 		, m_textureData(textureData)
 		, m_doneCopyingSignaller(doneCopyingSignaller)
 	{
@@ -991,12 +1029,38 @@ namespace anox
 		rkit::render::HeapSpec heapSpec = {};
 		heapSpec.m_allowBuffers = false;
 		heapSpec.m_allowNonRTDSImages = true;
+		heapSpec.m_heapType = rkit::render::HeapType::kDefault;
 
 		rkit::Optional<rkit::render::HeapKey> heapKey = prototype->GetMemoryRequirements().FindSuitableHeap(heapSpec);
 		if (!heapKey.IsSet())
 			return rkit::ResultCode::kInternalError;
 
-		return rkit::ResultCode::kNotYetImplemented;
+		// FIXME FIXME FIXME
+		rkit::UniquePtr<rkit::render::IMemoryHeap> memHeap;
+		RKIT_CHECK(m_graphicsSubsystem.m_renderDevice->CreateMemoryHeap(memHeap, heapKey.Get(), prototype->GetMemoryRequirements().Size()));
+
+		rkit::ConstSpan<uint8_t> initialDataSpan;
+		if (m_graphicsSubsystem.m_renderDevice->SupportsInitialTextureData())
+		{
+			initialDataSpan = m_textureData->ToSpan().SubSpan(headerSize);
+		}
+
+		rkit::UniquePtr<rkit::render::IImageResource> image;
+		RKIT_CHECK(m_graphicsSubsystem.m_renderDevice->CreateImage(image, std::move(prototype), memHeap->GetRegion(), initialDataSpan));
+
+		m_texture->SetRenderResource(std::move(image));
+
+		if (m_graphicsSubsystem.m_renderDevice->SupportsInitialTextureData())
+		{
+			if (m_doneCopyingSignaller)
+				m_doneCopyingSignaller->SignalDone(rkit::ResultCode::kOK);
+		}
+		else
+		{
+			RKIT_CHECK(m_graphicsSubsystem.PostTextureUploadJob(m_texture, m_textureData, headerSize, m_doneCopyingSignaller));
+		}
+
+		return rkit::ResultCode::kOK;
 	}
 
 	GraphicsSubsystem::CloseFrameRecordRunner::CloseFrameRecordRunner(rkit::render::IBaseCommandBatch *&outBatchPtr)
@@ -1251,6 +1315,8 @@ namespace anox
 		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
 
 		RKIT_CHECK(sysDriver->CreateMutex(m_setupMutex));
+		RKIT_CHECK(sysDriver->CreateMutex(m_asyncUploadMutex));
+
 		RKIT_CHECK(sysDriver->CreateEvent(m_shutdownJoinEvent, true, false));
 		RKIT_CHECK(sysDriver->CreateEvent(m_shutdownTerminateEvent, true, false));
 		RKIT_CHECK(sysDriver->CreateEvent(m_prevFrameWaitWakeEvent, true, false));
@@ -1365,6 +1431,38 @@ namespace anox
 
 		RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kIO, std::move(jobRunner), openPipelineCacheJob));
 
+		m_enableAsyncUpload = (!m_renderDevice->SupportsInitialBufferData() && !m_renderDevice->SupportsInitialTextureData());
+
+		if (m_enableAsyncUpload)
+		{
+			rkit::render::BufferSpec uploadBufferSpec = {};
+			uploadBufferSpec.m_size = 64 * 1024 * 1024;
+
+			rkit::render::BufferResourceSpec uploadBufferResSpec = {};
+			uploadBufferResSpec.m_usage.Add({
+				rkit::render::BufferUsageFlag::kCopySrc
+				});
+
+			rkit::UniquePtr<rkit::render::IBufferPrototype> prototype;
+			RKIT_CHECK(m_renderDevice->CreateBufferPrototype(prototype, uploadBufferSpec, uploadBufferResSpec, rkit::ConstSpan<rkit::render::IBaseCommandQueue *>()));
+
+			rkit::render::HeapSpec heapSpec = {};
+			heapSpec.m_cpuAccessible = true;
+			heapSpec.m_allowBuffers = true;
+			heapSpec.m_heapType = rkit::render::HeapType::kUpload;
+
+			rkit::Optional<rkit::render::HeapKey> uploadHeapKey = prototype->GetMemoryRequirements().FindSuitableHeap(heapSpec);
+			if (!uploadHeapKey.IsSet())
+			{
+				rkit::log::Error("No heap available for use as upload heap");
+				return rkit::ResultCode::kInternalError;
+			}
+
+			RKIT_CHECK(m_renderDevice->CreateMemoryHeap(m_asyncUploadHeap, uploadHeapKey.Get(), prototype->GetMemoryRequirements().Size()));
+
+			RKIT_CHECK(m_renderDevice->CreateBuffer(m_asyncUploadBuffer, std::move(prototype), m_asyncUploadHeap->GetRegion(), rkit::ConstSpan<uint8_t>()));
+		}
+
 		return rkit::ResultCode::kOK;
 	}
 
@@ -1375,6 +1473,11 @@ namespace anox
 			RKIT_CHECK(m_renderDevice->WaitForDeviceIdle());
 		}
 
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result GraphicsSubsystem::PostTextureUploadJob(const rkit::RCPtr<Texture> &texture, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData, size_t textureDataOffset, const rkit::RCPtr<rkit::JobSignaller> &doneSignaller)
+	{
 		return rkit::ResultCode::kOK;
 	}
 
@@ -2016,7 +2119,7 @@ namespace anox
 		}
 
 		rkit::UniquePtr<AllocateTextureStorageAndPostCopyJobRunner> allocStorageJobRunner;
-		RKIT_CHECK(rkit::New<AllocateTextureStorageAndPostCopyJobRunner>(allocStorageJobRunner, *this, std::move(textureData), doneCopyingSignaller));
+		RKIT_CHECK(rkit::New<AllocateTextureStorageAndPostCopyJobRunner>(allocStorageJobRunner, *this, texture, std::move(textureData), doneCopyingSignaller));
 
 		RKIT_CHECK(jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(allocStorageJobRunner), dependencies));
 

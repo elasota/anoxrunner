@@ -4,6 +4,7 @@
 
 #include "rkit/Render/RenderEnums.h"
 #include "rkit/Render/Fence.h"
+#include "rkit/Render/MemoryProtos.h"
 #include "rkit/Render/PipelineLibraryItemProtos.h"
 
 #include "CommandQueueType.h"
@@ -36,30 +37,37 @@ namespace rkit
 namespace rkit { namespace render
 {
 	struct IBaseCommandQueue;
-	struct ICopyCommandQueue;
-	struct IComputeCommandQueue;
-	struct IGraphicsCommandQueue;
-	struct IGraphicsComputeCommandQueue;
-	struct ICommandList;
 	struct IBinaryCPUWaitableFence;
 	struct IBinaryGPUWaitableFence;
+	struct IBufferPrototype;
+	struct IBufferResource;
+	struct IComputeCommandAllocator;
+	struct ICopyCommandAllocator;
+	struct ICopyCommandQueue;
+	struct IComputeCommandQueue;
+	struct IDisplay;
+	struct IGraphicsCommandAllocator;
+	struct IGraphicsCommandQueue;
+	struct IGraphicsComputeCommandAllocator;
+	struct IGraphicsComputeCommandQueue;
+	struct IRenderPassInstance;
+	struct ISwapChainSyncPoint;
+	struct ICommandList;
+	struct IImagePrototype;
+	struct IImageResource;
+	struct IMemoryHeap;
 	struct IPipelineLibraryLoader;
 	struct IPipelineLibraryConfigValidator;
 	struct IRenderDeviceCaps;
 	struct ISwapChainPrototype;
 	struct ISwapChain;
-	struct IImagePrototype;
+	struct BufferSpec;
+	struct BufferResourceSpec;
 	struct ImageSpec;
 	struct ImageResourceSpec;
-	struct IDisplay;
-	struct ICopyCommandAllocator;
-	struct IComputeCommandAllocator;
-	struct IGraphicsCommandAllocator;
-	struct IGraphicsComputeCommandAllocator;
-	struct ISwapChainSyncPoint;
-	struct RenderPassResources;
-	struct IRenderPassInstance;
 	class HeapKey;
+	class MemoryRegion;
+	struct RenderPassResources;
 
 	struct IRenderDevice
 	{
@@ -89,7 +97,19 @@ namespace rkit { namespace render
 		virtual Result CreateSwapChainPrototype(UniquePtr<ISwapChainPrototype> &outSwapChainPrototype, IDisplay &display) = 0;
 		virtual Result CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, UniquePtr<ISwapChainPrototype> &&prototype, uint8_t numImages, RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) = 0;
 
+		virtual Result CreateBufferPrototype(UniquePtr<IBufferPrototype> &outBufferPrototype, const BufferSpec &bufferSpec,
+			const BufferResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &restrictedQueues) = 0;
+		virtual Result CreateBuffer(UniquePtr<IBufferResource> &outBuffer, UniquePtr<IBufferPrototype> &&bufferPrototype,
+			const MemoryRegion &memRegion, const Span<const uint8_t> &initialData) = 0;
+
 		virtual Result CreateImagePrototype(UniquePtr<IImagePrototype> &outImagePrototype, const ImageSpec &imageSpec,
 			const ImageResourceSpec &resourceSpec, const Span<IBaseCommandQueue * const> &restrictedQueues) = 0;
+		virtual Result CreateImage(UniquePtr<IImageResource> &outImage, UniquePtr<IImagePrototype> &&imagePrototype,
+			const MemoryRegion &memRegion, const Span<const uint8_t> &initialData) = 0;
+
+		virtual Result CreateMemoryHeap(UniquePtr<IMemoryHeap> &outHeap, const HeapKey &heapKey, GPUMemorySize_t size) = 0;
+
+		virtual bool SupportsInitialTextureData() const = 0;
+		virtual bool SupportsInitialBufferData() const = 0;
 	};
 } } // rkit::render

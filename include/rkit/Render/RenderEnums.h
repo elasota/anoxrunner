@@ -302,6 +302,19 @@ namespace rkit { namespace render
 		kCount,
 	};
 
+	enum class BufferUsageFlag
+	{
+		kCopySrc,
+		kCopyDest,
+		kConstantBuffer,
+		kStorageBuffer,
+		kIndexBuffer,
+		kVertexBuffer,
+		kIndirectBuffer,
+
+		kCount,
+	};
+
 	enum class DepthStencilFormat
 	{
 		DepthFloat32,

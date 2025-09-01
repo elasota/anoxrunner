@@ -27,9 +27,8 @@ namespace anox
 	class GraphicsMemoryAllocation final
 	{
 	public:
-		GraphicsMemoryAllocation(rkit::render::IMemoryHeap *memHeap, rkit::GPUMemoryOffset_t offset);
+		GraphicsMemoryAllocation(rkit::render::IMemoryHeap *memHeap, rkit::render::GPUMemoryOffset_t offset);
 
-		const Graphics
 	};
 
 	struct IGraphicsMemoryAllocator

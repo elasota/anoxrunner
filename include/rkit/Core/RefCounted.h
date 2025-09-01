@@ -111,8 +111,8 @@ namespace rkit
 		template<class TOther>
 		RCPtr<TOther> ConstCast() const;
 
-		template<class TField>
-		RCPtr<TField> FieldRef(TField T::* fieldRef) const;
+		template<class TField, class TObject>
+		RCPtr<TField> FieldRef(TField TObject::* fieldRef) const;
 
 	private:
 		T *m_object;
@@ -439,11 +439,13 @@ namespace rkit
 	}
 
 	template<class T>
-	template<class TField>
-	RCPtr<TField> RCPtr<T>::FieldRef(TField T:: *fieldRef) const
+	template<class TField, class TObject>
+	RCPtr<TField> RCPtr<T>::FieldRef(TField TObject:: *fieldRef) const
 	{
 		RKIT_ASSERT(m_object != nullptr);
-		TField *field = &(m_object->*fieldRef);
+		TObject *obj = m_object;
+
+		TField *field = &(obj->*fieldRef);
 
 		return RCPtr<TField>(field, m_tracker);
 	}

@@ -16,6 +16,8 @@ namespace rkit { namespace render {
 		bool operator==(const HeapKey &other) const;
 		bool operator<(const HeapKey &other) const;
 
+		uint64_t GetAsUInt64() const;
+
 	private:
 		StaticArray<uint64_t, 1> m_keyBits;
 	};
@@ -61,5 +63,15 @@ namespace rkit { namespace render {
 		}
 
 		return true;
+	}
+
+
+	inline uint64_t HeapKey::GetAsUInt64() const
+	{
+		for (size_t i = 1; i < m_keyBits.Count(); i++)
+		{
+			RKIT_ASSERT(m_keyBits[i] == 0);
+		}
+		return m_keyBits[0];
 	}
 } }

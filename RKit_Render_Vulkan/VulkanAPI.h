@@ -63,6 +63,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_API(vkMergePipelineCaches);
 		RKIT_VK_API(vkCreateImage);
 		RKIT_VK_API(vkDestroyImage);
+		RKIT_VK_API(vkBindImageMemory);
 		RKIT_VK_API(vkGetImageMemoryRequirements);
 		RKIT_VK_API(vkDeviceWaitIdle);
 		RKIT_VK_API(vkWaitForFences);
@@ -83,6 +84,14 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_API(vkCmdClearAttachments);
 		RKIT_VK_API(vkCmdEndRenderPass);
 		RKIT_VK_API(vkCmdPipelineBarrier);
+		RKIT_VK_API(vkAllocateMemory);
+		RKIT_VK_API(vkFreeMemory);
+		RKIT_VK_API(vkMapMemory);
+		RKIT_VK_API(vkUnmapMemory);
+		RKIT_VK_API(vkCreateBuffer);
+		RKIT_VK_API(vkDestroyBuffer);
+		RKIT_VK_API(vkGetBufferMemoryRequirements);
+		RKIT_VK_API(vkBindBufferMemory);
 		RKIT_VK_API_EXT(vkCreateSwapchainKHR, VK_KHR_swapchain);
 		RKIT_VK_API_EXT(vkDestroySwapchainKHR, VK_KHR_swapchain);
 		RKIT_VK_API_EXT(vkGetSwapchainImagesKHR, VK_KHR_swapchain);

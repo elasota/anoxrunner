@@ -139,9 +139,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="VulkanBufferResource.cpp" />
     <ClCompile Include="VulkanCommandAllocator.cpp" />
     <ClCompile Include="VulkanCommandBatch.cpp" />
     <ClCompile Include="VulkanFence.cpp" />
+    <ClCompile Include="VulkanHeapKey.cpp" />
+    <ClCompile Include="VulkanMemoryHeap.cpp" />
     <ClCompile Include="VulkanMemoryRequirements.cpp" />
     <ClCompile Include="VulkanPipelineLibraryLoader.cpp" />
     <ClCompile Include="VulkanPlatformSpecific_Win32.cpp" />
@@ -167,12 +170,15 @@
     <ClInclude Include="VulkanAPILoader.h" />
     <ClInclude Include="VulkanAPI_Common.h" />
     <ClInclude Include="VulkanAutoObject.h" />
+    <ClInclude Include="VulkanBufferResource.h" />
     <ClInclude Include="VulkanCheck.h" />
     <ClInclude Include="VulkanCommandAllocator.h" />
     <ClInclude Include="VulkanCommandBatch.h" />
     <ClInclude Include="VulkanDevice.h" />
     <ClInclude Include="VulkanFence.h" />
+    <ClInclude Include="VulkanHeapKey.h" />
     <ClInclude Include="VulkanImageResource.h" />
+    <ClInclude Include="VulkanMemoryHeap.h" />
     <ClInclude Include="VulkanMemoryRequirements.h" />
     <ClInclude Include="VulkanPhysDevice.h" />
     <ClInclude Include="VulkanPipelineLibraryLoader.h" />
