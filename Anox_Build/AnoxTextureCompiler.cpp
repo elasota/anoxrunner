@@ -1003,6 +1003,12 @@ namespace anox { namespace buildsystem
 			}
 		}
 
+		// Convert 24-bit to 32-bit
+		if (numChannelsToSave == 3 && !isCompressed)
+			numChannelsToSave = 4;
+
+		pixelSize = static_cast<uint8_t>(numChannelsToSave);
+
 		uint32_t ddsFlags = 0;
 		ddsFlags |= rkit::data::DDSFlags::kCaps;
 		ddsFlags |= rkit::data::DDSFlags::kHeight;
@@ -1184,7 +1190,7 @@ namespace anox { namespace buildsystem
 
 	uint32_t TextureCompiler::GetVersion() const
 	{
-		return 2;
+		return 3;
 	}
 
 	rkit::Result TextureCompilerBase::ResolveIntermediatePath(rkit::String &outString, const rkit::StringView &identifierWithDisposition)

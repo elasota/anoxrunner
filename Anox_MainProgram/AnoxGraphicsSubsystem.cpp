@@ -10,6 +10,7 @@
 #include "anox/AnoxGraphicsSubsystem.h"
 
 #include "rkit/Render/BufferSpec.h"
+#include "rkit/Render/BufferImageFootprint.h"
 #include "rkit/Render/BufferResource.h"
 #include "rkit/Render/CommandAllocator.h"
 #include "rkit/Render/CommandBatch.h"
@@ -76,6 +77,7 @@ namespace anox
 	class Texture final : public ITexture, public rkit::RefCounted
 	{
 	public:
+		rkit::render::IImageResource *GetRenderResource() const;
 		void SetRenderResource(rkit::UniquePtr<rkit::render::IImageResource> &&resource);
 
 	private:
@@ -96,6 +98,7 @@ namespace anox
 		rkit::Result TransitionDisplayState() override;
 
 		rkit::Result RetireOldestFrame() override;
+		rkit::Result PumpAsyncUploads() override;
 		rkit::Result StartRendering() override;
 		rkit::Result DrawFrame() override;
 		rkit::Result EndFrame() override;
@@ -117,6 +120,8 @@ namespace anox
 		void SetSplashProgress(uint64_t progress);
 
 	private:
+		struct UploadActionSet;
+
 		template<class T>
 		struct PipelineConfigResolution
 		{
@@ -395,26 +400,77 @@ namespace anox
 			}
 		};
 
+		struct UploadTask
+		{
+			virtual ~UploadTask() {}
+
+			virtual rkit::Result PumpTask(bool &isCompleted, UploadActionSet &actionSet, GraphicsSubsystem &subsystem) = 0;
+			virtual void Complete() = 0;
+		};
+
+		struct BufferStripedMemCopyAction
+		{
+			const uint8_t *m_start = nullptr;
+			uint32_t m_rowSizeBytes = 0;
+			uint32_t m_rowInPitch = 0;
+			uint32_t m_rowOutPitch = 0;
+			uint32_t m_rowCount = 0;
+
+			rkit::render::MemoryPosition m_destPosition;
+		};
+
+		struct BufferToTextureCopyAction
+		{
+			rkit::render::IBufferResource *m_buffer = nullptr;
+			rkit::render::IImageResource *m_image = nullptr;
+
+			rkit::render::BufferImageFootprint m_footprint = {};
+
+			rkit::render::ImageRect3D m_destRect = {};
+		};
+
+		struct UploadActionSet
+		{
+			rkit::Vector<BufferStripedMemCopyAction> m_stripedMemCpy;
+			rkit::Vector<BufferToTextureCopyAction> m_bufferToTextureCopy;
+			rkit::Vector<rkit::UniquePtr<UploadTask>> m_retiredUploadTasks;
+		};
+
 		struct FrameSyncPoint
 		{
-			rkit::render::IBaseCommandBatch* m_frameEndBatch = nullptr;
+			rkit::render::IBaseCommandBatch *m_frameEndBatch = nullptr;
 			rkit::RCPtr<rkit::Job> m_frameEndJob;
 
-			size_t m_asyncUploadHeapHighMark = 0;
-			size_t m_asyncUploadHeapLowMark = 0;
+			UploadActionSet m_asyncUploadActionSet;
+			uint32_t m_asyncUploadHeapFinalHighMark = 0;
 
 			rkit::StaticArray<FrameSyncPointCommandListHandler, static_cast<size_t>(rkit::render::CommandQueueType::kCount)> m_commandListHandlers;
 
 			void Reset();
 		};
 
-		struct UploadTask
+		struct TextureUploadTask final : public UploadTask
 		{
-			size_t m_mappedSizeRequired = 0;
-			size_t m_alignmentRequired = 0;
-
-			rkit::RCPtr<void> m_uploadObject;
+			rkit::RCPtr<Texture> m_texture;
+			rkit::RCPtr<rkit::Vector<uint8_t>> m_textureData;
+			size_t m_textureDataOffset = 0;
 			rkit::RCPtr<rkit::JobSignaller> m_doneSignaller;
+
+			rkit::render::ImageSpec m_spec = {};
+
+			uint32_t m_arrayElement = 0;
+			uint32_t m_mipLevel = 0;
+			uint32_t m_blockCol = 0;
+			uint32_t m_blockRow = 0;
+			uint32_t m_blockDepthSlice = 0;
+
+			uint32_t m_blockWidth = 1;
+			uint32_t m_blockHeight = 1;
+			uint32_t m_blockDepth = 1;
+			uint32_t m_blockSizeBytes = 4;
+
+			rkit::Result PumpTask(bool &isCompleted, UploadActionSet &actionSet, GraphicsSubsystem &subsystem) override;
+			void Complete() override;
 		};
 
 		rkit::Result CreateAndQueueJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<rkit::IJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies, rkit::RCPtr<rkit::Job> (LogicalQueueBase::*queueMember));
@@ -431,7 +487,11 @@ namespace anox
 
 		rkit::Result WaitForRenderingTasks();
 
-		rkit::Result PostTextureUploadJob(const rkit::RCPtr<Texture> &texture, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData, size_t textureDataOffset, const rkit::RCPtr<rkit::JobSignaller> &doneSignaller);
+		rkit::Result PostAsyncUploadTask(rkit::UniquePtr<UploadTask> &&uploadTask);
+		rkit::Result PumpActiveAsyncUploadTask(UploadActionSet &actionSet);
+
+		void GetAsyncUploadHeapStats(uint32_t &outContiguousLow, uint32_t &outContiguousHigh) const;
+		void ConsumeAsyncUploadSpace(uint32_t space);
 
 		rkit::Optional<rkit::render::DisplayMode> m_currentDisplayMode;
 		rkit::render::DisplayMode m_desiredDisplayMode = rkit::render::DisplayMode::kSplash;
@@ -512,14 +572,23 @@ namespace anox
 		bool m_enableAsyncUpload = false;
 
 		rkit::UniquePtr<rkit::IMutex> m_asyncUploadMutex;
-		rkit::Vector<UploadTask> m_waitingUploadTasks;
+		rkit::Vector<rkit::UniquePtr<UploadTask>> m_asyncUploadWaitingTasks;
 
+		rkit::UniquePtr<UploadTask> m_asyncUploadActiveTask;
 		rkit::UniquePtr<rkit::render::IMemoryHeap> m_asyncUploadHeap;
 		rkit::UniquePtr<rkit::render::IBufferResource> m_asyncUploadBuffer;
-		size_t m_asyncUploadHeapLowMark = 0;
-		size_t m_asyncUploadHeapHighMark = 0;
+
+		uint32_t m_asyncUploadHeapLowMark = 0;
+		uint32_t m_asyncUploadHeapHighMark = 0;
+		uint32_t m_asyncUploadHeapSize = 0;
+		uint32_t m_asyncUploadHeapAlignment = 0;
+		bool m_asyncUploadHeapIsFull = false;
 	};
 
+	rkit::render::IImageResource *Texture::GetRenderResource() const
+	{
+		return m_resource.Get();
+	}
 
 	void Texture::SetRenderResource(rkit::UniquePtr<rkit::render::IImageResource> &&resource)
 	{
@@ -944,6 +1013,24 @@ namespace anox
 				{
 					textureFormat = rkit::render::TextureFormat::RGBA_UNorm8;
 				}
+				else if ((pixelFormatFlags & rgbaFlags) == rkit::data::DDSPixelFormatFlags::kRGB
+					&& bitCount == 16
+					&& rMask == 0x00ff
+					&& gMask == 0xff00
+					&& bMask == 0
+					&& aMask == 0)
+				{
+					textureFormat = rkit::render::TextureFormat::RG_UNorm8;
+				}
+				else if ((pixelFormatFlags & rgbaFlags) == rkit::data::DDSPixelFormatFlags::kRGB
+					&& bitCount == 8
+					&& rMask == 0xff
+					&& gMask == 0
+					&& bMask == 0
+					&& aMask == 0)
+				{
+					textureFormat = rkit::render::TextureFormat::R_UNorm8;
+				}
 
 				if (textureFormat != rkit::render::TextureFormat::Count && (ddsFlags & rkit::data::DDSFlags::kPitch))
 				{
@@ -1031,13 +1118,17 @@ namespace anox
 		heapSpec.m_allowNonRTDSImages = true;
 		heapSpec.m_heapType = rkit::render::HeapType::kDefault;
 
-		rkit::Optional<rkit::render::HeapKey> heapKey = prototype->GetMemoryRequirements().FindSuitableHeap(heapSpec);
+		const rkit::render::MemoryRequirementsView memReqs = prototype->GetMemoryRequirements();
+
+		rkit::render::GPUMemorySize_t memSize = memReqs.Size();
+
+		rkit::Optional<rkit::render::HeapKey> heapKey = memReqs.FindSuitableHeap(heapSpec);
 		if (!heapKey.IsSet())
 			return rkit::ResultCode::kInternalError;
 
 		// FIXME FIXME FIXME
 		rkit::UniquePtr<rkit::render::IMemoryHeap> memHeap;
-		RKIT_CHECK(m_graphicsSubsystem.m_renderDevice->CreateMemoryHeap(memHeap, heapKey.Get(), prototype->GetMemoryRequirements().Size()));
+		RKIT_CHECK(m_graphicsSubsystem.m_renderDevice->CreateMemoryHeap(memHeap, heapKey.Get(), memSize));
 
 		rkit::ConstSpan<uint8_t> initialDataSpan;
 		if (m_graphicsSubsystem.m_renderDevice->SupportsInitialTextureData())
@@ -1057,7 +1148,19 @@ namespace anox
 		}
 		else
 		{
-			RKIT_CHECK(m_graphicsSubsystem.PostTextureUploadJob(m_texture, m_textureData, headerSize, m_doneCopyingSignaller));
+			rkit::UniquePtr<TextureUploadTask> textureUploadTask;
+			RKIT_CHECK(rkit::New<TextureUploadTask>(textureUploadTask));
+
+			textureUploadTask->m_doneSignaller = m_doneCopyingSignaller;
+			textureUploadTask->m_texture = m_texture;
+			textureUploadTask->m_textureData = m_textureData;
+			textureUploadTask->m_textureDataOffset = headerSize;
+			textureUploadTask->m_spec = textureSpec;
+			textureUploadTask->m_blockWidth = pixelBlockWidth;
+			textureUploadTask->m_blockHeight = pixelBlockHeight;
+			textureUploadTask->m_blockSizeBytes = pixelBlockSizeBytes;
+
+			RKIT_CHECK(m_graphicsSubsystem.PostAsyncUploadTask(std::move(textureUploadTask)));
 		}
 
 		return rkit::ResultCode::kOK;
@@ -1293,6 +1396,228 @@ namespace anox
 		m_frameEndBatch = nullptr;
 	}
 
+	rkit::Result GraphicsSubsystem::TextureUploadTask::PumpTask(bool &isCompleted, UploadActionSet &actionSet, GraphicsSubsystem &subsystem)
+	{
+		isCompleted = false;
+
+		const uint32_t blockSizeBytes = m_blockSizeBytes;
+		const uint32_t arrayCount = m_spec.m_arrayLayers * (m_spec.m_cubeMap ? 6 : 1);
+
+		const uint8_t *textureDataStart = m_textureData->GetBuffer();
+
+		for (;;)
+		{
+			uint32_t lowContiguous = 0;
+			uint32_t highContiguous = 0;
+			subsystem.GetAsyncUploadHeapStats(lowContiguous, highContiguous);
+
+			if (lowContiguous == 0 && highContiguous == 0)
+			{
+				// Totally out of space
+				return rkit::ResultCode::kOK;
+			}
+
+			const uint32_t mipLevel = m_mipLevel;
+
+			const uint32_t levelWidth = rkit::Max<uint32_t>(1, m_spec.m_width >> mipLevel);
+			const uint32_t levelHeight = rkit::Max<uint32_t>(1, m_spec.m_height >> mipLevel);
+			const uint32_t levelDepth = rkit::Max<uint32_t>(1, m_spec.m_depth >> mipLevel);
+
+			const uint32_t levelBlockCols = rkit::DivideRoundUp(levelWidth, m_blockWidth);
+			const uint32_t levelBlockRows = rkit::DivideRoundUp(levelHeight, m_blockHeight);
+			const uint32_t levelBlockDepthSlices = rkit::DivideRoundUp(levelDepth, m_blockDepth);
+
+			const uint32_t levelRowPitch = rkit::AlignUp<uint32_t>(levelBlockCols * blockSizeBytes, subsystem.m_asyncUploadHeapAlignment);
+
+			const uint32_t depthSliceSize = levelBlockCols * levelRowPitch;
+
+			uint8_t copyAxisCount = 3;
+			if (m_blockRow != 0)
+				copyAxisCount = 2;
+			if (m_blockCol != 0)
+				copyAxisCount = 1;
+
+			if (copyAxisCount == 3)
+			{
+				if (depthSliceSize > lowContiguous)
+				{
+					if (depthSliceSize > highContiguous)
+						copyAxisCount = 2;
+					else
+					{
+						subsystem.ConsumeAsyncUploadSpace(lowContiguous);
+						lowContiguous = highContiguous;
+					}
+				}
+			}
+
+			if (copyAxisCount == 2)
+			{
+				if (levelRowPitch > lowContiguous)
+				{
+					if (levelRowPitch > highContiguous)
+						copyAxisCount = 1;
+					else
+					{
+						subsystem.ConsumeAsyncUploadSpace(lowContiguous);
+						lowContiguous = highContiguous;
+					}
+				}
+			}
+
+			if (copyAxisCount == 1)
+			{
+				if (blockSizeBytes > lowContiguous)
+				{
+					if (blockSizeBytes > highContiguous)
+					{
+						// Not enough buffer to copy anything
+						return rkit::ResultCode::kOK;
+					}
+					else
+					{
+						subsystem.ConsumeAsyncUploadSpace(lowContiguous);
+						lowContiguous = highContiguous;
+					}
+				}
+			}
+
+			BufferStripedMemCopyAction memCpyAction = {};
+			BufferToTextureCopyAction texCopyAction = {};
+
+			memCpyAction.m_start = textureDataStart + m_textureDataOffset;
+			memCpyAction.m_rowInPitch = levelWidth * blockSizeBytes;
+			memCpyAction.m_rowOutPitch = levelRowPitch;
+
+			texCopyAction.m_buffer = subsystem.m_asyncUploadBuffer.Get();
+			texCopyAction.m_image = m_texture->GetRenderResource();
+			texCopyAction.m_footprint.m_format = m_spec.m_format;
+			texCopyAction.m_destRect.m_x = m_blockCol * m_blockWidth;
+			texCopyAction.m_destRect.m_y = m_blockRow * m_blockHeight;
+			texCopyAction.m_destRect.m_z = m_blockDepthSlice * m_blockDepthSlice;
+
+
+			// At this point, there is definitely enough room to copy
+
+			// Fields to fill for:
+			// memCpyAction:
+			//     m_rowCount
+			//     m_rowSizeBytes
+			//     (m_destPosition will be applied after)
+			// texCopyAction:
+			//     (m_footprint.m_bufferOffset will be applied after)
+			//     m_footprint.m_width
+			//     m_footprint.m_height
+			//     m_footprint.m_depth
+			//     m_footprint.m_rowPitch
+			//     m_destRect.m_width
+			//     m_destRect.m_height
+			//     m_destRect.m_depth
+			bool finishedWithMipLevel = false;
+
+			uint32_t axisCopyAmount = 0;
+
+			switch (copyAxisCount)
+			{
+			case 3:
+				axisCopyAmount = rkit::Min<uint32_t>(levelBlockDepthSlices - m_blockDepthSlice, lowContiguous / depthSliceSize);
+				memCpyAction.m_rowCount = axisCopyAmount * levelBlockRows;
+				memCpyAction.m_rowSizeBytes = levelBlockCols * blockSizeBytes;
+
+				texCopyAction.m_footprint.m_width = levelBlockCols * m_blockWidth;
+				texCopyAction.m_footprint.m_height = levelBlockRows * m_blockHeight;
+				texCopyAction.m_footprint.m_depth = axisCopyAmount * m_blockDepth;
+				texCopyAction.m_footprint.m_rowPitch = levelRowPitch;
+				break;
+			case 2:
+				axisCopyAmount = rkit::Min<uint32_t>(levelBlockRows - m_blockRow, lowContiguous / levelRowPitch);
+				memCpyAction.m_rowCount = 1;
+				memCpyAction.m_rowSizeBytes = axisCopyAmount * blockSizeBytes;
+
+				texCopyAction.m_footprint.m_width = axisCopyAmount * m_blockWidth;
+				texCopyAction.m_footprint.m_height = m_blockHeight;
+				texCopyAction.m_footprint.m_depth = m_blockDepth;
+				texCopyAction.m_footprint.m_rowPitch = levelRowPitch;
+				break;
+			case 1:
+				axisCopyAmount = rkit::Min<uint32_t>(levelBlockCols - m_blockCol, lowContiguous / blockSizeBytes);
+				memCpyAction.m_rowCount = 1;
+				memCpyAction.m_rowSizeBytes = levelBlockCols * blockSizeBytes;
+
+				texCopyAction.m_footprint.m_width = levelBlockCols * m_blockWidth;
+				texCopyAction.m_footprint.m_height = m_blockHeight;
+				texCopyAction.m_footprint.m_depth = m_blockDepth;
+				texCopyAction.m_footprint.m_rowPitch = levelRowPitch;
+				break;
+			default:
+				return rkit::ResultCode::kInternalError;
+			}
+
+			const uint32_t inputBytesConsumed = memCpyAction.m_rowSizeBytes * memCpyAction.m_rowCount;
+
+			memCpyAction.m_destPosition = subsystem.m_asyncUploadHeap->GetStartPosition() + subsystem.m_asyncUploadHeapHighMark;
+			texCopyAction.m_footprint.m_bufferOffset = subsystem.m_asyncUploadHeapHighMark;
+			texCopyAction.m_destRect.m_width = rkit::Min(texCopyAction.m_footprint.m_width, levelWidth - static_cast<uint32_t>(texCopyAction.m_destRect.m_x));
+			texCopyAction.m_destRect.m_height = rkit::Min(texCopyAction.m_footprint.m_height, levelHeight - static_cast<uint32_t>(texCopyAction.m_destRect.m_y));
+			texCopyAction.m_destRect.m_depth = rkit::Min(texCopyAction.m_footprint.m_depth, levelDepth - static_cast<uint32_t>(texCopyAction.m_destRect.m_z));
+
+			subsystem.ConsumeAsyncUploadSpace(inputBytesConsumed);
+			m_textureDataOffset += inputBytesConsumed;
+
+			RKIT_CHECK(actionSet.m_bufferToTextureCopy.Append(texCopyAction));
+			RKIT_CHECK(actionSet.m_stripedMemCpy.Append(memCpyAction));
+
+			if (copyAxisCount == 1)
+				m_blockCol += axisCopyAmount;
+
+			if (m_blockCol == levelBlockCols)
+			{
+				m_blockCol = 0;
+				m_blockRow++;
+			}
+
+			if (copyAxisCount == 2)
+				m_blockRow += axisCopyAmount;
+
+			if (m_blockRow == levelBlockRows)
+			{
+				m_blockRow = 0;
+				m_blockDepthSlice++;
+			}
+
+			if (copyAxisCount == 3)
+				m_blockDepthSlice += axisCopyAmount;
+
+			if (m_blockDepthSlice == levelBlockDepthSlices)
+			{
+				m_blockDepthSlice = 0;
+				m_mipLevel++;
+			}
+
+			if (m_mipLevel == m_spec.m_mipLevels)
+			{
+				m_mipLevel = 0;
+				m_arrayElement++;
+			}
+
+			if (m_arrayElement == arrayCount)
+			{
+				isCompleted = true;
+				return rkit::ResultCode::kOK;
+			}
+		}
+
+		isCompleted = false;
+		return rkit::ResultCode::kOK;
+	}
+
+	void GraphicsSubsystem::TextureUploadTask::Complete()
+	{
+		if (m_doneSignaller.IsValid())
+			m_doneSignaller->SignalDone(rkit::ResultCode::kOK);
+	}
+
+
 	GraphicsSubsystem::GraphicsSubsystem(IGameDataFileSystem &fileSystem, rkit::data::IDataDriver &dataDriver, rkit::utils::IThreadPool &threadPool, anox::RenderBackend desiredBackend)
 		: m_fileSystem(fileSystem)
 		, m_threadPool(threadPool)
@@ -1436,7 +1761,9 @@ namespace anox
 		if (m_enableAsyncUpload)
 		{
 			rkit::render::BufferSpec uploadBufferSpec = {};
-			uploadBufferSpec.m_size = 64 * 1024 * 1024;
+			m_asyncUploadHeapSize = 64 * 1024 * 1024;
+			m_asyncUploadHeapAlignment = m_renderDevice->GetUploadHeapAlignment();
+			uploadBufferSpec.m_size = m_asyncUploadHeapSize;
 
 			rkit::render::BufferResourceSpec uploadBufferResSpec = {};
 			uploadBufferResSpec.m_usage.Add({
@@ -1461,6 +1788,10 @@ namespace anox
 			RKIT_CHECK(m_renderDevice->CreateMemoryHeap(m_asyncUploadHeap, uploadHeapKey.Get(), prototype->GetMemoryRequirements().Size()));
 
 			RKIT_CHECK(m_renderDevice->CreateBuffer(m_asyncUploadBuffer, std::move(prototype), m_asyncUploadHeap->GetRegion(), rkit::ConstSpan<uint8_t>()));
+
+			m_asyncUploadHeapLowMark = 0;
+			m_asyncUploadHeapHighMark = 0;
+			m_asyncUploadHeapIsFull = false;
 		}
 
 		return rkit::ResultCode::kOK;
@@ -1476,9 +1807,72 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result GraphicsSubsystem::PostTextureUploadJob(const rkit::RCPtr<Texture> &texture, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData, size_t textureDataOffset, const rkit::RCPtr<rkit::JobSignaller> &doneSignaller)
+	rkit::Result GraphicsSubsystem::PostAsyncUploadTask(rkit::UniquePtr<UploadTask> &&uploadTaskRef)
 	{
+		rkit::UniquePtr<UploadTask> uploadTask = std::move(uploadTaskRef);
+
+		rkit::MutexLock lock(*m_asyncUploadMutex);
+
+		RKIT_CHECK(m_asyncUploadWaitingTasks.Append(std::move(uploadTask)));
+
 		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result GraphicsSubsystem::PumpActiveAsyncUploadTask(UploadActionSet &actionSet)
+	{
+		bool isCompleted = false;
+		RKIT_CHECK(m_asyncUploadActiveTask->PumpTask(isCompleted, actionSet, *this));
+
+		if (isCompleted)
+		{
+			RKIT_CHECK(actionSet.m_retiredUploadTasks.Append(std::move(m_asyncUploadActiveTask)));
+			m_asyncUploadActiveTask.Reset();
+		}
+
+		return rkit::ResultCode::kOK;
+	}
+
+	void GraphicsSubsystem::GetAsyncUploadHeapStats(uint32_t &outContiguousLow, uint32_t &outContiguousHigh) const
+	{
+		if (m_asyncUploadHeapHighMark < m_asyncUploadHeapLowMark)
+		{
+			outContiguousLow = m_asyncUploadHeapLowMark - m_asyncUploadHeapHighMark;
+			outContiguousHigh = 0;
+		}
+		else if (m_asyncUploadHeapHighMark > m_asyncUploadHeapLowMark)
+		{
+			outContiguousLow = m_asyncUploadHeapSize - m_asyncUploadHeapHighMark;
+			outContiguousHigh = m_asyncUploadHeapLowMark;
+		}
+		else
+		{
+			outContiguousLow = m_asyncUploadHeapIsFull ? 0 : m_asyncUploadHeapSize;
+			outContiguousHigh = 0;
+		}
+	}
+
+	void GraphicsSubsystem::ConsumeAsyncUploadSpace(uint32_t space)
+	{
+		if (space == 0)
+			return;
+
+		RKIT_ASSERT(m_asyncUploadHeapIsFull == false);
+
+		if (m_asyncUploadHeapLowMark <= m_asyncUploadHeapHighMark)
+		{
+			RKIT_ASSERT(space <= m_asyncUploadHeapSize - m_asyncUploadHeapHighMark);
+			m_asyncUploadHeapHighMark += space;
+
+			if (m_asyncUploadHeapHighMark == m_asyncUploadHeapSize)
+				m_asyncUploadHeapHighMark = 0;
+		}
+		else
+		{
+			RKIT_ASSERT(space <= m_asyncUploadHeapLowMark - m_asyncUploadHeapHighMark);
+			m_asyncUploadHeapHighMark += space;
+		}
+
+		m_asyncUploadHeapIsFull = (m_asyncUploadHeapHighMark == m_asyncUploadHeapLowMark);
 	}
 
 	rkit::Result GraphicsSubsystem::CreateAndQueueJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<rkit::IJobRunner> &&jobRunnerRef, const rkit::JobDependencyList &dependencies, rkit::RCPtr<rkit::Job>(LogicalQueueBase:: *queueMember))
@@ -1928,7 +2322,6 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-
 	rkit::Result GraphicsSubsystem::RetireOldestFrame()
 	{
 		if (!m_currentDisplayMode.IsSet() || m_currentDisplayMode.Get() == rkit::render::DisplayMode::kSplash)
@@ -1943,6 +2336,24 @@ namespace anox
 
 			RKIT_ASSERT(syncPoint.m_frameEndBatch != nullptr);
 			RKIT_CHECK(syncPoint.m_frameEndBatch->WaitForCompletion());
+		}
+
+		// When the frame is retired, all of the uploads have been pushed,
+		// so the buffer can't be full.
+		m_asyncUploadHeapLowMark = syncPoint.m_asyncUploadHeapFinalHighMark;
+		m_asyncUploadHeapIsFull = false;
+
+		// If the buffer is completely emptied, reset to the zero point
+		if (m_asyncUploadHeapLowMark == m_asyncUploadHeapHighMark)
+		{
+			m_asyncUploadHeapLowMark = 0;
+			m_asyncUploadHeapHighMark = 0;
+		}
+
+		for (rkit::UniquePtr<UploadTask> &uploadTaskPtr : syncPoint.m_asyncUploadActionSet.m_retiredUploadTasks)
+		{
+			uploadTaskPtr->Complete();
+			uploadTaskPtr.Reset();
 		}
 
 		rkit::StaticBoolVector<static_cast<size_t>(rkit::render::CommandQueueType::kCount)> cmdQueueReset;
@@ -1980,6 +2391,41 @@ namespace anox
 
 			cmdQueueReset.Set(static_cast<size_t>(queueType), true);
 		}
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result GraphicsSubsystem::PumpAsyncUploads()
+	{
+		if (!m_enableAsyncUpload)
+			return rkit::ResultCode::kOK;
+
+		UploadActionSet &actionSet = m_syncPoints[m_currentSyncPoint].m_asyncUploadActionSet;
+		actionSet.m_bufferToTextureCopy.ShrinkToSize(0);
+		actionSet.m_stripedMemCpy.ShrinkToSize(0);
+		actionSet.m_retiredUploadTasks.ShrinkToSize(0);
+
+		for (;;)
+		{
+			if (!m_asyncUploadActiveTask.IsValid())
+			{
+				rkit::MutexLock lock(*m_asyncUploadMutex);
+
+				const size_t numWaitingTasks = m_asyncUploadWaitingTasks.Count();
+				if (numWaitingTasks == 0)
+					break;
+
+				m_asyncUploadActiveTask = std::move(m_asyncUploadWaitingTasks[numWaitingTasks - 1]);
+				m_asyncUploadWaitingTasks.ShrinkToSize(numWaitingTasks - 1);
+			}
+
+			RKIT_CHECK(PumpActiveAsyncUploadTask(actionSet));
+
+			if (m_asyncUploadActiveTask.IsValid())
+				break;	// Still working on this one
+		}
+
+		m_syncPoints[m_currentSyncPoint].m_asyncUploadHeapFinalHighMark = m_asyncUploadHeapHighMark;
 
 		return rkit::ResultCode::kOK;
 	}

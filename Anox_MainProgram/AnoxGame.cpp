@@ -140,6 +140,8 @@ namespace anox
 
 		RKIT_CHECK(m_graphicsSubsystem->RetireOldestFrame());
 
+		RKIT_CHECK(m_graphicsSubsystem->PumpAsyncUploads());
+
 		rkit::Optional<rkit::render::DisplayMode> displayMode = m_graphicsSubsystem->GetDisplayMode();
 		if (displayMode.IsSet() && displayMode.Get() != rkit::render::DisplayMode::kSplash)
 		{

@@ -111,6 +111,7 @@ namespace rkit { namespace render
 
 		virtual bool SupportsInitialTextureData() const = 0;
 		virtual bool SupportsInitialBufferData() const = 0;
+		virtual uint32_t GetUploadHeapAlignment() const = 0;
 
 		Result CreateBufferPrototype(UniquePtr<IBufferPrototype> &outBufferPrototype, const BufferSpec &bufferSpec,
 			const BufferResourceSpec &resourceSpec);

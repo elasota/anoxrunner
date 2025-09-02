@@ -72,6 +72,18 @@ namespace rkit { namespace render { namespace vulkan {
 		case TextureFormat::RGBA_UNorm8_sRGB:
 			createInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
 			break;
+		case TextureFormat::RG_UNorm8:
+			createInfo.format = VK_FORMAT_R8G8_UNORM;
+			break;
+		case TextureFormat::RG_UNorm8_sRGB:
+			createInfo.format = VK_FORMAT_R8G8_SRGB;
+			break;
+		case TextureFormat::R_UNorm8:
+			createInfo.format = VK_FORMAT_R8G8_UNORM;
+			break;
+		case TextureFormat::R_UNorm8_sRGB:
+			createInfo.format = VK_FORMAT_R8_SRGB;
+			break;
 		default:
 			return ResultCode::kInvalidParameter;
 		}

@@ -23,6 +23,8 @@ namespace rkit { namespace render {
 		IMemoryHeap *GetHeap() const;
 		GPUMemoryOffset_t GetOffset() const;
 
+		MemoryPosition operator+(GPUMemoryOffset_t offset) const;
+
 	private:
 		IMemoryHeap *m_memHeap = nullptr;
 		GPUMemoryOffset_t m_offset = 0;
@@ -105,6 +107,12 @@ namespace rkit { namespace render {
 	inline GPUMemoryOffset_t MemoryPosition::GetOffset() const
 	{
 		return m_offset;
+	}
+
+	inline MemoryPosition MemoryPosition::operator+(GPUMemoryOffset_t offset) const
+	{
+		RKIT_ASSERT(offset <= m_memHeap->GetSize() - m_offset);
+		return MemoryPosition(m_memHeap, offset);
 	}
 
 	inline MemoryRegion::MemoryRegion()

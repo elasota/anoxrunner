@@ -324,6 +324,14 @@ namespace rkit
 		};
 	}
 
+	template<class T>
+	Result SafeAlignUp(T &result, const T &value, const T &alignment);
+
+	template<class T>
+	T AlignUp(const T &value, const T &alignment);
+
+	template<class T>
+	T DivideRoundUp(const T &dividend, const T &divisor);
 
 	template<class T>
 	Result SafeAdd(T &result, const T &a, const T &b);
@@ -435,6 +443,40 @@ template<class TType>
 rkit::Ordering rkit::priv::StrongComparerHelper<TType, false>::Compare(const TType &a, const TType &b)
 {
 	return rkit::DefaultComparer<TType, TType>::Compare(a, b);
+}
+
+template<class T>
+rkit::Result rkit::SafeAlignUp(T &result, const T &a, const T &b)
+{
+	const T remainder = a % b;
+	if (remainder == 0)
+	{
+		result = a;
+		return ResultCode::kOK;
+	}
+
+	return SafeAdd<T>(result, a, static_cast<T>(b - remainder));
+}
+
+template<class T>
+T rkit::AlignUp(const T &a, const T &b)
+{
+	const T remainder = a % b;
+	if (remainder == 0)
+		return a;
+
+	return a + static_cast<T>(b - remainder);
+}
+
+template<class T>
+T rkit::DivideRoundUp(const T &dividend, const T &divisor)
+{
+	const T resultBase = dividend / divisor;
+	const T remainder = dividend % divisor;
+
+	if (remainder == 0)
+		return resultBase;
+	return resultBase + 1;
 }
 
 template<class T>

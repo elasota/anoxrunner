@@ -102,6 +102,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		bool SupportsInitialTextureData() const override;
 		bool SupportsInitialBufferData() const override;
+		uint32_t GetUploadHeapAlignment() const override;
 
 		Result LoadDeviceAPI();
 		Result CreatePools();
@@ -797,6 +798,11 @@ namespace rkit { namespace render { namespace vulkan
 	bool VulkanDevice::SupportsInitialBufferData() const
 	{
 		return false;
+	}
+
+	uint32_t VulkanDevice::GetUploadHeapAlignment() const
+	{
+		return static_cast<uint32_t>(m_physDevice->GetPhysDeviceProperties().limits.nonCoherentAtomSize);
 	}
 
 	Result VulkanDevice::LoadDeviceAPI()
