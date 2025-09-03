@@ -329,7 +329,7 @@ namespace rkit
 	}
 
 	template<size_t TSize>
-	bool StaticBoolVector<TSize>::FindFirstSet(size_t &outIndex) const
+	bool StaticBoolVector<TSize>::FindLastSet(size_t &outIndex) const
 	{
 		size_t index = TSize;
 		while (index > 0)
@@ -346,7 +346,7 @@ namespace rkit
 	}
 
 	template<size_t TSize>
-	bool StaticBoolVector<TSize>::FindLastSet(size_t &outIndex) const
+	bool StaticBoolVector<TSize>::FindFirstSet(size_t &outIndex) const
 	{
 		size_t index = 0;
 		while (index < TSize)

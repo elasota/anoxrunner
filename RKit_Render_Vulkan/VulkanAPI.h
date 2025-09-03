@@ -84,6 +84,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_API(vkCmdClearAttachments);
 		RKIT_VK_API(vkCmdEndRenderPass);
 		RKIT_VK_API(vkCmdPipelineBarrier);
+		RKIT_VK_API(vkCmdCopyBufferToImage);
 		RKIT_VK_API(vkAllocateMemory);
 		RKIT_VK_API(vkFreeMemory);
 		RKIT_VK_API(vkMapMemory);

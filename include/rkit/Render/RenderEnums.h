@@ -335,4 +335,19 @@ namespace rkit { namespace render
 		Copy,
 	};
 
+	enum class ImageLayout
+	{
+		Undefined,
+		PresentSource,
+		General,
+		RenderTarget,
+		DepthStencil,
+		DepthStencilReadOnly,
+		ShaderResource,
+		CopySrc,
+		CopyDst,
+
+		Count,
+	};
+
 } } // rkit::render

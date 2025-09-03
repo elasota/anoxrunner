@@ -4,12 +4,14 @@
 #include "rkit/Core/Result.h"
 
 #include "rkit/Render/Barrier.h"
+#include "rkit/Render/BufferImageFootprint.h"
 #include "rkit/Render/CommandEncoder.h"
 #include "rkit/Render/DepthStencilTargetClear.h"
 #include "rkit/Render/ImageRect.h"
 #include "rkit/Render/RenderTargetClear.h"
 
 #include "VulkanAPI.h"
+#include "VulkanBufferResource.h"
 #include "VulkanCheck.h"
 #include "VulkanCommandAllocator.h"
 #include "VulkanDevice.h"
@@ -31,6 +33,21 @@ namespace rkit { namespace render { namespace vulkan
 	{
 	public:
 		virtual Result CloseEncoder() = 0;
+	};
+
+	class VulkanCopyCommandEncoder : public ICopyCommandEncoder, public VulkanCommandEncoder
+	{
+	public:
+		explicit VulkanCopyCommandEncoder(VulkanCommandBatch &batch);
+
+		Result CopyBufferToImage(IImageResource &imageResource, const ImageRect3D &destRect,
+			IBufferResource &bufferResource, const BufferImageFootprint &bufferFootprint,
+			ImageLayout imageLayout, uint32_t mipLevel, uint32_t arrayLayer, ImagePlane plane) override;
+
+		Result CloseEncoder() override;
+
+	private:
+		VulkanCommandBatch &m_batch;
 	};
 
 	class VulkanGraphicsCommandEncoder : public IGraphicsCommandEncoder, public VulkanCommandEncoder
@@ -121,11 +138,68 @@ namespace rkit { namespace render { namespace vulkan
 		VkFence m_completionFence = VK_NULL_HANDLE;
 		bool m_isCPUWaitable = false;
 
+		VulkanCopyCommandEncoder m_copyCommandEncoder;
 		VulkanGraphicsCommandEncoder m_graphicsCommandEncoder;
 
 		StaticArray<VulkanCommandEncoder *, kNumEncoderTypes> m_encoders;
 		EncoderType m_currentEncoderType = EncoderType::kNone;
 	};
+
+
+	VulkanCopyCommandEncoder::VulkanCopyCommandEncoder(VulkanCommandBatch &batch)
+		: m_batch(batch)
+	{
+	}
+
+	Result VulkanCopyCommandEncoder::CopyBufferToImage(IImageResource &imageResource, const ImageRect3D &destRect,
+		IBufferResource &bufferResource, const BufferImageFootprint &bufferFootprint,
+		ImageLayout imageLayout, uint32_t mipLevel, uint32_t arrayLayer, ImagePlane plane)
+	{
+		VkImageLayout vkImageLayout;
+		RKIT_CHECK(VulkanUtils::ConvertImageLayout(vkImageLayout, imageLayout));
+
+		VkImageAspectFlags aspectMask = 0;
+		RKIT_CHECK(VulkanUtils::ConvertImagePlaneBits(aspectMask, ImagePlaneMask_t({ plane })));
+
+		uint32_t blockSizeBytes = 0;
+		uint32_t blockWidth = 0;
+		uint32_t blockHeight = 0;
+		uint32_t blockDepth = 0;
+		RKIT_CHECK(VulkanUtils::GetTextureFormatCharacteristics(bufferFootprint.m_format, blockSizeBytes, blockWidth, blockHeight, blockDepth));
+
+		RKIT_ASSERT(bufferFootprint.m_rowPitch % blockSizeBytes == 0);
+
+		VkBufferImageCopy bufferImageCopy = {};
+		bufferImageCopy.bufferOffset = bufferFootprint.m_bufferOffset;
+		bufferImageCopy.bufferRowLength = bufferFootprint.m_rowPitch / blockSizeBytes * blockWidth;
+		bufferImageCopy.bufferImageHeight = bufferFootprint.m_height;
+		bufferImageCopy.imageSubresource.aspectMask = aspectMask;
+		bufferImageCopy.imageSubresource.mipLevel = mipLevel;
+		bufferImageCopy.imageSubresource.baseArrayLayer = arrayLayer;
+		bufferImageCopy.imageSubresource.layerCount = 1;
+		bufferImageCopy.imageOffset.x = destRect.m_x;
+		bufferImageCopy.imageOffset.y = destRect.m_y;
+		bufferImageCopy.imageOffset.z = destRect.m_z;
+		bufferImageCopy.imageExtent.width = destRect.m_width;
+		bufferImageCopy.imageExtent.height = destRect.m_height;
+		bufferImageCopy.imageExtent.depth = destRect.m_depth;
+
+		VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
+		RKIT_CHECK(m_batch.OpenCommandBuffer(cmdBuffer));
+
+		VulkanDeviceBase &device = m_batch.GetDevice();
+		device.GetDeviceAPI().vkCmdCopyBufferToImage(cmdBuffer,
+			static_cast<VulkanBuffer &>(bufferResource).GetVkBuffer(),
+			static_cast<VulkanImageContainer &>(imageResource).GetVkImage(),
+			vkImageLayout, 1, &bufferImageCopy);
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanCopyCommandEncoder::CloseEncoder()
+	{
+		return ResultCode::kOK;
+	}
 
 	VulkanGraphicsCommandEncoder::VulkanGraphicsCommandEncoder(VulkanCommandBatch &batch)
 		: m_batch(batch)
@@ -364,9 +438,11 @@ namespace rkit { namespace render { namespace vulkan
 		: m_device(device)
 		, m_queue(queue)
 		, m_cmdAlloc(cmdAlloc)
+		, m_copyCommandEncoder(*this)
 		, m_graphicsCommandEncoder(*this)
 	{
 		m_encoders[static_cast<size_t>(EncoderType::kGraphics)] = &m_graphicsCommandEncoder;
+		m_encoders[static_cast<size_t>(EncoderType::kCopy)] = &m_copyCommandEncoder;
 	}
 
 	VulkanCommandBatch::~VulkanCommandBatch()
@@ -481,7 +557,11 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanCommandBatch::OpenCopyCommandEncoder(ICopyCommandEncoder *&outCopyCommandEncoder)
 	{
-		return ResultCode::kNotYetImplemented;
+		RKIT_CHECK(StartNewEncoder(EncoderType::kCopy));
+
+		outCopyCommandEncoder = &m_copyCommandEncoder;
+
+		return ResultCode::kOK;
 	}
 
 	Result VulkanCommandBatch::OpenComputeCommandEncoder(IComputeCommandEncoder *&outComputeCommandEncoder)

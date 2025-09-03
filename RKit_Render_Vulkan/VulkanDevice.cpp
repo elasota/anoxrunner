@@ -703,12 +703,15 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_ASSERT(bufferPrototype.IsValid());
 		RKIT_ASSERT(memRegion.GetHeap() != nullptr);
 
+		const MemoryPosition basePosition = memRegion.GetHeap()->GetStartPosition();
+
 		VulkanBufferPrototype &prototype = *static_cast<VulkanBufferPrototype *>(bufferPrototype.Get());
-		const VulkanMemoryHeap &heap = *static_cast<const VulkanMemoryHeap *>(memRegion.GetHeap());
+		const VulkanMemoryHeap &baseHeap = *static_cast<const VulkanMemoryHeap *>(basePosition.GetHeap());
+		GPUMemoryOffset_t baseOffset = basePosition.GetOffset() + memRegion.GetOffset();
 
 		const VkBuffer buffer = prototype.GetBuffer();
 
-		RKIT_VK_CHECK(m_vkd.vkBindBufferMemory(m_device, buffer, heap.GetDeviceMemory(), static_cast<VkDeviceSize>(memRegion.GetOffset())));
+		RKIT_VK_CHECK(m_vkd.vkBindBufferMemory(m_device, buffer, baseHeap.GetDeviceMemory(), static_cast<VkDeviceSize>(baseOffset)));
 
 		RKIT_CHECK(New<VulkanBuffer>(outBuffer, *this, buffer));
 
@@ -738,12 +741,15 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_ASSERT(imagePrototype.IsValid());
 		RKIT_ASSERT(memRegion.GetHeap() != nullptr);
 
+		MemoryPosition basePosition = memRegion.GetHeap()->GetStartPosition();
+
 		VulkanImagePrototype &prototype = *static_cast<VulkanImagePrototype *>(imagePrototype.Get());
-		const VulkanMemoryHeap &heap = *static_cast<const VulkanMemoryHeap *>(memRegion.GetHeap());
+		const VulkanMemoryHeap &baseHeap = *static_cast<const VulkanMemoryHeap *>(basePosition.GetHeap());
+		GPUMemoryOffset_t baseOffset = basePosition.GetOffset() + memRegion.GetOffset();
 
 		const VkImage image = prototype.GetImage();
 
-		RKIT_VK_CHECK(m_vkd.vkBindImageMemory(m_device, image, heap.GetDeviceMemory(), static_cast<VkDeviceSize>(memRegion.GetOffset())));
+		RKIT_VK_CHECK(m_vkd.vkBindImageMemory(m_device, image, baseHeap.GetDeviceMemory(), static_cast<VkDeviceSize>(baseOffset)));
 
 		RKIT_CHECK(New<VulkanImage>(outImage, *this, image, prototype.GetAllAspectFlags()));
 

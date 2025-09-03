@@ -150,6 +150,7 @@
     <ClCompile Include="AnoxGlobalVars.cpp" />
     <ClCompile Include="AnoxGraphicsSettings.cpp" />
     <ClCompile Include="AnoxGraphicsSubsystem.cpp" />
+    <ClCompile Include="AnoxGraphicTimelinedResource.cpp" />
     <ClCompile Include="AnoxKeybindManager.cpp" />
     <ClCompile Include="AnoxLoadEntireFileJob.cpp" />
     <ClCompile Include="AnoxMain.cpp" />
@@ -169,6 +170,7 @@
     <ClInclude Include="AnoxGameFileSystem.h" />
     <ClInclude Include="AnoxGameLogic.h" />
     <ClInclude Include="AnoxGraphicsJob.h" />
+    <ClInclude Include="AnoxGraphicTimelinedResource.h" />
     <ClInclude Include="AnoxKeybindManager.h" />
     <ClInclude Include="AnoxLoadEntireFileJob.h" />
     <ClInclude Include="AnoxMaterialResource.h" />

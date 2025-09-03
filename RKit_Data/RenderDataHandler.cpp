@@ -1079,8 +1079,14 @@ namespace rkit { namespace data
 
 		RTTI_ENUM_BEGIN(ImageLayout)
 			RTTI_ENUM_OPTION(Undefined)
+			RTTI_ENUM_OPTION(General)
 			RTTI_ENUM_OPTION(RenderTarget)
 			RTTI_ENUM_OPTION(PresentSource)
+			RTTI_ENUM_OPTION(DepthStencil)
+			RTTI_ENUM_OPTION(DepthStencilReadOnly)
+			RTTI_ENUM_OPTION(ShaderResource)
+			RTTI_ENUM_OPTION(CopySrc)
+			RTTI_ENUM_OPTION(CopyDst)
 		RTTI_ENUM_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(DepthStencilTargetDesc)

@@ -141,10 +141,10 @@ namespace rkit { namespace render { namespace vulkan
 		return FlushWithFence(static_cast<VulkanBinaryCPUWaitableFence &>(fence).GetFence());
 	}
 
-	Result VulkanQueueProxy::QueueWaitForBinaryGPUWaitable(IBinaryGPUWaitableFence &fence, const EnumMask<PipelineStage> &stagesToWaitFor)
+	Result VulkanQueueProxy::QueueWaitForBinaryGPUWaitable(IBinaryGPUWaitableFence &fence, const EnumMask<PipelineStage> &stagesToBlock)
 	{
 		VkPipelineStageFlags stageFlags = 0;
-		RKIT_CHECK(VulkanUtils::ConvertPipelineStageBits(stageFlags, stagesToWaitFor));
+		RKIT_CHECK(VulkanUtils::ConvertPipelineStageBits(stageFlags, stagesToBlock));
 		return AddBinarySemaWait(static_cast<VulkanBinaryGPUWaitableFence &>(fence).GetSemaphore(), stageFlags);
 	}
 

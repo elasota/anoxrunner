@@ -120,11 +120,29 @@ namespace rkit { namespace render { namespace vulkan
 		case ImageLayout::Undefined:
 			outLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			break;
+		case ImageLayout::General:
+			outLayout = VK_IMAGE_LAYOUT_GENERAL;
+			break;
 		case ImageLayout::RenderTarget:
 			outLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 			break;
 		case ImageLayout::PresentSource:
 			outLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+			break;
+		case ImageLayout::DepthStencil:
+			outLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			break;
+		case ImageLayout::DepthStencilReadOnly:
+			outLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+			break;
+		case ImageLayout::ShaderResource:
+			outLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			break;
+		case ImageLayout::CopySrc:
+			outLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			break;
+		case ImageLayout::CopyDst:
+			outLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 			break;
 		default:
 			return ResultCode::kInternalError;
@@ -141,6 +159,34 @@ namespace rkit { namespace render { namespace vulkan
 		result.extent.width = rect.m_width;
 		result.extent.height = rect.m_height;
 		return result;
+	}
+
+	Result VulkanUtils::GetTextureFormatCharacteristics(TextureFormat textureFormat, uint32_t &outBlockSizeBytes, uint32_t &outBlockWidth, uint32_t &outBlockHeight, uint32_t &outBlockDepth)
+	{
+		outBlockWidth = 1;
+		outBlockHeight = 1;
+		outBlockDepth = 1;
+		outBlockSizeBytes = 0;
+
+		switch (textureFormat)
+		{
+		case TextureFormat::RGBA_UNorm8:
+		case TextureFormat::RGBA_UNorm8_sRGB:
+			outBlockSizeBytes = 4;
+			break;
+		case TextureFormat::RG_UNorm8:
+		case TextureFormat::RG_UNorm8_sRGB:
+			outBlockSizeBytes = 2;
+			break;
+		case TextureFormat::R_UNorm8:
+		case TextureFormat::R_UNorm8_sRGB:
+			outBlockSizeBytes = 1;
+			break;
+		default:
+			return ResultCode::kInternalError;
+		}
+
+		return ResultCode::kOK;
 	}
 
 	Result VulkanUtils::ConvertPipelineStageBits(VkPipelineStageFlags &outFlags, const EnumMask<PipelineStage> &stages)

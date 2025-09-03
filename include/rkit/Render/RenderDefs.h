@@ -357,15 +357,6 @@ namespace rkit { namespace render
 		Count,
 	};
 
-	enum class ImageLayout
-	{
-		Undefined,
-		RenderTarget,
-		PresentSource,
-
-		Count,
-	};
-
 	struct RenderTargetDesc
 	{
 		TempStringIndex_t m_name;

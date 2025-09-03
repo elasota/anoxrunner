@@ -48,7 +48,7 @@ namespace rkit { namespace render
 	{
 		virtual Result QueueSignalBinaryGPUWaitable(IBinaryGPUWaitableFence &fence) = 0;
 		virtual Result QueueSignalBinaryCPUWaitable(IBinaryCPUWaitableFence &fence) = 0;
-		virtual Result QueueWaitForBinaryGPUWaitable(IBinaryGPUWaitableFence &fence, const EnumMask<PipelineStage> &stagesToWaitFor) = 0;
+		virtual Result QueueWaitForBinaryGPUWaitable(IBinaryGPUWaitableFence &fence, const EnumMask<PipelineStage> &stagesToBlock) = 0;
 
 		virtual CommandQueueType GetCommandQueueType() const = 0;
 

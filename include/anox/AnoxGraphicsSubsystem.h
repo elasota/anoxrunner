@@ -32,6 +32,11 @@ namespace rkit
 	{
 		struct IDataDriver;
 	}
+
+	namespace render
+	{
+		struct IBinaryGPUWaitableFence;
+	}
 }
 
 namespace anox
@@ -40,10 +45,16 @@ namespace anox
 	struct ISubmitJobRunner;
 	struct IGameDataFileSystem;
 	struct ITexture;
+	class GraphicTimelinedResource;
 
 	enum class RenderBackend
 	{
 		kVulkan,
+	};
+
+	struct IBinaryGPUWaitableFenceFactory
+	{
+		virtual rkit::Result CreateFence(rkit::render::IBinaryGPUWaitableFence *&outFence) = 0;
 	};
 
 	struct IGraphicsSubsystem
@@ -65,8 +76,11 @@ namespace anox
 
 		virtual rkit::Result CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies) = 0;
 		virtual rkit::Result CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<ISubmitJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies) = 0;
+		virtual rkit::Result QueueCrossQueueWait(LogicalQueueType queueToWaitFor, LogicalQueueType waitingQueue, IBinaryGPUWaitableFenceFactory &fenceFactory) = 0;
 
 		virtual rkit::Result CreateAsyncCreateTextureJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<ITexture> &outTexture, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData, const rkit::JobDependencyList &dependencies) = 0;
+
+		virtual void CondemnTimelinedResource(GraphicTimelinedResource &timelinedResource) = 0;
 
 		static rkit::Result Create(rkit::UniquePtr<IGraphicsSubsystem> &outSubsystem, IGameDataFileSystem &fileSystem, rkit::data::IDataDriver &dataDriver, rkit::utils::IThreadPool &threadPool, anox::RenderBackend defaultBackend);
 	};

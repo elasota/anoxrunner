@@ -259,8 +259,8 @@ namespace rkit
 	EnumMaskIterator<T> EnumMask<T>::end() const
 	{
 		size_t lastSet = 0;
-		if (m_boolVector.FindFirstSet(lastSet))
-			return EnumMaskIterator<T>(*this, lastSet + 1u);
+		if (m_boolVector.FindLastSet(lastSet))
+			return EnumMaskIterator<T>(*this, lastSet + 1);
 		else
 			return EnumMaskIterator<T>();
 	}

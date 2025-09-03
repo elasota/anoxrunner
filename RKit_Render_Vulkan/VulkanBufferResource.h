@@ -26,6 +26,8 @@ namespace rkit { namespace render { namespace vulkan {
 		VulkanBuffer(VulkanDeviceBase &device, VkBuffer buffer);
 		~VulkanBuffer();
 
+		VkBuffer GetVkBuffer() const;
+
 	private:
 		VulkanDeviceBase &m_device;
 		VkBuffer m_buffer;
@@ -62,5 +64,10 @@ namespace rkit { namespace render { namespace vulkan {
 	inline void VulkanBufferPrototype::DetachBuffer()
 	{
 		m_buffer = VK_NULL_HANDLE;
+	}
+
+	inline VkBuffer VulkanBuffer::GetVkBuffer() const
+	{
+		return m_buffer;
 	}
 } } }

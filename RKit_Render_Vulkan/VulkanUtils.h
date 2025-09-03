@@ -31,5 +31,6 @@ namespace rkit { namespace render { namespace vulkan
 		static Result ConvertImagePlaneBits(VkImageAspectFlags &outFlags, const EnumMask<ImagePlane> &planes);
 		static Result ConvertImageLayout(VkImageLayout &outLayout, ImageLayout imageLayout);
 		static VkRect2D ConvertImageRect(const ImageRect2D &rect);
+		static Result GetTextureFormatCharacteristics(TextureFormat textureFormat, uint32_t &outBlockSizeBytes, uint32_t &outBlockWidth, uint32_t &outBlockHeight, uint32_t &outBlockDepth);
 	};
 } } } // rkit::render::vulkan

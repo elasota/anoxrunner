@@ -35,6 +35,7 @@ namespace anox
 		rkit::Result RunBase(rkit::render::IBaseCommandQueue &commandQueue) override final;
 	};
 
+	typedef ITypedSubmitJobRunner<rkit::render::IBaseCommandQueue> IBaseSubmitJobRunner_t;
 	typedef ITypedSubmitJobRunner<rkit::render::IComputeCommandQueue> IComputeSubmitJobRunner_t;
 	typedef ITypedSubmitJobRunner<rkit::render::IGraphicsComputeCommandQueue> IGraphicsComputeSubmitJobRunner_t;
 	typedef ITypedSubmitJobRunner<rkit::render::IGraphicsCommandQueue> IGraphicsSubmitJobRunner_t;

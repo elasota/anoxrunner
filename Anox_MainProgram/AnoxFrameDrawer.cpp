@@ -162,7 +162,7 @@ namespace anox
 
 		RKIT_CHECK(graphicsSubsystem.CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kGraphics, std::move(recordJobRunner), rkit::Span<rkit::RCPtr<rkit::Job>>(&perDisplayResources->m_acquireJob, 1)));
 
-		RKIT_CHECK(graphicsSubsystem.CreateAndQueueSubmitJob(&submitJob, LogicalQueueType::kGraphics, std::move(submitJobRunner), rkit::Span<rkit::RCPtr<rkit::Job>>(&recordJob, 1)));
+		RKIT_CHECK(graphicsSubsystem.CreateAndQueueSubmitJob(&submitJob, LogicalQueueType::kGraphics, std::move(submitJobRunner), recordJob));
 
 		return rkit::ResultCode::kOK;
 	}

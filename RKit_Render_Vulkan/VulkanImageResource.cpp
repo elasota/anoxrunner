@@ -5,6 +5,7 @@
 #include "VulkanQueueProxy.h"
 #include "VulkanDevice.h"
 #include "VulkanCheck.h"
+#include "VulkanUtils.h"
 
 #include "rkit/Render/CommandQueue.h"
 #include "rkit/Render/ImageSpec.h"

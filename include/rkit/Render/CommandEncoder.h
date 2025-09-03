@@ -1,5 +1,8 @@
 #pragma once
 
+#include "ImagePlane.h"
+#include "RenderEnums.h"
+
 namespace rkit
 {
 	template<class T>
@@ -8,11 +11,15 @@ namespace rkit
 
 namespace rkit { namespace render
 {
-	struct ISwapChainSyncPoint;
 	struct BarrierGroup;
+	struct BufferImageFootprint;
 	struct DepthStencilTargetClear;
-	struct RenderTargetClear;
+	struct IBufferResource;
+	struct IImageResource;
+	struct ISwapChainSyncPoint;
 	struct ImageRect2D;
+	struct ImageRect3D;
+	struct RenderTargetClear;
 
 	struct IBaseCommandEncoder
 	{
@@ -32,5 +39,9 @@ namespace rkit { namespace render
 
 	struct ICopyCommandEncoder : public IBaseCommandEncoder
 	{
+		virtual Result CopyBufferToImage(IImageResource &imageResource, const ImageRect3D &destRect,
+			IBufferResource &bufferResource, const BufferImageFootprint &bufferFootprint,
+			ImageLayout imageLayout, uint32_t mipLevel, uint32_t arrayLayer, ImagePlane imagePlane
+		) = 0;
 	};
 } } // rkit::render
