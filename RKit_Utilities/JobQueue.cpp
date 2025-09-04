@@ -774,7 +774,7 @@ namespace rkit { namespace utils
 
 	RCPtr<Job> JobQueue::WaitForWork(const ISpan<JobType> &jobTypes, bool waitIfDepleted, IEvent *wakeEvent, IEvent *terminatedEvent)
 	{
-		Pair<rkit::RCPtr<Job>, WaitResultType> waitResult = WaitForWorkOrJob(jobTypes, true, wakeEvent, terminatedEvent, nullptr);
+		Pair<rkit::RCPtr<Job>, WaitResultType> waitResult = WaitForWorkOrJob(jobTypes, waitIfDepleted, wakeEvent, terminatedEvent, nullptr);
 
 		switch (waitResult.GetAt<1>())
 		{
@@ -930,7 +930,7 @@ namespace rkit { namespace utils
 				}
 
 				if (!waitIfDepleted)
-					break;
+					return Pair<RCPtr<Job>, JobQueue::WaitResultType>(RCPtr<Job>(), WaitResultType::kNoWork);
 
 				// Couldn't find anything to run, start waiting
 				CategoryThreadWaitList *waitList = nullptr;

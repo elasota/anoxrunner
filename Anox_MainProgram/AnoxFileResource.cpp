@@ -1,7 +1,6 @@
 #include "AnoxFileResource.h"
 #include "AnoxLoadEntireFileJob.h"
 #include "AnoxGameFileSystem.h"
-#include "AnoxLoadEntireFileJob.h"
 
 #include "rkit/Core/FutureProtos.h"
 #include "rkit/Core/Job.h"

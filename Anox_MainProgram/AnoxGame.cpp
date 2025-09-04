@@ -16,6 +16,8 @@
 #include "rkit/Core/CoroutineCompiler.h"
 #include "rkit/Core/Drivers.h"
 #include "rkit/Core/DriverModuleInitParams.h"
+#include "rkit/Core/Event.h"
+#include "rkit/Core/Job.h"
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/Module.h"
 #include "rkit/Core/ModuleDriver.h"
@@ -61,6 +63,9 @@ namespace anox
 		rkit::UniquePtr<IGraphicsSubsystem> m_graphicsSubsystem;
 		rkit::UniquePtr<IGameLogic> m_gameLogic;
 		rkit::UniquePtr<ICaptureHarness> m_captureHarness;
+
+		rkit::UniquePtr<rkit::IEvent> m_mainThreadWaitEvent;
+		rkit::UniquePtr<rkit::IEvent> m_mainThreadTerminateEvent;
 
 		rkit::data::IDataDriver *m_dataDriver = nullptr;
 
@@ -111,6 +116,9 @@ namespace anox
 		if (m_numThreadsOverride.IsSet())
 			numWorkThreads = m_numThreadsOverride.Get() - 1;
 
+		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->CreateEvent(m_mainThreadWaitEvent, true, false));
+		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->CreateEvent(m_mainThreadTerminateEvent, true, false));
+
 		RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->CreateThreadPool(m_threadPool, numWorkThreads));
 
 		RKIT_CHECK(AnoxGameFileSystemBase::Create(m_fileSystem, *m_threadPool->GetJobQueue()));
@@ -154,7 +162,15 @@ namespace anox
 
 		RKIT_CHECK(m_graphicsSubsystem->EndFrame());
 
-		// TODO: Run tasks
+
+		for (;;)
+		{
+			rkit::RCPtr<rkit::Job> jobToRun = m_threadPool->GetJobQueue()->WaitForWork(m_threadPool->GetMainThreadJobTypes(), false, m_mainThreadWaitEvent.Get(), m_mainThreadTerminateEvent.Get());
+			if (!jobToRun.IsValid())
+				break;
+
+			jobToRun->Run();
+		}
 
 		return rkit::ResultCode::kOK;
 	}
