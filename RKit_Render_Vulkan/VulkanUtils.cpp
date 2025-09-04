@@ -73,6 +73,12 @@ namespace rkit { namespace render { namespace vulkan
 			case ResourceAccess::kRenderTarget:
 				flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 				break;
+			case ResourceAccess::kCopySrc:
+				flags |= VK_ACCESS_TRANSFER_READ_BIT;
+				break;
+			case ResourceAccess::kCopyDest:
+				flags |= VK_ACCESS_TRANSFER_WRITE_BIT;
+				break;
 			case ResourceAccess::kPresentSource:
 				break;
 			default:
@@ -205,6 +211,9 @@ namespace rkit { namespace render { namespace vulkan
 				break;
 			case PipelineStage::kColorOutput:
 				flags |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+				break;
+			case PipelineStage::kCopy:
+				flags |= VK_PIPELINE_STAGE_TRANSFER_BIT;
 				break;
 			default:
 				return ResultCode::kInternalError;

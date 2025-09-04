@@ -12,6 +12,8 @@ namespace rkit { namespace render
 	{
 		kRenderTarget,
 		kPresentSource,
+		kCopySrc,
+		kCopyDest,
 
 		kCount,
 	};

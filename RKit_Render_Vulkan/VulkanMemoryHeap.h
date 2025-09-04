@@ -18,7 +18,6 @@ namespace rkit { namespace render { namespace vulkan {
 
 		Result MapMemory();
 
-		MemoryPosition GetStartPosition() const override;
 		GPUMemorySize_t GetSize() const override;
 		void *GetCPUPtr() const override;
 

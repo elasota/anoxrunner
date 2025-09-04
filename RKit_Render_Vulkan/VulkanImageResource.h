@@ -58,7 +58,7 @@ namespace rkit { namespace render { namespace vulkan
 		void DetachImage();
 
 		static Result Create(UniquePtr<VulkanImagePrototype> &outImagePrototype, VulkanDeviceBase &device,
-			const ImageSpec &imageSpec, const ImageResourceSpec &resourceSpec, const ConstSpan<IBaseCommandQueue *> &restrictedQueues);
+			const ImageSpec &imageSpec, const ImageResourceSpec &resourceSpec, const ConstSpan<IBaseCommandQueue *> &concurrentQueues);
 
 	private:
 		VulkanDeviceBase &m_device;

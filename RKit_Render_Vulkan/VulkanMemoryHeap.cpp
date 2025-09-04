@@ -29,11 +29,6 @@ namespace rkit { namespace render { namespace vulkan {
 		return ResultCode::kOK;
 	}
 
-	MemoryPosition VulkanMemoryHeap::GetStartPosition() const
-	{
-		return MemoryPosition(const_cast<VulkanMemoryHeap *>(this), 0);
-	}
-
 	GPUMemorySize_t VulkanMemoryHeap::GetSize() const
 	{
 		return m_size;

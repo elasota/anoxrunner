@@ -123,7 +123,6 @@ namespace rkit { namespace render { namespace vulkan
 
 			m_cmdBuffers.Reset();
 			m_commandBatches.Reset();
-
 		}
 
 		m_activeCmdBuffers = 0;
@@ -174,6 +173,8 @@ namespace rkit { namespace render { namespace vulkan
 		}
 
 		outCmdBuffer = cmdBuffer;
+
+		m_activeCmdBuffers++;
 
 		return ResultCode::kOK;
 	}

@@ -12,6 +12,7 @@ namespace rkit { namespace render
 	{
 		kTopOfPipe,
 		kColorOutput,
+		kCopy,
 		kBottomOfPipe,
 
 		kPresentAcquire,

@@ -57,9 +57,9 @@ namespace rkit { namespace render
 		Optional<EnumMask<ImagePlane>> m_planes;
 
 		uint32_t m_firstMipLevel = 0;
-		uint32_t m_numMipLevels = 1;
+		rkit::Optional<uint32_t> m_numMipLevels;
 		uint32_t m_firstArrayElement = 0;
-		uint32_t m_numArrayElements = 1;
+		rkit::Optional<uint32_t> m_numArrayElements;
 	};
 
 	struct BarrierGroup

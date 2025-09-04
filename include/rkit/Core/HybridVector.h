@@ -385,7 +385,7 @@ namespace rkit
 			size_t count = m_storage.m_staticStorage.m_size;
 			if (count < TStaticSize)
 			{
-				new (m_storage.m_staticStorage.GetStorage()) T(item);
+				new (m_storage.m_staticStorage.GetStorage() + count) T(item);
 				m_storage.m_staticStorage.m_size = count + 1;
 
 				return ResultCode::kOK;

@@ -9,6 +9,7 @@
 #include "anox/AnoxFileSystem.h"
 #include "anox/AnoxGraphicsSubsystem.h"
 
+#include "rkit/Render/Barrier.h"
 #include "rkit/Render/BufferSpec.h"
 #include "rkit/Render/BufferImageFootprint.h"
 #include "rkit/Render/BufferResource.h"
@@ -48,6 +49,7 @@
 #include "rkit/Core/Event.h"
 #include "rkit/Core/Future.h"
 #include "rkit/Core/HashTable.h"
+#include "rkit/Core/HybridVector.h"
 #include "rkit/Core/Job.h"
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/MemoryStream.h"
@@ -399,10 +401,11 @@ namespace anox
 			rkit::render::IBaseCommandBatch *&m_outBatchPtr;
 		};
 
-		class CopyAsyncUploadsSubmitRunner final : public ICopySubmitJobRunner_t
+
+		class AsyncUploadPrepareTargetsSubmitRunner final : public ICopySubmitJobRunner_t
 		{
 		public:
-			explicit CopyAsyncUploadsSubmitRunner();
+			explicit AsyncUploadPrepareTargetsSubmitRunner();
 
 			rkit::Result RunSubmit(rkit::render::ICopyCommandQueue &commandQueue) override;
 
@@ -412,16 +415,43 @@ namespace anox
 			rkit::render::ICopyCommandBatch *m_cmdBatch = nullptr;
 		};
 
-		class CopyAsyncUploadsRecordRunner final : public ICopyRecordJobRunner_t
+		class AsyncUploadPrepareTargetsRecordRunner final : public ICopyRecordJobRunner_t
 		{
 		public:
-			explicit CopyAsyncUploadsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint);
+			explicit AsyncUploadPrepareTargetsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint);
 
 			rkit::Result RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc) override;
 
 		private:
 			rkit::render::ICopyCommandBatch **m_cmdBatchRef;
 			FrameSyncPoint &m_syncPoint;
+		};
+
+		class CopyAsyncUploadsSubmitRunner final : public ICopySubmitJobRunner_t
+		{
+		public:
+			explicit CopyAsyncUploadsSubmitRunner(FrameSyncPoint &syncPoint);
+
+			rkit::Result RunSubmit(rkit::render::ICopyCommandQueue &commandQueue) override;
+
+			rkit::render::ICopyCommandBatch **GetCmdBatchRef();
+
+		private:
+			FrameSyncPoint &m_syncPoint;
+			rkit::render::ICopyCommandBatch *m_cmdBatch = nullptr;
+		};
+
+		class CopyAsyncUploadsRecordRunner final : public ICopyRecordJobRunner_t
+		{
+		public:
+			explicit CopyAsyncUploadsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint, uint64_t globalSyncPoint);
+
+			rkit::Result RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc) override;
+
+		private:
+			rkit::render::ICopyCommandBatch **m_cmdBatchRef;
+			FrameSyncPoint &m_syncPoint;
+			uint64_t m_globalSyncPoint;
 		};
 
 		class CloseFrameSubmitRunner final : public IGraphicsSubmitJobRunner_t
@@ -509,6 +539,7 @@ namespace anox
 		{
 			virtual ~UploadTask() {}
 
+			virtual rkit::Result StartTask(UploadActionSet &actionSet, GraphicsSubsystem &subsystem) = 0;
 			virtual rkit::Result PumpTask(bool &isCompleted, UploadActionSet &actionSet, GraphicsSubsystem &subsystem) = 0;
 			virtual void OnCopyCompleted() = 0;
 			virtual void OnUploadCompleted() = 0;
@@ -525,10 +556,15 @@ namespace anox
 			rkit::render::MemoryPosition m_destPosition;
 		};
 
+		struct PrepareImageForTransferAction
+		{
+			rkit::render::IImageResource *m_image = nullptr;
+		};
+
 		struct BufferToTextureCopyAction
 		{
 			rkit::render::IBufferResource *m_buffer = nullptr;
-			rkit::render::IImageResource *m_image = nullptr;
+			rkit::RCPtr<Texture> m_texture;
 
 			rkit::render::BufferImageFootprint m_footprint = {};
 
@@ -542,9 +578,15 @@ namespace anox
 
 		struct UploadActionSet
 		{
+			// NOTE: While m_stripedMemCpy and m_bufferToTextureCopy are always 1:1,
+			// m_prepareImageForTransfer is not, because it is only run once for
+			// each target texture.
+			rkit::Vector<PrepareImageForTransferAction> m_prepareImageForTransfer;
 			rkit::Vector<BufferStripedMemCopyAction> m_stripedMemCpy;
 			rkit::Vector<BufferToTextureCopyAction> m_bufferToTextureCopy;
 			rkit::Vector<rkit::RCPtr<UploadTask>> m_retiredUploadTasks;
+
+			void ClearActions();
 
 			rkit::RCPtr<rkit::Job> m_memCopyJob;
 			rkit::RCPtr<rkit::Job> m_cleanupJob;
@@ -588,6 +630,7 @@ namespace anox
 			uint32_t m_blockDepth = 1;
 			uint32_t m_blockSizeBytes = 4;
 
+			rkit::Result StartTask(UploadActionSet &actionSet, GraphicsSubsystem &subsystem) override;
 			rkit::Result PumpTask(bool &isCompleted, UploadActionSet &actionSet, GraphicsSubsystem &subsystem) override;
 			void OnCopyCompleted() override;
 			void OnUploadCompleted() override;
@@ -649,7 +692,7 @@ namespace anox
 
 		uint8_t m_numSyncPoints = 3;
 		uint8_t m_currentSyncPoint = 0;
-		uint64_t m_globalSyncPoint = 0;
+		uint64_t m_currentGlobalSyncPoint = 0;
 
 		rkit::render::IGraphicsCommandQueue *m_graphicsQueue = nullptr;
 		rkit::render::IGraphicsComputeCommandQueue *m_graphicsComputeQueue = nullptr;
@@ -1234,12 +1277,8 @@ namespace anox
 		rkit::render::ImageResourceSpec resSpec = {};
 		resSpec.m_usage.Add({ rkit::render::TextureUsageFlag::kCopyDest, rkit::render::TextureUsageFlag::kSampled });
 
-		rkit::StaticArray<rkit::render::IBaseCommandQueue *, 2> usedQueuesList;
-		usedQueuesList[0] = m_graphicsSubsystem.m_logicalQueues[static_cast<size_t>(LogicalQueueType::kDMA)]->GetBaseCommandQueue();
-		usedQueuesList[1] = m_graphicsSubsystem.m_logicalQueues[static_cast<size_t>(LogicalQueueType::kGraphics)]->GetBaseCommandQueue();
-
 		rkit::UniquePtr<rkit::render::IImagePrototype> prototype;
-		RKIT_CHECK(m_graphicsSubsystem.m_renderDevice->CreateImagePrototype(prototype, textureSpec, resSpec, usedQueuesList.ToSpan()));
+		RKIT_CHECK(m_graphicsSubsystem.m_renderDevice->CreateImagePrototype(prototype, textureSpec, resSpec));
 
 		// Find a good heap
 		rkit::render::HeapSpec heapSpec = {};
@@ -1313,10 +1352,10 @@ namespace anox
 			const uint32_t rowOutPitch = memCopyAction.m_rowOutPitch;
 			const uint32_t rowCount = memCopyAction.m_rowCount;
 
-			rkit::render::IMemoryHeap *memHeap = memCopyAction.m_destPosition.GetHeap();
+			rkit::render::IMemoryAllocation *memAllocation = memCopyAction.m_destPosition.GetAllocation();
 			rkit::render::GPUMemoryOffset_t memOffset = memCopyAction.m_destPosition.GetOffset();
 
-			uint8_t *destStart = static_cast<uint8_t *>(memHeap->GetCPUPtr()) + memOffset;
+			uint8_t *destStart = static_cast<uint8_t *>(memAllocation->GetCPUPtr()) + memOffset;
 
 			if (rowInPitch == rowOutPitch)
 				memcpy(destStart, srcStart, rowInPitch * rowCount);
@@ -1369,7 +1408,10 @@ namespace anox
 
 	rkit::Result GraphicsSubsystem::SignalBinaryFenceRunner::RunBase(rkit::render::IBaseCommandQueue &commandQueue)
 	{
-		return commandQueue.QueueSignalBinaryGPUWaitable(m_fence);
+		RKIT_CHECK(commandQueue.QueueSignalBinaryGPUWaitable(m_fence));
+		RKIT_CHECK(commandQueue.Flush());
+
+		return rkit::ResultCode::kOK;
 	}
 
 	GraphicsSubsystem::WaitForBinaryFenceRunner::WaitForBinaryFenceRunner(rkit::render::IBinaryGPUWaitableFence &fence, const rkit::render::PipelineStageMask_t &stagesToBlock)
@@ -1400,7 +1442,67 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	GraphicsSubsystem::CopyAsyncUploadsSubmitRunner::CopyAsyncUploadsSubmitRunner()
+	GraphicsSubsystem::AsyncUploadPrepareTargetsSubmitRunner::AsyncUploadPrepareTargetsSubmitRunner()
+	{
+	}
+
+	rkit::Result GraphicsSubsystem::AsyncUploadPrepareTargetsSubmitRunner::RunSubmit(rkit::render::ICopyCommandQueue &commandQueue)
+	{
+		RKIT_CHECK(m_cmdBatch->Submit());
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::render::ICopyCommandBatch **GraphicsSubsystem::AsyncUploadPrepareTargetsSubmitRunner::GetCmdBatchRef()
+	{
+		return &m_cmdBatch;
+	}
+
+	GraphicsSubsystem::AsyncUploadPrepareTargetsRecordRunner::AsyncUploadPrepareTargetsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint)
+		: m_cmdBatchRef(cmdBatchRef)
+		, m_syncPoint(syncPoint)
+	{
+	}
+
+	rkit::Result GraphicsSubsystem::AsyncUploadPrepareTargetsRecordRunner::RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc)
+	{
+		RKIT_CHECK(cmdAlloc.OpenCopyCommandBatch(*m_cmdBatchRef, false));
+
+		rkit::render::ICopyCommandBatch *cmdBatch = *m_cmdBatchRef;
+
+		rkit::render::BarrierGroup barrierGroup;
+
+		rkit::HybridVector<rkit::render::ImageMemoryBarrier, 16> imageBarriers;
+
+		RKIT_CHECK(imageBarriers.Reserve(m_syncPoint.m_asyncUploadActionSet.m_prepareImageForTransfer.Count()));
+
+		for (const PrepareImageForTransferAction &action : m_syncPoint.m_asyncUploadActionSet.m_prepareImageForTransfer)
+		{
+			rkit::render::ImageMemoryBarrier barrier = {};
+			barrier.m_priorStages.Add({ rkit::render::PipelineStage::kTopOfPipe });
+			barrier.m_subsequentStages.Add({ rkit::render::PipelineStage::kCopy });
+			barrier.m_subsequentAccess.Add({ rkit::render::ResourceAccess::kCopyDest });
+
+			barrier.m_image = action.m_image;
+
+			barrier.m_priorLayout = rkit::render::ImageLayout::Undefined;
+			barrier.m_subsequentLayout = rkit::render::ImageLayout::CopyDst;
+
+			RKIT_CHECK(imageBarriers.Append(barrier));
+		}
+
+		barrierGroup.m_imageMemoryBarriers = imageBarriers.ToSpan();
+
+		rkit::render::ICopyCommandEncoder *cmdEncoder = nullptr;
+		RKIT_CHECK(cmdBatch->OpenCopyCommandEncoder(cmdEncoder));
+		RKIT_CHECK(cmdEncoder->PipelineBarrier(barrierGroup));
+
+		RKIT_CHECK(cmdBatch->CloseBatch());
+
+		return rkit::ResultCode::kOK;
+	}
+
+	GraphicsSubsystem::CopyAsyncUploadsSubmitRunner::CopyAsyncUploadsSubmitRunner(FrameSyncPoint &syncPoint)
+		: m_syncPoint(syncPoint)
 	{
 	}
 
@@ -1416,9 +1518,10 @@ namespace anox
 		return &m_cmdBatch;
 	}
 
-	GraphicsSubsystem::CopyAsyncUploadsRecordRunner::CopyAsyncUploadsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint)
+	GraphicsSubsystem::CopyAsyncUploadsRecordRunner::CopyAsyncUploadsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint, uint64_t globalSyncPoint)
 		: m_cmdBatchRef(cmdBatchRef)
 		, m_syncPoint(syncPoint)
+		, m_globalSyncPoint(globalSyncPoint)
 	{
 	}
 
@@ -1433,7 +1536,10 @@ namespace anox
 
 		for (const BufferToTextureCopyAction &copyAction : m_syncPoint.m_asyncUploadActionSet.m_bufferToTextureCopy)
 		{
-			RKIT_CHECK(cmdEncoder->CopyBufferToImage(*copyAction.m_image, copyAction.m_destRect, *copyAction.m_buffer, copyAction.m_footprint,
+			Texture *texture = copyAction.m_texture;
+			texture->Touch(m_globalSyncPoint);
+
+			RKIT_CHECK(cmdEncoder->CopyBufferToImage(*texture->GetRenderResource(), copyAction.m_destRect, *copyAction.m_buffer, copyAction.m_footprint,
 				copyAction.m_imageLayout, copyAction.m_mipLevel, copyAction.m_arrayElement, copyAction.m_imagePlane));
 		}
 
@@ -1671,6 +1777,13 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
+	void GraphicsSubsystem::UploadActionSet::ClearActions()
+	{
+		m_bufferToTextureCopy.ShrinkToSize(0);
+		m_prepareImageForTransfer.ShrinkToSize(0);
+		m_retiredUploadTasks.ShrinkToSize(0);
+		m_stripedMemCpy.ShrinkToSize(0);
+	}
 
 	void GraphicsSubsystem::FrameSyncPoint::Reset()
 	{
@@ -1681,6 +1794,15 @@ namespace anox
 
 		m_frameEndBatch = nullptr;
 	}
+
+	rkit::Result GraphicsSubsystem::TextureUploadTask::StartTask(UploadActionSet &actionSet, GraphicsSubsystem &subsystem)
+	{
+		PrepareImageForTransferAction action = {};
+		action.m_image = m_texture->GetRenderResource();
+
+		return actionSet.m_prepareImageForTransfer.Append(action);
+	}
+
 
 	rkit::Result GraphicsSubsystem::TextureUploadTask::PumpTask(bool &isCompleted, UploadActionSet &actionSet, GraphicsSubsystem &subsystem)
 	{
@@ -1776,7 +1898,7 @@ namespace anox
 			memCpyAction.m_rowOutPitch = levelRowPitch;
 
 			texCopyAction.m_buffer = subsystem.m_asyncUploadBuffer.Get();
-			texCopyAction.m_image = m_texture->GetRenderResource();
+			texCopyAction.m_texture = m_texture;
 			texCopyAction.m_footprint.m_format = m_spec.m_format;
 			texCopyAction.m_destRect.m_x = m_blockCol * m_blockWidth;
 			texCopyAction.m_destRect.m_y = m_blockRow * m_blockHeight;
@@ -1844,7 +1966,7 @@ namespace anox
 
 			const uint32_t inputBytesConsumed = memCpyAction.m_rowSizeBytes * memCpyAction.m_rowCount;
 
-			memCpyAction.m_destPosition = subsystem.m_asyncUploadHeap->GetStartPosition() + subsystem.m_asyncUploadHeapHighMark;
+			memCpyAction.m_destPosition = subsystem.m_asyncUploadHeap->GetRegion().GetPosition() + subsystem.m_asyncUploadHeapHighMark;
 			texCopyAction.m_footprint.m_bufferOffset = subsystem.m_asyncUploadHeapHighMark;
 			texCopyAction.m_destRect.m_width = rkit::Min(texCopyAction.m_footprint.m_width, levelWidth - static_cast<uint32_t>(texCopyAction.m_destRect.m_x));
 			texCopyAction.m_destRect.m_height = rkit::Min(texCopyAction.m_footprint.m_height, levelHeight - static_cast<uint32_t>(texCopyAction.m_destRect.m_y));
@@ -2582,6 +2704,9 @@ namespace anox
 			{
 				m_stepCompleted = false;
 				RKIT_CHECK(KickOffNextSetupStep());
+
+				if (m_setupStep == DeviceSetupStep::kFinished)
+					return rkit::ResultCode::kOK;	// Bail out since there will be no main-thread jobs to run
 			}
 
 			rkit::GetDrivers().m_systemDriver->SleepMSec(1000u / 60u);
@@ -2669,7 +2794,7 @@ namespace anox
 			while (GraphicTimelinedResource *resource = m_unsortedCondemnedResources.Pop())
 			{
 				const uint64_t globalSyncPoint = resource->GetGlobalSyncPoint();
-				const uint64_t framesAgo = m_globalSyncPoint - globalSyncPoint;
+				const uint64_t framesAgo = m_currentGlobalSyncPoint - globalSyncPoint;
 
 				if (framesAgo >= m_numSyncPoints)
 					disposeNow.PushUnsafe(resource);
@@ -2734,23 +2859,28 @@ namespace anox
 		if (!m_enableAsyncUpload)
 			return rkit::ResultCode::kOK;
 
-		UploadActionSet &actionSet = m_syncPoints[m_currentSyncPoint].m_asyncUploadActionSet;
-		actionSet.m_bufferToTextureCopy.ShrinkToSize(0);
-		actionSet.m_stripedMemCpy.ShrinkToSize(0);
-		actionSet.m_retiredUploadTasks.ShrinkToSize(0);
+		FrameSyncPoint &syncPoint = m_syncPoints[m_currentSyncPoint];
+
+		UploadActionSet &actionSet = syncPoint.m_asyncUploadActionSet;
+		actionSet.ClearActions();
 
 		for (;;)
 		{
 			if (!m_asyncUploadActiveTask.IsValid())
 			{
-				rkit::MutexLock lock(*m_asyncUploadMutex);
+				{
+					rkit::MutexLock lock(*m_asyncUploadMutex);
 
-				const size_t numWaitingTasks = m_asyncUploadWaitingTasks.Count();
-				if (numWaitingTasks == 0)
-					break;
+					const size_t numWaitingTasks = m_asyncUploadWaitingTasks.Count();
+					if (numWaitingTasks == 0)
+						break;
 
-				m_asyncUploadActiveTask = std::move(m_asyncUploadWaitingTasks[numWaitingTasks - 1]);
-				m_asyncUploadWaitingTasks.ShrinkToSize(numWaitingTasks - 1);
+					m_asyncUploadActiveTask = std::move(m_asyncUploadWaitingTasks[numWaitingTasks - 1]);
+					m_asyncUploadWaitingTasks.ShrinkToSize(numWaitingTasks - 1);
+				}
+
+
+				RKIT_CHECK(m_asyncUploadActiveTask->StartTask(actionSet, *this));
 			}
 
 			RKIT_CHECK(PumpActiveAsyncUploadTask(actionSet));
@@ -2760,10 +2890,29 @@ namespace anox
 		}
 
 		actionSet.m_memCopyJob.Reset();
-		m_syncPoints[m_currentSyncPoint].m_asyncUploadHeapFinalHighMark = m_asyncUploadHeapHighMark;
+		syncPoint.m_asyncUploadHeapFinalHighMark = m_asyncUploadHeapHighMark;
 
-		// If anything was uploaded, post copy and cleanup jobs
-		// The upload jobs are not posted here, they are deferred to the end of the frame
+		SyncPointFenceFactory fenceFactory(*this, m_currentSyncPoint);
+
+		// If anything was uploaded, post the appropriate jobs.
+		// Async uploads have several jobs:
+		// - Initial layout transition jobs (run here)
+		// - Striped memcopy jobs (run here)
+		// - Buffer-to-image copy jobs
+		if (actionSet.m_prepareImageForTransfer.Count() > 0)
+		{
+			rkit::UniquePtr<AsyncUploadPrepareTargetsSubmitRunner> prepareSubmitRunner;
+			RKIT_CHECK(rkit::New< AsyncUploadPrepareTargetsSubmitRunner>(prepareSubmitRunner));
+
+			rkit::UniquePtr<AsyncUploadPrepareTargetsRecordRunner> prepareRecordRunner;
+			RKIT_CHECK(rkit::New<AsyncUploadPrepareTargetsRecordRunner>(prepareRecordRunner, prepareSubmitRunner->GetCmdBatchRef(), syncPoint));
+
+			rkit::RCPtr<rkit::Job> recordJob;
+			RKIT_CHECK(CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kDMA, std::move(prepareRecordRunner), rkit::JobDependencyList()));
+
+			RKIT_CHECK(CreateAndQueueSubmitJob(nullptr, LogicalQueueType::kDMA, std::move(prepareSubmitRunner), recordJob));
+		}
+
 		if (actionSet.m_stripedMemCpy.Count() > 0)
 		{
 			rkit::UniquePtr<StripedMemCopyJobRunner> copyJobRunner;
@@ -2815,16 +2964,18 @@ namespace anox
 
 		RKIT_CHECK(m_gameWindow->EndFrame(*this));
 
-		rkit::RCPtr<rkit::Job> asyncUploadMemCopyJob = m_syncPoints[m_currentSyncPoint].m_asyncUploadActionSet.m_memCopyJob;
+		FrameSyncPoint &syncPoint = m_syncPoints[m_currentSyncPoint];
+
+		rkit::RCPtr<rkit::Job> asyncUploadMemCopyJob = syncPoint.m_asyncUploadActionSet.m_memCopyJob;
 
 		if (asyncUploadMemCopyJob.IsValid())
 		{
 			// Post async upload submits to the end of the frame
 			rkit::UniquePtr<CopyAsyncUploadsSubmitRunner> submitRunner;
-			RKIT_CHECK(rkit::New<CopyAsyncUploadsSubmitRunner>(submitRunner));
+			RKIT_CHECK(rkit::New<CopyAsyncUploadsSubmitRunner>(submitRunner, syncPoint));
 
 			rkit::UniquePtr<CopyAsyncUploadsRecordRunner> recordRunner;
-			RKIT_CHECK(rkit::New<CopyAsyncUploadsRecordRunner>(recordRunner, submitRunner->GetCmdBatchRef(), m_syncPoints[m_currentSyncPoint]));
+			RKIT_CHECK(rkit::New<CopyAsyncUploadsRecordRunner>(recordRunner, submitRunner->GetCmdBatchRef(), syncPoint, m_currentGlobalSyncPoint));
 
 			rkit::RCPtr<rkit::Job> recordJob;
 			RKIT_CHECK(CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kDMA, std::move(recordRunner), asyncUploadMemCopyJob));
@@ -2854,7 +3005,7 @@ namespace anox
 		if (m_currentSyncPoint == m_numSyncPoints)
 			m_currentSyncPoint = 0;
 
-		m_globalSyncPoint++;
+		m_currentGlobalSyncPoint++;
 
 		return rkit::ResultCode::kOK;
 	}
@@ -2943,13 +3094,14 @@ namespace anox
 		rkit::UniquePtr<SignalBinaryFenceRunner> signalFenceRunner;
 		RKIT_CHECK(rkit::New<SignalBinaryFenceRunner>(signalFenceRunner, *fence));
 
-		RKIT_CHECK(CreateAndQueueSubmitJob(nullptr, queueToWaitForType, std::move(signalFenceRunner), rkit::JobDependencyList()));
+		rkit::RCPtr<rkit::Job> signalJob;
+		RKIT_CHECK(CreateAndQueueSubmitJob(&signalJob, queueToWaitForType, std::move(signalFenceRunner), rkit::JobDependencyList()));
 
 		rkit::render::PipelineStageMask_t stageMask({ rkit::render::PipelineStage::kTopOfPipe });
 
 		rkit::UniquePtr<WaitForBinaryFenceRunner> waitRunner;
 		RKIT_CHECK(rkit::New<WaitForBinaryFenceRunner>(waitRunner, *fence, stageMask));
-		RKIT_CHECK(CreateAndQueueSubmitJob(nullptr, waitingQueueType, std::move(waitRunner), rkit::JobDependencyList()));
+		RKIT_CHECK(CreateAndQueueSubmitJob(nullptr, waitingQueueType, std::move(waitRunner), signalJob));
 
 		return rkit::ResultCode::kOK;
 	}

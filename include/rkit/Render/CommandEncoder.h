@@ -39,6 +39,7 @@ namespace rkit { namespace render
 
 	struct ICopyCommandEncoder : public IBaseCommandEncoder
 	{
+		virtual Result PipelineBarrier(const BarrierGroup &barrierGroup) = 0;
 		virtual Result CopyBufferToImage(IImageResource &imageResource, const ImageRect3D &destRect,
 			IBufferResource &bufferResource, const BufferImageFootprint &bufferFootprint,
 			ImageLayout imageLayout, uint32_t mipLevel, uint32_t arrayLayer, ImagePlane imagePlane

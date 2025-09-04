@@ -29,10 +29,19 @@ namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanCommandBatch;
 
-	class VulkanCommandEncoder
+	class VulkanCommandEncoder : public NoCopy
 	{
 	public:
+		explicit VulkanCommandEncoder(VulkanCommandBatch &batch);
+
 		virtual Result CloseEncoder() = 0;
+
+	protected:
+		Result CommonPipelineBarrier(const BarrierGroup &barrierGroup) const;
+
+		VulkanQueueProxyBase *DefaultQueue(IBaseCommandQueue *specifiedQueue) const;
+
+		VulkanCommandBatch &m_batch;
 	};
 
 	class VulkanCopyCommandEncoder : public ICopyCommandEncoder, public VulkanCommandEncoder
@@ -40,14 +49,12 @@ namespace rkit { namespace render { namespace vulkan
 	public:
 		explicit VulkanCopyCommandEncoder(VulkanCommandBatch &batch);
 
+		Result PipelineBarrier(const BarrierGroup &barrierGroup) override;
 		Result CopyBufferToImage(IImageResource &imageResource, const ImageRect3D &destRect,
 			IBufferResource &bufferResource, const BufferImageFootprint &bufferFootprint,
 			ImageLayout imageLayout, uint32_t mipLevel, uint32_t arrayLayer, ImagePlane plane) override;
 
 		Result CloseEncoder() override;
-
-	private:
-		VulkanCommandBatch &m_batch;
 	};
 
 	class VulkanGraphicsCommandEncoder : public IGraphicsCommandEncoder, public VulkanCommandEncoder
@@ -65,10 +72,6 @@ namespace rkit { namespace render { namespace vulkan
 		Result OpenEncoder(IRenderPassInstance &rpi);
 
 	private:
-		VulkanQueueProxyBase *DefaultQueue(IBaseCommandQueue *specifiedQueue) const;
-
-		VulkanCommandBatch &m_batch;
-
 		VulkanRenderPassInstanceBase *m_rpi = nullptr;
 		bool m_isRendering = false;
 	};
@@ -145,94 +148,12 @@ namespace rkit { namespace render { namespace vulkan
 		EncoderType m_currentEncoderType = EncoderType::kNone;
 	};
 
-
-	VulkanCopyCommandEncoder::VulkanCopyCommandEncoder(VulkanCommandBatch &batch)
+	VulkanCommandEncoder::VulkanCommandEncoder(VulkanCommandBatch &batch)
 		: m_batch(batch)
 	{
 	}
 
-	Result VulkanCopyCommandEncoder::CopyBufferToImage(IImageResource &imageResource, const ImageRect3D &destRect,
-		IBufferResource &bufferResource, const BufferImageFootprint &bufferFootprint,
-		ImageLayout imageLayout, uint32_t mipLevel, uint32_t arrayLayer, ImagePlane plane)
-	{
-		VkImageLayout vkImageLayout;
-		RKIT_CHECK(VulkanUtils::ConvertImageLayout(vkImageLayout, imageLayout));
-
-		VkImageAspectFlags aspectMask = 0;
-		RKIT_CHECK(VulkanUtils::ConvertImagePlaneBits(aspectMask, ImagePlaneMask_t({ plane })));
-
-		uint32_t blockSizeBytes = 0;
-		uint32_t blockWidth = 0;
-		uint32_t blockHeight = 0;
-		uint32_t blockDepth = 0;
-		RKIT_CHECK(VulkanUtils::GetTextureFormatCharacteristics(bufferFootprint.m_format, blockSizeBytes, blockWidth, blockHeight, blockDepth));
-
-		RKIT_ASSERT(bufferFootprint.m_rowPitch % blockSizeBytes == 0);
-
-		VkBufferImageCopy bufferImageCopy = {};
-		bufferImageCopy.bufferOffset = bufferFootprint.m_bufferOffset;
-		bufferImageCopy.bufferRowLength = bufferFootprint.m_rowPitch / blockSizeBytes * blockWidth;
-		bufferImageCopy.bufferImageHeight = bufferFootprint.m_height;
-		bufferImageCopy.imageSubresource.aspectMask = aspectMask;
-		bufferImageCopy.imageSubresource.mipLevel = mipLevel;
-		bufferImageCopy.imageSubresource.baseArrayLayer = arrayLayer;
-		bufferImageCopy.imageSubresource.layerCount = 1;
-		bufferImageCopy.imageOffset.x = destRect.m_x;
-		bufferImageCopy.imageOffset.y = destRect.m_y;
-		bufferImageCopy.imageOffset.z = destRect.m_z;
-		bufferImageCopy.imageExtent.width = destRect.m_width;
-		bufferImageCopy.imageExtent.height = destRect.m_height;
-		bufferImageCopy.imageExtent.depth = destRect.m_depth;
-
-		VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
-		RKIT_CHECK(m_batch.OpenCommandBuffer(cmdBuffer));
-
-		VulkanDeviceBase &device = m_batch.GetDevice();
-		device.GetDeviceAPI().vkCmdCopyBufferToImage(cmdBuffer,
-			static_cast<VulkanBuffer &>(bufferResource).GetVkBuffer(),
-			static_cast<VulkanImageContainer &>(imageResource).GetVkImage(),
-			vkImageLayout, 1, &bufferImageCopy);
-
-		return ResultCode::kOK;
-	}
-
-	Result VulkanCopyCommandEncoder::CloseEncoder()
-	{
-		return ResultCode::kOK;
-	}
-
-	VulkanGraphicsCommandEncoder::VulkanGraphicsCommandEncoder(VulkanCommandBatch &batch)
-		: m_batch(batch)
-	{
-	}
-
-	Result VulkanGraphicsCommandEncoder::CloseEncoder()
-	{
-		if (m_isRendering)
-			return ResultCode::kNotYetImplemented;
-
-		return ResultCode::kOK;
-	}
-
-	Result VulkanGraphicsCommandEncoder::WaitForSwapChainAcquire(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &subsequentStages)
-	{
-		VkPipelineStageFlags stageFlags = 0;
-
-		RKIT_CHECK(m_batch.AddWaitForVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetAcquireSema(), subsequentStages));
-
-		return ResultCode::kOK;
-	}
-
-	Result VulkanGraphicsCommandEncoder::SignalSwapChainPresentReady(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &priorStages)
-	{
-		VkPipelineStageFlags stageFlags = 0;
-
-		RKIT_CHECK(m_batch.AddSignalVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetPresentSema(), priorStages));
-
-		return ResultCode::kOK;
-	}
-
-	Result VulkanGraphicsCommandEncoder::PipelineBarrier(const BarrierGroup &barrierGroup)
+	Result VulkanCommandEncoder::CommonPipelineBarrier(const BarrierGroup &barrierGroup) const
 	{
 		VkPipelineStageFlags srcStageMask = 0;
 		VkPipelineStageFlags dstStageMask = 0;
@@ -319,9 +240,9 @@ namespace rkit { namespace render { namespace vulkan
 				memBarrier.subresourceRange.aspectMask = static_cast<VulkanImageContainer *>(imageBarrier.m_image)->GetAllAspectFlags();
 
 			memBarrier.subresourceRange.baseMipLevel = imageBarrier.m_firstMipLevel;
-			memBarrier.subresourceRange.levelCount = imageBarrier.m_numMipLevels;
+			memBarrier.subresourceRange.levelCount = imageBarrier.m_numMipLevels.IsSet() ? imageBarrier.m_numMipLevels.Get() : VK_REMAINING_MIP_LEVELS;
 			memBarrier.subresourceRange.baseArrayLayer = imageBarrier.m_firstArrayElement;
-			memBarrier.subresourceRange.layerCount = imageBarrier.m_numArrayElements;
+			memBarrier.subresourceRange.layerCount = imageBarrier.m_numArrayElements.IsSet() ? imageBarrier.m_numArrayElements.Get() : VK_REMAINING_ARRAY_LAYERS;
 
 			RKIT_CHECK(VulkanUtils::ConvertImageLayout(memBarrier.oldLayout, imageBarrier.m_priorLayout));
 			RKIT_CHECK(VulkanUtils::ConvertImageLayout(memBarrier.newLayout, imageBarrier.m_subsequentLayout));
@@ -343,6 +264,110 @@ namespace rkit { namespace render { namespace vulkan
 			static_cast<uint32_t>(imageMemoryBarriers.Count()), imageMemoryBarriers.GetBuffer());
 
 		return ResultCode::kOK;
+	}
+
+	VulkanQueueProxyBase *VulkanCommandEncoder::DefaultQueue(IBaseCommandQueue *specifiedQueue) const
+	{
+		if (specifiedQueue)
+			return static_cast<VulkanQueueProxyBase *>(specifiedQueue->ToInternalCommandQueue());
+
+		return &m_batch.GetQueue();
+	}
+
+	VulkanCopyCommandEncoder::VulkanCopyCommandEncoder(VulkanCommandBatch &batch)
+		: VulkanCommandEncoder(batch)
+	{
+	}
+
+	Result VulkanCopyCommandEncoder::PipelineBarrier(const BarrierGroup &barrierGroup)
+	{
+		return CommonPipelineBarrier(barrierGroup);
+	}
+
+	Result VulkanCopyCommandEncoder::CopyBufferToImage(IImageResource &imageResource, const ImageRect3D &destRect,
+		IBufferResource &bufferResource, const BufferImageFootprint &bufferFootprint,
+		ImageLayout imageLayout, uint32_t mipLevel, uint32_t arrayLayer, ImagePlane plane)
+	{
+		VkImageLayout vkImageLayout;
+		RKIT_CHECK(VulkanUtils::ConvertImageLayout(vkImageLayout, imageLayout));
+
+		VkImageAspectFlags aspectMask = 0;
+		RKIT_CHECK(VulkanUtils::ConvertImagePlaneBits(aspectMask, ImagePlaneMask_t({ plane })));
+
+		uint32_t blockSizeBytes = 0;
+		uint32_t blockWidth = 0;
+		uint32_t blockHeight = 0;
+		uint32_t blockDepth = 0;
+		RKIT_CHECK(VulkanUtils::GetTextureFormatCharacteristics(bufferFootprint.m_format, blockSizeBytes, blockWidth, blockHeight, blockDepth));
+
+		RKIT_ASSERT(bufferFootprint.m_rowPitch % blockSizeBytes == 0);
+
+		VkBufferImageCopy bufferImageCopy = {};
+		bufferImageCopy.bufferOffset = bufferFootprint.m_bufferOffset;
+		bufferImageCopy.bufferRowLength = bufferFootprint.m_rowPitch / blockSizeBytes * blockWidth;
+		bufferImageCopy.bufferImageHeight = bufferFootprint.m_height;
+		bufferImageCopy.imageSubresource.aspectMask = aspectMask;
+		bufferImageCopy.imageSubresource.mipLevel = mipLevel;
+		bufferImageCopy.imageSubresource.baseArrayLayer = arrayLayer;
+		bufferImageCopy.imageSubresource.layerCount = 1;
+		bufferImageCopy.imageOffset.x = destRect.m_x;
+		bufferImageCopy.imageOffset.y = destRect.m_y;
+		bufferImageCopy.imageOffset.z = destRect.m_z;
+		bufferImageCopy.imageExtent.width = destRect.m_width;
+		bufferImageCopy.imageExtent.height = destRect.m_height;
+		bufferImageCopy.imageExtent.depth = destRect.m_depth;
+
+		VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
+		RKIT_CHECK(m_batch.OpenCommandBuffer(cmdBuffer));
+
+		VulkanDeviceBase &device = m_batch.GetDevice();
+		device.GetDeviceAPI().vkCmdCopyBufferToImage(cmdBuffer,
+			static_cast<VulkanBuffer &>(bufferResource).GetVkBuffer(),
+			static_cast<VulkanImageContainer &>(imageResource).GetVkImage(),
+			vkImageLayout, 1, &bufferImageCopy);
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanCopyCommandEncoder::CloseEncoder()
+	{
+		return ResultCode::kOK;
+	}
+
+	VulkanGraphicsCommandEncoder::VulkanGraphicsCommandEncoder(VulkanCommandBatch &batch)
+		: VulkanCommandEncoder(batch)
+	{
+	}
+
+	Result VulkanGraphicsCommandEncoder::CloseEncoder()
+	{
+		if (m_isRendering)
+			return ResultCode::kNotYetImplemented;
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanGraphicsCommandEncoder::WaitForSwapChainAcquire(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &subsequentStages)
+	{
+		VkPipelineStageFlags stageFlags = 0;
+
+		RKIT_CHECK(m_batch.AddWaitForVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetAcquireSema(), subsequentStages));
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanGraphicsCommandEncoder::SignalSwapChainPresentReady(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &priorStages)
+	{
+		VkPipelineStageFlags stageFlags = 0;
+
+		RKIT_CHECK(m_batch.AddSignalVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetPresentSema(), priorStages));
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanGraphicsCommandEncoder::PipelineBarrier(const BarrierGroup &barrierGroup)
+	{
+		return CommonPipelineBarrier(barrierGroup);
 	}
 
 	Result VulkanGraphicsCommandEncoder::ClearTargets(const Span<const RenderTargetClear> &renderTargetClears, const DepthStencilTargetClear *depthStencilClear, const Span<const ImageRect2D> &rects)
@@ -424,14 +449,6 @@ namespace rkit { namespace render { namespace vulkan
 		m_isRendering = false;
 
 		return ResultCode::kOK;
-	}
-
-	VulkanQueueProxyBase *VulkanGraphicsCommandEncoder::DefaultQueue(IBaseCommandQueue *specifiedQueue) const
-	{
-		if (specifiedQueue)
-			return static_cast<VulkanQueueProxyBase *>(specifiedQueue->ToInternalCommandQueue());
-
-		return &m_batch.GetQueue();
 	}
 
 	VulkanCommandBatch::VulkanCommandBatch(VulkanDeviceBase &device, VulkanQueueProxyBase &queue, VulkanCommandAllocatorBase &cmdAlloc)

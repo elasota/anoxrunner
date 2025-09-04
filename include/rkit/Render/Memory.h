@@ -10,23 +10,41 @@ namespace rkit
 
 namespace rkit { namespace render {
 	struct IMemoryHeap;
+	struct IMemoryAllocation;
 	class HeapKey;
 	struct HeapSpec;
+
+	class MemoryAddress final
+	{
+	public:
+		MemoryAddress();
+		MemoryAddress(IMemoryHeap &memHeap, GPUMemoryOffset_t offset);
+		MemoryAddress(const MemoryAddress &other) = default;
+
+		IMemoryHeap *GetHeap() const;
+		GPUMemoryOffset_t GetOffset() const;
+
+	private:
+		IMemoryHeap *m_memHeap = nullptr;
+		GPUMemoryOffset_t m_offset = 0;
+	};
 
 	class MemoryPosition final
 	{
 	public:
 		MemoryPosition();
-		MemoryPosition(IMemoryHeap *memHeap, GPUMemoryOffset_t offset);
+		MemoryPosition(IMemoryAllocation &memHeap, GPUMemoryOffset_t offset);
 		MemoryPosition(const MemoryPosition &other) = default;
 
-		IMemoryHeap *GetHeap() const;
+		IMemoryAllocation *GetAllocation() const;
 		GPUMemoryOffset_t GetOffset() const;
 
 		MemoryPosition operator+(GPUMemoryOffset_t offset) const;
 
+		operator MemoryAddress() const;
+
 	private:
-		IMemoryHeap *m_memHeap = nullptr;
+		IMemoryAllocation *m_memAllocation = nullptr;
 		GPUMemoryOffset_t m_offset = 0;
 	};
 
@@ -40,7 +58,7 @@ namespace rkit { namespace render {
 		MemoryRegion Subrange(GPUMemoryOffset_t offset, GPUMemorySize_t size) const;
 
 		const MemoryPosition &GetPosition() const;
-		IMemoryHeap *GetHeap() const;
+		IMemoryAllocation *GetAllocation() const;
 		GPUMemoryOffset_t GetOffset() const;
 		GPUMemorySize_t GetSize() const;
 
@@ -69,15 +87,23 @@ namespace rkit { namespace render {
 		HeapKeyFilterCallback_t m_heapKeyFilter;
 	};
 
-	struct IMemoryHeap
+	struct IMemoryAllocation
 	{
-		virtual ~IMemoryHeap() {}
+		virtual ~IMemoryAllocation() {}
 
-		virtual MemoryPosition GetStartPosition() const = 0;
+		virtual MemoryAddress GetBaseAddress() const = 0;
+	
 		virtual GPUMemorySize_t GetSize() const = 0;
 		virtual void *GetCPUPtr() const = 0;
 
-		MemoryRegion GetRegion();
+		MemoryRegion GetRegion() const;
+	};
+
+	struct IMemoryHeap : public IMemoryAllocation
+	{
+		virtual ~IMemoryHeap() {}
+
+		MemoryAddress GetBaseAddress() const override final;
 	};
 } }
 
@@ -87,21 +113,44 @@ namespace rkit { namespace render {
 #include "rkit/Render/HeapKey.h"
 
 namespace rkit { namespace render {
-	inline MemoryPosition::MemoryPosition()
+	inline MemoryAddress::MemoryAddress()
 		: m_memHeap(nullptr)
 		, m_offset(0)
 	{
 	}
 
-	inline MemoryPosition::MemoryPosition(IMemoryHeap *memHeap, GPUMemoryOffset_t offset)
-		: m_memHeap(memHeap)
+	inline MemoryAddress::MemoryAddress(IMemoryHeap &memHeap, GPUMemoryOffset_t offset)
+		: m_memHeap(&memHeap)
+		, m_offset(offset)
+	{
+		RKIT_ASSERT(offset <= memHeap.GetSize());
+	}
+
+	inline IMemoryHeap *MemoryAddress::GetHeap() const
+	{
+		return m_memHeap;
+	}
+
+	inline GPUMemoryOffset_t MemoryAddress::GetOffset() const
+	{
+		return m_offset;
+	}
+
+	inline MemoryPosition::MemoryPosition()
+		: m_memAllocation(nullptr)
+		, m_offset(0)
+	{
+	}
+
+	inline MemoryPosition::MemoryPosition(IMemoryAllocation &memAlloc, GPUMemoryOffset_t offset)
+		: m_memAllocation(&memAlloc)
 		, m_offset(offset)
 	{
 	}
 
-	inline IMemoryHeap *MemoryPosition::GetHeap() const
+	inline IMemoryAllocation *MemoryPosition::GetAllocation() const
 	{
-		return m_memHeap;
+		return m_memAllocation;
 	}
 
 	inline GPUMemoryOffset_t MemoryPosition::GetOffset() const
@@ -109,10 +158,17 @@ namespace rkit { namespace render {
 		return m_offset;
 	}
 
+	inline MemoryPosition::operator MemoryAddress() const
+	{
+		const MemoryAddress baseAddress = m_memAllocation->GetBaseAddress();
+		return MemoryAddress(*baseAddress.GetHeap(), baseAddress.GetOffset() + m_offset);
+	}
+
 	inline MemoryPosition MemoryPosition::operator+(GPUMemoryOffset_t offset) const
 	{
-		RKIT_ASSERT(offset <= m_memHeap->GetSize() - m_offset);
-		return MemoryPosition(m_memHeap, offset);
+		RKIT_ASSERT(m_memAllocation != nullptr);
+		RKIT_ASSERT(offset <= m_memAllocation->GetSize() - m_offset);
+		return MemoryPosition(*m_memAllocation, offset);
 	}
 
 	inline MemoryRegion::MemoryRegion()
@@ -131,12 +187,17 @@ namespace rkit { namespace render {
 		RKIT_ASSERT(offset <= m_size);
 		RKIT_ASSERT(size <= (m_size - offset));
 
-		return MemoryRegion(MemoryPosition(m_position.GetHeap(), m_position.GetOffset() + offset), size);
+		return MemoryRegion(MemoryPosition(*m_position.GetAllocation(), m_position.GetOffset() + offset), size);
 	}
 
-	inline IMemoryHeap *MemoryRegion::GetHeap() const
+	inline const MemoryPosition &MemoryRegion::GetPosition() const
 	{
-		return m_position.GetHeap();
+		return m_position;
+	}
+
+	inline IMemoryAllocation *MemoryRegion::GetAllocation() const
+	{
+		return m_position.GetAllocation();
 	}
 
 	inline GPUMemoryOffset_t MemoryRegion::GetOffset() const
@@ -172,8 +233,13 @@ namespace rkit { namespace render {
 		return m_heapKeyFilter(m_userdata, heapSpec);
 	}
 
-	inline MemoryRegion IMemoryHeap::GetRegion()
+	inline MemoryRegion IMemoryAllocation::GetRegion() const
 	{
-		return MemoryRegion(GetStartPosition(), GetSize());
+		return MemoryRegion(MemoryPosition(*const_cast<IMemoryAllocation *>(this), 0), this->GetSize());
+	}
+
+	inline MemoryAddress IMemoryHeap::GetBaseAddress() const
+	{
+		return MemoryAddress(*const_cast<IMemoryHeap *>(this), 0);
 	}
 } }

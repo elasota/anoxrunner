@@ -89,12 +89,12 @@ namespace rkit { namespace render { namespace vulkan
 			render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue) override;
 
 		Result CreateBufferPrototype(UniquePtr<IBufferPrototype> &outBufferPrototype, const BufferSpec &bufferSpec,
-			const BufferResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &restrictedQueues) override;
+			const BufferResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &concurrentQueues) override;
 		Result CreateBuffer(UniquePtr<IBufferResource> &outImage, UniquePtr<IBufferPrototype> &&bufferPrototype,
 			const MemoryRegion &memRegion, const Span<const uint8_t> &initialData) override;
 
 		Result CreateImagePrototype(UniquePtr<IImagePrototype> &outImagePrototype, const ImageSpec &imageSpec,
-			const ImageResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &restrictedQueues) override;
+			const ImageResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &concurrentQueues) override;
 		Result CreateImage(UniquePtr<IImageResource> &outImage, UniquePtr<IImagePrototype> &&imagePrototype,
 			const MemoryRegion &memRegion, const Span<const uint8_t> &initialData) override;
 
@@ -701,13 +701,13 @@ namespace rkit { namespace render { namespace vulkan
 		UniquePtr<IBufferPrototype> bufferPrototype = std::move(bufferPrototypeRef);
 
 		RKIT_ASSERT(bufferPrototype.IsValid());
-		RKIT_ASSERT(memRegion.GetHeap() != nullptr);
+		RKIT_ASSERT(memRegion.GetAllocation() != nullptr);
 
-		const MemoryPosition basePosition = memRegion.GetHeap()->GetStartPosition();
+		const MemoryAddress baseAddress = memRegion.GetPosition();
 
 		VulkanBufferPrototype &prototype = *static_cast<VulkanBufferPrototype *>(bufferPrototype.Get());
-		const VulkanMemoryHeap &baseHeap = *static_cast<const VulkanMemoryHeap *>(basePosition.GetHeap());
-		GPUMemoryOffset_t baseOffset = basePosition.GetOffset() + memRegion.GetOffset();
+		const VulkanMemoryHeap &baseHeap = *static_cast<const VulkanMemoryHeap *>(baseAddress.GetHeap());
+		GPUMemoryOffset_t baseOffset = baseAddress.GetOffset();
 
 		const VkBuffer buffer = prototype.GetBuffer();
 
@@ -739,13 +739,13 @@ namespace rkit { namespace render { namespace vulkan
 		UniquePtr<IImagePrototype> imagePrototype = std::move(imagePrototypeRef);
 
 		RKIT_ASSERT(imagePrototype.IsValid());
-		RKIT_ASSERT(memRegion.GetHeap() != nullptr);
+		RKIT_ASSERT(memRegion.GetAllocation() != nullptr);
 
-		MemoryPosition basePosition = memRegion.GetHeap()->GetStartPosition();
+		MemoryAddress baseAddress = memRegion.GetPosition();
 
 		VulkanImagePrototype &prototype = *static_cast<VulkanImagePrototype *>(imagePrototype.Get());
-		const VulkanMemoryHeap &baseHeap = *static_cast<const VulkanMemoryHeap *>(basePosition.GetHeap());
-		GPUMemoryOffset_t baseOffset = basePosition.GetOffset() + memRegion.GetOffset();
+		const VulkanMemoryHeap &baseHeap = *static_cast<const VulkanMemoryHeap *>(baseAddress.GetHeap());
+		GPUMemoryOffset_t baseOffset = baseAddress.GetOffset();
 
 		const VkImage image = prototype.GetImage();
 
