@@ -78,10 +78,6 @@ namespace rkit { namespace mem {
 
 	void MemMapMallocDriver::CheckMemAllocCounter(uint32_t counter)
 	{
-		if (counter == 0x021cb0)
-		{
-			int n = 0;
-		}
 	}
 
 	class MemModule final
