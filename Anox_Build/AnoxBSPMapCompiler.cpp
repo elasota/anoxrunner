@@ -332,6 +332,18 @@ namespace anox { namespace buildsystem
 			rkit::IWriteStream &m_stream;
 		};
 
+		class VectorReaderVisitor
+		{
+		public:
+			explicit VectorReaderVisitor(rkit::IReadStream &stream);
+
+			template<class T>
+			rkit::Result VisitMember(rkit::Vector<T> &vector) const;
+
+		private:
+			rkit::IReadStream &m_stream;
+		};
+
 		template<class TStructure>
 		static rkit::Result LoadLump(rkit::Vector<TStructure> &arr, rkit::ISeekableReadStream &stream, const BSPHeader &bspHeader, BSPLumpIndex lumpIndex);
 
@@ -356,7 +368,12 @@ namespace anox { namespace buildsystem
 		static rkit::Result BuildMaterials(data::BSPDataChunks &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 
 		static rkit::Result LoadBSPData(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, BSPDataCollection &bsp, rkit::Vector<LumpLoader> &loaders);
+
 		static rkit::Result WriteBSPModel(const data::BSPDataChunks &bspOutput, rkit::IWriteStream &outStream);
+		static rkit::Result ReadBSPModel(data::BSPDataChunks &bspOutput, rkit::IReadStream &inStream);
+
+		static rkit::Result WriteMaterialList(const rkit::ConstSpan<rkit::CIPath> &uniqueTextures, rkit::IWriteStream &outStream);
+		static rkit::Result ReadMaterialList(rkit::Vector<rkit::CIPath> &uniqueTextures, rkit::IReadStream &inStream);
 
 		template<class T>
 		static rkit::Result WriteVectorCB(const void *vectorPtr, rkit::IWriteStream &stream);
@@ -367,6 +384,8 @@ namespace anox { namespace buildsystem
 		static rkit::Result FormatLightmapPath(rkit::String &path, const rkit::StringView &identifier, size_t lightmapIndex);
 		static rkit::Result FormatModelPath(rkit::String &path, const rkit::StringView &identifier);
 		static rkit::Result FormatFaceStatsPath(rkit::String &path, const rkit::StringView &identifier);
+		static rkit::Result FormatGeometryPath(rkit::String &path, const rkit::StringView &identifier);
+		static rkit::Result FormatMaterialListPath(rkit::String &path, const rkit::StringView &identifier);
 	};
 
 	class BSPMapCompiler final : public BSPMapCompilerBase2
@@ -486,7 +505,7 @@ namespace anox { namespace buildsystem
 			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kWorldMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, texPath));
 		}
 
-		RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kBSPLightmapNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, depsNode->GetIdentifier()));
+		RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kBSPGeometryID, rkit::buildsystem::BuildFileLocation::kSourceDir, depsNode->GetIdentifier()));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -562,16 +581,157 @@ namespace anox { namespace buildsystem
 
 	bool BSPGeometryCompiler::HasAnalysisStage() const
 	{
-		return false;
+		return true;
 	}
 
 	rkit::Result BSPGeometryCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
-		return rkit::ResultCode::kInternalError;
+		RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kBSPLightmapNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, depsNode->GetIdentifier()));
+
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result BSPGeometryCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
+		BSPDataCollection bsp;
+
+		rkit::Vector<LumpLoader> loaders;
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kModels, bsp.m_models)));
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kNodes, bsp.m_nodes)));
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kLeafs, bsp.m_leafs)));
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kLeafFaces, bsp.m_leafFaces)));
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kLeafBrushes, bsp.m_leafBrushes)));
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kTexInfo, bsp.m_texInfos)));
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kFaceEdges, bsp.m_faceEdges)));
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kFaces, bsp.m_faces)));
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kPlanes, bsp.m_planes)));
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kEdges, bsp.m_edges)));
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kVerts, bsp.m_verts)));
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kLightmaps, bsp.m_lightMapData)));
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kBrushes, bsp.m_brushes)));
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kBrushSides, bsp.m_brushSides)));
+
+		RKIT_CHECK(LoadBSPData(depsNode, feedback, bsp, loaders));
+
+		rkit::Vector<BSPFaceStats> faceStats;
+		rkit::Vector<rkit::UniquePtr<priv::LightmapTree>> lightmapTrees;
+		RKIT_CHECK(LoadFaceStats(depsNode, feedback, faceStats, lightmapTrees));
+
+		rkit::Vector<size_t> texInfoToUniqueTexture;
+		rkit::Vector<rkit::CIPath> uniqueTextures;
+
+		RKIT_CHECK(texInfoToUniqueTexture.Resize(bsp.m_texInfos.Count()));
+
+		{
+			rkit::HashMap<rkit::CIPath, size_t> textureNameToUniqueTexture;
+
+			for (size_t texInfoIndex = 0; texInfoIndex < bsp.m_texInfos.Count(); texInfoIndex++)
+			{
+				const BSPTexInfo &texInfo = bsp.m_texInfos[texInfoIndex];
+
+				char fixedName[33] = {};
+				static_assert(sizeof(fixedName) == sizeof(texInfo.m_textureName) + 1, "Wrong texture name size");
+
+				size_t nameLength = 0;
+				while (nameLength < sizeof(fixedName) - 1u)
+				{
+					char nameChar = static_cast<uint8_t>(texInfo.m_textureName[nameLength]);
+					if (nameChar == 0)
+						break;
+
+					nameChar = rkit::InvariantCharCaseAdjuster<char>::ToLower(nameChar);
+					if (nameChar == '\\')
+						nameChar = '/';
+
+					fixedName[nameLength++] = nameChar;
+				}
+
+				fixedName[nameLength] = 0;
+
+				rkit::CIPath texName;
+				RKIT_CHECK(texName.Set(rkit::StringView(fixedName, nameLength)));
+
+				const rkit::HashMapConstIterator it = textureNameToUniqueTexture.Find(texName);
+
+				size_t uniqueTexIndex = 0;
+				if (it == textureNameToUniqueTexture.end())
+				{
+					uniqueTexIndex = uniqueTextures.Count();
+
+					RKIT_CHECK(textureNameToUniqueTexture.Set(texName, uniqueTexIndex));
+					RKIT_CHECK(uniqueTextures.Append(texName));
+				}
+				else
+					uniqueTexIndex = it.Value();
+
+				texInfoToUniqueTexture[texInfoIndex] = uniqueTexIndex;
+			}
+		}
+
+		rkit::Vector<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions;
+		rkit::Vector<rkit::data::ContentID> lightmapContentIDs;
+
+		{
+			RKIT_CHECK(lightmapDimensions.Resize(lightmapTrees.Count()));
+			RKIT_CHECK(lightmapContentIDs.Resize(lightmapTrees.Count()));
+
+			for (size_t lightmapIndex = 0; lightmapIndex < lightmapTrees.Count(); lightmapIndex++)
+			{
+				const priv::LightmapTree &tree = *lightmapTrees[lightmapIndex];
+
+				for (const priv::LightmapTreeNode &node : tree.m_nodes)
+				{
+					if (node.m_isOccupied)
+					{
+						BSPFaceStats &specificFaceStats = faceStats[node.m_ident.m_faceIndex];
+						specificFaceStats.m_atlasIndex = lightmapIndex;
+						specificFaceStats.m_lightmapPos[0] = node.m_x;
+						specificFaceStats.m_lightmapPos[1] = node.m_y;
+					}
+				}
+
+				lightmapDimensions[lightmapIndex] = rkit::Pair<uint16_t, uint16_t>(tree.m_nodes[0].m_width, tree.m_nodes[0].m_height);
+			}
+
+			RKIT_CHECK(ExportLightmaps(depsNode, feedback, lightmapContentIDs, bsp, faceStats, lightmapTrees));
+
+			lightmapTrees.Reset();
+		}
+
+		rkit::Vector<size_t> faceModelIndex;
+		RKIT_CHECK(faceModelIndex.Resize(bsp.m_faces.Count()));
+
+		data::BSPDataChunks bspOutput;
+		RKIT_CHECK(BuildGeometry(bspOutput, bsp, faceStats.ToSpan(), faceModelIndex.ToSpan(), texInfoToUniqueTexture.ToSpan(), lightmapDimensions.ToSpan()));
+
+		bspOutput.m_lightmaps = std::move(lightmapContentIDs);
+
+		{
+			rkit::String outPathStr;
+			RKIT_CHECK(FormatGeometryPath(outPathStr, depsNode->GetIdentifier()));
+
+			rkit::CIPath outPath;
+			RKIT_CHECK(outPath.Set(outPathStr));
+
+			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
+			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outStream));
+
+			RKIT_CHECK(WriteBSPModel(bspOutput, *outStream));
+		}
+
+		{
+			rkit::String outPathStr;
+			RKIT_CHECK(FormatMaterialListPath(outPathStr, depsNode->GetIdentifier()));
+
+			rkit::CIPath outPath;
+			RKIT_CHECK(outPath.Set(outPathStr));
+
+			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
+			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outStream));
+
+			RKIT_CHECK(WriteMaterialList(uniqueTextures.ToSpan(), *outStream));
+		}
+
 		return rkit::ResultCode::kOK;
 	}
 
@@ -2265,8 +2425,8 @@ namespace anox { namespace buildsystem
 				outVert.m_xyz[2] = rkit::endian::LittleFloat32_t::FromBits(bspVert.m_values[2]);
 				outVert.m_uv[0] = rkit::endian::LittleFloat32_t::FromBits(bspVert.m_values[3]);
 				outVert.m_uv[1] = rkit::endian::LittleFloat32_t::FromBits(bspVert.m_values[4]);
-				outVert.m_lightUV[2] = rkit::endian::LittleFloat32_t::FromBits(bspVert.m_values[5]);
-				outVert.m_lightUV[0] = rkit::endian::LittleFloat32_t::FromBits(bspVert.m_values[6]);
+				outVert.m_lightUV[0] = rkit::endian::LittleFloat32_t::FromBits(bspVert.m_values[5]);
+				outVert.m_lightUV[1] = rkit::endian::LittleFloat32_t::FromBits(bspVert.m_values[6]);
 				outVert.m_normal = bspVert.m_values[7];
 
 				RKIT_CHECK(bspOutput.m_drawVerts.Append(outVert));
@@ -2382,6 +2542,16 @@ namespace anox { namespace buildsystem
 		return path.Format("ax_bsp/{}.facestats", identifier.GetChars());
 	}
 
+	rkit::Result BSPMapCompilerBase2::FormatGeometryPath(rkit::String &path, const rkit::StringView &identifier)
+	{
+		return path.Format("ax_bsp/{}.geo", identifier.GetChars());
+	}
+
+	rkit::Result BSPMapCompilerBase2::FormatMaterialListPath(rkit::String &path, const rkit::StringView &identifier)
+	{
+		return path.Format("ax_bsp/{}.materials", identifier.GetChars());
+	}
+
 	rkit::Result BSPMapCompilerBase2::WriteBSPModel(const data::BSPDataChunks &bspOutput, rkit::IWriteStream &outStream)
 	{
 		data::BSPFile bspFile = {};
@@ -2393,6 +2563,75 @@ namespace anox { namespace buildsystem
 		VectorWriterVisitor visitor(outStream);
 
 		RKIT_CHECK(bspOutput.VisitAllChunks(visitor));
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result BSPMapCompilerBase2::ReadBSPModel(data::BSPDataChunks &bspData, rkit::IReadStream &inStream)
+	{
+		data::BSPFile bspFile = {};
+		bspFile.m_fourCC = data::BSPFile::kFourCC;
+		bspFile.m_version = data::BSPFile::kVersion;
+
+		RKIT_CHECK(inStream.ReadAll(&bspFile, sizeof(bspFile)));
+
+		if (bspFile.m_fourCC.Get() != data::BSPFile::kFourCC
+			|| bspFile.m_version.Get() != data::BSPFile::kVersion)
+			return rkit::ResultCode::kDataError;
+
+		VectorReaderVisitor visitor(inStream);
+
+		RKIT_CHECK(bspData.VisitAllChunks(visitor));
+
+		return rkit::ResultCode::kOK;
+	}
+
+
+	rkit::Result BSPMapCompilerBase2::WriteMaterialList(const rkit::ConstSpan<rkit::CIPath> &uniqueTextures, rkit::IWriteStream &outStream)
+	{
+		const uint32_t uniqueTextureCount = static_cast<uint32_t>(uniqueTextures.Count());
+
+		RKIT_CHECK(outStream.WriteAll(&uniqueTextureCount, sizeof(uniqueTextureCount)));
+
+		for (const rkit::CIPath &ciPath : uniqueTextures)
+		{
+			const uint32_t nameLength = static_cast<uint32_t>(ciPath.Length());
+			RKIT_CHECK(outStream.WriteAll(&nameLength, sizeof(nameLength)));
+
+			RKIT_CHECK(outStream.WriteAll(ciPath.CStr(), nameLength));
+		}
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result BSPMapCompilerBase2::ReadMaterialList(rkit::Vector<rkit::CIPath> &uniqueTextures, rkit::IReadStream &inStream)
+	{
+		uniqueTextures.Reset();
+
+		uint32_t uniqueTextureCount = 0;
+
+		RKIT_CHECK(inStream.ReadAll(&uniqueTextureCount, sizeof(uniqueTextureCount)));
+
+		RKIT_CHECK(uniqueTextures.Resize(uniqueTextureCount));
+
+		for (rkit::CIPath &ciPath : uniqueTextures)
+		{
+			uint32_t nameLength = 0;
+			RKIT_CHECK(inStream.ReadAll(&nameLength, sizeof(nameLength)));
+
+			if (nameLength > 0)
+			{
+				rkit::StringConstructionBuffer strBuf;
+				RKIT_CHECK(strBuf.Allocate(nameLength));
+
+				const rkit::Span<char> strSpan = strBuf.GetSpan();
+				RKIT_CHECK(inStream.ReadAll(strSpan.Ptr(), strSpan.Count()));
+
+				rkit::String str(std::move(strBuf));
+
+				RKIT_CHECK(ciPath.Set(str));
+			}
+		}
 
 		return rkit::ResultCode::kOK;
 	}
@@ -2419,18 +2658,18 @@ namespace anox { namespace buildsystem
 	template<class T>
 	rkit::Result BSPMapCompilerBase2::VectorWriterVisitor::VisitMember(const rkit::Vector<T> &vector) const
 	{
-		rkit::endian::LittleUInt32_t count;
+		rkit::endian::LittleUInt32_t countData;
 		if (vector.Count() > std::numeric_limits<uint32_t>::max())
 			return rkit::ResultCode::kIntegerOverflow;
 
-		count = static_cast<uint32_t>(vector.Count());
+		const size_t count = vector.Count();
+		countData = static_cast<uint32_t>(count);
 
-		RKIT_CHECK(m_stream.WriteAll(&count, sizeof(count)));
+		RKIT_CHECK(m_stream.WriteAll(&countData, sizeof(countData)));
 
 		if (vector.Count() > 0)
 		{
 			const void *dataPtr = vector.GetBuffer();
-			size_t count = vector.Count();
 
 			RKIT_CHECK(m_stream.WriteAll(dataPtr, count * sizeof(T)));
 		}
@@ -2438,133 +2677,76 @@ namespace anox { namespace buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
+	BSPMapCompilerBase2::VectorReaderVisitor::VectorReaderVisitor(rkit::IReadStream &stream)
+		: m_stream(stream)
+	{
+	}
+
+
+	template<class T>
+	rkit::Result BSPMapCompilerBase2::VectorReaderVisitor::VisitMember(rkit::Vector<T> &vector) const
+	{
+		rkit::endian::LittleUInt32_t countData;
+		RKIT_CHECK(m_stream.ReadAll(&countData, sizeof(countData)));
+
+		const uint32_t count = countData.Get();
+		RKIT_CHECK(vector.Resize(count));
+
+		if (count > 0)
+		{
+			void *dataPtr = vector.GetBuffer();
+			RKIT_CHECK(m_stream.ReadAll(dataPtr, count * sizeof(T)));
+		}
+
+		return rkit::ResultCode::kOK;
+	}
+
 	rkit::Result BSPMapCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
-		BSPDataCollection bsp;
-
-		rkit::Vector<LumpLoader> loaders;
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kModels, bsp.m_models)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kNodes, bsp.m_nodes)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kLeafs, bsp.m_leafs)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kLeafFaces, bsp.m_leafFaces)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kLeafBrushes, bsp.m_leafBrushes)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kTexInfo, bsp.m_texInfos)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kFaceEdges, bsp.m_faceEdges)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kFaces, bsp.m_faces)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kPlanes, bsp.m_planes)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kEdges, bsp.m_edges)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kVerts, bsp.m_verts)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kLightmaps, bsp.m_lightMapData)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kBrushes, bsp.m_brushes)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kBrushSides, bsp.m_brushSides)));
-
-		RKIT_CHECK(LoadBSPData(depsNode, feedback, bsp, loaders));
-
-		rkit::Vector<BSPFaceStats> faceStats;
-		rkit::Vector<rkit::UniquePtr<priv::LightmapTree>> lightmapTrees;
-		RKIT_CHECK(LoadFaceStats(depsNode, feedback, faceStats, lightmapTrees));
-
-		rkit::Vector<size_t> texInfoToUniqueTexture;
 		rkit::Vector<rkit::CIPath> uniqueTextures;
 
-		RKIT_CHECK(texInfoToUniqueTexture.Resize(bsp.m_texInfos.Count()));
+		data::BSPDataChunks bspData;
 
 		{
-			rkit::HashMap<rkit::CIPath, size_t> textureNameToUniqueTexture;
+			rkit::String inPathStr;
+			RKIT_CHECK(FormatGeometryPath(inPathStr, depsNode->GetIdentifier()));
 
-			for (size_t texInfoIndex = 0; texInfoIndex < bsp.m_texInfos.Count(); texInfoIndex++)
-			{
-				const BSPTexInfo &texInfo = bsp.m_texInfos[texInfoIndex];
+			rkit::CIPath inPath;
+			RKIT_CHECK(inPath.Set(inPathStr));
 
-				char fixedName[33] = {};
-				static_assert(sizeof(fixedName) == sizeof(texInfo.m_textureName) + 1, "Wrong texture name size");
+			rkit::UniquePtr<rkit::ISeekableReadStream> inStream;
+			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, inPath, inStream));
 
-				size_t nameLength = 0;
-				while (nameLength < sizeof(fixedName) - 1u)
-				{
-					char nameChar = static_cast<uint8_t>(texInfo.m_textureName[nameLength]);
-					if (nameChar == 0)
-						break;
-
-					nameChar = rkit::InvariantCharCaseAdjuster<char>::ToLower(nameChar);
-					if (nameChar == '\\')
-						nameChar = '/';
-
-					fixedName[nameLength++] = nameChar;
-				}
-
-				fixedName[nameLength] = 0;
-
-				rkit::CIPath texName;
-				RKIT_CHECK(texName.Set(rkit::StringView(fixedName, nameLength)));
-
-				const rkit::HashMapConstIterator it = textureNameToUniqueTexture.Find(texName);
-
-				size_t uniqueTexIndex = 0;
-				if (it == textureNameToUniqueTexture.end())
-				{
-					uniqueTexIndex = uniqueTextures.Count();
-
-					RKIT_CHECK(textureNameToUniqueTexture.Set(texName, uniqueTexIndex));
-					RKIT_CHECK(uniqueTextures.Append(texName));
-				}
-				else
-					uniqueTexIndex = it.Value();
-
-				texInfoToUniqueTexture[texInfoIndex] = uniqueTexIndex;
-			}
+			RKIT_CHECK(ReadBSPModel(bspData, *inStream));
 		}
-
-		rkit::Vector<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions;
-		rkit::Vector<rkit::data::ContentID> lightmapContentIDs;
 
 		{
-			RKIT_CHECK(lightmapDimensions.Resize(lightmapTrees.Count()));
-			RKIT_CHECK(lightmapContentIDs.Resize(lightmapTrees.Count()));
+			rkit::String inPathStr;
+			RKIT_CHECK(FormatMaterialListPath(inPathStr, depsNode->GetIdentifier()));
 
-			for (size_t lightmapIndex = 0; lightmapIndex < lightmapTrees.Count(); lightmapIndex++)
-			{
-				const priv::LightmapTree &tree = *lightmapTrees[lightmapIndex];
+			rkit::CIPath inPath;
+			RKIT_CHECK(inPath.Set(inPathStr));
 
-				for (const priv::LightmapTreeNode &node : tree.m_nodes)
-				{
-					if (node.m_isOccupied)
-					{
-						BSPFaceStats &specificFaceStats = faceStats[node.m_ident.m_faceIndex];
-						specificFaceStats.m_atlasIndex = lightmapIndex;
-						specificFaceStats.m_lightmapPos[0] = node.m_x;
-						specificFaceStats.m_lightmapPos[1] = node.m_y;
-					}
-				}
+			rkit::UniquePtr<rkit::ISeekableReadStream> inStream;
+			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, inPath, inStream));
 
-				lightmapDimensions[lightmapIndex] = rkit::Pair<uint16_t, uint16_t>(tree.m_nodes[0].m_width, tree.m_nodes[0].m_height);
-			}
-
-			RKIT_CHECK(ExportLightmaps(depsNode, feedback, lightmapContentIDs, bsp, faceStats, lightmapTrees));
-
-			lightmapTrees.Reset();
+			RKIT_CHECK(ReadMaterialList(uniqueTextures, *inStream));
 		}
 
-		rkit::Vector<size_t> faceModelIndex;
-		RKIT_CHECK(faceModelIndex.Resize(bsp.m_faces.Count()));
+		RKIT_CHECK(BuildMaterials(bspData, uniqueTextures.ToSpan(), feedback));
 
-		data::BSPDataChunks bspOutput;
-		RKIT_CHECK(BuildGeometry(bspOutput, bsp, faceStats.ToSpan(), faceModelIndex.ToSpan(), texInfoToUniqueTexture.ToSpan(), lightmapDimensions.ToSpan()));
+		{
+			rkit::String outPathStr;
+			RKIT_CHECK(FormatModelPath(outPathStr, depsNode->GetIdentifier()));
 
-		RKIT_CHECK(BuildMaterials(bspOutput, uniqueTextures.ToSpan(), feedback));
+			rkit::CIPath outPath;
+			RKIT_CHECK(outPath.Set(outPathStr));
 
-		rkit::String outPathStr;
-		RKIT_CHECK(FormatModelPath(outPathStr, depsNode->GetIdentifier()));
+			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
+			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, outPath, outStream));
 
-		rkit::CIPath outPath;
-		RKIT_CHECK(outPath.Set(outPathStr));
-
-		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
-		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, outPath, outStream));
-
-		bspOutput.m_lightmaps = std::move(lightmapContentIDs);
-
-		RKIT_CHECK(WriteBSPModel(bspOutput, *outStream));
+			RKIT_CHECK(WriteBSPModel(bspData, *outStream));
+		}
 
 		return rkit::ResultCode::kOK;
 	}
@@ -2767,7 +2949,7 @@ namespace anox { namespace buildsystem
 
 	uint32_t BSPMapCompiler::GetVersion() const
 	{
-		return 5;
+		return 6;
 	}
 
 	rkit::Result BSPMapCompiler::FormatWorldMaterialPath(rkit::String &str, const rkit::StringSliceView &textureName)
