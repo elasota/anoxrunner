@@ -14,6 +14,8 @@ namespace rkit { namespace render
 	struct BarrierGroup;
 	struct BufferImageFootprint;
 	struct DepthStencilTargetClear;
+	struct IBinaryCPUWaitableFence;
+	struct IBinaryGPUWaitableFence;
 	struct IBufferResource;
 	struct IImageResource;
 	struct ISwapChainSyncPoint;

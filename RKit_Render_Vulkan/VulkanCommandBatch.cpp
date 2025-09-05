@@ -15,12 +15,14 @@
 #include "VulkanCheck.h"
 #include "VulkanCommandAllocator.h"
 #include "VulkanDevice.h"
+#include "VulkanFence.h"
 #include "VulkanImageResource.h"
 #include "VulkanQueueProxy.h"
 #include "VulkanRenderPassInstance.h"
 #include "VulkanSwapChain.h"
 #include "VulkanUtils.h"
 
+#include "rkit/Core/LogDriver.h"
 #include "rkit/Core/StaticArray.h"
 #include "rkit/Core/UniquePtr.h"
 #include "rkit/Core/Vector.h"
@@ -104,12 +106,15 @@ namespace rkit { namespace render { namespace vulkan
 		Result OpenComputeCommandEncoder(IComputeCommandEncoder *&outCopyCommandEncoder) override;
 		Result OpenGraphicsCommandEncoder(IGraphicsCommandEncoder *&outCopyCommandEncoder, IRenderPassInstance &rpi) override;
 
+		Result AddWaitForFence(IBinaryGPUWaitableFence &fence, const PipelineStageMask_t &subsequentStageMask) override;
+		Result AddSignalFence(IBinaryGPUWaitableFence &fence) override;
+
 		Result Initialize();
 
 		Result StartNewEncoder(EncoderType encoderType);
 
 		Result AddWaitForVkSema(VkSemaphore sema, const PipelineStageMask_t &subsequentStageMask);
-		Result AddSignalVkSema(VkSemaphore sema, const PipelineStageMask_t &priorStageMask);
+		Result AddSignalVkSema(VkSemaphore sema);
 
 		Result OpenCommandBuffer(VkCommandBuffer &outCmdBuffer);
 		Result OpenRenderPass(VkCommandBuffer &outCmdBuffer, const VulkanRenderPassInstanceBase &rpi);
@@ -360,7 +365,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		VkPipelineStageFlags stageFlags = 0;
 
-		RKIT_CHECK(m_batch.AddSignalVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetPresentSema(), priorStages));
+		RKIT_CHECK(m_batch.AddSignalVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetPresentSema()));
 
 		return ResultCode::kOK;
 	}
@@ -597,6 +602,16 @@ namespace rkit { namespace render { namespace vulkan
 		return ResultCode::kOK;
 	}
 
+	Result VulkanCommandBatch::AddWaitForFence(IBinaryGPUWaitableFence &fence, const PipelineStageMask_t &subsequentStageMask)
+	{
+		return AddWaitForVkSema(static_cast<VulkanBinaryGPUWaitableFence &>(fence).GetSemaphore(), subsequentStageMask);
+	}
+
+	Result VulkanCommandBatch::AddSignalFence(IBinaryGPUWaitableFence &fence)
+	{
+		return AddSignalVkSema(static_cast<VulkanBinaryGPUWaitableFence &>(fence).GetSemaphore());
+	}
+
 	Result VulkanCommandBatch::AddWaitForVkSema(VkSemaphore sema, const PipelineStageMask_t &subsequentStages)
 	{
 		VkSubmitInfo *submitItem = nullptr;
@@ -633,7 +648,7 @@ namespace rkit { namespace render { namespace vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanCommandBatch::AddSignalVkSema(VkSemaphore sema, const PipelineStageMask_t &priorStages)
+	Result VulkanCommandBatch::AddSignalVkSema(VkSemaphore sema)
 	{
 		VkSubmitInfo *submitItem = nullptr;
 		if (m_submits.Count() > 0)

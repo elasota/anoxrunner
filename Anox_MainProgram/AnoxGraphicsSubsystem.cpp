@@ -393,12 +393,13 @@ namespace anox
 		class CloseFrameRecordRunner final : public IGraphicsRecordJobRunner_t
 		{
 		public:
-			explicit CloseFrameRecordRunner(rkit::render::IBaseCommandBatch *&outBatchPtr);
+			explicit CloseFrameRecordRunner(rkit::render::IBaseCommandBatch *&outBatchPtr, rkit::render::IBinaryGPUWaitableFence *asyncUploadFence);
 
 			rkit::Result RunRecord(rkit::render::IGraphicsCommandAllocator &cmdAlloc) override;
 
 		private:
 			rkit::render::IBaseCommandBatch *&m_outBatchPtr;
+			rkit::render::IBinaryGPUWaitableFence *m_asyncUploadFence;
 		};
 
 
@@ -444,11 +445,13 @@ namespace anox
 		class CopyAsyncUploadsRecordRunner final : public ICopyRecordJobRunner_t
 		{
 		public:
-			explicit CopyAsyncUploadsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint, uint64_t globalSyncPoint);
+			explicit CopyAsyncUploadsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint, uint64_t globalSyncPoint,
+				rkit::render::IBinaryGPUWaitableFence *fence);
 
 			rkit::Result RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc) override;
 
 		private:
+			rkit::render::IBinaryGPUWaitableFence *m_fence;
 			rkit::render::ICopyCommandBatch **m_cmdBatchRef;
 			FrameSyncPoint &m_syncPoint;
 			uint64_t m_globalSyncPoint;
@@ -1425,8 +1428,9 @@ namespace anox
 		return commandQueue.QueueWaitForBinaryGPUWaitable(m_fence, m_stagesToBlock);
 	}
 
-	GraphicsSubsystem::CloseFrameRecordRunner::CloseFrameRecordRunner(rkit::render::IBaseCommandBatch *&outBatchPtr)
+	GraphicsSubsystem::CloseFrameRecordRunner::CloseFrameRecordRunner(rkit::render::IBaseCommandBatch *&outBatchPtr, rkit::render::IBinaryGPUWaitableFence *asyncUploadFence)
 		: m_outBatchPtr(outBatchPtr)
+		, m_asyncUploadFence(asyncUploadFence)
 	{
 	}
 
@@ -1434,6 +1438,11 @@ namespace anox
 	{
 		rkit::render::IGraphicsCommandBatch *batch = nullptr;
 		RKIT_CHECK(cmdAlloc.OpenGraphicsCommandBatch(batch, true));
+
+		if (m_asyncUploadFence)
+		{
+			RKIT_CHECK(batch->AddWaitForFence(*m_asyncUploadFence, rkit::render::PipelineStageMask_t({ rkit::render::PipelineStage::kTopOfPipe })));
+		}
 
 		RKIT_CHECK(batch->CloseBatch());
 
@@ -1518,10 +1527,11 @@ namespace anox
 		return &m_cmdBatch;
 	}
 
-	GraphicsSubsystem::CopyAsyncUploadsRecordRunner::CopyAsyncUploadsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint, uint64_t globalSyncPoint)
+	GraphicsSubsystem::CopyAsyncUploadsRecordRunner::CopyAsyncUploadsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint, uint64_t globalSyncPoint, rkit::render::IBinaryGPUWaitableFence *fence)
 		: m_cmdBatchRef(cmdBatchRef)
 		, m_syncPoint(syncPoint)
 		, m_globalSyncPoint(globalSyncPoint)
+		, m_fence(fence)
 	{
 	}
 
@@ -1542,6 +1552,8 @@ namespace anox
 			RKIT_CHECK(cmdEncoder->CopyBufferToImage(*texture->GetRenderResource(), copyAction.m_destRect, *copyAction.m_buffer, copyAction.m_footprint,
 				copyAction.m_imageLayout, copyAction.m_mipLevel, copyAction.m_arrayElement, copyAction.m_imagePlane));
 		}
+
+		RKIT_CHECK(cmdBatch->AddSignalFence(*m_fence));
 
 		RKIT_CHECK(cmdBatch->CloseBatch());
 
@@ -2968,32 +2980,42 @@ namespace anox
 
 		rkit::RCPtr<rkit::Job> asyncUploadMemCopyJob = syncPoint.m_asyncUploadActionSet.m_memCopyJob;
 
+		SyncPointFenceFactory fenceFactory(*this, m_currentSyncPoint);
+
+		rkit::StaticArray<rkit::RCPtr<rkit::Job>, 1> frameEndRecordDeps;
+		size_t numFrameEndRecordDeps = 0;
+
+		rkit::render::IBinaryGPUWaitableFence *asyncUploadGPUFence = nullptr;
+
 		if (asyncUploadMemCopyJob.IsValid())
 		{
+			RKIT_CHECK(fenceFactory.CreateFence(asyncUploadGPUFence));
+
 			// Post async upload submits to the end of the frame
 			rkit::UniquePtr<CopyAsyncUploadsSubmitRunner> submitRunner;
 			RKIT_CHECK(rkit::New<CopyAsyncUploadsSubmitRunner>(submitRunner, syncPoint));
 
 			rkit::UniquePtr<CopyAsyncUploadsRecordRunner> recordRunner;
-			RKIT_CHECK(rkit::New<CopyAsyncUploadsRecordRunner>(recordRunner, submitRunner->GetCmdBatchRef(), syncPoint, m_currentGlobalSyncPoint));
+			RKIT_CHECK(rkit::New<CopyAsyncUploadsRecordRunner>(recordRunner, submitRunner->GetCmdBatchRef(), syncPoint, m_currentGlobalSyncPoint, asyncUploadGPUFence));
 
 			rkit::RCPtr<rkit::Job> recordJob;
 			RKIT_CHECK(CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kDMA, std::move(recordRunner), asyncUploadMemCopyJob));
 
-			RKIT_CHECK(CreateAndQueueSubmitJob(nullptr, LogicalQueueType::kDMA, std::move(submitRunner), recordJob));
+			rkit::RCPtr<rkit::Job> submitJob;
+			RKIT_CHECK(CreateAndQueueSubmitJob(&submitJob, LogicalQueueType::kDMA, std::move(submitRunner), recordJob));
 
-			SyncPointFenceFactory fenceFactory(*this, m_currentSyncPoint);
-			RKIT_CHECK(QueueCrossQueueWait(LogicalQueueType::kDMA, LogicalQueueType::kGraphics, fenceFactory));
+			frameEndRecordDeps[numFrameEndRecordDeps++] = submitJob;
 		}
 
 		rkit::UniquePtr<CloseFrameSubmitRunner> closeFrameSubmitRunner;
 		RKIT_CHECK(rkit::New<CloseFrameSubmitRunner>(closeFrameSubmitRunner, *m_currentFrameResources->m_frameEndBatchPtr));
 
 		rkit::UniquePtr<CloseFrameRecordRunner> closeFrameRecordRunner;
-		RKIT_CHECK(rkit::New<CloseFrameRecordRunner>(closeFrameRecordRunner, *closeFrameSubmitRunner->GetLastBatchRef()));
+		RKIT_CHECK(rkit::New<CloseFrameRecordRunner>(closeFrameRecordRunner, *closeFrameSubmitRunner->GetLastBatchRef(), asyncUploadGPUFence));
 
 		rkit::RCPtr<rkit::Job> closeFrameRecordJob;
-		RKIT_CHECK(CreateAndQueueRecordJob(&closeFrameRecordJob, LogicalQueueType::kGraphics, std::move(closeFrameRecordRunner), rkit::JobDependencyList()));
+		RKIT_CHECK(CreateAndQueueRecordJob(&closeFrameRecordJob, LogicalQueueType::kGraphics, std::move(closeFrameRecordRunner),
+			frameEndRecordDeps.ToSpan().SubSpan(0, numFrameEndRecordDeps)));
 
 		rkit::RCPtr<rkit::Job> closeFrameSubmitJob;
 		RKIT_CHECK(CreateAndQueueSubmitJob(&closeFrameSubmitJob, LogicalQueueType::kGraphics, std::move(closeFrameSubmitRunner), closeFrameRecordJob));
