@@ -114,7 +114,6 @@ namespace anox
 
 		rkit::Result CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies) override;
 		rkit::Result CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<ISubmitJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies) override;
-		rkit::Result QueueCrossQueueWait(LogicalQueueType queueToWaitFor, LogicalQueueType waitingQueue, IBinaryGPUWaitableFenceFactory &fenceFactory) override;
 
 		rkit::Result CreateAsyncCreateTextureJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<ITexture> &outTexture, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData, const rkit::JobDependencyList &dependencies) override;
 
@@ -365,29 +364,6 @@ namespace anox
 
 		private:
 			GraphicTimelinedResourceStack m_stack;
-		};
-
-		class SignalBinaryFenceRunner final : public ISubmitJobRunner
-		{
-		public:
-			explicit SignalBinaryFenceRunner(rkit::render::IBinaryGPUWaitableFence &fence);
-
-			rkit::Result RunBase(rkit::render::IBaseCommandQueue &commandQueue) override;
-
-		private:
-			rkit::render::IBinaryGPUWaitableFence &m_fence;
-		};
-
-		class WaitForBinaryFenceRunner final : public ISubmitJobRunner
-		{
-		public:
-			explicit WaitForBinaryFenceRunner(rkit::render::IBinaryGPUWaitableFence &fence, const rkit::render::PipelineStageMask_t &stagesToBlock);
-
-			rkit::Result RunBase(rkit::render::IBaseCommandQueue &commandQueue) override;
-
-		private:
-			rkit::render::IBinaryGPUWaitableFence &m_fence;
-			rkit::render::PipelineStageMask_t m_stagesToBlock;
 		};
 
 		class CloseFrameRecordRunner final : public IGraphicsRecordJobRunner_t
@@ -1402,30 +1378,6 @@ namespace anox
 	{
 		m_stack = GraphicTimelinedResourceStack();
 		return rkit::ResultCode::kOK;
-	}
-
-	GraphicsSubsystem::SignalBinaryFenceRunner::SignalBinaryFenceRunner(rkit::render::IBinaryGPUWaitableFence &fence)
-		: m_fence(fence)
-	{
-	}
-
-	rkit::Result GraphicsSubsystem::SignalBinaryFenceRunner::RunBase(rkit::render::IBaseCommandQueue &commandQueue)
-	{
-		RKIT_CHECK(commandQueue.QueueSignalBinaryGPUWaitable(m_fence));
-		RKIT_CHECK(commandQueue.Flush());
-
-		return rkit::ResultCode::kOK;
-	}
-
-	GraphicsSubsystem::WaitForBinaryFenceRunner::WaitForBinaryFenceRunner(rkit::render::IBinaryGPUWaitableFence &fence, const rkit::render::PipelineStageMask_t &stagesToBlock)
-		: m_fence(fence)
-		, m_stagesToBlock(stagesToBlock)
-	{
-	}
-
-	rkit::Result GraphicsSubsystem::WaitForBinaryFenceRunner::RunBase(rkit::render::IBaseCommandQueue &commandQueue)
-	{
-		return commandQueue.QueueWaitForBinaryGPUWaitable(m_fence, m_stagesToBlock);
 	}
 
 	GraphicsSubsystem::CloseFrameRecordRunner::CloseFrameRecordRunner(rkit::render::IBaseCommandBatch *&outBatchPtr, rkit::render::IBinaryGPUWaitableFence *asyncUploadFence)
@@ -3095,37 +3047,6 @@ namespace anox
 		RKIT_CHECK(rkit::New<RunSubmitJobRunner>(runSubmitJobRunner, std::move(jobRunner), *cmdListHandler.m_commandQueue));
 
 		return this->CreateAndQueueJob(outJob, queueType, std::move(runSubmitJobRunner), dependencies, &LogicalQueueBase::m_lastSubmitJob);
-	}
-
-	rkit::Result GraphicsSubsystem::QueueCrossQueueWait(LogicalQueueType queueToWaitForType, LogicalQueueType waitingQueueType, IBinaryGPUWaitableFenceFactory &fenceFactory)
-	{
-		FrameSyncPoint &syncPoint = m_syncPoints[m_currentSyncPoint];
-
-		LogicalQueueBase *waitForQueue = m_logicalQueues[static_cast<size_t>(queueToWaitForType)];
-		LogicalQueueBase *waitingQueue = m_logicalQueues[static_cast<size_t>(waitingQueueType)];
-
-		if (waitForQueue == waitingQueue)
-		{
-			// Queue waiting for itself
-			return rkit::ResultCode::kOK;
-		}
-
-		rkit::render::IBinaryGPUWaitableFence *fence = nullptr;
-		RKIT_CHECK(fenceFactory.CreateFence(fence));
-
-		rkit::UniquePtr<SignalBinaryFenceRunner> signalFenceRunner;
-		RKIT_CHECK(rkit::New<SignalBinaryFenceRunner>(signalFenceRunner, *fence));
-
-		rkit::RCPtr<rkit::Job> signalJob;
-		RKIT_CHECK(CreateAndQueueSubmitJob(&signalJob, queueToWaitForType, std::move(signalFenceRunner), rkit::JobDependencyList()));
-
-		rkit::render::PipelineStageMask_t stageMask({ rkit::render::PipelineStage::kTopOfPipe });
-
-		rkit::UniquePtr<WaitForBinaryFenceRunner> waitRunner;
-		RKIT_CHECK(rkit::New<WaitForBinaryFenceRunner>(waitRunner, *fence, stageMask));
-		RKIT_CHECK(CreateAndQueueSubmitJob(nullptr, waitingQueueType, std::move(waitRunner), signalJob));
-
-		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result GraphicsSubsystem::CreateAsyncCreateTextureJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<ITexture> &outTexture, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData, const rkit::JobDependencyList &dependencies)

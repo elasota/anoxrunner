@@ -139,7 +139,6 @@
     <ClCompile Include="AnoxCaptureHarness.cpp" />
     <ClCompile Include="AnoxCommandRegistry.cpp" />
     <ClCompile Include="AnoxCommandStack.cpp" />
-    <ClCompile Include="AnoxConfigSerializer.cpp" />
     <ClCompile Include="AnoxConfigurationSaver.cpp" />
     <ClCompile Include="AnoxConfigurationState.cpp" />
     <ClCompile Include="AnoxFileResource.cpp" />

@@ -57,9 +57,6 @@
     <ClCompile Include="AnoxKeybindManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="AnoxConfigSerializer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="AnoxGlobalVars.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

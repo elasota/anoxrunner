@@ -21,12 +21,7 @@ namespace rkit { namespace render { namespace vulkan
 	class VulkanQueueProxyBase : public IGraphicsComputeCommandQueue, public IInternalCommandQueue
 	{
 	public:
-		virtual Result Flush() = 0;
 		virtual uint32_t GetQueueFamily() const = 0;
-
-		virtual Result AddBinarySemaSignal(VkSemaphore sema) = 0;
-		virtual Result AddBinarySemaWait(VkSemaphore sema, VkPipelineStageFlags stageFlags) = 0;
-		virtual Result AddCommandList(VkCommandBuffer commandList) = 0;
 
 		virtual VkQueue GetVkQueue() const = 0;
 
