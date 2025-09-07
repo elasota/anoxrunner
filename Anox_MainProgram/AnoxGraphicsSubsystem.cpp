@@ -600,9 +600,6 @@ namespace anox
 
 			uint32_t m_arrayElement = 0;
 			uint32_t m_mipLevel = 0;
-			uint32_t m_blockCol = 0;
-			uint32_t m_blockRow = 0;
-			uint32_t m_blockDepthSlice = 0;
 
 			uint32_t m_blockWidth = 1;
 			uint32_t m_blockHeight = 1;
@@ -1799,58 +1796,21 @@ namespace anox
 			const uint32_t levelBlockRows = rkit::DivideRoundUp(levelHeight, m_blockHeight);
 			const uint32_t levelBlockDepthSlices = rkit::DivideRoundUp(levelDepth, m_blockDepth);
 
-			const uint32_t levelRowPitch = rkit::AlignUp<uint32_t>(levelBlockCols * blockSizeBytes, subsystem.m_asyncUploadHeapAlignment);
+			const uint32_t paddedLevelRowPitch = rkit::AlignUp<uint32_t>(levelBlockCols * blockSizeBytes, subsystem.m_asyncUploadHeapAlignment);
 
-			const uint32_t depthSliceSize = levelBlockCols * levelRowPitch;
+			const uint32_t paddedDepthSliceSize = levelBlockCols * paddedLevelRowPitch;
+			const uint32_t paddedLevelSize = paddedDepthSliceSize * levelBlockDepthSlices;
 
-			uint8_t copyAxisCount = 3;
-			if (m_blockRow != 0)
-				copyAxisCount = 2;
-			if (m_blockCol != 0)
-				copyAxisCount = 1;
-
-			if (copyAxisCount == 3)
+			// Vulkan is only guaranteed to support whole-mip-level copies, so we just do that exclusively
+			if (paddedLevelSize > lowContiguous)
 			{
-				if (depthSliceSize > lowContiguous)
+				if (paddedLevelSize > highContiguous)
+					return rkit::ResultCode::kOK;	// Not enough space
+				else
 				{
-					if (depthSliceSize > highContiguous)
-						copyAxisCount = 2;
-					else
-					{
-						subsystem.ConsumeAsyncUploadSpace(lowContiguous);
-						lowContiguous = highContiguous;
-					}
-				}
-			}
-
-			if (copyAxisCount == 2)
-			{
-				if (levelRowPitch > lowContiguous)
-				{
-					if (levelRowPitch > highContiguous)
-						copyAxisCount = 1;
-					else
-					{
-						subsystem.ConsumeAsyncUploadSpace(lowContiguous);
-						lowContiguous = highContiguous;
-					}
-				}
-			}
-
-			if (copyAxisCount == 1)
-			{
-				if (blockSizeBytes > lowContiguous)
-				{
-					if (blockSizeBytes > highContiguous)
-					{
-						// Not enough buffer to copy anything
-						return rkit::ResultCode::kOK;
-					}
-					else
-					{
-						subsystem.ConsumeAsyncUploadSpace(lowContiguous);
-						lowContiguous = highContiguous;
-					}
+					subsystem.ConsumeAsyncUploadSpace(lowContiguous);
+					lowContiguous = highContiguous;
+					highContiguous = 0;
 				}
 			}
 
@@ -1858,116 +1818,38 @@ namespace anox
 			BufferToTextureCopyAction texCopyAction = {};
 
 			memCpyAction.m_start = textureDataStart + m_textureDataOffset;
-			memCpyAction.m_rowInPitch = levelWidth * blockSizeBytes;
-			memCpyAction.m_rowOutPitch = levelRowPitch;
+			memCpyAction.m_rowInPitch = levelBlockCols * blockSizeBytes;
+			memCpyAction.m_rowOutPitch = paddedLevelRowPitch;
+			memCpyAction.m_rowCount = levelBlockRows * levelBlockDepthSlices;
+			memCpyAction.m_rowSizeBytes = levelBlockCols * blockSizeBytes;
+			memCpyAction.m_destPosition = subsystem.m_asyncUploadHeap->GetRegion().GetPosition() + subsystem.m_asyncUploadHeapHighMark;
 
 			texCopyAction.m_buffer = subsystem.m_asyncUploadBuffer.Get();
 			texCopyAction.m_texture = m_texture;
 			texCopyAction.m_footprint.m_format = m_spec.m_format;
-			texCopyAction.m_destRect.m_x = m_blockCol * m_blockWidth;
-			texCopyAction.m_destRect.m_y = m_blockRow * m_blockHeight;
-			texCopyAction.m_destRect.m_z = m_blockDepthSlice * m_blockDepthSlice;
+			texCopyAction.m_destRect.m_x = 0;
+			texCopyAction.m_destRect.m_y = 0;
+			texCopyAction.m_destRect.m_z = 0;
 			texCopyAction.m_arrayElement = m_arrayElement;
 			texCopyAction.m_mipLevel = m_mipLevel;
 			texCopyAction.m_imageLayout = rkit::render::ImageLayout::CopyDst;
 			texCopyAction.m_imagePlane = rkit::render::ImagePlane::kColor;
-
-			// At this point, there is definitely enough room to copy
-
-			// Fields to fill for:
-			// memCpyAction:
-			//     m_rowCount
-			//     m_rowSizeBytes
-			//     (m_destPosition will be applied after)
-			// texCopyAction:
-			//     (m_footprint.m_bufferOffset will be applied after)
-			//     m_footprint.m_width
-			//     m_footprint.m_height
-			//     m_footprint.m_depth
-			//     m_footprint.m_rowPitch
-			//     m_destRect.m_width
-			//     m_destRect.m_height
-			//     m_destRect.m_depth
-			bool finishedWithMipLevel = false;
-
-			uint32_t axisCopyAmount = 0;
-
-			switch (copyAxisCount)
-			{
-			case 3:
-				axisCopyAmount = rkit::Min<uint32_t>(levelBlockDepthSlices - m_blockDepthSlice, lowContiguous / depthSliceSize);
-				memCpyAction.m_rowCount = axisCopyAmount * levelBlockRows;
-				memCpyAction.m_rowSizeBytes = levelBlockCols * blockSizeBytes;
-
-				texCopyAction.m_footprint.m_width = levelBlockCols * m_blockWidth;
-				texCopyAction.m_footprint.m_height = levelBlockRows * m_blockHeight;
-				texCopyAction.m_footprint.m_depth = axisCopyAmount * m_blockDepth;
-				texCopyAction.m_footprint.m_rowPitch = levelRowPitch;
-				break;
-			case 2:
-				axisCopyAmount = rkit::Min<uint32_t>(levelBlockRows - m_blockRow, lowContiguous / levelRowPitch);
-				memCpyAction.m_rowCount = 1;
-				memCpyAction.m_rowSizeBytes = axisCopyAmount * blockSizeBytes;
-
-				texCopyAction.m_footprint.m_width = axisCopyAmount * m_blockWidth;
-				texCopyAction.m_footprint.m_height = m_blockHeight;
-				texCopyAction.m_footprint.m_depth = m_blockDepth;
-				texCopyAction.m_footprint.m_rowPitch = levelRowPitch;
-				break;
-			case 1:
-				axisCopyAmount = rkit::Min<uint32_t>(levelBlockCols - m_blockCol, lowContiguous / blockSizeBytes);
-				memCpyAction.m_rowCount = 1;
-				memCpyAction.m_rowSizeBytes = levelBlockCols * blockSizeBytes;
-
-				texCopyAction.m_footprint.m_width = levelBlockCols * m_blockWidth;
-				texCopyAction.m_footprint.m_height = m_blockHeight;
-				texCopyAction.m_footprint.m_depth = m_blockDepth;
-				texCopyAction.m_footprint.m_rowPitch = levelRowPitch;
-				break;
-			default:
-				return rkit::ResultCode::kInternalError;
-			}
-
-			const uint32_t inputBytesConsumed = memCpyAction.m_rowSizeBytes * memCpyAction.m_rowCount;
-
-			memCpyAction.m_destPosition = subsystem.m_asyncUploadHeap->GetRegion().GetPosition() + subsystem.m_asyncUploadHeapHighMark;
 			texCopyAction.m_footprint.m_bufferOffset = subsystem.m_asyncUploadHeapHighMark;
-			texCopyAction.m_destRect.m_width = rkit::Min(texCopyAction.m_footprint.m_width, levelWidth - static_cast<uint32_t>(texCopyAction.m_destRect.m_x));
-			texCopyAction.m_destRect.m_height = rkit::Min(texCopyAction.m_footprint.m_height, levelHeight - static_cast<uint32_t>(texCopyAction.m_destRect.m_y));
-			texCopyAction.m_destRect.m_depth = rkit::Min(texCopyAction.m_footprint.m_depth, levelDepth - static_cast<uint32_t>(texCopyAction.m_destRect.m_z));
+			texCopyAction.m_footprint.m_width = levelBlockCols * m_blockWidth;
+			texCopyAction.m_footprint.m_height = levelBlockRows * m_blockHeight;
+			texCopyAction.m_footprint.m_depth = levelBlockDepthSlices * m_blockDepth;
+			texCopyAction.m_footprint.m_rowPitch = paddedLevelRowPitch;
+			texCopyAction.m_destRect.m_width = rkit::Min(texCopyAction.m_footprint.m_width, levelWidth);
+			texCopyAction.m_destRect.m_height = rkit::Min(texCopyAction.m_footprint.m_height, levelHeight);
+			texCopyAction.m_destRect.m_depth = rkit::Min(texCopyAction.m_footprint.m_depth, levelDepth);
 
-			subsystem.ConsumeAsyncUploadSpace(inputBytesConsumed);
-			m_textureDataOffset += inputBytesConsumed;
+			subsystem.ConsumeAsyncUploadSpace(memCpyAction.m_rowOutPitch * memCpyAction.m_rowCount);
+			m_textureDataOffset += memCpyAction.m_rowInPitch * memCpyAction.m_rowCount;
 
 			RKIT_CHECK(actionSet.m_bufferToTextureCopy.Append(texCopyAction));
 			RKIT_CHECK(actionSet.m_stripedMemCpy.Append(memCpyAction));
 
-			if (copyAxisCount == 1)
-				m_blockCol += axisCopyAmount;
-
-			if (m_blockCol == levelBlockCols)
-			{
-				m_blockCol = 0;
-				m_blockRow++;
-			}
-
-			if (copyAxisCount == 2)
-				m_blockRow += axisCopyAmount;
-
-			if (m_blockRow == levelBlockRows)
-			{
-				m_blockRow = 0;
-				m_blockDepthSlice++;
-			}
-
-			if (copyAxisCount == 3)
-				m_blockDepthSlice += axisCopyAmount;
-
-			if (m_blockDepthSlice == levelBlockDepthSlices)
-			{
-				m_blockDepthSlice = 0;
-				m_mipLevel++;
-			}
+			m_mipLevel++;
 
 			if (m_mipLevel == m_spec.m_mipLevels)
 			{
