@@ -1,5 +1,6 @@
 #include "AnoxBSPMapCompiler.h"
 
+#include "AnoxEntityDefCompiler.h"
 #include "AnoxMaterialCompiler.h"
 
 #include "anox/AnoxModule.h"
@@ -18,6 +19,8 @@
 #include "rkit/Data/DDSFile.h"
 
 #include "rkit/Math/SoftFloat.h"
+
+#include "anox/UtilitiesDriver.h"
 
 
 #include <cmath>
@@ -203,6 +206,7 @@ namespace anox { namespace buildsystem
 		rkit::Vector<BSPPlane> m_planes;
 		rkit::Vector<BSPBrush> m_brushes;
 		rkit::Vector<BSPBrushSide> m_brushSides;
+		rkit::Vector<char> m_entityData;
 	};
 
 	struct BSPHeader
@@ -399,6 +403,9 @@ namespace anox { namespace buildsystem
 		uint32_t GetVersion() const override;
 
 		static rkit::Result FormatWorldMaterialPath(rkit::String &str, const rkit::StringSliceView &textureName);
+
+	private:
+		static rkit::Result CompileEntityData(data::BSPDataChunks &bspData, const rkit::ConstSpan<char> &entityData, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 	};
 
 	class BSPLightingCompiler final : public BSPMapCompilerBase2
@@ -506,6 +513,8 @@ namespace anox { namespace buildsystem
 		}
 
 		RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kBSPGeometryID, rkit::buildsystem::BuildFileLocation::kSourceDir, depsNode->GetIdentifier()));
+
+		RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kEntityDefNodeID, rkit::buildsystem::BuildFileLocation::kOutputFiles, EntityDefCompilerBase::GetEDefFilePath()));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -2703,9 +2712,18 @@ namespace anox { namespace buildsystem
 
 	rkit::Result BSPMapCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
+		BSPDataCollection bsp;
+
+		rkit::Vector<LumpLoader> loaders;
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kEntities, bsp.m_entityData)));
+
+		RKIT_CHECK(LoadBSPData(depsNode, feedback, bsp, loaders));
+
 		rkit::Vector<rkit::CIPath> uniqueTextures;
 
 		data::BSPDataChunks bspData;
+
+		RKIT_CHECK(CompileEntityData(bspData, bsp.m_entityData.ToSpan(), feedback));
 
 		{
 			rkit::String inPathStr;
@@ -2947,9 +2965,16 @@ namespace anox { namespace buildsystem
 		return true;
 	}
 
+	rkit::Result BSPMapCompiler::CompileEntityData(data::BSPDataChunks &bspData, const rkit::ConstSpan<char> &entityData, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		IUtilitiesDriver *utilsDriver = static_cast<IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, "Utilities"));
+
+		return rkit::ResultCode::kNotYetImplemented;
+	}
+
 	uint32_t BSPMapCompiler::GetVersion() const
 	{
-		return 6;
+		return 7;
 	}
 
 	rkit::Result BSPMapCompiler::FormatWorldMaterialPath(rkit::String &str, const rkit::StringSliceView &textureName)

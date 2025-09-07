@@ -137,11 +137,13 @@
   <ItemGroup>
     <ClCompile Include="AnoxAFSArchive.cpp" />
     <ClCompile Include="AnoxDataBuilder.cpp" />
+    <ClCompile Include="AnoxEntityDefs.cpp" />
     <ClCompile Include="AnoxUtilities.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AnoxAFSArchive.h" />
     <ClInclude Include="AnoxDataBuilder.h" />
+    <ClInclude Include="AnoxEntityDefs.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

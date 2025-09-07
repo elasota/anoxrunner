@@ -195,7 +195,6 @@ namespace rkit { namespace endian
 	template<class THelper>
 	SwappableNumber<THelper>::SwappableNumber()
 	{
-		THelper::SetValue(m_bytes, 0);
 	}
 
 	template<class THelper>

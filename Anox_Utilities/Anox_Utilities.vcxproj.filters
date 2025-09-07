@@ -24,12 +24,18 @@
     <ClCompile Include="AnoxDataBuilder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="AnoxEntityDefs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AnoxAFSArchive.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="AnoxDataBuilder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="AnoxEntityDefs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -869,7 +869,7 @@ namespace anox { namespace buildsystem
 	{
 		struct DeduplicatedContentID
 		{
-			rkit::data::ContentID m_contentID;
+			rkit::data::ContentID m_contentID = {};
 			size_t m_uniqueIndex = 0;
 		};
 

@@ -14,6 +14,7 @@
 #include "rkit/Render/BackendType.h"
 
 #include "AnoxBSPMapCompiler.h"
+#include "AnoxEntityDefCompiler.h"
 #include "AnoxMaterialCompiler.h"
 #include "AnoxTextureCompiler.h"
 
@@ -113,6 +114,13 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 		RKIT_CHECK(buildsystem::BSPMapCompilerBase::CreateGeometryCompiler(bspGeoCompiler));
 
 		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kBSPGeometryID, std::move(bspGeoCompiler)));
+	}
+
+	{
+		rkit::UniquePtr<buildsystem::EntityDefCompilerBase> entityDefCompiler;
+		RKIT_CHECK(buildsystem::EntityDefCompilerBase::Create(entityDefCompiler));
+
+		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kEntityDefNodeID, std::move(entityDefCompiler)));
 	}
 
 	RKIT_CHECK(instance->RegisterNodeTypeByExtension("cfg", rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kCopyFileNodeID));

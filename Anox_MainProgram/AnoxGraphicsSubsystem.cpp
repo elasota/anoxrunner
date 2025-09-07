@@ -1878,8 +1878,6 @@ namespace anox
 	{
 		if (m_doneSignaller.IsValid())
 			m_doneSignaller->SignalDone(rkit::ResultCode::kOK);
-
-		// FIXME FIXME FIXME touch the 
 	}
 
 
