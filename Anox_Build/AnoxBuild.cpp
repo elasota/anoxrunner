@@ -117,6 +117,13 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 	}
 
 	{
+		rkit::UniquePtr<buildsystem::BSPMapCompilerBase> bspEntCompiler;
+		RKIT_CHECK(buildsystem::BSPMapCompilerBase::CreateEntityCompiler(bspEntCompiler));
+
+		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kBSPEntityID, std::move(bspEntCompiler)));
+	}
+
+	{
 		rkit::UniquePtr<buildsystem::EntityDefCompilerBase> entityDefCompiler;
 		RKIT_CHECK(buildsystem::EntityDefCompilerBase::Create(entityDefCompiler));
 

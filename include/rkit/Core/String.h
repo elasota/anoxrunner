@@ -131,6 +131,8 @@ namespace rkit
 
 		Result VFormat(const BaseStringSliceView<TChar, TEncoding> &fmt, const FormatParameterList<TChar> &formatParams);
 
+		Ordering Compare(const BaseStringSliceView<TChar, TEncoding> &other) const;
+
 	private:
 		bool IsStaticString() const;
 		void CopyStaticStringFromOther(const BaseString &other);
@@ -534,6 +536,13 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::VFormat(const Base
 
 	return ResultCode::kOK;
 }
+
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::Ordering rkit::BaseString<TChar, TEncoding, TStaticSize>::Compare(const BaseStringSliceView<TChar, TEncoding> &other) const
+{
+	return static_cast<BaseStringSliceView<TChar, TEncoding>>(*this).Compare(other);
+}
+
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
 const TChar *rkit::BaseString<TChar, TEncoding, TStaticSize>::CStr() const

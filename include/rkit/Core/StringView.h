@@ -251,7 +251,7 @@ bool rkit::BaseStringSliceView<TChar, TEncoding>::EndsWith(const BaseStringSlice
 
 	for (size_t i = 0; i < cmpLength; i++)
 	{
-		if (TComparer::Compare(thisChars[i], otherChars[i]) != 0)
+		if (TComparer::Compare(thisChars[i], otherChars[i]) != Ordering::kEqual)
 			return false;
 	}
 
@@ -283,7 +283,7 @@ bool rkit::BaseStringSliceView<TChar, TEncoding>::Equals(const BaseStringSliceVi
 
 	for (size_t i = 0; i < cmpLength; i++)
 	{
-		if (TComparer::Compare(thisChars[i], otherChars[i]) != 0)
+		if (TComparer::Compare(thisChars[i], otherChars[i]) != Ordering::kEqual)
 			return false;
 	}
 

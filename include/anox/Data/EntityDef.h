@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rkit/Core/Endian.h"
+#include "rkit/Core/FourCC.h"
 
 namespace anox { namespace data {
 	enum class EntityFieldType
@@ -27,6 +28,8 @@ namespace anox { namespace data {
 	{
 		const EntityClassDef *m_parent;
 
+		uint32_t m_entityClassIndex;
+
 		const char *m_name;
 		size_t m_nameLength;
 
@@ -40,6 +43,9 @@ namespace anox { namespace data {
 	{
 		const EntityClassDef *const *m_classDefs;
 		size_t m_numClassDefs;
+
+		const char *const *m_badClassDefs;
+		size_t m_numBadClassDefs;
 	};
 
 	enum class UserEntityType
@@ -97,5 +103,20 @@ namespace anox { namespace data {
 		rkit::endian::LittleUInt32_t m_miscValue;
 		rkit::endian::LittleUInt32_t m_startSequenceID;
 		rkit::endian::LittleUInt16_t m_descriptionStringID;
+	};
+
+	struct UserEntityDefHeader
+	{
+		static const uint32_t kExpectedMagic = RKIT_FOURCC('U', 'E', 'D', 'F');
+		static const uint32_t kExpectedVersion = 1;
+
+		rkit::endian::BigUInt32_t m_magic;
+		rkit::endian::LittleUInt32_t m_version;
+
+		rkit::endian::LittleUInt16_t m_numStrings;
+		rkit::endian::LittleUInt32_t m_numEDefs;
+
+		// uint8_t m_stringLengthsMinusOne[m_numStrings]
+		// UserEntityDef m_eDefs
 	};
 } }

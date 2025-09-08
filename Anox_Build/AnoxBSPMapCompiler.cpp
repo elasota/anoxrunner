@@ -3,9 +3,6 @@
 #include "AnoxEntityDefCompiler.h"
 #include "AnoxMaterialCompiler.h"
 
-#include "anox/AnoxModule.h"
-#include "anox/Data/BSPModel.h"
-
 #include "rkit/Core/BoolVector.h"
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/LogDriver.h"
@@ -20,6 +17,10 @@
 
 #include "rkit/Math/SoftFloat.h"
 
+#include "anox/Data/EntityDef.h"
+#include "anox/Data/BSPModel.h"
+
+#include "anox/AnoxModule.h"
 #include "anox/UtilitiesDriver.h"
 
 
@@ -403,9 +404,6 @@ namespace anox { namespace buildsystem
 		uint32_t GetVersion() const override;
 
 		static rkit::Result FormatWorldMaterialPath(rkit::String &str, const rkit::StringSliceView &textureName);
-
-	private:
-		static rkit::Result CompileEntityData(data::BSPDataChunks &bspData, const rkit::ConstSpan<char> &entityData, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 	};
 
 	class BSPLightingCompiler final : public BSPMapCompilerBase2
@@ -428,6 +426,45 @@ namespace anox { namespace buildsystem
 		rkit::Result RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
 
 		uint32_t GetVersion() const override;
+	};
+
+	class BSPEntityCompiler final : public BSPMapCompilerBase2
+	{
+	public:
+		bool HasAnalysisStage() const override;
+
+		rkit::Result RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
+		rkit::Result RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
+
+		uint32_t GetVersion() const override;
+
+	private:
+		struct IEntityDataHandler
+		{
+			typedef rkit::ConstSpan<rkit::Pair<rkit::AsciiString, rkit::AsciiString>> PropertySpan_t;
+
+			virtual rkit::Result ParseBuiltinEntity(const data::EntityClassDef &classDef, const PropertySpan_t &properties) = 0;
+			virtual rkit::Result ParseUserEntity(const rkit::AsciiString &className, const PropertySpan_t &properties) = 0;
+		};
+
+		class EntityAnalysisHandler final : public IEntityDataHandler
+		{
+		public:
+
+			EntityAnalysisHandler(const UserEntityDictionaryBase &dict, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+
+			rkit::Result ParseBuiltinEntity(const data::EntityClassDef &classDef, const PropertySpan_t &properties) override;
+			rkit::Result ParseUserEntity(const rkit::AsciiString &className, const PropertySpan_t &properties) override;
+
+		private:
+			const UserEntityDictionaryBase &m_dict;
+			rkit::buildsystem::IDependencyNodeCompilerFeedback *m_feedback;
+		};
+
+		static rkit::Result ParseEntityData(const rkit::ConstSpan<char> &entityData, IEntityDataHandler &handler);
+
+		static void SkipWhitespace(rkit::ConstSpan<char> &span);
+		static rkit::Result ParseQuotedString(rkit::ConstSpan<char> &span, rkit::AsciiString &outString);
 	};
 
 
@@ -514,7 +551,7 @@ namespace anox { namespace buildsystem
 
 		RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kBSPGeometryID, rkit::buildsystem::BuildFileLocation::kSourceDir, depsNode->GetIdentifier()));
 
-		RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kEntityDefNodeID, rkit::buildsystem::BuildFileLocation::kOutputFiles, EntityDefCompilerBase::GetEDefFilePath()));
+		RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kBSPEntityID, rkit::buildsystem::BuildFileLocation::kSourceDir, depsNode->GetIdentifier()));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -747,6 +784,198 @@ namespace anox { namespace buildsystem
 	uint32_t BSPGeometryCompiler::GetVersion() const
 	{
 		return 1;
+	}
+
+	BSPEntityCompiler::EntityAnalysisHandler::EntityAnalysisHandler(const UserEntityDictionaryBase &dict, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+		: m_dict(dict)
+		, m_feedback(feedback)
+	{
+	}
+
+	rkit::Result BSPEntityCompiler::EntityAnalysisHandler::ParseBuiltinEntity(const data::EntityClassDef &classDef, const PropertySpan_t &properties)
+	{
+		// Ignore in analysis phase
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result BSPEntityCompiler::EntityAnalysisHandler::ParseUserEntity(const rkit::AsciiString &className, const PropertySpan_t &properties)
+	{
+		uint32_t edefID = 0;
+		if (!m_dict.FindEntityDef(className, edefID))
+		{
+			rkit::log::ErrorFmt("Unknown entity class {}", className.CStr());
+			return rkit::ResultCode::kDataError;
+		}
+
+		rkit::String edefIdentifier;
+		RKIT_CHECK(EntityDefCompilerBase::FormatEDef(edefIdentifier, edefID));
+
+		RKIT_CHECK(m_feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kEntityDefNodeID, rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefIdentifier));
+
+		return rkit::ResultCode::kOK;
+	}
+
+	bool BSPEntityCompiler::HasAnalysisStage() const
+	{
+		return true;
+	}
+
+	rkit::Result BSPEntityCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		rkit::UniquePtr<UserEntityDictionaryBase> dictionary;
+		RKIT_CHECK(EntityDefCompilerBase::LoadUserEntityDictionary(dictionary, feedback));
+
+		BSPDataCollection bsp;
+
+		rkit::Vector<LumpLoader> loaders;
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kEntities, bsp.m_entityData)));
+
+		RKIT_CHECK(LoadBSPData(depsNode, feedback, bsp, loaders));
+
+		EntityAnalysisHandler handler(*dictionary, feedback);
+
+		RKIT_CHECK(ParseEntityData(bsp.m_entityData.ToSpan(), handler));
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result BSPEntityCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		return rkit::ResultCode::kNotYetImplemented;
+	}
+
+	uint32_t BSPEntityCompiler::GetVersion() const
+	{
+		return 1;
+	}
+
+	rkit::Result BSPEntityCompiler::ParseEntityData(const rkit::ConstSpan<char> &entityDataRef, IEntityDataHandler &handler)
+	{
+		anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, "Utilities"));
+
+		const data::EntityDefsSchema &schema = anoxUtils->GetEntityDefs();
+
+		const rkit::ConstSpan<const anox::data::EntityClassDef *> classDefs(schema.m_classDefs, schema.m_numClassDefs);
+
+		rkit::ConstSpan<char> entityData = entityDataRef;
+
+		for (;;)
+		{
+			SkipWhitespace(entityData);
+			if (entityData.Count() == 0)
+				break;
+
+			if (entityData[0] != '{')
+				return rkit::ResultCode::kDataError;
+
+			entityData = entityData.SubSpan(1);
+
+			rkit::Vector<rkit::Pair<rkit::AsciiString, rkit::AsciiString>> keyValuePairs;
+
+			for (;;)
+			{
+				SkipWhitespace(entityData);
+				if (entityData.Count() == 0)
+					return rkit::ResultCode::kDataError;
+
+				if (entityData[0] == '}')
+				{
+					entityData = entityData.SubSpan(1);
+					break;
+				}
+
+
+				rkit::AsciiString keyString;
+				rkit::AsciiString valueString;
+
+				RKIT_CHECK(ParseQuotedString(entityData, keyString));
+
+				SkipWhitespace(entityData);
+				RKIT_CHECK(ParseQuotedString(entityData, valueString));
+
+				RKIT_CHECK(keyValuePairs.Append(rkit::Pair<rkit::AsciiString, rkit::AsciiString>(std::move(keyString), std::move(valueString))));
+			}
+
+			rkit::Optional<rkit::AsciiString> classname;
+			for (size_t i = 0; i < keyValuePairs.Count(); i++)
+			{
+				if (keyValuePairs[i].GetAt<0>() == "classname")
+				{
+					classname = std::move(keyValuePairs[i].GetAt<1>());
+
+					keyValuePairs.RemoveRange(i, 1);
+					break;
+				}
+			}
+
+			if (!classname.IsSet())
+				return rkit::ResultCode::kDataError;
+
+			bool isUserClass = true;
+			for (const anox::data::EntityClassDef *classDef : classDefs)
+			{
+				if (classname.Get() == rkit::AsciiStringSliceView(classDef->m_name, classDef->m_nameLength))
+				{
+					RKIT_CHECK(handler.ParseBuiltinEntity(*classDef, keyValuePairs.ToSpan()));
+
+					isUserClass = false;
+					break;
+				}
+			}
+
+			bool isBadClass = false;
+			if (isUserClass)
+			{
+				for (const char *badClass : rkit::ConstSpan<const char *>(schema.m_badClassDefs, schema.m_numBadClassDefs))
+				{
+					if (classname.Get() == rkit::AsciiStringView::FromCString(badClass))
+					{
+						isBadClass = true;
+						break;
+					}
+				}
+			}
+
+			if (isUserClass && !isBadClass)
+			{
+				RKIT_CHECK(handler.ParseUserEntity(classname.Get(), keyValuePairs.ToSpan()));
+			}
+		}
+
+		return rkit::ResultCode::kOK;
+	}
+
+	void BSPEntityCompiler::SkipWhitespace(rkit::ConstSpan<char> &span)
+	{
+		while (span.Count() > 0 && rkit::IsASCIIWhitespace(span[0]))
+		{
+			span = span.SubSpan(1);
+		}
+	}
+
+	rkit::Result BSPEntityCompiler::ParseQuotedString(rkit::ConstSpan<char> &span, rkit::AsciiString &outString)
+	{
+		if (span.Count() == 0 || span[0] != '\"')
+			return rkit::ResultCode::kDataError;
+
+		span = span.SubSpan(1);
+		size_t spanLength = 0;
+		while (spanLength < span.Count())
+		{
+			if (span[spanLength] == '\"')
+				break;
+
+			spanLength++;
+		}
+
+		if (spanLength == span.Count())
+			return rkit::ResultCode::kDataError;
+
+		const rkit::ConstSpan<char> stringSpan = span.SubSpan(0, spanLength);
+
+		span = span.SubSpan(spanLength + 1);
+
+		return outString.Set(stringSpan);
 	}
 
 	template<class TStructure>
@@ -2712,18 +2941,9 @@ namespace anox { namespace buildsystem
 
 	rkit::Result BSPMapCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
-		BSPDataCollection bsp;
-
-		rkit::Vector<LumpLoader> loaders;
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kEntities, bsp.m_entityData)));
-
-		RKIT_CHECK(LoadBSPData(depsNode, feedback, bsp, loaders));
-
 		rkit::Vector<rkit::CIPath> uniqueTextures;
 
 		data::BSPDataChunks bspData;
-
-		RKIT_CHECK(CompileEntityData(bspData, bsp.m_entityData.ToSpan(), feedback));
 
 		{
 			rkit::String inPathStr;
@@ -2965,13 +3185,6 @@ namespace anox { namespace buildsystem
 		return true;
 	}
 
-	rkit::Result BSPMapCompiler::CompileEntityData(data::BSPDataChunks &bspData, const rkit::ConstSpan<char> &entityData, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
-	{
-		IUtilitiesDriver *utilsDriver = static_cast<IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, "Utilities"));
-
-		return rkit::ResultCode::kNotYetImplemented;
-	}
-
 	uint32_t BSPMapCompiler::GetVersion() const
 	{
 		return 7;
@@ -3031,6 +3244,16 @@ namespace anox { namespace buildsystem
 	{
 		rkit::UniquePtr<BSPGeometryCompiler> bspMapCompiler;
 		RKIT_CHECK(rkit::New<BSPGeometryCompiler>(bspMapCompiler));
+
+		outCompiler = std::move(bspMapCompiler);
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result BSPMapCompilerBase::CreateEntityCompiler(rkit::UniquePtr<BSPMapCompilerBase> &outCompiler)
+	{
+		rkit::UniquePtr<BSPEntityCompiler> bspMapCompiler;
+		RKIT_CHECK(rkit::New<BSPEntityCompiler>(bspMapCompiler));
 
 		outCompiler = std::move(bspMapCompiler);
 

@@ -1,5 +1,6 @@
 #include "AnoxEntityDefCompiler.h"
 
+#include "rkit/Core/QuickSort.h"
 #include "rkit/Core/Algorithm.h"
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/Stream.h"
@@ -8,6 +9,37 @@
 #include "anox/Data/EntityDef.h"
 
 namespace anox { namespace buildsystem {
+	struct UserEntityDef2
+	{
+		rkit::AsciiString m_className;
+		rkit::AsciiString m_modelPath;
+		uint32_t m_modelCode = 0;
+		float m_scale[3] = { 0, 0, 0 };
+		uint8_t m_userEntityType = 0;
+		uint8_t m_shadowType = 0;
+		float m_bboxMin[3] = { 0, 0, 0 };
+		float m_bboxMax[3] = { 0, 0, 0 };
+		uint8_t m_flags = 0;
+		float m_walkSpeed;
+		float m_runSpeed;
+		float m_speed;
+		Label m_targetSequence;
+		rkit::endian::LittleUInt32_t m_miscValue;
+		Label m_startSequence;
+		rkit::AsciiString m_description;
+	};
+
+	class UserEntityDictionary final : public UserEntityDictionaryBase
+	{
+	public:
+		explicit UserEntityDictionary(rkit::Vector<UserEntityDef2> &&edefs);
+		bool FindEntityDef(const rkit::AsciiString &name, uint32_t &outEDefID) const override;
+
+	private:
+		rkit::Vector<UserEntityDef2> m_defs;
+	};
+
+
 	class EntityDefCompiler final : public EntityDefCompilerBase
 	{
 	public:
@@ -16,14 +48,50 @@ namespace anox { namespace buildsystem {
 		rkit::Result RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
 		rkit::Result RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
 
-		static rkit::StringView GetEDefFilePath();
-
 		uint32_t GetVersion() const override;
+
+		static rkit::Result ParseLabel(const rkit::ConstSpan<char> &span, Label &outLabel);
 
 	private:
 		static rkit::Result IndexString(rkit::Vector<rkit::AsciiString> &strings, rkit::HashMap<rkit::AsciiString, uint16_t> &stringToIndex, const rkit::AsciiString &str, uint16_t &outIndex);
-		static rkit::Result ParseLabel(const rkit::ConstSpan<char> &span, Label &outLabel);
 	};
+
+	UserEntityDictionary::UserEntityDictionary(rkit::Vector<UserEntityDef2> &&edefs)
+		: m_defs(std::move(edefs))
+	{
+		rkit::QuickSort(m_defs.begin(), m_defs.end(), [](const UserEntityDef2 &a, const UserEntityDef2 &b)
+			{
+				return a.m_className < b.m_className;
+			});
+	}
+
+	bool UserEntityDictionary::FindEntityDef(const rkit::AsciiString &name, uint32_t &outEDefID) const
+	{
+		size_t minInclusive = 0;
+		size_t maxExclusive = m_defs.Count();
+
+		while (minInclusive != maxExclusive)
+		{
+			const size_t testIndex = (minInclusive + maxExclusive) / 2;
+
+			rkit::Ordering ordering = m_defs[testIndex].m_className.Compare(name);
+			if (ordering == rkit::Ordering::kEqual)
+			{
+				outEDefID = static_cast<uint32_t>(testIndex);
+				return true;
+			}
+
+			if (ordering == rkit::Ordering::kGreater)
+				maxExclusive = testIndex;
+			else
+			{
+				RKIT_ASSERT(ordering == rkit::Ordering::kLess);
+				minInclusive = testIndex + 1;
+			}
+		}
+
+		return false;
+	}
 
 	bool EntityDefCompiler::HasAnalysisStage() const
 	{
@@ -36,6 +104,96 @@ namespace anox { namespace buildsystem {
 	}
 
 	rkit::Result EntityDefCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		return rkit::ResultCode::kNotYetImplemented;
+	}
+
+	rkit::Result EntityDefCompiler::IndexString(rkit::Vector<rkit::AsciiString> &strings, rkit::HashMap<rkit::AsciiString, uint16_t> &stringToIndex, const rkit::AsciiString &str, uint16_t &outIndex)
+	{
+		if (str.Length() > 256)
+			return rkit::ResultCode::kDataError;
+
+		rkit::HashValue_t hash = rkit::Hasher<rkit::AsciiString>::ComputeHash(0, str);
+		rkit::HashMap<rkit::AsciiString, uint16_t>::ConstIterator_t it = stringToIndex.FindPrehashed(hash, str);
+		if (it == stringToIndex.end())
+		{
+			const uint16_t stringIndex = static_cast<uint16_t>(strings.Count());
+
+			if (stringIndex == std::numeric_limits<uint16_t>::max())
+				return rkit::ResultCode::kDataError;
+
+			RKIT_CHECK(strings.Append(str));
+			RKIT_CHECK(stringToIndex.SetPrehashed(hash, str, stringIndex));
+
+			outIndex = stringIndex;
+		}
+		else
+			outIndex = it.Value();
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result EntityDefCompiler::ParseLabel(const rkit::ConstSpan<char> &span, Label &outLabel)
+	{
+		rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
+
+		size_t dividerPos = 0;
+		bool foundDivider = false;
+
+		for (size_t i = 0; i < span.Count(); i++)
+		{
+			if (span[i] == ':')
+			{
+				if (foundDivider)
+					return rkit::ResultCode::kDataError;
+				else
+				{
+					dividerPos = i;
+					foundDivider = true;
+				}
+			}
+			else
+			{
+				if (span[i] < '0' || span[i] > '9')
+					return rkit::ResultCode::kDataError;
+			}
+		}
+
+		if (!foundDivider)
+		{
+			if (span.Count() == 1 && span[0] == '0')
+			{
+				// Deal with broken npc_rowdy_alien
+				outLabel = Label();
+				return rkit::ResultCode::kOK;
+			}
+
+			return rkit::ResultCode::kDataError;
+		}
+
+		uint32_t highPart = 0;
+		uint32_t lowPart = 0;
+		if (!utils->ParseUInt32(rkit::StringSliceView(span.SubSpan(0, dividerPos)), 10, highPart)
+			|| !utils->ParseUInt32(rkit::StringSliceView(span.SubSpan(dividerPos + 1)), 10, lowPart)
+			|| !Label::IsValid(highPart, lowPart))
+			return rkit::ResultCode::kDataError;
+
+		outLabel = Label(highPart, lowPart);
+
+		return rkit::ResultCode::kOK;
+	}
+
+	uint32_t EntityDefCompiler::GetVersion() const
+	{
+		return 1;
+	}
+
+	rkit::Result EntityDefCompilerBase::FormatEDef(rkit::String &edefIdentifier, uint32_t edefID)
+	{
+		return edefIdentifier.Format("edefs/edef{}", edefID);
+	}
+
+	rkit::Result EntityDefCompilerBase::LoadUserEntityDictionary(rkit::UniquePtr<UserEntityDictionaryBase> &outDictionary, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		rkit::UniquePtr<rkit::ISeekableReadStream> inFile;
 		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, "models/entity.dat", inFile));
@@ -56,7 +214,7 @@ namespace anox { namespace buildsystem {
 		rkit::Vector<rkit::AsciiString> strings;
 		rkit::HashMap<rkit::AsciiString, uint16_t> stringToIndex;
 
-		rkit::Vector<data::UserEntityDef> edefs;
+		rkit::Vector<UserEntityDef2> edefs;
 
 		rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
 
@@ -104,7 +262,7 @@ namespace anox { namespace buildsystem {
 				fragmentStart = fragmentEnd + 1;
 			}
 
-			anox::data::UserEntityDef edef;
+			UserEntityDef2 edef;
 
 			for (size_t realFragmentIndex = 0; realFragmentIndex < numFragments; realFragmentIndex++)
 			{
@@ -145,15 +303,12 @@ namespace anox { namespace buildsystem {
 						rkit::AsciiString str;
 						RKIT_CHECK(str.Set(fragment));
 
-						uint16_t stringIndex = 0;
-						RKIT_CHECK(IndexString(strings, stringToIndex, str, stringIndex));
-
-						if (fragmentIndex == 1)
-							edef.m_classNameStringID = stringIndex;
-						else if (fragmentIndex == 2)
-							edef.m_modelPathStringID = stringIndex;
+						if (fragmentIndex == 0)
+							edef.m_className = str;
+						else if (fragmentIndex == 1)
+							edef.m_modelPath = str;
 						else if (fragmentIndex == 23)
-							edef.m_descriptionStringID = stringIndex;
+							edef.m_description = str;
 					}
 					break;
 				case 2:
@@ -284,8 +439,7 @@ namespace anox { namespace buildsystem {
 				case 19:
 					{
 						Label label;
-						RKIT_CHECK(ParseLabel(fragment, label));
-						edef.m_targetSequenceID = label.RawValue();
+						RKIT_CHECK(EntityDefCompiler::ParseLabel(fragment, edef.m_targetSequence));
 					}
 					break;
 				case 20:
@@ -301,8 +455,7 @@ namespace anox { namespace buildsystem {
 						if (slice != "none")
 						{
 							Label label;
-							RKIT_CHECK(ParseLabel(fragment, label));
-							edef.m_startSequenceID = label.RawValue();
+							RKIT_CHECK(EntityDefCompiler::ParseLabel(fragment, edef.m_startSequence));
 						}
 					}
 					break;
@@ -314,91 +467,14 @@ namespace anox { namespace buildsystem {
 			RKIT_CHECK(edefs.Append(edef));
 		}
 
-		return rkit::ResultCode::kNotYetImplemented;
-	}
-
-	rkit::Result EntityDefCompiler::IndexString(rkit::Vector<rkit::AsciiString> &strings, rkit::HashMap<rkit::AsciiString, uint16_t> &stringToIndex, const rkit::AsciiString &str, uint16_t &outIndex)
-	{
-		if (str.Length() > 256)
-			return rkit::ResultCode::kDataError;
-
-		rkit::HashValue_t hash = rkit::Hasher<rkit::AsciiString>::ComputeHash(0, str);
-		rkit::HashMap<rkit::AsciiString, uint16_t>::ConstIterator_t it = stringToIndex.FindPrehashed(hash, str);
-		if (it == stringToIndex.end())
-		{
-			if (strings.Count() == std::numeric_limits<uint16_t>::max())
-				return rkit::ResultCode::kDataError;
-
-			const uint16_t stringIndex = static_cast<uint16_t>(strings.Count());
-			RKIT_CHECK(strings.Append(str));
-			RKIT_CHECK(stringToIndex.SetPrehashed(hash, str, stringIndex));
-
-			outIndex = stringIndex;
-		}
-		else
-			outIndex = it.Value();
+		RKIT_CHECK(rkit::New<UserEntityDictionary>(outDictionary, std::move(edefs)));
 
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result EntityDefCompiler::ParseLabel(const rkit::ConstSpan<char> &span, Label &outLabel)
+	rkit::StringView EntityDictCompilerBase::GetEDictFilePath()
 	{
-		rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
-
-		size_t dividerPos = 0;
-		bool foundDivider = false;
-
-		for (size_t i = 0; i < span.Count(); i++)
-		{
-			if (span[i] == ':')
-			{
-				if (foundDivider)
-					return rkit::ResultCode::kDataError;
-				else
-				{
-					dividerPos = i;
-					foundDivider = true;
-				}
-			}
-			else
-			{
-				if (span[i] < '0' || span[i] > '9')
-					return rkit::ResultCode::kDataError;
-			}
-		}
-
-		if (!foundDivider)
-		{
-			if (span.Count() == 1 && span[0] == '0')
-			{
-				// Deal with broken npc_rowdy_alien
-				outLabel = Label();
-				return rkit::ResultCode::kOK;
-			}
-
-			return rkit::ResultCode::kDataError;
-		}
-
-		uint32_t highPart = 0;
-		uint32_t lowPart = 0;
-		if (!utils->ParseUInt32(rkit::StringSliceView(span.SubSpan(0, dividerPos)), 10, highPart)
-			|| !utils->ParseUInt32(rkit::StringSliceView(span.SubSpan(dividerPos + 1)), 10, lowPart)
-			|| !Label::IsValid(highPart, lowPart))
-			return rkit::ResultCode::kDataError;
-
-		outLabel = Label(highPart, lowPart);
-
-		return rkit::ResultCode::kOK;
-	}
-
-	uint32_t EntityDefCompiler::GetVersion() const
-	{
-		return 1;
-	}
-
-	rkit::StringView EntityDefCompilerBase::GetEDefFilePath()
-	{
-		return "entities.edef";
+		return "entities.edict";
 	}
 
 	rkit::Result EntityDefCompilerBase::Create(rkit::UniquePtr<EntityDefCompilerBase> &outCompiler)

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Ordering.h"
+
 namespace rkit
 {
 	template<class TChar>
@@ -14,7 +16,7 @@ namespace rkit
 	class CharStrictComparer
 	{
 	public:
-		static int Compare(TChar a, TChar b);
+		static Ordering Compare(TChar a, TChar b);
 		static bool CompareEqual(TChar a, TChar b);
 	};
 
@@ -22,7 +24,7 @@ namespace rkit
 	class CharCaseInsensitiveComparer
 	{
 	public:
-		static int Compare(TChar a, TChar b);
+		static Ordering Compare(TChar a, TChar b);
 		static bool CompareEqual(TChar a, TChar b);
 	};
 }
@@ -47,13 +49,15 @@ TChar rkit::InvariantCharCaseAdjuster<TChar>::ToLower(TChar c)
 }
 
 template<class TChar>
-int rkit::CharStrictComparer<TChar>::Compare(TChar a, TChar b)
+rkit::Ordering rkit::CharStrictComparer<TChar>::Compare(TChar a, TChar b)
 {
 	if (a < b)
-		return -1;
+		return Ordering::kLess;
+		
 	if (a > b)
-		return 1;
-	return 0;
+		return Ordering::kGreater;
+
+	return Ordering::kEqual;
 }
 
 template<class TChar>
@@ -63,7 +67,7 @@ bool rkit::CharStrictComparer<TChar>::CompareEqual(TChar a, TChar b)
 }
 
 template<class TChar, class TCaseAdjuster>
-int rkit::CharCaseInsensitiveComparer<TChar, TCaseAdjuster>::Compare(TChar a, TChar b)
+rkit::Ordering rkit::CharCaseInsensitiveComparer<TChar, TCaseAdjuster>::Compare(TChar a, TChar b)
 {
 	a = TCaseAdjuster::ToLower(a);
 	b = TCaseAdjuster::ToLower(b);

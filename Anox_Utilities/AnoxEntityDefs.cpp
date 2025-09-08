@@ -48,6 +48,23 @@ namespace anox { namespace utils { namespace priv {
 #undef CLASS_BASE
 #undef END_CLASS
 
+// Class IDs
+#define FIELD_METADATA(name, eft, type)
+
+#define CLASS_BASE(name) \
+	kClassID_ ## name,
+
+#define END_CLASS
+
+	enum ClassIDs
+	{
+#include "anox/Data/EntityDefs.inl"
+	};
+
+#undef FIELD_METADATA
+#undef CLASS_BASE
+#undef END_CLASS
+
 // Field def array
 #define FIELD_METADATA(name, eft, type) \
 	{ \
@@ -63,7 +80,9 @@ namespace anox { namespace utils { namespace priv {
 		static const ::anox::data::EntityFieldDef g_fieldDefs[] = \
 		{
 
+// Add a blank one so the list can be empty
 #define END_CLASS \
+			{} \
 		}; \
 	}
 
@@ -75,6 +94,7 @@ namespace anox { namespace utils { namespace priv {
 #undef END_CLASS
 
 #define CLASS_FILL_IN(name) \
+	kClassID_ ## name, \
 	#name, \
 	sizeof(#name) - 1, \
 	kSize, \
@@ -121,10 +141,26 @@ namespace anox { namespace utils { namespace priv {
 #undef CLASS_BASE
 #undef END_CLASS
 
+	static const char *const g_badClasses[] =
+	{
+		"ob_building-1",
+		"ob_building-4",
+		"ob_building-5",
+		"ob_building-6",
+		"ob_flame-stop",
+		"boots_cine",
+		"pathcorner",
+		"ob_Scrate_healths",
+		"npc_tme",
+	};
+
 	static const ::anox::data::EntityDefsSchema g_schema =
 	{
 		g_classDefs,
-		sizeof(g_classDefs) / sizeof(g_classDefs[0])
+		sizeof(g_classDefs) / sizeof(g_classDefs[0]),
+
+		g_badClasses,
+		sizeof(g_badClasses) / sizeof(g_badClasses[0])
 	};
 
 } } }
