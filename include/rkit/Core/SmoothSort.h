@@ -223,7 +223,10 @@ namespace rkit { namespace priv {
 				SmoothSortPairSHR(p, 2);
 				pshift += 2;
 			}
-			else {
+			else
+			{
+				RKIT_ASSERT(pshift > 0);
+
 				if (rkit::priv::LeonardoSequence_t::kNumbers[pshift - 1] >= static_cast<size_t>(high - head))
 					SmoothSortTrinkle(head, cmp, p, pshift, false);
 				else

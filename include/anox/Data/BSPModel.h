@@ -109,7 +109,7 @@ namespace anox { namespace data {
 		rkit::endian::LittleFloat32_t m_maxs[3];
 		rkit::endian::LittleFloat32_t m_origin[3];
 
-		uint8_t m_rootIsLeaf;
+		uint8_t m_rootIsLeaf = 0;
 	};
 } }
 

@@ -5,8 +5,11 @@
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/Stream.h"
 
+#include "anox/AnoxModule.h"
 #include "anox/Label.h"
 #include "anox/Data/EntityDef.h"
+
+#include "AnoxModelCompiler.h"
 
 namespace anox { namespace buildsystem {
 	struct UserEntityDef2
@@ -15,7 +18,7 @@ namespace anox { namespace buildsystem {
 		rkit::AsciiString m_modelPath;
 		uint32_t m_modelCode = 0;
 		float m_scale[3] = { 0, 0, 0 };
-		uint8_t m_userEntityType = 0;
+		rkit::AsciiString m_type;
 		uint8_t m_shadowType = 0;
 		float m_bboxMin[3] = { 0, 0, 0 };
 		float m_bboxMax[3] = { 0, 0, 0 };
@@ -33,7 +36,14 @@ namespace anox { namespace buildsystem {
 	{
 	public:
 		explicit UserEntityDictionary(rkit::Vector<UserEntityDef2> &&edefs);
-		bool FindEntityDef(const rkit::AsciiString &name, uint32_t &outEDefID) const override;
+		bool FindEntityDef(const rkit::AsciiStringSliceView &name, uint32_t &outEDefID) const override;
+
+		rkit::AsciiStringView GetEDefType(uint32_t edefID) const override;
+		uint32_t GetEDefCount() const override;
+
+		rkit::Result WriteEDef(rkit::IWriteStream &stream, uint32_t edefID) const override;
+
+		const UserEntityDef2 &GetEDef(uint32_t edefID) const;
 
 	private:
 		rkit::Vector<UserEntityDef2> m_defs;
@@ -65,7 +75,7 @@ namespace anox { namespace buildsystem {
 			});
 	}
 
-	bool UserEntityDictionary::FindEntityDef(const rkit::AsciiString &name, uint32_t &outEDefID) const
+	bool UserEntityDictionary::FindEntityDef(const rkit::AsciiStringSliceView &name, uint32_t &outEDefID) const
 	{
 		size_t minInclusive = 0;
 		size_t maxExclusive = m_defs.Count();
@@ -93,14 +103,69 @@ namespace anox { namespace buildsystem {
 		return false;
 	}
 
+	rkit::AsciiStringView UserEntityDictionary::GetEDefType(uint32_t edefID) const
+	{
+		return m_defs[edefID].m_type;
+	}
+
+	uint32_t UserEntityDictionary::GetEDefCount() const
+	{
+		return static_cast<uint32_t>(m_defs.Count());
+	}
+
+	rkit::Result UserEntityDictionary::WriteEDef(rkit::IWriteStream &stream, uint32_t edefID) const
+	{
+		return rkit::ResultCode::kNotYetImplemented;
+	}
+
+	const UserEntityDef2 &UserEntityDictionary::GetEDef(uint32_t edefID) const
+	{
+		return m_defs[edefID];
+	}
+
 	bool EntityDefCompiler::HasAnalysisStage() const
 	{
-		return false;
+		return true;
 	}
 
 	rkit::Result EntityDefCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
-		return rkit::ResultCode::kInternalError;
+		const rkit::StringView identifier = depsNode->GetIdentifier();
+		const rkit::StringView prefix = "edefs/edef";
+		if (!identifier.StartsWith(prefix))
+			return rkit::ResultCode::kInternalError;
+
+		uint32_t edefID = 0;
+		if (!rkit::GetDrivers().m_utilitiesDriver->ParseUInt32(identifier.SubString(prefix.Length()), 10, edefID))
+			return rkit::ResultCode::kInternalError;
+
+		rkit::UniquePtr<UserEntityDictionaryBase> dictionary;
+		RKIT_CHECK(EntityDefCompilerBase::LoadUserEntityDictionary(dictionary, feedback));
+
+		const uint32_t numEDefs = dictionary->GetEDefCount();
+
+		if (edefID >= numEDefs)
+			return rkit::ResultCode::kInternalError;
+
+		const UserEntityDef2 &edef = static_cast<UserEntityDictionary &>(*dictionary).GetEDef(edefID);
+		const rkit::AsciiStringView modelPath = edef.m_modelPath;
+
+		rkit::String modelPathStr;
+		RKIT_CHECK(modelPathStr.Set(modelPath.ToSpan()));
+		RKIT_CHECK(modelPathStr.MakeLower());
+
+		if (modelPath.EndsWithNoCase(".md2"))
+		{
+			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kMD2ModelNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, modelPathStr));
+		}
+		else if (modelPath.EndsWithNoCase(".mda"))
+		{
+			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kMDAModelNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, modelPathStr));
+		}
+		else
+			return rkit::ResultCode::kDataError;
+
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result EntityDefCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
@@ -131,6 +196,11 @@ namespace anox { namespace buildsystem {
 			outIndex = it.Value();
 
 		return rkit::ResultCode::kOK;
+	}
+
+	uint32_t EntityDefCompiler::GetVersion() const
+	{
+		return 2;
 	}
 
 	rkit::Result EntityDefCompiler::ParseLabel(const rkit::ConstSpan<char> &span, Label &outLabel)
@@ -181,11 +251,6 @@ namespace anox { namespace buildsystem {
 		outLabel = Label(highPart, lowPart);
 
 		return rkit::ResultCode::kOK;
-	}
-
-	uint32_t EntityDefCompiler::GetVersion() const
-	{
-		return 1;
 	}
 
 	rkit::Result EntityDefCompilerBase::FormatEDef(rkit::String &edefIdentifier, uint32_t edefID)
@@ -356,42 +421,7 @@ namespace anox { namespace buildsystem {
 					}
 					break;
 				case 5:
-					{
-						rkit::AsciiStringSliceView slice(fragment);
-						data::UserEntityType userEntityType = data::UserEntityType::kCount;
-						if (slice == "playerchar")
-							userEntityType = data::UserEntityType::kPlayerChar;
-						else if (slice == "char")
-							userEntityType = data::UserEntityType::kChar;
-						else if (slice == "charfly")
-							userEntityType = data::UserEntityType::kCharFly;
-						else if (slice == "noclip")
-							userEntityType = data::UserEntityType::kNoClip;
-						else if (slice == "general")
-							userEntityType = data::UserEntityType::kGeneral;
-						else if (slice == "trashspawn")
-							userEntityType = data::UserEntityType::kTrashSpawn;
-						else if (slice == "bugspawn")
-							userEntityType = data::UserEntityType::kBugSpawn;
-						else if (slice == "lottobot")
-							userEntityType = data::UserEntityType::kLottoBot;
-						else if (slice == "pickup")
-							userEntityType = data::UserEntityType::kPickup;
-						else if (slice == "scavenger")
-							userEntityType = data::UserEntityType::kScavenger;
-						else if (slice == "effect")
-							userEntityType = data::UserEntityType::kEffect;
-						else if (slice == "container")
-							userEntityType = data::UserEntityType::kContainer;
-						else if (slice == "lightsource")
-							userEntityType = data::UserEntityType::kLightSource;
-						else if (slice == "sunpoint")
-							userEntityType = data::UserEntityType::kSunPoint;
-						else
-							return rkit::ResultCode::kDataError;
-
-						edef.m_userEntityType = static_cast<uint8_t>(userEntityType);
-					}
+					RKIT_CHECK(edef.m_type.Set(fragment));
 					break;
 				case 12:
 					{
@@ -470,11 +500,6 @@ namespace anox { namespace buildsystem {
 		RKIT_CHECK(rkit::New<UserEntityDictionary>(outDictionary, std::move(edefs)));
 
 		return rkit::ResultCode::kOK;
-	}
-
-	rkit::StringView EntityDictCompilerBase::GetEDictFilePath()
-	{
-		return "entities.edict";
 	}
 
 	rkit::Result EntityDefCompilerBase::Create(rkit::UniquePtr<EntityDefCompilerBase> &outCompiler)

@@ -219,7 +219,7 @@ bool rkit::BaseStringSliceView<TChar, TEncoding>::StartsWith(const BaseStringSli
 
 	for (size_t i = 0; i < cmpLength; i++)
 	{
-		if (TComparer::Compare(thisChars[i], otherChars[i]) != 0)
+		if (TComparer::Compare(thisChars[i], otherChars[i]) != Ordering::kEqual)
 			return false;
 	}
 
@@ -229,13 +229,13 @@ bool rkit::BaseStringSliceView<TChar, TEncoding>::StartsWith(const BaseStringSli
 template<class TChar, rkit::CharacterEncoding TEncoding>
 bool rkit::BaseStringSliceView<TChar, TEncoding>::StartsWith(const BaseStringSliceView<TChar, TEncoding> &other) const
 {
-	return EndsWith(other, CharStrictComparer<TChar>());
+	return StartsWith(other, CharStrictComparer<TChar>());
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding>
 bool rkit::BaseStringSliceView<TChar, TEncoding>::StartsWithNoCase(const BaseStringSliceView<TChar, TEncoding> &other) const
 {
-	return EndsWith(other, CharCaseInsensitiveComparer<TChar, InvariantCharCaseAdjuster<TChar>>());
+	return StartsWith(other, CharCaseInsensitiveComparer<TChar, InvariantCharCaseAdjuster<TChar>>());
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding>
@@ -299,7 +299,7 @@ bool rkit::BaseStringSliceView<TChar, TEncoding>::Equals(const BaseStringSliceVi
 template<class TChar, rkit::CharacterEncoding TEncoding>
 bool rkit::BaseStringSliceView<TChar, TEncoding>::EqualsNoCase(const BaseStringSliceView<TChar, TEncoding> &other) const
 {
-	return EndsWith(other, CharCaseInsensitiveComparer<TChar, InvariantCharCaseAdjuster<TChar>>());
+	return Equals(other, CharCaseInsensitiveComparer<TChar, InvariantCharCaseAdjuster<TChar>>());
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding>

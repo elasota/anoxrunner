@@ -4,10 +4,22 @@
 #include "rkit/Core/FourCC.h"
 
 namespace anox { namespace data {
+	struct EntityClassDef;
+
 	enum class EntityFieldType
 	{
-		kID,
+		kLabel,
+		kBool,
+		kBoolOnOff,
+		kUInt,
+		kFloat,
+		kVec2,
 		kVec3,
+		kVec4,
+		kString,
+		kContentID,
+		kBSPModel,
+		kComponent,
 	};
 
 	struct EntityDataVec3
@@ -17,11 +29,13 @@ namespace anox { namespace data {
 
 	struct EntityFieldDef
 	{
-		size_t m_offset;
+		uint32_t m_offset;
 		EntityFieldType m_fieldType;
 
 		const char *m_name;
 		size_t m_nameLength;
+
+		const EntityClassDef *m_classDef;
 	};
 
 	struct EntityClassDef

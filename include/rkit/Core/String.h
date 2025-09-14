@@ -681,7 +681,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::ChangeCase(const T
 		return ResultCode::kOK;
 	}
 
-	BaseString<TChar, TStaticSize> newString;
+	BaseString<TChar, TEncoding, TStaticSize> newString;
 
 	Span<TChar> uninitSpan;
 	RKIT_CHECK(CreateAndReturnUninitializedSpan(newString, length, uninitSpan));

@@ -130,7 +130,7 @@ namespace anox { namespace buildsystem
 		rkit::endian::LittleFloat32_t m_uvVectors[2][4];
 		rkit::endian::LittleUInt32_t m_flags;
 		rkit::endian::LittleInt32_t m_value;
-		char m_textureName[32];
+		char m_textureName[32] = {};
 		rkit::endian::LittleInt32_t m_nextFrame;
 	};
 
@@ -155,7 +155,7 @@ namespace anox { namespace buildsystem
 		rkit::endian::LittleUInt16_t m_numEdges;
 		rkit::endian::LittleUInt16_t m_texture;
 
-		uint8_t m_lmStyles[4];
+		uint8_t m_lmStyles[4] = {};
 		rkit::endian::LittleUInt32_t m_lightmapDataPos;
 	};
 
@@ -441,27 +441,48 @@ namespace anox { namespace buildsystem
 	private:
 		struct IEntityDataHandler
 		{
-			typedef rkit::ConstSpan<rkit::Pair<rkit::AsciiString, rkit::AsciiString>> PropertySpan_t;
+			typedef rkit::Pair<rkit::AsciiString, rkit::AsciiString> Property_t;
+			typedef rkit::ConstSpan<Property_t> PropertySpan_t;
 
 			virtual rkit::Result ParseBuiltinEntity(const data::EntityClassDef &classDef, const PropertySpan_t &properties) = 0;
-			virtual rkit::Result ParseUserEntity(const rkit::AsciiString &className, const PropertySpan_t &properties) = 0;
+			virtual rkit::Result ParseUserEntity(uint32_t edefID, const data::EntityClassDef &classDef, const PropertySpan_t &properties) = 0;
 		};
 
 		class EntityAnalysisHandler final : public IEntityDataHandler
 		{
 		public:
-
-			EntityAnalysisHandler(const UserEntityDictionaryBase &dict, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+			explicit EntityAnalysisHandler(rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 
 			rkit::Result ParseBuiltinEntity(const data::EntityClassDef &classDef, const PropertySpan_t &properties) override;
-			rkit::Result ParseUserEntity(const rkit::AsciiString &className, const PropertySpan_t &properties) override;
+			rkit::Result ParseUserEntity(uint32_t edefID, const data::EntityClassDef &classDef, const PropertySpan_t &properties) override;
 
 		private:
-			const UserEntityDictionaryBase &m_dict;
 			rkit::buildsystem::IDependencyNodeCompilerFeedback *m_feedback;
 		};
 
-		static rkit::Result ParseEntityData(const rkit::ConstSpan<char> &entityData, IEntityDataHandler &handler);
+		class EntityCompileHandler final : public IEntityDataHandler
+		{
+		public:
+			explicit EntityCompileHandler(rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+
+			rkit::Result ParseBuiltinEntity(const data::EntityClassDef &classDef, const PropertySpan_t &properties) override;
+			rkit::Result ParseUserEntity(uint32_t edefID, const data::EntityClassDef &classDef, const PropertySpan_t &properties) override;
+
+		private:
+			enum class PropertyDisposition
+			{
+				kPresent,
+				kMissing,
+				kIgnore,
+				kAngleRecast,
+			};
+
+			static PropertyDisposition FindFieldDef(const data::EntityClassDef &classDef, const rkit::AsciiStringSliceView &str, uint32_t baseOffset, const data::EntityFieldDef *&outFieldDef, uint32_t &outOffset);
+
+			rkit::buildsystem::IDependencyNodeCompilerFeedback *m_feedback;
+		};
+
+		static rkit::Result ParseEntityData(const UserEntityDictionaryBase &dict, const rkit::ConstSpan<char> &entityData, IEntityDataHandler &handler);
 
 		static void SkipWhitespace(rkit::ConstSpan<char> &span);
 		static rkit::Result ParseQuotedString(rkit::ConstSpan<char> &span, rkit::AsciiString &outString);
@@ -786,9 +807,8 @@ namespace anox { namespace buildsystem
 		return 1;
 	}
 
-	BSPEntityCompiler::EntityAnalysisHandler::EntityAnalysisHandler(const UserEntityDictionaryBase &dict, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
-		: m_dict(dict)
-		, m_feedback(feedback)
+	BSPEntityCompiler::EntityAnalysisHandler::EntityAnalysisHandler(rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+		: m_feedback(feedback)
 	{
 	}
 
@@ -798,21 +818,120 @@ namespace anox { namespace buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result BSPEntityCompiler::EntityAnalysisHandler::ParseUserEntity(const rkit::AsciiString &className, const PropertySpan_t &properties)
+	rkit::Result BSPEntityCompiler::EntityAnalysisHandler::ParseUserEntity(uint32_t edefID, const data::EntityClassDef &classDef, const PropertySpan_t &properties)
 	{
-		uint32_t edefID = 0;
-		if (!m_dict.FindEntityDef(className, edefID))
-		{
-			rkit::log::ErrorFmt("Unknown entity class {}", className.CStr());
-			return rkit::ResultCode::kDataError;
-		}
-
 		rkit::String edefIdentifier;
 		RKIT_CHECK(EntityDefCompilerBase::FormatEDef(edefIdentifier, edefID));
 
 		RKIT_CHECK(m_feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kEntityDefNodeID, rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefIdentifier));
 
 		return rkit::ResultCode::kOK;
+	}
+
+	BSPEntityCompiler::EntityCompileHandler::EntityCompileHandler(rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+		: m_feedback(feedback)
+	{
+	}
+
+	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseBuiltinEntity(const data::EntityClassDef &classDef, const PropertySpan_t &properties)
+	{
+		const rkit::AsciiStringView ignoreProperties[] =
+		{
+			// Typos
+			"defualt_ambient",
+			"defualt_anim",
+			"targtename",
+			"-cone",
+			"spawnconditon",
+			"",
+
+			// Ignore
+			"_lightmin",
+			"_color",
+			"_cone",
+		};
+
+		for (const Property_t &property : properties)
+		{
+			if (property.GetAt<0>() == "message" && property.GetAt<1>() == "")
+				continue;
+
+			uint32_t offset = 0;
+			const data::EntityFieldDef *fieldDef = nullptr;
+			PropertyDisposition dispo = FindFieldDef(classDef, property.GetAt<0>(), 0, fieldDef, offset);
+
+			if (dispo == PropertyDisposition::kMissing)
+			{
+				bool ignored = false;
+				for (const rkit::AsciiStringView &ignoreProperty : ignoreProperties)
+				{
+					if (property.GetAt<0>() == ignoreProperty)
+					{
+						ignored = true;
+						break;
+					}
+				}
+
+				if (!ignored)
+				{
+					rkit::log::ErrorFmt("Class {} is missing field {}", classDef.m_name, property.GetAt<0>().CStr());
+					return rkit::ResultCode::kDataError;
+				}
+			}
+		}
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseUserEntity(uint32_t edefID, const data::EntityClassDef &classDef, const PropertySpan_t &properties)
+	{
+		return ParseBuiltinEntity(classDef, properties);
+	}
+
+	BSPEntityCompiler::EntityCompileHandler::PropertyDisposition BSPEntityCompiler::EntityCompileHandler::FindFieldDef(const data::EntityClassDef &classDef, const rkit::AsciiStringSliceView &fieldName, uint32_t baseOffset, const data::EntityFieldDef *&outFieldDef, uint32_t &outOffset)
+	{
+		PropertyDisposition dispo = PropertyDisposition::kMissing;
+
+		const rkit::ConstSpan<anox::data::EntityFieldDef> fieldDefs(classDef.m_fields, classDef.m_numFields);
+
+		for (const data::EntityFieldDef &fieldDef : fieldDefs)
+		{
+			if (fieldDef.m_fieldType == data::EntityFieldType::kComponent)
+			{
+				PropertyDisposition componentDispo = FindFieldDef(*fieldDef.m_classDef, fieldName, baseOffset + fieldDef.m_offset, outFieldDef, outOffset);
+				if (componentDispo != PropertyDisposition::kMissing)
+				{
+					RKIT_ASSERT(dispo == PropertyDisposition::kMissing);
+					dispo = componentDispo;
+				}
+
+				continue;
+			}
+
+			if (rkit::AsciiStringView(fieldDef.m_name, fieldDef.m_nameLength).EqualsNoCase(fieldName))
+			{
+				RKIT_ASSERT(dispo == PropertyDisposition::kMissing);
+				dispo = PropertyDisposition::kPresent;
+				outOffset = baseOffset + fieldDef.m_offset;
+				outFieldDef = &fieldDef;
+			}
+		}
+
+		if (fieldName == "angle")
+		{
+			for (const anox::data::EntityFieldDef &fieldDef : fieldDefs)
+			{
+				if (rkit::AsciiStringView(fieldDef.m_name, fieldDef.m_nameLength).EqualsNoCase("angles"))
+				{
+					RKIT_ASSERT(dispo == PropertyDisposition::kMissing);
+					dispo = PropertyDisposition::kAngleRecast;
+					outOffset = baseOffset + fieldDef.m_offset;
+					outFieldDef = &fieldDef;
+				}
+			}
+		}
+
+		return dispo;
 	}
 
 	bool BSPEntityCompiler::HasAnalysisStage() const
@@ -832,24 +951,38 @@ namespace anox { namespace buildsystem
 
 		RKIT_CHECK(LoadBSPData(depsNode, feedback, bsp, loaders));
 
-		EntityAnalysisHandler handler(*dictionary, feedback);
+		EntityAnalysisHandler handler(feedback);
 
-		RKIT_CHECK(ParseEntityData(bsp.m_entityData.ToSpan(), handler));
+		RKIT_CHECK(ParseEntityData(*dictionary, bsp.m_entityData.ToSpan(), handler));
 
 		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result BSPEntityCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		rkit::UniquePtr<UserEntityDictionaryBase> dictionary;
+		RKIT_CHECK(EntityDefCompilerBase::LoadUserEntityDictionary(dictionary, feedback));
+
+		BSPDataCollection bsp;
+
+		rkit::Vector<LumpLoader> loaders;
+		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kEntities, bsp.m_entityData)));
+
+		RKIT_CHECK(LoadBSPData(depsNode, feedback, bsp, loaders));
+
+		EntityCompileHandler handler(feedback);
+
+		RKIT_CHECK(ParseEntityData(*dictionary, bsp.m_entityData.ToSpan(), handler));
+
+		return rkit::ResultCode::kOK;
 	}
 
 	uint32_t BSPEntityCompiler::GetVersion() const
 	{
-		return 1;
+		return 5;
 	}
 
-	rkit::Result BSPEntityCompiler::ParseEntityData(const rkit::ConstSpan<char> &entityDataRef, IEntityDataHandler &handler)
+	rkit::Result BSPEntityCompiler::ParseEntityData(const UserEntityDictionaryBase &dict, const rkit::ConstSpan<char> &entityDataRef, IEntityDataHandler &handler)
 	{
 		anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, "Utilities"));
 
@@ -896,25 +1029,29 @@ namespace anox { namespace buildsystem
 				RKIT_CHECK(keyValuePairs.Append(rkit::Pair<rkit::AsciiString, rkit::AsciiString>(std::move(keyString), std::move(valueString))));
 			}
 
-			rkit::Optional<rkit::AsciiString> classname;
+			rkit::Optional<rkit::AsciiString> classnameOpt;
 			for (size_t i = 0; i < keyValuePairs.Count(); i++)
 			{
 				if (keyValuePairs[i].GetAt<0>() == "classname")
 				{
-					classname = std::move(keyValuePairs[i].GetAt<1>());
+					classnameOpt = std::move(keyValuePairs[i].GetAt<1>());
 
 					keyValuePairs.RemoveRange(i, 1);
 					break;
 				}
 			}
 
-			if (!classname.IsSet())
+			if (!classnameOpt.IsSet())
 				return rkit::ResultCode::kDataError;
+
+			rkit::AsciiStringView classname = classnameOpt.Get();
+
+			rkit::AsciiStringView userEntityType;
 
 			bool isUserClass = true;
 			for (const anox::data::EntityClassDef *classDef : classDefs)
 			{
-				if (classname.Get() == rkit::AsciiStringSliceView(classDef->m_name, classDef->m_nameLength))
+				if (classname.EqualsNoCase(rkit::AsciiStringSliceView(classDef->m_name, classDef->m_nameLength)))
 				{
 					RKIT_CHECK(handler.ParseBuiltinEntity(*classDef, keyValuePairs.ToSpan()));
 
@@ -928,7 +1065,7 @@ namespace anox { namespace buildsystem
 			{
 				for (const char *badClass : rkit::ConstSpan<const char *>(schema.m_badClassDefs, schema.m_numBadClassDefs))
 				{
-					if (classname.Get() == rkit::AsciiStringView::FromCString(badClass))
+					if (classname.EqualsNoCase(rkit::AsciiStringView::FromCString(badClass)))
 					{
 						isBadClass = true;
 						break;
@@ -938,7 +1075,30 @@ namespace anox { namespace buildsystem
 
 			if (isUserClass && !isBadClass)
 			{
-				RKIT_CHECK(handler.ParseUserEntity(classname.Get(), keyValuePairs.ToSpan()));
+				uint32_t edefID = 0;
+				if (!dict.FindEntityDef(classname, edefID))
+					return rkit::ResultCode::kDataError;
+
+				rkit::AsciiStringSliceView type = dict.GetEDefType(edefID);
+
+				rkit::AsciiString fullType;
+				RKIT_CHECK(fullType.Set("userentity_"));
+				RKIT_CHECK(fullType.Append(type));
+
+				const data::EntityClassDef *userEntityClassDef = nullptr;
+				for (const anox::data::EntityClassDef *classDef : classDefs)
+				{
+					if (rkit::AsciiStringSliceView(classDef->m_name, classDef->m_nameLength).EqualsNoCase(fullType))
+					{
+						userEntityClassDef = classDef;
+						break;
+					}
+				}
+
+				if (!userEntityClassDef)
+					return rkit::ResultCode::kDataError;
+
+				RKIT_CHECK(handler.ParseUserEntity(edefID, *userEntityClassDef, keyValuePairs.ToSpan()));
 			}
 		}
 

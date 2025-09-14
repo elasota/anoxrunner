@@ -134,6 +134,7 @@ namespace rkit
 {
 	template<class T>
 	inline Tuple<T>::Tuple()
+		: m_value()
 	{
 	}
 

@@ -14,6 +14,7 @@
 #include "rkit/Render/BackendType.h"
 
 #include "AnoxBSPMapCompiler.h"
+#include "AnoxModelCompiler.h"
 #include "AnoxEntityDefCompiler.h"
 #include "AnoxMaterialCompiler.h"
 #include "AnoxTextureCompiler.h"
@@ -128,6 +129,20 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 		RKIT_CHECK(buildsystem::EntityDefCompilerBase::Create(entityDefCompiler));
 
 		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kEntityDefNodeID, std::move(entityDefCompiler)));
+	}
+
+	{
+		rkit::UniquePtr<buildsystem::AnoxMD2CompilerBase> md2Compiler;
+		RKIT_CHECK(buildsystem::AnoxMD2CompilerBase::Create(md2Compiler));
+
+		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kMD2ModelNodeID, std::move(md2Compiler)));
+	}
+
+	{
+		rkit::UniquePtr<buildsystem::AnoxMDACompilerBase> mdaCompiler;
+		RKIT_CHECK(buildsystem::AnoxMDACompilerBase::Create(mdaCompiler));
+
+		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kMDAModelNodeID, std::move(mdaCompiler)));
 	}
 
 	RKIT_CHECK(instance->RegisterNodeTypeByExtension("cfg", rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kCopyFileNodeID));

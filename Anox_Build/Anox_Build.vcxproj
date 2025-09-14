@@ -139,12 +139,14 @@
     <ClCompile Include="AnoxBuild.cpp" />
     <ClCompile Include="AnoxEntityDefCompiler.cpp" />
     <ClCompile Include="AnoxMaterialCompiler.cpp" />
+    <ClCompile Include="AnoxModelCompiler.cpp" />
     <ClCompile Include="AnoxTextureCompiler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AnoxBSPMapCompiler.h" />
     <ClInclude Include="AnoxEntityDefCompiler.h" />
     <ClInclude Include="AnoxMaterialCompiler.h" />
+    <ClInclude Include="AnoxModelCompiler.h" />
     <ClInclude Include="AnoxTextureCompiler.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

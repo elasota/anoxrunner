@@ -30,6 +30,9 @@
     <ClCompile Include="AnoxEntityDefCompiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="AnoxModelCompiler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AnoxMaterialCompiler.h">
@@ -42,6 +45,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="AnoxEntityDefCompiler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="AnoxModelCompiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
