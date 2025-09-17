@@ -5,6 +5,7 @@ namespace anox { namespace data {
 	{
 		kFont,
 		kWorld,
+		kModel,
 
 		kCount,
 	};

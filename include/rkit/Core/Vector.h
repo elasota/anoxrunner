@@ -210,17 +210,20 @@ namespace rkit
 			RKIT_CHECK(Reallocate(size));
 		}
 
-		while (size < m_count)
+		size_t count = m_count;
+		while (size < count)
 		{
-			m_count--;
-			m_arr[m_count].~T();
+			count--;
+			m_arr[count].~T();
 		}
 
-		while (size > m_count)
+		while (size > count)
 		{
-			new (m_arr + m_count) T();
-			m_count++;
+			new (m_arr + count) T();
+			count++;
 		}
+
+		m_count = count;
 
 		return ResultCode::kOK;
 	}

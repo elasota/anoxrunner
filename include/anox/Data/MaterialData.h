@@ -35,9 +35,6 @@ namespace anox { namespace data
 		rkit::endian::LittleUInt32_t m_bitmap;
 		rkit::endian::LittleUInt32_t m_next;
 		rkit::endian::LittleUInt32_t m_waitMSec;
-
-		rkit::endian::LittleInt32_t m_xOffset;
-		rkit::endian::LittleInt32_t m_yOffset;
 	};
 
 	struct MaterialBitmapDef

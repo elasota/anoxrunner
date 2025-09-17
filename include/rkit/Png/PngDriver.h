@@ -7,6 +7,7 @@ namespace rkit
 	namespace utils
 	{
 		struct IImage;
+		struct ImageSpec;
 	}
 
 	template<class T>
@@ -18,6 +19,7 @@ namespace rkit
 namespace rkit { namespace png {
 	struct IPngDriver : public ICustomDriver
 	{
-		virtual Result LoadPNG(ISeekableReadStream &stream, UniquePtr<utils::IImage> &outImage) const = 0;
+		virtual Result LoadPNGMetadata(utils::ImageSpec &imageSpec, ISeekableReadStream &stream) const = 0;
+		virtual Result LoadPNG(UniquePtr<utils::IImage> &outImage, ISeekableReadStream &stream) const = 0;
 	};
 } } // rkit::png

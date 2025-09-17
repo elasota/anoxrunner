@@ -71,7 +71,7 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 {
 	{
 		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler;
-		RKIT_CHECK(rkit::New<buildsystem::MaterialCompiler>(matCompiler));
+		RKIT_CHECK(rkit::New<buildsystem::MaterialCompiler>(matCompiler, *m_pngDriver));
 
 		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kFontMaterialNodeID, std::move(matCompiler)));
 
@@ -80,11 +80,20 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 
 	{
 		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler;
-		RKIT_CHECK(rkit::New<buildsystem::MaterialCompiler>(matCompiler));
+		RKIT_CHECK(rkit::New<buildsystem::MaterialCompiler>(matCompiler, *m_pngDriver));
 
 		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kWorldMaterialNodeID, std::move(matCompiler)));
 
 		RKIT_CHECK(instance->RegisterNodeTypeByExtension(buildsystem::MaterialCompiler::GetWorldMaterialExtension(), kAnoxNamespaceID, buildsystem::kWorldMaterialNodeID));
+	}
+
+	{
+		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler;
+		RKIT_CHECK(rkit::New<buildsystem::MaterialCompiler>(matCompiler, *m_pngDriver));
+
+		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kModelMaterialNodeID, std::move(matCompiler)));
+
+		RKIT_CHECK(instance->RegisterNodeTypeByExtension(buildsystem::MaterialCompiler::GetModelMaterialExtension(), kAnoxNamespaceID, buildsystem::kModelMaterialNodeID));
 	}
 
 	{

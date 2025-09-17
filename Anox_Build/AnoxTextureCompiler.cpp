@@ -112,27 +112,29 @@ namespace anox { namespace buildsystem
 		};
 
 		template<class TPixelElement, size_t TElementsPerPixel>
-		class TextureCompilerImage
+		class TextureCompilerImage final : public rkit::utils::IImage
 		{
 		public:
 			typedef TextureCompilerPixel<TPixelElement, TElementsPerPixel> Pixel_t;
 
 			TextureCompilerImage();
 
-			rkit::Result Initialize(uint32_t width, uint32_t height);
+			const rkit::utils::ImageSpec &GetImageSpec() const override;
+			uint8_t GetPixelSizeBytes() const override;
 
-			rkit::Span<Pixel_t> GetScanline(uint32_t y);
-			rkit::Span<const Pixel_t> GetScanline(uint32_t y) const;
+			virtual const void *GetScanline(uint32_t row) const override;
+			virtual void *ModifyScanline(uint32_t row) override;
 
-			uint32_t GetWidth() const;
-			uint32_t GetHeight() const;
+			rkit::Result Initialize(uint32_t width, uint32_t height, rkit::utils::PixelPacking pixelPacking);
+
+			rkit::Span<Pixel_t> GetScanlineSpan(uint32_t y);
+			rkit::Span<const Pixel_t> GetScanlineSpan(uint32_t y) const;
 
 		private:
 			rkit::Vector<Pixel_t> m_pixelData;
 
 			size_t m_pitchInElements;
-			uint32_t m_width;
-			uint32_t m_height;
+			rkit::utils::ImageSpec m_imageSpec;
 		};
 
 		template<class TElementType, size_t TNumElements, size_t TElementIndex, bool TElementIsInRange>
@@ -222,10 +224,47 @@ namespace anox { namespace buildsystem
 
 		uint32_t GetVersion() const override;
 
+		static rkit::Result GetImageMetadataDerived(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName);
+		static rkit::Result GetImageDerived(rkit::UniquePtr<rkit::utils::IImage> &image, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
+
 	private:
+		enum class TGADataType
+		{
+			kEmpty = 0,
+			kUncompressedPalette = 1,
+			kUncompressedColor = 2,
+			kRLEPalette = 9,
+			kRLEColor = 10,
+		};
+
+		struct TGAHeader
+		{
+			uint8_t m_identSize;
+			uint8_t m_colorMapType;
+			uint8_t m_dataType;
+			rkit::endian::LittleUInt16_t m_colorMapStart;
+			rkit::endian::LittleUInt16_t m_colorMapLength;
+			uint8_t m_colorMapEntrySizeBits;
+			rkit::endian::LittleUInt16_t m_imageOriginX;
+			rkit::endian::LittleUInt16_t m_imageOriginY;
+			rkit::endian::LittleUInt16_t m_imageWidth;
+			rkit::endian::LittleUInt16_t m_imageHeight;
+			uint8_t m_pixelSizeBits;
+			uint8_t m_imageDescriptor;
+		};
+
+		static rkit::Result GetTGAMetadata(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName);
+		static rkit::Result GetPCXMetadata(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName);
+		static rkit::Result GetPNGMetadata(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, const rkit::CIPathView &shortName);
+
+		static rkit::Result GetTGA(rkit::UniquePtr<rkit::utils::IImage> &image, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
+		static rkit::Result GetPCX(rkit::UniquePtr<rkit::utils::IImage> &image, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
+		static rkit::Result GetPNG(rkit::UniquePtr<rkit::utils::IImage> &image, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
+
 		static rkit::Result CompileTGA(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
 		static rkit::Result CompilePCX(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
 		static rkit::Result CompilePNG(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
+		static rkit::Result CompileImage(const rkit::utils::IImage &image, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, ImageImportDisposition disposition);
 
 		template<class TElementType, size_t TNumElements>
 		static rkit::Result GenerateMipMaps(rkit::Vector<priv::TextureCompilerImage<TElementType, TNumElements>> &resultImages, const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &sourceImages, size_t &outNumLevels, ImageImportDisposition disposition);
@@ -319,56 +358,65 @@ namespace anox { namespace buildsystem { namespace priv
 	template<class TPixelElement, size_t TElementsPerPixel>
 	TextureCompilerImage<TPixelElement, TElementsPerPixel>::TextureCompilerImage()
 		: m_pitchInElements(0)
-		, m_width(0)
-		, m_height(0)
+		, m_imageSpec{}
 	{
 	}
 
 	template<class TPixelElement, size_t TElementsPerPixel>
-	rkit::Result TextureCompilerImage<TPixelElement, TElementsPerPixel>::Initialize(uint32_t width, uint32_t height)
+	const rkit::utils::ImageSpec &TextureCompilerImage<TPixelElement, TElementsPerPixel>::GetImageSpec() const
 	{
-		if (width == 0 || height == 0)
+		return m_imageSpec;
+	}
+
+	template<class TPixelElement, size_t TElementsPerPixel>
+	uint8_t TextureCompilerImage<TPixelElement, TElementsPerPixel>::GetPixelSizeBytes() const
+	{
+		return sizeof(TPixelElement) * TElementsPerPixel;
+	}
+
+	template<class TPixelElement, size_t TElementsPerPixel>
+	const void *TextureCompilerImage<TPixelElement, TElementsPerPixel>::GetScanline(uint32_t row) const
+	{
+		return this->GetScanlineSpan(row).Ptr();
+	}
+
+	template<class TPixelElement, size_t TElementsPerPixel>
+	void *TextureCompilerImage<TPixelElement, TElementsPerPixel>::ModifyScanline(uint32_t row)
+	{
+		return this->GetScanlineSpan(row).Ptr();
+	}
+
+	template<class TPixelElement, size_t TElementsPerPixel>
+	rkit::Result TextureCompilerImage<TPixelElement, TElementsPerPixel>::Initialize(uint32_t width, uint32_t height, rkit::utils::PixelPacking pixelPacking)
+	{
+		if (m_imageSpec.m_width == 0 || m_imageSpec.m_height == 0)
 		{
 			rkit::log::Error("Image had 0 dimension");
 			return rkit::ResultCode::kDataError;
 		}
 
-		const size_t pitch = width;
+		const size_t pitch = m_imageSpec.m_width;
 
 		size_t numElements = 0;
-		RKIT_CHECK(rkit::SafeMul<size_t>(numElements, pitch, height));
+		RKIT_CHECK(rkit::SafeMul<size_t>(numElements, pitch, m_imageSpec.m_height));
 
 		RKIT_CHECK(m_pixelData.Resize(numElements));
 
 		m_pitchInElements = pitch;
-		m_width = width;
-		m_height = height;
 
 		return rkit::ResultCode::kOK;
 	}
 
 	template<class TPixelElement, size_t TElementsPerPixel>
-	rkit::Span<typename TextureCompilerImage<TPixelElement, TElementsPerPixel>::Pixel_t> TextureCompilerImage<TPixelElement, TElementsPerPixel>::GetScanline(uint32_t y)
+	rkit::Span<typename TextureCompilerImage<TPixelElement, TElementsPerPixel>::Pixel_t> TextureCompilerImage<TPixelElement, TElementsPerPixel>::GetScanlineSpan(uint32_t y)
 	{
-		return m_pixelData.ToSpan().SubSpan(y * m_pitchInElements, m_width);
+		return m_pixelData.ToSpan().SubSpan(y * m_pitchInElements, m_imageSpec.m_width);
 	}
 
 	template<class TPixelElement, size_t TElementsPerPixel>
-	rkit::Span<const typename TextureCompilerImage<TPixelElement, TElementsPerPixel>::Pixel_t> TextureCompilerImage<TPixelElement, TElementsPerPixel>::GetScanline(uint32_t y) const
+	rkit::Span<const typename TextureCompilerImage<TPixelElement, TElementsPerPixel>::Pixel_t> TextureCompilerImage<TPixelElement, TElementsPerPixel>::GetScanlineSpan(uint32_t y) const
 	{
-		return m_pixelData.ToSpan().SubSpan(y * m_pitchInElements, m_width);
-	}
-
-	template<class TPixelElement, size_t TElementsPerPixel>
-	uint32_t TextureCompilerImage<TPixelElement, TElementsPerPixel>::GetWidth() const
-	{
-		return m_width;
-	}
-
-	template<class TPixelElement, size_t TElementsPerPixel>
-	uint32_t TextureCompilerImage<TPixelElement, TElementsPerPixel>::GetHeight() const
-	{
-		return m_height;
+		return m_pixelData.ToSpan().SubSpan(y * m_pitchInElements, m_imageSpec.m_width);
 	}
 
 	template<class TElementType, size_t TNumElements, size_t TElementIndex>
@@ -379,7 +427,7 @@ namespace anox { namespace buildsystem { namespace priv
 
 		for (uint32_t y = 0; y < height; y++)
 		{
-			const rkit::ConstSpan<TextureCompilerPixel<TElementType, TNumElements>> scanline = image.GetScanline(y);
+			const rkit::ConstSpan<TextureCompilerPixel<TElementType, TNumElements>> scanline = image.GetScanlineSpan(y);
 
 			for (const TextureCompilerPixel<TElementType, TNumElements> &pixel : scanline)
 			{
@@ -532,35 +580,76 @@ namespace anox { namespace buildsystem
 		return rkit::ResultCode::kOperationFailed;
 	}
 
-	rkit::Result TextureCompiler::CompileTGA(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
+	rkit::Result TextureCompiler::GetTGAMetadata(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName)
 	{
-		enum class TGADataType
-		{
-			kEmpty = 0,
-			kUncompressedPalette = 1,
-			kUncompressedColor = 2,
-			kRLEPalette = 9,
-			kRLEColor = 10,
-		};
-
-		struct TGAHeader
-		{
-			uint8_t m_identSize;
-			uint8_t m_colorMapType;
-			uint8_t m_dataType;
-			rkit::endian::LittleUInt16_t m_colorMapStart;
-			rkit::endian::LittleUInt16_t m_colorMapLength;
-			uint8_t m_colorMapEntrySizeBits;
-			rkit::endian::LittleUInt16_t m_imageOriginX;
-			rkit::endian::LittleUInt16_t m_imageOriginY;
-			rkit::endian::LittleUInt16_t m_imageWidth;
-			rkit::endian::LittleUInt16_t m_imageHeight;
-			uint8_t m_pixelSizeBits;
-			uint8_t m_imageDescriptor;
-		};
-
 		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
-		RKIT_CHECK(feedback->OpenInput(depsNode->GetInputFileLocation(), shortName, stream));
+		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, stream));
+
+		TGAHeader tgaHeader;
+		RKIT_CHECK(stream->ReadAll(&tgaHeader, sizeof(tgaHeader)));
+
+		if (tgaHeader.m_pixelSizeBits % 8 != 0)
+		{
+			rkit::log::Error("Unsupported pixel bits");
+			return rkit::ResultCode::kDataError;
+		}
+
+		imageSpec = {};
+		imageSpec.m_width = tgaHeader.m_imageWidth.Get();
+		imageSpec.m_height = tgaHeader.m_imageHeight.Get();
+		imageSpec.m_numChannels = tgaHeader.m_pixelSizeBits / 8;
+		imageSpec.m_pixelPacking = rkit::utils::PixelPacking::kUInt8;
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result TextureCompiler::GetPCXMetadata(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName)
+	{
+		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
+		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, stream));
+
+		priv::PCXHeader pcxHeader;
+		RKIT_CHECK(stream->ReadAll(&pcxHeader, sizeof(pcxHeader)));
+
+		if (pcxHeader.m_numColorPlanes != 1 && pcxHeader.m_numColorPlanes != 3 && pcxHeader.m_numColorPlanes != 4)
+		{
+			rkit::log::ErrorFmt("PCX file '{}' has an unsupported number of planes", shortName.GetChars());
+			return rkit::ResultCode::kMalformedFile;
+		}
+
+		if (pcxHeader.m_bitsPerPlane != 8)
+		{
+			rkit::log::ErrorFmt("PCX file '{}' has an unsupported bits per plane", shortName.GetChars());
+			return rkit::ResultCode::kMalformedFile;
+		}
+
+		if (pcxHeader.m_minX.Get() > pcxHeader.m_maxX.Get() || pcxHeader.m_minY.Get() > pcxHeader.m_maxY.Get())
+		{
+			rkit::log::Error("Invalid PCX dimensions");
+			return rkit::ResultCode::kDataError;
+		}
+
+		imageSpec = {};
+		imageSpec.m_width = pcxHeader.m_maxX.Get() - pcxHeader.m_minX.Get() + 1;
+		imageSpec.m_height = pcxHeader.m_maxY.Get() - pcxHeader.m_minY.Get() + 1;
+		imageSpec.m_numChannels = 3;
+		imageSpec.m_pixelPacking = rkit::utils::PixelPacking::kUInt8;
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result TextureCompiler::GetPNGMetadata(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, const rkit::CIPathView &shortName)
+	{
+		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
+		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, stream));
+
+		return pngDriver.LoadPNGMetadata(imageSpec, *stream);
+	}
+
+	rkit::Result TextureCompiler::GetTGA(rkit::UniquePtr<rkit::utils::IImage> &outImage, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
+	{
+		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
+		RKIT_CHECK(feedback->OpenInput(buildFileLocation, shortName, stream));
 
 		TGAHeader tgaHeader;
 		RKIT_CHECK(stream->ReadAll(&tgaHeader, sizeof(tgaHeader)));
@@ -576,8 +665,9 @@ namespace anox { namespace buildsystem
 		uint32_t width = tgaHeader.m_imageWidth.Get();
 		uint32_t height = tgaHeader.m_imageHeight.Get();
 
-		priv::TextureCompilerImage<uint8_t, 4> image;
-		RKIT_CHECK(image.Initialize(width, height));
+		rkit::UniquePtr<priv::TextureCompilerImage<uint8_t, 4>> image;
+		RKIT_CHECK((rkit::New<priv::TextureCompilerImage<uint8_t, 4>>(image)));
+		RKIT_CHECK(image->Initialize(width, height, rkit::utils::PixelPacking::kUInt8));
 
 		if (tgaHeader.m_pixelSizeBits % 8 != 0)
 		{
@@ -664,7 +754,7 @@ namespace anox { namespace buildsystem
 
 		for (uint32_t y = 0; y < height; y++)
 		{
-			const rkit::Span<priv::TextureCompilerPixel<uint8_t, 4>> outScanline = image.GetScanline(height - 1 - y);
+			const rkit::Span<priv::TextureCompilerPixel<uint8_t, 4>> outScanline = image->GetScanlineSpan(height - 1 - y);
 			RKIT_ASSERT(outScanline.Count() >= width);
 
 			const uint8_t *inScanlineBytes = decompressedImageData.GetBuffer() + static_cast<size_t>(y) * width * pixelSizeBytes;
@@ -672,57 +762,53 @@ namespace anox { namespace buildsystem
 			switch (tgaHeader.m_pixelSizeBits)
 			{
 			case 24:
+			{
+				for (size_t i = 0; i < width; i++)
 				{
-					for (size_t i = 0; i < width; i++)
-					{
-						const uint8_t *inBytes = inScanlineBytes + (i * 3);
-						outScanline[i].Set(inBytes[0], inBytes[1], inBytes[2], 0xff);
-					}
+					const uint8_t *inBytes = inScanlineBytes + (i * 3);
+					outScanline[i].Set(inBytes[0], inBytes[1], inBytes[2], 0xff);
 				}
-				break;
+			}
+			break;
 			case 32:
+			{
+				for (size_t i = 0; i < width; i++)
 				{
-					for (size_t i = 0; i < width; i++)
-					{
-						const uint8_t *inBytes = inScanlineBytes + (i * 4);
-						outScanline[i].Set(inBytes[0], inBytes[1], inBytes[2], inBytes[3]);
-					}
+					const uint8_t *inBytes = inScanlineBytes + (i * 4);
+					outScanline[i].Set(inBytes[0], inBytes[1], inBytes[2], inBytes[3]);
 				}
-				break;
+			}
+			break;
 			default:
 				rkit::log::Error("TGA bit size unsupported");
 				return rkit::ResultCode::kNotYetImplemented;
 			}
 		}
 
-		rkit::Vector<priv::TextureCompilerImage<uint8_t, 4>> images;
-
-		size_t numLevels = 0;
-		RKIT_CHECK(GenerateMipMaps(images, (rkit::Span<priv::TextureCompilerImage<uint8_t, 4>>(&image, 1)), numLevels, disposition));
-
-		return ExportDDS(images.ToSpan(), numLevels, 1, depsNode, feedback, disposition);
+		outImage = std::move(image);
+		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result TextureCompiler::CompilePCX(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
+	rkit::Result TextureCompiler::GetPCX(rkit::UniquePtr<rkit::utils::IImage> &outImage, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
 	{
 		typedef uint8_t RGBTriplet_t[3];
 
 		priv::PCXHeader pcxHeader = {};
 
 		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
-		RKIT_CHECK(feedback->OpenInput(depsNode->GetInputFileLocation(), shortName, stream));
+		RKIT_CHECK(feedback->OpenInput(buildFileLocation, shortName, stream));
 
 		RKIT_CHECK(stream->ReadAll(&pcxHeader, sizeof(pcxHeader)));
 
 		if (pcxHeader.m_numColorPlanes != 1 && pcxHeader.m_numColorPlanes != 3 && pcxHeader.m_numColorPlanes != 4)
 		{
-			rkit::log::ErrorFmt("PCX file '{}' has an unsupported number of planes", shortName.GetChars());
+			rkit::log::ErrorFmt("PCX file '{}' has an unsupported number of planes", shortName.ToStringView());
 			return rkit::ResultCode::kMalformedFile;
 		}
 
 		if (pcxHeader.m_bitsPerPlane != 8)
 		{
-			rkit::log::ErrorFmt("PCX file '{}' has an unsupported bits per plane", shortName.GetChars());
+			rkit::log::ErrorFmt("PCX file '{}' has an unsupported bits per plane", shortName.ToStringView());
 			return rkit::ResultCode::kMalformedFile;
 		}
 
@@ -794,8 +880,9 @@ namespace anox { namespace buildsystem
 		uint8_t vgaPalette[256][3];
 		bool haveVGAPalette = false;
 
-		priv::TextureCompilerImage<uint8_t, 4> image;
-		RKIT_CHECK(image.Initialize(width, height));
+		rkit::UniquePtr<priv::TextureCompilerImage<uint8_t, 4>> image;
+		RKIT_CHECK((rkit::New<priv::TextureCompilerImage<uint8_t, 4>>(image)));
+		RKIT_CHECK(image->Initialize(width, height, rkit::utils::PixelPacking::kUInt8));
 
 		if (pcxHeader.m_numColorPlanes == 1)
 		{
@@ -831,7 +918,7 @@ namespace anox { namespace buildsystem
 			for (uint32_t y = 0; y < height; y++)
 			{
 				const rkit::ConstSpan<uint8_t> inScanline = pcxData.ToSpan().SubSpan(y * scanLinePitch, width);
-				const rkit::Span<priv::TextureCompilerPixel<uint8_t, 4>> outScanline = image.GetScanline(y);
+				const rkit::Span<priv::TextureCompilerPixel<uint8_t, 4>> outScanline = image->GetScanlineSpan(y);
 
 				for (uint32_t x = 0; x < width; x++)
 				{
@@ -857,37 +944,59 @@ namespace anox { namespace buildsystem
 			return rkit::ResultCode::kNotYetImplemented;
 		}
 
-		rkit::Vector<priv::TextureCompilerImage<uint8_t, 4>> images;
+		outImage = std::move(image);
+		return rkit::ResultCode::kOK;
+	}
 
-		size_t numLevels = 0;
-		RKIT_CHECK(GenerateMipMaps(images, rkit::Span<priv::TextureCompilerImage<uint8_t, 4>>(&image, 1), numLevels, disposition));
+	rkit::Result TextureCompiler::GetPNG(rkit::UniquePtr<rkit::utils::IImage> &image, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
+	{
+		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
+		RKIT_CHECK(feedback->OpenInput(buildFileLocation, shortName, stream));
 
-		return ExportDDS(images.ToSpan(), numLevels, 1, depsNode, feedback, disposition);
+		return pngDriver.LoadPNG(image, *stream);
+	}
+
+	rkit::Result TextureCompiler::CompileTGA(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
+	{
+		rkit::UniquePtr<rkit::utils::IImage> image;
+		RKIT_CHECK(GetTGA(image, feedback, rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, disposition));
+
+		return CompileImage(*image, depsNode, feedback, disposition);
+	}
+
+	rkit::Result TextureCompiler::CompilePCX(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
+	{
+		rkit::UniquePtr<rkit::utils::IImage> image;
+		RKIT_CHECK(GetPCX(image, feedback, rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, disposition));
+
+		return CompileImage(*image, depsNode, feedback, disposition);
 	}
 
 	rkit::Result TextureCompiler::CompilePNG(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
 	{
-		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
-		RKIT_CHECK(feedback->OpenInput(depsNode->GetInputFileLocation(), shortName, stream));
+		rkit::UniquePtr<rkit::utils::IImage> image;
+		RKIT_CHECK(GetPNG(image, feedback, pngDriver, rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, disposition));
 
-		rkit::UniquePtr<rkit::utils::IImage> pngImage;
-		RKIT_CHECK(pngDriver.LoadPNG(*stream, pngImage));
+		return CompileImage(*image, depsNode, feedback, disposition);
+	}
 
-		if (pngImage->GetPixelPacking() != rkit::utils::PixelPacking::kUInt8)
+	rkit::Result TextureCompiler::CompileImage(const rkit::utils::IImage &image, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, ImageImportDisposition disposition)
+	{
+		if (image.GetPixelPacking() != rkit::utils::PixelPacking::kUInt8)
 			return rkit::ResultCode::kDataError;
 
-		const uint32_t width = pngImage->GetWidth();
-		const uint32_t height = pngImage->GetHeight();
+		const uint32_t width = image.GetWidth();
+		const uint32_t height = image.GetHeight();
 
 		priv::TextureCompilerImage<uint8_t, 4> tcImage;
-		RKIT_CHECK(tcImage.Initialize(pngImage->GetWidth(), pngImage->GetHeight()));
+		RKIT_CHECK(tcImage.Initialize(image.GetWidth(), image.GetHeight(), rkit::utils::PixelPacking::kUInt8));
 
 		for (uint32_t y = 0; y < height; y++)
 		{
-			rkit::Span<priv::TextureCompilerPixel<uint8_t, 4>> outScanline = tcImage.GetScanline(y);
-			const void *inScanline = pngImage->GetScanline(y);
+			rkit::Span<priv::TextureCompilerPixel<uint8_t, 4>> outScanline = tcImage.GetScanlineSpan(y);
+			const void *inScanline = image.GetScanline(y);
 
-			switch (pngImage->GetNumChannels())
+			switch (image.GetNumChannels())
 			{
 			case 1:
 				for (size_t x = 0; x < width; x++)
@@ -1142,7 +1251,7 @@ namespace anox { namespace buildsystem
 			{
 				uint8_t *scanlineOut = scanlineBuffer;
 
-				const rkit::ConstSpan<priv::TextureCompilerPixel<TElementType, TNumElements>> scanline = image.GetScanline(y);
+				const rkit::ConstSpan<priv::TextureCompilerPixel<TElementType, TNumElements>> scanline = image.GetScanlineSpan(y);
 
 				for (const priv::TextureCompilerPixel<TElementType, TNumElements> &pixel : scanline)
 				{
@@ -1193,9 +1302,90 @@ namespace anox { namespace buildsystem
 		return 3;
 	}
 
+	rkit::Result TextureCompiler::GetImageMetadataDerived(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName)
+	{
+		const rkit::StringSliceView path = shortName.ToStringView();
+
+		size_t extPos = path.Length();
+		while (extPos > 0)
+		{
+			extPos--;
+			if (path[extPos] == '.')
+				break;
+		}
+
+		if (extPos == 0)
+		{
+			rkit::log::ErrorFmt("Missing file extension: {}", path);
+			return rkit::ResultCode::kDataError;
+		}
+
+		const rkit::StringSliceView extension = path.SubString(extPos);
+
+		if (extension == ".pcx")
+			return GetPCXMetadata(imageSpec, feedback, shortName);
+
+		if (extension == ".png")
+			return GetPNGMetadata(imageSpec, feedback, pngDriver, shortName);
+
+		if (extension == ".tga")
+			return GetTGAMetadata(imageSpec, feedback, shortName);
+
+		rkit::log::ErrorFmt("Unsupported file format: {}", path);
+		return rkit::ResultCode::kDataError;
+	}
+
+	rkit::Result TextureCompiler::GetImageDerived(rkit::UniquePtr<rkit::utils::IImage> &image,
+		rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver,
+		rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
+	{
+		const rkit::StringSliceView path = shortName.ToStringView();
+
+		size_t extPos = path.Length();
+		while (extPos > 0)
+		{
+			extPos--;
+			if (path[extPos] == '.')
+				break;
+		}
+
+		if (extPos == 0)
+		{
+			rkit::log::ErrorFmt("Missing file extension: {}", path);
+			return rkit::ResultCode::kDataError;
+		}
+
+		const rkit::StringSliceView extension = path.SubString(extPos);
+
+		if (extension == ".pcx")
+			return GetPCX(image, feedback, buildFileLocation, shortName, disposition);
+
+		if (extension == ".png")
+			return GetPNG(image, feedback, pngDriver, buildFileLocation, shortName, disposition);
+
+		if (extension == ".tga")
+			return GetTGA(image, feedback, buildFileLocation, shortName, disposition);
+
+		rkit::log::ErrorFmt("Unsupported file format: {}", path);
+		return rkit::ResultCode::kDataError;
+	}
+
+
 	rkit::Result TextureCompilerBase::ResolveIntermediatePath(rkit::String &outString, const rkit::StringView &identifierWithDisposition)
 	{
 		return outString.Format("ax_tex/{}.dds", identifierWithDisposition.GetChars());
+	}
+
+	rkit::Result TextureCompilerBase::GetImageMetadata(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName)
+	{
+		return TextureCompiler::GetImageMetadataDerived(imageSpec, feedback, pngDriver, buildFileLocation, shortName);
+	}
+
+	rkit::Result TextureCompilerBase::GetImage(rkit::UniquePtr<rkit::utils::IImage> &image,
+		rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver,
+		rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
+	{
+		return TextureCompiler::GetImageDerived(image, feedback, pngDriver, buildFileLocation, shortName, disposition);
 	}
 
 	rkit::Result TextureCompilerBase::CreateImportIdentifier(rkit::String &result, const rkit::StringView &imagePath, ImageImportDisposition disposition)

@@ -5,11 +5,16 @@
 #include "NoCopy.h"
 #include "StringProto.h"
 
-// Might need to move this one?
-#include "Format.h"
+#include "FormatProtos.h"
 
 #include <cstdint>
 #include <cstddef>
+
+namespace rkit
+{
+	template<class TChar>
+	struct IFormatStringWriter;
+}
 
 namespace rkit { namespace priv {
 	template<class TChar, CharacterEncoding TEncoding>
@@ -132,6 +137,8 @@ namespace rkit
 		Result VFormat(const BaseStringSliceView<TChar, TEncoding> &fmt, const FormatParameterList<TChar> &formatParams);
 
 		Ordering Compare(const BaseStringSliceView<TChar, TEncoding> &other) const;
+
+		void FormatValue(IFormatStringWriter<TChar> &writer) const;
 
 	private:
 		bool IsStaticString() const;
@@ -543,6 +550,12 @@ rkit::Ordering rkit::BaseString<TChar, TEncoding, TStaticSize>::Compare(const Ba
 	return static_cast<BaseStringSliceView<TChar, TEncoding>>(*this).Compare(other);
 }
 
+
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+void rkit::BaseString<TChar, TEncoding, TStaticSize>::FormatValue(IFormatStringWriter<TChar> &writer) const
+{
+	return static_cast<BaseStringSliceView<TChar, TEncoding>>(*this).FormatValue(writer);
+}
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
 const TChar *rkit::BaseString<TChar, TEncoding, TStaticSize>::CStr() const

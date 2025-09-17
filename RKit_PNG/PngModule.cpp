@@ -23,7 +23,8 @@ namespace rkit { namespace png {
 		rkit::Result InitDriver(const rkit::DriverInitParameters *) override;
 		void ShutdownDriver() override;
 
-		Result LoadPNG(ISeekableReadStream &stream, UniquePtr<utils::IImage> &outImage) const override;
+		Result LoadPNGMetadata(utils::ImageSpec &outImageSpec, ISeekableReadStream &stream) const override;
+		Result LoadPNG(UniquePtr<utils::IImage> &outImage, ISeekableReadStream &stream) const override;
 
 		uint32_t GetDriverNamespaceID() const override { return rkit::IModuleDriver::kDefaultNamespace; }
 		rkit::StringView GetDriverName() const override { return "PNG"; }
@@ -65,6 +66,7 @@ namespace rkit { namespace png {
 		explicit PngLoader(ISeekableReadStream &stream);
 		~PngLoader();
 
+		Result RunMetadata(utils::ImageSpec &outImageSpec);
 		Result Run(UniquePtr<utils::IImage> &outImage);
 
 	private:
@@ -135,6 +137,48 @@ namespace rkit { namespace png {
 	PngLoader::~PngLoader()
 	{
 		png_destroy_read_struct(&m_png, &m_info, &m_endInfo);
+	}
+
+	Result PngLoader::RunMetadata(utils::ImageSpec &imageSpec)
+	{
+		m_png = png_create_read_struct_2(PNG_LIBPNG_VER_STRING, this, StaticErrorCB, StaticWarnCB, this, StaticAllocCB, StaticFreeCB);
+
+		if (!m_png)
+		{
+			rkit::log::Error("Creating PNG failed");
+			return ResultCode::kDataError;
+		}
+
+		m_info = png_create_info_struct(m_png);
+
+		if (!m_png)
+		{
+			rkit::log::Error("Creating PNG info failed");
+			return ResultCode::kDataError;
+		}
+
+		png_set_user_limits(m_png, 4096, 4096);
+		png_set_read_fn(m_png, this, StaticReadCB);
+
+		int transforms = PNG_TRANSFORM_PACKING | PNG_TRANSFORM_EXPAND;
+
+		RKIT_CHECK(TrapPNGCall(png_read_info)(m_png, m_info));
+
+		const png_byte channels = png_get_channels(m_png, m_info);
+		const png_byte bitDepth = png_get_bit_depth(m_png, m_info);
+
+		if (bitDepth != 8)
+		{
+			rkit::log::Error("Unsupported bit depth");
+			return ResultCode::kDataError;
+		}
+
+		imageSpec.m_width = png_get_image_width(m_png, m_info);
+		imageSpec.m_height = png_get_image_height(m_png, m_info);
+		imageSpec.m_pixelPacking = utils::PixelPacking::kUInt8;
+		imageSpec.m_numChannels = channels;
+
+		return rkit::ResultCode::kOK;
 	}
 
 	Result PngLoader::Run(UniquePtr<utils::IImage> &outImage)
@@ -259,7 +303,13 @@ namespace rkit { namespace png {
 	{
 	}
 
-	Result PngDriver::LoadPNG(ISeekableReadStream &stream, UniquePtr<utils::IImage> &outImage) const
+	Result PngDriver::LoadPNGMetadata(utils::ImageSpec &outImageSpec, ISeekableReadStream &stream) const
+	{
+		PngLoader loader(stream);
+		return loader.RunMetadata(outImageSpec);
+	}
+
+	Result PngDriver::LoadPNG(UniquePtr<utils::IImage> &outImage, ISeekableReadStream &stream) const
 	{
 		PngLoader loader(stream);
 		return loader.Run(outImage);
