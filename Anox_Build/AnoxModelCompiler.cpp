@@ -265,7 +265,6 @@ namespace anox { namespace buildsystem
 	bool AnoxMDACompiler::ParseToken(rkit::ConstSpan<char> &outToken, rkit::ConstSpan<char> &lineSpan)
 	{
 		size_t endPos = 0;
-		size_t eolCharCount = 0;
 
 		while (endPos < lineSpan.Count())
 		{

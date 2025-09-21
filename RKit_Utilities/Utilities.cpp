@@ -108,6 +108,9 @@ namespace rkit
 		bool ParseUInt64(const StringSliceView &str, uint8_t radix, uint64_t &i) const override;
 
 		Result CreateImage(const utils::ImageSpec &spec, UniquePtr<utils::IImage> &image) const override;
+		Result CloneImage(UniquePtr<utils::IImage> &outImage, const utils::IImage &image) const override;
+		Result BlitImageSigned(utils::IImage &destImage, const utils::IImage &srcImage, ptrdiff_t srcX, ptrdiff_t srcY, ptrdiff_t destX, ptrdiff_t destY, size_t width, size_t height) const override;
+		Result BlitImage(utils::IImage &destImage, const utils::IImage &srcImage, size_t srcX, size_t srcY, size_t destX, size_t destY, size_t width, size_t height) const override;
 
 		void FormatSignedInt(IFormatStringWriter<char> &writer, intmax_t value) const override;
 		void FormatUnsignedInt(IFormatStringWriter<char> &writer, uintmax_t value) const override;
@@ -2336,8 +2339,123 @@ namespace rkit
 	Result UtilitiesDriver::CreateImage(const utils::ImageSpec &spec, UniquePtr<utils::IImage> &image) const
 	{
 		UniquePtr<utils::ImageBase> imageBase;
-		RKIT_CHECK(utils::ImageBase::Create(spec, imageBase));
+		RKIT_CHECK(utils::ImageBase::Create(imageBase, spec));
 		image = std::move(imageBase);
+		return ResultCode::kOK;
+	}
+
+	Result UtilitiesDriver::CloneImage(UniquePtr<utils::IImage> &outImage, const utils::IImage &image) const
+	{
+		UniquePtr<utils::ImageBase> imageBase;
+		RKIT_CHECK(utils::ImageBase::Create(imageBase, image.GetImageSpec()));
+
+		RKIT_CHECK(BlitImage(*imageBase, image, 0, 0, 0, 0, image.GetWidth(), image.GetHeight()));
+
+		outImage = std::move(imageBase);
+		return ResultCode::kOK;
+	}
+
+	Result UtilitiesDriver::BlitImageSigned(utils::IImage &destImage, const utils::IImage &srcImage, ptrdiff_t srcX, ptrdiff_t srcY, ptrdiff_t destX, ptrdiff_t destY, size_t width, size_t height) const
+	{
+		const utils::ImageSpec &destSpec = destImage.GetImageSpec();
+		const utils::ImageSpec &srcSpec = srcImage.GetImageSpec();
+
+		ptrdiff_t minX = Min(srcX, destX);
+		ptrdiff_t minY = Min(srcY, destY);
+
+		// Insets a coordinate and returns true if it is still valid
+		auto adjustCoords = [](size_t (&outCoords)[2], const ptrdiff_t (&inCoords)[2], size_t &sizeMeasure) -> bool
+			{
+				ptrdiff_t minCoord = Min(inCoords[0], inCoords[1]);
+
+				if (minCoord < 0)
+				{
+					const size_t negativeMinCoord = static_cast<size_t>(-(minCoord + 1)) + 1;
+
+					if (sizeMeasure <= negativeMinCoord)
+						return false;
+
+					for (int i = 0; i < 2; i++)
+					{
+						const ptrdiff_t coord = inCoords[i];
+
+						if (coord < 0)
+						{
+							const size_t negativeCoord = static_cast<size_t>(-(coord + 1)) + 1;
+
+							outCoords[i] = static_cast<size_t>(negativeCoord - negativeMinCoord);
+						}
+						else
+						{
+							const size_t uCoord = static_cast<size_t>(coord);
+
+							if (std::numeric_limits<size_t>::max() - uCoord < negativeMinCoord)
+								return false;
+
+							outCoords[i] = uCoord + negativeMinCoord;
+						}
+					}
+
+					sizeMeasure -= negativeMinCoord;
+				}
+				else
+				{
+					for (int i = 0; i < 2; i++)
+						outCoords[i] = static_cast<size_t>(inCoords[i]);
+				}
+
+				return true;
+			};
+
+		size_t srcDestXOut[2] = { 0, 0 };
+		ptrdiff_t srcDestXIn[2] = { srcX, destX };
+
+		size_t srcDestYOut[2] = { 0, 0 };
+		ptrdiff_t srcDestYIn[2] = { srcY, destY };
+
+		if (!adjustCoords(srcDestXOut, srcDestXIn, width)
+			|| !adjustCoords(srcDestYOut, srcDestYIn, height))
+		{
+			return ResultCode::kOK;
+		}
+
+		return BlitImage(destImage, srcImage, srcDestXOut[0], srcDestYOut[0], srcDestXOut[1], srcDestYOut[1], width, height);
+	}
+
+	Result UtilitiesDriver::BlitImage(utils::IImage &destImage, const utils::IImage &srcImage, size_t srcX, size_t srcY, size_t destX, size_t destY, size_t width, size_t height) const
+	{
+		const utils::ImageSpec &destSpec = destImage.GetImageSpec();
+		const utils::ImageSpec &srcSpec = srcImage.GetImageSpec();
+
+		if (srcX >= srcSpec.m_width || srcY >= srcSpec.m_height || destX >= destSpec.m_width || destY >= destSpec.m_height)
+			return ResultCode::kOK;
+
+		bool requiresConversion = (destSpec.m_pixelPacking != srcSpec.m_pixelPacking || destSpec.m_numChannels != srcSpec.m_numChannels);
+
+		const size_t maxDestWidth = destSpec.m_width - destX;
+		const size_t maxDestHeight = destSpec.m_height - destY;
+		const size_t maxSrcWidth = srcSpec.m_width - srcX;
+		const size_t maxSrcHeight = srcSpec.m_height - srcY;
+
+		width = rkit::Min(rkit::Min(width, maxDestWidth), maxSrcWidth);
+		height = rkit::Min(rkit::Min(height, maxDestHeight), maxSrcHeight);
+
+		if (requiresConversion)
+			return ResultCode::kNotYetImplemented;
+
+		const size_t bytesPerPixel = utils::img::BytesPerPixel(srcSpec.m_numChannels, srcSpec.m_pixelPacking);
+		const size_t srcByteOffset = srcX * bytesPerPixel;
+		const size_t destByteOffset = destX * bytesPerPixel;
+		const size_t spanSize = width * bytesPerPixel;
+
+		for (size_t relY = 0; relY < height; relY++)
+		{
+			const size_t srcRow = srcY + relY;
+			const size_t destRow = destY + relY;
+
+			utils::img::BlitScanline(destImage, srcImage, srcRow, srcByteOffset, destRow, destByteOffset, spanSize);
+		}
+
 		return ResultCode::kOK;
 	}
 

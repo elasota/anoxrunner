@@ -1240,7 +1240,7 @@ namespace anox { namespace buildsystem
 				}
 
 				if (usi == faceStats.m_numUniqueStyles)
-					faceStats.m_uniqueStyles[faceStats.m_numUniqueStyles++];
+					faceStats.m_uniqueStyles[faceStats.m_numUniqueStyles++] = face.m_lmStyles[i];
 
 				faceStats.m_numInputStyles++;
 			}
@@ -3424,7 +3424,7 @@ namespace anox { namespace buildsystem
 namespace rkit
 {
 	template<size_t TSize>
-	struct rkit::Hasher<anox::buildsystem::U32Cluster<TSize>>
+	struct Hasher<anox::buildsystem::U32Cluster<TSize>>
 		: public BinaryHasher<anox::buildsystem::U32Cluster<TSize>>
 	{
 	};

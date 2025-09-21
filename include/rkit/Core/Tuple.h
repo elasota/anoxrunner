@@ -106,13 +106,13 @@ namespace rkit { namespace priv
 	template<size_t TIndex, class TFirstType, class... TMoreTypes>
 	typename TupleTypeAtIndex<TIndex - 1, TMoreTypes...>::Type_t &TupleGetAtHelper<TIndex, TFirstType, TMoreTypes...>::GetMutable(TFirstType &firstValue, Tuple<TMoreTypes...> &moreValues)
 	{
-		return moreValues.GetAt<TIndex - 1>();
+		return moreValues.template GetAt<TIndex - 1>();
 	}
 
 	template<size_t TIndex, class TFirstType, class... TMoreTypes>
 	const typename TupleTypeAtIndex<TIndex - 1, TMoreTypes...>::Type_t &TupleGetAtHelper<TIndex, TFirstType, TMoreTypes...>::GetConst(const TFirstType &firstValue, const Tuple<TMoreTypes...> &moreValues)
 	{
-		return moreValues.GetAt<TIndex - 1>();
+		return moreValues.template GetAt<TIndex - 1>();
 	}
 
 	template<class TFirstType, class... TMoreTypes>

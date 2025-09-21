@@ -14,6 +14,7 @@ namespace rkit
 	class UniquePtr;
 
 	struct ISeekableReadStream;
+	struct ISeekableWriteStream;
 }
 
 namespace rkit { namespace png {
@@ -21,5 +22,6 @@ namespace rkit { namespace png {
 	{
 		virtual Result LoadPNGMetadata(utils::ImageSpec &imageSpec, ISeekableReadStream &stream) const = 0;
 		virtual Result LoadPNG(UniquePtr<utils::IImage> &outImage, ISeekableReadStream &stream) const = 0;
+		virtual Result SavePNG(const utils::IImage &image, ISeekableWriteStream &stream) const = 0;
 	};
 } } // rkit::png

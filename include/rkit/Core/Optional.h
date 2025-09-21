@@ -137,7 +137,7 @@ namespace rkit
 	Optional<T> &Optional<T>::operator=(const T &value)
 	{
 		if (m_isSet)
-			m_value.m_value = std::move(value);
+			m_value.m_value = value;
 		else
 		{
 			m_value.m_uninit.~Uninitialized();

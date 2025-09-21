@@ -42,6 +42,9 @@ namespace anox { namespace buildsystem
 			rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver,
 			rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName, ImageImportDisposition disposition);
 
+		static rkit::Result CompileImage(const rkit::utils::IImage &image, const rkit::CIPathView &outPath,
+			rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, ImageImportDisposition disposition);
+
 	protected:
 		TextureCompilerBase() {}
 	};

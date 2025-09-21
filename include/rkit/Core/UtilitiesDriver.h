@@ -129,6 +129,9 @@ namespace rkit
 		virtual bool ParseUInt64(const StringSliceView &str, uint8_t radix, uint64_t &i) const = 0;
 
 		virtual Result CreateImage(const utils::ImageSpec &spec, UniquePtr<utils::IImage> &image) const = 0;
+		virtual Result CloneImage(UniquePtr<utils::IImage> &outImage, const utils::IImage &image) const = 0;
+		virtual Result BlitImageSigned(utils::IImage &destImage, const utils::IImage &srcImage, ptrdiff_t srcX, ptrdiff_t srcY, ptrdiff_t destX, ptrdiff_t destY, size_t width, size_t height) const = 0;
+		virtual Result BlitImage(utils::IImage &destImage, const utils::IImage &srcImage, size_t srcX, size_t srcY, size_t destX, size_t destY, size_t width, size_t height) const = 0;
 
 		virtual void FormatSignedInt(IFormatStringWriter<char> &writer, intmax_t value) const = 0;
 		virtual void FormatUnsignedInt(IFormatStringWriter<char> &writer, uintmax_t value) const = 0;

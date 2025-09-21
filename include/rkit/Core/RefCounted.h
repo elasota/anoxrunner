@@ -8,10 +8,13 @@
 
 namespace rkit
 {
+	template<class T>
+	class UniquePtr;
+
 	class RefCounted;
 	struct RefCountedTracker;
 
-	namespace Private
+	namespace priv
 	{
 		struct RefCountedInstantiator
 		{
@@ -44,7 +47,7 @@ namespace rkit
 	class RefCounted : private RefCountedTracker
 	{
 	public:
-		friend struct rkit::Private::RefCountedInstantiator;
+		friend struct rkit::priv::RefCountedInstantiator;
 
 	protected:
 		RefCounted();
@@ -128,13 +131,58 @@ namespace rkit
 
 	template<class TType, class TPtrType>
 	Result New(RCPtr<TPtrType> &objPtr);
+
+	template<class RCType, class UPtrType>
+	Result MakeRC(RCPtr<RCType> &rcPtr, UniquePtr<UPtrType> &&uniquePtr);
 }
 
 #include "Drivers.h"
 #include "MallocDriver.h"
 #include "Result.h"
+#include "UniquePtr.h"
 
 #include <utility>
+
+namespace rkit { namespace priv
+{
+	template<class T>
+	class UniquePtrTracker final : public RefCountedTracker
+	{
+	public:
+		UniquePtrTracker() = delete;
+		UniquePtrTracker(UniquePtr<T> &&object);
+
+		void SetSelf(const SimpleObjectAllocation<UniquePtrTracker<T>> &self);
+
+		void RCTrackerZero() override;
+
+	private:
+
+		void InitRefCounted(const SimpleObjectAllocation<RefCounted> &alloc);
+
+		UniquePtr<T> m_object;
+		SimpleObjectAllocation<UniquePtrTracker<T>> m_self;
+	};
+
+	template<class T>
+	UniquePtrTracker<T>::UniquePtrTracker(UniquePtr<T> &&object)
+		: RefCountedTracker(0)
+		, m_object(std::move(object))
+	{
+	}
+
+	template<class T>
+	void UniquePtrTracker<T>::SetSelf(const SimpleObjectAllocation<UniquePtrTracker<T>> &self)
+	{
+		m_self = self;
+	}
+
+	template<class T>
+	void UniquePtrTracker<T>::RCTrackerZero()
+	{
+		rkit::SafeDelete(m_self);
+	}
+} }
 
 namespace rkit
 {
@@ -204,7 +252,7 @@ namespace rkit
 	template<class T>
 	inline RCPtr<T>::RCPtr(T *ptr)
 		: m_object(ptr)
-		, m_tracker(Private::RefCountedInstantiator::GetTrackerFromObject(ptr))
+		, m_tracker(priv::RefCountedInstantiator::GetTrackerFromObject(ptr))
 	{
 		if (m_tracker != nullptr)
 			m_tracker->RCTrackerAddRef();
@@ -381,7 +429,7 @@ namespace rkit
 			RefCountedTracker *oldTracker = m_tracker;
 
 			T *newObj = other;
-			RefCountedTracker *newTracker = Private::RefCountedInstantiator::GetTrackerFromObject(newObj);
+			RefCountedTracker *newTracker = priv::RefCountedInstantiator::GetTrackerFromObject(newObj);
 
 			m_object = newObj;
 			m_tracker = newTracker;
@@ -478,8 +526,8 @@ namespace rkit
 		allocation.m_mem = mem;
 		allocation.m_obj = refCounted;
 
-		Private::RefCountedInstantiator::InitRefCounted(*refCounted, allocation);
-		RefCountedTracker *tracker = Private::RefCountedInstantiator::GetTrackerFromObject(refCounted);
+		priv::RefCountedInstantiator::InitRefCounted(*refCounted, allocation);
+		RefCountedTracker *tracker = priv::RefCountedInstantiator::GetTrackerFromObject(refCounted);
 
 		objPtr = RCPtr<TPtrType>(obj, tracker);
 
@@ -508,8 +556,8 @@ namespace rkit
 		allocation.m_mem = mem;
 		allocation.m_obj = refCounted;
 
-		Private::RefCountedInstantiator::InitRefCounted(*refCounted, allocation);
-		RefCountedTracker *tracker = Private::RefCountedInstantiator::GetTrackerFromObject(refCounted);
+		priv::RefCountedInstantiator::InitRefCounted(*refCounted, allocation);
+		RefCountedTracker *tracker = priv::RefCountedInstantiator::GetTrackerFromObject(refCounted);
 
 		objPtr = RCPtr<TPtrType>(obj, tracker);
 
@@ -522,7 +570,28 @@ namespace rkit
 		return NewWithAlloc<TType, TPtrType>(objPtr, GetDrivers().m_mallocDriver);
 	}
 
-	namespace Private
+	template<class RCType, class UPtrType>
+	Result MakeRC(RCPtr<RCType> &rcPtr, UniquePtr<UPtrType> &&uniquePtr)
+	{
+		RCType *object = uniquePtr.Get();
+
+		if (object == nullptr)
+		{
+			rcPtr.Reset();
+			return ResultCode::kOK;
+		}
+
+		UniquePtr<priv::UniquePtrTracker<UPtrType>> tracker;
+		RKIT_CHECK(New<priv::UniquePtrTracker<UPtrType>>(tracker, std::move(uniquePtr)));
+
+		SimpleObjectAllocation<priv::UniquePtrTracker<UPtrType>> trackerAllocation = tracker.Detach();
+		trackerAllocation.m_obj->SetSelf(trackerAllocation);
+
+		rcPtr = RCPtr<RCType>(object, trackerAllocation.m_obj);
+		return ResultCode::kOK;
+	}
+
+	namespace priv
 	{
 		inline void RefCountedInstantiator::InitRefCounted(RefCounted &refCounted, const SimpleObjectAllocation<RefCounted> &alloc)
 		{

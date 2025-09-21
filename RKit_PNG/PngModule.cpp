@@ -25,6 +25,7 @@ namespace rkit { namespace png {
 
 		Result LoadPNGMetadata(utils::ImageSpec &outImageSpec, ISeekableReadStream &stream) const override;
 		Result LoadPNG(UniquePtr<utils::IImage> &outImage, ISeekableReadStream &stream) const override;
+		Result SavePNG(const utils::IImage &image, ISeekableWriteStream &stream) const override;
 
 		uint32_t GetDriverNamespaceID() const override { return rkit::IModuleDriver::kDefaultNamespace; }
 		rkit::StringView GetDriverName() const override { return "PNG"; }
@@ -40,7 +41,7 @@ namespace rkit { namespace png {
 
 		PngCallThunk(Func_t func);
 
-		Result operator()(TFirstArg png, TArgs... args) const;
+		Result operator()(png_structp png, TArgs... args) const;
 
 	private:
 		Func_t m_func;
@@ -50,7 +51,7 @@ namespace rkit { namespace png {
 	class PngCallWithReturnValueThunk
 	{
 	public:
-		typedef TReturn(*Func_t)(TFirstArg png, TArgs... args);
+		typedef TReturn(*Func_t)(png_structp png, TArgs... args);
 
 		PngCallWithReturnValueThunk(Func_t func);
 
@@ -60,7 +61,25 @@ namespace rkit { namespace png {
 		Func_t m_func;
 	};
 
-	class PngLoader
+	class PngHandlerBase
+	{
+	public:
+		static void PNGCBAPI StaticErrorCB(png_structp png, png_const_charp msg);
+		static void PNGCBAPI StaticWarnCB(png_structp png, png_const_charp msg);
+		static png_voidp PNGCBAPI StaticAllocCB(png_structp png, png_alloc_size_t sz);
+		static void PNGCBAPI StaticFreeCB(png_structp png, png_voidp ptr);
+
+		void *GetErrorPtr();
+		void *GetMemPtr();
+
+		template<class TReturn, class... TArgs>
+		static PngCallWithReturnValueThunk<TReturn, TArgs...> TrapPNGCall(TReturn(*pngCall)(TArgs... args));
+
+		template<class... TArgs>
+		static PngCallThunk<TArgs...> TrapPNGCall(void(*pngCall)(TArgs... args));
+	};
+
+	class PngLoader final : public PngHandlerBase
 	{
 	public:
 		explicit PngLoader(ISeekableReadStream &stream);
@@ -70,22 +89,33 @@ namespace rkit { namespace png {
 		Result Run(UniquePtr<utils::IImage> &outImage);
 
 	private:
-		static void PNGCBAPI StaticErrorCB(png_structp png, png_const_charp msg);
-		static void PNGCBAPI StaticWarnCB(png_structp png, png_const_charp msg);
-		static png_voidp PNGCBAPI StaticAllocCB(png_structp png, png_alloc_size_t sz);
-		static void PNGCBAPI StaticFreeCB(png_structp png, png_voidp ptr);
 		static void PNGCBAPI StaticReadCB(png_structp png, png_bytep buffer, size_t sz);
 
-		template<class TReturn, class... TArgs>
-		PngCallWithReturnValueThunk<TReturn, TArgs...> TrapPNGCall(TReturn(*pngCall)(TArgs... args));
-
-		template<class... TArgs>
-		PngCallThunk<TArgs...> TrapPNGCall(void(*pngCall)(TArgs... args));
+		void *GetIOPtr();
 
 		ISeekableReadStream &m_stream;
 		png_structp m_png = nullptr;
 		png_infop m_info = nullptr;
 		png_infop m_endInfo = nullptr;
+	};
+
+	class PngSaver final : public PngHandlerBase
+	{
+	public:
+		explicit PngSaver(ISeekableWriteStream &stream);
+		~PngSaver();
+
+		Result Run(const utils::IImage &image);
+
+	private:
+		static void PNGCBAPI StaticWriteCB(png_structp png, png_bytep buffer, size_t sz);
+		static void PNGCBAPI StaticFlushCB(png_structp png);
+
+		void *GetIOPtr();
+
+		ISeekableWriteStream &m_stream;
+		png_structp m_png = nullptr;
+		png_infop m_info = nullptr;
 	};
 
 	template<class TFirstArg, class... TArgs>
@@ -95,7 +125,7 @@ namespace rkit { namespace png {
 	}
 
 	template<class TFirstArg, class... TArgs>
-	Result PngCallThunk<TFirstArg, TArgs...>::operator()(TFirstArg png, TArgs... args) const
+	Result PngCallThunk<TFirstArg, TArgs...>::operator()(png_structp png, TArgs... args) const
 	{
 		if (setjmp(png_jmpbuf(png)))
 		{
@@ -129,6 +159,54 @@ namespace rkit { namespace png {
 		}
 	}
 
+	void PNGCBAPI PngHandlerBase::StaticErrorCB(png_structp png, png_const_charp msg)
+	{
+		rkit::log::Error(rkit::StringView::FromCString(msg));
+		png_longjmp(png, 1);
+	}
+
+	void PNGCBAPI PngHandlerBase::StaticWarnCB(png_structp png, png_const_charp msg)
+	{
+		rkit::log::Warning(rkit::StringView::FromCString(msg));
+	}
+
+	png_voidp PNGCBAPI PngHandlerBase::StaticAllocCB(png_structp png, png_alloc_size_t sz)
+	{
+		return GetDrivers().m_mallocDriver->Alloc(sz);
+	}
+
+	void PNGCBAPI PngHandlerBase::StaticFreeCB(png_structp png, png_voidp ptr)
+	{
+		return GetDrivers().m_mallocDriver->Free(ptr);
+	}
+
+	void *PngHandlerBase::GetErrorPtr()
+	{
+		return this;
+	}
+
+	void *PngHandlerBase::GetMemPtr()
+	{
+		return this;
+	}
+
+	template<class TReturn, class... TArgs>
+	PngCallWithReturnValueThunk<TReturn, TArgs...> PngHandlerBase::TrapPNGCall(TReturn(*pngCall)(TArgs... args))
+	{
+		return PngCallWithReturnValueThunk<TReturn, TArgs...>(pngCall);
+	}
+
+	template<class... TArgs>
+	PngCallThunk<TArgs...> PngHandlerBase::TrapPNGCall(void(*pngCall)(TArgs... args))
+	{
+		return PngCallThunk<TArgs...>(pngCall);
+	}
+
+	rkit::Result PngDriver::InitDriver(const rkit::DriverInitParameters *)
+	{
+		return rkit::ResultCode::kOK;
+	}
+
 	PngLoader::PngLoader(ISeekableReadStream &stream)
 		: m_stream(stream)
 	{
@@ -141,7 +219,7 @@ namespace rkit { namespace png {
 
 	Result PngLoader::RunMetadata(utils::ImageSpec &imageSpec)
 	{
-		m_png = png_create_read_struct_2(PNG_LIBPNG_VER_STRING, this, StaticErrorCB, StaticWarnCB, this, StaticAllocCB, StaticFreeCB);
+		m_png = png_create_read_struct_2(PNG_LIBPNG_VER_STRING, GetErrorPtr(), StaticErrorCB, StaticWarnCB, GetMemPtr(), StaticAllocCB, StaticFreeCB);
 
 		if (!m_png)
 		{
@@ -158,7 +236,7 @@ namespace rkit { namespace png {
 		}
 
 		png_set_user_limits(m_png, 4096, 4096);
-		png_set_read_fn(m_png, this, StaticReadCB);
+		png_set_read_fn(m_png, GetIOPtr(), StaticReadCB);
 
 		int transforms = PNG_TRANSFORM_PACKING | PNG_TRANSFORM_EXPAND;
 
@@ -252,27 +330,6 @@ namespace rkit { namespace png {
 		return ResultCode::kOK;
 	}
 
-	void PNGCBAPI PngLoader::StaticErrorCB(png_structp png, png_const_charp msg)
-	{
-		rkit::log::Error(rkit::StringView::FromCString(msg));
-		png_longjmp(png, 1);
-	}
-
-	void PNGCBAPI PngLoader::StaticWarnCB(png_structp png, png_const_charp msg)
-	{
-		rkit::log::Warning(rkit::StringView::FromCString(msg));
-	}
-
-	png_voidp PNGCBAPI PngLoader::StaticAllocCB(png_structp png, png_alloc_size_t sz)
-	{
-		return GetDrivers().m_mallocDriver->Alloc(sz);
-	}
-
-	void PNGCBAPI PngLoader::StaticFreeCB(png_structp png, png_voidp ptr)
-	{
-		return GetDrivers().m_mallocDriver->Free(ptr);
-	}
-
 	void PNGCBAPI PngLoader::StaticReadCB(png_structp png, png_bytep buffer, size_t sz)
 	{
 		png_voidp ioPtr = png_get_io_ptr(png);
@@ -282,21 +339,110 @@ namespace rkit { namespace png {
 			png_error(png, "Read error");
 	}
 
-	template<class TReturn, class... TArgs>
-	PngCallWithReturnValueThunk<TReturn, TArgs...> PngLoader::TrapPNGCall(TReturn(*pngCall)(TArgs... args))
+	void *PngLoader::GetIOPtr()
 	{
-		return PngCallWithReturnValueThunk<TReturn, TArgs...>(pngCall);
+		return this;
 	}
 
-	template<class... TArgs>
-	PngCallThunk<TArgs...> PngLoader::TrapPNGCall(void(*pngCall)(TArgs... args))
+	PngSaver::PngSaver(ISeekableWriteStream &stream)
+		: m_stream(stream)
 	{
-		return PngCallThunk<TArgs...>(pngCall);
 	}
 
-	rkit::Result PngDriver::InitDriver(const rkit::DriverInitParameters *)
+	PngSaver::~PngSaver()
 	{
-		return rkit::ResultCode::kOK;
+		png_destroy_write_struct(&m_png, &m_info);
+	}
+
+	Result PngSaver::Run(const utils::IImage &image)
+	{
+		const utils::ImageSpec &imageSpec = image.GetImageSpec();
+
+		m_png = png_create_write_struct_2(PNG_LIBPNG_VER_STRING, GetErrorPtr(), StaticErrorCB, StaticWarnCB, GetMemPtr(), StaticAllocCB, StaticFreeCB);
+
+		if (!m_png)
+		{
+			rkit::log::Error("Creating PNG failed");
+			return ResultCode::kDataError;
+		}
+
+		m_info = png_create_info_struct(m_png);
+
+		if (!m_png)
+		{
+			rkit::log::Error("Creating PNG info failed");
+			return ResultCode::kDataError;
+		}
+
+		int bitDepth = 0;
+		switch (imageSpec.m_pixelPacking)
+		{
+		case utils::PixelPacking::kUInt8:
+			bitDepth = 8;
+			break;
+		default:
+			rkit::log::Error("Unknown pixel packing");
+			return ResultCode::kDataError;
+		}
+
+		int colorType = 0;
+		switch (imageSpec.m_numChannels)
+		{
+		case 1:
+			colorType = PNG_COLOR_TYPE_GRAY;
+			break;
+		case 2:
+			colorType = PNG_COLOR_TYPE_GRAY_ALPHA;
+			break;
+		case 3:
+			colorType = PNG_COLOR_TYPE_RGB;
+			break;
+		case 4:
+			colorType = PNG_COLOR_TYPE_RGBA;
+			break;
+		default:
+			rkit::log::Error("Unsupported channel count");
+			return ResultCode::kDataError;
+		}
+
+		RKIT_CHECK(TrapPNGCall(png_set_IHDR)(m_png, m_info, image.GetWidth(), image.GetHeight(), bitDepth, colorType, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT));
+
+		png_set_write_fn(m_png, GetIOPtr(), StaticWriteCB, StaticFlushCB);
+
+		RKIT_CHECK(TrapPNGCall(png_write_info)(m_png, m_info));
+
+		for (uint32_t row = 0; row < imageSpec.m_height; row++)
+		{
+			RKIT_CHECK(TrapPNGCall(png_write_row)(m_png, static_cast<png_const_bytep>(image.GetScanline(row))));
+		}
+
+		RKIT_CHECK(TrapPNGCall(png_write_end)(m_png, m_info));
+
+		return ResultCode::kOK;
+	}
+
+	void PNGCBAPI PngSaver::StaticWriteCB(png_structp png, png_bytep buffer, size_t sz)
+	{
+		png_voidp ioPtr = png_get_io_ptr(png);
+		Result result = static_cast<PngSaver *>(ioPtr)->m_stream.WriteAll(buffer, sz);
+
+		if (!rkit::utils::ResultIsOK(result))
+			png_error(png, "Write error");
+
+	}
+
+	void PNGCBAPI PngSaver::StaticFlushCB(png_structp png)
+	{
+		png_voidp ioPtr = png_get_io_ptr(png);
+		Result result = static_cast<PngSaver *>(ioPtr)->m_stream.Flush();
+
+		if (!rkit::utils::ResultIsOK(result))
+			png_error(png, "Flush error");
+	}
+
+	void *PngSaver::GetIOPtr()
+	{
+		return this;
 	}
 
 	void PngDriver::ShutdownDriver()
@@ -313,6 +459,12 @@ namespace rkit { namespace png {
 	{
 		PngLoader loader(stream);
 		return loader.Run(outImage);
+	}
+
+	Result PngDriver::SavePNG(const utils::IImage &image, ISeekableWriteStream &stream) const
+	{
+		PngSaver saver(stream);
+		return saver.Run(image);
 	}
 
 } } // rkit::png

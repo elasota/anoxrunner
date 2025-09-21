@@ -83,7 +83,7 @@ namespace rkit { namespace utils {
 		return m_image.GetBuffer() + m_pitchInElements * row;
 	}
 
-	Result ImageBase::Create(const ImageSpec &spec, UniquePtr<ImageBase> &outImage)
+	Result ImageBase::Create(UniquePtr<ImageBase> &outImage, const ImageSpec &spec)
 	{
 		UniquePtr<ImageBase> image;
 
@@ -103,3 +103,32 @@ namespace rkit { namespace utils {
 		return ResultCode::kOK;
 	}
 } } // rkit::utils
+
+
+namespace rkit { namespace utils { namespace img
+{
+	size_t BytesPerPixel(uint8_t numChannels, PixelPacking pixelPacking)
+	{
+		switch (pixelPacking)
+		{
+		case PixelPacking::kUInt8:
+			return numChannels;
+			break;
+		default:
+			RKIT_ASSERT(false);
+			return 0;
+		}
+	}
+
+	void BlitScanline(IImage &dest, const IImage &src, size_t srcRow, size_t srcByteOffset, size_t destRow, size_t destByteOffset, size_t numBytes)
+	{
+		const void *srcScanline = src.GetScanline(static_cast<uint32_t>(srcRow));
+		void *destScanline = dest.ModifyScanline(static_cast<uint32_t>(destRow));
+
+		ConstSpan<uint8_t> srcSpan(static_cast<const uint8_t *>(srcScanline) + srcByteOffset, numBytes);
+		Span<uint8_t> destSpan(static_cast<uint8_t *>(destScanline) + destByteOffset, numBytes);
+
+		CopySpanNonOverlapping(destSpan, srcSpan);
+	}
+
+} } } // rkit::utils::img

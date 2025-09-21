@@ -13,9 +13,12 @@
 #include "rkit/Core/String.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/Vector.h"
+#include "rkit/Core/RefCounted.h"
 
 #include "rkit/Utilities/Image.h"
 #include "rkit/Utilities/TextParser.h"
+
+#include "rkit/Png/PngDriver.h"
 
 #include "AnoxTextureCompiler.h"
 
@@ -36,6 +39,7 @@ namespace anox { namespace buildsystem
 		bool m_mipMapped;
 		bool m_bilinear;
 		bool m_clamp;
+		ImageImportDisposition m_importDisposition = ImageImportDisposition::kCount;
 	};
 
 	struct MaterialAnalysisBitmapDef
@@ -47,7 +51,6 @@ namespace anox { namespace buildsystem
 	{
 		rkit::String m_identifier;
 		bool m_isGenerated;
-		ImageImportDisposition m_disposition;
 	};
 
 	enum class InterformMaterialMovement
@@ -77,12 +80,12 @@ namespace anox { namespace buildsystem
 
 	struct MaterialAnalysisFrameDef
 	{
-		uint32_t m_bitmap;
-		uint32_t m_next;
-		uint32_t m_waitMSec;
+		uint32_t m_bitmap = 0;
+		uint32_t m_next = 0;
+		uint32_t m_waitMSec = 0;
 
-		int32_t m_xOffset;
-		int32_t m_yOffset;
+		int32_t m_xOffset = 0;
+		int32_t m_yOffset = 0;
 	};
 
 	struct MaterialAnalysisDynamicData
@@ -118,8 +121,6 @@ namespace anox { namespace buildsystem
 
 			const uint8_t isGenerated = imageImport.m_isGenerated ? 1 : 0;
 			RKIT_CHECK(stream.WriteAll(&isGenerated, 1));
-
-			RKIT_CHECK(stream.WriteAll(&imageImport.m_disposition, sizeof(imageImport.m_disposition)));
 		}
 
 		const MaterialAnalysisBitmapDef *bitmaps = m_bitmapDefs.GetBuffer();
@@ -146,7 +147,6 @@ namespace anox { namespace buildsystem
 		RKIT_CHECK(m_bitmapDefs.Resize(counts[1]));
 		RKIT_CHECK(m_frameDefs.Resize(counts[2]));
 
-
 		for (MaterialAnalysisImageImport &imageImport : m_imageImports)
 		{
 			uint64_t strLength64 = 0;
@@ -170,8 +170,6 @@ namespace anox { namespace buildsystem
 			RKIT_CHECK(stream.ReadAll(&isGenerated, 1));
 
 			imageImport.m_isGenerated = (isGenerated != 0);
-
-			RKIT_CHECK(stream.ReadAll(&imageImport.m_disposition, sizeof(ImageImportDisposition)));
 		}
 
 		MaterialAnalysisBitmapDef *bitmaps = m_bitmapDefs.GetBuffer();
@@ -405,12 +403,14 @@ namespace anox { namespace buildsystem
 							RKIT_CHECK(textParser->ExpectToken("="));
 							RKIT_CHECK(textParser->RequireToken(token));
 
-							int32_t nextIndex = 0;
-							if (!utils.ParseInt32(rkit::StringSliceView(token), 10, nextIndex))
+							uint32_t bitmapIndex = 0;
+							if (!utils.ParseUInt32(rkit::StringSliceView(token), 10, bitmapIndex))
 							{
 								rkit::log::Error("Invalid next frame");
 								return rkit::ResultCode::kDataError;
 							}
+
+							frameDef.m_bitmap = bitmapIndex;
 						}
 						else if (IsToken(token, "next"))
 						{
@@ -631,12 +631,7 @@ namespace anox { namespace buildsystem
 
 		if (analysisHeader.m_materialType == data::MaterialType::kAnimation)
 		{
-			ImageImportDisposition disposition = ImageImportDisposition::kWorldAlphaTestedNoMip;
-
-			for (MaterialAnalysisImageImport &imageImport : dynamicData.m_imageImports)
-			{
-				imageImport.m_disposition = disposition;
-			}
+			analysisHeader.m_importDisposition = ImageImportDisposition::kWorldAlphaTestedNoMip;
 		}
 
 		if (analysisHeader.m_materialType == data::MaterialType::kInterform)
@@ -655,7 +650,7 @@ namespace anox { namespace buildsystem
 		{
 			if (!imageImport.m_isGenerated)
 			{
-				RKIT_CHECK(TextureCompilerBase::CreateImportIdentifier(imageImport.m_identifier, imageImport.m_identifier, imageImport.m_disposition));
+				RKIT_CHECK(TextureCompilerBase::CreateImportIdentifier(imageImport.m_identifier, imageImport.m_identifier, analysisHeader.m_importDisposition));
 			}
 		}
 
@@ -715,8 +710,6 @@ namespace anox { namespace buildsystem
 		analysisHeader.m_materialType = data::MaterialType::kSingle;
 		analysisHeader.m_colorType = data::MaterialColorType::kRGBA;
 
-		ImageImportDisposition disposition = ImageImportDisposition::kCount;
-
 		data::MaterialResourceType nodeType = data::MaterialResourceType::kCount;
 
 		RKIT_CHECK(MaterialNodeTypeFromFourCC(nodeType, depsNode->GetDependencyNodeType()));
@@ -727,17 +720,17 @@ namespace anox { namespace buildsystem
 		case data::MaterialResourceType::kFont:
 			analysisHeader.m_bilinear = false;
 			analysisHeader.m_mipMapped = false;
-			disposition = ImageImportDisposition::kGraphicTransparent;
+			analysisHeader.m_importDisposition = ImageImportDisposition::kGraphicTransparent;
 			break;
 		case data::MaterialResourceType::kWorld:
 			analysisHeader.m_bilinear = true;
 			analysisHeader.m_mipMapped = true;
-			disposition = ImageImportDisposition::kWorldAlphaTested;
+			analysisHeader.m_importDisposition = ImageImportDisposition::kWorldAlphaTested;
 			break;
 		case data::MaterialResourceType::kModel:
 			analysisHeader.m_bilinear = true;
 			analysisHeader.m_mipMapped = true;
-			disposition = ImageImportDisposition::kModel;
+			analysisHeader.m_importDisposition = ImageImportDisposition::kModel;
 			break;
 		default:
 			return rkit::ResultCode::kInternalError;
@@ -748,8 +741,7 @@ namespace anox { namespace buildsystem
 		RKIT_CHECK(dynamicData.m_imageImports.Resize(1));
 
 		MaterialAnalysisImageImport &imageImport = dynamicData.m_imageImports[0];
-		RKIT_CHECK(TextureCompilerBase::CreateImportIdentifier(imageImport.m_identifier, longName, disposition));
-		imageImport.m_disposition = disposition;
+		RKIT_CHECK(TextureCompilerBase::CreateImportIdentifier(imageImport.m_identifier, longName, analysisHeader.m_importDisposition));
 
 		RKIT_CHECK(dynamicData.m_bitmapDefs.Resize(1));
 
@@ -939,7 +931,6 @@ namespace anox { namespace buildsystem
 			{
 				MaterialAnalysisImageImport imageImport = {};
 				RKIT_CHECK(imageImport.m_identifier.Set(lower.ToSpan()));
-				imageImport.m_disposition = disposition;
 				RKIT_CHECK(dynamicData.m_imageImports.Append(std::move(imageImport)));
 			}
 		}
@@ -955,7 +946,6 @@ namespace anox { namespace buildsystem
 		if (header.m_materialType != data::MaterialType::kAnimation)
 			return rkit::ResultCode::kOK;
 
-		MaterialAnalysisHeader newHeader = header;
 		MaterialAnalysisDynamicData newDynamicData = {};
 
 		const size_t numBitmaps = dynamicData.m_bitmapDefs.Count();
@@ -1026,7 +1016,7 @@ namespace anox { namespace buildsystem
 			const MaterialAnalysisFrameDef &frameDef = dynamicData.m_frameDefs[i];
 			if (!bitmapIsFullFrame[dynamicData.m_frameDefs[i].m_bitmap] || frameDef.m_xOffset != 0 || frameDef.m_yOffset != 0)
 			{
-				bitmapIsFullFrame[i] = false;
+				frameIsFullFrame[i] = false;
 				allFullFrame = false;
 			}
 		}
@@ -1034,12 +1024,238 @@ namespace anox { namespace buildsystem
 		if (allFullFrame)
 			return rkit::ResultCode::kOK;
 
-		// Okay, 
+		rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
 
-		header = std::move(newHeader);
+		rkit::Vector<rkit::RCPtr<rkit::utils::IImage>> baseBitmaps;
+		rkit::Vector<rkit::RCPtr<rkit::utils::IImage>> frameImages;
+		rkit::Vector<MaterialAnalysisImageImport> frameImageImports;
+		RKIT_CHECK(frameImages.Resize(numFrames));
+		RKIT_CHECK(frameImageImports.Resize(numFrames));
+		RKIT_CHECK(baseBitmaps.Resize(numBitmaps));
+
+		rkit::RCPtr<rkit::utils::IImage> prevFullImage;
+
+		rkit::Vector<bool> handledFrame;
+		RKIT_CHECK(handledFrame.Resize(numFrames));
+
+		ImageImportDisposition disposition = header.m_importDisposition;
+
+		auto loadBitmapForFrame = [this, feedback, disposition, &dynamicData, &baseBitmaps](rkit::RCPtr<rkit::utils::IImage> *optBitmapPtr, size_t frameIndex) -> rkit::Result
+			{
+				const MaterialAnalysisFrameDef &frameDef = dynamicData.m_frameDefs[frameIndex];
+				const MaterialAnalysisBitmapDef &frameBitmapDef = dynamicData.m_bitmapDefs[frameDef.m_bitmap];
+				const MaterialAnalysisImageImport &frameImportDef = dynamicData.m_imageImports[frameBitmapDef.m_nameIndex];
+
+				rkit::RCPtr<rkit::utils::IImage> &bitmapPtrRef = baseBitmaps[frameDef.m_bitmap];
+
+				if (!bitmapPtrRef.IsValid())
+				{
+					rkit::CIPath path;
+					RKIT_CHECK(path.Set(frameImportDef.m_identifier));
+
+					rkit::UniquePtr<rkit::utils::IImage> image;
+					RKIT_CHECK(TextureCompilerBase::GetImage(image, feedback, m_pngDriver, rkit::buildsystem::BuildFileLocation::kSourceDir, path, disposition));
+
+					RKIT_CHECK(rkit::MakeRC(bitmapPtrRef, std::move(image)));
+				}
+
+				if (optBitmapPtr)
+					*optBitmapPtr = bitmapPtrRef;
+
+				return rkit::ResultCode::kOK;
+			};
+
+
+		rkit::Vector<size_t> startPoints;
+		{
+			size_t candidateStart = 0;
+			for (candidateStart = 0; candidateStart < numFrames; candidateStart++)
+			{
+				if (handledFrame[candidateStart])
+					continue;
+
+				RKIT_CHECK(startPoints.Append(candidateStart));
+
+				size_t currentFrame = candidateStart;
+				while (!handledFrame[currentFrame])
+				{
+					handledFrame[currentFrame] = true;
+					currentFrame = dynamicData.m_frameDefs[currentFrame].m_next;
+				}
+			}
+
+			// Reset handled flags
+			for (bool &handled : handledFrame)
+				handled = false;
+		}
+
+		for (size_t startFrame : startPoints)
+		{
+			size_t loopStartFrame = 0;
+
+			{
+				rkit::Optional<size_t> prevFrame;
+
+				size_t currentFrame = startFrame;
+				while (!handledFrame[currentFrame])
+				{
+					const MaterialAnalysisFrameDef &frameDef = dynamicData.m_frameDefs[currentFrame];
+
+					if (frameIsFullFrame[currentFrame])
+					{
+						frameImageImports[currentFrame] = dynamicData.m_imageImports[dynamicData.m_bitmapDefs[frameDef.m_bitmap].m_nameIndex];
+					}
+					else
+					{
+
+						if (!prevFrame.IsSet())
+						{
+							rkit::log::Error("First frame is incomplete");
+							return rkit::ResultCode::kDataError;
+						}
+
+						rkit::RCPtr<rkit::utils::IImage> prevFrameImage = frameImages[prevFrame.Get()];
+
+						if (!prevFrameImage)
+						{
+							rkit::RCPtr<rkit::utils::IImage> prevFrameBitmap;
+
+							RKIT_CHECK(loadBitmapForFrame(&prevFrameBitmap, prevFrame.Get()));
+
+							prevFrameImage = prevFrameBitmap;
+						}
+
+						rkit::RCPtr<rkit::utils::IImage> currentFrameBitmap;
+
+						RKIT_CHECK(loadBitmapForFrame(&currentFrameBitmap, currentFrame));
+
+						rkit::RCPtr<rkit::utils::IImage> currentFrameImage;
+
+						{
+							rkit::UniquePtr<rkit::utils::IImage> currentFrameImageUPtr;
+							RKIT_CHECK(utils->CloneImage(currentFrameImageUPtr, *prevFrameImage));
+							RKIT_CHECK(rkit::MakeRC(currentFrameImage, std::move(currentFrameImageUPtr)));
+						}
+
+						RKIT_CHECK(utils->BlitImageSigned(*currentFrameImage, *currentFrameBitmap, 0, 0, frameDef.m_xOffset, frameDef.m_yOffset, currentFrameBitmap->GetWidth(), currentFrameBitmap->GetHeight()));
+
+						frameImages[currentFrame] = currentFrameImage;
+
+						MaterialAnalysisImageImport &imageImportRef = frameImageImports[currentFrame];
+
+						imageImportRef.m_isGenerated = true;
+						RKIT_CHECK(imageImportRef.m_identifier.Format("ax_mtl_frame/{}.{}.dds", depsNode->GetIdentifier(), currentFrame));
+					}
+
+					handledFrame[currentFrame] = true;
+					prevFrame = currentFrame;
+					currentFrame = dynamicData.m_frameDefs[currentFrame].m_next;
+				}
+
+				loopStartFrame = currentFrame;
+			}
+
+			// Find the real loop start, skipping empty frames
+			{
+				size_t currentFrame = startFrame;
+
+				while (currentFrame != loopStartFrame)
+				{
+					if (dynamicData.m_frameDefs[currentFrame].m_waitMSec != 0)
+						break;
+
+					currentFrame = dynamicData.m_frameDefs[currentFrame].m_next;
+				}
+
+				loopStartFrame = currentFrame;
+			}
+
+			// Cull empty frames
+			{
+				size_t currentFrame = startFrame;
+
+				rkit::Vector<size_t> framesToMerge;
+
+				bool startedLoop = false;
+
+				for (;;)
+				{
+					bool isRealFrame = (currentFrame == loopStartFrame || dynamicData.m_frameDefs[currentFrame].m_waitMSec != 0);
+
+					if (isRealFrame)
+					{
+						for (size_t frameToMerge : framesToMerge)
+							frameImageImports[frameToMerge] = frameImageImports[currentFrame];
+
+						framesToMerge.ShrinkToSize(0);
+
+						if (currentFrame == loopStartFrame)
+						{
+							if (startedLoop)
+								break;
+							else
+								startedLoop = true;
+						}
+
+						const MaterialAnalysisImageImport &imageImport = frameImageImports[currentFrame];
+
+						if (imageImport.m_isGenerated)
+						{
+							rkit::CIPath path;
+							RKIT_CHECK(path.Set(imageImport.m_identifier));
+
+							RKIT_CHECK(TextureCompilerBase::CompileImage(*frameImages[currentFrame], path, feedback, disposition));
+						}
+					}
+					else
+					{
+						RKIT_CHECK(framesToMerge.Append(currentFrame));
+					}
+
+					currentFrame = dynamicData.m_frameDefs[currentFrame].m_next;
+				}
+			}
+		}
+
+		// Emit final frames
+		RKIT_CHECK(newDynamicData.m_frameDefs.Resize(numFrames));
+
+		for (size_t frameIndex = 0; frameIndex < numFrames; frameIndex++)
+		{
+			MaterialAnalysisFrameDef &frameDef = newDynamicData.m_frameDefs[frameIndex];
+
+			frameDef.m_next = dynamicData.m_frameDefs[frameIndex].m_next;
+			frameDef.m_waitMSec = dynamicData.m_frameDefs[frameIndex].m_waitMSec;
+
+			const MaterialAnalysisImageImport &imageImport = frameImageImports[frameIndex];
+
+			size_t imageImportIndex = 0;
+			while (imageImportIndex < newDynamicData.m_imageImports.Count())
+			{
+				const MaterialAnalysisImageImport &candidate = newDynamicData.m_imageImports[imageImportIndex];
+				if (candidate.m_isGenerated == imageImport.m_isGenerated && candidate.m_identifier == imageImport.m_identifier)
+					break;
+
+				imageImportIndex++;
+			}
+
+			if (imageImportIndex == newDynamicData.m_imageImports.Count())
+			{
+				RKIT_CHECK(newDynamicData.m_imageImports.Append(imageImport));
+			}
+
+			frameDef.m_bitmap = static_cast<uint32_t>(imageImportIndex);
+		}
+
+		RKIT_CHECK(newDynamicData.m_bitmapDefs.Resize(newDynamicData.m_imageImports.Count()));
+		for (size_t imageIndex = 0; imageIndex < newDynamicData.m_imageImports.Count(); imageIndex++)
+		{
+			newDynamicData.m_bitmapDefs[imageIndex].m_nameIndex = static_cast<uint32_t>(imageIndex);
+		}
+
 		dynamicData = std::move(newDynamicData);
 
-		return rkit::ResultCode::kNotYetImplemented;
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result MaterialCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
@@ -1134,7 +1350,12 @@ namespace anox { namespace buildsystem
 			const MaterialAnalysisImageImport &imageImport = dynamicData.m_imageImports[i];
 
 			rkit::String intermediatePathStr;
-			RKIT_CHECK(TextureCompilerBase::ResolveIntermediatePath(intermediatePathStr, imageImport.m_identifier));
+			if (imageImport.m_isGenerated)
+				intermediatePathStr = imageImport.m_identifier;
+			else
+			{
+				RKIT_CHECK(TextureCompilerBase::ResolveIntermediatePath(intermediatePathStr, imageImport.m_identifier));
+			}
 
 			rkit::CIPath intermediatePath;
 			RKIT_CHECK(intermediatePath.Set(intermediatePathStr));
