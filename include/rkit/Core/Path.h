@@ -93,7 +93,7 @@ namespace rkit
 	public:
 		typedef typename TPathTraits::Char_t Char_t;
 		static const Char_t kDefaultDelimiter = TPathTraits::kDefaultDelimiter;
-		typedef BaseStringSliceView<Char_t, TPathTraits::kEncoding> Component_t;
+		typedef BaseStringSliceView<Char_t, TPathTraits::kEncoding> ComponentView_t;
 
 		BasePathIterator() = delete;
 
@@ -126,8 +126,8 @@ namespace rkit
 		typedef typename TPathTraits::Char_t Char_t;
 		static const CharacterEncoding kEncoding = TPathTraits::kEncoding;
 		static const Char_t kDefaultDelimiter = TPathTraits::kDefaultDelimiter;
-		typedef BaseStringSliceView<Char_t, TPathTraits::kEncoding> Component_t;
-		typedef BaseStringSliceView<Char_t, TPathTraits::kEncoding> LastComponent_t;
+		typedef BaseStringSliceView<Char_t, TPathTraits::kEncoding> ComponentView_t;
+		typedef BaseStringSliceView<Char_t, TPathTraits::kEncoding> LastComponentView_t;
 
 		BasePathSliceView();
 		explicit BasePathSliceView(const BaseStringSliceView<Char_t, TPathTraits::kEncoding> &slice);
@@ -138,13 +138,13 @@ namespace rkit
 		const Char_t *GetChars() const;
 		size_t Length() const;
 
-		Component_t operator[](size_t index) const;
+		ComponentView_t operator[](size_t index) const;
 
 		BasePathSliceView<TIsAbsolute, TPathTraits> AbsSlice(size_t numComponents) const;
 		BasePathSliceView<false, TPathTraits> RelSlice(size_t firstComponent, size_t numComponents) const;
 
 		size_t NumComponents() const;
-		LastComponent_t LastComponent() const;
+		LastComponentView_t LastComponent() const;
 
 		BaseStringSliceView<Char_t, TPathTraits::kEncoding> ToStringSliceView() const;
 
@@ -168,8 +168,8 @@ namespace rkit
 		typedef typename TPathTraits::Char_t Char_t;
 		static const Char_t kDefaultDelimiter = TPathTraits::kDefaultDelimiter;
 		static const CharacterEncoding kEncoding = TPathTraits::kEncoding;
-		typedef BaseStringSliceView<Char_t, TPathTraits::kEncoding> Component_t;
-		typedef BaseStringView<Char_t, TPathTraits::kEncoding> LastComponent_t;
+		typedef BaseStringSliceView<Char_t, TPathTraits::kEncoding> ComponentView_t;
+		typedef BaseStringView<Char_t, TPathTraits::kEncoding> LastComponentView_t;
 
 		BasePathView();
 		explicit BasePathView(const BaseStringView<Char_t, TPathTraits::kEncoding> &slice);
@@ -177,7 +177,7 @@ namespace rkit
 		template<size_t TLength>
 		BasePathView(const Char_t(&charsArray)[TLength]);
 
-		LastComponent_t LastComponent() const;
+		LastComponentView_t LastComponent() const;
 
 		BaseStringView<Char_t, TPathTraits::kEncoding> ToStringView() const;
 	};
@@ -191,7 +191,8 @@ namespace rkit
 		typedef typename TPathTraits::Char_t Char_t;
 		static const CharacterEncoding kEncoding = TPathTraits::kEncoding;
 		static const Char_t kDefaultDelimiter = TPathTraits::kDefaultDelimiter;
-		typedef BaseStringSliceView<Char_t, kEncoding> Component_t;
+		typedef BaseStringSliceView<Char_t, kEncoding> ComponentView_t;
+		typedef BaseString<Char_t, kEncoding> Component_t;
 		typedef BasePathView<TIsAbsolute, TPathTraits> View_t;
 		typedef BaseString<Char_t, kEncoding> String_t;
 
@@ -211,14 +212,14 @@ namespace rkit
 		Result AppendComponent(const BaseStringSliceView<Char_t, TPathTraits::kEncoding> &str);
 		Result Append(const BasePathView<false, TPathTraits> &str);
 
-		Component_t operator[](size_t index) const;
+		ComponentView_t operator[](size_t index) const;
 		BasePathSliceView<TIsAbsolute, TPathTraits> AbsSlice(size_t numComponents) const;
 		BasePathSliceView<false, TPathTraits> RelSlice(size_t firstComponent, size_t numComponents) const;
 		size_t NumComponents() const;
 
 		const BaseString<Char_t, TPathTraits::kEncoding> &ToString() const;
 
-		Result Set(const Component_t &str);
+		Result Set(const ComponentView_t &str);
 		Result Set(const BasePathSliceView<TIsAbsolute, TPathTraits> &path);
 
 		template<class TOtherChar, CharacterEncoding TOtherPathEncoding>
@@ -469,7 +470,7 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	typename BasePathSliceView<TIsAbsolute, TPathTraits>::Component_t BasePathSliceView<TIsAbsolute, TPathTraits>::operator[](size_t index) const
+	typename BasePathSliceView<TIsAbsolute, TPathTraits>::ComponentView_t BasePathSliceView<TIsAbsolute, TPathTraits>::operator[](size_t index) const
 	{
 		size_t scanPos = 0;
 		while (index > 0)
@@ -582,10 +583,10 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	typename BasePathSliceView<TIsAbsolute, TPathTraits>::LastComponent_t BasePathSliceView<TIsAbsolute, TPathTraits>::LastComponent() const
+	typename BasePathSliceView<TIsAbsolute, TPathTraits>::LastComponentView_t BasePathSliceView<TIsAbsolute, TPathTraits>::LastComponent() const
 	{
 		if (m_view.Length() == 0)
-			return LastComponent_t();
+			return LastComponentView_t();
 
 		size_t startPos = m_view.Length() - 1;
 		while (startPos > 0)
@@ -596,7 +597,7 @@ namespace rkit
 			startPos--;
 		}
 
-		return LastComponent_t(m_view.SubString(startPos));
+		return LastComponentView_t(m_view.SubString(startPos));
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -660,11 +661,11 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	typename BasePathView<TIsAbsolute, TPathTraits>::LastComponent_t BasePathView<TIsAbsolute, TPathTraits>::LastComponent() const
+	typename BasePathView<TIsAbsolute, TPathTraits>::LastComponentView_t BasePathView<TIsAbsolute, TPathTraits>::LastComponent() const
 	{
-		typename BasePathSliceView<TIsAbsolute, TPathTraits>::LastComponent_t lastComponent = BasePathSliceView<TIsAbsolute, TPathTraits>::LastComponent();
+		typename BasePathSliceView<TIsAbsolute, TPathTraits>::LastComponentView_t lastComponent = BasePathSliceView<TIsAbsolute, TPathTraits>::LastComponent();
 
-		return LastComponent_t(lastComponent.GetChars(), lastComponent.Length());
+		return LastComponentView_t(lastComponent.GetChars(), lastComponent.Length());
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -799,7 +800,7 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	typename BasePath<TIsAbsolute, TPathTraits>::Component_t BasePath<TIsAbsolute, TPathTraits>::operator[](size_t index) const
+	typename BasePath<TIsAbsolute, TPathTraits>::ComponentView_t BasePath<TIsAbsolute, TPathTraits>::operator[](size_t index) const
 	{
 		return BasePathView<TIsAbsolute, TPathTraits>(m_path)[index];
 	}
@@ -831,7 +832,7 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	Result BasePath<TIsAbsolute, TPathTraits>::Set(const Component_t &str)
+	Result BasePath<TIsAbsolute, TPathTraits>::Set(const ComponentView_t &str)
 	{
 		switch (Validate(str))
 		{

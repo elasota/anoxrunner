@@ -162,7 +162,7 @@ namespace rkit { namespace buildsystem
 
 							Result ApplyResult(const CIPathView &pathView)
 							{
-								CIPathView::Component_t lastComponent = pathView.LastComponent();
+								CIPathView::ComponentView_t lastComponent = pathView.LastComponent();
 
 								if (m_utils->MatchesWildcard(lastComponent, m_wildcard))
 								{

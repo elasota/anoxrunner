@@ -43,10 +43,6 @@ namespace rkit
 		template<class TBase>
 		TImpl *ResolveImpl(OpaqueImplementation<TBase> *);
 
-		static void DestructImpl(Opaque &self);
-
-		void (*m_dtor)(Opaque &self);
-
 #if RKIT_IS_DEBUG
 		TImpl &m_impl;
 #endif
@@ -107,9 +103,8 @@ namespace rkit
 	template<class TImpl>
 	template<class... TArgs>
 	Opaque<TImpl>::Opaque(TArgs... args)
-		: m_dtor(DestructImpl)
 #if RKIT_IS_DEBUG
-		, m_impl(Impl())
+		: m_impl(Impl())
 #endif
 	{
 		new (&Impl()) TImpl(std::forward<TArgs>(args)...);
@@ -118,7 +113,7 @@ namespace rkit
 	template<class TImpl>
 	Opaque<TImpl>::~Opaque()
 	{
-		m_dtor(*this);
+		Impl().~TImpl();
 	}
 
 	template<class TImpl>
@@ -142,11 +137,5 @@ namespace rkit
 		typedef priv::OpaquePairing<TBase, TImpl> Pairing_t;
 
 		return reinterpret_cast<TImpl *>(reinterpret_cast<uint8_t *>(base) - offsetof(Pairing_t, m_base) + offsetof(Pairing_t, m_impl));
-	}
-
-	template<class TImpl>
-	void Opaque<TImpl>::DestructImpl(Opaque<TImpl> &self)
-	{
-		self.Impl().~TImpl();
 	}
 }

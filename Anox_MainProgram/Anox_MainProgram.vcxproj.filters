@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\Data">
+      <UniqueIdentifier>{6dbd5bff-7b28-4125-a64c-a48f0ab3a00d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnoxMain.cpp">
@@ -152,5 +155,31 @@
     <ClInclude Include="AnoxGraphicTimelinedResource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\anox\Data\BSPModel.h">
+      <Filter>Header Files\Data</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\anox\Data\CompressedNormal.h">
+      <Filter>Header Files\Data</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\anox\Data\CompressedQuat.h">
+      <Filter>Header Files\Data</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\anox\Data\EntityDef.h">
+      <Filter>Header Files\Data</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\anox\Data\MaterialData.h">
+      <Filter>Header Files\Data</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\anox\Data\MaterialResourceType.h">
+      <Filter>Header Files\Data</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\anox\Data\MDAModel.h">
+      <Filter>Header Files\Data</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\include\anox\Data\EntityDefs.inl">
+      <Filter>Header Files\Data</Filter>
+    </None>
   </ItemGroup>
 </Project>

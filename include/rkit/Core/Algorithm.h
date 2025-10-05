@@ -370,6 +370,9 @@ namespace rkit
 	void CopySpanNonOverlapping(const Span<T> &dest, const Span<const T> &src);
 
 	template<class T>
+	void CopySpanNonOverlapping(const Span<T> &dest, const Span<T> &src);
+
+	template<class T>
 	void CopySpan(const Span<T> &dest, const Span<const T> &src);
 
 	template<class T>
@@ -1046,6 +1049,15 @@ void rkit::CopySpanNonOverlapping(const Span<T> &dest, const Span<const T> &src)
 {
 	return priv::SpanOpsHelper<T, std::is_trivially_copyable<T>::value>::CopySpanNonOverlapping(dest, src);
 }
+
+template<class T>
+void rkit::CopySpanNonOverlapping(const Span<T> &dest, const Span<T> &src)
+{
+	Span<const T> srcConst = src;
+	CopySpanNonOverlapping(dest, srcConst);
+}
+
+
 
 template<class T>
 void rkit::CopySpan(const Span<T> &dest, const Span<const T> &src)

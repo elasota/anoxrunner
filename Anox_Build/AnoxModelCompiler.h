@@ -11,12 +11,16 @@ namespace anox { namespace buildsystem
 	class AnoxMDACompilerBase : public rkit::buildsystem::IDependencyNodeCompiler
 	{
 	public:
+		static rkit::Result ConstructOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier);
+
 		static rkit::Result Create(rkit::UniquePtr<AnoxMDACompilerBase> &outCompiler);
 	};
 
 	class AnoxMD2CompilerBase : public rkit::buildsystem::IDependencyNodeCompiler
 	{
 	public:
+		static rkit::Result ConstructOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier);
+
 		static rkit::Result Create(rkit::UniquePtr<AnoxMD2CompilerBase> &outCompiler);
 	};
 } }

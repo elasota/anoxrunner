@@ -160,6 +160,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\anox\AnoxGraphicsSubsystem.h" />
+    <ClInclude Include="..\include\anox\Data\BSPModel.h" />
+    <ClInclude Include="..\include\anox\Data\CompressedNormal.h" />
+    <ClInclude Include="..\include\anox\Data\CompressedQuat.h" />
+    <ClInclude Include="..\include\anox\Data\EntityDef.h" />
+    <ClInclude Include="..\include\anox\Data\MaterialData.h" />
+    <ClInclude Include="..\include\anox\Data\MaterialResourceType.h" />
+    <ClInclude Include="..\include\anox\Data\MDAModel.h" />
     <ClInclude Include="AnoxBSPModelResource.h" />
     <ClInclude Include="AnoxCaptureHarness.h" />
     <ClInclude Include="AnoxCommandRegistry.h" />
@@ -182,6 +189,9 @@
     <ClInclude Include="AnoxTexture.h" />
     <ClInclude Include="AnoxTextureResource.h" />
     <ClInclude Include="GraphicsMemoryAllocator.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\include\anox\Data\EntityDefs.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -643,6 +643,12 @@ namespace anox { namespace buildsystem
 			}
 		}
 
+		if (dynamicData.m_frameDefs.Count() == 0)
+		{
+			rkit::log::Error("ATD has no frames");
+			return rkit::ResultCode::kDataError;
+		}
+
 		RKIT_CHECK(GenerateRealFrames(analysisHeader, dynamicData, depsNode, feedback));
 
 		// Finalize identifiers
@@ -1116,7 +1122,7 @@ namespace anox { namespace buildsystem
 
 						rkit::RCPtr<rkit::utils::IImage> prevFrameImage = frameImages[prevFrame.Get()];
 
-						if (!prevFrameImage)
+						if (!prevFrameImage.IsValid())
 						{
 							rkit::RCPtr<rkit::utils::IImage> prevFrameBitmap;
 

@@ -32,11 +32,11 @@ namespace rkit { namespace render { namespace vulkan
 
 			CommandQueueType queueType = CommandQueueType::kCount;
 
-			if (graphicsComputeBits == graphicsComputeMask)
+			if ((qfFlags & graphicsComputeMask) == (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT))
 				queueType = CommandQueueType::kGraphicsCompute;
-			else if (graphicsComputeBits == VK_QUEUE_GRAPHICS_BIT)
+			else if ((qfFlags & graphicsComputeMask) == VK_QUEUE_GRAPHICS_BIT)
 				queueType = CommandQueueType::kGraphics;
-			else if (graphicsComputeBits == VK_QUEUE_COMPUTE_BIT)
+			else if ((qfFlags & graphicsComputeMask) == VK_QUEUE_COMPUTE_BIT)
 				queueType = CommandQueueType::kAsyncCompute;
 			else if ((qfFlags & dmaMask) == VK_QUEUE_TRANSFER_BIT)
 				queueType = CommandQueueType::kCopy;

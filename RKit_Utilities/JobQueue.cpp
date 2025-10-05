@@ -581,29 +581,31 @@ namespace rkit { namespace utils
 
 		MutexLock lock(*m_distributorMutex);
 
-		job->m_distJobWasQueued = true;
+		JobImpl *jobPtr = job.Get();
+
+		jobPtr->m_distJobWasQueued = true;
 
 		// OK to check JobDependencyFailed outside of dep graph mutex because it
-		if (job->m_dgJobDependencyFailed || m_isClosing)
+		if (jobPtr->m_dgJobDependencyFailed || m_isClosing)
 		{
 			lock.Unlock();
 
-			job->m_distJobWasStarted = true;
+			jobPtr->m_distJobWasStarted = true;
 
-			JobDone(job.Get(), false);
+			JobDone(jobPtr, false);
 			return;
 		}
 
 		// If there are threads waiting for this job to start or complete,
-		// give it to the first queued job, and the rest will wait for it
+		// give it to the first queued thread, and the rest will wait for it
 		// to complete.
-		if (!job->m_distWaitingThreadsRing.IsIsolated())
+		if (!jobPtr->m_distWaitingThreadsRing.IsIsolated())
 		{
 			JobQueueWaitingThreadInfo *wti = job->m_distWaitingThreadsRing.m_next->m_owner;
 			UnlinkWaitingThread(*wti);
 
-			job->m_distJobWasStarted = true;
-			wti->m_job = std::move(job);
+			jobPtr->m_distJobWasStarted = true;
+			wti->m_job = job;
 			wti->Wake(JobQueueWakeDisposition::kJobStartedByThisThread);
 
 			return;
@@ -643,11 +645,11 @@ namespace rkit { namespace utils
 		if (threadToKick != nullptr)
 		{
 			// Found a thread to wake up
-			job->m_distJobWasStarted = true;
+			jobPtr->m_distJobWasStarted = true;
 
 			UnlinkWaitingThread(*threadToKick);
 
-			threadToKick->m_job = job;
+			threadToKick->m_job = jobPtr;
 			threadToKick->Wake(JobQueueWakeDisposition::kDequeuedWork);
 
 			return;
@@ -655,15 +657,15 @@ namespace rkit { namespace utils
 
 		// Couldn't find a thread to give this job to, put it in the queue
 		PendingJobList &pji = m_pendingJobLists[jobTypeIndex];
-		job->m_prevRunnableJob = pji.m_lastJob;
-		job->m_nextRunnableJob = nullptr;
+		jobPtr->m_prevRunnableJob = pji.m_lastJob;
+		jobPtr->m_nextRunnableJob = nullptr;
 
 		if (pji.m_lastJob)
 			pji.m_lastJob->m_nextRunnableJob = job;
 		else
 			pji.m_firstJob = job;
 
-		pji.m_lastJob = job;
+		pji.m_lastJob = jobPtr;
 	}
 
 	void JobQueue::JobDone(JobImpl *job, bool succeeded)

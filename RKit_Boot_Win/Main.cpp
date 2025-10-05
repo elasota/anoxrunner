@@ -394,6 +394,7 @@ static int WinMainCommon(HINSTANCE hInstance)
 
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
+	memset(rkit::g_winGlobalsBuffer.m_bytes, 0, sizeof(rkit::g_winGlobalsBuffer.m_bytes));
 	new (rkit::g_winGlobalsBuffer.m_bytes) rkit::Win32Globals();
 
 	rkit::Drivers *drivers = &rkit::g_winGlobals.m_drivers;

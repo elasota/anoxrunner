@@ -47,7 +47,7 @@ namespace anox { namespace buildsystem
 
 		uint32_t GetVersion() const override;
 
-		static rkit::Result ConstructOutputPath(rkit::CIPath &analysisPath, data::MaterialResourceType nodeType, const rkit::StringView &identifier);
+		static rkit::Result ConstructOutputPath(rkit::CIPath &outputPath, data::MaterialResourceType nodeType, const rkit::StringView &identifier);
 
 	private:
 		MaterialCompiler() = delete;

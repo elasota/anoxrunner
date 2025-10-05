@@ -11,6 +11,9 @@ namespace rkit
 			kIntermediateDir,
 			kOutputFiles,
 			kOutputContent,
+
+			kAuxDir0,
+			kAuxDir10000 = kAuxDir0 + 10000,
 		};
 	}
 }

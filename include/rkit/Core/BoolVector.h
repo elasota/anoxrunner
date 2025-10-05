@@ -8,9 +8,13 @@
 namespace rkit
 {
 	class BoolVectorConstIterator;
+	class ConstBoolSpan;
+	class BoolSpan;
 
 	template<class T>
 	class Span;
+
+	class BoolSpanLValue;
 
 	class BoolVector
 	{
@@ -24,23 +28,27 @@ namespace rkit
 		static const Chunk_t kFullChunkBits = ((((static_cast<Chunk_t>(1) << (kBitsPerChunk - 1)) - 1u) << 1u) | 1u);
 
 		BoolVector();
-		BoolVector(BoolVector &&other);
+		BoolVector(BoolVector &&other) noexcept;
 
 		Result Resize(size_t newSize);
 		Result Append(bool value);
 
+		BoolSpanLValue operator[](size_t index);
 		bool operator[](size_t index) const;
 		void Set(size_t index, bool value);
 
 		Result Duplicate(const BoolVector &other);
 
-		BoolVector &operator=(BoolVector &&other);
+		BoolVector &operator=(BoolVector &&other) noexcept;
 
 		BoolVectorConstIterator begin() const;
 		BoolVectorConstIterator end() const;
 
 		Span<Chunk_t> GetChunks();
 		Span<const Chunk_t> GetChunks() const;
+
+		BoolSpan ToSpan();
+		ConstBoolSpan ToSpan() const;
 
 		size_t Count() const;
 		void Reset();
@@ -50,10 +58,80 @@ namespace rkit
 		size_t m_size;
 	};
 
+	class BoolSpanLValue
+	{
+	public:
+		BoolSpanLValue(BoolVector::Chunk_t &chunk, uint8_t bit);
+
+		bool operator=(bool value) const;
+		operator bool() const;
+
+	private:
+		BoolSpanLValue() = delete;
+		BoolSpanLValue(const BoolSpanLValue &) = delete;
+
+		BoolSpanLValue &operator=(const BoolSpanLValue &) = delete;
+
+		BoolVector::Chunk_t &m_chunk;
+		BoolVector::Chunk_t m_bitMask;
+	};
+
+	class ConstBoolSpan
+	{
+	public:
+		friend class BoolVector;
+
+		typedef BoolVector::Chunk_t Chunk_t;
+
+		ConstBoolSpan();
+		ConstBoolSpan(const ConstBoolSpan &) = default;
+
+		ConstBoolSpan SubSpan(size_t offset) const;
+		ConstBoolSpan SubSpan(size_t offset, size_t size) const;
+
+		BoolSpanLValue operator[](size_t index);
+		bool operator[](size_t index) const;
+
+		BoolVectorConstIterator begin() const;
+		BoolVectorConstIterator end() const;
+
+	protected:
+		explicit ConstBoolSpan(Chunk_t *firstChunk, uint8_t firstBit, size_t count);
+
+		void GetPtrTo(size_t offset, Chunk_t *&outChunk, uint8_t &outBit) const;
+
+		static const size_t kBitsPerChunk = sizeof(Chunk_t) * 8;
+
+		Chunk_t *m_firstChunk;
+		size_t m_count;
+		uint8_t m_firstBit;
+	};
+
+	class BoolSpan : public ConstBoolSpan
+	{
+	public:
+		friend class BoolVector;
+
+		BoolSpan() = default;
+		BoolSpan(const BoolSpan &) = default;
+
+		BoolSpan SubSpan(size_t offset) const;
+		BoolSpan SubSpan(size_t offset, size_t size) const;
+
+		BoolSpanLValue operator[](size_t index);
+		bool operator[](size_t index) const;
+
+		void SetAt(size_t index, bool value) const;
+
+	private:
+		explicit BoolSpan(const ConstBoolSpan &span);
+	};
+
 	class BoolVectorConstIterator
 	{
 	public:
 		friend class BoolVector;
+		friend class BoolSpan;
 
 		BoolVectorConstIterator(const BoolVector::Chunk_t *chunk, int bit);
 		BoolVectorConstIterator(const BoolVectorConstIterator &other);
@@ -96,7 +174,7 @@ namespace rkit
 		static_assert((1 << kLog2BitsPerChunk) == kBitsPerChunk);
 	}
 
-	inline BoolVector::BoolVector(BoolVector &&other)
+	inline BoolVector::BoolVector(BoolVector &&other) noexcept
 		: m_chunks(std::move(other.m_chunks))
 		, m_size(other.m_size)
 	{
@@ -167,6 +245,11 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
+	inline BoolSpanLValue BoolVector::operator[](size_t index)
+	{
+		return ToSpan()[index];
+	}
+
 	inline bool BoolVector::operator[](size_t index) const
 	{
 		return ((m_chunks[index / kBitsPerChunk] >> (index % kBitsPerChunk)) & 1u) != 0;
@@ -209,7 +292,7 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
-	inline BoolVector &BoolVector::operator=(BoolVector &&other)
+	inline BoolVector &BoolVector::operator=(BoolVector &&other) noexcept
 	{
 		m_chunks = std::move(other.m_chunks);
 		m_size = other.m_size;
@@ -238,6 +321,18 @@ namespace rkit
 	inline Span<const BoolVector::Chunk_t> BoolVector::GetChunks() const
 	{
 		return m_chunks.ToSpan();
+	}
+
+
+	inline BoolSpan BoolVector::ToSpan()
+	{
+		const BoolVector *constThis = this;
+		return BoolSpan(constThis->ToSpan());
+	}
+
+	inline ConstBoolSpan BoolVector::ToSpan() const
+	{
+		return ConstBoolSpan(const_cast<Chunk_t *>(m_chunks.GetBuffer()), 0, m_size);
 	}
 
 	inline size_t BoolVector::Count() const
@@ -364,5 +459,145 @@ namespace rkit
 	inline bool BoolVectorConstIterator::operator!=(const BoolVectorConstIterator &other) const
 	{
 		return !((*this) == other);
+	}
+
+
+	inline BoolSpanLValue::BoolSpanLValue(BoolVector::Chunk_t &chunk, uint8_t bit)
+		: m_chunk(chunk)
+		, m_bitMask(static_cast<BoolVector::Chunk_t>(1) << bit)
+	{
+	}
+
+	inline bool BoolSpanLValue::operator=(bool value) const
+	{
+		if (value)
+			m_chunk |= m_bitMask;
+		else
+			m_chunk &= ~m_bitMask;
+
+		return value;
+	}
+
+	inline BoolSpanLValue::operator bool() const
+	{
+		return (m_chunk & m_bitMask) != 0;
+	}
+
+	inline ConstBoolSpan::ConstBoolSpan()
+		: m_firstChunk(nullptr)
+		, m_count(0)
+		, m_firstBit(0)
+	{
+	}
+
+	inline void ConstBoolSpan::GetPtrTo(size_t offset, Chunk_t *&outChunk, uint8_t &outBit) const
+	{
+		if (m_count == 0)
+		{
+			outChunk = nullptr;
+			outBit = 0;
+		}
+		else
+		{
+			const uint8_t adjustedFirstBit = m_firstBit + static_cast<uint8_t>(offset % kBitsPerChunk);
+
+			outChunk = m_firstChunk + (adjustedFirstBit / kBitsPerChunk) + offset / kBitsPerChunk;
+			outBit = static_cast<uint8_t>(adjustedFirstBit % kBitsPerChunk);
+		}
+	}
+
+	inline ConstBoolSpan ConstBoolSpan::SubSpan(size_t offset) const
+	{
+		RKIT_ASSERT(offset < m_count);
+
+		return SubSpan(offset, m_count - offset);
+	}
+
+	inline ConstBoolSpan ConstBoolSpan::SubSpan(size_t offset, size_t size) const
+	{
+		RKIT_ASSERT(offset < m_count);
+		RKIT_ASSERT(m_count - offset >= size);
+
+		Chunk_t *firstChunk = nullptr;
+		uint8_t firstBit = 0;
+		GetPtrTo(offset, firstChunk, firstBit);
+
+		return ConstBoolSpan(firstChunk, firstBit, size);
+	}
+
+
+	inline bool ConstBoolSpan::operator[](size_t index) const
+	{
+		const ConstBoolSpan singleBitSpan = SubSpan(index, 1);
+		return ((singleBitSpan.m_firstChunk[0] >> singleBitSpan.m_firstBit) & 1) != 0;
+	}
+
+	inline BoolVectorConstIterator ConstBoolSpan::begin() const
+	{
+		return BoolVectorConstIterator(m_firstChunk, m_firstBit);
+	}
+
+	inline BoolVectorConstIterator ConstBoolSpan::end() const
+	{
+		Chunk_t *chunk = nullptr;
+		uint8_t bit = 0;
+		GetPtrTo(m_count, chunk, bit);
+
+		return BoolVectorConstIterator(chunk, bit);
+	}
+
+	inline ConstBoolSpan::ConstBoolSpan(Chunk_t *firstChunk, uint8_t firstBit, size_t count)
+		: m_firstChunk(firstChunk)
+		, m_count(count)
+		, m_firstBit(firstBit)
+	{
+	}
+
+	inline BoolSpan BoolSpan::SubSpan(size_t offset) const
+	{
+		return BoolSpan(static_cast<const ConstBoolSpan *>(this)->SubSpan(offset));
+	}
+
+	inline BoolSpan BoolSpan::SubSpan(size_t offset, size_t size) const
+	{
+		return BoolSpan(static_cast<const ConstBoolSpan *>(this)->SubSpan(offset, size));
+	}
+
+
+	inline BoolSpanLValue BoolSpan::operator[](size_t index)
+	{
+		Chunk_t *chunk = nullptr;
+		uint8_t bit = 0;
+
+		GetPtrTo(index, chunk, bit);
+		return BoolSpanLValue(*chunk, bit);
+	}
+
+	inline bool BoolSpan::operator[](size_t index) const
+	{
+		const ConstBoolSpan &constSpan = *this;
+
+		return constSpan[index];
+	}
+
+	inline void BoolSpan::SetAt(size_t index, bool value) const
+	{
+		RKIT_ASSERT(index < m_count);
+
+		Chunk_t *chunkPtr = nullptr;
+		uint8_t bit = 0;
+		GetPtrTo(index, chunkPtr, bit);
+
+		const Chunk_t offsetBit = static_cast<Chunk_t>(static_cast<Chunk_t>(1) << bit);
+
+		if (value)
+			(*chunkPtr) &= ~offsetBit;
+		else
+			(*chunkPtr) |= offsetBit;
+	}
+
+	inline BoolSpan::BoolSpan(const ConstBoolSpan &span)
+		: ConstBoolSpan(span)
+	{
 	}
 }

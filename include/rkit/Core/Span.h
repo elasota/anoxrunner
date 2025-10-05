@@ -475,10 +475,10 @@ rkit::Span<TOther> rkit::Span<T>::ReinterpretCast() const
 		return rkit::Span<TOther>(reinterpret_cast<TOther *>(m_arr), m_count);
 	else
 	{
-		const size_t thisSize = m_count * sizeof(T);
-		RKIT_ASSERT(thisSize % sizeof(TOther) == 0);
+		const size_t thisSizeBytes = m_count * sizeof(T);
+		RKIT_ASSERT(thisSizeBytes % sizeof(TOther) == 0);
 
-		return rkit::Span<TOther>(reinterpret_cast<TOther *>(m_arr), thisSize / sizeof(TOther));
+		return rkit::Span<TOther>(reinterpret_cast<TOther *>(m_arr), thisSizeBytes / sizeof(TOther));
 	}
 }
 

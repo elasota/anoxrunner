@@ -70,6 +70,7 @@ namespace anox { namespace utils
 
 		bool FindFileInArchive(const rkit::CIPathView &path, bool allowDirectories, const MountedArchive *&outArchive, afs::FileHandle &outFileHandle);
 
+		rkit::OSAbsPath m_exeDir;
 		rkit::OSAbsPath m_sourceDir;
 		rkit::OSAbsPath m_intermedDir;
 		rkit::OSAbsPath m_dataFilesDir;
@@ -300,38 +301,37 @@ namespace anox { namespace utils
 				}
 			}
 		}
-		else if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kIntermediateDir)
-		{
-			rkit::OSRelPath relPath;
-			RKIT_CHECK(relPath.ConvertFrom(path));
-
-			rkit::OSAbsPath osPath = m_intermedDir;
-			RKIT_CHECK(osPath.Append(relPath));
-
-			RKIT_CHECK(sysDriver->GetFileAttributesAbs(osPath, exists, attribs));
-		}
-		else if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kOutputFiles)
-		{
-			rkit::OSRelPath relPath;
-			RKIT_CHECK(relPath.ConvertFrom(path));
-
-			rkit::OSAbsPath osPath = m_dataFilesDir;
-			RKIT_CHECK(osPath.Append(relPath));
-
-			RKIT_CHECK(sysDriver->GetFileAttributesAbs(osPath, exists, attribs));
-		}
-		else if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kOutputContent)
-		{
-			rkit::OSRelPath relPath;
-			RKIT_CHECK(relPath.ConvertFrom(path));
-
-			rkit::OSAbsPath osPath = m_dataContentDir;
-			RKIT_CHECK(osPath.Append(relPath));
-
-			RKIT_CHECK(sysDriver->GetFileAttributesAbs(osPath, exists, attribs));
-		}
 		else
-			return rkit::ResultCode::kNotYetImplemented;
+		{
+			rkit::OSAbsPath osPath;
+
+			switch (inputFileLocation)
+			{
+			case rkit::buildsystem::BuildFileLocation::kIntermediateDir:
+				osPath = m_intermedDir;
+				break;
+			case rkit::buildsystem::BuildFileLocation::kOutputFiles:
+				osPath = m_dataFilesDir;
+				break;
+			case rkit::buildsystem::BuildFileLocation::kOutputContent:
+				osPath = m_dataContentDir;
+				break;
+			case rkit::buildsystem::BuildFileLocation::kAuxDir0:
+				osPath = m_exeDir;
+				break;
+			default:
+				return rkit::ResultCode::kNotYetImplemented;
+			}
+
+			{
+				rkit::OSRelPath relPath;
+				RKIT_CHECK(relPath.ConvertFrom(path));
+
+				RKIT_CHECK(osPath.Append(relPath));
+			}
+
+			RKIT_CHECK(sysDriver->GetFileAttributesAbs(osPath, exists, attribs));
+		}
 
 		// Try to import file from the root directory
 		if (exists)
@@ -385,22 +385,33 @@ namespace anox { namespace utils
 
 			return openResult;
 		}
-		else if (inputFileLocation == rkit::buildsystem::BuildFileLocation::kIntermediateDir)
+		else
 		{
-			rkit::OSRelPath relPath;
-			RKIT_CHECK(relPath.ConvertFrom(path));
+			rkit::OSAbsPath osPath;
 
-			rkit::OSAbsPath osPath = m_intermedDir;
-			RKIT_CHECK(osPath.Append(relPath));
+			switch (inputFileLocation)
+			{
+			case rkit::buildsystem::BuildFileLocation::kIntermediateDir:
+				osPath = m_intermedDir;
+				break;
+			case rkit::buildsystem::BuildFileLocation::kAuxDir0:
+				osPath = m_exeDir;
+				break;
+			default:
+				return rkit::ResultCode::kNotYetImplemented;
+			}
+
+			{
+				rkit::OSRelPath relPath;
+				RKIT_CHECK(relPath.ConvertFrom(path));
+
+				RKIT_CHECK(osPath.Append(relPath));
+			}
 
 			rkit::Result openResult = sysDriver->OpenFileReadAbs(outStream, osPath);
 			if (rkit::utils::GetResultCode(openResult) == rkit::ResultCode::kFileOpenError)
 				return rkit::ResultCode::kOK;
-
-			return openResult;
 		}
-		else
-			return rkit::ResultCode::kNotYetImplemented;
 
 
 		return rkit::ResultCode::kOK;
@@ -657,7 +668,15 @@ namespace anox { namespace utils
 
 	rkit::Result AnoxFileSystem::Load(anox::IUtilitiesDriver *utils, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataFilesDir, const rkit::OSAbsPathView &dataContentDir, const rkit::OSAbsPathView &dataSourceDir)
 	{
-		RKIT_CHECK(m_sourceDir.Set(sourceDir));
+		RKIT_CHECK(m_exeDir.Set(sourceDir));
+
+		m_sourceDir = m_exeDir;
+
+		{
+			rkit::OSRelPath anoxdataComponent;
+			RKIT_CHECK(anoxdataComponent.SetFromUTF8("anoxdata"));
+			RKIT_CHECK(m_sourceDir.Append(anoxdataComponent));
+		}
 		RKIT_CHECK(m_intermedDir.Set(intermedDir));
 		RKIT_CHECK(m_dataFilesDir.Set(dataFilesDir));
 		RKIT_CHECK(m_dataContentDir.Set(dataContentDir));
