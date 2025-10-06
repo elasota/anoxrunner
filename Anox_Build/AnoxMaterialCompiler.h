@@ -63,6 +63,8 @@ namespace anox { namespace buildsystem
 		static bool IsToken(const rkit::Span<const char> &span, const rkit::StringView &str);
 		static rkit::Result ParseImageImport(const rkit::Span<const char> &token, ImageImportDisposition disposition, MaterialAnalysisDynamicData &dynamicData, MaterialAnalysisBitmapDef &bitmapDef, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 
+		static rkit::Result AnalyzeDDSChannelUsage(rkit::IReadStream &stream, bool &rgbUsage, bool &alphaUsage, bool &lumaUsage);
+
 		rkit::Result GenerateRealFrames(MaterialAnalysisHeader &header, MaterialAnalysisDynamicData &dynamicData, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) const;
 
 		rkit::png::IPngDriver &m_pngDriver;

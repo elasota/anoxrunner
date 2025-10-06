@@ -28,6 +28,11 @@ namespace anox { namespace buildsystem
 		kCount,
 	};
 
+	struct TextureMetadata
+	{
+		uint8_t m_usesChannel[4] = {};
+	};
+
 	class TextureCompilerBase : public rkit::buildsystem::IDependencyNodeCompiler
 	{
 	public:
@@ -36,6 +41,7 @@ namespace anox { namespace buildsystem
 		static rkit::Result CreateImportIdentifier(rkit::String &identifier, const rkit::StringView &imagePath, ImageImportDisposition disposition);
 
 		static rkit::Result ResolveIntermediatePath(rkit::String &outString, const rkit::StringView &identifierWithDisposition);
+		static rkit::Result ResolveMetadataPath(rkit::String &outString, const rkit::StringView &identifierWithDisposition);
 
 		static rkit::Result GetImageMetadata(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName);
 		static rkit::Result GetImage(rkit::UniquePtr<rkit::utils::IImage> &image,

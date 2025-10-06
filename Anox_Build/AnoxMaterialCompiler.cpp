@@ -4,6 +4,7 @@
 #include "anox/Data/MaterialData.h"
 
 #include "rkit/Data/ContentID.h"
+#include "rkit/Data/DDSFile.h"
 
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/Optional.h"
@@ -39,6 +40,7 @@ namespace anox { namespace buildsystem
 		bool m_mipMapped;
 		bool m_bilinear;
 		bool m_clamp;
+		bool m_isAutoColorType;
 		ImageImportDisposition m_importDisposition = ImageImportDisposition::kCount;
 	};
 
@@ -252,6 +254,7 @@ namespace anox { namespace buildsystem
 		analysisHeader.m_mipMapped = false;
 		analysisHeader.m_width = 1;
 		analysisHeader.m_height = 1;
+		analysisHeader.m_isAutoColorType = true;
 		analysisHeader.m_colorType = data::MaterialColorType::kRGB;
 
 		bool interformHalfSet[2] = { false, false };
@@ -313,6 +316,7 @@ namespace anox { namespace buildsystem
 					return rkit::ResultCode::kDataError;
 				}
 
+				analysisHeader.m_isAutoColorType = false;
 				analysisHeader.m_colorType = static_cast<data::MaterialColorType>(ct - 1);
 			}
 			else if (IsToken(token, "width") || IsToken(token, "height"))
@@ -712,6 +716,7 @@ namespace anox { namespace buildsystem
 		analysisHeader.m_version = MaterialAnalysisHeader::kExpectedVersion;
 		analysisHeader.m_bilinear = true;
 		analysisHeader.m_mipMapped = true;
+		analysisHeader.m_isAutoColorType = true;
 
 		analysisHeader.m_materialType = data::MaterialType::kSingle;
 		analysisHeader.m_colorType = data::MaterialColorType::kRGBA;
@@ -784,6 +789,7 @@ namespace anox { namespace buildsystem
 		analysisHeader.m_version = MaterialAnalysisHeader::kExpectedVersion;
 		analysisHeader.m_bilinear = true;
 		analysisHeader.m_mipMapped = true;
+		analysisHeader.m_isAutoColorType = false;
 
 		analysisHeader.m_materialType = data::MaterialType::kMissing;
 		analysisHeader.m_colorType = data::MaterialColorType::kRGBA;
@@ -840,6 +846,26 @@ namespace anox { namespace buildsystem
 	bool MaterialCompiler::IsToken(const rkit::Span<const char> &span, const rkit::StringView &str)
 	{
 		return rkit::CompareSpansEqual(span, str.ToSpan());
+	}
+
+	rkit::Result MaterialCompiler::AnalyzeDDSChannelUsage(rkit::IReadStream &stream, bool &rgbUsage, bool &alphaUsage, bool &lumaUsage)
+	{
+		rkit::data::DDSHeader ddsHeader;
+		RKIT_CHECK(stream.ReadAll(&ddsHeader, sizeof(ddsHeader)));
+
+		const uint32_t pfFlags = ddsHeader.m_pixelFormat.m_pixelFormatFlags.Get();
+
+		if (pfFlags & rkit::data::DDSPixelFormatFlags::kAlphaPixels)
+			alphaUsage = true;
+		if (pfFlags & rkit::data::DDSPixelFormatFlags::kRGB)
+			rgbUsage = true;
+		if (pfFlags & rkit::data::DDSPixelFormatFlags::kLuminance)
+			lumaUsage = true;
+
+		if (pfFlags & rkit::data::DDSPixelFormatFlags::kFourCC)
+			return rkit::ResultCode::kNotYetImplemented;
+
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result MaterialCompiler::ParseImageImport(const rkit::Span<const char> &token, ImageImportDisposition disposition, MaterialAnalysisDynamicData &dynamicData, MaterialAnalysisBitmapDef &bitmapDef, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
@@ -1331,6 +1357,10 @@ namespace anox { namespace buildsystem
 		MaterialAnalysisHeader analysisHeader;
 		MaterialAnalysisDynamicData dynamicData;
 
+		bool rgbUsage = false;
+		bool alphaUsage = false;
+		bool lumaUsage = false;
+
 		{
 			rkit::UniquePtr<rkit::ISeekableReadStream> analysisStream;
 			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, analysisPath, analysisStream));
@@ -1367,6 +1397,14 @@ namespace anox { namespace buildsystem
 			RKIT_CHECK(intermediatePath.Set(intermediatePathStr));
 
 			RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, intermediatePath, bitmapContentIDs[i].m_contentID));
+
+			if (analysisHeader.m_isAutoColorType)
+			{
+				rkit::UniquePtr<rkit::ISeekableReadStream> ddsFile;
+				RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, intermediatePath, ddsFile));
+
+				RKIT_CHECK(AnalyzeDDSChannelUsage(*ddsFile, rgbUsage, alphaUsage, lumaUsage));
+			}
 		}
 
 		rkit::Vector<data::MaterialBitmapDef> bitmapDefs;
@@ -1419,6 +1457,14 @@ namespace anox { namespace buildsystem
 
 		materialHeader.m_numBitmaps = static_cast<uint32_t>(bitmapDefs.Count());
 		materialHeader.m_numFrames = static_cast<uint32_t>(frameDefs.Count());
+
+		if (analysisHeader.m_isAutoColorType)
+		{
+			if (rgbUsage)
+				materialHeader.m_colorType = static_cast<uint8_t>(alphaUsage ? data::MaterialColorType::kRGBA : data::MaterialColorType::kRGB);
+			else
+				materialHeader.m_colorType = static_cast<uint8_t>(alphaUsage ? data::MaterialColorType::kLuminanceAlpha : data::MaterialColorType::kLuminance);
+		}
 
 		rkit::CIPath outputPath;
 		RKIT_CHECK(ConstructOutputPath(outputPath, nodeType, depsNode->GetIdentifier()));

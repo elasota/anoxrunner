@@ -31,7 +31,7 @@ namespace anox { namespace data
 		// MDAModelTri m_tris[m_numSubmodels][submodel.m_numTris]
 		// MDAModelVert m_verts[m_numSubmodels][submodel.m_numVerts]
 		// MDAModelPoint m_points[m_numFrames][m_numPoints]
-		// MDAModelVertMorph m_vertMorphs[m_numSubmodels][m_numMorphkeys][submodel.m_numMorphedVerts]
+		// MDAModelVertMorph m_vertMorphs[m_numMorphKeys][m_numMorphedPoints]
 	};
 
 	struct MDAAnimation
@@ -42,10 +42,72 @@ namespace anox { namespace data
 		rkit::endian::LittleUInt16_t m_numFrames;
 	};
 
+	enum class MDAAlphaTestMode
+	{
+		kDisabled,
+		kGE128,
+		kGT0,
+		kLT128,
+
+		kCount,
+	};
+
+	enum class MDABlendMode
+	{
+		kDisabled,
+		kAdd,
+		kMultiply,
+		kAlphaBlend,
+
+		kCount,
+	};
+
+	enum class MDAUVGenMode
+	{
+		kDisabled,
+		kSphere,
+
+		kCount,
+	};
+
+	enum class MDARGBGenMode
+	{
+		kDefault,
+		kIdentity,
+		kDiffuseZero,
+
+		kCount,
+	};
+
+	enum class MDADepthFunc
+	{
+		kDefault,
+		kEqual,
+		kLess,
+
+		kCount,
+	};
+
+	enum class MDACullType
+	{
+		kBack,
+		kFront,
+		kDisable,
+
+		kCount,
+	};
+
 	struct MDASkinPass
 	{
 		rkit::data::ContentID m_materialContentID;
 		uint8_t m_clampFlag = 0;
+		uint8_t m_depthWriteFlag = 1;
+		uint8_t m_alphaTestMode = static_cast<uint8_t>(MDAAlphaTestMode::kDisabled);
+		uint8_t m_blendMode = static_cast<uint8_t>(MDABlendMode::kDisabled);
+		uint8_t m_uvGenMode = static_cast<uint8_t>(MDAUVGenMode::kDisabled);
+		uint8_t m_rgbGenMode = static_cast<uint8_t>(MDARGBGenMode::kDefault);
+		uint8_t m_depthFunc = static_cast<uint8_t>(MDADepthFunc::kDefault);
+		uint8_t m_cullType = static_cast<uint8_t>(MDACullType::kBack);
 	};
 
 	struct MDASkin
@@ -61,8 +123,7 @@ namespace anox { namespace data
 
 	struct MDAModelBoneFrame
 	{
-		rkit::endian::LittleFloat32_t m_position[3];
-		CompressedQuat m_orientation;
+		rkit::endian::LittleFloat32_t m_matrix[3][4];
 	};
 
 	struct MDAModelMorphKey

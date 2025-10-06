@@ -6,12 +6,14 @@
 #include "rkit/Core/BoolVector.h"
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/Optional.h"
+#include "rkit/Core/QuickSort.h"
 #include "rkit/Core/Stream.h"
 
 #include "rkit/Data/ContentID.h"
 
 #include "anox/AnoxModule.h"
 #include "anox/Data/MDAModel.h"
+#include "anox/Data/MaterialData.h"
 
 #include "AnoxMaterialCompiler.h"
 #include "AnoxPrecompiledMesh.h"
@@ -94,6 +96,11 @@ namespace anox { namespace buildsystem
 			rkit::endian::LittleUInt32_t m_numFrames;
 		};
 
+		struct MDABoneFrame
+		{
+			rkit::endian::LittleFloat32_t m_matrix[16];
+		};
+
 		struct MDABoneChunkData
 		{
 			static const uint32_t kExpectedMagic = 0xad1f10edu;
@@ -134,6 +141,13 @@ namespace anox { namespace buildsystem
 		{
 			rkit::CIPath m_map;
 			bool m_clamp = false;
+			rkit::Optional<data::MDAAlphaTestMode> m_alphaTestMode;
+			rkit::Optional<data::MDABlendMode> m_blendMode;
+			rkit::Optional<data::MDAUVGenMode> m_uvGenMode;
+			rkit::Optional<data::MDADepthFunc> m_depthFunc;
+			rkit::Optional<data::MDACullType> m_cullType;
+			rkit::Optional<data::MDARGBGenMode> m_rgbGenMode;
+			rkit::Optional<bool> m_depthWrite;
 		};
 
 		struct UncompiledMDASkin
@@ -201,7 +215,7 @@ namespace anox { namespace buildsystem
 		};
 
 		static rkit::Result AnalyzeMD2(const rkit::CIPathView &md2Path, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
-		static rkit::Result ResolveTexturePath(rkit::CIPath &textureDefPath, const rkit::CIPathView &md2Path, const MD2TextureDef &textureDef);
+		static rkit::Result ResolveTexturePath(rkit::CIPath &textureDefPath, const rkit::CIPathView &md2Path, const MD2TextureDef &textureDef, bool constructFullMaterialPath);
 
 		static rkit::Result CompileMDA(rkit::CIPath &outputPath, UncompiledMDAData &mdaData, bool autoSkin, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 		static rkit::Result CompileMDASubmodels(UncompiledTriList &triList, rkit::Span<uint32_t> xyzToPointID);
@@ -271,7 +285,7 @@ namespace anox { namespace buildsystem
 		for (const MD2TextureDef &textureDef : textures)
 		{
 			rkit::CIPath texturePath;
-			RKIT_CHECK(ResolveTexturePath(texturePath, md2Path, textureDef));
+			RKIT_CHECK(ResolveTexturePath(texturePath, md2Path, textureDef, true));
 
 			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kModelMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, texturePath.ToString()));
 		}
@@ -279,23 +293,37 @@ namespace anox { namespace buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxModelCompilerCommon::ResolveTexturePath(rkit::CIPath &textureDefPath, const rkit::CIPathView &md2Path, const MD2TextureDef &textureDef)
+	rkit::Result AnoxModelCompilerCommon::ResolveTexturePath(rkit::CIPath &textureDefPath, const rkit::CIPathView &md2Path, const MD2TextureDef &textureDef, bool constructFullMaterialPath)
 	{
 		size_t strLength = 0;
+		size_t lastDotPosPlusOne = 0;
 		while (strLength < 64)
 		{
 			const char c = textureDef.m_textureName[strLength];
-			if (c == '\0' || c == '.')
+			if (c == '\0')
 				break;
 			else
+			{
 				strLength++;
+
+				if (c == '.')
+					lastDotPosPlusOne = strLength;
+			}
 		}
 
-		rkit::String materialPath;
-		RKIT_CHECK(materialPath.Format("{}.{}", rkit::StringSliceView(textureDef.m_textureName, strLength), MaterialCompiler::GetModelMaterialExtension()));
+		if (lastDotPosPlusOne != 0)
+			strLength = lastDotPosPlusOne - 1;
+
+		rkit::StringSliceView materialPathView(textureDef.m_textureName, strLength);
+		rkit::String materialPathTemp;
+		if (constructFullMaterialPath)
+		{
+			RKIT_CHECK(materialPathTemp.Format("{}.{}", materialPathView, MaterialCompiler::GetModelMaterialExtension()));
+			materialPathView = materialPathTemp;
+		}
 
 		RKIT_CHECK(textureDefPath.Set(md2Path.AbsSlice(md2Path.NumComponents() - 1)));
-		RKIT_CHECK(textureDefPath.AppendComponent(materialPath));
+		RKIT_CHECK(textureDefPath.AppendComponent(materialPathView));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -568,6 +596,103 @@ namespace anox { namespace buildsystem
 											pass.m_clamp = isClampMap;
 
 											haveMap = true;
+										}
+										else if (TokenIs(token, "alphafunc"))
+										{
+											RKIT_CHECK(ExpectToken(token, line));
+
+											if (TokenIs(token, "ge128"))
+												pass.m_alphaTestMode = data::MDAAlphaTestMode::kGE128;
+											else if (TokenIs(token, "lt128"))
+												pass.m_alphaTestMode = data::MDAAlphaTestMode::kLT128;
+											else
+											{
+												rkit::log::Error("Unknown alphafunc");
+												return rkit::ResultCode::kDataError;
+											}
+										}
+										else if (TokenIs(token, "depthwrite"))
+										{
+											RKIT_CHECK(ExpectToken(token, line));
+
+											uint32_t depthWriteFlag = 0;
+											if (!utils->ParseUInt32(rkit::StringSliceView(token), 10, depthWriteFlag))
+											{
+												rkit::log::Error("Invalid depthwrite value");
+												return rkit::ResultCode::kDataError;
+											}
+
+											pass.m_depthWrite = (depthWriteFlag != 0);
+										}
+										else if (TokenIs(token, "uvgen"))
+										{
+											RKIT_CHECK(ExpectToken(token, line));
+
+											if (TokenIs(token, "sphere"))
+												pass.m_uvGenMode = data::MDAUVGenMode::kSphere;
+											else
+											{
+												rkit::log::Error("Unknown uvgen type");
+												return rkit::ResultCode::kDataError;
+											}
+										}
+										else if (TokenIs(token, "blendmode"))
+										{
+											RKIT_CHECK(ExpectToken(token, line));
+
+											if (TokenIs(token, "add"))
+												pass.m_blendMode = data::MDABlendMode::kAdd;
+											else if (TokenIs(token, "none"))
+												pass.m_blendMode = data::MDABlendMode::kDisabled;
+											else
+											{
+												rkit::log::Error("Unknown blendmode");
+												return rkit::ResultCode::kDataError;
+											}
+										}
+										else if (TokenIs(token, "depthfunc"))
+										{
+											RKIT_CHECK(ExpectToken(token, line));
+
+											if (TokenIs(token, "equal"))
+												pass.m_depthFunc = data::MDADepthFunc::kEqual;
+											else if (TokenIs(token, "less"))
+												pass.m_depthFunc = data::MDADepthFunc::kLess;
+											else
+											{
+												rkit::log::Error("Unknown depthfunc");
+												return rkit::ResultCode::kDataError;
+											}
+										}
+										else if (TokenIs(token, "cull"))
+										{
+											RKIT_CHECK(ExpectToken(token, line));
+
+											if (TokenIs(token, "back"))
+												pass.m_cullType = data::MDACullType::kBack;
+											else if (TokenIs(token, "front"))
+												pass.m_cullType = data::MDACullType::kFront;
+											else if (TokenIs(token, "disable"))
+												pass.m_cullType = data::MDACullType::kDisable;
+											else
+											{
+												rkit::log::Error("Unknown cull type");
+												return rkit::ResultCode::kDataError;
+											}
+										}
+										else if (TokenIs(token, "rgbgen"))
+										{
+											RKIT_CHECK(ExpectToken(token, line));
+
+											if (TokenIs(token, "diffusezero"))
+												pass.m_rgbGenMode = data::MDARGBGenMode::kDiffuseZero;
+											else if (TokenIs(token, "identity"))
+												pass.m_rgbGenMode = data::MDARGBGenMode::kIdentity;
+											else
+											{
+												rkit::log::Error("Unknown rgbgen type");
+												return rkit::ResultCode::kDataError;
+											}
 										}
 										else
 										{
@@ -1266,17 +1391,90 @@ namespace anox { namespace buildsystem
 			}
 		}
 
-		if (mdaData.m_boneChunk.Count() > 0)
+		// Compute point remappings
+		uint32_t numMorphedPoints = 0;
+
+		for (bool hasMorph : xyzHasMorph)
 		{
-			return rkit::ResultCode::kNotYetImplemented;
+			if (hasMorph)
+				numMorphedPoints++;
 		}
 
 		rkit::Vector<uint32_t> xyzToPointIndex;
 		RKIT_CHECK(xyzToPointIndex.Resize(numXYZ));
 
+		rkit::Vector<uint32_t> pointToXYZIndex;
+		RKIT_CHECK(pointToXYZIndex.Resize(numXYZ));
+
 		for (uint32_t i = 0; i < numXYZ; i++)
+			pointToXYZIndex[i] = i;
+
+		rkit::QuickSort(pointToXYZIndex.begin(), pointToXYZIndex.end(), [&xyzHasMorph](uint32_t a, uint32_t b)
+			{
+				const bool aHasMorph = xyzHasMorph[a];
+				const bool bHasMorph = xyzHasMorph[b];
+
+				if (aHasMorph != bHasMorph)
+					return aHasMorph;
+
+				return a < b;
+			});
+
+		for (uint32_t i = 0; i < numXYZ; i++)
+			xyzToPointIndex[pointToXYZIndex[i]] = i;
+
+		rkit::Vector<data::MDAModelBone> bones;
+		rkit::Vector<rkit::Vector<data::MDAModelBoneFrame>> boneFrames;
+
+		if (mdaData.m_boneChunk.Count() > 0)
 		{
-			xyzToPointIndex[i] = i;
+			const rkit::ConstSpan<uint8_t> boneDataBytes = mdaData.m_boneChunk.ToSpan();
+
+			MDABoneChunkData boneData;
+			if (boneDataBytes.Count() < sizeof(boneData))
+			{
+				rkit::log::Error("Bone data too small");
+				return rkit::ResultCode::kDataError;
+			}
+
+			rkit::CopySpanNonOverlapping(rkit::Span<MDABoneChunkData>(&boneData, 1).ReinterpretCast<uint8_t>(), boneDataBytes.SubSpan(0, sizeof(boneData)));
+
+			const rkit::ConstSpan<uint8_t> boneFrameBytes = boneDataBytes.SubSpan(sizeof(boneData));
+
+			if (boneFrameBytes.Count() / sizeof(MDABoneFrame) < numFrames)
+			{
+				rkit::log::Error("Bone frame data was too small");
+				return rkit::ResultCode::kDataError;
+			}
+
+			RKIT_CHECK(bones.Resize(1));
+			RKIT_CHECK(boneFrames.Resize(1));
+
+			bones[0].m_boneIDFourCC = boneData.m_boneID.Get();
+
+			rkit::Vector<data::MDAModelBoneFrame> &outFrames = boneFrames[0];
+
+			RKIT_CHECK(outFrames.Resize(numFrames));
+			for (uint32_t frameIndex = 0; frameIndex < numFrames; frameIndex++)
+			{
+				MDABoneFrame inFrame = {};
+				data::MDAModelBoneFrame &outFrame = outFrames[frameIndex];
+
+				rkit::CopySpanNonOverlapping(rkit::Span<MDABoneFrame>(&inFrame, 1).ReinterpretCast<uint8_t>(), boneFrameBytes.SubSpan(frameIndex * sizeof(inFrame), sizeof(inFrame)));
+
+				float matrix[4][4] = {};
+
+				for (size_t matrixElement = 0; matrixElement < 16; matrixElement++)
+				{
+					matrix[matrixElement % 4][matrixElement / 4] = inFrame.m_matrix[matrixElement].Get();
+				}
+
+				for (size_t row = 0; row < 3; row++)
+				{
+					for (size_t col = 0; col < 4; col++)
+						outFrame.m_matrix[row][col] = matrix[row][col];
+				}
+			}
 		}
 
 		for (UncompiledTriList &triList : triLists)
@@ -1347,6 +1545,10 @@ namespace anox { namespace buildsystem
 						vertUIntCoords[2] = ((packedVert >> 21) & 0x7ff);
 					}
 					break;
+				case 8:
+					for (size_t axis = 0; axis < 3; axis++)
+						vertUIntCoords[axis] = vertData[axis * 2] + static_cast<uint16_t>(vertData[axis * 2 + 1] << 8);
+					break;
 				default:
 					return rkit::ResultCode::kInternalError;
 				}
@@ -1362,11 +1564,50 @@ namespace anox { namespace buildsystem
 			}
 		}
 
+		// Generate vert morphs
+		rkit::Vector<data::MDAModelVertMorph> compiledVertMorphs;
+
+		{
+			size_t morphKeyListSize = 0;
+			RKIT_CHECK(rkit::SafeMul<size_t>(morphKeyListSize, morphs.Count(), numMorphedPoints));
+
+			RKIT_CHECK(compiledVertMorphs.Resize(morphKeyListSize));
+		}
+
+		if (numMorphedPoints > 0)
+		{
+			for (size_t morphIndex = 0; morphIndex < morphs.Count(); morphIndex++)
+			{
+				rkit::Span<data::MDAModelVertMorph> keyVertMorphs = compiledVertMorphs.ToSpan().SubSpan(morphIndex * numMorphedPoints, numMorphedPoints);
+
+				for (data::MDAModelVertMorph &vertMorph : keyVertMorphs)
+					vertMorph = {};
+
+				const UncompiledMDAMorph &uncompiledMorph = morphs[morphIndex];
+				for (const UncompiledMDAVertMorph &inVertMorph : morphs[morphIndex].m_vertMorphs)
+				{
+					const uint32_t pointIndex = xyzToPointIndex[inVertMorph.m_vertIndex];
+
+					data::MDAModelVertMorph &outVertMorph = keyVertMorphs[pointIndex];
+
+					rkit::StaticArray<float, 3> vertMorphBase;
+					for (size_t axis = 0; axis < 3; axis++)
+						vertMorphBase[axis] = inVertMorph.m_delta[axis];
+
+					for (size_t axis = 0; axis < 3; axis++)
+						outVertMorph.m_delta[axis] = inVertMorph.m_delta[axis];
+				}
+			}
+		}
+
 		rkit::Vector<data::MDAProfile> profiles;
 		rkit::Vector<rkit::Vector<data::MDASkin>> profileSkins;
 		rkit::Vector<rkit::Vector<rkit::Vector<data::MDASkinPass>>> profileSkinPasses;
 
 		rkit::Vector<char> profileConditionStrings;
+
+		UncompiledMDAProfile autoSkinProfile;
+		rkit::ConstSpan<UncompiledMDAProfile> mdaProfiles;
 
 		if (autoSkin)
 		{
@@ -1376,40 +1617,28 @@ namespace anox { namespace buildsystem
 			RKIT_CHECK(inputFile->SeekStart(header.m_texturePos.Get()));
 			RKIT_CHECK(inputFile->ReadAll(md2Textures.GetBuffer(), sizeof(MD2TextureDef) * numTextures));
 
-			RKIT_CHECK(profiles.Resize(1));
-			profiles[0].m_fourCC = RKIT_FOURCC('D', 'F', 'L', 'T');
-
-			RKIT_CHECK(profileSkins.Resize(1));
-			RKIT_CHECK(profileSkins[0].Resize(numTextures));
-
-			RKIT_CHECK(profileSkinPasses.Resize(1));
-			RKIT_CHECK(profileSkinPasses[0].Resize(numTextures));
+			autoSkinProfile.m_fourCC = RKIT_FOURCC('D', 'F', 'L', 'T');
+			RKIT_CHECK(autoSkinProfile.m_skins.Resize(numTextures));
 
 			for (size_t texIndex = 0; texIndex < numTextures; texIndex++)
 			{
 				const MD2TextureDef &textureDef = md2Textures[texIndex];
 
-				data::MDASkin &skin = profileSkins[0][texIndex];
-				skin.m_numPasses = 1;
+				UncompiledMDASkin &skin = autoSkinProfile.m_skins[texIndex];
+				RKIT_CHECK(skin.m_passes.Resize(1));
 
-				rkit::Vector<data::MDASkinPass> &skinPasses = profileSkinPasses[0][texIndex];
+				UncompiledMDAPass &pass = skin.m_passes[0];
 
-				RKIT_CHECK(skinPasses.Resize(1));
-
-				rkit::CIPath texturePath;
-				RKIT_CHECK(ResolveTexturePath(texturePath, mdaData.m_baseModel, textureDef));
-
-				rkit::CIPath compiledMaterialPath;
-				RKIT_CHECK(MaterialCompiler::ConstructOutputPath(compiledMaterialPath, data::MaterialResourceType::kModel, texturePath.ToString()));
-
-				RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, skinPasses[0].m_materialContentID));
+				RKIT_CHECK(ResolveTexturePath(pass.m_map, mdaData.m_baseModel, textureDef, false));
 			}
 
-			RKIT_CHECK(profileSkinPasses.Resize(1));
+			mdaProfiles = rkit::ConstSpan<UncompiledMDAProfile>(&autoSkinProfile, 1);
 		}
 		else
+			mdaProfiles = mdaData.m_profiles.ToSpan();
+
 		{
-			const size_t numProfiles = mdaData.m_profiles.Count();
+			const size_t numProfiles = mdaProfiles.Count();
 
 			RKIT_CHECK(profiles.Resize(numProfiles));
 			RKIT_CHECK(profileSkins.Resize(numProfiles));
@@ -1417,7 +1646,7 @@ namespace anox { namespace buildsystem
 
 			for (size_t profileIndex = 0; profileIndex < numProfiles; profileIndex++)
 			{
-				const UncompiledMDAProfile &inProfile = mdaData.m_profiles[profileIndex];
+				const UncompiledMDAProfile &inProfile = mdaProfiles[profileIndex];
 
 				data::MDAProfile &outProfile = profiles[profileIndex];
 
@@ -1469,12 +1698,77 @@ namespace anox { namespace buildsystem
 
 						RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, outPass.m_materialContentID));
 
+						bool needMaterialData = false;
 						outPass.m_clampFlag = (inPass.m_clamp ? 1 : 0);
+
+						if (inPass.m_alphaTestMode.IsSet())
+							outPass.m_alphaTestMode = static_cast<uint8_t>(inPass.m_alphaTestMode.Get());
+						else
+							needMaterialData = true;
+
+						if (inPass.m_depthWrite.IsSet())
+							outPass.m_depthWriteFlag = inPass.m_depthWrite.Get() ? 1 : 0;
+						else
+							needMaterialData = true;
+
+						if (inPass.m_blendMode.IsSet())
+							outPass.m_blendMode = static_cast<uint8_t>(inPass.m_blendMode.Get());
+						else
+							needMaterialData = true;
+
+						if (inPass.m_uvGenMode.IsSet())
+							outPass.m_uvGenMode = static_cast<uint8_t>(inPass.m_uvGenMode.Get());
+
+						if (inPass.m_rgbGenMode.IsSet())
+							outPass.m_rgbGenMode = static_cast<uint8_t>(inPass.m_rgbGenMode.Get());
+
+						if (inPass.m_depthFunc.IsSet())
+							outPass.m_depthFunc = static_cast<uint8_t>(inPass.m_depthFunc.Get());
+
+						if (inPass.m_cullType.IsSet())
+							outPass.m_cullType = static_cast<uint8_t>(inPass.m_cullType.Get());
+
+						if (needMaterialData)
+						{
+							rkit::UniquePtr<rkit::ISeekableReadStream> materialStream;
+							RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, materialStream));
+
+							data::MaterialHeader matHeader;
+							RKIT_CHECK(materialStream->ReadAll(&matHeader, sizeof(matHeader)));
+
+							const data::MaterialColorType colorType = static_cast<data::MaterialColorType>(matHeader.m_colorType);
+
+							bool haveAlpha = false;
+
+							switch (colorType)
+							{
+							case data::MaterialColorType::kLuminance:
+							case data::MaterialColorType::kRGB:
+								haveAlpha = false;
+								break;
+							case data::MaterialColorType::kLuminanceAlpha:
+							case data::MaterialColorType::kRGBA:
+								haveAlpha = true;
+								break;
+							default:
+								rkit::log::Error("Unknown material color type");
+								return rkit::ResultCode::kDataError;
+							}
+
+							if (haveAlpha)
+							{
+								if (!inPass.m_alphaTestMode.IsSet())
+									outPass.m_alphaTestMode = static_cast<uint8_t>(data::MDAAlphaTestMode::kGT0);
+
+								if (inPass.m_depthWrite.IsSet())
+									outPass.m_depthWriteFlag = false;
+
+								if (inPass.m_blendMode.IsSet())
+									outPass.m_blendMode = static_cast<uint8_t>(data::MDABlendMode::kAlphaBlend);
+							}
+						}
 					}
 				}
-
-				RKIT_CHECK(profileSkinPasses.Resize(1));
-				RKIT_CHECK(profileSkinPasses[0].Resize(numTextures));
 			}
 		}
 
@@ -1503,6 +1797,18 @@ namespace anox { namespace buildsystem
 			return rkit::ResultCode::kDataError;
 		}
 
+		if (morphKeys.Count() > 0xffffu)
+		{
+			rkit::log::Error("Too many morph keys");
+			return rkit::ResultCode::kDataError;
+		}
+
+		if (bones.Count() > 0xffffu)
+		{
+			rkit::log::Error("Too many bones");
+			return rkit::ResultCode::kDataError;
+		}
+
 		data::MDAModelHeader outHeader = {};
 
 		for (const UncompiledTriList &triList : triLists)
@@ -1518,11 +1824,11 @@ namespace anox { namespace buildsystem
 		}
 
 		outHeader.m_numSkins = numTextures;
-		//m_numMorphKeys = ???
-		//m_numBones = ???
+		outHeader.m_numMorphKeys = static_cast<uint16_t>(morphKeys.Count());
+		outHeader.m_numBones = static_cast<uint16_t>(bones.Count());
 		outHeader.m_numFrames = static_cast<uint16_t>(numFrames);
 		outHeader.m_numPoints = static_cast<uint16_t>(numXYZ);
-		//m_numMorphedPoints = ???
+		outHeader.m_numMorphedPoints = static_cast<uint16_t>(numMorphedPoints);
 		outHeader.m_numAnimations = static_cast<uint8_t>(animations.Count());
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
@@ -1558,9 +1864,17 @@ namespace anox { namespace buildsystem
 		// Write animation names
 		RKIT_CHECK(outFile->WriteAll(animNameChars.GetBuffer(), sizeof(animNameChars[0]) * animNameChars.Count()));
 
-		// MDAModelMorphKey m_morphKeys[m_numMorphKeys]
-		// MDAModelBone m_bones[m_numBones]
-		// MDAModelBoneFrame m_boneFrames[m_numFrames][m_numBones]
+		// Write morph keys
+		RKIT_CHECK(outFile->WriteAll(morphKeys.GetBuffer(), sizeof(morphKeys[0]) * morphKeys.Count()));
+
+		// Write bones
+		RKIT_CHECK(outFile->WriteAll(bones.GetBuffer(), sizeof(bones[0]) * bones.Count()));
+
+		// Write bone frames
+		for (const rkit::Vector<data::MDAModelBoneFrame> &boneFramesList : boneFrames)
+		{
+			RKIT_CHECK(outFile->WriteAll(boneFramesList.GetBuffer(), sizeof(boneFramesList[0]) * boneFramesList.Count()));
+		}
 
 		// Write submodels
 		for (size_t textureIndex = 0; textureIndex < triLists.Count(); textureIndex++)
@@ -1597,9 +1911,10 @@ namespace anox { namespace buildsystem
 		}
 
 		// Write points
-		RKIT_CHECK(outFile->WriteAll(points.GetBuffer(), sizeof(points[0]) *points.Count()));
+		RKIT_CHECK(outFile->WriteAll(points.GetBuffer(), sizeof(points[0]) * points.Count()));
 
-		// MDAModelVertMorph m_vertMorphs[m_numSubmodels][m_numMorphkeys][submodel.m_numMorphedVerts]
+		// Write vert morphs
+		RKIT_CHECK(outFile->WriteAll(compiledVertMorphs.GetBuffer(), sizeof(compiledVertMorphs[0]) * compiledVertMorphs.Count()));
 
 		return rkit::ResultCode::kOK;
 	}

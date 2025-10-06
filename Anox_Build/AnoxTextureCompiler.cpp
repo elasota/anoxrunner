@@ -90,12 +90,12 @@ namespace anox { namespace buildsystem
 			void Set(TElementValues... values);
 
 			template<size_t TIndex>
-			TElementType &ModifyAt(TElementType value);
+			TElementType &ModifyAt();
 
-			TElementType &ModifyR() const { return ModifyAt<0>(); }
-			TElementType &ModifyG() const { return ModifyAt<1>(); }
-			TElementType &ModifyB() const { return ModifyAt<2>(); }
-			TElementType &ModifyA() const { return ModifyAt<3>(); }
+			TElementType &ModifyR() { return ModifyAt<0>(); }
+			TElementType &ModifyG() { return ModifyAt<1>(); }
+			TElementType &ModifyB() { return ModifyAt<2>(); }
+			TElementType &ModifyA() { return ModifyAt<3>(); }
 
 			TElementType GetR() const { return GetAt<0>(); }
 			TElementType GetG() const { return GetAt<1>(); }
@@ -351,7 +351,7 @@ namespace anox { namespace buildsystem { namespace priv
 
 	template<class TElementType, size_t TNumElements>
 	template<size_t TIndex>
-	TElementType &TextureCompilerPixel<TElementType, TNumElements>::ModifyAt(TElementType value)
+	TElementType &TextureCompilerPixel<TElementType, TNumElements>::ModifyAt()
 	{
 		static_assert(TIndex < TNumElements);
 		return m_values[TIndex];
@@ -771,7 +771,7 @@ namespace anox { namespace buildsystem
 				for (size_t i = 0; i < width; i++)
 				{
 					const uint8_t *inBytes = inScanlineBytes + (i * 3);
-					outScanline[i].Set(inBytes[0], inBytes[1], inBytes[2], 0xff);
+					outScanline[i].Set(inBytes[2], inBytes[1], inBytes[0], 0xff);
 				}
 			}
 			break;
@@ -780,7 +780,7 @@ namespace anox { namespace buildsystem
 				for (size_t i = 0; i < width; i++)
 				{
 					const uint8_t *inBytes = inScanlineBytes + (i * 4);
-					outScanline[i].Set(inBytes[0], inBytes[1], inBytes[2], inBytes[3]);
+					outScanline[i].Set(inBytes[2], inBytes[1], inBytes[0], inBytes[3]);
 				}
 			}
 			break;
@@ -1122,10 +1122,6 @@ namespace anox { namespace buildsystem
 			}
 		}
 
-		// Convert 24-bit to 32-bit
-		if (numChannelsToSave == 3 && !isCompressed)
-			numChannelsToSave = 4;
-
 		pixelSize = static_cast<uint8_t>(numChannelsToSave);
 
 		uint32_t ddsFlags = 0;
@@ -1180,10 +1176,22 @@ namespace anox { namespace buildsystem
 
 				if (!isCompressed)
 				{
-					pixelFormatFlags |= rkit::data::DDSPixelFormatFlags::kRGB;
-
-					if (numChannelsToSave >= 4)
+					if (numChannelsToSave == 1)
+					{
+						pixelFormatFlags |= rkit::data::DDSPixelFormatFlags::kLuminance;
+					}
+					else if (numChannelsToSave == 2)
+					{
+						pixelFormatFlags |= rkit::data::DDSPixelFormatFlags::kLuminance;
 						pixelFormatFlags |= rkit::data::DDSPixelFormatFlags::kAlphaPixels;
+					}
+					else
+					{
+
+						pixelFormatFlags |= rkit::data::DDSPixelFormatFlags::kRGB;
+						if (numChannelsToSave == 4 || numChannelsToSave == 2)
+							pixelFormatFlags |= rkit::data::DDSPixelFormatFlags::kAlphaPixels;
+					}
 				}
 
 				pixelFormat.m_pixelFormatFlags = pixelFormatFlags;
@@ -1201,14 +1209,29 @@ namespace anox { namespace buildsystem
 
 			pixelFormat.m_rgbBitCount = pixelSize * 8;
 
-			pixelFormat.m_rBitMask = 0x000000ffu;
-
-			if (numChannelsToSave >= 2)
-				pixelFormat.m_gBitMask = 0x0000ff00u;
-			if (numChannelsToSave >= 3)
-				pixelFormat.m_bBitMask = 0x00ff0000u;
-			if (numChannelsToSave >= 4)
+			switch (numChannelsToSave)
+			{
+			case 1:
+				pixelFormat.m_rBitMask = 0xffu;
+				break;
+			case 2:
+				pixelFormat.m_rBitMask = 0x00ffu;
+				pixelFormat.m_aBitMask = 0xff00u;
+				break;
+			case 3:
+				pixelFormat.m_rBitMask = 0xff0000u;
+				pixelFormat.m_gBitMask = 0x00ff00u;
+				pixelFormat.m_bBitMask = 0x0000ffu;
+				break;
+			case 4:
 				pixelFormat.m_aBitMask = 0xff000000u;
+				pixelFormat.m_rBitMask = 0x00ff0000u;
+				pixelFormat.m_gBitMask = 0x0000ff00u;
+				pixelFormat.m_bBitMask = 0x000000ffu;
+				break;
+			default:
+				return rkit::ResultCode::kInternalError;
+			}
 		}
 
 		{
@@ -1265,7 +1288,11 @@ namespace anox { namespace buildsystem
 
 				for (const priv::TextureCompilerPixel<TElementType, TNumElements> &pixel : scanline)
 				{
-					rkit::endian::LittleUInt64_t packedPixel(priv::PixelPackHelper<TElementType, TNumElements>::Pack(pixel));
+					priv::TextureCompilerPixel<TElementType, TNumElements> reorderedPixel = pixel;
+					if (numChannelsToSave >= 3)
+						rkit::Swap(reorderedPixel.ModifyR(), reorderedPixel.ModifyB());
+
+					rkit::endian::LittleUInt64_t packedPixel(priv::PixelPackHelper<TElementType, TNumElements>::Pack(reorderedPixel));
 
 					for (size_t i = 0; i < pixelSize; i++)
 						scanlineOut[i] = packedPixel.GetBytes()[i];

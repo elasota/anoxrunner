@@ -149,6 +149,8 @@ namespace rkit
 		bool operator==(const BoolVectorConstIterator &other) const;
 		bool operator!=(const BoolVectorConstIterator &other) const;
 
+		bool operator*() const;
+
 	private:
 		void Increase(size_t sz);
 		void Increase(ptrdiff_t diff);
@@ -461,6 +463,10 @@ namespace rkit
 		return !((*this) == other);
 	}
 
+	inline bool BoolVectorConstIterator::operator*() const
+	{
+		return (((*m_chunk) >> m_bit) & 1) != 0;
+	}
 
 	inline BoolSpanLValue::BoolSpanLValue(BoolVector::Chunk_t &chunk, uint8_t bit)
 		: m_chunk(chunk)
