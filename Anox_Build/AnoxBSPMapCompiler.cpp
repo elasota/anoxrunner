@@ -21,7 +21,7 @@
 #include "anox/Data/BSPModel.h"
 
 #include "anox/AnoxModule.h"
-#include "anox/UtilitiesDriver.h"
+#include "anox/AnoxUtilitiesDriver.h"
 
 
 #include <cmath>
@@ -3249,11 +3249,9 @@ namespace anox { namespace buildsystem
 							}
 
 							uint16_t maxMagnitude = std::max(rgb[0], std::max(rgb[1], rgb[2]));
-							uint8_t alpha = 255;
 
 							if (maxMagnitude > 255)
 							{
-								alpha -= (maxMagnitude - 255) / 3;
 								for (size_t channel = 0; channel < 3; channel++)
 									outTexel[channel] = rgb[channel] * 255u / maxMagnitude;
 								outTexel[3] = 255 - ((maxMagnitude - 255) / 3);

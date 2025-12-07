@@ -2,6 +2,7 @@
 
 #include "rkit/Core/QuickSort.h"
 #include "rkit/Core/Algorithm.h"
+#include "rkit/Core/LogDriver.h"
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/Stream.h"
 
@@ -10,6 +11,7 @@
 #include "anox/Data/EntityDef.h"
 
 #include "AnoxModelCompiler.h"
+#include "anox/AnoxUtilitiesDriver.h"
 
 namespace anox { namespace buildsystem {
 	struct UserEntityDef2
@@ -19,7 +21,7 @@ namespace anox { namespace buildsystem {
 		uint32_t m_modelCode = 0;
 		float m_scale[3] = { 0, 0, 0 };
 		rkit::AsciiString m_type;
-		uint8_t m_shadowType = 0;
+		data::UserEntityShadowType m_shadowType = data::UserEntityShadowType::kShadow;
 		float m_bboxMin[3] = { 0, 0, 0 };
 		float m_bboxMax[3] = { 0, 0, 0 };
 		uint8_t m_flags = 0;
@@ -162,6 +164,10 @@ namespace anox { namespace buildsystem {
 		{
 			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kMDAModelNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, modelPathStr));
 		}
+		else if (modelPath.EndsWithNoCase(".ctc"))
+		{
+			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kCTCModelNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, modelPathStr));
+		}
 		else
 			return rkit::ResultCode::kDataError;
 
@@ -170,7 +176,118 @@ namespace anox { namespace buildsystem {
 
 	rkit::Result EntityDefCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, "Utilities"));
+
+		const rkit::StringView identifier = depsNode->GetIdentifier();
+		const rkit::StringView prefix = "edefs/edef";
+		if (!identifier.StartsWith(prefix))
+			return rkit::ResultCode::kInternalError;
+
+		uint32_t edefID = 0;
+		if (!rkit::GetDrivers().m_utilitiesDriver->ParseUInt32(identifier.SubString(prefix.Length()), 10, edefID))
+			return rkit::ResultCode::kInternalError;
+
+		rkit::UniquePtr<UserEntityDictionaryBase> dictionary;
+		RKIT_CHECK(EntityDefCompilerBase::LoadUserEntityDictionary(dictionary, feedback));
+
+		const uint32_t numEDefs = dictionary->GetEDefCount();
+
+		if (edefID >= numEDefs)
+			return rkit::ResultCode::kInternalError;
+
+		const UserEntityDef2 &edef = static_cast<UserEntityDictionary &>(*dictionary).GetEDef(edefID);
+		const rkit::AsciiStringView modelPathStrView = edef.m_modelPath;
+
+		if (edef.m_description.Length() > 255)
+		{
+			rkit::log::Error("Description too long");
+			return rkit::ResultCode::kDataError;
+		}
+
+		rkit::Optional<size_t> classDefIndex;
+
+		{
+			const data::EntityDefsSchema &schema = anoxUtils->GetEntityDefs();
+
+			rkit::AsciiString fullType;
+			RKIT_CHECK(fullType.Set("userentity_"));
+			RKIT_CHECK(fullType.Append(edef.m_type));
+
+			for (size_t i = 0; i < schema.m_numClassDefs; i++)
+			{
+				const data::EntityClassDef &classDef = *schema.m_classDefs[i];
+
+				rkit::AsciiStringSliceView className(classDef.m_name, classDef.m_nameLength);
+
+				if (className == fullType)
+				{
+					classDefIndex = i;
+					break;
+				}
+			}
+
+			if (!classDefIndex.IsSet())
+			{
+				rkit::log::Error("Invalid userentity type");
+				return rkit::ResultCode::kDataError;
+			}
+		}
+
+		data::UserEntityDef outDef = {};
+		outDef.m_magic = data::UserEntityDef::kExpectedMagic;
+		outDef.m_version = data::UserEntityDef::kExpectedVersion;
+		outDef.m_modelCode = edef.m_modelCode;
+
+		for (size_t axis = 0; axis < 3; axis++)
+		{
+			outDef.m_scale[axis] = edef.m_scale[axis];
+			outDef.m_bboxMin[axis] = edef.m_bboxMin[axis];
+			outDef.m_bboxMax[axis] = edef.m_bboxMax[axis];
+		}
+
+		{
+			const rkit::AsciiStringView modelPath = edef.m_modelPath;
+
+			rkit::String modelPathStr;
+			RKIT_CHECK(modelPathStr.Set(modelPath.ToSpan()));
+			RKIT_CHECK(modelPathStr.MakeLower());
+
+			rkit::CIPath outputModelPath;
+
+			if (modelPath.EndsWithNoCase(".md2"))
+			{
+				RKIT_CHECK(AnoxMD2CompilerBase::ConstructOutputPath(outputModelPath, modelPathStr));
+			}
+			else if (modelPath.EndsWithNoCase(".mda"))
+			{
+				RKIT_CHECK(AnoxMDACompilerBase::ConstructOutputPath(outputModelPath, modelPathStr));
+			}
+			else
+				return rkit::ResultCode::kDataError;
+
+			RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outputModelPath, outDef.m_modelContentID));
+		}
+
+		outDef.m_entityType = static_cast<uint32_t>(classDefIndex.Get());
+		outDef.m_shadowType = static_cast<uint8_t>(edef.m_shadowType);
+		outDef.m_flags = edef.m_flags;
+		outDef.m_walkSpeed = edef.m_walkSpeed;
+		outDef.m_runSpeed = edef.m_runSpeed;
+		outDef.m_speed = edef.m_speed;
+		outDef.m_targetSequenceID = edef.m_targetSequence.RawValue();
+		outDef.m_miscValue = edef.m_miscValue;
+		outDef.m_startSequenceID = edef.m_startSequence.RawValue();
+		outDef.m_descriptionStringLength = static_cast<uint8_t>(edef.m_description.Length());
+
+		rkit::CIPath edefPath;
+		RKIT_CHECK(edefPath.Set(depsNode->GetIdentifier()));
+
+		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
+		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefPath, outFile));
+
+		RKIT_CHECK(outFile->WriteAll(&outDef, sizeof(outDef)));
+
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result EntityDefCompiler::IndexString(rkit::Vector<rkit::AsciiString> &strings, rkit::HashMap<rkit::AsciiString, uint16_t> &stringToIndex, const rkit::AsciiString &str, uint16_t &outIndex)
@@ -437,7 +554,7 @@ namespace anox { namespace buildsystem {
 						else
 							return rkit::ResultCode::kDataError;
 
-						edef.m_shadowType = static_cast<uint8_t>(shadowType);
+						edef.m_shadowType = shadowType;
 					}
 					break;
 				case 13:

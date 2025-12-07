@@ -160,14 +160,14 @@ namespace rkit
 	public:
 		HashTableBase();
 		explicit HashTableBase(IMallocDriver *alloc);
-		HashTableBase(HashTableBase<TKey, TValue, TSize> &&other);
+		HashTableBase(HashTableBase<TKey, TValue, TSize> &&other) noexcept;
 		~HashTableBase();
 
 		void Clear();
 
 		size_t Count() const;
 
-		HashTableBase &operator=(HashTableBase<TKey, TValue, TSize> &&other);
+		HashTableBase &operator=(HashTableBase<TKey, TValue, TSize> &&other) noexcept;
 
 	protected:
 		Result Resize(TSize newCapacity);
@@ -536,7 +536,7 @@ rkit::HashTableBase<TKey, TValue, TSize>::~HashTableBase()
 }
 
 template<class TKey, class TValue, class TSize>
-rkit::HashTableBase<TKey, TValue, TSize>::HashTableBase(HashTableBase<TKey, TValue, TSize> &&other)
+rkit::HashTableBase<TKey, TValue, TSize>::HashTableBase(HashTableBase<TKey, TValue, TSize> &&other) noexcept
 	: m_values(std::move(other.m_values))
 	, m_memoryBlob(other.m_memoryBlob)
 	, m_nextAndOccupancy(other.m_nextAndOccupancy)
@@ -595,7 +595,7 @@ size_t rkit::HashTableBase<TKey, TValue, TSize>::Count() const
 }
 
 template<class TKey, class TValue, class TSize>
-rkit::HashTableBase<TKey, TValue, TSize> &rkit::HashTableBase<TKey, TValue, TSize>::operator=(HashTableBase<TKey, TValue, TSize> &&other)
+rkit::HashTableBase<TKey, TValue, TSize> &rkit::HashTableBase<TKey, TValue, TSize>::operator=(HashTableBase<TKey, TValue, TSize> &&other) noexcept
 {
 	Clear();
 

@@ -659,6 +659,13 @@ namespace anox { namespace buildsystem
 		TGAHeader tgaHeader;
 		RKIT_CHECK(stream->ReadAll(&tgaHeader, sizeof(tgaHeader)));
 
+		if (tgaHeader.m_identSize == 'B' && tgaHeader.m_colorMapType == 'M')
+		{
+			// Actually a bmp file (e.g. models/objects/wall01.tga
+			rkit::log::Warning("TGA file is actually a BMP");
+			return rkit::ResultCode::kNotYetImplemented;
+		}
+
 		RKIT_CHECK(stream->SeekCurrent(tgaHeader.m_identSize));
 
 		if (tgaHeader.m_colorMapLength.Get() > 0)

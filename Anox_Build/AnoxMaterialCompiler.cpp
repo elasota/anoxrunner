@@ -647,13 +647,18 @@ namespace anox { namespace buildsystem
 			}
 		}
 
-		if (dynamicData.m_frameDefs.Count() == 0)
-		{
-			rkit::log::Error("ATD has no frames");
-			return rkit::ResultCode::kDataError;
-		}
 
-		RKIT_CHECK(GenerateRealFrames(analysisHeader, dynamicData, depsNode, feedback));
+		if (analysisHeader.m_materialType == data::MaterialType::kAnimation
+			|| analysisHeader.m_materialType == data::MaterialType::kSingle)
+		{
+			if (dynamicData.m_frameDefs.Count() == 0)
+			{
+				rkit::log::Error("ATD has no frames");
+				return rkit::ResultCode::kDataError;
+			}
+
+			RKIT_CHECK(GenerateRealFrames(analysisHeader, dynamicData, depsNode, feedback));
+		}
 
 		// Finalize identifiers
 		for (MaterialAnalysisImageImport &imageImport : dynamicData.m_imageImports)
@@ -918,12 +923,12 @@ namespace anox { namespace buildsystem
 					extPos--;
 					if (lower[extPos] == '.')
 						break;
-				}
 
-				if (extPos == 0)
-				{
-					rkit::log::ErrorFmt("Invalid image path {}", imagePath.ToString());
-					return rkit::ResultCode::kDataError;
+					if (extPos == 0 || lower[extPos] == '/')
+					{
+						extPos = lower.Count();
+						break;
+					}
 				}
 
 				rkit::String oldExt;
@@ -1115,15 +1120,15 @@ namespace anox { namespace buildsystem
 					currentFrame = dynamicData.m_frameDefs[currentFrame].m_next;
 				}
 			}
-
-			// Reset handled flags
-			for (bool &handled : handledFrame)
-				handled = false;
 		}
 
 		for (size_t startFrame : startPoints)
 		{
 			size_t loopStartFrame = 0;
+
+			// Reset handled flags
+			for (bool &handled : handledFrame)
+				handled = false;
 
 			{
 				rkit::Optional<size_t> prevFrame;
@@ -1139,11 +1144,24 @@ namespace anox { namespace buildsystem
 					}
 					else
 					{
-
 						if (!prevFrame.IsSet())
 						{
-							rkit::log::Error("First frame is incomplete");
-							return rkit::ResultCode::kDataError;
+							for (size_t fixupIndex = 0; fixupIndex < frameImages.Count(); fixupIndex++)
+							{
+								if (frameImages[fixupIndex].IsValid())
+								{
+									prevFrame = fixupIndex;
+									break;
+								}
+							}
+
+							if (!prevFrame.IsSet())
+							{
+								rkit::log::Error("First frame is incomplete, couldn't fix it");
+								return rkit::ResultCode::kDataError;
+							}
+
+							rkit::log::Warning("First frame is incomplete, defaulted to first valid image");
 						}
 
 						rkit::RCPtr<rkit::utils::IImage> prevFrameImage = frameImages[prevFrame.Get()];
@@ -1189,14 +1207,16 @@ namespace anox { namespace buildsystem
 
 			// Find the real loop start, skipping empty frames
 			{
-				size_t currentFrame = startFrame;
+				size_t currentFrame = loopStartFrame;
 
-				while (currentFrame != loopStartFrame)
+				for (;;)
 				{
 					if (dynamicData.m_frameDefs[currentFrame].m_waitMSec != 0)
 						break;
 
 					currentFrame = dynamicData.m_frameDefs[currentFrame].m_next;
+					if (currentFrame == loopStartFrame)
+						break;	// No delays at all, so this loops
 				}
 
 				loopStartFrame = currentFrame;

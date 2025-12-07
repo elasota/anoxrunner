@@ -110,13 +110,19 @@ namespace rkit
 		Result MakeLower();
 		Result MakeUpper();
 
+		template<class TComparer>
+		bool StartsWith(const BaseStringSliceView<TChar, TEncoding> &other, const TComparer &comparer) const;
 		bool StartsWith(const SliceView_t &strView) const;
 		bool StartsWith(const Span<const TChar> &span) const;
 		bool StartsWith(TChar ch) const;
+		bool StartsWithNoCase(const SliceView_t &other) const;
 
+		template<class TComparer>
+		bool EndsWith(const BaseStringSliceView<TChar, TEncoding> &other, const TComparer &comparer) const;
 		bool EndsWith(const SliceView_t &strView) const;
 		bool EndsWith(const Span<const TChar> &span) const;
 		bool EndsWith(TChar ch) const;
+		bool EndsWithNoCase(const SliceView_t &other) const;
 
 		operator View_t() const;
 		operator SliceView_t() const;
@@ -762,6 +768,13 @@ template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
 bool rkit::BaseString<TChar, TEncoding, TStaticSize>::EndsWith(TChar ch) const
 {
 	return this->EndsWith(Span<const TChar>(&ch, 1));
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+bool rkit::BaseString<TChar, TEncoding, TStaticSize>::EndsWithNoCase(const SliceView_t &other) const
+{
+	SliceView_t slice = *this;
+	return slice.EndsWithNoCase(other);
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>

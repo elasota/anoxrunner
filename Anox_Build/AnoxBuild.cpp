@@ -154,6 +154,13 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kMDAModelNodeID, std::move(mdaCompiler)));
 	}
 
+	{
+		rkit::UniquePtr<buildsystem::AnoxCTCCompilerBase> ctcCompiler;
+		RKIT_CHECK(buildsystem::AnoxCTCCompilerBase::Create(ctcCompiler));
+
+		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kCTCModelNodeID, std::move(ctcCompiler)));
+	}
+
 	RKIT_CHECK(instance->RegisterNodeTypeByExtension("cfg", rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kCopyFileNodeID));
 
 	return rkit::ResultCode::kOK;

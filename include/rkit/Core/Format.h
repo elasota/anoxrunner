@@ -145,6 +145,24 @@ namespace rkit
 		}
 	};
 
+	template<size_t TArraySize>
+	struct Formatter<const char[TArraySize]>
+	{
+		inline static void Format(IFormatStringWriter<char> &writer, const char (&value)[TArraySize])
+		{
+			Formatter<const char *>::Format(writer, value);
+		}
+	};
+
+	template<size_t TArraySize>
+	struct Formatter<char[TArraySize]>
+	{
+		inline static void Format(IFormatStringWriter<char> &writer, const char (&value)[TArraySize])
+		{
+			Formatter<const char *>::Format(writer, value);
+		}
+	};
+
 	template<>
 	struct Formatter<const wchar_t *>
 	{
@@ -158,6 +176,24 @@ namespace rkit
 	struct Formatter<wchar_t *>
 	{
 		inline static void Format(IFormatStringWriter<wchar_t> &writer, wchar_t *value)
+		{
+			Formatter<const wchar_t *>::Format(writer, value);
+		}
+	};
+
+	template<size_t TArraySize>
+	struct Formatter<const wchar_t[TArraySize]>
+	{
+		inline static void Format(IFormatStringWriter<wchar_t> &writer, const wchar_t (&value)[TArraySize])
+		{
+			Formatter<const wchar_t *>::Format(writer, value);
+		}
+	};
+
+	template<size_t TArraySize>
+	struct Formatter<wchar_t[TArraySize]>
+	{
+		inline static void Format(IFormatStringWriter<wchar_t> &writer, const wchar_t (&value)[TArraySize])
 		{
 			Formatter<const wchar_t *>::Format(writer, value);
 		}

@@ -1485,7 +1485,7 @@ namespace rkit { namespace buildsystem
 
 		CallbackSpan<FileDependencyInfoView, const IDependencyNode *> depsSpan = m_isCompilePhase ? m_dependencyNode->GetCompileFileDependencies() : m_dependencyNode->GetAnalysisFileDependencies();
 
-		for (FileDependencyInfoView fStatus : depsSpan)
+		for (const FileDependencyInfoView &fStatus : depsSpan)
 		{
 			if (fStatus.m_status.m_location == location && fStatus.m_status.m_filePath == path)
 			{

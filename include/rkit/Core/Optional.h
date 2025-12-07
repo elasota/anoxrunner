@@ -9,15 +9,15 @@ namespace rkit
 
 		Optional();
 		Optional(const T &value);
-		Optional(T &&value);
+		Optional(T &&value) noexcept;
 		Optional(const Optional<T> &value);
-		Optional(Optional<T> &&value);
+		Optional(Optional<T> &&value) noexcept;
 		~Optional();
 
-		Optional<T> &operator=(T &&value);
+		Optional<T> &operator=(T &&value) noexcept;
 		Optional<T> &operator=(const T &value);
 
-		Optional<T> &operator=(Optional<T> &&value);
+		Optional<T> &operator=(Optional<T> &&value) noexcept;
 		Optional<T> &operator=(const Optional<T> &value);
 
 		bool IsSet() const;
@@ -70,7 +70,7 @@ namespace rkit
 	}
 
 	template<class T>
-	Optional<T>::Optional(T &&value)
+	Optional<T>::Optional(T &&value) noexcept
 		: m_isSet(true)
 		, m_value(std::move(value))
 	{
@@ -91,7 +91,7 @@ namespace rkit
 	}
 
 	template<class T>
-	Optional<T>::Optional(Optional<T> &&other)
+	Optional<T>::Optional(Optional<T> &&other) noexcept
 		: m_isSet(false)
 		, m_value(Uninitialized())
 	{
@@ -119,7 +119,7 @@ namespace rkit
 
 
 	template<class T>
-	Optional<T> &Optional<T>::operator=(T &&value)
+	Optional<T> &Optional<T>::operator=(T &&value) noexcept
 	{
 		if (m_isSet)
 			m_value.m_value = std::move(value);
@@ -149,7 +149,7 @@ namespace rkit
 	}
 
 	template<class T>
-	Optional<T> &Optional<T>::operator=(Optional<T> &&other)
+	Optional<T> &Optional<T>::operator=(Optional<T> &&other) noexcept
 	{
 		if (this != &other)
 		{

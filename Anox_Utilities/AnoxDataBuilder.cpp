@@ -2,7 +2,7 @@
 
 #include "anox/AnoxModule.h"
 #include "anox/AFSArchive.h"
-#include "anox/UtilitiesDriver.h"
+#include "anox/AnoxUtilitiesDriver.h"
 
 #include "rkit/BuildSystem/BuildSystem.h"
 #include "rkit/BuildSystem/DependencyGraph.h"

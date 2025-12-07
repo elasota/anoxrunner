@@ -202,8 +202,7 @@ namespace rkit
 			for (size_t i = oldChunkCount; i < chunksRequired; i++)
 				chunks[i] = 0;
 		}
-
-		if (newSize < oldSize)
+		else if (newSize < oldSize)
 		{
 			const size_t lastChunkResidual = newSize % kBitsPerChunk;
 
@@ -597,9 +596,9 @@ namespace rkit
 		const Chunk_t offsetBit = static_cast<Chunk_t>(static_cast<Chunk_t>(1) << bit);
 
 		if (value)
-			(*chunkPtr) &= ~offsetBit;
-		else
 			(*chunkPtr) |= offsetBit;
+		else
+			(*chunkPtr) &= ~offsetBit;
 	}
 
 	inline BoolSpan::BoolSpan(const ConstBoolSpan &span)

@@ -7,7 +7,7 @@
 #include "rkit/Core/Pair.h"
 #include "rkit/Core/Result.h"
 #include "rkit/Core/StaticArray.h"
-#include "rkit/Core/StaticBoolVector.h"
+#include "rkit/Core/StaticBoolArray.h"
 #include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/Vector.h"
 
@@ -136,7 +136,7 @@ namespace rkit { namespace utils
 
 		size_t m_waitListIndex = 0;
 
-		rkit::StaticBoolVector<kNumJobCategories> m_respondsToCategories;
+		rkit::StaticBoolArray<kNumJobCategories> m_respondsToCategories;
 
 		void Wake(JobQueueWakeDisposition disposition);
 		JobQueueWakeDisposition AwaitWake() const;
@@ -803,7 +803,7 @@ namespace rkit { namespace utils
 		if (jobTypes.Count() == 0 && jobToWaitFor == nullptr)
 			return Pair<RCPtr<Job>, JobQueue::WaitResultType>(RCPtr<Job>(), WaitResultType::kNoWork);
 
-		StaticBoolVector<JobQueueWaitingThreadInfo::kNumJobCategories> waitListMask;
+		StaticBoolArray<JobQueueWaitingThreadInfo::kNumJobCategories> waitListMask;
 
 		for (;;)
 		{

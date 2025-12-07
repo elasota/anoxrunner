@@ -1,6 +1,6 @@
 #pragma once
 
-#include "StaticBoolVector.h"
+#include "StaticBoolArray.h"
 
 #include <cstddef>
 
@@ -72,9 +72,9 @@ namespace rkit
 	private:
 		static const size_t kMax = static_cast<size_t>(T::kCount);
 
-		explicit EnumMask(const StaticBoolVector<kMax> &boolVector);
+		explicit EnumMask(const StaticBoolArray<kMax> &boolVector);
 
-		StaticBoolVector<kMax> m_boolVector;
+		StaticBoolArray<kMax> m_boolVector;
 	};
 }
 
@@ -266,7 +266,7 @@ namespace rkit
 	}
 
 	template<class T>
-	EnumMask<T>::EnumMask(const StaticBoolVector<kMax> &boolVector)
+	EnumMask<T>::EnumMask(const StaticBoolArray<kMax> &boolVector)
 		: m_boolVector(boolVector)
 	{
 	}

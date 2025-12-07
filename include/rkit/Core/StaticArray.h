@@ -18,7 +18,7 @@ namespace rkit
 		~StaticArray();
 
 		StaticArray<T, TSize> &operator=(const StaticArray<T, TSize> &other);
-		StaticArray<T, TSize> &operator=(StaticArray<T, TSize> &&other);
+		StaticArray<T, TSize> &operator=(StaticArray<T, TSize> &&other) noexcept;
 
 		T &operator[](size_t index);
 		const T &operator[](size_t index) const;
@@ -70,7 +70,7 @@ namespace rkit
 	}
 
 	template<class T, size_t TSize>
-	StaticArray<T, TSize> &StaticArray<T, TSize>::operator=(StaticArray<T, TSize> &&other)
+	StaticArray<T, TSize> &StaticArray<T, TSize>::operator=(StaticArray<T, TSize> &&other) noexcept
 	{
 		for (size_t i = 0; i < TSize; i++)
 			m_elements[i] = std::move(other.m_elements[i]);

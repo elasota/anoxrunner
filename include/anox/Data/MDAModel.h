@@ -5,12 +5,18 @@
 
 namespace anox { namespace data
 {
+	enum class MDAAnimationType
+	{
+		kVertexAnimated = 0,
+		kSkeletalAnimated = 1,
+	};
+
 	struct MDAModelHeader
 	{
 		uint8_t m_numSkins = 0;
 		uint8_t m_numSubModels = 0;
 		uint8_t m_numProfiles = 0;
-		uint8_t m_numAnimations = 0;
+		uint8_t m_numAnimations7_AnimationType1 = 0;
 		rkit::endian::LittleUInt16_t m_numMorphKeys;
 		rkit::endian::LittleUInt16_t m_numBones;
 		rkit::endian::LittleUInt16_t m_numFrames;
@@ -24,13 +30,23 @@ namespace anox { namespace data
 		// MDAAnimation m_animations[m_numAnimations]
 		// char m_animationNameChars[m_numAnimations][anim.m_nameLength]
 		// MDAModelMorphKey m_morphKeys[m_numMorphKeys]
-		// MDAModelBone m_bones[m_numBones]
-		// MDAModelBoneFrame m_boneFrames[m_numFrames][m_numBones]
+		// if skeletal model:
+		//     MDASkeletalModelBone m_bones[m_numBones]
+		// if vertex model:
+		//     MDAVertexModelBone m_bones[m_numBones]
+		//
+		// if skeletal model:
+		//     MDAModelSkeletalBoneFrame m_boneFrames[m_numFrames][m_numBones]
+		// if vertex model:
+		//     MDAModelTagBoneFrame m_boneFrames[m_numFrames][m_numBones]
+		//
 		// MDAModelSubModel m_subModels[m_numSubModels]
-
 		// MDAModelTri m_tris[m_numSubmodels][submodel.m_numTris]
 		// MDAModelVert m_verts[m_numSubmodels][submodel.m_numVerts]
-		// MDAModelPoint m_points[m_numFrames][m_numPoints]
+		// if skeletal model:
+		//     MDASkeletalModelPoint m_points[m_numPoints]
+		// if vertex model:
+		//     MDAModelPoint m_points[m_numFrames][m_numPoints]
 		// MDAModelVertMorph m_vertMorphs[m_numMorphKeys][m_numMorphedPoints]
 	};
 
@@ -55,9 +71,18 @@ namespace anox { namespace data
 	enum class MDABlendMode
 	{
 		kDisabled,
+		kNormal,
 		kAdd,
 		kMultiply,
 		kAlphaBlend,
+
+		kCount,
+	};
+
+	enum class MDASortMode
+	{
+		kBlend,
+		kOpaque,
 
 		kCount,
 	};
@@ -108,11 +133,14 @@ namespace anox { namespace data
 		uint8_t m_rgbGenMode = static_cast<uint8_t>(MDARGBGenMode::kDefault);
 		uint8_t m_depthFunc = static_cast<uint8_t>(MDADepthFunc::kDefault);
 		uint8_t m_cullType = static_cast<uint8_t>(MDACullType::kBack);
+		rkit::endian::LittleFloat32_t m_scrollU;
+		rkit::endian::LittleFloat32_t m_scrollV;
 	};
 
 	struct MDASkin
 	{
 		uint8_t m_numPasses = 0;
+		uint8_t m_sortMode = static_cast<uint8_t>(MDASortMode::kOpaque);
 	};
 
 	struct MDAProfile
@@ -121,9 +149,15 @@ namespace anox { namespace data
 		rkit::endian::LittleUInt32_t m_conditionLength;
 	};
 
-	struct MDAModelBoneFrame
+	struct MDAModelTagBoneFrame
 	{
 		rkit::endian::LittleFloat32_t m_matrix[3][4];
+	};
+
+	struct MDAModelSkeletalBoneFrame
+	{
+		rkit::endian::LittleFloat32_t m_translation[3];
+		CompressedQuat m_rotation;
 	};
 
 	struct MDAModelMorphKey
@@ -131,7 +165,13 @@ namespace anox { namespace data
 		rkit::endian::BigUInt32_t m_morphKeyFourCC;
 	};
 
-	struct MDAModelBone
+	struct MDASkeletalModelBone
+	{
+		rkit::endian::LittleUInt16_t m_parentIndexPlusOne;
+		rkit::endian::LittleFloat32_t m_baseMatrix[3][4];
+	};
+
+	struct MDAVertexModelBone
 	{
 		rkit::endian::BigUInt32_t m_boneIDFourCC;
 	};
@@ -141,6 +181,13 @@ namespace anox { namespace data
 		rkit::endian::LittleUInt32_t m_pointID;
 		rkit::endian::LittleUInt16_t m_texCoordU;
 		rkit::endian::LittleUInt16_t m_texCoordV;
+	};
+
+	struct MDASkeletalModelPoint
+	{
+		rkit::endian::LittleFloat32_t m_point[3];
+		CompressedNormal m_compressedNormal;
+		rkit::endian::LittleUInt16_t m_boneIndex;
 	};
 
 	struct MDAModelPoint
@@ -168,7 +215,7 @@ namespace anox { namespace data
 	{
 		rkit::endian::LittleUInt32_t m_materialID;
 		rkit::endian::LittleUInt32_t m_numTris;
-		rkit::endian::LittleUInt16_t m_numVerts;
+		rkit::endian::LittleUInt16_t m_numVertsMinusOne;
 	};
 
 } } // anox::data

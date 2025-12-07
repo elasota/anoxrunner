@@ -16,7 +16,7 @@ namespace anox { namespace data
 		// X = (primary * bit[0]) - 8191
 		// Y = (secondary * bit[1]) - 8191
 		// Z = (primary * (1 - bit[0]) + (secondary * (1 - bit[1])) - 8191
-		// X,Y,Z = X,Y,Z * (1 - (bit[3] * 2))
+		// X,Y,Z = X,Y,Z * (1 - (bit[2] * 2))
 		// X,Y,Z = normalize(X,Y,Z)
 		rkit::endian::LittleUInt32_t m_compressedNormal;
 	};
@@ -26,6 +26,45 @@ namespace anox { namespace data
 
 namespace anox { namespace data
 {
+	inline void DecompressNormal(const CompressedNormal &cn, float &outX, float &outY, float &outZ)
+	{
+		const uint32_t bits = cn.m_compressedNormal.GetBits();
+
+		const int16_t primary = (bits >> 4) & 0x3fff;
+		const int16_t secondary = (bits >> 18) & 0x3fff;
+
+		int16_t x = -8191;
+		int16_t y = -8191;
+		int16_t z = -8191;
+
+		if (bits & 1)
+			x += primary;
+		else
+			z += primary;
+
+		if (bits & 2)
+			y += secondary;
+		else
+			z += secondary;
+
+		if (bits & 4)
+		{
+			x = -x;
+			y = -y;
+			z = -z;
+		}
+
+		const int32_t xsq = static_cast<int32_t>(x) * x;
+		const int32_t ysq = static_cast<int32_t>(y) * y;
+		const int32_t zsq = static_cast<int32_t>(z) * z;
+
+		const double len = sqrt(xsq + ysq + zsq);
+
+		outX = static_cast<float>(x / len);
+		outY = static_cast<float>(y / len);
+		outZ = static_cast<float>(z / len);
+	}
+
 	inline CompressedNormal CompressNormal(float x, float y, float z)
 	{
 		const uint32_t kXIsPrimary = 1;
@@ -87,13 +126,13 @@ namespace anox { namespace data
 		primary /= -magnitude;
 		secondary /= -magnitude;
 
-		if (!(primary >= 0.f))
-			primary = 0.f;
+		if (!(primary >= -1.f))
+			primary = -1.f;
 		else if (primary > 1.0f)
 			primary = 1.0f;
 
-		if (!(secondary >= 0.f))
-			secondary = 0.f;
+		if (!(secondary >= -1.f))
+			secondary = -1.f;
 		else if (secondary > 1.0f)
 			secondary = 1.0f;
 

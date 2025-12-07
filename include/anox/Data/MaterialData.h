@@ -52,10 +52,10 @@ namespace anox { namespace data
 		rkit::endian::LittleUInt32_t m_width;
 		rkit::endian::LittleUInt32_t m_height;
 
-		uint8_t m_bilinear;
-		uint8_t m_materialType;
-		uint8_t m_colorType;
-		uint8_t m_unused;
+		uint8_t m_bilinear = 0;
+		uint8_t m_materialType = 0;
+		uint8_t m_colorType = 0;
+		uint8_t m_unused = 0;
 
 		rkit::endian::LittleUInt32_t m_numBitmaps;
 		rkit::endian::LittleUInt32_t m_numFrames;

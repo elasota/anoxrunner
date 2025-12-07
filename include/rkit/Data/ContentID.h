@@ -13,7 +13,7 @@ namespace rkit { namespace data
 	{
 		static const size_t kSize = 32;
 
-		uint8_t m_data[kSize];
+		uint8_t m_data[kSize] = {};
 
 		ContentIDString ToString() const;
 

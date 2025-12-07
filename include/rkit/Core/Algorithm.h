@@ -412,6 +412,12 @@ namespace rkit
 
 	template<class TTo, class TFrom>
 	TTo BitCast(const TFrom &from);
+
+	template<class TTo, class TFrom>
+	TTo ImplicitCast(const TFrom &from)
+	{
+		return from;
+	}
 }
 
 #include "Result.h"

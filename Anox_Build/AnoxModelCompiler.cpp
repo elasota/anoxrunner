@@ -6,10 +6,14 @@
 #include "rkit/Core/BoolVector.h"
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/Optional.h"
+#include "rkit/Core/Pair.h"
+#include "rkit/Core/Platform.h"
 #include "rkit/Core/QuickSort.h"
 #include "rkit/Core/Stream.h"
 
 #include "rkit/Data/ContentID.h"
+#include "rkit/Math/Vec.h"
+#include "rkit/Math/Quat.h"
 
 #include "anox/AnoxModule.h"
 #include "anox/Data/MDAModel.h"
@@ -17,6 +21,8 @@
 
 #include "AnoxMaterialCompiler.h"
 #include "AnoxPrecompiledMesh.h"
+
+#include <math.h>
 
 namespace anox { namespace buildsystem
 {
@@ -29,7 +35,8 @@ namespace anox { namespace buildsystem
 		struct MD2Header
 		{
 			static const uint32_t kExpectedMagic = RKIT_FOURCC('I', 'D', 'P', '2');
-			static const uint16_t kExpectedMajorVersion = 15;
+			static const uint16_t kMinMajorVersion = 14;
+			static const uint16_t kMaxMajorVersion = 15;
 			static const uint16_t kMaxMinorVersion = 2;
 
 			rkit::endian::BigUInt32_t m_magic;
@@ -69,7 +76,7 @@ namespace anox { namespace buildsystem
 		{
 			rkit::endian::LittleFloat32_t m_scale[3];
 			rkit::endian::LittleFloat32_t m_translate[3];
-			char m_name[16];
+			char m_name[16] = {};
 		};
 
 		struct MDAChunkHeaderData
@@ -90,7 +97,7 @@ namespace anox { namespace buildsystem
 
 		struct MDAAnimInfoData
 		{
-			char m_animCategory[8];
+			char m_animCategory[8] = {};
 			rkit::endian::LittleUInt32_t m_animNumber;
 			rkit::endian::LittleUInt32_t m_firstFrame;
 			rkit::endian::LittleUInt32_t m_numFrames;
@@ -141,6 +148,8 @@ namespace anox { namespace buildsystem
 		{
 			rkit::CIPath m_map;
 			bool m_clamp = false;
+			float m_scrollU = 0.f;
+			float m_scrollV = 0.f;
 			rkit::Optional<data::MDAAlphaTestMode> m_alphaTestMode;
 			rkit::Optional<data::MDABlendMode> m_blendMode;
 			rkit::Optional<data::MDAUVGenMode> m_uvGenMode;
@@ -153,6 +162,7 @@ namespace anox { namespace buildsystem
 		struct UncompiledMDASkin
 		{
 			rkit::Vector<UncompiledMDAPass> m_passes;
+			rkit::Optional<data::MDASortMode> m_sortMode;
 		};
 
 		struct UncompiledMDAProfile
@@ -214,6 +224,7 @@ namespace anox { namespace buildsystem
 			rkit::Vector<UncompiledMDASubmodel> m_submodels;
 		};
 
+		static rkit::Result AnalyzeMD2File(rkit::ISeekableReadStream &inputFile, const rkit::CIPathView &md2Path, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 		static rkit::Result AnalyzeMD2(const rkit::CIPathView &md2Path, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 		static rkit::Result ResolveTexturePath(rkit::CIPath &textureDefPath, const rkit::CIPathView &md2Path, const MD2TextureDef &textureDef, bool constructFullMaterialPath);
 
@@ -229,7 +240,7 @@ namespace anox { namespace buildsystem
 	public:
 		bool HasAnalysisStage() const override;
 		rkit::Result RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
-		rkit::Result RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+		rkit::Result RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
 
 		virtual uint32_t GetVersion() const override;
 
@@ -246,6 +257,8 @@ namespace anox { namespace buildsystem
 		static bool TokenIs(const rkit::ConstSpan<char> &token, const rkit::AsciiStringView &candidate);
 
 		static rkit::Result ExtractPath(rkit::CIPath &path, const rkit::ConstSpan<char> &token, bool stripExtension);
+
+		static rkit::Result OpenMDAPath(rkit::UniquePtr<rkit::ISeekableReadStream> &outInputFile, bool &outIsActuallyMD2, rkit::CIPath &inOutPath, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 	};
 
 	class AnoxMD2Compiler final : public AnoxModelCompilerCommon, public AnoxMD2CompilerBase
@@ -253,9 +266,190 @@ namespace anox { namespace buildsystem
 	public:
 		bool HasAnalysisStage() const override;
 		rkit::Result RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
-		rkit::Result RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+		rkit::Result RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
 
 		virtual uint32_t GetVersion() const override;
+	};
+
+	class AnoxCTCCompiler final : public AnoxModelCompilerCommon, public AnoxCTCCompilerBase
+	{
+	public:
+		bool HasAnalysisStage() const override;
+		rkit::Result RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
+		rkit::Result RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
+
+		virtual uint32_t GetVersion() const override;
+
+	private:
+		struct CTCHeader
+		{
+			static const uint32_t kExpectedMagic = RKIT_FOURCC('S', 'M', 'D', 'L');
+			static const uint32_t kExpectedVersion = 11;
+
+			rkit::endian::BigUInt32_t m_magic;
+			rkit::endian::LittleUInt32_t m_version;
+			rkit::endian::LittleUInt32_t m_skinWidth;
+			rkit::endian::LittleUInt32_t m_skinHeight;
+			rkit::endian::LittleUInt32_t m_frameSize;
+			rkit::endian::LittleUInt32_t m_numTextures;
+			rkit::endian::LittleUInt32_t m_numPoints;
+			rkit::endian::LittleUInt32_t m_numTexCoords;
+			rkit::endian::LittleUInt32_t m_numTris;
+			rkit::endian::LittleUInt32_t m_numGLCommands;
+			rkit::endian::LittleUInt32_t m_numFrames;
+			rkit::endian::LittleUInt32_t m_numAnimations_Size24;	// ???
+			rkit::endian::LittleUInt32_t m_numBones;
+			rkit::endian::LittleUInt32_t m_numMorphs;
+			rkit::endian::LittleUInt32_t m_numAttachments;
+			rkit::endian::LittleUInt32_t m_numGLCommandDWords;
+			rkit::endian::LittleUInt32_t m_numUnknown5;
+			rkit::endian::LittleFloat32_t m_unknownFloat;
+			rkit::endian::LittleUInt32_t m_numVertColors;
+
+			rkit::endian::LittleUInt32_t m_texturesPos;
+			rkit::endian::LittleUInt32_t m_pointsPos;
+			rkit::endian::LittleUInt32_t m_internalOutputPointsPos;
+			rkit::endian::LittleUInt32_t m_triVertIndexesPos;
+			rkit::endian::LittleUInt32_t m_triTexCoordsPos;
+			rkit::endian::LittleUInt32_t m_bonesPos;
+			rkit::endian::LittleUInt32_t m_skeletalDataPos;
+			rkit::endian::LittleUInt32_t m_animationPos;
+			rkit::endian::LittleUInt32_t m_frameDataPos;
+			rkit::endian::LittleUInt32_t m_legacyGLCommandsPos;
+			rkit::endian::LittleUInt32_t m_morphsPos;
+			rkit::endian::LittleUInt32_t m_attachmentsPos;
+			rkit::endian::LittleUInt32_t m_triListSizesPos;
+			rkit::endian::LittleUInt32_t m_unknown5Pos;
+			rkit::endian::LittleUInt32_t m_unknown5TrisOutputPos;
+			rkit::endian::LittleUInt32_t m_vertColorsPos;
+			rkit::endian::LittleUInt32_t m_eofPos;
+		};
+
+		struct CTCCompoundTriVert
+		{
+			uint16_t m_inPointIndex;
+			rkit::StaticArray<uint16_t, 2> m_compressedUV;
+
+			bool operator==(const CTCCompoundTriVert &other) const;
+			bool operator!=(const CTCCompoundTriVert &other) const;
+		};
+
+		struct CTCAnimation
+		{
+			char m_name[16];
+			rkit::endian::LittleUInt32_t m_unknown;	// Possibly flags
+			rkit::endian::LittleUInt32_t m_frameCount;	// Seems to maybe not be frame count...?
+		};
+
+		struct CTCMatrix44
+		{
+			rkit::StaticArray<rkit::StaticArray<rkit::endian::LittleFloat32_t, 4>, 4> m_rows;
+		};
+
+		struct CTCBoneKey
+		{
+			rkit::StaticArray<rkit::endian::LittleFloat32_t, 3> m_pos;
+			rkit::StaticArray<rkit::endian::LittleFloat32_t, 3> m_angles;
+		};
+
+		struct CTCBone
+		{
+			rkit::endian::LittleUInt32_t m_parentIndexPlusOne;
+			rkit::endian::LittleUInt32_t m_childCount;
+			rkit::endian::LittleUInt32_t m_internal_childListPtr;
+
+			rkit::endian::LittleFloat32_t m_internal_unknown[6];
+			CTCMatrix44 m_internal_finalTransform;
+			CTCMatrix44 m_baseTransform;
+		};
+
+		struct CTCPoint
+		{
+			rkit::StaticArray<rkit::endian::LittleFloat32_t, 3> m_pos;
+			rkit::StaticArray<rkit::endian::LittleFloat32_t, 3> m_normal;
+		};
+
+		struct CTCBoneAndWeight
+		{
+			rkit::endian::LittleUInt32_t m_boneIndex;
+			rkit::endian::LittleFloat32_t m_weight;
+		};
+
+		struct CTCTriVerts
+		{
+			rkit::StaticArray<rkit::endian::LittleUInt16_t, 3> m_verts;
+		};
+
+		struct CTCTexCoords
+		{
+			rkit::StaticArray<rkit::endian::LittleFloat32_t, 2> m_uvFloatBits;
+		};
+
+		struct CTCTriTexCoords
+		{
+			rkit::StaticArray<CTCTexCoords, 3> m_texCoords;
+		};
+
+		struct CTCMorph
+		{
+			char m_name[16];
+
+			rkit::endian::LittleUInt32_t m_numVertMorphs;
+			rkit::endian::LittleFloat32_t m_internal_lerpFactor;
+			rkit::endian::LittleUInt32_t m_internal_vertIndexPtr;
+			rkit::endian::LittleUInt32_t m_internal_morphDeltaPtr;
+		};
+
+		struct VertMorph
+		{
+			rkit::endian::LittleUInt32_t m_pointIndex;
+			rkit::StaticArray<rkit::endian::LittleFloat32_t, 3> m_targetPosition;
+		};
+
+		struct Morph
+		{
+			char m_name[17];
+
+			rkit::Vector<VertMorph> m_vertMorphs;
+		};
+
+		struct MorphData
+		{
+			rkit::Vector<Morph> m_morphs;
+		};
+
+		// This is, functionally, T*R
+		struct Matrix3x4
+		{
+			rkit::StaticArray<rkit::StaticArray<float, 4>, 3> m_rows;
+		};
+
+		static rkit::Result AddTriClusters(
+			rkit::Vector<data::MDAModelSubModel> &outSubModels,
+			rkit::Vector<data::MDAModelTri> &outTris,
+			rkit::Vector<data::MDAModelVert> &outVerts,
+			uint32_t materialID,
+			rkit::ConstSpan<uint32_t> inVertToOutVert,
+			rkit::ConstSpan<CTCTriVerts> triVerts, rkit::ConstSpan<CTCTriTexCoords> triTexCoords, size_t numTris);
+
+
+		static rkit::Result AddOneTriCluster(
+			rkit::Vector<data::MDAModelTri> &outTris,
+			rkit::Vector<data::MDAModelVert> &outVerts,
+			rkit::ConstSpan<uint32_t> inVertToOutVert,
+			rkit::ConstSpan<CTCTriVerts> triVerts, rkit::ConstSpan<CTCTriTexCoords> triTexCoords, size_t numTris,
+			rkit::BoolSpan triAdded);
+
+		static Matrix3x4 OrthoMatrixMul(const Matrix3x4 &a, const Matrix3x4 &b);
+		static Matrix3x4 OrthoInvertMatrix(const Matrix3x4 &inMat);
+		static Matrix3x4 BoneKeyToMatrix(const CTCBoneKey &key);
+		static Matrix3x4 GenerateRotationMatrix(float degrees, float x, float y, float z);
+		static Matrix3x4 GenerateTranslationMatrix(float x, float y, float z);
+		static Matrix3x4 GenerateIdentityMatrix();
+		static Matrix3x4 QuatToMatrix(float x, float y, float z, float w);
+		static void MatrixToQuat(const Matrix3x4 &mat, float &x, float &y, float &z, float &w);
+		static data::MDAModelSkeletalBoneFrame ConvertMatrixToFrame(const Matrix3x4 &mat);
+		static Matrix3x4 ConvertFrameToMatrix(const data::MDAModelSkeletalBoneFrame &boneFrame);
 	};
 
 	rkit::Result AnoxModelCompilerCommon::ConstructOutputPathByType(rkit::CIPath &outPath, const rkit::StringView &outputType, const rkit::StringView &identifier)
@@ -272,15 +466,20 @@ namespace anox { namespace buildsystem
 		rkit::UniquePtr<rkit::ISeekableReadStream> inputFile;
 		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, md2Path, inputFile));
 
+		return AnalyzeMD2File(*inputFile, md2Path, feedback);
+	}
+
+	rkit::Result AnoxModelCompilerCommon::AnalyzeMD2File(rkit::ISeekableReadStream &inputFile, const rkit::CIPathView &md2Path, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
 		MD2Header md2Header;
-		RKIT_CHECK(inputFile->ReadAll(&md2Header, sizeof(MD2Header)));
+		RKIT_CHECK(inputFile.ReadAll(&md2Header, sizeof(MD2Header)));
 
 		size_t numTextures = md2Header.m_numTextures.Get();
 
 		rkit::Vector<MD2TextureDef> textures;
 		RKIT_CHECK(textures.Resize(numTextures));
 
-		RKIT_CHECK(inputFile->ReadAll(textures.GetBuffer(), sizeof(MD2TextureDef) * numTextures));
+		RKIT_CHECK(inputFile.ReadAll(textures.GetBuffer(), sizeof(MD2TextureDef) * numTextures));
 
 		for (const MD2TextureDef &textureDef : textures)
 		{
@@ -333,6 +532,37 @@ namespace anox { namespace buildsystem
 		return true;
 	}
 
+	rkit::Result AnoxMDACompiler::OpenMDAPath(rkit::UniquePtr<rkit::ISeekableReadStream> &outInputFile, bool &outIsActuallyMD2, rkit::CIPath &inOutPath, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		outIsActuallyMD2 = false;
+		outInputFile.Reset();
+
+		RKIT_CHECK(feedback->TryOpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, inOutPath, outInputFile));
+
+		if (!outInputFile.IsValid())
+		{
+			if (inOutPath.ToString().EndsWithNoCase(".mda"))
+			{
+				rkit::String md2PathStr;
+				RKIT_CHECK(md2PathStr.Set(inOutPath.ToString().SubString(0, inOutPath.Length() - 4)));
+				RKIT_CHECK(md2PathStr.Append(".md2"));
+
+				rkit::CIPath md2Path;
+				RKIT_CHECK(md2Path.Set(md2PathStr));
+
+				RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, md2Path, outInputFile));
+
+				inOutPath = md2Path;
+				outIsActuallyMD2 = true;
+				return rkit::ResultCode::kOK;
+			}
+
+			return rkit::ResultCode::kDataError;
+		}
+
+		return rkit::ResultCode::kOK;
+	}
+
 	rkit::Result AnoxMDACompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		rkit::Vector<uint8_t> mdaBytes;
@@ -342,7 +572,13 @@ namespace anox { namespace buildsystem
 			RKIT_CHECK(mdaPath.Set(depsNode->GetIdentifier()));
 
 			rkit::UniquePtr<rkit::ISeekableReadStream> inputFile;
-			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, mdaPath, inputFile));
+			RKIT_CHECK(feedback->TryOpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, mdaPath, inputFile));
+
+			bool isActuallyMD2 = false;
+			RKIT_CHECK(OpenMDAPath(inputFile, isActuallyMD2, mdaPath, feedback));
+
+			if (isActuallyMD2)
+				return AnalyzeMD2File(*inputFile, mdaPath, feedback);
 
 			RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->ReadEntireFile(*inputFile, mdaBytes));
 		}
@@ -395,6 +631,8 @@ namespace anox { namespace buildsystem
 
 	rkit::Result AnoxMDACompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
+		rkit::FloatingPointStateScope scope(rkit::FloatingPointState::GetCurrent().AppendIEEEStrict());
+
 		rkit::UniquePtr<rkit::ISeekableReadStream> inputFile;
 		rkit::Vector<uint8_t> mdaBytes;
 
@@ -403,6 +641,22 @@ namespace anox { namespace buildsystem
 		{
 			rkit::CIPath path;
 			RKIT_CHECK(path.Set(depsNode->GetIdentifier()));
+
+			bool isActuallyMD2 = false;
+			RKIT_CHECK(OpenMDAPath(inputFile, isActuallyMD2, path, feedback));
+
+			if (isActuallyMD2)
+			{
+				UncompiledMDAData mdaData;
+				mdaData.m_baseModel = path;
+
+				// Construct from the identifier since path is changed at this point,
+				// we want to keep the original suffix
+				rkit::CIPath outputPath;
+				RKIT_CHECK(ConstructOutputPath(outputPath, depsNode->GetIdentifier()));
+
+				return CompileMDA(outputPath, mdaData, true, depsNode, feedback);
+			}
 
 			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, path, inputFile));
 
@@ -605,6 +859,8 @@ namespace anox { namespace buildsystem
 												pass.m_alphaTestMode = data::MDAAlphaTestMode::kGE128;
 											else if (TokenIs(token, "lt128"))
 												pass.m_alphaTestMode = data::MDAAlphaTestMode::kLT128;
+											else if (TokenIs(token, "gt0"))
+												pass.m_alphaTestMode = data::MDAAlphaTestMode::kGT0;
 											else
 											{
 												rkit::log::Error("Unknown alphafunc");
@@ -636,6 +892,37 @@ namespace anox { namespace buildsystem
 												return rkit::ResultCode::kDataError;
 											}
 										}
+										else if (TokenIs(token, "uvmod"))
+										{
+											RKIT_CHECK(ExpectToken(token, line));
+
+											if (TokenIs(token, "scroll"))
+											{
+												double uvScroll[2] = { 0.0, 0.0 };
+
+												for (size_t axis = 0; axis < 2; axis++)
+												{
+													RKIT_CHECK(ExpectToken(token, line));
+
+													rkit::String tokenStr;
+													RKIT_CHECK(tokenStr.Set(token));
+
+													if (!utils->ParseDouble(tokenStr, uvScroll[axis]))
+													{
+														rkit::log::Error("Invalid scroll");
+														return rkit::ResultCode::kDataError;
+													}
+												}
+
+												pass.m_scrollU = static_cast<float>(uvScroll[0]);
+												pass.m_scrollV = static_cast<float>(uvScroll[1]);
+											}
+											else
+											{
+												rkit::log::Error("Unknown uvmode type");
+												return rkit::ResultCode::kDataError;
+											}
+										}
 										else if (TokenIs(token, "blendmode"))
 										{
 											RKIT_CHECK(ExpectToken(token, line));
@@ -644,6 +931,8 @@ namespace anox { namespace buildsystem
 												pass.m_blendMode = data::MDABlendMode::kAdd;
 											else if (TokenIs(token, "none"))
 												pass.m_blendMode = data::MDABlendMode::kDisabled;
+											else if (TokenIs(token, "normal"))
+												pass.m_blendMode = data::MDABlendMode::kNormal;
 											else
 											{
 												rkit::log::Error("Unknown blendmode");
@@ -709,6 +998,20 @@ namespace anox { namespace buildsystem
 
 									RKIT_CHECK(skin.m_passes.Append(std::move(pass)));
 								}
+								else if (TokenIs(token, "sort"))
+								{
+									RKIT_CHECK(ExpectToken(token, line));
+
+									if (TokenIs(token, "blend"))
+										skin.m_sortMode = data::MDASortMode::kBlend;
+									else if (TokenIs(token, "opaque"))
+										skin.m_sortMode = data::MDASortMode::kOpaque;
+									else
+									{
+										rkit::log::Error("Unknown sort type");
+										return rkit::ResultCode::kDataError;
+									}
+								}
 								else
 								{
 									rkit::log::Error("Unknown directive in skin");
@@ -717,6 +1020,18 @@ namespace anox { namespace buildsystem
 							}
 
 							RKIT_CHECK(profile.m_skins.Append(std::move(skin)));
+						}
+						else if (TokenIs(token, "evaluate"))
+						{
+							RKIT_CHECK(ExpectToken(token, line));
+
+							if (token.Count() < 2 || token[0] != '\"' || token[token.Count() - 1] != '\"')
+							{
+								rkit::log::Error("Invalid condition");
+								return rkit::ResultCode::kDataError;
+							}
+
+							RKIT_CHECK(profile.m_evaluate.Set(token.SubSpan(1, token.Count() - 2)));
 						}
 						else
 						{
@@ -1023,6 +1338,930 @@ namespace anox { namespace buildsystem
 		return CompileMDA(outputPath, mdaData, true, depsNode, feedback);
 	}
 
+	bool AnoxCTCCompiler::HasAnalysisStage() const
+	{
+		return true;
+	}
+
+	rkit::Result AnoxCTCCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		rkit::CIPath ctcPath;
+		RKIT_CHECK(ctcPath.Set(depsNode->GetIdentifier()));
+
+		rkit::UniquePtr<rkit::ISeekableReadStream> inputFile;
+		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, ctcPath, inputFile));
+
+		CTCHeader header;
+		RKIT_CHECK(inputFile->ReadOneBinary(header));
+
+		if (header.m_version.Get() != CTCHeader::kExpectedVersion || header.m_magic.Get() != CTCHeader::kExpectedMagic)
+			return rkit::ResultCode::kDataError;
+
+		const uint32_t numTextures = header.m_numTextures.Get();
+
+		if (numTextures == 0)
+			return rkit::ResultCode::kDataError;
+
+		RKIT_CHECK(inputFile->SeekStart(header.m_texturesPos.Get()));
+
+		for (size_t i = 0; i < numTextures; i++)
+		{
+			MD2TextureDef textureDef;
+			RKIT_CHECK(inputFile->ReadOneBinary(textureDef));
+
+			rkit::CIPath texturePath;
+			RKIT_CHECK(ResolveTexturePath(texturePath, ctcPath, textureDef, true));
+
+			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kModelMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, texturePath.ToString()));
+		}
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result AnoxCTCCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		rkit::CIPath ctcPath;
+		RKIT_CHECK(ctcPath.Set(depsNode->GetIdentifier()));
+
+		rkit::UniquePtr<rkit::ISeekableReadStream> inputFile;
+		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, ctcPath, inputFile));
+
+		CTCHeader header;
+		RKIT_CHECK(inputFile->ReadOneBinary(header));
+
+		const uint32_t numPoints = header.m_numPoints.Get();
+		const uint32_t numTotalTris = header.m_numTris.Get();
+		const uint32_t numTextures = header.m_numTextures.Get();
+		const uint32_t numMorphs = header.m_numMorphs.Get();
+
+		rkit::Vector<rkit::endian::LittleUInt32_t> textureTriListSizes;
+		RKIT_CHECK(textureTriListSizes.Resize(numTextures));
+
+		RKIT_CHECK(inputFile->SeekStart(header.m_triListSizesPos.Get()));
+		RKIT_CHECK(inputFile->ReadAllSpan(textureTriListSizes.ToSpan()));
+
+		rkit::Vector<Morph> morphs;
+
+		RKIT_CHECK(morphs.Resize(numMorphs));
+
+		RKIT_CHECK(inputFile->SeekStart(header.m_morphsPos.Get()));
+
+		for (uint32_t mi = 0; mi < numMorphs; mi++)
+		{
+			Morph &outMorph = morphs[mi];
+
+			CTCMorph ctcMorph;
+			RKIT_CHECK(inputFile->ReadOneBinary(ctcMorph));
+
+			rkit::CopySpanNonOverlapping(rkit::Span<char>(outMorph.m_name).SubSpan(0, 16), rkit::ConstSpan<char>(ctcMorph.m_name));
+
+			outMorph.m_name[16] = 0;
+
+			const uint32_t numVertMorphs = ctcMorph.m_numVertMorphs.Get();
+
+			RKIT_CHECK(outMorph.m_vertMorphs.Resize(numVertMorphs));
+		}
+
+		for (uint32_t mi = 0; mi < numMorphs; mi++)
+		{
+			for (VertMorph &vertMorph : morphs[mi].m_vertMorphs)
+			{
+				RKIT_CHECK(inputFile->ReadOneBinary(vertMorph.m_pointIndex));
+
+				return rkit::ResultCode::kNotYetImplemented;
+			}
+			for (VertMorph &vertMorph : morphs[mi].m_vertMorphs)
+			{
+				RKIT_CHECK(inputFile->ReadOneBinary(vertMorph.m_targetPosition));
+			}
+		}
+
+		rkit::Vector<CTCTriVerts> triVerts;
+		rkit::Vector<CTCTriTexCoords> triTexCoords;
+
+		RKIT_CHECK(triVerts.Resize(numTotalTris));
+		RKIT_CHECK(inputFile->SeekStart(header.m_triVertIndexesPos.Get()));
+		RKIT_CHECK(inputFile->ReadAllSpan(triVerts.ToSpan()));
+
+		RKIT_CHECK(triTexCoords.Resize(numTotalTris));
+		RKIT_CHECK(inputFile->SeekStart(header.m_triTexCoordsPos.Get()));
+		RKIT_CHECK(inputFile->ReadAllSpan(triTexCoords.ToSpan()));
+
+		data::MDAProfile outProfile = {};
+
+		rkit::Vector<data::MDAAnimation> outAnimations;
+		rkit::Vector<rkit::AsciiString> outAnimationNames;
+
+		rkit::Vector<data::MDASkeletalModelBone> outBones;
+
+		rkit::Vector<data::MDASkin> outSkins;
+		rkit::Vector<data::MDASkinPass> outSkinPasses;
+
+		rkit::Vector<data::MDAModelMorphKey> outMorphKeys;
+
+		rkit::Vector<rkit::Vector<data::MDAModelSkeletalBoneFrame>> outFrames;
+
+		rkit::Vector<data::MDAModelSubModel> outSubModels;
+		rkit::Vector<data::MDAModelTri> outTris;
+		rkit::Vector<data::MDAModelVert> outVerts;
+		rkit::Vector<data::MDASkeletalModelPoint> outPoints;
+		rkit::Vector<data::MDAModelVertMorph> outVertMorphs;
+
+		uint32_t numMorphedPoints = 0;
+
+		rkit::BoolVector pointHasMorph;
+		RKIT_CHECK(pointHasMorph.Resize(numPoints));
+
+		for (const Morph &morph : morphs)
+		{
+			for (const VertMorph &vertMorph : morph.m_vertMorphs)
+			{
+				const uint32_t pointIndex = vertMorph.m_pointIndex.Get();
+				if (pointIndex >= numPoints)
+				{
+					rkit::log::Error("Vert morph vert index was out of range");
+					return rkit::ResultCode::kDataError;
+				}
+
+				pointHasMorph.Set(pointIndex, true);
+			}
+		}
+
+		rkit::Vector<uint32_t> inPointToOutPoint;
+
+		RKIT_CHECK(inPointToOutPoint.Resize(numPoints));
+
+		{
+			uint32_t numUnmorphedPoints = 0;
+
+			for (uint32_t inPointIndex = 0; inPointIndex < numPoints; inPointIndex++)
+			{
+				if (pointHasMorph[inPointIndex])
+					inPointToOutPoint[inPointIndex] = numMorphedPoints++;
+			}
+
+			for (uint32_t inPointIndex = 0; inPointIndex < numPoints; inPointIndex++)
+			{
+				if (!pointHasMorph[inPointIndex])
+					inPointToOutPoint[inPointIndex] = numMorphedPoints + (numUnmorphedPoints++);
+			}
+		}
+
+		{
+			size_t firstTri = 0;
+			for (uint32_t textureIndex = 0; textureIndex < numTextures; textureIndex++)
+			{
+				const uint32_t numTrisForTexture = textureTriListSizes[textureIndex].Get();
+				if (numTrisForTexture > numTotalTris || (numTotalTris - firstTri) < numTrisForTexture)
+					return rkit::ResultCode::kDataError;
+
+				const rkit::ConstSpan<CTCTriVerts> textureTriVerts = triVerts.ToSpan().SubSpan(firstTri, numTrisForTexture);
+				const rkit::ConstSpan<CTCTriTexCoords> textureTriTexCoords = triTexCoords.ToSpan().SubSpan(firstTri, numTrisForTexture);
+
+				RKIT_CHECK(AddTriClusters(outSubModels, outTris, outVerts, textureIndex, inPointToOutPoint.ToSpan(), textureTriVerts, textureTriTexCoords, numTrisForTexture));
+
+				firstTri += numTrisForTexture;
+			}
+		}
+
+		rkit::Vector<CTCAnimation> inAnimations;
+		RKIT_CHECK(inAnimations.Resize(header.m_numAnimations_Size24.Get()));
+
+		RKIT_CHECK(inputFile->SeekStart(header.m_animationPos.Get()));
+		RKIT_CHECK(inputFile->ReadAllSpan(inAnimations.ToSpan()));
+
+		const uint32_t numFrames = header.m_numFrames.Get();
+
+		{
+			uint32_t animNumber = 0;
+			uint32_t startFrame = 0;
+
+			for (const CTCAnimation &inAnim : inAnimations)
+			{
+				char animNameChars[17];
+
+				rkit::CopySpanNonOverlapping(rkit::Span<char>(animNameChars).SubSpan(0, 16), rkit::ConstSpan<char>(inAnim.m_name));
+
+				animNameChars[16] = 0;
+
+				rkit::AsciiString animName;
+				const uint8_t animNameLength = static_cast<uint8_t>(strlen(animNameChars));
+				RKIT_CHECK(animName.Set(rkit::ConstSpan<char>(animNameChars, strlen(animNameChars))));
+
+				const uint32_t availableFrames = numFrames - startFrame;
+				const uint32_t numFramesForAnim = inAnim.m_frameCount.Get();
+				if (availableFrames < numFramesForAnim)
+				{
+					rkit::log::Error("Too many frames in animations");
+					return rkit::ResultCode::kDataError;
+				}
+
+				data::MDAAnimation outAnim = {};
+				outAnim.m_animNumber = animNumber;
+				outAnim.m_firstFrame = startFrame;
+				outAnim.m_numFrames = numFramesForAnim;
+				outAnim.m_categoryLength = animNameLength;
+
+				RKIT_CHECK(outAnimationNames.Append(std::move(animName)));
+				RKIT_CHECK(outAnimations.Append(std::move(outAnim)));
+
+				animNumber++;
+				startFrame += numFramesForAnim;
+			}
+		}
+
+		// Convert bones
+		rkit::Vector<CTCBone> bones;
+		const uint32_t numBones = header.m_numBones.Get();
+		RKIT_CHECK(bones.Resize(numBones));
+
+		RKIT_CHECK(inputFile->SeekStart(header.m_bonesPos.Get()));
+		RKIT_CHECK(inputFile->ReadAllSpan(bones.ToSpan()));
+
+		for (size_t boneIndex = 0; boneIndex < numBones; boneIndex++)
+		{
+			const CTCBone &inBone = bones[boneIndex];
+
+			data::MDASkeletalModelBone outBone = {};
+
+			for (size_t row = 0; row < 3; row++)
+			{
+				for (size_t col = 0; col < 4; col++)
+					outBone.m_baseMatrix[row][col] = inBone.m_baseTransform.m_rows[row][col];
+			}
+
+			const uint32_t parentIndexPlusOne = inBone.m_parentIndexPlusOne.Get();
+			if (parentIndexPlusOne > boneIndex)
+			{
+				rkit::log::Error("Invalid bone parent index");
+				return rkit::ResultCode::kDataError;
+			}
+
+			outBone.m_parentIndexPlusOne = static_cast<uint16_t>(inBone.m_parentIndexPlusOne.Get());
+
+			RKIT_CHECK(outBones.Append(outBone));
+		}
+
+		rkit::Vector<MD2TextureDef> inTextures;
+
+		RKIT_CHECK(inTextures.Resize(numTextures));
+
+		RKIT_CHECK(inputFile->SeekStart(header.m_texturesPos.Get()));
+		RKIT_CHECK(inputFile->ReadAllSpan(inTextures.ToSpan()));
+
+		for (const MD2TextureDef &inTexture : inTextures)
+		{
+			char nameChars[65];
+			nameChars[64] = 0;
+
+			rkit::CopySpanNonOverlapping(rkit::Span<char>(nameChars).SubSpan(0, 64), rkit::ConstSpan<char>(inTexture.m_textureName));
+			const size_t nameLen = strlen(nameChars);
+
+			data::MDASkin skin = {};
+			skin.m_numPasses = 1;
+			skin.m_sortMode = static_cast<uint8_t>(data::MDASortMode::kOpaque);
+
+			data::MDASkinPass skinPass = {};
+
+			rkit::CIPath materialPath;
+			RKIT_CHECK(ResolveTexturePath(materialPath, ctcPath, inTexture, true));
+
+			rkit::CIPath compiledMaterialPath;
+			RKIT_CHECK(MaterialCompiler::ConstructOutputPath(compiledMaterialPath, data::MaterialResourceType::kModel, materialPath.ToString()));
+
+			RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, skinPass.m_materialContentID));
+
+			RKIT_CHECK(outSkins.Append(skin));
+			RKIT_CHECK(outSkinPasses.Append(skinPass));
+		}
+
+		if (numMorphedPoints > 0)
+		{
+			return rkit::ResultCode::kNotYetImplemented;
+		}
+
+		RKIT_CHECK(outPoints.Resize(numPoints));
+
+		{
+			rkit::Vector<CTCPoint> inPoints;
+			RKIT_CHECK(inPoints.Resize(numPoints));
+
+			RKIT_CHECK(inputFile->SeekStart(header.m_pointsPos.Get()));
+			RKIT_CHECK(inputFile->ReadAllSpan(inPoints.ToSpan()));
+
+			for (uint32_t inPointIndex = 0; inPointIndex < numPoints; inPointIndex++)
+			{
+				data::MDASkeletalModelPoint &outPoint = outPoints[inPointToOutPoint[inPointIndex]];
+				const CTCPoint &inPoint = inPoints[inPointIndex];
+
+				rkit::StaticArray<float, 3> pos;
+				rkit::StaticArray<float, 3> normal;
+
+				for (size_t axis = 0; axis < 3; axis++)
+				{
+					pos[axis] = inPoint.m_pos[axis].Get();
+					normal[axis] = inPoint.m_normal[axis].Get();
+				}
+
+				outPoint.m_boneIndex = 0;
+				outPoint.m_compressedNormal = data::CompressNormal(normal[0], normal[1], normal[2]);
+				for (size_t axis = 0; axis < 3; axis++)
+					outPoint.m_point[axis] = inPoint.m_pos[axis];
+			}
+		}
+
+		// Process skeletal data
+		{
+			RKIT_CHECK(inputFile->SeekStart(header.m_skeletalDataPos.Get()));
+
+			rkit::endian::BigUInt32_t skeletalDataFourCC;
+			RKIT_CHECK(inputFile->ReadOneBinary(skeletalDataFourCC));
+
+			if (skeletalDataFourCC.Get() != RKIT_FOURCC('S', 'T', 'G', 'W'))
+			{
+				rkit::log::Error("Skeletal data fourcc mismatch");
+				return rkit::ResultCode::kDataError;
+			}
+
+			for (uint32_t inPointIndex = 0; inPointIndex < numPoints; inPointIndex++)
+			{
+				rkit::endian::LittleUInt32_t numBonesForPointData;
+				RKIT_CHECK(inputFile->ReadOneBinary(numBonesForPointData));
+
+				const uint32_t numBonesForPoint = numBonesForPointData.Get();
+
+				if (numBonesForPoint == 0)
+				{
+					rkit::log::Error("Skeletal data vert had no bones?");
+					return rkit::ResultCode::kDataError;
+				}
+
+				for (uint32_t bpi = 0; bpi < numBonesForPoint; bpi++)
+				{
+					CTCBoneAndWeight boneAndWeightData;
+					RKIT_CHECK(inputFile->ReadOneBinary(boneAndWeightData));
+
+					const uint32_t boneIndex = boneAndWeightData.m_boneIndex.Get();
+					const float weight = boneAndWeightData.m_weight.Get();
+
+					if (boneIndex >= bones.Count())
+					{
+						rkit::log::Error("Bone index was out of range");
+						return rkit::ResultCode::kDataError;
+					}
+
+					// Anachronox never uses multi-weight skinning even though the format
+					// supports it
+					if (bpi == 0)
+						outPoints[inPointToOutPoint[inPointIndex]].m_boneIndex = boneIndex;
+				}
+			}
+		}
+
+		// Process frames
+		{
+			RKIT_CHECK(inputFile->SeekStart(header.m_frameDataPos.Get()));
+
+			rkit::Vector<Matrix3x4> absMatrixes;
+			RKIT_CHECK(absMatrixes.Resize(numBones));
+
+			RKIT_CHECK(outFrames.Resize(numFrames));
+
+			for (uint32_t frameIndex = 0; frameIndex < numFrames; frameIndex++)
+			{
+				rkit::Vector<data::MDAModelSkeletalBoneFrame> &frameBones = outFrames[frameIndex];
+				RKIT_CHECK(frameBones.Resize(numBones));
+
+				CTCBoneKey baseKey;
+				RKIT_CHECK(inputFile->ReadOneBinary(baseKey));
+
+				const Matrix3x4 baseMatrix = BoneKeyToMatrix(baseKey);
+
+				for (uint32_t boneIndex = 0; boneIndex < numBones; boneIndex++)
+				{
+					const CTCBone &inBone = bones[boneIndex];
+					const Matrix3x4 *parentMatrixPtr = &baseMatrix;
+
+					const uint32_t parentIndexPlusOne = inBone.m_parentIndexPlusOne.Get();
+
+					if (parentIndexPlusOne != 0)
+						parentMatrixPtr = &absMatrixes[parentIndexPlusOne - 1];
+
+					CTCBoneKey boneKey;
+					RKIT_CHECK(inputFile->ReadOneBinary(boneKey));
+
+					const Matrix3x4 relMatrix = BoneKeyToMatrix(baseKey);
+					absMatrixes[boneIndex] = OrthoMatrixMul(*parentMatrixPtr, relMatrix);
+				}
+
+				// Compress matrices
+				for (uint32_t boneIndex = 0; boneIndex < numBones; boneIndex++)
+				{
+					const CTCBone &inBone = bones[boneIndex];
+					const uint32_t parentIndexPlusOne = inBone.m_parentIndexPlusOne.Get();
+
+					Matrix3x4 &absMatrixRef = absMatrixes[boneIndex];
+
+					Matrix3x4 relMatrix = absMatrixRef;
+					if (parentIndexPlusOne != 0)
+					{
+						// absMatrixRef = parentMatrix * relMatrix
+						const Matrix3x4 invParentMatrix = OrthoInvertMatrix(absMatrixes[parentIndexPlusOne - 1]);
+						relMatrix = OrthoMatrixMul(invParentMatrix, relMatrix);
+					}
+
+					const data::MDAModelSkeletalBoneFrame compressedBoneFrame = ConvertMatrixToFrame(relMatrix);
+
+					relMatrix = ConvertFrameToMatrix(compressedBoneFrame);
+					if (parentIndexPlusOne == 0)
+						absMatrixRef = relMatrix;
+					else
+						absMatrixRef = OrthoMatrixMul(absMatrixes[parentIndexPlusOne - 1], relMatrix);
+
+					frameBones[boneIndex] = compressedBoneFrame;
+				}
+			}
+
+			return rkit::ResultCode::kNotYetImplemented;
+		}
+
+		outProfile.m_conditionLength = 0;
+		outProfile.m_fourCC = RKIT_FOURCC('D', 'F', 'L', 'T');
+
+		data::MDAModelHeader outHeader = {};
+		outHeader.m_numProfiles = 1;
+
+		if (outSubModels.Count() > 255)
+		{
+			rkit::log::Error("Too many submodels");
+			return rkit::ResultCode::kDataError;
+		}
+
+		outHeader.m_numSubModels = static_cast<uint8_t>(outSubModels.Count());
+
+		if (outAnimations.Count() > 127)
+		{
+			rkit::log::Error("Too many animations");
+			return rkit::ResultCode::kDataError;
+		}
+
+		outHeader.m_numAnimations7_AnimationType1 = static_cast<uint8_t>(0x80 | outAnimations.Count());
+
+		if (outSkins.Count() > 255)
+		{
+			rkit::log::Error("Too many skins");
+			return rkit::ResultCode::kDataError;
+		}
+
+		outHeader.m_numSkins = static_cast<uint8_t>(outSkins.Count());
+
+		if (outMorphKeys.Count() > std::numeric_limits<uint16_t>::max())
+		{
+			rkit::log::Error("Too many morph keys");
+			return rkit::ResultCode::kDataError;
+		}
+
+		outHeader.m_numMorphKeys = static_cast<uint16_t>(outMorphKeys.Count());
+
+		if (outBones.Count() > std::numeric_limits<uint16_t>::max())
+		{
+			rkit::log::Error("Too many morph keys");
+			return rkit::ResultCode::kDataError;
+		}
+
+		outHeader.m_numBones = static_cast<uint16_t>(outBones.Count());
+
+		if (outFrames.Count() > std::numeric_limits<uint16_t>::max())
+		{
+			rkit::log::Error("Too many frames");
+			return rkit::ResultCode::kDataError;
+		}
+
+		outHeader.m_numFrames = static_cast<uint16_t>(outFrames.Count());
+
+		if (outPoints.Count() > std::numeric_limits<uint32_t>::max())
+		{
+			rkit::log::Error("Too many points");
+			return rkit::ResultCode::kDataError;
+		}
+
+		outHeader.m_numPoints = static_cast<uint32_t>(outPoints.Count());
+
+		outHeader.m_numMorphedPoints = static_cast<uint32_t>(numMorphedPoints);
+
+		rkit::CIPath outputPath;
+		RKIT_CHECK(ConstructOutputPath(outputPath, depsNode->GetIdentifier()));
+
+		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
+		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outputPath, outFile));
+
+		RKIT_CHECK(outFile->WriteOneBinary(outHeader));
+
+		RKIT_CHECK(outFile->WriteOneBinary(outProfile));
+
+		// No conditions to write
+
+		RKIT_CHECK(outFile->WriteAllSpan(outSkins.ToSpan()));
+		RKIT_CHECK(outFile->WriteAllSpan(outSkinPasses.ToSpan()));
+		RKIT_CHECK(outFile->WriteAllSpan(outAnimations.ToSpan()));
+
+		for (const rkit::AsciiString &animName : outAnimationNames)
+		{
+			RKIT_CHECK(outFile->WriteAllSpan(animName.ToSpan()));
+		}
+
+		RKIT_CHECK(outFile->WriteAllSpan(outMorphKeys.ToSpan()));
+		RKIT_CHECK(outFile->WriteAllSpan(outBones.ToSpan()));
+
+		for (const rkit::Vector<data::MDAModelSkeletalBoneFrame> &frame : outFrames)
+		{
+			RKIT_CHECK(outFile->WriteAllSpan(frame.ToSpan()));
+		}
+
+		RKIT_CHECK(outFile->WriteAllSpan(outSubModels.ToSpan()));
+		RKIT_CHECK(outFile->WriteAllSpan(outTris.ToSpan()));
+		RKIT_CHECK(outFile->WriteAllSpan(outVerts.ToSpan()));
+		RKIT_CHECK(outFile->WriteAllSpan(outPoints.ToSpan()));
+		RKIT_CHECK(outFile->WriteAllSpan(outVertMorphs.ToSpan()));
+
+		return rkit::ResultCode::kNotYetImplemented;
+	}
+
+	rkit::Result AnoxCTCCompiler::AddTriClusters(rkit::Vector<data::MDAModelSubModel> &outSubModels,
+		rkit::Vector<data::MDAModelTri> &outTris,
+		rkit::Vector<data::MDAModelVert> &outVerts,
+		uint32_t materialID,
+		rkit::ConstSpan<uint32_t> inVertToOutVert,
+		rkit::ConstSpan<CTCTriVerts> triVerts, rkit::ConstSpan<CTCTriTexCoords> triTexCoords, size_t numTris)
+	{
+		rkit::BoolVector triAdded;
+		RKIT_CHECK(triAdded.Resize(numTris));
+
+		for (;;)
+		{
+			const size_t firstTri = outTris.Count();
+			const size_t firstVert = outVerts.Count();
+
+			data::MDAModelSubModel subModel = {};
+			subModel.m_materialID = materialID;
+
+			RKIT_CHECK(AddOneTriCluster(outTris, outVerts, inVertToOutVert, triVerts, triTexCoords, numTris, triAdded.ToSpan()));
+
+			if (firstTri != outTris.Count())
+			{
+				RKIT_ASSERT(firstVert != outVerts.Count());
+
+				subModel.m_numTris = static_cast<uint16_t>(outTris.Count() - firstTri);
+				subModel.m_numVertsMinusOne = static_cast<uint16_t>(outVerts.Count() - firstVert - 1u);
+			}
+			else
+			{
+				RKIT_ASSERT(firstVert == outVerts.Count());
+				break;
+			}
+		}
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result AnoxCTCCompiler::AddOneTriCluster(
+		rkit::Vector<data::MDAModelTri> &outTris,
+		rkit::Vector<data::MDAModelVert> &outVerts,
+		rkit::ConstSpan<uint32_t> inPointToOutPoint,
+		rkit::ConstSpan<CTCTriVerts> triVertsSpan, rkit::ConstSpan<CTCTriTexCoords> triTexCoordsSpan, size_t numTris,
+		rkit::BoolSpan triAdded)
+	{
+		rkit::HashMap<CTCCompoundTriVert, uint16_t> compoundVertToVertIndex;
+
+		size_t vertsEmitted = 0;
+
+		for (size_t triIndex = 0; triIndex < numTris; triIndex++)
+		{
+			if (triAdded[triIndex])
+				continue;
+
+			rkit::StaticArray<rkit::HashValue_t, 3> triCompoundVertHashes;
+			rkit::StaticArray<CTCCompoundTriVert, 3> triCompoundVerts;
+
+			uint8_t numNewVerts = 0;
+
+			const CTCTriVerts &triVerts = triVertsSpan[triIndex];
+			const CTCTriTexCoords &triTexCoords = triTexCoordsSpan[triIndex];
+
+			for (size_t ptIndex = 0; ptIndex < 3; ptIndex++)
+			{
+				CTCCompoundTriVert &triCompoundVert = triCompoundVerts[ptIndex];
+
+				triCompoundVert.m_inPointIndex = triVerts.m_verts[ptIndex].Get();
+
+				for (size_t axis = 0; axis < 2; axis++)
+					triCompoundVert.m_compressedUV[axis] = CompressUV(triTexCoords.m_texCoords[ptIndex].m_uvFloatBits[axis].GetBits());
+
+				const rkit::HashValue_t hashValue = rkit::GetDrivers().m_utilitiesDriver->ComputeHash(0, &triCompoundVert, sizeof(triCompoundVert));
+
+				triCompoundVertHashes[ptIndex] = hashValue;
+
+				if (compoundVertToVertIndex.FindPrehashed(hashValue, triCompoundVert) == compoundVertToVertIndex.end())
+					numNewVerts++;
+			}
+
+			const size_t availableVertIndexes = 0x10000u - vertsEmitted;
+
+			if (availableVertIndexes > numNewVerts)
+			{
+				data::MDAModelTri outTri = {};
+
+				for (size_t ptIndex = 0; ptIndex < 3; ptIndex++)
+				{
+					const CTCCompoundTriVert &compoundVert = triCompoundVerts[ptIndex];
+					rkit::HashValue_t hashValue = triCompoundVertHashes[ptIndex];
+
+					uint16_t submodelVertIndex = static_cast<uint16_t>(vertsEmitted);
+
+					const rkit::HashMap<CTCCompoundTriVert, uint16_t>::ConstIterator_t it = compoundVertToVertIndex.FindPrehashed(hashValue, compoundVert);
+					if (it == compoundVertToVertIndex.end())
+					{
+						const size_t inPointIndex = compoundVert.m_inPointIndex;
+
+						if (inPointIndex >= inPointToOutPoint.Count())
+						{
+							rkit::log::Error("Vert was out of range");
+							return rkit::ResultCode::kDataError;
+						}
+
+						data::MDAModelVert outVert = {};
+						outVert.m_pointID = inPointToOutPoint[inPointIndex];
+						outVert.m_texCoordU = compoundVert.m_compressedUV[0];
+						outVert.m_texCoordV = compoundVert.m_compressedUV[1];
+
+						RKIT_ASSERT(vertsEmitted < 0x10000u);
+						RKIT_CHECK(outVerts.Append(outVert));
+
+						RKIT_CHECK(compoundVertToVertIndex.SetPrehashed(hashValue, compoundVert, static_cast<uint16_t>(vertsEmitted)));
+
+						vertsEmitted++;
+					}
+					else
+						submodelVertIndex = it.Value();
+
+					outTri.m_verts[ptIndex] = submodelVertIndex;
+				}
+
+				RKIT_CHECK(outTris.Append(outTri));
+
+				triAdded.SetAt(triIndex, true);
+			}
+		}
+
+		return rkit::ResultCode::kOK;
+	}
+
+	AnoxCTCCompiler::Matrix3x4 AnoxCTCCompiler::OrthoMatrixMul(const Matrix3x4 &a, const Matrix3x4 &b)
+	{
+		Matrix3x4 result;
+		for (size_t outRow = 0; outRow < 3; outRow++)
+		{
+			for (size_t outCol = 0; outCol < 4; outCol++)
+			{
+				float coeff = 0.f;
+				for (size_t term = 0; term < 3; term++)
+					coeff += a.m_rows[outRow][term] * b.m_rows[term][outCol];
+				// b.m_rows[3][outCol] is implicitly 0 for term outCol=0..2
+
+				result.m_rows[outRow][outCol] = coeff;
+			}
+
+			// b.m_rows[3][outCol] is implicitly 1 for term outCol=3
+			result.m_rows[outRow][3] += a.m_rows[outRow][3];
+		}
+
+		return result;
+	}
+
+	AnoxCTCCompiler::Matrix3x4 AnoxCTCCompiler::OrthoInvertMatrix(const Matrix3x4 &inMat)
+	{
+		// inMat is T*R, invert is R'*T'
+		// T':
+		Matrix3x4 invT = {};
+		invT.m_rows[0][0] = 1.f;
+		invT.m_rows[1][1] = 1.f;
+		invT.m_rows[2][2] = 1.f;
+		invT.m_rows[0][3] = -inMat.m_rows[0][3];
+		invT.m_rows[1][3] = -inMat.m_rows[1][3];
+		invT.m_rows[2][3] = -inMat.m_rows[2][3];
+
+		Matrix3x4 invR = {};
+		for (size_t row = 0; row < 3; row++)
+		{
+			for (size_t col = 0; col < 3; col++)
+			{
+				invR.m_rows[row][col] = inMat.m_rows[col][row];
+			}
+		}
+
+		Matrix3x4 result = OrthoMatrixMul(invR, invT);
+
+		result = invR;
+		for (size_t outRow = 0; outRow < 3; outRow++)
+		{
+			float coeff = 0.f;
+			for (size_t term = 0; term < 3; term++)
+				coeff -= inMat.m_rows[term][outRow] * inMat.m_rows[term][3];
+
+			result.m_rows[outRow][3] = coeff;
+		}
+
+		return result;
+	}
+
+	AnoxCTCCompiler::Matrix3x4 AnoxCTCCompiler::BoneKeyToMatrix(const CTCBoneKey &key)
+	{
+		const float piDiv180 = 0.01745329251994329576923690768489f;
+		const float dx = key.m_angles[1].Get();
+		const float dy = key.m_angles[2].Get();
+		const float dz = key.m_angles[0].Get();
+
+		const float sx = sinf(dx * piDiv180);
+		const float cx = cosf(dx * piDiv180);
+		const float sy = sinf(dy * piDiv180);
+		const float cy = cosf(dy * piDiv180);
+		const float sz = sinf(dz * piDiv180);
+		const float cz = cosf(dz * piDiv180);
+
+		Matrix3x4 result = {};
+		Matrix3x4 t = GenerateTranslationMatrix(key.m_pos[0].Get(), key.m_pos[1].Get(), key.m_pos[2].Get());
+		Matrix3x4 rx = GenerateRotationMatrix(key.m_angles[1].Get(), 1.0f, 0.0f, 0.0f);
+		Matrix3x4 ry = GenerateRotationMatrix(key.m_angles[0].Get(), 0.0f, 1.0f, 0.0f);
+		Matrix3x4 rz = GenerateRotationMatrix(key.m_angles[2].Get(), 0.0f, 0.0f, 1.0f);
+
+		return OrthoMatrixMul(OrthoMatrixMul(OrthoMatrixMul(t, ry), rx), rz);
+	}
+
+	AnoxCTCCompiler::Matrix3x4 AnoxCTCCompiler::GenerateRotationMatrix(float degrees, float x, float y, float z)
+	{
+		const float r = degrees * 0.01745329251994329576923690768489f;
+		const float s = sinf(r);
+		const float c = cosf(r);
+
+		const float oneMinusC = 1.0f - c;
+
+		Matrix3x4 result = {};
+		result.m_rows[0][0] = x * x * oneMinusC + c;
+		result.m_rows[0][1] = x * y * oneMinusC - z * s;
+		result.m_rows[0][2] = x * z * oneMinusC + y * s;
+
+		result.m_rows[1][0] = y * x * oneMinusC + z * s;
+		result.m_rows[1][1] = y * y * oneMinusC + c;
+		result.m_rows[1][2] = y * z * oneMinusC - x * s;
+
+		result.m_rows[2][0] = z * x * oneMinusC - y * s;
+		result.m_rows[2][1] = z * y * oneMinusC + x * s;
+		result.m_rows[2][2] = z * z * oneMinusC + c;
+
+		return result;
+	}
+
+	AnoxCTCCompiler::Matrix3x4 AnoxCTCCompiler::GenerateTranslationMatrix(float x, float y, float z)
+	{
+		Matrix3x4 result = GenerateIdentityMatrix();
+		result.m_rows[0][3] = x;
+		result.m_rows[1][3] = y;
+		result.m_rows[2][3] = z;
+		return result;
+	}
+
+	AnoxCTCCompiler::Matrix3x4 AnoxCTCCompiler::GenerateIdentityMatrix()
+	{
+		Matrix3x4 result = {};
+		for (size_t axis = 0; axis < 3; axis++)
+			result.m_rows[axis][axis] = 1.f;
+
+		return result;
+	}
+
+	void AnoxCTCCompiler::MatrixToQuat(const Matrix3x4 &mat, float &outX, float &outY, float &outZ, float &outW)
+	{
+		const float xTerm = mat.m_rows[0][0];	// (1 - 2yy - 2zz)
+		const float yTerm = mat.m_rows[1][1];	// (1 - 2xx - 2zz)
+		const float zTerm = mat.m_rows[2][2];	// (1 - 2xx - 2yy)
+
+		const float axisTerms[] =
+		{
+			xTerm - yTerm - zTerm,	// 4xx - 1
+			yTerm - xTerm - zTerm,	// 4yy - 1
+			zTerm - xTerm - yTerm,	// 4zz - 1
+		};
+
+		float sqResults[4] = {};
+		for (size_t axis = 0; axis < 3; axis++)
+			sqResults[axis] = (axisTerms[axis] + 1.0f) * 0.25f;
+		sqResults[3] = 1.0f - sqResults[0] - sqResults[1] - sqResults[2];
+
+		float finalResults[4] = {};
+		for (size_t axis = 0; axis < 4; axis++)
+		{
+			const float coeff = sqResults[axis];
+			if (coeff < 0.0f)
+				finalResults[axis] = 0.0f;
+			else
+				finalResults[axis] = sqrtf(coeff);
+		}
+
+		outX = finalResults[0];
+		outY = finalResults[1];
+		outZ = finalResults[2];
+		outW = finalResults[3];
+	}
+
+	AnoxCTCCompiler::Matrix3x4 AnoxCTCCompiler::QuatToMatrix(float x, float y, float z, float w)
+	{
+		Matrix3x4 result = {};
+		result.m_rows[0][0] = 1.0f - (2.0f * y * y) - (2.0f * z * z);
+		result.m_rows[0][1] = (2.0f * x * y) - (2.0f * z * w);
+		result.m_rows[0][2] = (2.0f * x * z) + (2.0f * y * w);
+
+		result.m_rows[1][0] = (2.0f * x * y) + (2.0f * z * w);
+		result.m_rows[1][1] = 1.0f - (2.0f * x * x) - (2.0f * z * z);
+		result.m_rows[1][2] = (2.0f * y * z) - (2.0f * x * w);
+
+		result.m_rows[2][0] = (2.0f * x * z) - (2.0f * y * w);
+		result.m_rows[2][1] = (2.0f * y * z) + (2.0f * x * w);
+		result.m_rows[2][2] = 1.0f - (2.0f * x * x) - (2.0f * y * y);
+
+		return result;
+	}
+
+	data::MDAModelSkeletalBoneFrame AnoxCTCCompiler::ConvertMatrixToFrame(const Matrix3x4 &mat)
+	{
+		float x = 0.0f;
+		float y = 0.0f;
+		float z = 0.0f;
+		float w = 0.0f;
+		MatrixToQuat(mat, x, y, z, w);
+
+		data::MDAModelSkeletalBoneFrame result = {};
+
+		for (size_t axis = 0; axis < 3; axis++)
+			result.m_translation[axis] = mat.m_rows[axis][3];
+
+		if (w < 0.f)
+		{
+			x = -x;
+			y = -y;
+			z = -z;
+		}
+
+		result.m_rotation = data::CompressNormalizedQuat(x, y, z);
+
+		return result;
+	}
+
+	AnoxCTCCompiler::Matrix3x4 AnoxCTCCompiler::ConvertFrameToMatrix(const data::MDAModelSkeletalBoneFrame &boneFrame)
+	{
+		float x = 0.f;
+		float y = 0.f;
+		float z = 0.f;
+		float w = 0.f;
+
+		data::DecompressQuat(boneFrame.m_rotation, x, y, z, w);
+
+		AnoxCTCCompiler::Matrix3x4 result = QuatToMatrix(x, y, z, w);
+
+		for (size_t axis = 0; axis < 3; axis++)
+			result.m_rows[axis][3] = boneFrame.m_translation[axis].Get();
+
+		return result;
+	}
+
+	uint32_t AnoxCTCCompiler::GetVersion() const
+	{
+		return 1;
+	}
+
+	rkit::Result AnoxCTCCompilerBase::ConstructOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier)
+	{
+		return AnoxModelCompilerCommon::ConstructOutputPathByType(outPath, "ctc", identifier);
+	}
+
+	bool AnoxCTCCompiler::CTCCompoundTriVert::operator==(const CTCCompoundTriVert &other) const
+	{
+		if (m_inPointIndex != other.m_inPointIndex)
+			return false;
+
+		if (m_compressedUV[0] != other.m_compressedUV[0])
+			return false;
+
+		if (m_compressedUV[1] != other.m_compressedUV[1])
+			return false;
+
+		return true;
+	}
+
+	bool AnoxCTCCompiler::CTCCompoundTriVert::operator!=(const CTCCompoundTriVert &other) const
+	{
+		return !((*this) == other);
+	}
+
 	rkit::Result AnoxModelCompilerCommon::CompileMDA(rkit::CIPath &outputPath, UncompiledMDAData &mdaData, bool autoSkin, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		rkit::FloatingPointStateScope scope(rkit::FloatingPointState::GetCurrent().AppendIEEEStrict());
@@ -1106,7 +2345,8 @@ namespace anox { namespace buildsystem
 		}
 
 		if (header.m_magic.Get() != MD2Header::kExpectedMagic
-			|| header.m_majorVersion.Get() != MD2Header::kExpectedMajorVersion
+			|| header.m_majorVersion.Get() < MD2Header::kMinMajorVersion
+			|| header.m_majorVersion.Get() > MD2Header::kMaxMajorVersion
 			|| header.m_minorVersion.Get() > MD2Header::kMaxMinorVersion)
 		{
 			rkit::log::Error("MD2 file appears to be invalid");
@@ -1423,8 +2663,8 @@ namespace anox { namespace buildsystem
 		for (uint32_t i = 0; i < numXYZ; i++)
 			xyzToPointIndex[pointToXYZIndex[i]] = i;
 
-		rkit::Vector<data::MDAModelBone> bones;
-		rkit::Vector<rkit::Vector<data::MDAModelBoneFrame>> boneFrames;
+		rkit::Vector<data::MDAVertexModelBone> vertexBones;
+		rkit::Vector<rkit::Vector<data::MDAModelTagBoneFrame>> boneFrames;
 
 		if (mdaData.m_boneChunk.Count() > 0)
 		{
@@ -1447,18 +2687,18 @@ namespace anox { namespace buildsystem
 				return rkit::ResultCode::kDataError;
 			}
 
-			RKIT_CHECK(bones.Resize(1));
+			RKIT_CHECK(vertexBones.Resize(1));
 			RKIT_CHECK(boneFrames.Resize(1));
 
-			bones[0].m_boneIDFourCC = boneData.m_boneID.Get();
+			vertexBones[0].m_boneIDFourCC = boneData.m_boneID.Get();
 
-			rkit::Vector<data::MDAModelBoneFrame> &outFrames = boneFrames[0];
+			rkit::Vector<data::MDAModelTagBoneFrame> &outFrames = boneFrames[0];
 
 			RKIT_CHECK(outFrames.Resize(numFrames));
 			for (uint32_t frameIndex = 0; frameIndex < numFrames; frameIndex++)
 			{
 				MDABoneFrame inFrame = {};
-				data::MDAModelBoneFrame &outFrame = outFrames[frameIndex];
+				data::MDAModelTagBoneFrame &outFrame = outFrames[frameIndex];
 
 				rkit::CopySpanNonOverlapping(rkit::Span<MDABoneFrame>(&inFrame, 1).ReinterpretCast<uint8_t>(), boneFrameBytes.SubSpan(frameIndex * sizeof(inFrame), sizeof(inFrame)));
 
@@ -1685,6 +2925,10 @@ namespace anox { namespace buildsystem
 
 					outSkin.m_numPasses = static_cast<uint8_t>(numPasses);
 
+
+					if (inSkin.m_sortMode.IsSet())
+						outSkin.m_sortMode = static_cast<uint8_t>(inSkin.m_sortMode.Get());
+
 					for (size_t passIndex = 0; passIndex < numPasses; passIndex++)
 					{
 						data::MDASkinPass &outPass = outPasses[passIndex];
@@ -1700,6 +2944,8 @@ namespace anox { namespace buildsystem
 
 						bool needMaterialData = false;
 						outPass.m_clampFlag = (inPass.m_clamp ? 1 : 0);
+						outPass.m_scrollU = inPass.m_scrollU;
+						outPass.m_scrollV = inPass.m_scrollV;
 
 						if (inPass.m_alphaTestMode.IsSet())
 							outPass.m_alphaTestMode = static_cast<uint8_t>(inPass.m_alphaTestMode.Get());
@@ -1760,10 +3006,10 @@ namespace anox { namespace buildsystem
 								if (!inPass.m_alphaTestMode.IsSet())
 									outPass.m_alphaTestMode = static_cast<uint8_t>(data::MDAAlphaTestMode::kGT0);
 
-								if (inPass.m_depthWrite.IsSet())
+								if (!inPass.m_depthWrite.IsSet())
 									outPass.m_depthWriteFlag = false;
 
-								if (inPass.m_blendMode.IsSet())
+								if (!inPass.m_blendMode.IsSet())
 									outPass.m_blendMode = static_cast<uint8_t>(data::MDABlendMode::kAlphaBlend);
 							}
 						}
@@ -1791,7 +3037,7 @@ namespace anox { namespace buildsystem
 			return rkit::ResultCode::kDataError;
 		}
 
-		if (animations.Count() > 0xffu)
+		if (animations.Count() > 0x7fu)
 		{
 			rkit::log::Error("Too many animations");
 			return rkit::ResultCode::kDataError;
@@ -1803,7 +3049,7 @@ namespace anox { namespace buildsystem
 			return rkit::ResultCode::kDataError;
 		}
 
-		if (bones.Count() > 0xffffu)
+		if (vertexBones.Count() > 0xffffu)
 		{
 			rkit::log::Error("Too many bones");
 			return rkit::ResultCode::kDataError;
@@ -1825,28 +3071,28 @@ namespace anox { namespace buildsystem
 
 		outHeader.m_numSkins = numTextures;
 		outHeader.m_numMorphKeys = static_cast<uint16_t>(morphKeys.Count());
-		outHeader.m_numBones = static_cast<uint16_t>(bones.Count());
+		outHeader.m_numBones = static_cast<uint16_t>(vertexBones.Count());
 		outHeader.m_numFrames = static_cast<uint16_t>(numFrames);
 		outHeader.m_numPoints = static_cast<uint16_t>(numXYZ);
 		outHeader.m_numMorphedPoints = static_cast<uint16_t>(numMorphedPoints);
-		outHeader.m_numAnimations = static_cast<uint8_t>(animations.Count());
+		outHeader.m_numAnimations7_AnimationType1 = static_cast<uint8_t>(animations.Count());
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
 		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outputPath, outFile));
 
 		// Write header
-		RKIT_CHECK(outFile->WriteAll(&outHeader, sizeof(outHeader)));
+		RKIT_CHECK(outFile->WriteOneBinary(outHeader));
 
 		// Write profiles
-		RKIT_CHECK(outFile->WriteAll(profiles.GetBuffer(), sizeof(profiles[0]) * profiles.Count()));
+		RKIT_CHECK(outFile->WriteAllSpan(profiles.ToSpan()));
 
 		// Write profile condition chars
-		RKIT_CHECK(outFile->WriteAll(profileConditionStrings.GetBuffer(), sizeof(profileConditionStrings[0]) * profileConditionStrings.Count()));
+		RKIT_CHECK(outFile->WriteAllSpan(profileConditionStrings.ToSpan()));
 
 		// Write profile skins
 		for (const rkit::Vector<data::MDASkin> &skinList : profileSkins)
 		{
-			RKIT_CHECK(outFile->WriteAll(skinList.GetBuffer(), sizeof(skinList[0]) * skinList.Count()));
+			RKIT_CHECK(outFile->WriteAllSpan(skinList.ToSpan()));
 		}
 
 		// Write profile skin passes
@@ -1854,26 +3100,26 @@ namespace anox { namespace buildsystem
 		{
 			for (const rkit::Vector<data::MDASkinPass> &passesList : skinPassesList)
 			{
-				RKIT_CHECK(outFile->WriteAll(passesList.GetBuffer(), sizeof(passesList[0]) * passesList.Count()));
+				RKIT_CHECK(outFile->WriteAllSpan(passesList.ToSpan()));
 			}
 		}
 
 		// Write animations
-		RKIT_CHECK(outFile->WriteAll(animations.GetBuffer(), sizeof(animations[0]) * animations.Count()));
+		RKIT_CHECK(outFile->WriteAllSpan(animations.ToSpan()));
 
 		// Write animation names
-		RKIT_CHECK(outFile->WriteAll(animNameChars.GetBuffer(), sizeof(animNameChars[0]) * animNameChars.Count()));
+		RKIT_CHECK(outFile->WriteAllSpan(animNameChars.ToSpan()));
 
 		// Write morph keys
-		RKIT_CHECK(outFile->WriteAll(morphKeys.GetBuffer(), sizeof(morphKeys[0]) * morphKeys.Count()));
+		RKIT_CHECK(outFile->WriteAllSpan(morphKeys.ToSpan()));
 
 		// Write bones
-		RKIT_CHECK(outFile->WriteAll(bones.GetBuffer(), sizeof(bones[0]) * bones.Count()));
+		RKIT_CHECK(outFile->WriteAllSpan(vertexBones.ToSpan()));
 
 		// Write bone frames
-		for (const rkit::Vector<data::MDAModelBoneFrame> &boneFramesList : boneFrames)
+		for (const rkit::Vector<data::MDAModelTagBoneFrame> &boneFramesList : boneFrames)
 		{
-			RKIT_CHECK(outFile->WriteAll(boneFramesList.GetBuffer(), sizeof(boneFramesList[0]) * boneFramesList.Count()));
+			RKIT_CHECK(outFile->WriteAllSpan(boneFramesList.ToSpan()));
 		}
 
 		// Write submodels
@@ -1883,12 +3129,18 @@ namespace anox { namespace buildsystem
 
 			for (const UncompiledMDASubmodel &subModel : triList.m_submodels)
 			{
+				if (subModel.m_verts.Count() == 0)
+				{
+					rkit::log::Error("Submodel has no verts");
+					return rkit::ResultCode::kDataError;
+				}
+
 				data::MDAModelSubModel outSubModel = {};
 				outSubModel.m_materialID = static_cast<uint8_t>(textureIndex);
 				outSubModel.m_numTris = static_cast<uint32_t>(subModel.m_tris.Count());
-				outSubModel.m_numVerts = static_cast<uint16_t>(subModel.m_verts.Count());
+				outSubModel.m_numVertsMinusOne = static_cast<uint16_t>(subModel.m_verts.Count() - 1);
 
-				RKIT_CHECK(outFile->WriteAll(&outSubModel, sizeof(outSubModel)));
+				RKIT_CHECK(outFile->WriteOneBinary(outSubModel));
 			}
 		}
 
@@ -1897,7 +3149,7 @@ namespace anox { namespace buildsystem
 		{
 			for (const UncompiledMDASubmodel &subModel : triList.m_submodels)
 			{
-				RKIT_CHECK(outFile->WriteAll(subModel.m_tris.GetBuffer(), sizeof(subModel.m_tris[0]) * subModel.m_tris.Count()));
+				RKIT_CHECK(outFile->WriteAllSpan(subModel.m_tris.ToSpan()));
 			}
 		}
 
@@ -1906,15 +3158,15 @@ namespace anox { namespace buildsystem
 		{
 			for (const UncompiledMDASubmodel &subModel : triList.m_submodels)
 			{
-				RKIT_CHECK(outFile->WriteAll(subModel.m_verts.GetBuffer(), sizeof(subModel.m_verts[0]) * subModel.m_verts.Count()));
+				RKIT_CHECK(outFile->WriteAllSpan(subModel.m_verts.ToSpan()));
 			}
 		}
 
 		// Write points
-		RKIT_CHECK(outFile->WriteAll(points.GetBuffer(), sizeof(points[0]) * points.Count()));
+		RKIT_CHECK(outFile->WriteAllSpan(points.ToSpan()));
 
 		// Write vert morphs
-		RKIT_CHECK(outFile->WriteAll(compiledVertMorphs.GetBuffer(), sizeof(compiledVertMorphs[0]) * compiledVertMorphs.Count()));
+		RKIT_CHECK(outFile->WriteAllSpan(compiledVertMorphs.ToSpan()));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -2019,12 +3271,18 @@ namespace anox { namespace buildsystem
 		float f = 0.f;
 		memcpy(&f, &floatBits, 4);
 
-		if (!(f >= 0.f))
-			f = 0.f;
-		else if (!(f <= 1.0f))
-			f = 1.0f;
+		const float scale = 16384.0f;
+		const float bias = 32768.0f;
+		const float maxValue = 65535.0f;
 
-		return static_cast<uint16_t>(floorf((f + 0.5f) * 65535.0f));
+		float scaledF = f * scale + bias;
+
+		if (!(scaledF >= 0.f))
+			scaledF = 0.f;
+		else if (!(scaledF <= maxValue))
+			scaledF = maxValue;
+
+		return static_cast<uint16_t>(floorf(scaledF + 0.5f));
 	}
 
 	uint32_t AnoxMD2Compiler::GetVersion() const
@@ -2050,5 +3308,10 @@ namespace anox { namespace buildsystem
 	rkit::Result AnoxMD2CompilerBase::Create(rkit::UniquePtr<AnoxMD2CompilerBase> &outCompiler)
 	{
 		return rkit::New<AnoxMD2Compiler>(outCompiler);
+	}
+
+	rkit::Result AnoxCTCCompilerBase::Create(rkit::UniquePtr<AnoxCTCCompilerBase> &outCompiler)
+	{
+		return rkit::New<AnoxCTCCompiler>(outCompiler);
 	}
 } }

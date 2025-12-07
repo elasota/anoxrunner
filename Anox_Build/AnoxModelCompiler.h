@@ -7,6 +7,7 @@ namespace anox { namespace buildsystem
 {
 	static const uint32_t kMD2ModelNodeID = RKIT_FOURCC('A', 'M', 'D', '2');
 	static const uint32_t kMDAModelNodeID = RKIT_FOURCC('A', 'M', 'D', 'A');
+	static const uint32_t kCTCModelNodeID = RKIT_FOURCC('A', 'C', 'T', 'C');
 
 	class AnoxMDACompilerBase : public rkit::buildsystem::IDependencyNodeCompiler
 	{
@@ -22,5 +23,13 @@ namespace anox { namespace buildsystem
 		static rkit::Result ConstructOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier);
 
 		static rkit::Result Create(rkit::UniquePtr<AnoxMD2CompilerBase> &outCompiler);
+	};
+
+	class AnoxCTCCompilerBase : public rkit::buildsystem::IDependencyNodeCompiler
+	{
+	public:
+		static rkit::Result ConstructOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier);
+
+		static rkit::Result Create(rkit::UniquePtr<AnoxCTCCompilerBase> &outCompiler);
 	};
 } }

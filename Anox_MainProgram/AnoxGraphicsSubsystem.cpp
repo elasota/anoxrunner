@@ -61,7 +61,7 @@
 #include "rkit/Core/Path.h"
 #include "rkit/Core/RefCounted.h"
 #include "rkit/Core/Result.h"
-#include "rkit/Core/StaticBoolVector.h"
+#include "rkit/Core/StaticBoolArray.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/UniquePtr.h"
@@ -2659,7 +2659,7 @@ namespace anox
 		}
 
 
-		rkit::StaticBoolVector<static_cast<size_t>(rkit::render::CommandQueueType::kCount)> cmdQueueReset;
+		rkit::StaticBoolArray<static_cast<size_t>(rkit::render::CommandQueueType::kCount)> cmdQueueReset;
 
 		for (size_t logicalQueueTypeInt = 0; logicalQueueTypeInt < kNumLogicalQueueTypes; logicalQueueTypeInt++)
 		{

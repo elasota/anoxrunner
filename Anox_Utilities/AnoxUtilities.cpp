@@ -4,7 +4,7 @@
 
 #include "anox/AnoxModule.h"
 #include "anox/AFSFormat.h"
-#include "anox/UtilitiesDriver.h"
+#include "anox/AnoxUtilitiesDriver.h"
 
 #include "rkit/Core/DriverModuleStub.h"
 #include "rkit/Core/UtilitiesDriver.h"

@@ -11,6 +11,9 @@ namespace rkit
 	template<class T>
 	class UniquePtr;
 
+	template<class T>
+	class Span;
+
 	struct IBaseStream
 	{
 		virtual ~IBaseStream() {}
@@ -22,6 +25,12 @@ namespace rkit
 
 		virtual Result ReadPartial(void *data, size_t count, size_t &outCountRead) = 0;
 		Result ReadAll(void *data, size_t count);
+
+		template<class T>
+		Result ReadOneBinary(T &object);
+
+		template<class T>
+		Result ReadAllSpan(const rkit::Span<T> &span);
 	};
 
 	struct IWriteStream : public virtual IBaseStream
@@ -30,6 +39,12 @@ namespace rkit
 
 		virtual Result WritePartial(const void *data, size_t count, size_t &outCountWritten) = 0;
 		Result WriteAll(const void *data, size_t count);
+
+		template<class T>
+		Result WriteOneBinary(const T &object);
+
+		template<class T>
+		Result WriteAllSpan(const rkit::Span<T> &span);
 
 		virtual Result Flush() = 0;
 	};
@@ -90,6 +105,7 @@ namespace rkit
 }
 
 #include "Result.h"
+#include "Span.h"
 
 inline rkit::Result rkit::IReadStream::ReadAll(void *data, size_t count)
 {
@@ -111,4 +127,36 @@ inline rkit::Result rkit::IWriteStream::WriteAll(const void *data, size_t count)
 		return ResultCode::kIOReadError;
 
 	return ResultCode::kOK;
+}
+
+
+template<class T>
+inline rkit::Result rkit::IWriteStream::WriteOneBinary(const T &object)
+{
+	return WriteAll(&object, sizeof(T));
+}
+
+template<class T>
+rkit::Result rkit::IWriteStream::WriteAllSpan(const rkit::Span<T> &span)
+{
+	if (span.Count() == 0)
+		return ResultCode::kOK;
+
+	return WriteAll(span.Ptr(), span.Count() * sizeof(T));
+}
+
+template<class T>
+inline rkit::Result rkit::IReadStream::ReadOneBinary(T &object)
+{
+	return this->ReadAll(&object, sizeof(T));
+}
+
+
+template<class T>
+inline rkit::Result rkit::IReadStream::ReadAllSpan(const rkit::Span<T> &span)
+{
+	if (span.Count() == 0)
+		return rkit::ResultCode::kOK;
+
+	return this->ReadAll(span.Ptr(), span.Count() * sizeof(T));
 }

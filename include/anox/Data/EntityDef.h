@@ -3,6 +3,8 @@
 #include "rkit/Core/Endian.h"
 #include "rkit/Core/FourCC.h"
 
+#include "rkit/Data/ContentID.h"
+
 namespace anox { namespace data {
 	struct EntityClassDef;
 
@@ -62,26 +64,6 @@ namespace anox { namespace data {
 		size_t m_numBadClassDefs;
 	};
 
-	enum class UserEntityType
-	{
-		kPlayerChar,
-		kChar,
-		kCharFly,
-		kNoClip,
-		kGeneral,
-		kTrashSpawn,
-		kBugSpawn,
-		kLottoBot,
-		kPickup,
-		kScavenger,
-		kEffect,
-		kContainer,
-		kLightSource,
-		kSunPoint,
-
-		kCount,
-	};
-
 	enum class UserEntityFlags
 	{
 		kSolid = (1 << 0),
@@ -101,11 +83,16 @@ namespace anox { namespace data {
 
 	struct UserEntityDef
 	{
-		rkit::endian::LittleUInt16_t m_classNameStringID;
-		rkit::endian::LittleUInt16_t m_modelPathStringID;
+		static const uint32_t kExpectedMagic = RKIT_FOURCC('U', 'E', 'D', 'F');
+		static const uint32_t kExpectedVersion = 1;
+
+		rkit::endian::BigUInt32_t m_magic;
+		rkit::endian::LittleUInt32_t m_version;
+
+		rkit::data::ContentID m_modelContentID;
 		rkit::endian::BigUInt32_t m_modelCode;
 		rkit::endian::LittleFloat32_t m_scale[3];
-		uint8_t m_userEntityType = 0;
+		rkit::endian::LittleUInt32_t m_entityType;
 		uint8_t m_shadowType = 0;
 		rkit::endian::LittleFloat32_t m_bboxMin[3];
 		rkit::endian::LittleFloat32_t m_bboxMax[3];
@@ -116,21 +103,6 @@ namespace anox { namespace data {
 		rkit::endian::LittleUInt32_t m_targetSequenceID;
 		rkit::endian::LittleUInt32_t m_miscValue;
 		rkit::endian::LittleUInt32_t m_startSequenceID;
-		rkit::endian::LittleUInt16_t m_descriptionStringID;
-	};
-
-	struct UserEntityDefHeader
-	{
-		static const uint32_t kExpectedMagic = RKIT_FOURCC('U', 'E', 'D', 'F');
-		static const uint32_t kExpectedVersion = 1;
-
-		rkit::endian::BigUInt32_t m_magic;
-		rkit::endian::LittleUInt32_t m_version;
-
-		rkit::endian::LittleUInt16_t m_numStrings;
-		rkit::endian::LittleUInt32_t m_numEDefs;
-
-		// uint8_t m_stringLengthsMinusOne[m_numStrings]
-		// UserEntityDef m_eDefs
+		uint8_t m_descriptionStringLength = 0;
 	};
 } }
