@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{7da52f69-ec26-4144-b5e6-ead1b85cdf38}</ProjectGuid>
-    <RootNamespace>AnoxMainProgram</RootNamespace>
+    <ProjectGuid>{27d9a7c8-71c2-4e71-ba3b-d1718da6d743}</ProjectGuid>
+    <RootNamespace>RKitCoreLib</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -59,23 +59,27 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\Debug.props" />
     <Import Project="..\Common.props" />
+    <Import Project="..\Debug.props" />
+    <Import Project="..\CoreLib_Internal.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\Release.props" />
     <Import Project="..\Common.props" />
+    <Import Project="..\Release.props" />
+    <Import Project="..\CoreLib_Internal.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\Debug.props" />
     <Import Project="..\Common.props" />
+    <Import Project="..\Debug.props" />
+    <Import Project="..\CoreLib_Internal.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\Release.props" />
     <Import Project="..\Common.props" />
+    <Import Project="..\Release.props" />
+    <Import Project="..\CoreLib_Internal.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -101,8 +105,6 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
@@ -129,74 +131,15 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="AnoxBSPModelResource.cpp" />
-    <ClCompile Include="AnoxCaptureHarness.cpp" />
-    <ClCompile Include="AnoxCommandRegistry.cpp" />
-    <ClCompile Include="AnoxCommandStack.cpp" />
-    <ClCompile Include="AnoxConfigurationSaver.cpp" />
-    <ClCompile Include="AnoxConfigurationState.cpp" />
-    <ClCompile Include="AnoxFileResource.cpp" />
-    <ClCompile Include="AnoxGameFileSystem.cpp" />
-    <ClCompile Include="AnoxFrameDrawer.cpp" />
-    <ClCompile Include="AnoxGame.cpp" />
-    <ClCompile Include="AnoxGameLogic.cpp" />
-    <ClCompile Include="AnoxGlobalVars.cpp" />
-    <ClCompile Include="AnoxGraphicsSettings.cpp" />
-    <ClCompile Include="AnoxGraphicsSubsystem.cpp" />
-    <ClCompile Include="AnoxGraphicTimelinedResource.cpp" />
-    <ClCompile Include="AnoxKeybindManager.cpp" />
-    <ClCompile Include="AnoxLoadEntireFileJob.cpp" />
-    <ClCompile Include="AnoxMain.cpp" />
-    <ClCompile Include="AnoxMaterialResource.cpp" />
-    <ClCompile Include="AnoxRenderedWindow.cpp" />
-    <ClCompile Include="AnoxResourceManager.cpp" />
-    <ClCompile Include="AnoxTextureResource.cpp" />
+    <ClCompile Include="MathFunctions.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\include\anox\AnoxGraphicsSubsystem.h" />
-    <ClInclude Include="..\include\anox\Data\BSPModel.h" />
-    <ClInclude Include="..\include\anox\Data\CompressedNormal.h" />
-    <ClInclude Include="..\include\anox\Data\CompressedQuat.h" />
-    <ClInclude Include="..\include\anox\Data\EntityDef.h" />
-    <ClInclude Include="..\include\anox\Data\MaterialData.h" />
-    <ClInclude Include="..\include\anox\Data\MaterialResourceType.h" />
-    <ClInclude Include="..\include\anox\Data\MDAModel.h" />
-    <ClInclude Include="AnoxBSPModelResource.h" />
-    <ClInclude Include="AnoxCaptureHarness.h" />
-    <ClInclude Include="AnoxCommandRegistry.h" />
-    <ClInclude Include="AnoxConfigurationSaver.h" />
-    <ClInclude Include="AnoxFileResource.h" />
-    <ClInclude Include="AnoxFrameDrawer.h" />
-    <ClInclude Include="AnoxGameFileSystem.h" />
-    <ClInclude Include="AnoxGameLogic.h" />
-    <ClInclude Include="AnoxGraphicsJob.h" />
-    <ClInclude Include="AnoxGraphicTimelinedResource.h" />
-    <ClInclude Include="AnoxKeybindManager.h" />
-    <ClInclude Include="AnoxLoadEntireFileJob.h" />
-    <ClInclude Include="AnoxMaterialResource.h" />
-    <ClInclude Include="AnoxPeriodicResources.h" />
-    <ClInclude Include="AnoxRecordJobRunner.h" />
-    <ClInclude Include="AnoxRenderedWindow.h" />
-    <ClInclude Include="AnoxGraphicsResourceManager.h" />
-    <ClInclude Include="AnoxGraphicsSettings.h" />
-    <ClInclude Include="AnoxResourceManager.h" />
-    <ClInclude Include="AnoxTexture.h" />
-    <ClInclude Include="AnoxTextureResource.h" />
-    <ClInclude Include="GraphicsMemoryAllocator.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\include\anox\Data\EntityDefs.inl" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\RKit_CoreLib\RKit_CoreLib.vcxproj">
-      <Project>{27d9a7c8-71c2-4e71-ba3b-d1718da6d743}</Project>
-    </ProjectReference>
+    <ClInclude Include="..\include\rkit\Core\CoreLib.h" />
+    <ClInclude Include="..\include\rkit\Math\Mat.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

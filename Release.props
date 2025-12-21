@@ -5,7 +5,7 @@
   <PropertyGroup />
   <ItemDefinitionGroup>
     <ClCompile>
-      <PreprocessorDefinitions>RKIT_IS_DEBUG=0;RKIT_IS_FINAL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>RKIT_IS_DEBUG=0;RKIT_IS_FINAL=0;RKIT_CORELIB_DLL=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup />

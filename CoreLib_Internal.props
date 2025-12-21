@@ -5,9 +5,7 @@
   <PropertyGroup />
   <ItemDefinitionGroup>
     <ClCompile>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <PreprocessorDefinitions>RKIT_IS_DEBUG=1;RKIT_IS_FINAL=0;_CRTDBG_MAP_ALLOC=1;RKIT_CORELIB_DLL=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <SupportJustMyCode>false</SupportJustMyCode>
+      <PreprocessorDefinitions>RKIT_CORELIB_INTERNAL=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup />

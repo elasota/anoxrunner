@@ -4,7 +4,7 @@ namespace rkit { namespace math {
 	template<class TComponent, size_t TSize>
 	class Vec;
 
-	typedef Vec<float, 3> Vec2;
+	typedef Vec<float, 2> Vec2;
 	typedef Vec<float, 3> Vec3;
 	typedef Vec<float, 4> Vec4;
 

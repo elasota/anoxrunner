@@ -31,8 +31,16 @@
 #pragma warning(error:4834)	// [[nodiscard]] discarded
 #endif
 
-
 #define RKIT_PLATFORM_WIN32	1
+
+
+#if RKIT_PLATFORM == RKIT_PLATFORM_WIN32
+#define RKIT_DLLEXPORT_API __declspec(dllexport)
+#define RKIT_DLLIMPORT_API __declspec(dllimport)
+#else
+#define RKIT_DLLEXPORT_API
+#define RKIT_DLLIMPORT_API
+#endif
 
 #if RKIT_IS_DEBUG
 	#define RKIT_USE_CLASS_RESULT 1

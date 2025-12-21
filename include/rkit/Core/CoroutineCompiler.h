@@ -881,7 +881,10 @@ namespace rkit { namespace coro
 #define CORO_LOCALS	\
 	Params &params = static_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame)->m_params;\
 	Locals &locals = static_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame)->m_locals;\
-	ClassInstance *self = static_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame)->m_classInstance;
+	ClassInstance *self = static_cast<CoroStackFrame *>(CORO_INTERNAL_coroStackFrame)->m_classInstance;\
+	(void)params;\
+	(void)locals;\
+	(void)self;
 
 #define CORO_FUNCTION_DEF	\
 	static ::rkit::coro::CodePtr CoroFunction(::rkit::coro::Context *CORO_INTERNAL_coroContext, ::rkit::coro::StackFrameBase *CORO_INTERNAL_coroStackFrame)\

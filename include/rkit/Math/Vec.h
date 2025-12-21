@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rkit/Core/Platform.h"
+#include "rkit/Core/IntList.h"
 
 #include "VecProto.h"
 
@@ -10,14 +11,58 @@ namespace rkit
 {
 	template<size_t TSize>
 	class StaticBoolArray;
+
+	template<class T>
+	class Span;
 }
 
 namespace rkit { namespace math { namespace priv {
+	template<class TComponent, size_t TSize>
+	struct VecStorageResolver;
+
+	template<class TComponent, size_t TRows, size_t TCols>
+	struct MatrixTransposer;
+
+	template<class TComponent, size_t TSize>
+	class VecStorage;
+
+	template<class TComponent, size_t TSize, size_t TOtherSize>
+	struct DotProductCollater
+	{
+		static Vec<TComponent, TSize> Collate(const Vec<TComponent, TOtherSize> *values);
+	};
+
 	template<class TComponent, size_t TSize, size_t TIndex>
 	class VecStorageSwizzleReader
 	{
 	public:
 		static const TComponent &Get(const TComponent(&array)[TSize]);
+	};
+
+	template<class TCandidate>
+	struct VecUnroller
+	{
+		static constexpr size_t kSize = 1;
+		static TCandidate Unroll(const TCandidate &candidate, size_t index);
+	};
+
+	template<class TVecComponent, size_t TSize>
+	struct VecUnroller<Vec<TVecComponent, TSize>>
+	{
+		static constexpr size_t kSize = TSize;
+		static TVecComponent Unroll(const Vec<TVecComponent, TSize> &candidate, size_t index);
+	};
+
+	template<class TCandidate>
+	struct VecUnroller<const TCandidate>
+		: public VecUnroller<TCandidate>
+	{
+	};
+
+	template<class TCandidate>
+	struct VecUnroller<TCandidate &>
+		: public VecUnroller<TCandidate>
+	{
 	};
 
 	template<size_t... TIndexes>
@@ -37,8 +82,33 @@ namespace rkit { namespace math { namespace priv {
 		static constexpr size_t kCount = IndexCounter<TMore...>::kCount + 1u;
 	};
 
+	template<size_t... TIndexes>
+	struct IndexChecker
+	{
+		template<size_t TSize>
+		static void Check();
+	};
+
+	template<size_t TFirstIndex, size_t... TMoreIndexes>
+	struct IndexChecker<TFirstIndex, TMoreIndexes...>
+	{
+		template<size_t TSize>
+		static void Check();
+	};
+
 	enum class VecStorageExplicitParamListTag
 	{
+	};
+
+	template<class TComponent, size_t TSize, class TIndexList>
+	struct VecStorageLoader
+	{
+	};
+
+	template<class TComponent, size_t TSize, size_t... TIndexes>
+	struct VecStorageLoader<TComponent, TSize, IntList<size_t, TIndexes...>>
+	{
+		static VecStorage<TComponent, TSize> Load();
 	};
 
 	template<class TComponent, size_t TSize>
@@ -51,10 +121,14 @@ namespace rkit { namespace math { namespace priv {
 		Storage_t &ModifyStorage();
 
 		VecStorage FromArray(const TComponent(&array)[TSize]);
+		VecStorage FromPtr(const TComponent *ptr);
 
 	private:
 		template<class TOtherComponent, size_t TOtherSize>
 		friend class VecStorage;
+
+		template<class TComponent, size_t TSize, class TIndexList>
+		friend struct VecStorageLoader;
 
 		template<class TPred>
 		bool CompareWithPred(const VecStorage<TComponent, TSize> &other, const TPred &pred) const;
@@ -63,6 +137,9 @@ namespace rkit { namespace math { namespace priv {
 		StaticBoolArray<TSize> MultiCompareWithPred(const VecStorage<TComponent, TSize> &other, const TPred &pred) const;
 
 		explicit VecStorage(const Storage_t &storage);
+
+		template<bool... TParams>
+		VecStorage InternalNegateElementsImpl() const;
 
 	protected:
 		VecStorage();
@@ -87,27 +164,146 @@ namespace rkit { namespace math { namespace priv {
 		StaticBoolArray<TSize> InternalMultiGreaterOrEqual(const VecStorage<TComponent, TSize> &other) const;
 		StaticBoolArray<TSize> InternalMultiLessOrEqual(const VecStorage<TComponent, TSize> &other) const;
 
+		VecStorage InternalDotProduct(const VecStorage<TComponent, TSize> &other) const;
+
 		template<size_t TIndexCount, size_t... TIndexes>
-		VecStorage<TComponent, TIndexCount> InternalSwizzle() const;
+		typename VecStorageResolver<TComponent, TIndexCount>::Type_t InternalSwizzle() const;
+
+		template<bool... TParam>
+		VecStorage InternalNegateElements() const
+		{
+			static_assert(IntListSize<bool, TParam...>::kValue == TSize, "Wrong number of bool parameters");
+			return this->InternalNegateElementsImpl<TParam...>();
+		}
+
+		template<size_t TIndex>
+		VecStorage InternalBroadcast() const;
 
 		Storage_t m_v[TSize];
 	};
 
+	template<class TComponent, size_t TSize>
+	struct VecStorageResolver
+	{
+		typedef VecStorage<TComponent, TSize> Type_t;
+	};
+
+	template<class TComponent, size_t TSize, class TIndexList>
+	struct VecIndexListSwizzler
+	{
+	};
+
+	template<class TComponent, size_t TSize, size_t... TIndexes>
+	struct VecIndexListSwizzler<TComponent, TSize, IntList<size_t, TIndexes...>>
+	{
+		static Vec<TComponent, IntListSize<IntList<size_t, TIndexes...>>::kValue> Swizzle(const Vec<TComponent, TSize> &vec);
+	};
+
 #if RKIT_PLATFORM_ARCH_HAVE_SSE
-	template<size_t TOutputCount, size_t... TIndexes>
+	template<size_t TComponentCount>
+	class VecSSEFloatStorage;
+
+	template<bool TUse, size_t TSize, size_t TOtherSize>
+	struct M128DotProductCollater
+	{
+	};
+
+	template<size_t TSize, size_t TOtherSize>
+	struct M128DotProductCollater<true, TSize, TOtherSize>
+	{
+		static Vec<float, TSize> Collate(const Vec<float, TOtherSize> *values);
+	};
+
+	template<size_t TSize, size_t TOtherSize>
+	struct M128DotProductCollater<false, TSize, TOtherSize>
+		: public DotProductCollater<float, TSize, TOtherSize>
+	{
+	};
+
+	template<bool TIsSequential, size_t TOutputCount, size_t... TIndexes>
 	struct M128StaticIndexSwizzler
 	{
 		static VecStorage<float, TOutputCount> Read(__m128 src);
 	};
 
-	template<size_t T0, size_t T1, size_t T2, size_t T3>
-	struct M128StaticIndexSwizzler<4, T0, T1, T2, T3>
+	template<size_t TOutputCount, size_t... TIndexes>
+	struct M128StaticIndexSwizzler<true, TOutputCount, TIndexes...>
 	{
-		static VecStorage<float, 4> Read(__m128 src);
+		static VecSSEFloatStorage<TOutputCount> Read(__m128 src);
+	};
+
+	template<size_t T0, size_t T1>
+	struct M128StaticIndexSwizzler<false, 2, T0, T1>
+	{
+		static VecSSEFloatStorage<2> Read(__m128 src);
+	};
+
+	template<size_t T0, size_t T1, size_t T2>
+	struct M128StaticIndexSwizzler<false, 3, T0, T1, T2>
+	{
+		static VecSSEFloatStorage<3> Read(__m128 src);
+	};
+
+	template<size_t T0, size_t T1, size_t T2, size_t T3>
+	struct M128StaticIndexSwizzler<false, 4, T0, T1, T2, T3>
+	{
+		static VecSSEFloatStorage<4> Read(__m128 src);
+	};
+
+	template<size_t TSize>
+	struct M128DotProductCalculator
+	{
 	};
 
 	template<>
-	class VecStorage<float, 4>
+	struct M128DotProductCalculator<2>
+	{
+		static float Compute(__m128 a, __m128 b);
+	};
+
+	template<>
+	struct M128DotProductCalculator<3>
+	{
+		static float Compute(__m128 a, __m128 b);
+	};
+
+	template<>
+	struct M128DotProductCalculator<4>
+	{
+		static float Compute(__m128 a, __m128 b);
+	};
+
+	template<size_t TSize>
+	struct M128FloatLoader
+	{
+	};
+
+	template<>
+	struct M128FloatLoader<2>
+	{
+		static __m128 Load(const float *f);
+	};
+
+	template<>
+	struct M128FloatLoader<3>
+	{
+		static __m128 Load(const float *f);
+	};
+
+	template<>
+	struct M128FloatLoader<4>
+	{
+		static __m128 Load(const float *f);
+	};
+
+	template<uint32_t T0, uint32_t T1, uint32_t T2, uint32_t T3>
+	struct M128FloatBitsConstant
+	{
+		static __m128 Create();
+	};
+
+	template<size_t TComponentCount>
+	class VecSSEFloatStorage
 	{
 	public:
 		typedef __m128 Storage_t;
@@ -115,153 +311,135 @@ namespace rkit { namespace math { namespace priv {
 		const __m128 &GetStorage() const;
 		__m128 &ModifyStorage();
 
-		VecStorage FromArray(const float(&array)[4]);
+		VecSSEFloatStorage<TComponentCount> FromArray(const float(&array)[TComponentCount]);
 
 	private:
 		template<class TOtherComponent, size_t TOtherSize>
 		friend class VecStorage;
 
-		template<size_t TOutputCount, size_t... TIndexes>
+		template<bool TIsSequential, size_t TOutputCount, size_t... TIndexes>
 		friend struct M128StaticIndexSwizzler;
 
-		static StaticBoolArray<4> OpResultToBits(__m128 opResult);
+		template<class TOtherComponent, size_t TRows, size_t TCols>
+		friend struct MatrixTransposer;
+
+		static StaticBoolArray<TComponentCount> OpResultToBits(__m128 opResult);
 		static bool MaskedOpAll(__m128 opResult);
 
-		explicit VecStorage(__m128 storage);
+		explicit VecSSEFloatStorage(__m128 storage);
+
+		template<bool T0, bool T1, bool T2, bool T3>
+		VecSSEFloatStorage<TComponentCount> InternalNegateElements4() const;
 
 	protected:
-		VecStorage();
-		VecStorage(const VecStorage<float, 4> &other) = default;
-		VecStorage(VecStorageExplicitParamListTag, float x, float y, float z, float w);
+		VecSSEFloatStorage();
+		VecSSEFloatStorage(const VecSSEFloatStorage<TComponentCount> &other) = default;
 
-		VecStorage &operator=(const VecStorage<float, 4> &other) = default;
+		VecSSEFloatStorage(VecStorageExplicitParamListTag, float x, float y);
+		VecSSEFloatStorage(VecStorageExplicitParamListTag, float x, float y, float z);
+		VecSSEFloatStorage(VecStorageExplicitParamListTag, float x, float y, float z, float w);
+
+		VecSSEFloatStorage<TComponentCount> &operator=(const VecSSEFloatStorage<TComponentCount> &other) = default;
 
 		const float &InternalGetAt(size_t index) const;
 		float &InternalModifyAt(size_t index);
 		void InternalSetAt(size_t index, float value);
 
-		bool InternalEqual(const VecStorage<float, 4> &other) const;
-		bool InternalNotEqual(const VecStorage<float, 4> &other) const;
+		bool InternalEqual(const VecSSEFloatStorage<TComponentCount> &other) const;
+		bool InternalNotEqual(const VecSSEFloatStorage<TComponentCount> &other) const;
 
-		StaticBoolArray<4> InternalMultiEqual(const VecStorage<float, 4> &other) const;
-		StaticBoolArray<4> InternalMultiNotEqual(const VecStorage<float, 4> &other) const;
-		StaticBoolArray<4> InternalMultiGreater(const VecStorage<float, 4> &other) const;
-		StaticBoolArray<4> InternalMultiLess(const VecStorage<float, 4> &other) const;
-		StaticBoolArray<4> InternalMultiGreaterOrEqual(const VecStorage<float, 4> &other) const;
-		StaticBoolArray<4> InternalMultiLessOrEqual(const VecStorage<float, 4> &other) const;
+		VecSSEFloatStorage<TComponentCount> InternalAddScalar(float value) const;
+		VecSSEFloatStorage<TComponentCount> InternalSubScalar(float value) const;
+		VecSSEFloatStorage<TComponentCount> InternalMulScalar(float value) const;
+		VecSSEFloatStorage<TComponentCount> InternalDivScalar(float value) const;
+
+		VecSSEFloatStorage<TComponentCount> InternalAddVector(const VecSSEFloatStorage<TComponentCount> &other) const;
+		VecSSEFloatStorage<TComponentCount> InternalSubVector(const VecSSEFloatStorage<TComponentCount> &other) const;
+		VecSSEFloatStorage<TComponentCount> InternalMulVector(const VecSSEFloatStorage<TComponentCount> &other) const;
+		VecSSEFloatStorage<TComponentCount> InternalDivVector(const VecSSEFloatStorage<TComponentCount> &other) const;
+
+		StaticBoolArray<TComponentCount> InternalMultiEqual(const VecSSEFloatStorage<TComponentCount> &other) const;
+		StaticBoolArray<TComponentCount> InternalMultiNotEqual(const VecSSEFloatStorage<TComponentCount> &other) const;
+		StaticBoolArray<TComponentCount> InternalMultiGreater(const VecSSEFloatStorage<TComponentCount> &other) const;
+		StaticBoolArray<TComponentCount> InternalMultiLess(const VecSSEFloatStorage<TComponentCount> &other) const;
+		StaticBoolArray<TComponentCount> InternalMultiGreaterOrEqual(const VecSSEFloatStorage<TComponentCount> &other) const;
+		StaticBoolArray<TComponentCount> InternalMultiLessOrEqual(const VecSSEFloatStorage<TComponentCount> &other) const;
+
+		float InternalDotProduct(const VecSSEFloatStorage<TComponentCount> &other) const;
 
 		template<size_t TIndexCount, size_t... TIndexes>
-		VecStorage<float, TIndexCount> InternalSwizzle() const;
+		typename VecStorageResolver<float, TIndexCount>::Type_t InternalSwizzle() const;
+
+		template<bool T0>
+		VecSSEFloatStorage<TComponentCount> InternalNegateElements() const
+		{
+			static_assert(TComponentCount == 1, "Wrong number of bool parameters");
+			return this->InternalNegateElements4<T0, false, false, false>();
+		}
+
+		template<bool T0, bool T1>
+		VecSSEFloatStorage<TComponentCount> InternalNegateElements() const
+		{
+			static_assert(TComponentCount == 2, "Wrong number of bool parameters");
+			return this->InternalNegateElements4<T0, T1, false, false>();
+		}
+
+		template<bool T0, bool T1, bool T2>
+		VecSSEFloatStorage<TComponentCount> InternalNegateElements() const
+		{
+			static_assert(TComponentCount == 3, "Wrong number of bool parameters");
+			return this->InternalNegateElements4<T0, T1, T2, false>();
+		}
+
+		template<bool T0, bool T1, bool T2, bool T3>
+		VecSSEFloatStorage<TComponentCount> InternalNegateElements() const
+		{
+			static_assert(TComponentCount == 4, "Wrong number of bool parameters");
+			return this->InternalNegateElements4<T0, T1, T2, T3>();
+		}
+
+		template<size_t TIndex>
+		VecSSEFloatStorage<TComponentCount> InternalBroadcast() const;
 
 		__m128 m_v;
+	};
+
+	template<>
+	struct VecStorageResolver<float, 4>
+	{
+		typedef VecSSEFloatStorage<4> Type_t;
+	};
+
+	template<>
+	struct VecStorageResolver<float, 3>
+	{
+		typedef VecSSEFloatStorage<3> Type_t;
+	};
+
+	template<>
+	struct VecStorageResolver<float, 2>
+	{
+		typedef VecSSEFloatStorage<2> Type_t;
 	};
 #endif
 } } }
 
 namespace rkit { namespace math {
 	template<class TComponent, size_t TSize>
-	class VecBase : public priv::VecStorage<TComponent, TSize>
+	class Vec final : public priv::VecStorageResolver<TComponent, TSize>::Type_t
 	{
 	public:
-		VecBase() = default;
-		VecBase(const VecBase &other) = default;
+		template<class TOtherComponent, size_t TOtherSize>
+		friend class Vec;
 
-		VecBase &operator=(const VecBase &other) = default;
+		template<class TOtherComponent, size_t TOtherRows, size_t TOtherCols>
+		friend class Matrix;
 
-		TComponent &operator[](size_t index);
-		const TComponent &operator[](size_t index) const;
+		template<class TOtherComponent, size_t TOtherRows, size_t TOtherCols>
+		friend struct priv::MatrixTransposer;
 
-		template<size_t TIndex>
-		const TComponent &GetAt() const
-		{
-			static_assert(TIndex < TSize, "Index out of range");
-			return this->InternalGetAt(TIndex);
-		}
+		typedef typename priv::VecStorageResolver<TComponent, TSize>::Type_t StorageType_t;
 
-		template<size_t TIndex>
-		TComponent &ModifyAt()
-		{
-			static_assert(TIndex < TSize, "Index out of range");
-			return this->InternalModifyAt(TIndex);
-		}
-
-		// X
-		template<typename = typename std::enable_if<(TSize >= 1)>::type>
-		const TComponent& GetX() const { return this->InternalGetAt(0); }
-
-		template<typename = typename std::enable_if<(TSize >= 1)>::type>
-		TComponent& ModifyX() { return this->InternalModifyAt(0); }
-
-		template<typename = typename std::enable_if<(TSize >= 1)>::type>
-		void SetX(const TComponent &value) { return this->InternalSetAt(0, value); }
-
-		// Y
-		template<typename = typename std::enable_if<(TSize >= 2)>::type>
-		const TComponent &GetY() const { return this->InternalGetAt(1); }
-
-		template<typename = typename std::enable_if<(TSize >= 2)>::type>
-		TComponent &ModifyY() { return this->InternalModifyAt(1); }
-
-		template<typename = typename std::enable_if<(TSize >= 2)>::type>
-		void SetY(const TComponent &value) { return this->InternalSetAt(1, value); }
-
-		// Z
-		template<typename = typename std::enable_if<(TSize >= 3)>::type>
-		const TComponent &GetZ() const { return this->InternalGetAt(2); }
-
-		template<typename = typename std::enable_if<(TSize >= 3)>::type>
-		TComponent &ModifyZ() { return this->InternalModifyAt(2); }
-
-		template<typename = typename std::enable_if<(TSize >= 3)>::type>
-		void SetZ(const TComponent &value) { return this->InternalSetAt(2, value); }
-
-		// W
-		template<typename = typename std::enable_if<(TSize >= 4)>::type>
-		const TComponent &GetW() const { return this->InternalGetAt(3); }
-
-		template<typename = typename std::enable_if<(TSize >= 4)>::type>
-		TComponent &ModifyW() { return this->InternalModifyAt(3); }
-
-		template<typename = typename std::enable_if<(TSize >= 4)>::type>
-		void SetW(const TComponent &value) { return this->InternalSetAt(3, value); }
-
-		bool operator==(const VecBase<TComponent, TSize> &other) const;
-		bool operator!=(const VecBase<TComponent, TSize> &other) const;
-
-		StaticBoolArray<TSize> MultiEqual(const VecBase<TComponent, TSize> &other) const;
-		StaticBoolArray<TSize> MultiNotEqual(const VecBase<TComponent, TSize> &other) const;
-		StaticBoolArray<TSize> MultiGreater(const VecBase<TComponent, TSize> &other) const;
-		StaticBoolArray<TSize> MultiLess(const VecBase<TComponent, TSize> &other) const;
-		StaticBoolArray<TSize> MultiGreaterOrEqual(const VecBase<TComponent, TSize> &other) const;
-		StaticBoolArray<TSize> MultiLessOrEqual(const VecBase<TComponent, TSize> &other) const;
-
-	protected:
-		template<class... TParam>
-		explicit VecBase(priv::VecStorageExplicitParamListTag, const TParam&... params);
-
-		template<size_t TIndexCount, size_t... TIndexes>
-		VecBase<TComponent, TIndexCount> BaseSwizzle() const;
-
-	private:
-		explicit VecBase(const priv::VecStorage<TComponent, TSize> &other);
-
-		template<size_t TIndex>
-		static bool StaticValidateIndex2()
-		{
-			static_assert(TIndex < TSize, "Index out of range");
-			return true;
-		}
-
-		template<class... TParam>
-		static void StaticValidateIndex1(TParam...)
-		{
-		}
-	};
-
-	template<class TComponent, size_t TSize>
-	class Vec final : public VecBase<TComponent, TSize>
-	{
-	public:
 		Vec() = default;
 		Vec(const Vec<TComponent, TSize> &other) = default;
 
@@ -274,8 +452,153 @@ namespace rkit { namespace math {
 		template<size_t... TIndexes>
 		Vec<TComponent, priv::IndexCounter<TIndexes...>::kCount> Swizzle() const;
 
+		template<bool... TNegate>
+		Vec<TComponent, TSize> NegateElements() const;
+
+		template<size_t TIndex>
+		Vec<TComponent, TSize> Broadcast() const;
+
+		template<size_t TIndex, size_t TOutputSize>
+		Vec<TComponent, TOutputSize> BroadcastToSize() const;
+
+		template<size_t TIndex>
+		const TComponent &GetAt() const;
+
+		template<size_t TIndex>
+		TComponent &ModifyAt();
+
+		template<size_t TIndex>
+		void SetAt(const TComponent &value);
+
+		const TComponent &GetX() const { return this->GetAt<0>(); }
+		TComponent &ModifyX() { return this->ModifyAt<0>(); }
+		void SetX(const TComponent &value) { this->SetAt<0>(value); }
+
+		const TComponent &GetY() const { return this->GetAt<1>(); }
+		TComponent &ModifyY() { return this->ModifyAt<1>(); }
+		void SetY(const TComponent &value) { this->SetAt<1>(value); }
+
+		const TComponent &GetZ() const { return this->GetAt<2>(); }
+		TComponent &ModifyZ() { return this->ModifyAt<2>(); }
+		void SetZ(const TComponent &value) { this->SetAt<2>(value); }
+
+		const TComponent &GetW() const { return this->GetAt<3>(); }
+		TComponent &ModifyW() { return this->ModifyAt<3>(); }
+		void SetW(const TComponent &value) { this->SetAt<3>(value); }
+
+		TComponent &operator[](size_t index);
+		const TComponent &operator[](size_t index) const;
+
+		Vec<TComponent, TSize> operator+(TComponent value) const
+		{
+			return Vec<TComponent, TSize>(this->InternalAddScalar(value));
+		}
+
+		Vec<TComponent, TSize> operator+(const Vec<TComponent, TSize> &other) const
+		{
+			return Vec<TComponent, TSize>(this->InternalAddVector(other));
+		}
+
+		Vec<TComponent, TSize> operator-(TComponent value) const
+		{
+			return Vec<TComponent, TSize>(this->InternalSubScalar(value));
+		}
+
+		Vec<TComponent, TSize> operator-(const Vec<TComponent, TSize> &other) const
+		{
+			return Vec<TComponent, TSize>(this->InternalSubVector(other));
+		}
+
+		Vec<TComponent, TSize> operator*(TComponent value) const
+		{
+			return Vec<TComponent, TSize>(this->InternalMulScalar(value));
+		}
+
+		Vec<TComponent, TSize> operator*(const Vec<TComponent, TSize> &other) const
+		{
+			return Vec<TComponent, TSize>(this->InternalMulVector(other));
+		}
+
+		Vec<TComponent, TSize> operator/(TComponent value) const
+		{
+			return Vec<TComponent, TSize>(this->InternalDivScalar(value));
+		}
+
+		Vec<TComponent, TSize> operator/(const Vec<TComponent, TSize> &other) const
+		{
+			return Vec<TComponent, TSize>(this->InternalDivVector(other));
+		}
+
+		TComponent DotProduct(const Vec<TComponent, TSize> &other) const
+		{
+			return this->InternalDotProduct(other);
+		}
+
+		bool operator==(const Vec<TComponent, TSize> &other) const
+		{
+			return this->InternalEqual(other);
+		}
+
+		bool operator!=(const Vec<TComponent, TSize> &other) const
+		{
+			return this->InternalNotEqual(other);
+		}
+
+		StaticBoolArray<TSize> MultiEqual(const Vec<TComponent, TSize> &other) const
+		{
+			return this->InternalMultiEqual(other);
+		}
+
+		StaticBoolArray<TSize> MultiNotEqual(const Vec<TComponent, TSize> &other) const
+		{
+			return this->InternalMultiNotEqual(other);
+		}
+
+		StaticBoolArray<TSize> MultiGreater(const Vec<TComponent, TSize> &other) const
+		{
+			return this->InternalMultiGreater(other);
+		}
+
+		StaticBoolArray<TSize> MultiLess(const Vec<TComponent, TSize> &other) const
+		{
+			return this->InternalMultiLess(other);
+		}
+
+		StaticBoolArray<TSize> MultiGreaterOrEqual(const Vec<TComponent, TSize> &other) const
+		{
+			return this->InternalMultiGreaterOrEqual(other);
+		}
+
+		StaticBoolArray<TSize> MultiLessOrEqual(const Vec<TComponent, TSize> &other) const
+		{
+			return this->InternalMultiLessOrEqual(other);
+		}
+
+		TComponent GetLength() const;
+
+		Vec<TComponent, TSize> GetNormalized() const
+		{
+			return (*this) / (this->GetLength());
+		}
+
+		Vec<TComponent, TSize> GetNormalizedFast() const;
+		Vec<TComponent, TSize> GetNormalizedFastNonDeterministic() const;
+
+		static Vec<TComponent, TSize> FromSpan(const Span<const TComponent> &values);
+		static Vec<TComponent, TSize> FromArray(const TComponent (&values)[TSize]);
+		static Vec<TComponent, TSize> FromPtr(const TComponent *values);
+
+		template<size_t TOtherSize>
+		static Vec<TComponent, TSize> FromMultiDotProductSpan(const Span<const Vec<TComponent, TOtherSize>> &values);
+
+		template<size_t TOtherSize>
+		static Vec<TComponent, TSize> FromMultiDotProductArray(const Vec<TComponent, TOtherSize>(&otherArray)[TSize]);
+
+		template<size_t TOtherSize>
+		static Vec<TComponent, TSize> FromMultiDotProductPtr(const Vec<TComponent, TOtherSize> *values);
+
 	private:
-		explicit Vec(const VecBase<TComponent, TSize> &base);
+		explicit Vec(const StorageType_t &storage);
 	};
 } }
 
@@ -283,110 +606,77 @@ namespace rkit { namespace math {
 #include "rkit/Core/StaticBoolArray.h"
 #include "rkit/Core/Algorithm.h"
 #include "rkit/Core/TypeList.h"
+#include "rkit/Math/Functions.h"
+
+#include <string.h>
 
 namespace rkit { namespace math {
 	template<class TComponent, size_t TSize>
-	TComponent &VecBase<TComponent, TSize>::operator[](size_t index)
-	{
-		RKIT_ASSERT(index < TSize);
-		return this->InternalModifyAt(index);
-	}
-
-	template<class TComponent, size_t TSize>
-	const TComponent &VecBase<TComponent, TSize>::operator[](size_t index) const
-	{
-		RKIT_ASSERT(index < TSize);
-		return this->InternalGetAt(index);
-	}
-
-
-	template<class TComponent, size_t TSize>
-	bool VecBase<TComponent, TSize>::operator==(const VecBase<TComponent, TSize> &other) const
-	{
-		return this->InternalEqual(other);
-	}
-
-	template<class TComponent, size_t TSize>
-	bool VecBase<TComponent, TSize>::operator!=(const VecBase<TComponent, TSize> &other) const
-	{
-		return this->InternalNotEqual(other);
-	}
-
-	template<class TComponent, size_t TSize>
-	StaticBoolArray<TSize> VecBase<TComponent, TSize>::MultiEqual(const VecBase<TComponent, TSize> &other) const
-	{
-		return this->InternalMultiEqual(other);
-	}
-
-	template<class TComponent, size_t TSize>
-	StaticBoolArray<TSize> VecBase<TComponent, TSize>::MultiNotEqual(const VecBase<TComponent, TSize> &other) const
-	{
-		return this->InternalMultiNotEqual(other);
-	}
-
-	template<class TComponent, size_t TSize>
-	StaticBoolArray<TSize> VecBase<TComponent, TSize>::MultiGreater(const VecBase<TComponent, TSize> &other) const
-	{
-		return this->InternalMultiGreater(other);
-	}
-
-	template<class TComponent, size_t TSize>
-	StaticBoolArray<TSize> VecBase<TComponent, TSize>::MultiLess(const VecBase<TComponent, TSize> &other) const
-	{
-		return this->InternalMultiLess(other);
-	}
-
-	template<class TComponent, size_t TSize>
-	StaticBoolArray<TSize> VecBase<TComponent, TSize>::MultiGreaterOrEqual(const VecBase<TComponent, TSize> &other) const
-	{
-		return this->InternalMultiGreaterOrEqual(other);
-	}
-
-	template<class TComponent, size_t TSize>
-	StaticBoolArray<TSize> VecBase<TComponent, TSize>::MultiLessOrEqual(const VecBase<TComponent, TSize> &other) const
-	{
-		return this->InternalMultiLessOrEqual(other);
-	}
-
-	template<class TComponent, size_t TSize>
-	template<class... TParam>
-	VecBase<TComponent, TSize>::VecBase(priv::VecStorageExplicitParamListTag, const TParam&... params)
-		: priv::VecStorage<TComponent, TSize>(priv::VecStorageExplicitParamListTag(), params...)
-	{
-	}
-
-	template<class TComponent, size_t TSize>
-	VecBase<TComponent, TSize>::VecBase(const priv::VecStorage<TComponent, TSize> &other)
-		: priv::VecStorage<TComponent, TSize>(other)
-	{
-	}
-
-	template<class TComponent, size_t TSize>
-	template<size_t TIndexCount, size_t... TIndexes>
-	VecBase<TComponent, TIndexCount> VecBase<TComponent, TSize>::BaseSwizzle() const
-	{
-		StaticValidateIndex1(StaticValidateIndex2<TIndexes>()...);
-
-		return VecBase<TComponent, TIndexCount>(this->InternalSwizzle<TIndexCount, TIndexes...>());
-	}
-
-	template<class TComponent, size_t TSize>
 	template<class... TParam>
 	inline Vec<TComponent, TSize>::Vec(const TParam&... params)
-		: VecBase<TComponent, TSize>(priv::VecStorageExplicitParamListTag(), ImplicitCast<TComponent>(params)...)
+		: StorageType_t(priv::VecStorageExplicitParamListTag(), ImplicitCast<TComponent>(params)...)
 	{
 	}
 
 	template<class TComponent, size_t TSize>
 	template<class TOtherComponent>
 	inline Vec<TComponent, TSize>::Vec(const Vec<TOtherComponent, TSize> &other)
-		: VecBase(other)
+		: StorageType_t(StorageType_t::FromOtherStorage(ImplicitCast<typename priv::VecStorageResolver<TOtherComponent, TSize>::Type_t>(other)))
 	{
 	}
 
 	template<class TComponent, size_t TSize>
-	inline Vec<TComponent, TSize>::Vec(const VecBase<TComponent, TSize> &base)
-		: VecBase<TComponent, TSize>(base)
+	TComponent Vec<TComponent, TSize>::GetLength() const
+	{
+		return Sqrtf(this->DotProduct(*this));
+	}
+
+	template<class TComponent, size_t TSize>
+	Vec<TComponent, TSize> Vec<TComponent, TSize>::GetNormalizedFast() const
+	{
+		return (*this) * Vec<TComponent, TSize>(FastRsqrtDeterministic(this->DotProduct(*this)));
+	}
+
+	template<class TComponent, size_t TSize>
+	Vec<TComponent, TSize> Vec<TComponent, TSize>::GetNormalizedFastNonDeterministic() const
+	{
+		return (*this) * Vec<TComponent, TSize>(FastRsqrtNonDeterministic(this->DotProduct(*this)));
+	}
+
+	template<class TComponent, size_t TSize>
+	Vec<TComponent, TSize> Vec<TComponent, TSize>::FromSpan(const Span<const TComponent> &values)
+	{
+		RKIT_ASSERT(values.Count() == TSize);
+		return Vec<TComponent, TSize>::FromPtr(values.Ptr());
+	}
+
+	template<class TComponent, size_t TSize>
+	Vec<TComponent, TSize> Vec<TComponent, TSize>::FromArray(const TComponent(&values)[TSize])
+	{
+		return Vec<TComponent, TSize>(StorageType_t::InternalFromArray(values));
+	}
+
+	template<class TComponent, size_t TSize>
+	Vec<TComponent, TSize> Vec<TComponent, TSize>::FromPtr(const TComponent *values)
+	{
+		return Vec<TComponent, TSize>(StorageType_t::InternalFromPtr(values));
+	}
+
+	template<class TComponent, size_t TSize>
+	template<size_t TOtherSize>
+	static Vec<TComponent, TSize> Vec<TComponent, TSize>::FromMultiDotProductSpan(const Span<const Vec<TComponent, TOtherSize>> &values);
+
+	template<class TComponent, size_t TSize>
+	template<size_t TOtherSize>
+	static Vec<TComponent, TSize> Vec<TComponent, TSize>::FromMultiDotProductArray(const Vec<TComponent, TOtherSize>(&otherArray)[TSize]);
+
+	template<class TComponent, size_t TSize>
+	template<size_t TOtherSize>
+	static Vec<TComponent, TSize> Vec<TComponent, TSize>::FromMultiDotProductPtr(const Vec<TComponent, TOtherSize> *values);
+
+	template<class TComponent, size_t TSize>
+	inline Vec<TComponent, TSize>::Vec(const StorageType_t &base)
+		: StorageType_t(base)
 	{
 	}
 
@@ -394,12 +684,91 @@ namespace rkit { namespace math {
 	template<size_t... TIndexes>
 	inline Vec<TComponent, priv::IndexCounter<TIndexes...>::kCount> Vec<TComponent, TSize>::Swizzle() const
 	{
+		typedef priv::IndexChecker<TIndexes...> Checker_t;
+		Checker_t::template Check<TSize>();
+
 		typedef std::integral_constant<size_t, priv::IndexCounter<TIndexes...>::kCount> IndexCountType_t;
-		return Vec<TComponent, IndexCountType_t::value>(this->BaseSwizzle<IndexCountType_t::value, TIndexes...>());
+		typedef Vec<TComponent, IndexCountType_t::value> ResultType_t;
+
+		return ResultType_t(this->template InternalSwizzle<IndexCountType_t::value, TIndexes...>());
+	}
+
+
+	template<class TComponent, size_t TSize>
+	template<bool... TNegate>
+	Vec<TComponent, TSize> Vec<TComponent, TSize>::NegateElements() const
+	{
+		return Vec<TComponent, TSize>(this->template InternalNegateElements<TNegate...>());
+	}
+
+	template<class TComponent, size_t TSize>
+	template<size_t TIndex>
+	Vec<TComponent, TSize> Vec<TComponent, TSize>::Broadcast() const
+	{
+		static_assert(TIndex < TSize, "Invalid index");
+		return Vec<TComponent, TSize>(this->template InternalBroadcast<TIndex>());
+	}
+
+	template<class TComponent, size_t TSize>
+	template<size_t TIndex, size_t TOutputSize>
+	Vec<TComponent, TOutputSize> Vec<TComponent, TSize>::BroadcastToSize() const
+	{
+		return priv::VecIndexListSwizzler<TComponent, TSize, typename IntListCreateSequence<size_t, TOutputSize, TIndex, 0>::Type_t>::Swizzle(*this);
+	}
+
+	template<class TComponent, size_t TSize>
+	template<size_t TIndex>
+	const TComponent &Vec<TComponent, TSize>::GetAt() const
+	{
+		static_assert(TIndex < TSize, "Invalid index");
+		return this->InternalGetAt(TIndex);
+	}
+
+	template<class TComponent, size_t TSize>
+	template<size_t TIndex>
+	TComponent &Vec<TComponent, TSize>::ModifyAt()
+	{
+		static_assert(TIndex < TSize, "Invalid index");
+		return this->InternalModifyAt(TIndex);
+	}
+
+	template<class TComponent, size_t TSize>
+	template<size_t TIndex>
+	void Vec<TComponent, TSize>::SetAt(const TComponent &value)
+	{
+		static_assert(TIndex < TSize, "Invalid index");
+		this->InternalSetAt(TIndex, value);
+	}
+
+	template<class TComponent, size_t TSize>
+	TComponent &Vec<TComponent, TSize>::operator[](size_t index)
+	{
+		RKIT_ASSERT(index < TSize);
+		return this->InternalModifyAt(index);
+	}
+
+	template<class TComponent, size_t TSize>
+	const TComponent &Vec<TComponent, TSize>::operator[](size_t index) const
+	{
+		RKIT_ASSERT(index < TSize);
+		return this->InternalGetAt(index);
 	}
 } }
 
 namespace rkit { namespace math { namespace priv {
+	template<size_t... TIndexes>
+	template<size_t TSize>
+	void IndexChecker<TIndexes...>::Check()
+	{
+	}
+
+	template<size_t TFirstIndex, size_t... TMoreIndexes>
+	template<size_t TSize>
+	void IndexChecker<TFirstIndex, TMoreIndexes...>::Check()
+	{
+		static_assert(TFirstIndex < TSize, "Invalid index");
+		IndexChecker<TMoreIndexes...>::template Check<TSize>();
+	}
 
 	template<class TComponent, size_t TSize>
 	const typename VecStorage<TComponent, TSize>::Storage_t &VecStorage<TComponent, TSize>::GetStorage() const
@@ -504,122 +873,318 @@ namespace rkit { namespace math { namespace priv {
 		return this->MultiCompareWithPred(other, DefaultCompareLessEqualPred());
 	}
 
-
 #if RKIT_PLATFORM_ARCH_HAVE_SSE
-	template<size_t TOutputCount, size_t... TIndexes>
-	inline VecStorage<float, TOutputCount> M128StaticIndexSwizzler<TOutputCount, TIndexes...>::Read(__m128 src)
+	template<bool TIsSequential, size_t TOutputCount, size_t... TIndexes>
+	VecStorage<float, TOutputCount> M128StaticIndexSwizzler<TIsSequential, TOutputCount, TIndexes...>::Read(__m128 src)
 	{
-		const float values[] =
+		const float *fv = reinterpret_cast<const float *>(&src);
+
+		const float floats[TOutputCount] =
 		{
-			reinterpret_cast<const float *>(&src)[TIndexes]...
+			fv[TIndexes]...
 		};
-		return VecStorage<float, TOutputCount>::FromArray(values);
+
+		return VecStorage<float, TOutputCount>::FromArray(floats);
+	}
+
+	template<size_t T0, size_t T1>
+	VecSSEFloatStorage<2> M128StaticIndexSwizzler<false, 2, T0, T1>::Read(__m128 src)
+	{
+		typedef std::integral_constant<unsigned int, ((T0 << 0) | (T1 << 2))> IntConst_t;
+		return VecSSEFloatStorage<2>(_mm_shuffle_ps(src, _mm_setzero_ps(), IntConst_t::value));
+	}
+
+	template<size_t TOutputCount, size_t... TIndexes>
+	VecSSEFloatStorage<TOutputCount> M128StaticIndexSwizzler<true, TOutputCount, TIndexes...>::Read(__m128 src)
+	{
+		return VecSSEFloatStorage<TOutputCount>(src);
+	}
+
+	template<size_t T0, size_t T1, size_t T2>
+	VecSSEFloatStorage<3> M128StaticIndexSwizzler<false, 3, T0, T1, T2>::Read(__m128 src)
+	{
+		typedef std::integral_constant<unsigned int, ((T0 << 0) | (T1 << 2) | (T2 << 4))> IntConst_t;
+
+		return VecSSEFloatStorage<3>(_mm_shuffle_ps(src, src, IntConst_t::value));
 	}
 
 	template<size_t T0, size_t T1, size_t T2, size_t T3>
-	inline VecStorage<float, 4> M128StaticIndexSwizzler<4, T0, T1, T2, T3>::Read(__m128 src)
+	VecSSEFloatStorage<4> M128StaticIndexSwizzler<false, 4, T0, T1, T2, T3>::Read(__m128 src)
 	{
-		typedef std::integral_constant<unsigned int, static_cast<unsigned int>(T0 | (T1 << 2) | (T2 << 4) | (T3 << 6))> Imm_t;
-		return VecStorage<float, 4>(_mm_shuffle_ps(src, src, Imm_t::value));
-	};
-
-
-	inline const __m128 &VecStorage<float, 4>::GetStorage() const
-	{
-		return m_v;
+		typedef std::integral_constant<unsigned int, ((T0 << 0) | (T1 << 2) | (T2 << 4) | (T3 << 6))> IntConst_t;
+		return VecSSEFloatStorage<4>(_mm_shuffle_ps(src, src, IntConst_t::value));
 	}
 
-	inline __m128 &VecStorage<float, 4>::ModifyStorage()
+	inline float M128DotProductCalculator<2>::Compute(__m128 a, __m128 b)
 	{
-		return m_v;
+		__m128 v = _mm_mul_ps(a, b);
+
+		__m128 element1 = _mm_shuffle_ps(v, v, 1);
+
+		return _mm_cvtss_f32(_mm_add_ss(v, element1));
 	}
 
-	inline StaticBoolArray<4> VecStorage<float, 4>::OpResultToBits(__m128 opResult)
+	inline float M128DotProductCalculator<3>::Compute(__m128 a, __m128 b)
 	{
-		const uint8_t bits = static_cast<uint8_t>(_mm_movemask_ps(opResult));
-		return StaticBoolArray<4>::FromBitsUnchecked(&bits);
+		__m128 v = _mm_mul_ps(a, b);
+
+		__m128 element1 = _mm_shuffle_ps(v, v, 1);
+		__m128 element2 = _mm_shuffle_ps(v, v, 2);
+
+		return _mm_cvtss_f32(_mm_add_ss(_mm_add_ss(v, element1), element2));
 	}
 
-	inline bool VecStorage<float, 4>::MaskedOpAll(__m128 opResult)
+	inline float M128DotProductCalculator<4>::Compute(__m128 a, __m128 b)
 	{
-		return _mm_movemask_ps(opResult) == 0xf;
+		const __m128 v = _mm_mul_ps(a, b);
+
+		const __m128 element23 = _mm_shuffle_ps(v, v, (2 | (3 << 2)));
+
+		const __m128 step1 = _mm_add_ps(v, element23);
+
+		const __m128 step1_element1 = _mm_shuffle_ps(step1, step1, 1);
+
+		return _mm_cvtss_f32(_mm_add_ss(step1, step1_element1));
 	}
 
-	inline VecStorage<float, 4>::VecStorage(__m128 storage)
-		: m_v(storage)
+	inline __m128 M128FloatLoader<2>::Load(const float *f)
 	{
+		return _mm_set_ps(0.f, 0.f, f[1], f[0]);
 	}
 
-	inline VecStorage<float, 4>::VecStorage()
+	inline __m128 M128FloatLoader<3>::Load(const float *f)
+	{
+		return _mm_set_ps(0.f, f[2], f[1], f[0]);
+	}
+
+	inline __m128 M128FloatLoader<4>::Load(const float *f)
+	{
+		return _mm_loadu_ps(f);
+	}
+
+	template<uint32_t T0, uint32_t T1, uint32_t T2, uint32_t T3>
+	__m128 M128FloatBitsConstant<T0, T1, T2, T3>::Create()
+	{
+		uint32_t dwords[4] = { T0, T1, T2, T3 };
+		__m128 result;
+		memcpy(&result, dwords, 16);
+		return result;
+	}
+
+	template<size_t TSize>
+	const __m128 &VecSSEFloatStorage<TSize>::GetStorage() const
+	{
+		return this->m_v;
+	}
+
+	template<size_t TSize>
+	__m128 &VecSSEFloatStorage<TSize>::ModifyStorage()
+	{
+		return this->m_v;
+	}
+
+	template<size_t TSize>
+	VecSSEFloatStorage<TSize> VecSSEFloatStorage<TSize>::FromArray(const float(&array)[TSize])
+	{
+		return M128FloatLoader<TSize>::Load(array);
+	}
+
+	template<size_t TSize>
+	StaticBoolArray<TSize> VecSSEFloatStorage<TSize>::OpResultToBits(__m128 opResult)
+	{
+		constexpr int bitMask = (1 << TSize) - 1;
+		const uint8_t bits = static_cast<uint8_t>(_mm_movemask_ps(opResult) & bitMask);
+
+		return StaticBoolArray<TSize>::FromBitsUnchecked(&bits);
+	}
+
+	template<size_t TSize>
+	bool VecSSEFloatStorage<TSize>::MaskedOpAll(__m128 opResult)
+	{
+		constexpr int bitMask = (1 << TSize) - 1;
+
+		return _mm_movemask_ps(opResult) >= bitMask;
+	}
+
+	template<size_t TSize>
+	VecSSEFloatStorage<TSize>::VecSSEFloatStorage()
 		: m_v(_mm_setzero_ps())
 	{
 	}
 
-	inline VecStorage<float, 4>::VecStorage(VecStorageExplicitParamListTag, float x, float y, float z, float w)
-		: m_v(_mm_set_ps(w, z, y, x))
+	template<size_t TSize>
+	VecSSEFloatStorage<TSize>::VecSSEFloatStorage(__m128 storage)
+		: m_v(storage)
 	{
 	}
 
-	inline const float &VecStorage<float, 4>::InternalGetAt(size_t index) const
+	template<size_t TSize>
+	VecSSEFloatStorage<TSize>::VecSSEFloatStorage(VecStorageExplicitParamListTag, float x, float y)
+		: m_v(_mm_set_ps(0.f, 0.f, y, x))
+	{
+		static_assert(TSize == 2, "Wrong constructor for this size");
+	}
+
+	template<size_t TSize>
+	VecSSEFloatStorage<TSize>::VecSSEFloatStorage(VecStorageExplicitParamListTag, float x, float y, float z)
+		: m_v(_mm_set_ps(0.f, z, y, x))
+	{
+		static_assert(TSize == 3, "Wrong constructor for this size");
+	}
+
+	template<size_t TSize>
+	VecSSEFloatStorage<TSize>::VecSSEFloatStorage(VecStorageExplicitParamListTag, float x, float y, float z, float w)
+		: m_v(_mm_set_ps(w, z, y, x))
+	{
+		static_assert(TSize == 4, "Wrong constructor for this size");
+	}
+
+	template<size_t TSize>
+	const float &VecSSEFloatStorage<TSize>::InternalGetAt(size_t index) const
 	{
 		return reinterpret_cast<const float *>(&m_v)[index];
 	}
 
-	inline float &VecStorage<float, 4>::InternalModifyAt(size_t index)
+	template<size_t TSize>
+	float &VecSSEFloatStorage<TSize>::InternalModifyAt(size_t index)
 	{
 		return reinterpret_cast<float *>(&m_v)[index];
 	}
 
-	inline void VecStorage<float, 4>::InternalSetAt(size_t index, float value)
+	template<size_t TSize>
+	void VecSSEFloatStorage<TSize>::InternalSetAt(size_t index, float value)
 	{
 		reinterpret_cast<float *>(&m_v)[index] = value;
 	}
 
-	inline bool VecStorage<float, 4>::InternalEqual(const VecStorage<float, 4> &other) const
+	template<size_t TSize>
+	bool VecSSEFloatStorage<TSize>::InternalEqual(const VecSSEFloatStorage<TSize> &other) const
 	{
-		return MaskedOpAll(_mm_cmpeq_ps(m_v, other.m_v));
+		return this->MaskedOpAll(_mm_cmpeq_ps(m_v, other.m_v));
 	}
 
-	inline bool VecStorage<float, 4>::InternalNotEqual(const VecStorage<float, 4> &other) const
+	template<size_t TSize>
+	bool VecSSEFloatStorage<TSize>::InternalNotEqual(const VecSSEFloatStorage<TSize> &other) const
 	{
-		return MaskedOpAll(_mm_cmpneq_ps(m_v, other.m_v));
+		return this->MaskedOpAll(_mm_cmpneq_ps(m_v, other.m_v));
 	}
 
-	inline StaticBoolArray<4> VecStorage<float, 4>::InternalMultiEqual(const VecStorage<float, 4> &other) const
+	template<size_t TSize>
+	VecSSEFloatStorage<TSize> VecSSEFloatStorage<TSize>::InternalAddScalar(float value) const
 	{
-		return OpResultToBits(_mm_cmpeq_ps(m_v, other.m_v));
+		return VecSSEFloatStorage<TSize>(_mm_add_ps(m_v, _mm_set_ps1(value)));
 	}
 
-	inline StaticBoolArray<4> VecStorage<float, 4>::InternalMultiNotEqual(const VecStorage<float, 4> &other) const
+	template<size_t TSize>
+	VecSSEFloatStorage<TSize> VecSSEFloatStorage<TSize>::InternalSubScalar(float value) const
 	{
-		return OpResultToBits(_mm_cmpneq_ps(m_v, other.m_v));
+		return VecSSEFloatStorage<TSize>(_mm_sub_ps(m_v, _mm_set_ps1(value)));
 	}
 
-	inline StaticBoolArray<4> VecStorage<float, 4>::InternalMultiGreater(const VecStorage<float, 4> &other) const
+	template<size_t TSize>
+	VecSSEFloatStorage<TSize> VecSSEFloatStorage<TSize>::InternalMulScalar(float value) const
 	{
-		return OpResultToBits(_mm_cmpgt_ps(m_v, other.m_v));
+		return VecSSEFloatStorage<TSize>(_mm_mul_ps(m_v, _mm_set_ps1(value)));
 	}
 
-	inline StaticBoolArray<4> VecStorage<float, 4>::InternalMultiLess(const VecStorage<float, 4> &other) const
+	template<size_t TSize>
+	VecSSEFloatStorage<TSize> VecSSEFloatStorage<TSize>::InternalDivScalar(float value) const
 	{
-		return OpResultToBits(_mm_cmplt_ps(m_v, other.m_v));
+		return VecSSEFloatStorage<TSize>(_mm_div_ps(m_v, _mm_set_ps1(value)));
 	}
 
-	inline StaticBoolArray<4> VecStorage<float, 4>::InternalMultiGreaterOrEqual(const VecStorage<float, 4> &other) const
+
+	template<size_t TSize>
+	VecSSEFloatStorage<TSize> VecSSEFloatStorage<TSize>::InternalAddVector(const VecSSEFloatStorage<TSize> &other) const
 	{
-		return OpResultToBits(_mm_cmpge_ps(m_v, other.m_v));
+		return VecSSEFloatStorage<TSize>(_mm_add_ps(m_v, other.m_v));
 	}
 
-	inline StaticBoolArray<4> VecStorage<float, 4>::InternalMultiLessOrEqual(const VecStorage<float, 4> &other) const
+	template<size_t TSize>
+	VecSSEFloatStorage<TSize> VecSSEFloatStorage<TSize>::InternalSubVector(const VecSSEFloatStorage<TSize> &other) const
 	{
-		return OpResultToBits(_mm_cmple_ps(m_v, other.m_v));
+		return VecSSEFloatStorage<TSize>(_mm_sub_ps(m_v, other.m_v));
 	}
 
+	template<size_t TSize>
+	VecSSEFloatStorage<TSize> VecSSEFloatStorage<TSize>::InternalMulVector(const VecSSEFloatStorage<TSize> &other) const
+	{
+		return VecSSEFloatStorage<TSize>(_mm_mul_ps(m_v, other.m_v));
+	}
+
+	template<size_t TSize>
+	VecSSEFloatStorage<TSize> VecSSEFloatStorage<TSize>::InternalDivVector(const VecSSEFloatStorage<TSize> &other) const
+	{
+		return VecSSEFloatStorage<TSize>(_mm_div_ps(m_v, other.m_v));
+	}
+
+	template<size_t TSize>
+	StaticBoolArray<TSize> VecSSEFloatStorage<TSize>::InternalMultiEqual(const VecSSEFloatStorage<TSize> &other) const
+	{
+		return this->OpResultToBits(_mm_cmpeq_ps(m_v, other.m_v));
+	}
+
+	template<size_t TSize>
+	StaticBoolArray<TSize> VecSSEFloatStorage<TSize>::InternalMultiNotEqual(const VecSSEFloatStorage<TSize> &other) const
+	{
+		return this->OpResultToBits(_mm_cmpneq_ps(m_v, other.m_v));
+	}
+
+	template<size_t TSize>
+	StaticBoolArray<TSize> VecSSEFloatStorage<TSize>::InternalMultiGreater(const VecSSEFloatStorage<TSize> &other) const
+	{
+		return this->OpResultToBits(_mm_cmpgt_ps(m_v, other.m_v));
+	}
+
+	template<size_t TSize>
+	StaticBoolArray<TSize> VecSSEFloatStorage<TSize>::InternalMultiLess(const VecSSEFloatStorage<TSize> &other) const
+	{
+		return this->OpResultToBits(_mm_cmplt_ps(m_v, other.m_v));
+	}
+
+	template<size_t TSize>
+	StaticBoolArray<TSize> VecSSEFloatStorage<TSize>::InternalMultiGreaterOrEqual(const VecSSEFloatStorage<TSize> &other) const
+	{
+		return this->OpResultToBits(_mm_cmpge_ps(m_v, other.m_v));
+	}
+
+	template<size_t TSize>
+	StaticBoolArray<TSize> VecSSEFloatStorage<TSize>::InternalMultiLessOrEqual(const VecSSEFloatStorage<TSize> &other) const
+	{
+		return this->OpResultToBits(_mm_cmple_ps(m_v, other.m_v));
+	}
+
+	template<size_t TSize>
+	float VecSSEFloatStorage<TSize>::InternalDotProduct(const VecSSEFloatStorage<TSize> &other) const
+	{
+		return M128DotProductCalculator<TSize>::Compute(m_v, other.m_v);
+	}
+
+	template<size_t TSize>
 	template<size_t TIndexCount, size_t... TIndexes>
-	inline VecStorage<float, TIndexCount> VecStorage<float, 4>::InternalSwizzle() const
+	typename VecStorageResolver<float, TIndexCount>::Type_t VecSSEFloatStorage<TSize>::InternalSwizzle() const
 	{
-		typedef M128StaticIndexSwizzler<TIndexCount, TIndexes...> Swizzler_t;
-		return Swizzler_t::Read(m_v);
+		typedef IntList<size_t, TIndexes...> IndexList_t;
+		constexpr bool isSequential = IntListIsSequential<IndexList_t>::kValue;
+		constexpr bool isFirstZero = (IntListElement<0, IndexList_t>::kValue == 0);
+		constexpr bool isSmallEnough = (TIndexCount <= 4);
+		return M128StaticIndexSwizzler<(isSequential && isFirstZero && isSmallEnough), TIndexCount, TIndexes...>::Read(m_v);
+	}
+
+	template<size_t TSize>
+	template<size_t TIndex>
+	VecSSEFloatStorage<TSize> VecSSEFloatStorage<TSize>::InternalBroadcast() const
+	{
+		return VecSSEFloatStorage<TSize>(_mm_shuffle_ps(m_v, m_v, TIndex * 0x55));
+	}
+
+
+	template<size_t TSize>
+	template<bool T0, bool T1, bool T2, bool T3>
+	VecSSEFloatStorage<TSize> VecSSEFloatStorage<TSize>::InternalNegateElements4() const
+	{
+		const __m128 xorMask = M128FloatBitsConstant<(T0 ? 0x80000000u : 0u), (T1 ? 0x80000000u : 0u), (T2 ? 0x80000000u : 0u), (T3 ? 0x80000000u : 0u)>::Create();
+		return VecSSEFloatStorage<TSize>(_mm_xor_ps(xorMask, m_v));
 	}
 #endif
 } } }

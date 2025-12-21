@@ -1,7 +1,7 @@
 namespace rkit { namespace math {
 	template<class TComponent>
-	class Quat;
+	class Quaternion;
 
-	typedef Quat<float> Quat_t;
-	typedef Quat<double> DQuat_t;
+	typedef Quaternion<float> Quat;
+	typedef Quaternion<double> DQuat;
 } }
