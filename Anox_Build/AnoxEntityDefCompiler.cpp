@@ -262,6 +262,10 @@ namespace anox { namespace buildsystem {
 			{
 				RKIT_CHECK(AnoxMDACompilerBase::ConstructOutputPath(outputModelPath, modelPathStr));
 			}
+			else if (modelPath.EndsWithNoCase(".ctc"))
+			{
+				RKIT_CHECK(AnoxCTCCompilerBase::ConstructOutputPath(outputModelPath, modelPathStr));
+			}
 			else
 				return rkit::ResultCode::kDataError;
 

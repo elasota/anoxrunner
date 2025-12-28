@@ -127,6 +127,9 @@ namespace rkit { namespace math {
 		static Matrix<TComponent, TRows, TCols> FromRowsPtr(const Vec<TComponent, TCols> *rows);
 		static Matrix<TComponent, TRows, TCols> FromRowsSpan(const Span<const Vec<TComponent, TCols>> &rows);
 
+		Vec<TComponent, TCols> &operator[](size_t index);
+		const Vec<TComponent, TCols> &operator[](size_t index) const;
+
 	private:
 		Vec<TComponent, TCols> m_rows[TRows];
 	};
@@ -310,14 +313,74 @@ namespace rkit { namespace math { namespace priv {
 
 	inline Matrix<float, 4, 3> MatrixTransposer<float, 3, 4>::Transpose(const Vec<float, 4>(&in)[3])
 	{
+		const __m128 in0 = in[0].m_v;
+		const __m128 in1 = in[1].m_v;
+		const __m128 in2 = in[2].m_v;
+
+		const __m128 m_00_01_10_11 = _mm_shuffle_ps(in0, in1, ((0 << 0) | (1 << 2) | (0 << 4) | (1 << 6)));
+		const __m128 m_02_03_12_13 = _mm_shuffle_ps(in0, in1, ((2 << 0) | (3 << 2) | (2 << 4) | (3 << 6)));
+
+		const __m128 m_00_10_20_xx = _mm_shuffle_ps(m_00_01_10_11, in2, ((0 << 0) | (2 << 2) | (0 << 4)));
+		const __m128 m_01_11_21_xx = _mm_shuffle_ps(m_00_01_10_11, in2, ((1 << 0) | (3 << 2) | (1 << 4)));
+		const __m128 m_02_12_22_xx = _mm_shuffle_ps(m_02_03_12_13, in2, ((0 << 0) | (2 << 2) | (2 << 4)));
+		const __m128 m_03_13_23_xx = _mm_shuffle_ps(m_02_03_12_13, in2, ((1 << 0) | (3 << 2) | (3 << 4)));
+
+		return Matrix<float, 4, 3>(
+			Vec<float, 3>(VecSSEFloatStorage<3>(m_00_10_20_xx)),
+			Vec<float, 3>(VecSSEFloatStorage<3>(m_01_11_21_xx)),
+			Vec<float, 3>(VecSSEFloatStorage<3>(m_02_12_22_xx)),
+			Vec<float, 3>(VecSSEFloatStorage<3>(m_03_13_23_xx))
+		);
 	}
 
 	inline Matrix<float, 3, 4> MatrixTransposer<float, 4, 3>::Transpose(const Vec<float, 3>(&in)[4])
 	{
+		const __m128 in0 = in[0].m_v;
+		const __m128 in1 = in[1].m_v;
+		const __m128 in2 = in[2].m_v;
+		const __m128 in3 = in[3].m_v;
+
+		const __m128 m_00_01_10_11 = _mm_shuffle_ps(in0, in1, ((0 << 0) | (1 << 2) | (0 << 4) | (1 << 6)));
+		const __m128 m_20_21_30_31 = _mm_shuffle_ps(in2, in3, ((0 << 0) | (1 << 2) | (0 << 4) | (1 << 6)));
+
+
+		const __m128 m_02_xx_12_xx = _mm_shuffle_ps(in0, in1, ((2 << 0) | (3 << 2) | (2 << 4) | (3 << 6)));
+		const __m128 m_22_xx_32_xx = _mm_shuffle_ps(in2, in3, ((2 << 0) | (3 << 2) | (2 << 4) | (3 << 6)));
+
+		const __m128 m_00_10_20_30 = _mm_shuffle_ps(m_00_01_10_11, m_20_21_30_31, ((0 << 0) | (2 << 2) | (0 << 4) | (2 << 6)));
+		const __m128 m_01_11_21_31 = _mm_shuffle_ps(m_00_01_10_11, m_20_21_30_31, ((1 << 0) | (3 << 2) | (1 << 4) | (3 << 6)));
+		const __m128 m_02_12_22_32 = _mm_shuffle_ps(m_02_xx_12_xx, m_22_xx_32_xx, ((0 << 0) | (2 << 2) | (0 << 4) | (2 << 6)));
+
+		return Matrix<float, 3, 4>(
+			Vec<float, 4>(VecSSEFloatStorage<4>(m_00_10_20_30)),
+			Vec<float, 4>(VecSSEFloatStorage<4>(m_01_11_21_31)),
+			Vec<float, 4>(VecSSEFloatStorage<4>(m_02_12_22_32))
+		);
 	}
 
 	inline Matrix<float, 4, 4> MatrixTransposer<float, 4, 4>::Transpose(const Vec<float, 4>(&in)[4])
 	{
+		const __m128 in0 = in[0].m_v;
+		const __m128 in1 = in[1].m_v;
+		const __m128 in2 = in[2].m_v;
+		const __m128 in3 = in[3].m_v;
+
+		const __m128 m_00_01_10_11 = _mm_shuffle_ps(in0, in1, ((0 << 0) | (1 << 2) | (0 << 4) | (1 << 6)));
+		const __m128 m_02_03_12_13 = _mm_shuffle_ps(in0, in1, ((2 << 0) | (3 << 2) | (2 << 4) | (3 << 6)));
+		const __m128 m_20_21_30_31 = _mm_shuffle_ps(in2, in3, ((0 << 0) | (1 << 2) | (0 << 4) | (1 << 6)));
+		const __m128 m_22_23_32_33 = _mm_shuffle_ps(in2, in3, ((2 << 0) | (3 << 2) | (2 << 4) | (3 << 6)));
+
+		const __m128 m_00_10_20_30 = _mm_shuffle_ps(m_00_01_10_11, m_20_21_30_31, ((0 << 0) | (2 << 2) | (0 << 4) | (2 << 6)));
+		const __m128 m_01_11_21_31 = _mm_shuffle_ps(m_00_01_10_11, m_20_21_30_31, ((1 << 0) | (3 << 2) | (1 << 4) | (3 << 6)));
+		const __m128 m_02_12_22_32 = _mm_shuffle_ps(m_02_03_12_13, m_22_23_32_33, ((0 << 0) | (2 << 2) | (0 << 4) | (2 << 6)));
+		const __m128 m_03_13_23_33 = _mm_shuffle_ps(m_02_03_12_13, m_22_23_32_33, ((1 << 0) | (3 << 2) | (1 << 4) | (3 << 6)));
+
+		return Matrix<float, 4, 4>(
+			Vec<float, 4>(VecSSEFloatStorage<4>(m_00_10_20_30)),
+			Vec<float, 4>(VecSSEFloatStorage<4>(m_01_11_21_31)),
+			Vec<float, 4>(VecSSEFloatStorage<4>(m_02_12_22_32)),
+			Vec<float, 4>(VecSSEFloatStorage<4>(m_03_13_23_33))
+		);
 	}
 #endif
 } } }

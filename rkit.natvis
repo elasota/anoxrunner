@@ -41,4 +41,7 @@
 			<Item Name="[prevFrame]">m_prevFrame ? (m_prevFrame->m_stackInspector) : nullptr</Item>
 		</Expand>
 	</Type>
+	<Type Name="rkit::BasePathSliceView&lt;*,*&gt;">
+		<DisplayString>{m_view.m_span.m_arr}</DisplayString>
+	</Type>
 </AutoVisualizer>

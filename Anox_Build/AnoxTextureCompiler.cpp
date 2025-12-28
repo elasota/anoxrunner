@@ -1183,6 +1183,7 @@ namespace anox { namespace buildsystem
 
 				if (!isCompressed)
 				{
+#ifdef DDS_USE_LUMA_ENCODING
 					if (numChannelsToSave == 1)
 					{
 						pixelFormatFlags |= rkit::data::DDSPixelFormatFlags::kLuminance;
@@ -1193,8 +1194,8 @@ namespace anox { namespace buildsystem
 						pixelFormatFlags |= rkit::data::DDSPixelFormatFlags::kAlphaPixels;
 					}
 					else
+#endif
 					{
-
 						pixelFormatFlags |= rkit::data::DDSPixelFormatFlags::kRGB;
 						if (numChannelsToSave == 4 || numChannelsToSave == 2)
 							pixelFormatFlags |= rkit::data::DDSPixelFormatFlags::kAlphaPixels;
@@ -1218,6 +1219,7 @@ namespace anox { namespace buildsystem
 
 			switch (numChannelsToSave)
 			{
+#ifdef DDS_USE_LUMA_ENCODING
 			case 1:
 				pixelFormat.m_rBitMask = 0xffu;
 				break;
@@ -1230,6 +1232,20 @@ namespace anox { namespace buildsystem
 				pixelFormat.m_gBitMask = 0x00ff00u;
 				pixelFormat.m_bBitMask = 0x0000ffu;
 				break;
+#else
+			case 1:
+				pixelFormat.m_rBitMask = 0xffu;
+				break;
+			case 2:
+				pixelFormat.m_rBitMask = 0x00ffu;
+				pixelFormat.m_aBitMask = 0xff00u;
+				break;
+			case 3:
+				pixelFormat.m_rBitMask = 0xff0000u;
+				pixelFormat.m_gBitMask = 0x00ff00u;
+				pixelFormat.m_bBitMask = 0x0000ffu;
+				break;
+#endif
 			case 4:
 				pixelFormat.m_aBitMask = 0xff000000u;
 				pixelFormat.m_rBitMask = 0x00ff0000u;

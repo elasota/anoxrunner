@@ -189,42 +189,6 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 	// FIXME: Move this to RKit Config
 	RKIT_CHECK(sysDriver->SetSettingsDirectory("AnoxRunner"));
 
-	{
-		rkit::math::Vec3 v1(1.f, 2.f, 3.f);
-		rkit::math::Vec4 v2(4.f, 3.f, 2.f, 1.f);
-
-		printf("Equal: %s\n", (v1 == v2.Swizzle<3, 2, 1>()) ? "y" : "n");
-
-
-		rkit::math::Vec3 v3 = rkit::math::Vec3(1.f, 2.f, 3.f).GetNormalized();
-		rkit::math::Vec3 v4 = rkit::math::Vec3(2.f, -1.f, 8.f).GetNormalized();
-
-		printf("Normalized vector: %g %g %g  Len %g\n", v3[0], v3[1], v3[2], v3.GetLength());
-
-		float angle1 = 30.f;
-		float angle2 = 70.f;
-
-		float halfAngle1Rad = angle1 * 0.00872664625997164788461845384244f;
-		float halfAngle2Rad = angle2 * 0.00872664625997164788461845384244f;
-
-		rkit::math::Quat q1 = rkit::math::Quat::FromAxisAnglePrecomputed(v3, sinf(halfAngle1Rad), cosf(halfAngle1Rad));
-		rkit::math::Quat q2 = rkit::math::Quat::FromAxisAnglePrecomputed(v4, sinf(halfAngle2Rad), cosf(halfAngle2Rad));
-
-		rkit::math::Quat q3 = q1 * q2;
-
-		rkit::math::Mat33 qm1 = q1.ToRotationMatrix();
-		rkit::math::Mat33 qm2 = q2.ToRotationMatrix();
-
-		rkit::math::Mat33 qm12 = qm1 * qm2;
-
-		rkit::math::Mat33 m1 = rkit::math::Mat33::FromRotationPrecomputed(v3, sinf(halfAngle1Rad * 2.f), cosf(halfAngle1Rad * 2.f));
-		rkit::math::Mat33 m2 = rkit::math::Mat33::FromRotationPrecomputed(v4, sinf(halfAngle2Rad * 2.f), cosf(halfAngle2Rad * 2.f));
-
-		rkit::math::Mat33 m12 = m1 * m2;
-
-		int n = 0;
-	}
-
 	if (autoBuild)
 	{
 		rkit::IModule *utilsModule = rkit::GetDrivers().m_moduleDriver->LoadModule(kAnoxNamespaceID, "Utilities");

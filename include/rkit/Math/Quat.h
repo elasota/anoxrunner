@@ -20,10 +20,14 @@ namespace rkit { namespace math {
 		Quaternion operator*(const Quaternion &other);
 
 		Matrix<TComponent, 3, 3> ToRotationMatrix() const;
+		Matrix<TComponent, 3, 3> InverseToRotationMatrix() const;
 		static Quaternion<TComponent> FromRotationMatrix(const Matrix<TComponent, 3, 3> &mat);
 
 		static Quaternion<TComponent> FromAxisAnglePrecomputed(TComponent axisX, TComponent axisY, TComponent axisZ, TComponent sinHalfAngle, TComponent cosHalfAngle);
 		static Quaternion<TComponent> FromAxisAnglePrecomputed(const Vec<TComponent, 3> &axis, TComponent sinHalfAngle, TComponent cosHalfAngle);
+
+		Vec<TComponent, 3> Transform(const Vec<TComponent, 3>& pos) const;
+		Vec<TComponent, 3> InverseTransform(const Vec<TComponent, 3> &pos) const;
 
 	private:
 		Quaternion(const Vec<TComponent, 4> &vec);
@@ -117,11 +121,62 @@ namespace rkit { namespace math {
 		return Matrix<TComponent, 3, 3>(row0, row1, row2);
 	}
 
+	template<class TComponent>
+	Matrix<TComponent, 3, 3> Quaternion<TComponent>::InverseToRotationMatrix() const
+	{
+		//          (1 - 2*y*y - 2*z*z)     (2*x*y + 2*z*w)     (2*x*z - 2*y*w)
+		// result =     (2*x*y - 2*z*w) (1 - 2*x*x - 2*z*z)     (2*y*z + 2*x*w)
+		//              (2*x*z + 2*y*w)     (2*y*z - 2*x*w) (1 - 2*x*x - 2*y*y)
+
+		// Reordered:
+		//          (1                    (0                   (0
+		//             - 2*y*y               + 2*y*x              - 2*y*w
+		//             - 2*z*z)              + 2*z*w)             + 2*z*x)
+		//          (0                    (1                   (0
+		// result =    + 2*x*y               - 2*x*x              + 2*x*w
+		//             - 2*z*w)              - 2*z*z)             + 2*z*y)
+		//          (0                    (0                   (1
+		//             + 2*x*z               - 2*x*w)             - 2*x*x)
+		//             + 2*y*w)              + 2*y*z)             - 2*y*y)
+
+		Vec<TComponent, 3> valueMul2 = (m_value + m_value).template Swizzle<0, 1, 2>();
+
+		const Vec<TComponent, 3> row0 = Vec<TComponent, 3>(static_cast<TComponent>(1), static_cast<TComponent>(0), static_cast<TComponent>(0))
+			- (valueMul2.template Broadcast<1>() * m_value.template Swizzle<1, 0, 3>()).template NegateElements<false, true, false>()
+			+ (valueMul2.template Broadcast<2>() * m_value.template Swizzle<2, 3, 0>()).template NegateElements<true, false, false>();
+
+		const Vec<TComponent, 3> row1 = Vec<TComponent, 3>(static_cast<TComponent>(0), static_cast<TComponent>(1), static_cast<TComponent>(0))
+			+ (valueMul2.template Broadcast<0>() * m_value.template Swizzle<1, 0, 3>()).template NegateElements<false, true, false>()
+			- (valueMul2.template Broadcast<2>() * m_value.template Swizzle<3, 2, 1>()).template NegateElements<false, false, true>();
+
+		const Vec<TComponent, 3> row2 =
+			Vec<TComponent, 3>(static_cast<TComponent>(0), static_cast<TComponent>(0), static_cast<TComponent>(1))
+			- (valueMul2.template Broadcast<0>() * m_value.template Swizzle<2, 3, 0>()).template NegateElements<true, false, false>()
+			+ (valueMul2.template Broadcast<1>() * m_value.template Swizzle<3, 2, 1>()).template NegateElements<false, false, true>();
+
+		return Matrix<TComponent, 3, 3>(row0, row1, row2);
+	}
+
 	/*
 	static Quaternion<TComponent> FromRotationMatrix(const Matrix<3, 3, TComponent> &mat);
 
 	static Quaternion<TComponent> FromAxisAnglePrecomputed(const Vec<TComponent, 3> &axis, TComponent sinHalfAngle, TComponent cosHalfAngle);
 	*/
 
+	template<class TComponent>
+	Vec<TComponent, 3> Quaternion<TComponent>::Transform(const Vec<TComponent, 3> &pos) const
+	{
+		const Matrix<TComponent, 3, 3> invMatrix = this->InverseToRotationMatrix();
+
+		return pos * invMatrix[0] + pos * invMatrix[1] + pos * invMatrix[2];
+	}
+
+	template<class TComponent>
+	Vec<TComponent, 3> Quaternion<TComponent>::InverseTransform(const Vec<TComponent, 3> &pos) const
+	{
+		const Matrix<TComponent, 3, 3> invMatrix = this->ToRotationMatrix();
+
+		return pos * invMatrix[0] + pos * invMatrix[1] + pos * invMatrix[2];
+	}
 
 } }

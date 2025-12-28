@@ -1781,8 +1781,6 @@ namespace anox { namespace buildsystem
 					frameBones[boneIndex] = compressedBoneFrame;
 				}
 			}
-
-			return rkit::ResultCode::kNotYetImplemented;
 		}
 
 		outProfile.m_conditionLength = 0;
@@ -1860,7 +1858,6 @@ namespace anox { namespace buildsystem
 		RKIT_CHECK(outFile->WriteOneBinary(outProfile));
 
 		// No conditions to write
-
 		RKIT_CHECK(outFile->WriteAllSpan(outSkins.ToSpan()));
 		RKIT_CHECK(outFile->WriteAllSpan(outSkinPasses.ToSpan()));
 		RKIT_CHECK(outFile->WriteAllSpan(outAnimations.ToSpan()));
@@ -1884,7 +1881,7 @@ namespace anox { namespace buildsystem
 		RKIT_CHECK(outFile->WriteAllSpan(outPoints.ToSpan()));
 		RKIT_CHECK(outFile->WriteAllSpan(outVertMorphs.ToSpan()));
 
-		return rkit::ResultCode::kNotYetImplemented;
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result AnoxCTCCompiler::AddTriClusters(rkit::Vector<data::MDAModelSubModel> &outSubModels,
@@ -1919,6 +1916,8 @@ namespace anox { namespace buildsystem
 				RKIT_ASSERT(firstVert == outVerts.Count());
 				break;
 			}
+
+			RKIT_CHECK(outSubModels.Append(subModel));
 		}
 
 		return rkit::ResultCode::kOK;
@@ -2041,15 +2040,6 @@ namespace anox { namespace buildsystem
 	AnoxCTCCompiler::Matrix3x4 AnoxCTCCompiler::OrthoInvertMatrix(const Matrix3x4 &inMat)
 	{
 		// inMat is T*R, invert is R'*T'
-		// T':
-		Matrix3x4 invT = {};
-		invT.m_rows[0][0] = 1.f;
-		invT.m_rows[1][1] = 1.f;
-		invT.m_rows[2][2] = 1.f;
-		invT.m_rows[0][3] = -inMat.m_rows[0][3];
-		invT.m_rows[1][3] = -inMat.m_rows[1][3];
-		invT.m_rows[2][3] = -inMat.m_rows[2][3];
-
 		Matrix3x4 invR = {};
 		for (size_t row = 0; row < 3; row++)
 		{
@@ -2059,9 +2049,19 @@ namespace anox { namespace buildsystem
 			}
 		}
 
-		Matrix3x4 result = OrthoMatrixMul(invR, invT);
+		/*
+		Matrix3x4 invT = {};
+		invT.m_rows[0][0] = 1.f;
+		invT.m_rows[1][1] = 1.f;
+		invT.m_rows[2][2] = 1.f;
+		invT.m_rows[0][3] = -inMat.m_rows[0][3];
+		invT.m_rows[1][3] = -inMat.m_rows[1][3];
+		invT.m_rows[2][3] = -inMat.m_rows[2][3];
 
-		result = invR;
+		Matrix3x4 result = OrthoMatrixMul(invR, invT);
+		*/
+
+		Matrix3x4 result = invR;
 		for (size_t outRow = 0; outRow < 3; outRow++)
 		{
 			float coeff = 0.f;

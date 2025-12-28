@@ -1141,6 +1141,7 @@ namespace anox
 
 			if (pixelFormatFlags & rkit::data::DDSPixelFormatFlags::kFourCC)
 			{
+				return rkit::ResultCode::kNotYetImplemented;
 			}
 			else
 			{
@@ -1152,7 +1153,8 @@ namespace anox
 				const uint32_t bitCount = pixelFormat.m_rgbBitCount.Get();
 
 				const uint32_t rgbaFlags = (rkit::data::DDSPixelFormatFlags::kRGB | rkit::data::DDSPixelFormatFlags::kAlphaPixels);
-				if ((pixelFormatFlags & rgbaFlags) == rgbaFlags
+				const uint32_t rgbaLumaFlags = (rgbaFlags | rkit::data::DDSPixelFormatFlags::kLuminance);
+				if ((pixelFormatFlags & rgbaLumaFlags) == rgbaFlags
 					&& bitCount == 32
 					&& rMask == 0x000000ff
 					&& gMask == 0x0000ff00
@@ -1161,7 +1163,7 @@ namespace anox
 				{
 					textureFormat = rkit::render::TextureFormat::RGBA_UNorm8;
 				}
-				else if ((pixelFormatFlags & rgbaFlags) == rkit::data::DDSPixelFormatFlags::kRGB
+				else if ((pixelFormatFlags & rgbaLumaFlags) == rkit::data::DDSPixelFormatFlags::kRGB
 					&& bitCount == 16
 					&& rMask == 0x00ff
 					&& gMask == 0xff00
@@ -1170,7 +1172,7 @@ namespace anox
 				{
 					textureFormat = rkit::render::TextureFormat::RG_UNorm8;
 				}
-				else if ((pixelFormatFlags & rgbaFlags) == rkit::data::DDSPixelFormatFlags::kRGB
+				else if ((pixelFormatFlags & rgbaLumaFlags) == rkit::data::DDSPixelFormatFlags::kRGB
 					&& bitCount == 8
 					&& rMask == 0xff
 					&& gMask == 0
