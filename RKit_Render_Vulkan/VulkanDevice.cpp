@@ -6,6 +6,7 @@
 #include "VulkanCommandAllocator.h"
 #include "VulkanCheck.h"
 #include "VulkanFence.h"
+#include "VulkanCPUFenceWaiter.h"
 #include "VulkanHeapKey.h"
 #include "VulkanMemoryHeap.h"
 #include "VulkanPipelineLibraryLoader.h"
@@ -50,6 +51,8 @@ namespace rkit { namespace render { namespace vulkan
 		Result CreateSwapChainSyncPoint(UniquePtr<ISwapChainSyncPoint> &outSyncPoint) override;
 
 		Result CreateRenderPassInstance(UniquePtr<IRenderPassInstance> &outInstance, const RenderPassRef_t &renderPass, const RenderPassResources &resources) override;
+
+		Result CreateCPUFenceWaiter(UniquePtr<ICPUFenceWaiter> &outFenceWaiter) override;
 
 		Result ResetBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences) override;
 		Result WaitForBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll) override;
@@ -442,6 +445,17 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_CHECK(VulkanRenderPassInstanceBase::Create(rpi, *this, renderPass, resources));
 
 		outRPI = std::move(rpi);
+
+		return ResultCode::kOK;
+	}
+
+	Result VulkanDevice::CreateCPUFenceWaiter(UniquePtr<ICPUFenceWaiter> &outFenceWaiter)
+	{
+		UniquePtr<VulkanCPUFenceWaiterBase> fw;
+
+		RKIT_CHECK(VulkanCPUFenceWaiterBase::Create(fw, *this));
+
+		outFenceWaiter = std::move(fw);
 
 		return ResultCode::kOK;
 	}

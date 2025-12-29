@@ -8,6 +8,24 @@ namespace rkit { namespace render { namespace vulkan
 {
 	class VulkanDeviceBase;
 
+	class VulkanTimelineFence final : public ICPUVisibleTimelineFence
+	{
+	public:
+		VulkanTimelineFence(VulkanDeviceBase &device);
+		~VulkanTimelineFence();
+
+		Result Initialize(uint64_t initialValue);
+
+		Result SetValue(TimelinePoint_t value) override;
+		Result GetCurrentValue(TimelinePoint_t &outValue) const override;
+
+		VkSemaphore GetSemaphore() const;
+
+	private:
+		VulkanDeviceBase &m_device;
+		VkSemaphore m_sema;
+	};
+
 	class VulkanBinaryCPUWaitableFence final : public IBinaryCPUWaitableFence
 	{
 	public:

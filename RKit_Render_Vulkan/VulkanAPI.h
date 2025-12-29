@@ -98,6 +98,9 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_API_EXT(vkGetSwapchainImagesKHR, VK_KHR_swapchain);
 		RKIT_VK_API_EXT(vkAcquireNextImageKHR, VK_KHR_swapchain);
 		RKIT_VK_API_EXT(vkQueuePresentKHR, VK_KHR_swapchain);
+		RKIT_VK_API_EXT(vkWaitSemaphoresKHR, VK_KHR_timeline_semaphore);
+		RKIT_VK_API_EXT(vkGetSemaphoreCounterValueKHR, VK_KHR_timeline_semaphore);
+		RKIT_VK_API_EXT(vkSignalSemaphoreKHR, VK_KHR_timeline_semaphore);
 		RKIT_VK_API_END;
 	};
 } } } // rkit::render::vulkan

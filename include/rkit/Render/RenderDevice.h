@@ -45,6 +45,7 @@ namespace rkit { namespace render
 	struct ICopyCommandAllocator;
 	struct ICopyCommandQueue;
 	struct IComputeCommandQueue;
+	struct ICPUFenceWaiter;
 	struct IDisplay;
 	struct IGraphicsCommandAllocator;
 	struct IGraphicsCommandQueue;
@@ -83,6 +84,8 @@ namespace rkit { namespace render
 		virtual Result CreateSwapChainSyncPoint(UniquePtr<ISwapChainSyncPoint> &outSyncPoint) = 0;
 
 		virtual Result CreateRenderPassInstance(UniquePtr<IRenderPassInstance> &outInstance, const RenderPassRef_t &renderPass, const RenderPassResources &resources) = 0;
+
+		virtual Result CreateCPUFenceWaiter(UniquePtr<ICPUFenceWaiter> &outFenceWaiter) = 0;
 
 		virtual Result ResetBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences) = 0;
 		virtual Result WaitForBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll) = 0;

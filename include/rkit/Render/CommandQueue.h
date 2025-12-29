@@ -25,6 +25,7 @@ namespace rkit { namespace render
 	struct IGraphicsCommandList;
 	struct IGraphicsComputeCommandList;
 	struct IInternalCommandQueue;
+	struct ITimelineFence;
 	struct IBinaryGPUWaitableFence;
 	struct IBinaryCPUWaitableFence;
 	struct ISwapChainSyncPoint;
