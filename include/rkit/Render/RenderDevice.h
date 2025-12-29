@@ -88,8 +88,6 @@ namespace rkit { namespace render
 		virtual Result CreateCPUFenceWaiter(UniquePtr<ICPUFenceWaiter> &outFenceWaiter) = 0;
 
 		virtual Result ResetBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences) = 0;
-		virtual Result WaitForBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll) = 0;
-		virtual Result WaitForBinaryFencesTimed(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll, uint64_t timeoutMSec) = 0;
 		virtual Result WaitForDeviceIdle() = 0;
 
 		virtual const IRenderDeviceCaps &GetCaps() const = 0;

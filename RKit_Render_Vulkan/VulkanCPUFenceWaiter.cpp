@@ -128,7 +128,7 @@ namespace rkit { namespace render { namespace vulkan {
 
 	Result VulkanCPUFenceWaiter::WaitForFencesTimed(bool &outTimeout, const Span<const Pair<ICPUVisibleTimelineFence *, TimelinePoint_t>> &timelineWaits, uint64_t timeoutMSec, bool waitAll)
 	{
-		const uint64_t maxNSec = (std::numeric_limits<uint64_t>::max() - 1) / 1000000;
+		constexpr uint64_t maxNSec = (std::numeric_limits<uint64_t>::max() - 1) / 1000000;
 		if (timeoutMSec > maxNSec)
 			return ResultCode::kIntegerOverflow;
 
@@ -143,7 +143,7 @@ namespace rkit { namespace render { namespace vulkan {
 
 	Result VulkanCPUFenceWaiter::WaitForBinaryFencesTimed(bool &outTimeout, const Span<IBinaryCPUWaitableFence *> &binaryWaits, uint64_t timeoutMSec, bool waitAll)
 	{
-		const uint64_t maxNSec = (std::numeric_limits<uint64_t>::max() - 1) / 1000000;
+		constexpr uint64_t maxNSec = (std::numeric_limits<uint64_t>::max() - 1) / 1000000;
 		if (timeoutMSec > maxNSec)
 			return ResultCode::kIntegerOverflow;
 

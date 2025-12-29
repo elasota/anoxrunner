@@ -676,6 +676,7 @@ namespace anox
 		rkit::render::ICopyCommandQueue *m_dmaQueue = nullptr;
 
 		rkit::Vector<FrameSyncPoint> m_syncPoints;
+		rkit::UniquePtr<rkit::render::ICPUFenceWaiter> m_fenceWaiter;
 		GraphicTimelinedResourceStack m_unsortedCondemnedResources;
 
 		LogicalQueue<rkit::render::ICopyCommandQueue, rkit::render::ICopyCommandAllocator,
@@ -1895,9 +1896,16 @@ namespace anox
 
 	GraphicsSubsystem::~GraphicsSubsystem()
 	{
-		(void)m_renderDevice->WaitForDeviceIdle();
+		if (m_renderDevice.IsValid())
+		{
+			(void)m_renderDevice->WaitForDeviceIdle();
+		}
 
+		m_syncPoints.Reset();
+		m_fenceWaiter.Reset();
 		m_gameWindow.Reset();
+
+		m_renderDevice.Reset();
 	}
 
 	rkit::Result GraphicsSubsystem::Initialize()
@@ -1970,8 +1978,8 @@ namespace anox
 
 		rkit::Vector<rkit::render::CommandQueueTypeRequest> queueRequests;
 
-		float fOne = 1.0f;
-		float fHalf = 0.5f;
+		const float fOne = 1.0f;
+		const float fHalf = 0.5f;
 
 		{
 			rkit::render::CommandQueueTypeRequest rq;
@@ -1999,6 +2007,8 @@ namespace anox
 
 		RKIT_CHECK(m_syncPoints.Resize(m_numSyncPoints));
 		m_currentSyncPoint = 0;
+
+		RKIT_CHECK(m_renderDevice->CreateCPUFenceWaiter(m_fenceWaiter));
 
 		// FIXME: Localize
 		RKIT_CHECK(progressMonitor->SetText("Loading shader package..."));
@@ -2603,7 +2613,7 @@ namespace anox
 			RKIT_CHECK(m_threadPool.GetJobQueue()->CheckFault());
 
 			RKIT_ASSERT(syncPoint.m_frameEndBatch != nullptr);
-			RKIT_CHECK(syncPoint.m_frameEndBatch->WaitForCompletion());
+			RKIT_CHECK(syncPoint.m_frameEndBatch->WaitForCompletion(*m_fenceWaiter));
 		}
 
 		if (syncPoint.m_asyncUploadActionSet.m_cleanupJob.IsValid())

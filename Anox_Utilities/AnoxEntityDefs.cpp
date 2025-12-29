@@ -5,6 +5,7 @@
 #include "AnoxEntityDefs.h"
 
 #include "anox/Data/EntityDef.h"
+#include "anox/Data/EntityStructs.h"
 
 namespace anox { namespace utils { namespace priv {
 
@@ -20,12 +21,14 @@ namespace anox { namespace utils { namespace priv {
 		};\
 	}; \
 	static constexpr ::anox::data::EntityFieldType fld_type_ ## name = ::anox::data::EntityFieldType::eft;\
-	static constexpr size_t fld_offset_ ## name = PackedStorageMeta<__LINE__>::kOffset;
+	static constexpr size_t fld_dataOffset_ ## name = PackedStorageMeta<__LINE__>::kOffset;\
+	static constexpr size_t fld_structOffset_ ## name = offsetof(StructType_t, m_ ## name);
 	
 
 #define CLASS_BASE(className)	\
 	namespace cls_ ## className \
 	{ \
+		typedef ::anox::data::EClass_ ## className StructType_t; \
 		extern const ::anox::data::EntityClassDef g_classDef; \
 		template<size_t> \
 		struct PackedStorageMeta \
@@ -37,7 +40,7 @@ namespace anox { namespace utils { namespace priv {
 			enum Metadata \
 			{ \
 				kOffset = 0, \
-				kEnd = 0 \
+				kEnd = 0, \
 			}; \
 		};
 
@@ -57,41 +60,12 @@ namespace anox { namespace utils { namespace priv {
 #define FIELD_STRING(name) FIELD_METADATA(name, kString, 4, nullptr)
 #define FIELD_FLOAT(name) FIELD_METADATA(name, kFloat, 4, nullptr)
 #define FIELD_BSPMODEL(name) FIELD_METADATA(name, kBSPModel, 4, nullptr)
-#define FIELD_CONTENTID(name) FIELD_METADATA(name, kContentID, sizeof(::rkit::data::ContentID), nullptr)
+#define FIELD_EDEF(name) FIELD_METADATA(name, kEntityDef, 4, nullptr)
 #define FIELD_COMPONENT(name) FIELD_METADATA(name, kComponent, cls_ ## name::kSize, &cls_ ## name::g_classDef)
 
 #include "anox/Data/EntityDefs.inl"
 
 #undef FIELD_METADATA
-#undef CLASS_INHERIT
-#undef CLASS_INHERIT_INVISIBLE
-#undef CLASS_BASE
-#undef CLASS_BASE_INVISIBLE
-#undef END_CLASS
-
-// Class IDs
-#define FIELD_METADATA(name, eft, size, classDef)
-
-#define CLASS_BASE(name) \
-	kClassID_ ## name,
-
-#define CLASS_INHERIT(name, parent) \
-	kClassID_ ## name,
-
-#define CLASS_INHERIT_INVISIBLE(name, parent)
-#define CLASS_BASE_INVISIBLE(name)
-
-#define END_CLASS
-
-	enum ClassIDs
-	{
-#include "anox/Data/EntityDefs.inl"
-		kClassID_count,
-	};
-
-#undef FIELD_METADATA
-#undef CLASS_INHERIT
-#undef CLASS_INHERIT_INVISIBLE
 #undef CLASS_BASE
 #undef CLASS_BASE_INVISIBLE
 #undef END_CLASS
@@ -99,7 +73,8 @@ namespace anox { namespace utils { namespace priv {
 // Field def array
 #define FIELD_METADATA(name, eft, size, classDef) \
 	{ \
-		fld_offset_ ## name, \
+		fld_dataOffset_ ## name, \
+		fld_structOffset_ ## name, \
 		fld_type_ ## name, \
 		#name, \
 		sizeof(#name) - 1, \
@@ -112,9 +87,6 @@ namespace anox { namespace utils { namespace priv {
 		static const ::anox::data::EntityFieldDef g_fieldDefs[] = \
 		{
 
-#define CLASS_INHERIT(name, parent) CLASS_BASE(name)
-
-#define CLASS_INHERIT_INVISIBLE(name, parent) CLASS_INHERIT(name, parent)
 #define CLASS_BASE_INVISIBLE(name) CLASS_BASE(name)
 
 // Add a blank one so the list can be empty
@@ -127,17 +99,16 @@ namespace anox { namespace utils { namespace priv {
 
 
 #undef FIELD_METADATA
-#undef CLASS_INHERIT
-#undef CLASS_INHERIT_INVISIBLE
 #undef CLASS_BASE
 #undef CLASS_BASE_INVISIBLE
 #undef END_CLASS
 
 #define CLASS_FILL_IN(name, cid) \
-	kClassID_ ## cid, \
+	static_cast<uint32_t>(::anox::data::EClass_ID::k_ ## cid), \
 	#name, \
 	sizeof(#name) - 1, \
 	kSize, \
+	sizeof(::anox::data::EClass_ ## name), \
 	g_fieldDefs, \
 	sizeof(g_fieldDefs) / sizeof(g_fieldDefs[0]) - 1
 
@@ -158,22 +129,6 @@ namespace anox { namespace utils { namespace priv {
 			nullptr, \
 			CLASS_FILL_IN(name, count)
 
-#define CLASS_INHERIT(name, parent) \
-	namespace cls_ ## name \
-	{ \
-		static const ::anox::data::EntityClassDef g_classDef = \
-		{\
-			&cls_ ## parent::g_classDef, \
-			CLASS_FILL_IN(name, name)
-
-#define CLASS_INHERIT_INVISIBLE(name, parent) \
-	namespace cls_ ## name \
-	{ \
-		static const ::anox::data::EntityClassDef g_classDef = \
-		{\
-			&cls_ ## parent::g_classDef, \
-			CLASS_FILL_IN(name, count)
-
 #define END_CLASS \
 		}; \
 	}
@@ -185,8 +140,6 @@ namespace anox { namespace utils { namespace priv {
 #undef CLASS_FILL_IN
 
 #undef FIELD_METADATA
-#undef CLASS_INHERIT
-#undef CLASS_INHERIT_INVISIBLE
 #undef CLASS_BASE
 #undef CLASS_BASE_INVISIBLE
 #undef END_CLASS
@@ -196,11 +149,6 @@ namespace anox { namespace utils { namespace priv {
 	&cls_ ## name::g_classDef,
 
 #define CLASS_BASE_INVISIBLE(name)
-
-#define CLASS_INHERIT(name, parent) \
-	&cls_ ## name::g_classDef,
-
-#define CLASS_INHERIT_INVISIBLE(className, parent)
 
 #define END_CLASS
 
@@ -212,8 +160,6 @@ namespace anox { namespace utils { namespace priv {
 	};
 
 #undef FIELD_METADATA
-#undef CLASS_INHERIT
-#undef CLASS_INHERIT_INVISIBLE
 #undef CLASS_BASE
 #undef CLASS_BASE_INVISIBLE
 #undef END_CLASS

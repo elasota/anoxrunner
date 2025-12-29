@@ -328,7 +328,7 @@ CLASS_BASE(worldspawn)
 END_CLASS
 
 CLASS_BASE_INVISIBLE(userentity)
-	FIELD_CONTENTID(edef)	// This must be first!
+	FIELD_EDEF(edef)	// This must be first!
 	FIELD_COMPONENT(placed)
 END_CLASS
 
@@ -441,9 +441,9 @@ CLASS_BASE(userentity_container)
 END_CLASS
 
 CLASS_BASE(userentity_lightsource)
-	FIELD_CONTENTID(edef)
+	FIELD_EDEF(edef)
 END_CLASS
 
 CLASS_BASE(userentity_sunpoint)
-	FIELD_CONTENTID(edef)
+	FIELD_EDEF(edef)
 END_CLASS

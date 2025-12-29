@@ -583,7 +583,11 @@ namespace anox
 
 			CORO_CHECK(locals.path.Set(fullPathStr));
 
+			rkit::log::LogInfo("GameLogic: Loading map");
+
 			CORO_CALL(self->AsyncLoadCIPathKeyedResource, locals.loadResult, anox::resloaders::kBSPModelResourceTypeCode, locals.path);
+
+			rkit::log::LogInfo("GameLogic: Map loaded successfully");
 
 			int n = 0;
 		CORO_END
@@ -599,6 +603,8 @@ namespace anox
 		struct Params {};
 
 		CORO_BEGIN
+			rkit::log::LogInfo("GameLogic: Starting session");
+
 			CORO_CHECK(self->m_game->GetCaptureHarness()->GetConfigurationState(locals.configState));
 
 			IConfigurationValueView root = locals.configState->GetRoot();

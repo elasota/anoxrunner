@@ -101,6 +101,7 @@ namespace rkit
 		Result CreateBlockingReader(UniquePtr<ISeekableReadStream> &outReadStream, UniquePtr<IAsyncReadFile> &&asyncFile, FilePos_t fileSize) const override;
 
 		bool ParseDouble(const StringView &str, double &d) const override;
+		bool ParseFloat(const StringView &str, float &f) const override;
 
 		bool ParseInt32(const StringSliceView &str, uint8_t radix, int32_t &i) const override;
 		bool ParseInt64(const StringSliceView &str, uint8_t radix, int64_t &i) const override;
@@ -2308,6 +2309,18 @@ namespace rkit
 	{
 		char *endPtr = nullptr;
 		double result = strtod(str.GetChars(), &endPtr);
+
+		if (endPtr != str.GetChars() + str.Length())
+			return false;
+
+		d = result;
+		return true;
+	}
+
+	bool UtilitiesDriver::ParseFloat(const StringView &str, float &d) const
+	{
+		char *endPtr = nullptr;
+		float result = strtof(str.GetChars(), &endPtr);
 
 		if (endPtr != str.GetChars() + str.Length())
 			return false;

@@ -6,6 +6,8 @@
 
 #include "anox/Data/BSPModel.h"
 
+#include "anox/Data/EntityStructs.h"
+
 #include "rkit/Data/ContentID.h"
 #include "rkit/Core/Future.h"
 #include "rkit/Core/Job.h"

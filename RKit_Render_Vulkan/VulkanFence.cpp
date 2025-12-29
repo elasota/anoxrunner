@@ -82,17 +82,6 @@ namespace rkit { namespace render { namespace vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanBinaryCPUWaitableFence::WaitFor()
-	{
-		return this->WaitForTimed(std::numeric_limits<uint64_t>::max());
-	}
-
-	Result VulkanBinaryCPUWaitableFence::WaitForTimed(uint64_t timeoutMSec)
-	{
-		IBinaryCPUWaitableFence *fence = this;
-		return m_device.WaitForBinaryFencesTimed(Span<IBinaryCPUWaitableFence *>(&fence, 1).ToValueISpan(), false, timeoutMSec);
-	}
-
 	Result VulkanBinaryCPUWaitableFence::ResetFence()
 	{
 		IBinaryCPUWaitableFence *fence = this;

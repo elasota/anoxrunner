@@ -325,6 +325,21 @@ namespace anox { namespace buildsystem
 			uint32_t m_numNodes = 0;
 		};
 
+		struct ObjectsHeader
+		{
+			uint32_t m_numEntityDefs = 0;
+			uint32_t m_numEntities = 0;
+			uint32_t m_numStrings = 0;
+			uint32_t m_entityBlobSize = 0;
+			uint32_t m_stringBlobSize = 0;
+
+			// ContentID m_edefContentIDs[m_numEntityDefs]
+			// uint32_t m_types[m_numEntities]
+			// uint8_t m_entityData[m_entityBlobSize]
+			// uint32_t m_stringLengths[m_numStrings]
+			// uint8_t m_strings[m_stringBlobSize]
+		};
+
 		class VectorWriterVisitor
 		{
 		public:
@@ -372,6 +387,8 @@ namespace anox { namespace buildsystem
 
 		static rkit::Result BuildMaterials(data::BSPDataChunks &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 
+		static rkit::Result ReadObjectData(data::BSPDataChunks &bspOutput, rkit::IReadStream &inStream);
+
 		static rkit::Result LoadBSPData(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, BSPDataCollection &bsp, rkit::Vector<LumpLoader> &loaders);
 
 		static rkit::Result WriteBSPModel(const data::BSPDataChunks &bspOutput, rkit::IWriteStream &outStream);
@@ -388,6 +405,7 @@ namespace anox { namespace buildsystem
 
 		static rkit::Result FormatLightmapPath(rkit::String &path, const rkit::StringView &identifier, size_t lightmapIndex);
 		static rkit::Result FormatModelPath(rkit::String &path, const rkit::StringView &identifier);
+		static rkit::Result FormatObjectsPath(rkit::String &path, const rkit::StringView &identifier);
 		static rkit::Result FormatFaceStatsPath(rkit::String &path, const rkit::StringView &identifier);
 		static rkit::Result FormatGeometryPath(rkit::String &path, const rkit::StringView &identifier);
 		static rkit::Result FormatMaterialListPath(rkit::String &path, const rkit::StringView &identifier);
@@ -439,6 +457,12 @@ namespace anox { namespace buildsystem
 		uint32_t GetVersion() const override;
 
 	private:
+		struct CompiledEntity
+		{
+			uint32_t m_type;
+			rkit::Vector<uint8_t> m_dataBlob;
+		};
+
 		struct IEntityDataHandler
 		{
 			typedef rkit::Pair<rkit::AsciiString, rkit::AsciiString> Property_t;
@@ -468,6 +492,8 @@ namespace anox { namespace buildsystem
 			rkit::Result ParseBuiltinEntity(const data::EntityClassDef &classDef, const PropertySpan_t &properties) override;
 			rkit::Result ParseUserEntity(uint32_t edefID, const data::EntityClassDef &classDef, const PropertySpan_t &properties) override;
 
+			rkit::Result WriteEntityData(rkit::IWriteStream &stream) const;
+
 		private:
 			enum class PropertyDisposition
 			{
@@ -477,9 +503,16 @@ namespace anox { namespace buildsystem
 				kAngleRecast,
 			};
 
+			rkit::Result ParseEntityCommon(const rkit::data::ContentID *contentID, const data::EntityClassDef &classDef, const PropertySpan_t &properties);
 			static PropertyDisposition FindFieldDef(const data::EntityClassDef &classDef, const rkit::AsciiStringSliceView &str, uint32_t baseOffset, const data::EntityFieldDef *&outFieldDef, uint32_t &outOffset);
+			static rkit::Result ParseField(const rkit::Span<uint8_t> &span, const data::EntityFieldDef &fieldDef, const rkit::AsciiStringSliceView &propertyValue);
+			static rkit::Result ParseFloatSequence(const rkit::Span<uint8_t> &span, size_t numFloats, const rkit::AsciiStringSliceView &propertyValue);
 
 			rkit::buildsystem::IDependencyNodeCompilerFeedback *m_feedback;
+
+			rkit::Vector<CompiledEntity> m_compiledEntities;
+			rkit::Vector<rkit::AsciiString> m_strings;
+			rkit::Vector<rkit::data::ContentID> m_edefContentIDs;
 		};
 
 		static rkit::Result ParseEntityData(const UserEntityDictionaryBase &dict, const rkit::ConstSpan<char> &entityData, IEntityDataHandler &handler);
@@ -833,8 +866,12 @@ namespace anox { namespace buildsystem
 	{
 	}
 
-	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseBuiltinEntity(const data::EntityClassDef &classDef, const PropertySpan_t &properties)
+	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseEntityCommon(const rkit::data::ContentID *contentID, const data::EntityClassDef &classDef, const PropertySpan_t &properties)
 	{
+		CompiledEntity compiledEntity;
+
+		compiledEntity.m_type = classDef.m_entityClassIndex;
+
 		const rkit::AsciiStringView ignoreProperties[] =
 		{
 			// Typos
@@ -850,6 +887,27 @@ namespace anox { namespace buildsystem
 			"_color",
 			"_cone",
 		};
+
+		RKIT_CHECK(compiledEntity.m_dataBlob.Resize(classDef.m_dataSize));
+
+		const rkit::Span<uint8_t> blobBytes = compiledEntity.m_dataBlob.ToSpan();
+
+		if (contentID)
+		{
+			uint32_t edefID = 0;
+			while (edefID < m_edefContentIDs.Count() && m_edefContentIDs[edefID] != (*contentID))
+				edefID++;
+
+			if (edefID == m_edefContentIDs.Count())
+			{
+				RKIT_CHECK(m_edefContentIDs.Append(*contentID));
+			}
+
+			rkit::endian::LittleUInt32_t edefIDData;
+			edefIDData = edefID;
+
+			rkit::CopySpanNonOverlapping(blobBytes.SubSpan(0, 4), edefIDData.GetBytes().ToSpan());
+		}
 
 		for (const Property_t &property : properties)
 		{
@@ -878,14 +936,43 @@ namespace anox { namespace buildsystem
 					return rkit::ResultCode::kDataError;
 				}
 			}
+			else
+			{
+				switch (dispo)
+				{
+				case PropertyDisposition::kPresent:
+					RKIT_CHECK(ParseField(blobBytes, *fieldDef, property.Second()));
+					break;
+				case PropertyDisposition::kAngleRecast:
+					return rkit::ResultCode::kNotYetImplemented;
+				default:
+					return rkit::ResultCode::kInternalError;
+				}
+			}
 		}
+
+		RKIT_CHECK(m_compiledEntities.Append(std::move(compiledEntity)));
 
 		return rkit::ResultCode::kOK;
 	}
 
+	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseBuiltinEntity(const data::EntityClassDef &classDef, const PropertySpan_t &properties)
+	{
+		return ParseEntityCommon(nullptr, classDef, properties);
+	}
+
 	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseUserEntity(uint32_t edefID, const data::EntityClassDef &classDef, const PropertySpan_t &properties)
 	{
-		return ParseBuiltinEntity(classDef, properties);
+		rkit::String edefIdentifier;
+		RKIT_CHECK(EntityDefCompilerBase::FormatEDef(edefIdentifier, edefID));
+
+		rkit::CIPath edefPath;
+		RKIT_CHECK(edefPath.Set(edefIdentifier));
+
+		rkit::data::ContentID contentID;
+		RKIT_CHECK(m_feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefPath, contentID));
+	
+		return ParseEntityCommon(&contentID, classDef, properties);
 	}
 
 	BSPEntityCompiler::EntityCompileHandler::PropertyDisposition BSPEntityCompiler::EntityCompileHandler::FindFieldDef(const data::EntityClassDef &classDef, const rkit::AsciiStringSliceView &fieldName, uint32_t baseOffset, const data::EntityFieldDef *&outFieldDef, uint32_t &outOffset)
@@ -898,7 +985,7 @@ namespace anox { namespace buildsystem
 		{
 			if (fieldDef.m_fieldType == data::EntityFieldType::kComponent)
 			{
-				PropertyDisposition componentDispo = FindFieldDef(*fieldDef.m_classDef, fieldName, baseOffset + fieldDef.m_offset, outFieldDef, outOffset);
+				PropertyDisposition componentDispo = FindFieldDef(*fieldDef.m_classDef, fieldName, baseOffset + fieldDef.m_dataOffset, outFieldDef, outOffset);
 				if (componentDispo != PropertyDisposition::kMissing)
 				{
 					RKIT_ASSERT(dispo == PropertyDisposition::kMissing);
@@ -912,7 +999,7 @@ namespace anox { namespace buildsystem
 			{
 				RKIT_ASSERT(dispo == PropertyDisposition::kMissing);
 				dispo = PropertyDisposition::kPresent;
-				outOffset = baseOffset + fieldDef.m_offset;
+				outOffset = baseOffset + fieldDef.m_dataOffset;
 				outFieldDef = &fieldDef;
 			}
 		}
@@ -925,13 +1012,179 @@ namespace anox { namespace buildsystem
 				{
 					RKIT_ASSERT(dispo == PropertyDisposition::kMissing);
 					dispo = PropertyDisposition::kAngleRecast;
-					outOffset = baseOffset + fieldDef.m_offset;
+					outOffset = baseOffset + fieldDef.m_dataOffset;
 					outFieldDef = &fieldDef;
 				}
 			}
 		}
 
 		return dispo;
+	}
+
+	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseField(const rkit::Span<uint8_t> &span, const data::EntityFieldDef &fieldDef, const rkit::AsciiStringSliceView &propertyValue)
+	{
+		switch (fieldDef.m_fieldType)
+		{
+		case data::EntityFieldType::kLabel:
+			{
+				rkit::Optional<size_t> colonPos;
+				for (size_t i = 0; i < propertyValue.Length(); i++)
+				{
+					if (propertyValue[i] == ':')
+					{
+						colonPos = i;
+						break;
+					}
+				}
+
+				if (!colonPos.IsSet())
+				{
+					rkit::log::Error("Invalid label value");
+					return rkit::ResultCode::kDataError;
+				}
+
+				const rkit::ConstSpan<char> valueChars = propertyValue.ToSpan();
+
+				rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
+				uint32_t labelHigh = 0;
+				uint32_t labelLow = 0;
+				if (!utils->ParseUInt32(rkit::StringSliceView(valueChars.SubSpan(0, colonPos.Get())), 10, labelHigh))
+				{
+					rkit::log::Error("Invalid label value");
+					return rkit::ResultCode::kDataError;
+				}
+				if (!utils->ParseUInt32(rkit::StringSliceView(valueChars.SubSpan(colonPos.Get() + 1)), 10, labelLow))
+				{
+					rkit::log::Error("Invalid label value");
+					return rkit::ResultCode::kDataError;
+				}
+
+				uint32_t labelValue = 0;
+				RKIT_CHECK(rkit::SafeMul<uint32_t>(labelHigh, labelHigh, 10000));
+				RKIT_CHECK(rkit::SafeAdd<uint32_t>(labelValue, labelHigh, labelLow));
+
+				rkit::endian::LittleUInt32_t labelData;
+				labelData = labelValue;
+
+				rkit::CopySpanNonOverlapping(span.SubSpan(0, 4), labelData.GetBytes().ToSpan());
+			}
+			break;
+		case data::EntityFieldType::kFloat:
+			return ParseFloatSequence(span, 1, propertyValue);
+		case data::EntityFieldType::kVec2:
+			return ParseFloatSequence(span, 2, propertyValue);
+		case data::EntityFieldType::kVec3:
+			return ParseFloatSequence(span, 3, propertyValue);
+		case data::EntityFieldType::kVec4:
+			return ParseFloatSequence(span, 4, propertyValue);
+		case data::EntityFieldType::kBool:
+		case data::EntityFieldType::kBoolOnOff:
+		case data::EntityFieldType::kUInt:
+		case data::EntityFieldType::kString:
+		case data::EntityFieldType::kEntityDef:
+		case data::EntityFieldType::kBSPModel:
+		case data::EntityFieldType::kComponent:
+			return rkit::ResultCode::kNotYetImplemented;
+		default:
+			return rkit::ResultCode::kInternalError;
+		}
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseFloatSequence(const rkit::Span<uint8_t> &span, size_t numFloats, const rkit::AsciiStringSliceView &propertyValue)
+	{
+		rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
+
+		size_t startPos = 0;
+		for (size_t floatIndex = 0; floatIndex < numFloats; floatIndex++)
+		{
+			if (floatIndex != 0)
+			{
+				while (startPos < propertyValue.Length() && propertyValue[startPos] == ' ')
+					startPos++;
+			}
+
+			size_t endPos = startPos;
+			while (endPos < propertyValue.Length() && propertyValue[endPos] != ' ')
+				endPos++;
+
+			const rkit::ConstSpan<char> charsSpan = propertyValue.SubString(startPos, endPos - startPos).ToSpan();
+			if (charsSpan.Count() == 0)
+			{
+				rkit::log::Error("Malformed float value composite");
+				return rkit::ResultCode::kDataError;
+			}
+
+			rkit::String floatStr;
+			RKIT_CHECK(floatStr.Set(rkit::StringSliceView(charsSpan)));
+			float f = 0.f;
+			if (!utils->ParseFloat(floatStr, f))
+			{
+				rkit::log::Error("Malformed float value");
+				return rkit::ResultCode::kDataError;
+			}
+
+			rkit::endian::LittleFloat32_t floatData;
+			floatData = f;
+
+			rkit::CopySpanNonOverlapping<uint8_t>(span.SubSpan(floatIndex * 4, 4), floatData.GetBytes().ToSpan());
+		}
+
+		return rkit::ResultCode::kOK;
+	}
+
+
+	rkit::Result BSPEntityCompiler::EntityCompileHandler::WriteEntityData(rkit::IWriteStream &stream) const
+	{
+		if (m_compiledEntities.Count() > std::numeric_limits<uint32_t>::max())
+			return rkit::ResultCode::kDataError;
+
+		size_t entityBlobSize = 0;
+		size_t stringBlobSize = 0;
+		for (const CompiledEntity &compiledEntity : m_compiledEntities)
+		{
+			entityBlobSize += compiledEntity.m_dataBlob.Count();
+		}
+		for (const rkit::AsciiString &str : m_strings)
+		{
+			stringBlobSize += str.Length();
+		}
+
+		if (entityBlobSize > std::numeric_limits<uint32_t>::max()
+			|| m_compiledEntities.Count() > std::numeric_limits<uint32_t>::max()
+			|| stringBlobSize > std::numeric_limits<uint32_t>::max())
+			return rkit::ResultCode::kIntegerOverflow;
+
+		BSPMapCompilerBase2::ObjectsHeader objHeader = {};
+		objHeader.m_numEntityDefs = static_cast<uint32_t>(m_edefContentIDs.Count());
+		objHeader.m_entityBlobSize = static_cast<uint32_t>(entityBlobSize);
+		objHeader.m_stringBlobSize = static_cast<uint32_t>(stringBlobSize);
+		objHeader.m_numEntities = static_cast<uint32_t>(m_compiledEntities.Count());
+		objHeader.m_numStrings = static_cast<uint32_t>(m_strings.Count());
+
+		RKIT_CHECK(stream.WriteOneBinary(objHeader));
+
+		RKIT_CHECK(stream.WriteAllSpan(m_edefContentIDs.ToSpan()));
+
+		for (const CompiledEntity &compiledEntity : m_compiledEntities)
+		{
+			RKIT_CHECK(stream.WriteOneBinary(static_cast<uint32_t>(compiledEntity.m_type)));
+		}
+		for (const CompiledEntity &compiledEntity : m_compiledEntities)
+		{
+			RKIT_CHECK(stream.WriteAllSpan(compiledEntity.m_dataBlob.ToSpan()));
+		}
+		for (const rkit::AsciiString &str : m_strings)
+		{
+			RKIT_CHECK(stream.WriteOneBinary(static_cast<uint32_t>(str.Length())));
+		}
+		for (const rkit::AsciiString &str : m_strings)
+		{
+			RKIT_CHECK(stream.WriteAllSpan(str.ToSpan()));
+		}
+
+		return rkit::ResultCode::kOK;
 	}
 
 	bool BSPEntityCompiler::HasAnalysisStage() const
@@ -974,12 +1227,25 @@ namespace anox { namespace buildsystem
 
 		RKIT_CHECK(ParseEntityData(*dictionary, bsp.m_entityData.ToSpan(), handler));
 
+		{
+			rkit::String outPathStr;
+			RKIT_CHECK(FormatObjectsPath(outPathStr, depsNode->GetIdentifier()));
+
+			rkit::CIPath outPath;
+			RKIT_CHECK(outPath.Set(outPathStr));
+
+			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
+			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outStream));
+
+			RKIT_CHECK(handler.WriteEntityData(*outStream));
+		}
+
 		return rkit::ResultCode::kOK;
 	}
 
 	uint32_t BSPEntityCompiler::GetVersion() const
 	{
-		return 5;
+		return 1;
 	}
 
 	rkit::Result BSPEntityCompiler::ParseEntityData(const UserEntityDictionaryBase &dict, const rkit::ConstSpan<char> &entityDataRef, IEntityDataHandler &handler)
@@ -2896,6 +3162,38 @@ namespace anox { namespace buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
+	rkit::Result BSPMapCompilerBase2::ReadObjectData(data::BSPDataChunks &bspOutput, rkit::IReadStream &inStream)
+	{
+		ObjectsHeader header = {};
+		RKIT_CHECK(inStream.ReadOneBinary(header));
+
+		rkit::Vector<rkit::data::ContentID> edefContentIDs;
+		rkit::Vector<uint8_t> entityData;
+		rkit::Vector<uint8_t> stringData;
+		rkit::Vector<rkit::endian::LittleUInt32_t> entityTypes;
+		rkit::Vector<rkit::endian::LittleUInt32_t> stringLengths;
+
+		RKIT_CHECK(edefContentIDs.Resize(header.m_numEntityDefs));
+		RKIT_CHECK(entityData.Resize(header.m_entityBlobSize));
+		RKIT_CHECK(stringData.Resize(header.m_stringBlobSize));
+		RKIT_CHECK(entityTypes.Resize(header.m_numEntities));
+		RKIT_CHECK(stringLengths.Resize(header.m_numStrings));
+
+		RKIT_CHECK(inStream.ReadAllSpan(edefContentIDs.ToSpan()));
+		RKIT_CHECK(inStream.ReadAllSpan(entityTypes.ToSpan()));
+		RKIT_CHECK(inStream.ReadAllSpan(entityData.ToSpan()));
+		RKIT_CHECK(inStream.ReadAllSpan(stringLengths.ToSpan()));
+		RKIT_CHECK(inStream.ReadAllSpan(stringData.ToSpan()));
+
+		bspOutput.m_entityDefs = std::move(edefContentIDs);
+		bspOutput.m_entityTypes = std::move(entityTypes);
+		bspOutput.m_entityData = std::move(entityData);
+		bspOutput.m_entityStringLengths = std::move(stringLengths);
+		bspOutput.m_entityStringData = std::move(stringData);
+
+		return rkit::ResultCode::kOK;
+	}
+
 	rkit::Result BSPMapCompilerBase2::LoadBSPData(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, BSPDataCollection &bsp, rkit::Vector<LumpLoader> &loaders)
 	{
 		const rkit::StringView identifier = depsNode->GetIdentifier();
@@ -2933,6 +3231,11 @@ namespace anox { namespace buildsystem
 	rkit::Result BSPMapCompilerBase2::FormatModelPath(rkit::String &path, const rkit::StringView &identifier)
 	{
 		return path.Format("ax_bsp/{}.bspmodel", identifier.GetChars());
+	}
+
+	rkit::Result BSPMapCompilerBase2::FormatObjectsPath(rkit::String &path, const rkit::StringView &identifier)
+	{
+		return path.Format("ax_bsp/{}.objects", identifier.GetChars());
 	}
 
 	rkit::Result BSPMapCompilerBase2::FormatFaceStatsPath(rkit::String &path, const rkit::StringView &identifier)
@@ -3132,6 +3435,19 @@ namespace anox { namespace buildsystem
 		}
 
 		RKIT_CHECK(BuildMaterials(bspData, uniqueTextures.ToSpan(), feedback));
+
+		{
+			rkit::String inPathStr;
+			RKIT_CHECK(FormatObjectsPath(inPathStr, depsNode->GetIdentifier()));
+
+			rkit::CIPath inPath;
+			RKIT_CHECK(inPath.Set(inPathStr));
+
+			rkit::UniquePtr<rkit::ISeekableReadStream> inStream;
+			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, inPath, inStream));
+
+			RKIT_CHECK(ReadObjectData(bspData, *inStream));
+		}
 
 		{
 			rkit::String outPathStr;

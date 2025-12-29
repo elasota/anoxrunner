@@ -13,6 +13,7 @@ namespace rkit
 namespace rkit { namespace render
 {
 	struct IBinaryGPUWaitableFence;
+	struct ICPUFenceWaiter;
 	struct ICopyCommandEncoder;
 	struct IComputeCommandEncoder;
 	struct IGraphicsCommandEncoder;
@@ -23,7 +24,7 @@ namespace rkit { namespace render
 	struct IBaseCommandBatch
 	{
 		virtual Result Submit() = 0;
-		virtual Result WaitForCompletion() = 0;
+		virtual Result WaitForCompletion(ICPUFenceWaiter& fenceWaiter) = 0;
 		virtual Result CloseBatch() = 0;
 
 		virtual Result AddWaitForFence(IBinaryGPUWaitableFence &fence, const PipelineStageMask_t &subsequentStageMask) = 0;

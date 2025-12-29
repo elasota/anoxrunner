@@ -19,7 +19,7 @@ namespace anox { namespace data {
 		kVec3,
 		kVec4,
 		kString,
-		kContentID,
+		kEntityDef,
 		kBSPModel,
 		kComponent,
 	};
@@ -31,7 +31,8 @@ namespace anox { namespace data {
 
 	struct EntityFieldDef
 	{
-		uint32_t m_offset;
+		uint32_t m_dataOffset;
+		uint32_t m_structOffset;
 		EntityFieldType m_fieldType;
 
 		const char *m_name;
@@ -49,7 +50,8 @@ namespace anox { namespace data {
 		const char *m_name;
 		size_t m_nameLength;
 
-		size_t m_size;
+		size_t m_dataSize;
+		size_t m_structSize;
 
 		const EntityFieldDef *m_fields;
 		size_t m_numFields;

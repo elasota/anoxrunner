@@ -176,6 +176,9 @@
     <ClInclude Include="..\include\anox\Data\MDAModel.h">
       <Filter>Header Files\Data</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\anox\Data\EntityStructs.h">
+      <Filter>Header Files\Data</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\include\anox\Data\EntityDefs.inl">

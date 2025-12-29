@@ -121,6 +121,7 @@ namespace rkit
 
 		virtual Result CreateBlockingReader(UniquePtr<ISeekableReadStream> &outReadStream, UniquePtr<IAsyncReadFile> &&asyncFile, FilePos_t fileSize) const = 0;
 
+		virtual bool ParseFloat(const StringView &str, float &f) const = 0;
 		virtual bool ParseDouble(const StringView &str, double &d) const = 0;
 
 		virtual bool ParseInt32(const StringSliceView &str, uint8_t radix, int32_t &i) const = 0;

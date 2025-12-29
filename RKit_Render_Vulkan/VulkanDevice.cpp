@@ -55,8 +55,6 @@ namespace rkit { namespace render { namespace vulkan
 		Result CreateCPUFenceWaiter(UniquePtr<ICPUFenceWaiter> &outFenceWaiter) override;
 
 		Result ResetBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences) override;
-		Result WaitForBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll) override;
-		Result WaitForBinaryFencesTimed(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll, uint64_t timeoutMSec) override;
 		Result WaitForDeviceIdle() override;
 
 		VkDevice GetDevice() const override;
@@ -477,44 +475,6 @@ namespace rkit { namespace render { namespace vulkan
 				staticFences[i] = static_cast<VulkanBinaryCPUWaitableFence *>(fences[i + firstFence])->GetFence();
 
 			RKIT_VK_CHECK(m_vkd.vkResetFences(m_device, static_cast<uint32_t>(fencesThisRound), staticFences.GetBuffer()));
-		}
-
-		return ResultCode::kOK;
-	}
-
-	Result VulkanDevice::WaitForBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll)
-	{
-		return WaitForBinaryFencesTimed(fences, std::numeric_limits<uint64_t>::max(), waitForAll);
-	}
-
-	Result VulkanDevice::WaitForBinaryFencesTimed(const ISpan<IBinaryCPUWaitableFence *> &fences, bool waitForAll, uint64_t timeoutMSec)
-	{
-		const size_t kMaxStaticFences = 16;
-
-		size_t numFences = fences.Count();
-		if (numFences <= kMaxStaticFences || (waitForAll && timeoutMSec == std::numeric_limits<uint64_t>::max()))
-		{
-			StaticArray<VkFence, kMaxStaticFences> staticFences;
-			for (size_t firstFence = 0; firstFence < numFences; firstFence += kMaxStaticFences)
-			{
-				size_t fencesThisRound = numFences - firstFence;
-				if (fencesThisRound > kMaxStaticFences)
-					fencesThisRound = kMaxStaticFences;
-
-				for (size_t i = 0; i < fencesThisRound; i++)
-					staticFences[i] = static_cast<VulkanBinaryCPUWaitableFence *>(fences[i + firstFence])->GetFence();
-
-				RKIT_VK_CHECK(m_vkd.vkWaitForFences(m_device, static_cast<uint32_t>(fencesThisRound), staticFences.GetBuffer(), waitForAll ? VK_TRUE : VK_FALSE, timeoutMSec));
-			}
-		}
-		else
-		{
-			Vector<VkFence> dynFences;
-			RKIT_CHECK(dynFences.Resize(numFences));
-			for (size_t i = 0; i < numFences; i++)
-				dynFences[i] = static_cast<VulkanBinaryCPUWaitableFence *>(fences[i])->GetFence();
-
-			RKIT_VK_CHECK(m_vkd.vkWaitForFences(m_device, static_cast<uint32_t>(numFences), dynFences.GetBuffer(), waitForAll ? VK_TRUE : VK_FALSE, timeoutMSec));
 		}
 
 		return ResultCode::kOK;

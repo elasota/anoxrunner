@@ -53,8 +53,6 @@ namespace rkit { namespace render
 	{
 		virtual ~IBinaryCPUWaitableFence() {}
 
-		virtual Result WaitFor() = 0;
-		virtual Result WaitForTimed(uint64_t timeoutMSec) = 0;
 		virtual Result ResetFence() = 0;
 	};
 

@@ -164,6 +164,7 @@
     <ClInclude Include="..\include\anox\Data\CompressedNormal.h" />
     <ClInclude Include="..\include\anox\Data\CompressedQuat.h" />
     <ClInclude Include="..\include\anox\Data\EntityDef.h" />
+    <ClInclude Include="..\include\anox\Data\EntityStructs.h" />
     <ClInclude Include="..\include\anox\Data\MaterialData.h" />
     <ClInclude Include="..\include\anox\Data\MaterialResourceType.h" />
     <ClInclude Include="..\include\anox\Data\MDAModel.h" />

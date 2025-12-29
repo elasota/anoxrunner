@@ -99,7 +99,7 @@ namespace rkit { namespace render { namespace vulkan
 		Result OpenCommandBatch(bool cpuWaitable) override;
 
 		Result Submit() override;
-		Result WaitForCompletion() override;
+		Result WaitForCompletion(ICPUFenceWaiter& fenceWaiter) override;
 		Result CloseBatch() override;
 
 		Result OpenCopyCommandEncoder(ICopyCommandEncoder *&outCopyCommandEncoder) override;
@@ -556,7 +556,7 @@ namespace rkit { namespace render { namespace vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanCommandBatch::WaitForCompletion()
+	Result VulkanCommandBatch::WaitForCompletion(ICPUFenceWaiter& fenceWaiter)
 	{
 		if (!m_isCPUWaitable)
 			return ResultCode::kInternalError;

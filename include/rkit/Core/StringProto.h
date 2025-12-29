@@ -2,7 +2,8 @@
 
 #include "CharacterEncoding.h"
 
-#include <cstddef>
+#include <stdint.h>
+#include <stddef.h>
 
 namespace rkit
 {

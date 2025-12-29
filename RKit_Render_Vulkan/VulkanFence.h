@@ -33,9 +33,6 @@ namespace rkit { namespace render { namespace vulkan
 		~VulkanBinaryCPUWaitableFence();
 
 		Result Initialize(bool startSignaled);
-
-		Result WaitFor() override;
-		Result WaitForTimed(uint64_t timeoutMSec) override;
 		Result ResetFence() override;
 
 		VkFence GetFence() const;
