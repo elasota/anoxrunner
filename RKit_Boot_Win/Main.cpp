@@ -500,12 +500,13 @@ static int WinMainCommon(HINSTANCE hInstance)
 	programLauncherModule->Unload();
 	systemModule->Unload();
 
+	_CrtCheckMemory();
+	_CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_DEBUG);
+	_CrtDumpMemoryLeaks();
+
 	memModule->Unload();
 
 	rkit::g_winGlobals.~Win32Globals();
-
-	_CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_DEBUG);
-	_CrtDumpMemoryLeaks();
 
 	return 0;
 }

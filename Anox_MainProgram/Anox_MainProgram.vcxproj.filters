@@ -84,6 +84,9 @@
     <ClCompile Include="AnoxGraphicTimelinedResource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="AnoxEntityDefResource.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\anox\AnoxGraphicsSubsystem.h">
@@ -178,6 +181,9 @@
     </ClInclude>
     <ClInclude Include="..\include\anox\Data\EntityStructs.h">
       <Filter>Header Files\Data</Filter>
+    </ClInclude>
+    <ClInclude Include="AnoxEntityDefResource.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

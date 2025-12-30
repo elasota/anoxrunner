@@ -15,6 +15,7 @@
 
 #include "rkit/Data/ContentID.h"
 
+#include "AnoxEntityDefResource.h"
 #include "AnoxFileResource.h"
 #include "AnoxMaterialResource.h"
 #include "AnoxBSPModelResource.h"
@@ -435,6 +436,13 @@ namespace anox
 			RKIT_CHECK(AnoxMaterialResourceLoaderBase::Create(worldMaterialLoader, data::MaterialResourceType::kWorld));
 
 			RKIT_CHECK(RegisterContentKeyedLoader(resloaders::kWorldMaterialTypeCode, std::move(worldMaterialLoader)));
+		}
+
+		{
+			rkit::RCPtr<AnoxEntityDefResourceLoaderBase> edefLoader;
+			RKIT_CHECK(AnoxEntityDefResourceLoaderBase::Create(edefLoader));
+
+			RKIT_CHECK(RegisterContentKeyedLoader(resloaders::kEntityDefTypeCode, std::move(edefLoader)));
 		}
 
 		return rkit::ResultCode::kOK;

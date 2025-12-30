@@ -66,6 +66,7 @@ namespace rkit
 		// Closes the job queue.  The shutdown procedure for the job queue should be:
 		// - Close the job queue
 		// - Wait for all participating threads to finish calling WaitForWork
+		// - Ensure any outstanding job signallers are destroyed
 		// - Destroy the job queue
 		virtual Result Close() = 0;
 	};

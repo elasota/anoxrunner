@@ -157,6 +157,15 @@ namespace anox
 			RKIT_CHECK(resourceJobs.Append(job));
 		}
 
+		for (const rkit::data::ContentID &edefContentID : chunks.m_entityDefs)
+		{
+			rkit::RCPtr<rkit::Job> job;
+			rkit::Future<AnoxResourceRetrieveResult> result;
+			RKIT_CHECK(m_resManager.GetContentIDKeyedResource(&job, result, resloaders::kEntityDefTypeCode, edefContentID));
+
+			RKIT_CHECK(resourceJobs.Append(job));
+		}
+
 		{
 			rkit::UniquePtr<rkit::IJobRunner> dependenciesDoneJobRunner;
 			RKIT_CHECK(m_jobQueue.CreateSignalJobRunner(dependenciesDoneJobRunner, m_waitForDependenciesSignaller));

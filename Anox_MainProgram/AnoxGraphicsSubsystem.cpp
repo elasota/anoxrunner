@@ -1901,9 +1901,19 @@ namespace anox
 			(void)m_renderDevice->WaitForDeviceIdle();
 		}
 
+		m_asyncUploadBuffer.Reset();
+		m_asyncUploadHeap.Reset();
+
 		m_syncPoints.Reset();
 		m_fenceWaiter.Reset();
 		m_gameWindow.Reset();
+
+		m_asyncUploadActiveTask.Reset();
+		m_asyncUploadWaitingTasks.Reset();
+		m_unsortedCondemnedResources = GraphicTimelinedResourceStack();
+
+		m_pipelineLibraryLoader.Reset();
+		m_pipelineLibrary.Reset();
 
 		m_renderDevice.Reset();
 	}
@@ -2784,6 +2794,8 @@ namespace anox
 
 			rkit::RCPtr<rkit::Job> cleanupJob;
 			RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(&cleanupJob, rkit::JobType::kNormalPriority, std::move(cleanupJobRunner), memCopyJob));
+
+			m_syncPoints[m_currentSyncPoint].m_asyncUploadActionSet.m_cleanupJob = cleanupJob;
 		}
 
 		return rkit::ResultCode::kOK;
