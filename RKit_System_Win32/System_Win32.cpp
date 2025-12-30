@@ -789,7 +789,15 @@ namespace rkit
 	{
 		Result continueResult = CheckedContinueRequest();
 		if (!utils::ResultIsOK(continueResult))
-			m_overlappedHolder.m_callback(m_overlappedHolder.m_userdata, continueResult, m_overlappedHolder.m_bytesProcessed);
+		{
+			const size_t bytesProcessed = m_overlappedHolder.m_bytesProcessed;
+			void *userdata = m_overlappedHolder.m_userdata;
+			AsyncIOCompletionCallback_t callback = m_overlappedHolder.m_callback;
+
+			CloseRequest();
+
+			callback(userdata, continueResult, bytesProcessed);
+		}
 	}
 
 	Result AsyncReadWriteRequesterInstance_Win32::CheckedContinueRequest()
@@ -886,7 +894,15 @@ namespace rkit
 		m_overlappedHolder.m_remainingBytes -= dwNumberOfBytesTransfered;
 
 		if (dwNumberOfBytesTransfered != m_overlappedHolder.m_amountRequestedByLastRequest || m_overlappedHolder.m_remainingBytes == 0)
-			m_overlappedHolder.m_callback(m_overlappedHolder.m_userdata, ResultCode::kOK, m_overlappedHolder.m_bytesProcessed);
+		{
+			const size_t bytesProcessed = m_overlappedHolder.m_bytesProcessed;
+			void *userdata = m_overlappedHolder.m_userdata;
+			AsyncIOCompletionCallback_t callback = m_overlappedHolder.m_callback;
+
+			CloseRequest();
+
+			callback(userdata, ResultCode::kOK, bytesProcessed);
+		}
 		else
 			ContinueRequest();
 	}
