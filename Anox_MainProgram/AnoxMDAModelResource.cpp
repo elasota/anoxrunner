@@ -65,6 +65,72 @@ namespace anox
 	{
 		rkit::ReadOnlyMemoryStream stream(m_state->m_mdaFileContents.GetBuffer(), m_state->m_mdaFileContents.Count());
 
+		data::MDAModelHeader header;
+		RKIT_CHECK(stream.ReadOneBinary(header));
+
+		const uint8_t numAnimations = (header.m_numAnimations7_AnimationType1 & 0x7f);
+		const data::MDAAnimationType animType = static_cast<data::MDAAnimationType>(header.m_numAnimations7_AnimationType1 >> 7);
+
+		rkit::Vector<data::MDAProfile> profiles;
+
+		RKIT_CHECK(profiles.Resize(header.m_numProfiles));
+		RKIT_CHECK(stream.ReadAllSpan(profiles.ToSpan()));
+
+		size_t conditionLengthTotal = 0;
+		for (const data::MDAProfile &profile : profiles)
+		{
+			size_t conditionLength = profile.m_conditionLength.Get();
+
+			RKIT_CHECK(rkit::SafeAdd(conditionLengthTotal, conditionLengthTotal, conditionLength));
+		}
+
+		size_t paddedConditionLengthTotal = 0;
+		RKIT_CHECK(rkit::SafeAdd(paddedConditionLengthTotal, conditionLengthTotal, profiles.Count()));
+
+		rkit::Vector<char> profileConditions;
+		RKIT_CHECK(profileConditions.Resize(paddedConditionLengthTotal));
+
+		// FIXME: Don't do this...
+		{
+			size_t startPos = 0;
+			for (const data::MDAProfile &profile : profiles)
+			{
+				const size_t conditionLength = profile.m_conditionLength.Get();
+				const rkit::Span<char> chars = profileConditions.ToSpan().SubSpan(startPos, conditionLength);
+
+				RKIT_CHECK(stream.ReadAllSpan(chars));
+				profileConditions[startPos + conditionLength] = 0;
+
+				rkit::AsciiStringView conditionStr(chars.Ptr(), conditionLength);
+				if (!conditionStr.Validate())
+					return rkit::ResultCode::kDataError;
+			}
+		}
+
+
+		// MDASkin m_skins[m_numProfiles][m_numSkins]
+		// MDASkinPass m_skinPasses[m_numProfiles][m_numSkins][skin.m_numPasses]
+		// MDAAnimation m_animations[m_numAnimations]
+		// char m_animationNameChars[m_numAnimations][anim.m_nameLength]
+		// MDAModelMorphKey m_morphKeys[m_numMorphKeys]
+		// if skeletal model:
+		//     MDASkeletalModelBone m_bones[m_numBones]
+		// if vertex model:
+		//     MDAVertexModelBone m_bones[m_numBones]
+		//
+		// if skeletal model:
+		//     MDAModelSkeletalBoneFrame m_boneFrames[m_numFrames][m_numBones]
+		// if vertex model:
+		//     MDAModelTagBoneFrame m_boneFrames[m_numFrames][m_numBones]
+		//
+		// MDAModelSubModel m_subModels[m_numSubModels]
+		// MDAModelTri m_tris[m_numSubmodels][submodel.m_numTris]
+		// MDAModelVert m_verts[m_numSubmodels][submodel.m_numVerts]
+		// if skeletal model:
+		//     MDASkeletalModelPoint m_points[m_numPoints]
+		// if vertex model:
+		//     MDAModelPoint m_points[m_numFrames][m_numPoints]
+		// MDAModelVertMorph m_vertMorphs[m_numMorphKeys][m_numMorphedPoints]
 
 		/*
 		const data::UserMDAModel &edef = m_resource->GetMDAModel();

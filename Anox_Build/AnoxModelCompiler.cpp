@@ -1127,7 +1127,7 @@ namespace anox { namespace buildsystem
 
 	uint32_t AnoxMDACompiler::GetVersion() const
 	{
-		return 1;
+		return 2;
 	}
 
 	rkit::Result AnoxMDACompiler::ExpectLine(rkit::ConstSpan<char> &outLine, rkit::ConstSpan<char> &fileSpan)
@@ -3055,6 +3055,12 @@ namespace anox { namespace buildsystem
 			return rkit::ResultCode::kDataError;
 		}
 
+		if (profiles.Count() > 0xffu)
+		{
+			rkit::log::Error("Too many profiles");
+			return rkit::ResultCode::kDataError;
+		}
+
 		data::MDAModelHeader outHeader = {};
 
 		for (const UncompiledTriList &triList : triLists)
@@ -3076,6 +3082,7 @@ namespace anox { namespace buildsystem
 		outHeader.m_numPoints = static_cast<uint16_t>(numXYZ);
 		outHeader.m_numMorphedPoints = static_cast<uint16_t>(numMorphedPoints);
 		outHeader.m_numAnimations7_AnimationType1 = static_cast<uint8_t>(animations.Count());
+		outHeader.m_numProfiles = static_cast<uint8_t>(profiles.Count());
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
 		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outputPath, outFile));
