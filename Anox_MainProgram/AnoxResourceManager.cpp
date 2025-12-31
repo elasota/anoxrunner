@@ -15,10 +15,11 @@
 
 #include "rkit/Data/ContentID.h"
 
+#include "AnoxBSPModelResource.h"
 #include "AnoxEntityDefResource.h"
 #include "AnoxFileResource.h"
 #include "AnoxMaterialResource.h"
-#include "AnoxBSPModelResource.h"
+#include "AnoxMDAModelResource.h"
 #include "AnoxTextureResource.h"
 
 #include <algorithm>
@@ -443,6 +444,13 @@ namespace anox
 			RKIT_CHECK(AnoxEntityDefResourceLoaderBase::Create(edefLoader));
 
 			RKIT_CHECK(RegisterContentKeyedLoader(resloaders::kEntityDefTypeCode, std::move(edefLoader)));
+		}
+
+		{
+			rkit::RCPtr<AnoxMDAModelResourceLoaderBase> mdaLoader;
+			RKIT_CHECK(AnoxMDAModelResourceLoaderBase::Create(mdaLoader));
+
+			RKIT_CHECK(RegisterContentKeyedLoader(resloaders::kMDAModelResourceTypeCode, std::move(mdaLoader)));
 		}
 
 		return rkit::ResultCode::kOK;

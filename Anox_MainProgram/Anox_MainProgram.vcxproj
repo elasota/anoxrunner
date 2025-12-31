@@ -42,13 +42,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>ClangCL</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>ClangCL</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -135,6 +135,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AnoxAbstractSingleFileResource.cpp" />
     <ClCompile Include="AnoxBSPModelResource.cpp" />
     <ClCompile Include="AnoxCaptureHarness.cpp" />
     <ClCompile Include="AnoxCommandRegistry.cpp" />
@@ -155,6 +156,7 @@
     <ClCompile Include="AnoxLoadEntireFileJob.cpp" />
     <ClCompile Include="AnoxMain.cpp" />
     <ClCompile Include="AnoxMaterialResource.cpp" />
+    <ClCompile Include="AnoxMDAModelResource.cpp" />
     <ClCompile Include="AnoxRenderedWindow.cpp" />
     <ClCompile Include="AnoxResourceManager.cpp" />
     <ClCompile Include="AnoxTextureResource.cpp" />
@@ -169,6 +171,7 @@
     <ClInclude Include="..\include\anox\Data\MaterialData.h" />
     <ClInclude Include="..\include\anox\Data\MaterialResourceType.h" />
     <ClInclude Include="..\include\anox\Data\MDAModel.h" />
+    <ClInclude Include="AnoxAbstractSingleFileResource.h" />
     <ClInclude Include="AnoxBSPModelResource.h" />
     <ClInclude Include="AnoxCaptureHarness.h" />
     <ClInclude Include="AnoxCommandRegistry.h" />
@@ -183,6 +186,7 @@
     <ClInclude Include="AnoxKeybindManager.h" />
     <ClInclude Include="AnoxLoadEntireFileJob.h" />
     <ClInclude Include="AnoxMaterialResource.h" />
+    <ClInclude Include="AnoxMDAModelResource.h" />
     <ClInclude Include="AnoxPeriodicResources.h" />
     <ClInclude Include="AnoxRecordJobRunner.h" />
     <ClInclude Include="AnoxRenderedWindow.h" />

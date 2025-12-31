@@ -1,4 +1,5 @@
 #include "rkit/Core/Endian.h"
+#include "rkit/Data/ContentID.h"
 
 #include "CompressedNormal.h"
 #include "CompressedQuat.h"

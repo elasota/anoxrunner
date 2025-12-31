@@ -87,6 +87,12 @@
     <ClCompile Include="AnoxEntityDefResource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="AnoxMDAModelResource.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="AnoxAbstractSingleFileResource.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\anox\AnoxGraphicsSubsystem.h">
@@ -183,6 +189,12 @@
       <Filter>Header Files\Data</Filter>
     </ClInclude>
     <ClInclude Include="AnoxEntityDefResource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="AnoxMDAModelResource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="AnoxAbstractSingleFileResource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

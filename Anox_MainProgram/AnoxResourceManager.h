@@ -90,6 +90,9 @@ namespace anox
 	template<class TKeyType, class TResourceType>
 	struct AnoxTypedResourceLoader : public AnoxKeyedResourceLoader<TKeyType>
 	{
+		typedef TKeyType KeyType_t;
+		typedef TResourceType ResourceBase_t;
+
 		virtual rkit::Result CreateLoadJob(const rkit::RCPtr<TResourceType> &resource, const AnoxResourceLoaderSystems &systems, const TKeyType &key, rkit::RCPtr<rkit::Job> &outJob) const = 0;
 		virtual rkit::Result CreateResourceObject(rkit::UniquePtr<TResourceType> &outResource) const = 0;
 
