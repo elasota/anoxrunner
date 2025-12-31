@@ -418,6 +418,9 @@ namespace rkit
 	{
 		return from;
 	}
+
+	template<class TDest, class TSrc, class TConverter>
+	void ConvertSpan(const Span<TDest> &dest, const Span<TSrc> &src, const TConverter &converter);
 }
 
 #include "Result.h"
@@ -1188,4 +1191,19 @@ inline TTo rkit::BitCast(const TFrom &from)
 	TTo result;
 	::memcpy(&result, &from, sizeof(TFrom));
 	return result;
+}
+
+
+template<class TDest, class TSrc, class TConverter>
+void rkit::ConvertSpan(const Span<TDest> &dest, const Span<TSrc> &src, const TConverter &converter)
+{
+	RKIT_ASSERT(dest.Count() == src.Count());
+
+	TDest *destPtr = dest.Ptr();
+	TSrc *srcPtr = src.Ptr();
+
+	const size_t count = Min(dest.Count(), src.Count());
+
+	for (size_t i = 0; i < count; i++)
+		destPtr[i] = converter(srcPtr[i]);
 }
