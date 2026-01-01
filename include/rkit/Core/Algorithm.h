@@ -421,6 +421,12 @@ namespace rkit
 
 	template<class TDest, class TSrc, class TConverter>
 	void ConvertSpan(const Span<TDest> &dest, const Span<TSrc> &src, const TConverter &converter);
+
+	template<class TDest, class TSrc, class TProcessor>
+	void ProcessParallelSpans(const Span<TDest> &dest, const Span<TSrc> &src, const TProcessor &processor);
+
+	template<class TDest, class TSrc, class TProcessor>
+	Result CheckedProcessParallelSpans(const Span<TDest> &dest, const Span<TSrc> &src, const TProcessor &processor);
 }
 
 #include "Result.h"
@@ -1193,7 +1199,6 @@ inline TTo rkit::BitCast(const TFrom &from)
 	return result;
 }
 
-
 template<class TDest, class TSrc, class TConverter>
 void rkit::ConvertSpan(const Span<TDest> &dest, const Span<TSrc> &src, const TConverter &converter)
 {
@@ -1206,4 +1211,36 @@ void rkit::ConvertSpan(const Span<TDest> &dest, const Span<TSrc> &src, const TCo
 
 	for (size_t i = 0; i < count; i++)
 		destPtr[i] = converter(srcPtr[i]);
+}
+
+template<class TDest, class TSrc, class TProcessor>
+void rkit::ProcessParallelSpans(const Span<TDest> &dest, const Span<TSrc> &src, const TProcessor &processor)
+{
+	RKIT_ASSERT(dest.Count() == src.Count());
+
+	TDest *destPtr = dest.Ptr();
+	TSrc *srcPtr = src.Ptr();
+
+	const size_t count = Min(dest.Count(), src.Count());
+
+	for (size_t i = 0; i < count; i++)
+		processor(destPtr[i], srcPtr[i]);
+}
+
+template<class TDest, class TSrc, class TProcessor>
+rkit::Result rkit::CheckedProcessParallelSpans(const Span<TDest> &dest, const Span<TSrc> &src, const TProcessor &processor)
+{
+	RKIT_ASSERT(dest.Count() == src.Count());
+
+	TDest *destPtr = dest.Ptr();
+	TSrc *srcPtr = src.Ptr();
+
+	const size_t count = Min(dest.Count(), src.Count());
+
+	for (size_t i = 0; i < count; i++)
+	{
+		RKIT_CHECK(processor(destPtr[i], srcPtr[i]));
+	}
+
+	return ResultCode::kOK;
 }

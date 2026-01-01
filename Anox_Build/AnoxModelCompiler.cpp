@@ -1,5 +1,6 @@
 #include "AnoxModelCompiler.h"
 
+#include "rkit/Core/DeduplicatedList.h"
 #include "rkit/Core/Endian.h"
 #include "rkit/Core/FPControl.h"
 #include "rkit/Core/HashTable.h"
@@ -1127,7 +1128,7 @@ namespace anox { namespace buildsystem
 
 	uint32_t AnoxMDACompiler::GetVersion() const
 	{
-		return 2;
+		return 3;
 	}
 
 	rkit::Result AnoxMDACompiler::ExpectLine(rkit::ConstSpan<char> &outLine, rkit::ConstSpan<char> &fileSpan)
@@ -1380,6 +1381,8 @@ namespace anox { namespace buildsystem
 
 	rkit::Result AnoxCTCCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
+		rkit::DeduplicatedList<rkit::data::ContentID> materialContentIDs;
+
 		rkit::CIPath ctcPath;
 		RKIT_CHECK(ctcPath.Set(depsNode->GetIdentifier()));
 
@@ -1629,7 +1632,17 @@ namespace anox { namespace buildsystem
 			rkit::CIPath compiledMaterialPath;
 			RKIT_CHECK(MaterialCompiler::ConstructOutputPath(compiledMaterialPath, data::MaterialResourceType::kModel, materialPath.ToString()));
 
-			RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, skinPass.m_materialContentID));
+			rkit::data::ContentID materialContentID;
+			RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, materialContentID));
+
+			size_t materialIndex = 0;
+			RKIT_CHECK(materialContentIDs.AddAndGetIndex(materialIndex, materialContentID));
+
+			typedef uint16_t StoredMaterialIndex_t;
+			if (materialIndex > std::numeric_limits<StoredMaterialIndex_t>::max())
+				return rkit::ResultCode::kIntegerOverflow;
+
+			skinPass.m_materialIndex = static_cast<StoredMaterialIndex_t>(materialIndex);
 
 			RKIT_CHECK(outSkins.Append(skin));
 			RKIT_CHECK(outSkinPasses.Append(skinPass));
@@ -1797,6 +1810,16 @@ namespace anox { namespace buildsystem
 
 		outHeader.m_numSubModels = static_cast<uint8_t>(outSubModels.Count());
 
+		const rkit::ConstSpan<rkit::data::ContentID> outMaterials = materialContentIDs.GetItems();
+
+		if (outMaterials.Count() > std::numeric_limits<uint16_t>::max())
+		{
+			rkit::log::Error("Too many materials");
+			return rkit::ResultCode::kDataError;
+		}
+
+		outHeader.m_numMaterials = static_cast<uint16_t>(outMaterials.Count());
+
 		if (outAnimations.Count() > 127)
 		{
 			rkit::log::Error("Too many animations");
@@ -1853,7 +1876,10 @@ namespace anox { namespace buildsystem
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
 		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outputPath, outFile));
 
+		// Start writing the file
 		RKIT_CHECK(outFile->WriteOneBinary(outHeader));
+
+		RKIT_CHECK(outFile->WriteAllSpan(outMaterials));
 
 		RKIT_CHECK(outFile->WriteOneBinary(outProfile));
 
@@ -2235,7 +2261,7 @@ namespace anox { namespace buildsystem
 
 	uint32_t AnoxCTCCompiler::GetVersion() const
 	{
-		return 1;
+		return 2;
 	}
 
 	rkit::Result AnoxCTCCompilerBase::ConstructOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier)
@@ -2265,6 +2291,8 @@ namespace anox { namespace buildsystem
 	rkit::Result AnoxModelCompilerCommon::CompileMDA(rkit::CIPath &outputPath, UncompiledMDAData &mdaData, bool autoSkin, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		rkit::FloatingPointStateScope scope(rkit::FloatingPointState::GetCurrent().AppendIEEEStrict());
+
+		rkit::DeduplicatedList<rkit::data::ContentID> materialContentIDs;
 
 		rkit::UniquePtr<rkit::ISeekableReadStream> inputFile;
 		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, mdaData.m_baseModel, inputFile));
@@ -2940,7 +2968,17 @@ namespace anox { namespace buildsystem
 						rkit::CIPath compiledMaterialPath;
 						RKIT_CHECK(MaterialCompiler::ConstructOutputPath(compiledMaterialPath, data::MaterialResourceType::kModel, materialPath));
 
-						RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, outPass.m_materialContentID));
+						rkit::data::ContentID materialContentID;
+						RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, materialContentID));
+
+						typedef uint16_t StoredMaterialIndex_t;
+						size_t materialIndex = 0;
+						RKIT_CHECK(materialContentIDs.AddAndGetIndex(materialIndex, materialContentID));
+
+						if (materialIndex > std::numeric_limits<uint16_t>::max())
+							return rkit::ResultCode::kIntegerOverflow;
+
+						outPass.m_materialIndex = static_cast<StoredMaterialIndex_t>(materialIndex);
 
 						bool needMaterialData = false;
 						outPass.m_clampFlag = (inPass.m_clamp ? 1 : 0);
@@ -3019,6 +3057,8 @@ namespace anox { namespace buildsystem
 		}
 
 		// Construct final header
+		const rkit::ConstSpan<rkit::data::ContentID> materials = materialContentIDs.GetItems();
+
 		if (numTextures > 0xff)
 		{
 			rkit::log::Error("Too many materials");
@@ -3061,6 +3101,12 @@ namespace anox { namespace buildsystem
 			return rkit::ResultCode::kDataError;
 		}
 
+		if (materials.Count() > 0xffffu)
+		{
+			rkit::log::Error("Too many materials");
+			return rkit::ResultCode::kDataError;
+		}
+
 		data::MDAModelHeader outHeader = {};
 
 		for (const UncompiledTriList &triList : triLists)
@@ -3083,12 +3129,16 @@ namespace anox { namespace buildsystem
 		outHeader.m_numMorphedPoints = static_cast<uint16_t>(numMorphedPoints);
 		outHeader.m_numAnimations7_AnimationType1 = static_cast<uint8_t>(animations.Count());
 		outHeader.m_numProfiles = static_cast<uint8_t>(profiles.Count());
+		outHeader.m_numMaterials = static_cast<uint16_t>(materials.Count());
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
 		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outputPath, outFile));
 
 		// Write header
 		RKIT_CHECK(outFile->WriteOneBinary(outHeader));
+
+		// Write materials
+		RKIT_CHECK(outFile->WriteAllSpan(materials));
 
 		// Write profiles
 		RKIT_CHECK(outFile->WriteAllSpan(profiles.ToSpan()));
@@ -3294,7 +3344,7 @@ namespace anox { namespace buildsystem
 
 	uint32_t AnoxMD2Compiler::GetVersion() const
 	{
-		return 1;
+		return 2;
 	}
 
 	rkit::Result AnoxMDACompilerBase::ConstructOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier)

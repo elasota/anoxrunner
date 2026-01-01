@@ -134,31 +134,31 @@ namespace rkit { namespace traits { namespace priv {
 
 	template<class TTargetType, class TDispatchMetadataType, class TReturnType, class... TParams>
 	struct TraitVTableSlotBinderBase2<TraitRefType::kNone, TTargetType, TDispatchMetadataType, TReturnType, TypeList<TParams...>>
-		: public TDispatchMetadataType::InstanceDispatcher<TTargetType, TTargetType, TReturnType, TParams...>
+		: public TDispatchMetadataType::template InstanceDispatcher<TTargetType, TTargetType, TReturnType, TParams...>
 	{
 	};
 
 	template<class TTargetType, class TDispatchMetadataType, class TReturnType, class... TParams>
 	struct TraitVTableSlotBinderBase2<TraitRefType::kConst, TTargetType, TDispatchMetadataType, TReturnType, TypeList<TParams...>>
-		: public TDispatchMetadataType::InstanceDispatcher<TTargetType, const TTargetType, TReturnType, TParams...>
+		: public TDispatchMetadataType::template InstanceDispatcher<TTargetType, const TTargetType, TReturnType, TParams...>
 	{
 	};
 
 	template<class TTargetType, class TDispatchMetadataType, class TReturnType, class... TParams>
 	struct TraitVTableSlotBinderBase2<TraitRefType::kVolatile, TTargetType, TDispatchMetadataType, TReturnType, TypeList<TParams...>>
-		: public TDispatchMetadataType::InstanceDispatcher<TTargetType, volatile TTargetType, TReturnType, TParams...>
+		: public TDispatchMetadataType::template InstanceDispatcher<TTargetType, volatile TTargetType, TReturnType, TParams...>
 	{
 	};
 
 	template<class TTargetType, class TDispatchMetadataType, class TReturnType, class... TParams>
 	struct TraitVTableSlotBinderBase2<TraitRefType::kConstVolatile, TTargetType, TDispatchMetadataType, TReturnType, TypeList<TParams...>>
-		: public TDispatchMetadataType::InstanceDispatcher<TTargetType, const volatile TTargetType, TReturnType, TParams...>
+		: public TDispatchMetadataType::template InstanceDispatcher<TTargetType, const volatile TTargetType, TReturnType, TParams...>
 	{
 	};
 
 	template<class TTargetType, class TDispatchMetadataType, class TReturnType, class... TParams>
 	struct TraitVTableSlotBinderBase2<TraitRefType::kStatic, TTargetType, TDispatchMetadataType, TReturnType, TypeList<TParams...>>
-		: public TDispatchMetadataType::StaticDispatcher<TTargetType, TReturnType, TParams...>
+		: public TDispatchMetadataType::template StaticDispatcher<TTargetType, TReturnType, TParams...>
 	{
 	};
 
@@ -191,7 +191,7 @@ namespace rkit { namespace traits { namespace priv {
 	{
 	};
 
-	template<class TDispatchTag, TraitRefType TRefType, class TTargetType, size_t TNumFunctions>
+	template<class TDispatchTag, TraitRefType TRefType, class TTargetType>
 	struct TraitVTableBinderBase<TDispatchTag, TRefType, TTargetType, 1, true>
 	{
 		static TraitVTableReference<1> Bind();
@@ -415,7 +415,7 @@ namespace rkit { namespace traits { namespace priv {
 			)...
 	};
 
-	template<class TDispatchTag, TraitRefType TRefType, class TTargetType, size_t TNumFunctions>
+	template<class TDispatchTag, TraitRefType TRefType, class TTargetType>
 	TraitVTableReference<1> TraitVTableBinderBase<TDispatchTag, TRefType, TTargetType, 1, true>::Bind()
 	{
 		const typename MethodDispatchMetadata<TDispatchTag, 0>::CallbackType_t cb = TraitVTableSlotBinder<TDispatchTag, TRefType, TTargetType, 0>::Dispatch;
@@ -532,7 +532,7 @@ namespace rkit { namespace traits {
 	class TraitRef final : public priv::TraitRefBases<TraitRef<TTraits...>, TTraits...>
 	{
 	public:
-		friend class priv::TraitPrivateReader;
+		friend struct priv::TraitPrivateReader;
 
 		TraitRef() = default;
 
@@ -609,7 +609,7 @@ namespace rkit { namespace traits {
 	template<class T>
 	TraitRef<TTraits...> TraitRef<TTraits...>::ForClass()
 	{
-		return TraitRef<TTraits...>(obj, priv::TraitVTablesReferenceCollection<TTraits...>::template Bind<TraitRefType::kStatic, T>());
+		return TraitRef<TTraits...>(nullptr, priv::TraitVTablesReferenceCollection<TTraits...>::template Bind<TraitRefType::kStatic, T>());
 	}
 
 	template<class... TTraits>

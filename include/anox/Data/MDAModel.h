@@ -21,9 +21,11 @@ namespace anox { namespace data
 		rkit::endian::LittleUInt16_t m_numMorphKeys;
 		rkit::endian::LittleUInt16_t m_numBones;
 		rkit::endian::LittleUInt16_t m_numFrames;
+		rkit::endian::LittleUInt16_t m_numMaterials;
 		rkit::endian::LittleUInt32_t m_numPoints;
 		rkit::endian::LittleUInt32_t m_numMorphedPoints;
 
+		// ContentID m_materialContentIDs[m_numMaterials]
 		// MDAProfile m_profiles[m_numProfiles]
 		// char m_profileConditions[m_numProfiles][profile.m_conditionLength]
 		// MDASkin m_skins[m_numProfiles][m_numSkins]
@@ -125,7 +127,7 @@ namespace anox { namespace data
 
 	struct MDASkinPass
 	{
-		rkit::data::ContentID m_materialContentID;
+		rkit::endian::LittleUInt16_t m_materialIndex;
 		uint8_t m_clampFlag = 0;
 		uint8_t m_depthWriteFlag = 1;
 		uint8_t m_alphaTestMode = static_cast<uint8_t>(MDAAlphaTestMode::kDisabled);
