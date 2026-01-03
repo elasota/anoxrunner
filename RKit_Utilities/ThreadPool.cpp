@@ -134,7 +134,7 @@ namespace rkit { namespace utils
 
 		// DO NOT destroy the job queue here!
 		// Closing the thread pool will put the job queue in single-threaded mode and wake up
-		// all waiting threads to terminate them, but there may still be outstanding JobSignallers
+		// all waiting threads to terminate them, but there may still be outstanding JobSignalers
 		// referencing the job queue.
 		//m_jobQueue.Reset();
 

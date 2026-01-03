@@ -3,9 +3,9 @@
 namespace anox
 {
 	AnoxAbstractSingleFileLoaderAnalyzeJob::AnoxAbstractSingleFileLoaderAnalyzeJob(const rkit::RCPtr<AnoxAbstractSingleFileResourceLoaderState> &state,
-		const rkit::RCPtr<rkit::JobSignaller> &waitForDependenciesSignaller)
+		const rkit::RCPtr<rkit::JobSignaler> &waitForDependenciesSignaler)
 		: m_state(state)
-		, m_waitForDependenciesSignaller(waitForDependenciesSignaller)
+		, m_waitForDependenciesSignaler(waitForDependenciesSignaler)
 	{
 	}
 
@@ -17,17 +17,17 @@ namespace anox
 
 		if (!dependencyJobs.Count())
 		{
-			if (m_waitForDependenciesSignaller.IsValid())
-				m_waitForDependenciesSignaller->SignalDone(rkit::ResultCode::kOK);
+			if (m_waitForDependenciesSignaler.IsValid())
+				m_waitForDependenciesSignaler->SignalDone(rkit::ResultCode::kOK);
 		}
 		else
 		{
-			RKIT_ASSERT(m_waitForDependenciesSignaller.IsValid());
+			RKIT_ASSERT(m_waitForDependenciesSignaler.IsValid());
 
 			rkit::IJobQueue &jobQueue = m_state->m_systems.m_fileSystem->GetJobQueue();
 
 			rkit::UniquePtr<rkit::IJobRunner> dependenciesDoneJobRunner;
-			RKIT_CHECK(jobQueue.CreateSignalJobRunner(dependenciesDoneJobRunner, m_waitForDependenciesSignaller));
+			RKIT_CHECK(jobQueue.CreateSignalJobRunner(dependenciesDoneJobRunner, m_waitForDependenciesSignaler));
 			RKIT_CHECK(jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(dependenciesDoneJobRunner), dependencyJobs.ToSpan()));
 		}
 

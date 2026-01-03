@@ -116,13 +116,13 @@ namespace anox
 	public:
 		explicit AnoxAbstractSingleFileLoaderAnalyzeJob(
 			const rkit::RCPtr<AnoxAbstractSingleFileResourceLoaderState> &state,
-			const rkit::RCPtr<rkit::JobSignaller> &waitForDependenciesSignaller);
+			const rkit::RCPtr<rkit::JobSignaler> &waitForDependenciesSignaler);
 
 		rkit::Result Run() override;
 
 	private:
 		rkit::RCPtr<AnoxAbstractSingleFileResourceLoaderState> m_state;
-		rkit::RCPtr<rkit::JobSignaller> m_waitForDependenciesSignaller;
+		rkit::RCPtr<rkit::JobSignaler> m_waitForDependenciesSignaler;
 	};
 
 	class AnoxAbstractSingleFileLoaderLoadJob final : public rkit::IJobRunner
@@ -223,17 +223,17 @@ namespace anox
 
 		if (TLoaderInfo::kHasAnalysisPhase)
 		{
-			rkit::RCPtr<rkit::JobSignaller> waitForDependenciesSignaller;
+			rkit::RCPtr<rkit::JobSignaler> waitForDependenciesSignaler;
 			if (TLoaderInfo::kHasDependencies)
 			{
-				RKIT_CHECK(jobQueue.CreateSignalledJob(waitForDependenciesSignaller, waitForDependenciesJob));
+				RKIT_CHECK(jobQueue.CreateSignaledJob(waitForDependenciesSignaler, waitForDependenciesJob));
 			}
 
 			rkit::RCPtr<rkit::Job> loadFileJob;
 			RKIT_CHECK(CreateLoadEntireFileJob(loadFileJob, loaderState.FieldRef(&AnoxAbstractSingleFileResourceLoaderState::m_fileContents), fileSystem, key));
 
 			rkit::UniquePtr<rkit::IJobRunner> analysisJobRunner;
-			RKIT_CHECK(rkit::New<AnoxAbstractSingleFileLoaderAnalyzeJob>(analysisJobRunner, loaderState, waitForDependenciesSignaller));
+			RKIT_CHECK(rkit::New<AnoxAbstractSingleFileLoaderAnalyzeJob>(analysisJobRunner, loaderState, waitForDependenciesSignaler));
 
 			rkit::RCPtr<rkit::Job> analysisJob;
 			RKIT_CHECK(fileSystem.GetJobQueue().CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(analysisJobRunner), loadFileJob));

@@ -42,7 +42,7 @@ namespace anox
 		explicit AnoxBSPLoaderAnalyzeJob(const rkit::RCPtr<AnoxBSPModelResource> &resource,
 			const rkit::RCPtr<AnoxBSPModelResourceLoaderState> &state, rkit::IJobQueue &jobQueue,
 			AnoxResourceManagerBase &resManager,
-			const rkit::RCPtr<rkit::JobSignaller> &waitForDependenciesSignaller);
+			const rkit::RCPtr<rkit::JobSignaler> &waitForDependenciesSignaler);
 
 		rkit::Result Run() override;
 
@@ -63,7 +63,7 @@ namespace anox
 		rkit::RCPtr<AnoxBSPModelResourceLoaderState> m_state;
 		rkit::IJobQueue &m_jobQueue;
 		AnoxResourceManagerBase &m_resManager;
-		rkit::RCPtr<rkit::JobSignaller> m_waitForDependenciesSignaller;
+		rkit::RCPtr<rkit::JobSignaler> m_waitForDependenciesSignaler;
 	};
 
 	class AnoxBSPLoaderProcessJob final : public rkit::IJobRunner
@@ -93,14 +93,14 @@ namespace anox
 		RKIT_CHECK(rkit::New<AnoxBSPModelResourceLoaderState>(loaderState));
 
 		rkit::RCPtr<rkit::Job> waitForDependenciesJob;
-		rkit::RCPtr<rkit::JobSignaller> waitForDependenciesSignaller;
-		RKIT_CHECK(jobQueue.CreateSignalledJob(waitForDependenciesSignaller, waitForDependenciesJob));
+		rkit::RCPtr<rkit::JobSignaler> waitForDependenciesSignaler;
+		RKIT_CHECK(jobQueue.CreateSignaledJob(waitForDependenciesSignaler, waitForDependenciesJob));
 
 		rkit::RCPtr<rkit::Job> loadFileJob;
 		RKIT_CHECK(CreateLoadEntireFileJob(loadFileJob, loaderState.FieldRef(&AnoxBSPModelResourceLoaderState::m_bspFileContents), fileSystem, key));
 
 		rkit::UniquePtr<rkit::IJobRunner> analysisJobRunner;
-		RKIT_CHECK(rkit::New<AnoxBSPLoaderAnalyzeJob>(analysisJobRunner, resource, loaderState, jobQueue, *systems.m_resManager, waitForDependenciesSignaller));
+		RKIT_CHECK(rkit::New<AnoxBSPLoaderAnalyzeJob>(analysisJobRunner, resource, loaderState, jobQueue, *systems.m_resManager, waitForDependenciesSignaler));
 
 		rkit::RCPtr<rkit::Job> analysisJob;
 		RKIT_CHECK(fileSystem.GetJobQueue().CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(analysisJobRunner), loadFileJob));
@@ -111,12 +111,12 @@ namespace anox
 	}
 
 	AnoxBSPLoaderAnalyzeJob::AnoxBSPLoaderAnalyzeJob(const rkit::RCPtr<AnoxBSPModelResource> &resource,
-		const rkit::RCPtr<AnoxBSPModelResourceLoaderState> &state, rkit::IJobQueue &jobQueue, AnoxResourceManagerBase &resManager, const rkit::RCPtr<rkit::JobSignaller> &waitForDependenciesSignaller)
+		const rkit::RCPtr<AnoxBSPModelResourceLoaderState> &state, rkit::IJobQueue &jobQueue, AnoxResourceManagerBase &resManager, const rkit::RCPtr<rkit::JobSignaler> &waitForDependenciesSignaler)
 		: m_resource(resource)
 		, m_state(state)
 		, m_jobQueue(jobQueue)
 		, m_resManager(resManager)
-		, m_waitForDependenciesSignaller(waitForDependenciesSignaller)
+		, m_waitForDependenciesSignaler(waitForDependenciesSignaler)
 	{
 	}
 
@@ -168,7 +168,7 @@ namespace anox
 
 		{
 			rkit::UniquePtr<rkit::IJobRunner> dependenciesDoneJobRunner;
-			RKIT_CHECK(m_jobQueue.CreateSignalJobRunner(dependenciesDoneJobRunner, m_waitForDependenciesSignaller));
+			RKIT_CHECK(m_jobQueue.CreateSignalJobRunner(dependenciesDoneJobRunner, m_waitForDependenciesSignaler));
 			RKIT_CHECK(m_jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(dependenciesDoneJobRunner), resourceJobs.ToSpan().ToValueISpan()));
 		}
 

@@ -76,11 +76,11 @@ namespace rkit { namespace utils
 		JobQueueWaitRingEntry m_distWaitingThreadsRing;
 	};
 
-	class JobSignallerImpl final : public JobSignaller
+	class JobSignalerImpl final : public JobSignaler
 	{
 	public:
-		JobSignallerImpl(JobQueue &jobQueue, const RCPtr<JobImpl> &job);
-		~JobSignallerImpl();
+		JobSignalerImpl(JobQueue &jobQueue, const RCPtr<JobImpl> &job);
+		~JobSignalerImpl();
 
 		void SignalDone(const Result &result) override;
 
@@ -88,7 +88,7 @@ namespace rkit { namespace utils
 		// Needed due to vtable being trashed in destructor
 		void InternalSignalDone(const Result &result);
 
-		bool m_haveSignalled = false;
+		bool m_haveSignaled = false;
 
 		JobQueue &m_jobQueue;
 		RCPtr<JobImpl> m_job;
@@ -146,15 +146,15 @@ namespace rkit { namespace utils
 	{
 	public:
 		friend class JobImpl;
-		friend class JobSignallerImpl;
+		friend class JobSignalerImpl;
 
 		explicit JobQueue(IMallocDriver *alloc);
 		~JobQueue();
 
 		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const JobDependencyList &dependencies) override;
 
-		Result CreateSignalledJob(RCPtr<JobSignaller> &outSignaler, RCPtr<Job> &outJob) override;
-		Result CreateSignalJobRunner(UniquePtr<IJobRunner> &outJobRunner, const RCPtr<JobSignaller> &signaller) override;
+		Result CreateSignaledJob(RCPtr<JobSignaler> &outSignaler, RCPtr<Job> &outJob) override;
+		Result CreateSignalJobRunner(UniquePtr<IJobRunner> &outJobRunner, const RCPtr<JobSignaler> &signaller) override;
 
 		// Wait for work or for a specific job.
 		// wakeEvent: Event to use for waking up the thread
@@ -184,12 +184,12 @@ namespace rkit { namespace utils
 		class SignalJobRunner final : public IJobRunner
 		{
 		public:
-			explicit SignalJobRunner(const RCPtr<JobSignaller> &signaller);
+			explicit SignalJobRunner(const RCPtr<JobSignaler> &signaller);
 
 			Result Run() override;
 
 		private:
-			RCPtr<JobSignaller> m_signaller;
+			RCPtr<JobSignaler> m_signaller;
 		};
 
 		Pair<RCPtr<Job>, WaitResultType> WaitForWorkOrJob(const ISpan<JobType> &jobTypes, bool waitIfDepleted, IEvent *wakeEvent, IEvent *terminatedEvent, JobImpl *jobToWaitFor);
@@ -291,26 +291,26 @@ namespace rkit { namespace utils
 		m_jobQueue.JobDone(this, jobSucceeded);
 	}
 
-	JobSignallerImpl::JobSignallerImpl(JobQueue &jobQueue, const RCPtr<JobImpl> &job)
+	JobSignalerImpl::JobSignalerImpl(JobQueue &jobQueue, const RCPtr<JobImpl> &job)
 		: m_jobQueue(jobQueue)
 		, m_job(job)
 	{
 	}
 
-	JobSignallerImpl::~JobSignallerImpl()
+	JobSignalerImpl::~JobSignalerImpl()
 	{
-		if (!m_haveSignalled)
+		if (!m_haveSignaled)
 			InternalSignalDone(ResultCode::kJobAborted);
 	}
 
-	void JobSignallerImpl::SignalDone(const Result &result)
+	void JobSignalerImpl::SignalDone(const Result &result)
 	{
 		InternalSignalDone(result);
 	}
 
-	void JobSignallerImpl::InternalSignalDone(const Result &result)
+	void JobSignalerImpl::InternalSignalDone(const Result &result)
 	{
-		m_haveSignalled = true;
+		m_haveSignaled = true;
 
 		if (!utils::ResultIsOK(result))
 			m_jobQueue.Fault(result);
@@ -377,7 +377,7 @@ namespace rkit { namespace utils
 		return m_wakeDisposition;
 	}
 
-	JobQueue::SignalJobRunner::SignalJobRunner(const RCPtr<JobSignaller> &signaller)
+	JobQueue::SignalJobRunner::SignalJobRunner(const RCPtr<JobSignaler> &signaller)
 		: m_signaller(signaller)
 	{
 		RKIT_ASSERT(signaller.IsValid());
@@ -553,13 +553,13 @@ namespace rkit { namespace utils
 		return ResultCode::kOK;
 	}
 
-	Result JobQueue::CreateSignalledJob(RCPtr<JobSignaller> &outSignaler, RCPtr<Job> &outJob)
+	Result JobQueue::CreateSignaledJob(RCPtr<JobSignaler> &outSignaler, RCPtr<Job> &outJob)
 	{
 		RCPtr<JobImpl> resultJob;
 		RKIT_CHECK(NewWithAlloc<JobImpl>(resultJob, m_alloc, *this, UniquePtr<IJobRunner>(), 0, JobType::kNormalPriority));
 
-		RCPtr<JobSignallerImpl> signaller;
-		RKIT_CHECK(New<JobSignallerImpl>(signaller, *this, resultJob));
+		RCPtr<JobSignalerImpl> signaller;
+		RKIT_CHECK(New<JobSignalerImpl>(signaller, *this, resultJob));
 
 		outSignaler = std::move(signaller);
 		outJob = std::move(resultJob);
@@ -567,7 +567,7 @@ namespace rkit { namespace utils
 		return ResultCode::kOK;
 	}
 
-	Result JobQueue::CreateSignalJobRunner(UniquePtr<IJobRunner> &outJobRunner, const RCPtr<JobSignaller> &signaller)
+	Result JobQueue::CreateSignalJobRunner(UniquePtr<IJobRunner> &outJobRunner, const RCPtr<JobSignaler> &signaller)
 	{
 		return New<SignalJobRunner>(outJobRunner, signaller);
 	}

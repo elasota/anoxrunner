@@ -320,7 +320,7 @@ namespace anox
 			explicit AllocateTextureStorageAndPostCopyJobRunner(GraphicsSubsystem &graphicsSubsystem,
 				const rkit::RCPtr<Texture> &texture,
 				const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData,
-				const rkit::RCPtr<rkit::JobSignaller> &doneCopyingSignaller);
+				const rkit::RCPtr<rkit::JobSignaler> &doneCopyingSignaler);
 
 			rkit::Result Run() override;
 
@@ -328,7 +328,7 @@ namespace anox
 			GraphicsSubsystem &m_graphicsSubsystem;
 			const rkit::RCPtr<Texture> m_texture;
 			const rkit::RCPtr<rkit::Vector<uint8_t>> m_textureData;
-			rkit::RCPtr<rkit::JobSignaller> m_doneCopyingSignaller;
+			rkit::RCPtr<rkit::JobSignaler> m_doneCopyingSignaler;
 		};
 
 		class StripedMemCopyJobRunner final : public rkit::IJobRunner
@@ -594,7 +594,7 @@ namespace anox
 			rkit::RCPtr<Texture> m_texture;
 			rkit::RCPtr<rkit::Vector<uint8_t>> m_textureData;
 			size_t m_textureDataOffset = 0;
-			rkit::RCPtr<rkit::JobSignaller> m_doneSignaller;
+			rkit::RCPtr<rkit::JobSignaler> m_doneSignaler;
 
 			rkit::render::ImageSpec m_spec = {};
 
@@ -1056,11 +1056,11 @@ namespace anox
 		GraphicsSubsystem &graphicsSubsystem,
 		const rkit::RCPtr<Texture> &texture,
 		const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData,
-		const rkit::RCPtr<rkit::JobSignaller> &doneCopyingSignaller)
+		const rkit::RCPtr<rkit::JobSignaler> &doneCopyingSignaler)
 		: m_graphicsSubsystem(graphicsSubsystem)
 		, m_texture(texture)
 		, m_textureData(textureData)
-		, m_doneCopyingSignaller(doneCopyingSignaller)
+		, m_doneCopyingSignaler(doneCopyingSignaler)
 	{
 	}
 
@@ -1290,15 +1290,15 @@ namespace anox
 
 		if (m_graphicsSubsystem.m_renderDevice->SupportsInitialTextureData())
 		{
-			if (m_doneCopyingSignaller)
-				m_doneCopyingSignaller->SignalDone(rkit::ResultCode::kOK);
+			if (m_doneCopyingSignaler)
+				m_doneCopyingSignaler->SignalDone(rkit::ResultCode::kOK);
 		}
 		else
 		{
 			rkit::RCPtr<TextureUploadTask> textureUploadTask;
 			RKIT_CHECK(rkit::New<TextureUploadTask>(textureUploadTask));
 
-			textureUploadTask->m_doneSignaller = m_doneCopyingSignaller;
+			textureUploadTask->m_doneSignaler = m_doneCopyingSignaler;
 			textureUploadTask->m_texture = m_texture;
 			textureUploadTask->m_textureData = m_textureData;
 			textureUploadTask->m_textureDataOffset = headerSize;
@@ -1879,8 +1879,8 @@ namespace anox
 
 	void GraphicsSubsystem::TextureUploadTask::OnUploadCompleted()
 	{
-		if (m_doneSignaller.IsValid())
-			m_doneSignaller->SignalDone(rkit::ResultCode::kOK);
+		if (m_doneSignaler.IsValid())
+			m_doneSignaler->SignalDone(rkit::ResultCode::kOK);
 	}
 
 
@@ -2960,17 +2960,17 @@ namespace anox
 
 		rkit::IJobQueue &jobQueue = *m_threadPool.GetJobQueue();
 
-		rkit::RCPtr<rkit::JobSignaller> doneCopyingSignaller;
+		rkit::RCPtr<rkit::JobSignaler> doneCopyingSignaler;
 		rkit::RCPtr<rkit::Job> doneCopyingJob;
 		if (outJob)
 		{
-			RKIT_CHECK(jobQueue.CreateSignalledJob(doneCopyingSignaller, doneCopyingJob));
+			RKIT_CHECK(jobQueue.CreateSignaledJob(doneCopyingSignaler, doneCopyingJob));
 
 			*outJob = doneCopyingJob;
 		}
 
 		rkit::UniquePtr<AllocateTextureStorageAndPostCopyJobRunner> allocStorageJobRunner;
-		RKIT_CHECK(rkit::New<AllocateTextureStorageAndPostCopyJobRunner>(allocStorageJobRunner, *this, texture, textureData, doneCopyingSignaller));
+		RKIT_CHECK(rkit::New<AllocateTextureStorageAndPostCopyJobRunner>(allocStorageJobRunner, *this, texture, textureData, doneCopyingSignaler));
 
 		RKIT_CHECK(jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(allocStorageJobRunner), dependencies));
 

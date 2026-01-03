@@ -252,7 +252,7 @@ namespace anox
 
 		if (edef.m_modelContentID.IsNull())
 		{
-			m_waitForDependenciesSignaller->SignalDone(rkit::ResultCode::kOK);
+			m_waitForDependenciesSignaler->SignalDone(rkit::ResultCode::kOK);
 		}
 		else
 		{
@@ -261,7 +261,7 @@ namespace anox
 			RKIT_CHECK(m_resManager.GetContentIDKeyedResource(&loadModelJob, result, resloaders::kMDAModelResourceTypeCode, edef.m_modelContentID));
 
 			rkit::UniquePtr<rkit::IJobRunner> dependenciesDoneJobRunner;
-			RKIT_CHECK(m_jobQueue.CreateSignalJobRunner(dependenciesDoneJobRunner, m_waitForDependenciesSignaller));
+			RKIT_CHECK(m_jobQueue.CreateSignalJobRunner(dependenciesDoneJobRunner, m_waitForDependenciesSignaler));
 			RKIT_CHECK(m_jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(dependenciesDoneJobRunner), loadModelJob));
 		}
 		*/

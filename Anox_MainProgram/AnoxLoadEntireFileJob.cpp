@@ -15,7 +15,7 @@ namespace anox
 	{
 	public:
 		AnoxFileResourcePostIOLoadJobRunner(rkit::IJobQueue &jobQueue, const rkit::RCPtr<rkit::Vector<uint8_t>> &fileBlob,
-			const rkit::Future<rkit::AsyncFileOpenReadResult> &openFileFuture, rkit::RCPtr<rkit::JobSignaller> &&signaller);
+			const rkit::Future<rkit::AsyncFileOpenReadResult> &openFileFuture, rkit::RCPtr<rkit::JobSignaler> &&signaller);
 
 		rkit::Result Run() override;
 
@@ -23,13 +23,13 @@ namespace anox
 		rkit::IJobQueue &m_jobQueue;
 		rkit::RCPtr<rkit::Vector<uint8_t>> m_fileBlob;
 		rkit::Future<rkit::AsyncFileOpenReadResult> m_openFileFuture;
-		rkit::RCPtr<rkit::JobSignaller> m_signaller;
+		rkit::RCPtr<rkit::JobSignaler> m_signaller;
 	};
 
 	class AnoxFileResourceIOCompleter final
 	{
 	public:
-		explicit AnoxFileResourceIOCompleter(const rkit::RCPtr<rkit::JobSignaller> &signaller, const rkit::RCPtr<rkit::Vector<uint8_t>> &fileBlob, size_t expectedBytes);
+		explicit AnoxFileResourceIOCompleter(const rkit::RCPtr<rkit::JobSignaler> &signaller, const rkit::RCPtr<rkit::Vector<uint8_t>> &fileBlob, size_t expectedBytes);
 
 		void SetSelf(rkit::UniquePtr<AnoxFileResourceIOCompleter> &&self);
 
@@ -38,13 +38,13 @@ namespace anox
 	private:
 		void Complete(const rkit::Result &result, size_t bytesRead);
 
-		rkit::RCPtr<rkit::JobSignaller> m_signaller;
+		rkit::RCPtr<rkit::JobSignaler> m_signaller;
 		rkit::UniquePtr<AnoxFileResourceIOCompleter> m_self;
 		rkit::RCPtr<rkit::Vector<uint8_t>> m_fileBlob;
 		size_t m_expectedBytes;
 	};
 
-	AnoxFileResourcePostIOLoadJobRunner::AnoxFileResourcePostIOLoadJobRunner(rkit::IJobQueue &jobQueue, const rkit::RCPtr<rkit::Vector<uint8_t>> &fileBlob, const rkit::Future<rkit::AsyncFileOpenReadResult> &openFileFuture, rkit::RCPtr<rkit::JobSignaller> &&signaller)
+	AnoxFileResourcePostIOLoadJobRunner::AnoxFileResourcePostIOLoadJobRunner(rkit::IJobQueue &jobQueue, const rkit::RCPtr<rkit::Vector<uint8_t>> &fileBlob, const rkit::Future<rkit::AsyncFileOpenReadResult> &openFileFuture, rkit::RCPtr<rkit::JobSignaler> &&signaller)
 		: m_jobQueue(jobQueue)
 		, m_fileBlob(fileBlob)
 		, m_openFileFuture(openFileFuture)
@@ -83,7 +83,7 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	AnoxFileResourceIOCompleter::AnoxFileResourceIOCompleter(const rkit::RCPtr<rkit::JobSignaller> &signaller, const rkit::RCPtr<rkit::Vector<uint8_t>> &fileBlob, size_t expectedBytes)
+	AnoxFileResourceIOCompleter::AnoxFileResourceIOCompleter(const rkit::RCPtr<rkit::JobSignaler> &signaller, const rkit::RCPtr<rkit::Vector<uint8_t>> &fileBlob, size_t expectedBytes)
 		: m_signaller(signaller)
 		, m_fileBlob(fileBlob)
 		, m_expectedBytes(expectedBytes)
@@ -115,9 +115,9 @@ namespace anox
 	{
 		rkit::Future<rkit::AsyncFileOpenReadResult> openFileFuture(openFileFutureContainer);
 
-		rkit::RCPtr<rkit::JobSignaller> signaller;
+		rkit::RCPtr<rkit::JobSignaler> signaller;
 		rkit::RCPtr<rkit::Job> ioRequestJob;
-		RKIT_CHECK(jobQueue.CreateSignalledJob(signaller, ioRequestJob));
+		RKIT_CHECK(jobQueue.CreateSignaledJob(signaller, ioRequestJob));
 
 		rkit::UniquePtr<rkit::IJobRunner> postIOJobRunner;
 		rkit::RCPtr<rkit::Job> postIOJob;

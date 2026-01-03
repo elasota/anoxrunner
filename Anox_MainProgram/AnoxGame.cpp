@@ -92,7 +92,7 @@ namespace anox
 		m_graphicsSubsystem.Reset();
 		m_resourceManager.Reset();
 
-		// Destroy thread pool after subsystems (so any JobSignallers are destroyed)
+		// Destroy thread pool after subsystems (so any JobSignalers are destroyed)
 		m_threadPool.Reset();
 	}
 

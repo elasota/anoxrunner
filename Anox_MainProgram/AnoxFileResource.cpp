@@ -15,7 +15,7 @@
 namespace anox
 {
 	// Job chart:
-	// Open -> Post IO Job         (Signaller) -> IO Complete
+	// Open -> Post IO Job         (Signaler) -> IO Complete
 	//             `-----> IO Request --^
 	class AnoxFileResourceLoader;
 
