@@ -33,4 +33,14 @@ namespace anox
 
 		return rkit::ResultCode::kOK;
 	}
+
+	AnoxAbstractSingleFileLoaderLoadJob::AnoxAbstractSingleFileLoaderLoadJob(const rkit::RCPtr<AnoxAbstractSingleFileResourceLoaderState> &state)
+		: m_state(state)
+	{
+	}
+
+	rkit::Result AnoxAbstractSingleFileLoaderLoadJob::Run()
+	{
+		return m_state->m_functions->m_loadFile(*m_state);
+	}
 }

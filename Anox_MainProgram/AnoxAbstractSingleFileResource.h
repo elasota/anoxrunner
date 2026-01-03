@@ -43,6 +43,23 @@ namespace anox { namespace priv {
 		static rkit::Result AnalyzeFile(AnoxAbstractSingleFileResourceLoaderState &state,
 			rkit::HybridVector<rkit::RCPtr<rkit::Job>, 16> &outDependencyJobs);
 	};
+
+	template<class TLoaderInfo, bool THasLoadPhase>
+	struct SingleFileResourceLoaderLoadHelper
+	{
+	};
+
+	template<class TLoaderInfo>
+	struct SingleFileResourceLoaderLoadHelper<TLoaderInfo, false>
+	{
+		static rkit::Result LoadFile(AnoxAbstractSingleFileResourceLoaderState &state);
+	};
+
+	template<class TLoaderInfo>
+	struct SingleFileResourceLoaderLoadHelper<TLoaderInfo, true>
+	{
+		static rkit::Result LoadFile(AnoxAbstractSingleFileResourceLoaderState &state);
+	};
 } }
 
 namespace anox
@@ -53,9 +70,12 @@ namespace anox
 	{
 		bool m_hasDependencies;
 		bool m_hasAnalysisPhase;
+		bool m_hasLoadPhase;
 		rkit::Result(*m_analyzeFile)(
 			AnoxAbstractSingleFileResourceLoaderState &state,
 			rkit::HybridVector<rkit::RCPtr<rkit::Job>, 16> &outDependencyJobs);
+		rkit::Result(*m_loadFile)(
+			AnoxAbstractSingleFileResourceLoaderState &state);
 	};
 
 	template<class TLoaderInfo>
@@ -69,8 +89,10 @@ namespace anox
 	{
 		TLoaderInfo::kHasDependencies,
 		TLoaderInfo::kHasAnalysisPhase,
+		TLoaderInfo::kHasLoadPhase,
 
 		priv::SingleFileResourceLoaderAnalysisHelper<TLoaderInfo, TLoaderInfo::kHasAnalysisPhase, TLoaderInfo::kHasDependencies>::AnalyzeFile,
+		priv::SingleFileResourceLoaderLoadHelper<TLoaderInfo, TLoaderInfo::kHasLoadPhase>::LoadFile,
 	};
 
 	template<class TLoaderInfo>
@@ -101,6 +123,18 @@ namespace anox
 	private:
 		rkit::RCPtr<AnoxAbstractSingleFileResourceLoaderState> m_state;
 		rkit::RCPtr<rkit::JobSignaller> m_waitForDependenciesSignaller;
+	};
+
+	class AnoxAbstractSingleFileLoaderLoadJob final : public rkit::IJobRunner
+	{
+	public:
+		explicit AnoxAbstractSingleFileLoaderLoadJob(
+			const rkit::RCPtr<AnoxAbstractSingleFileResourceLoaderState> &state);
+
+		rkit::Result Run() override;
+
+	private:
+		rkit::RCPtr<AnoxAbstractSingleFileResourceLoaderState> m_state;
 	};
 }
 
@@ -134,9 +168,33 @@ namespace anox { namespace priv {
 	rkit::Result SingleFileResourceLoaderAnalysisHelper<TLoaderInfo, true, false>::AnalyzeFile(AnoxAbstractSingleFileResourceLoaderState &state,
 		rkit::HybridVector<rkit::RCPtr<rkit::Job>, 16> &outDependencyJobs)
 	{
+		using JobRC = typename rkit::RCPtr<rkit::Job>;
+		using VTrait = typename rkit::VectorTrait<JobRC>;
 		// Analysis phase with no dependencies
 		typename TLoaderInfo::State_t &derivedState = static_cast<typename TLoaderInfo::State_t &>(state);
-		return TLoaderInfo::AnalyzeFile(derivedState);
+		typename TLoaderInfo::Resource_t &derivedResource = *static_cast<typename TLoaderInfo::Resource_t *>(state.m_resource);
+		return TLoaderInfo::AnalyzeFile(derivedState, derivedResource);
+	}
+
+	template<class TLoaderInfo>
+	rkit::Result SingleFileResourceLoaderLoadHelper<TLoaderInfo, false>::LoadFile(AnoxAbstractSingleFileResourceLoaderState &state)
+	{
+		// No load phase
+		typename TLoaderInfo::State_t &derivedState = static_cast<typename TLoaderInfo::State_t &>(state);
+		typename TLoaderInfo::Resource_t &derivedResource = *static_cast<typename TLoaderInfo::Resource_t *>(state.m_resource);
+		return rkit::ResultCode::kOK;
+	}
+
+	template<class TLoaderInfo>
+	rkit::Result SingleFileResourceLoaderLoadHelper<TLoaderInfo, true>::LoadFile(AnoxAbstractSingleFileResourceLoaderState &state)
+	{
+		using JobRC = typename rkit::RCPtr<rkit::Job>;
+		using VTrait = typename rkit::VectorTrait<JobRC>;
+
+		// Load phase
+		typename TLoaderInfo::State_t &derivedState = static_cast<typename TLoaderInfo::State_t &>(state);
+		typename TLoaderInfo::Resource_t &derivedResource = *static_cast<typename TLoaderInfo::Resource_t *>(state.m_resource);
+		return TLoaderInfo::LoadFile(derivedState, derivedResource);
 	}
 } }
 
@@ -161,27 +219,44 @@ namespace anox
 		loaderState->m_systems = systems;
 
 		rkit::RCPtr<rkit::Job> waitForDependenciesJob;
-		rkit::RCPtr<rkit::JobSignaller> waitForDependenciesSignaller;
-		if (TLoaderInfo::kHasDependencies)
+		rkit::RCPtr<rkit::Job> loadJob;
+
+		if (TLoaderInfo::kHasAnalysisPhase)
 		{
-			RKIT_CHECK(jobQueue.CreateSignalledJob(waitForDependenciesSignaller, waitForDependenciesJob));
+			rkit::RCPtr<rkit::JobSignaller> waitForDependenciesSignaller;
+			if (TLoaderInfo::kHasDependencies)
+			{
+				RKIT_CHECK(jobQueue.CreateSignalledJob(waitForDependenciesSignaller, waitForDependenciesJob));
+			}
+
+			rkit::RCPtr<rkit::Job> loadFileJob;
+			RKIT_CHECK(CreateLoadEntireFileJob(loadFileJob, loaderState.FieldRef(&AnoxAbstractSingleFileResourceLoaderState::m_fileContents), fileSystem, key));
+
+			rkit::UniquePtr<rkit::IJobRunner> analysisJobRunner;
+			RKIT_CHECK(rkit::New<AnoxAbstractSingleFileLoaderAnalyzeJob>(analysisJobRunner, loaderState, waitForDependenciesSignaller));
+
+			rkit::RCPtr<rkit::Job> analysisJob;
+			RKIT_CHECK(fileSystem.GetJobQueue().CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(analysisJobRunner), loadFileJob));
+
+			if (!TLoaderInfo::kHasDependencies)
+			{
+				waitForDependenciesJob = analysisJob;
+			}
 		}
 
-		rkit::RCPtr<rkit::Job> loadFileJob;
-		RKIT_CHECK(CreateLoadEntireFileJob(loadFileJob, loaderState.FieldRef(&AnoxAbstractSingleFileResourceLoaderState::m_fileContents), fileSystem, key));
-
-		rkit::UniquePtr<rkit::IJobRunner> analysisJobRunner;
-		RKIT_CHECK(rkit::New<AnoxAbstractSingleFileLoaderAnalyzeJob>(analysisJobRunner, loaderState, waitForDependenciesSignaller));
-
-		rkit::RCPtr<rkit::Job> analysisJob;
-		RKIT_CHECK(fileSystem.GetJobQueue().CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(analysisJobRunner), loadFileJob));
-
-		if (!TLoaderInfo::kHasDependencies)
+		if (TLoaderInfo::kHasLoadPhase)
 		{
-			waitForDependenciesJob = analysisJob;
+			rkit::UniquePtr<rkit::IJobRunner> loadJobRunner;
+			RKIT_CHECK(rkit::New<AnoxAbstractSingleFileLoaderLoadJob>(loadJobRunner, loaderState));
+
+			RKIT_CHECK(fileSystem.GetJobQueue().CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(loadJobRunner), waitForDependenciesJob));
+		}
+		else
+		{
+			loadJob = waitForDependenciesJob;
 		}
 
-		outJob = std::move(waitForDependenciesJob);
+		outJob = std::move(loadJob);
 
 		return rkit::ResultCode::kOK;
 	}

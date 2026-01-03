@@ -440,6 +440,13 @@ namespace anox
 		}
 
 		{
+			rkit::RCPtr<AnoxMaterialResourceLoaderBase> modelMaterialLoader;
+			RKIT_CHECK(AnoxMaterialResourceLoaderBase::Create(modelMaterialLoader, data::MaterialResourceType::kModel));
+
+			RKIT_CHECK(RegisterContentKeyedLoader(resloaders::kModelMaterialTypeCode, std::move(modelMaterialLoader)));
+		}
+
+		{
 			rkit::RCPtr<AnoxEntityDefResourceLoaderBase> edefLoader;
 			RKIT_CHECK(AnoxEntityDefResourceLoaderBase::Create(edefLoader));
 

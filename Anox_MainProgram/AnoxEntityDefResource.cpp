@@ -31,8 +31,10 @@ namespace anox
 
 		static constexpr bool kHasDependencies = true;
 		static constexpr bool kHasAnalysisPhase = true;
+		static constexpr bool kHasLoadPhase = true;
 
 		static rkit::Result AnalyzeFile(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps);
+		static rkit::Result LoadFile(State_t &state, Resource_t &resource);
 	};
 
 	class AnoxEntityDefResource final : public AnoxEntityDefResourceBase
@@ -73,6 +75,11 @@ namespace anox
 		}
 
 		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result AnoxEntityDefLoaderInfo::LoadFile(State_t &state, Resource_t &resource)
+	{
+		return rkit::ResultCode::kNotYetImplemented;
 	}
 
 	rkit::Result AnoxEntityDefResourceLoaderBase::Create(rkit::RCPtr<AnoxEntityDefResourceLoaderBase> &outLoader)

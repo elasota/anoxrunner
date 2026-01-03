@@ -59,8 +59,10 @@ namespace anox
 
 		static constexpr bool kHasDependencies = true;
 		static constexpr bool kHasAnalysisPhase = true;
+		static constexpr bool kHasLoadPhase = true;
 
 		static rkit::Result AnalyzeFile(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps);
+		static rkit::Result LoadFile(State_t &state, Resource_t &resource);
 	};
 
 	rkit::Result AnoxMDAModelLoaderInfo::AnalyzeFile(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
@@ -80,18 +82,14 @@ namespace anox
 
 		RKIT_CHECK(outDeps.Reserve(numMaterials));
 
-#if 0
 		for (const rkit::data::ContentID &materialContentID : materialContentIDs)
 		{
-			rkit::RCPtr<rkit::Job> loadModelJob;
+			rkit::RCPtr<rkit::Job> job;
 			rkit::Future<AnoxResourceRetrieveResult> result;
-			RKIT_CHECK(state.m_systems.m_resManager->GetContentIDKeyedResource(&loadModelJob, result, resloaders::kMDAModelResourceTypeCode, edef.m_modelContentID));
+			RKIT_CHECK(state.m_systems.m_resManager->GetContentIDKeyedResource(&job, result, resloaders::kModelMaterialTypeCode, materialContentID));
 
-			rkit::UniquePtr<rkit::IJobRunner> dependenciesDoneJobRunner;
-			RKIT_CHECK(m_jobQueue.CreateSignalJobRunner(dependenciesDoneJobRunner, m_waitForDependenciesSignaller));
-			RKIT_CHECK(m_jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(dependenciesDoneJobRunner), loadModelJob));
+			RKIT_CHECK(outDeps.AppendRValue(std::move(job)));
 		}
-#endif
 
 #if 0
 		const uint8_t numAnimations = (header.m_numAnimations7_AnimationType1 & 0x7f);
@@ -269,6 +267,11 @@ namespace anox
 		*/
 #endif
 
+		return rkit::ResultCode::kNotYetImplemented;
+	}
+
+	rkit::Result AnoxMDAModelLoaderInfo::LoadFile(State_t &state, Resource_t &resource)
+	{
 		return rkit::ResultCode::kNotYetImplemented;
 	}
 

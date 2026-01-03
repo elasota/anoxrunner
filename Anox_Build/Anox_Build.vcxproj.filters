@@ -33,6 +33,9 @@
     <ClCompile Include="AnoxModelCompiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="AnoxPipelineCompiler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AnoxMaterialCompiler.h">
