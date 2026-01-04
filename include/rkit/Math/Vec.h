@@ -7,6 +7,10 @@
 
 #include <type_traits>
 
+#if RKIT_PLATFORM_ARCH_HAVE_SSE
+#include <xmmintrin.h>
+#endif
+
 namespace rkit
 {
 	template<size_t TSize>
@@ -120,8 +124,8 @@ namespace rkit { namespace math { namespace priv {
 		const Storage_t &GetStorage() const;
 		Storage_t &ModifyStorage();
 
-		VecStorage FromArray(const TComponent(&array)[TSize]);
-		VecStorage FromPtr(const TComponent *ptr);
+		static VecStorage FromArray(const TComponent(&array)[TSize]);
+		static VecStorage FromPtr(const TComponent *ptr);
 
 	private:
 		template<class TOtherComponent, size_t TOtherSize>
@@ -311,7 +315,8 @@ namespace rkit { namespace math { namespace priv {
 		const __m128 &GetStorage() const;
 		__m128 &ModifyStorage();
 
-		VecSSEFloatStorage<TComponentCount> FromArray(const float(&array)[TComponentCount]);
+		static VecSSEFloatStorage<TComponentCount> FromArray(const float(&array)[TComponentCount]);
+		static VecSSEFloatStorage<TComponentCount> FromPtr(const float *ptr);
 
 	private:
 		template<class TOtherComponent, size_t TOtherSize>
@@ -653,13 +658,13 @@ namespace rkit { namespace math {
 	template<class TComponent, size_t TSize>
 	Vec<TComponent, TSize> Vec<TComponent, TSize>::FromArray(const TComponent(&values)[TSize])
 	{
-		return Vec<TComponent, TSize>(StorageType_t::InternalFromArray(values));
+		return Vec<TComponent, TSize>(StorageType_t::FromArray(values));
 	}
 
 	template<class TComponent, size_t TSize>
 	Vec<TComponent, TSize> Vec<TComponent, TSize>::FromPtr(const TComponent *values)
 	{
-		return Vec<TComponent, TSize>(StorageType_t::InternalFromPtr(values));
+		return Vec<TComponent, TSize>(StorageType_t::FromPtr(values));
 	}
 
 	template<class TComponent, size_t TSize>
@@ -986,7 +991,13 @@ namespace rkit { namespace math { namespace priv {
 	template<size_t TSize>
 	VecSSEFloatStorage<TSize> VecSSEFloatStorage<TSize>::FromArray(const float(&array)[TSize])
 	{
-		return M128FloatLoader<TSize>::Load(array);
+		return VecSSEFloatStorage<TSize>(M128FloatLoader<TSize>::Load(array));
+	}
+
+	template<size_t TSize>
+	VecSSEFloatStorage<TSize> VecSSEFloatStorage<TSize>::FromPtr(const float *array)
+	{
+		return VecSSEFloatStorage<TSize>(M128FloatLoader<TSize>::Load(array));
 	}
 
 	template<size_t TSize>

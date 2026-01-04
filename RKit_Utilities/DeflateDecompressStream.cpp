@@ -10,10 +10,10 @@ namespace rkit
 		, m_alloc(alloc)
 		, m_streamInitialized(false)
 		, m_filePos(0)
-		, m_decompressedSize(decompressedSize)
 		, m_compressedSizeRemaining(0)
-		, m_zstream{}
+		, m_decompressedSize(decompressedSize)
 		, m_buffer{}
+		, m_zstream{}
 	{
 	}
 

@@ -167,6 +167,7 @@ namespace rkit
 	template<class T>
 	EnumMask<T>::EnumMask()
 	{
+		static_assert(std::is_standard_layout<EnumMask<T>>::value, "EnumMask should be standard layout");
 	}
 
 	template<class T>

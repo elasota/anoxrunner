@@ -87,6 +87,7 @@ namespace rkit
 #include "RKitAssert.h"
 
 #include <limits>
+#include <type_traits>
 
 namespace rkit
 {
@@ -210,6 +211,7 @@ namespace rkit
 	StaticBoolArray<TSize>::StaticBoolArray()
 		: m_bytes{}
 	{
+		static_assert(std::is_standard_layout<StaticBoolArray<TSize>>::value, "StaticBoolArray should be standard layout");
 	}
 
 	template<size_t TSize>

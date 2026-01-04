@@ -40,8 +40,15 @@ namespace rkit
 		const TImpl &Impl() const;
 
 	private:
+		typedef void (*DestructFunc_t)(TImpl *impl);
+
 		template<class TBase>
 		TImpl *ResolveImpl(OpaqueImplementation<TBase> *);
+
+		template<class TBase>
+		static void Destruct(TImpl *impl);
+
+		DestructFunc_t m_implDtor;
 
 #if RKIT_IS_DEBUG
 		TImpl &m_impl;
@@ -61,7 +68,7 @@ namespace rkit
 	template<class TBase>
 	OpaqueImplementation<TBase>::OpaqueImplementation()
 #if RKIT_IS_DEBUG
-		: m_base(Base())
+		: m_base(this->Base())
 #endif
 	{
 		static_assert(std::is_final<TBase>::value, "Opaque base must be final");
@@ -103,8 +110,9 @@ namespace rkit
 	template<class TImpl>
 	template<class... TArgs>
 	Opaque<TImpl>::Opaque(TArgs... args)
+		: m_implDtor(nullptr)
 #if RKIT_IS_DEBUG
-		: m_impl(Impl())
+		, m_impl(Impl())
 #endif
 	{
 		new (&Impl()) TImpl(std::forward<TArgs>(args)...);
@@ -113,7 +121,8 @@ namespace rkit
 	template<class TImpl>
 	Opaque<TImpl>::~Opaque()
 	{
-		Impl().~TImpl();
+		if (m_implDtor != nullptr)
+			m_implDtor(&this->Impl());
 	}
 
 	template<class TImpl>

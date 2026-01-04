@@ -142,6 +142,7 @@
     <ClCompile Include="AnoxCommandStack.cpp" />
     <ClCompile Include="AnoxConfigurationSaver.cpp" />
     <ClCompile Include="AnoxConfigurationState.cpp" />
+    <ClCompile Include="AnoxDataReader.cpp" />
     <ClCompile Include="AnoxEntityDefResource.cpp" />
     <ClCompile Include="AnoxFileResource.cpp" />
     <ClCompile Include="AnoxGameFileSystem.cpp" />
@@ -176,6 +177,7 @@
     <ClInclude Include="AnoxCaptureHarness.h" />
     <ClInclude Include="AnoxCommandRegistry.h" />
     <ClInclude Include="AnoxConfigurationSaver.h" />
+    <ClInclude Include="AnoxDataReader.h" />
     <ClInclude Include="AnoxEntityDefResource.h" />
     <ClInclude Include="AnoxFileResource.h" />
     <ClInclude Include="AnoxFrameDrawer.h" />

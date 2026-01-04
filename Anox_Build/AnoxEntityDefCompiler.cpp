@@ -25,9 +25,9 @@ namespace anox { namespace buildsystem {
 		float m_bboxMin[3] = { 0, 0, 0 };
 		float m_bboxMax[3] = { 0, 0, 0 };
 		uint8_t m_flags = 0;
-		float m_walkSpeed;
-		float m_runSpeed;
-		float m_speed;
+		float m_walkSpeed = 0.f;
+		float m_runSpeed = 0.f;
+		float m_speed = 0.f;
 		Label m_targetSequence;
 		rkit::endian::LittleUInt32_t m_miscValue;
 		Label m_startSequence;
@@ -234,8 +234,6 @@ namespace anox { namespace buildsystem {
 		}
 
 		data::UserEntityDef outDef = {};
-		outDef.m_magic = data::UserEntityDef::kExpectedMagic;
-		outDef.m_version = data::UserEntityDef::kExpectedVersion;
 		outDef.m_modelCode = edef.m_modelCode;
 
 		for (size_t axis = 0; axis < 3; axis++)
@@ -290,6 +288,7 @@ namespace anox { namespace buildsystem {
 		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefPath, outFile));
 
 		RKIT_CHECK(outFile->WriteAll(&outDef, sizeof(outDef)));
+		RKIT_CHECK(outFile->WriteAllSpan(edef.m_description.ToSpan()));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -538,7 +537,7 @@ namespace anox { namespace buildsystem {
 						else if (fragmentIndex >= 6)
 							edef.m_bboxMin[fragmentIndex - 6] = f;
 						else if (fragmentIndex >= 2)
-							edef.m_bboxMin[fragmentIndex - 2] = f;
+							edef.m_scale[fragmentIndex - 2] = f;
 					}
 					break;
 				case 5:
@@ -570,13 +569,13 @@ namespace anox { namespace buildsystem {
 						if (slice == "1")
 						{
 							if (fragmentIndex == 13)
-								edef.m_flags |= static_cast<uint8_t>(data::UserEntityFlags::kSolid);
+								edef.m_flags |= static_cast<uint8_t>(1 << static_cast<int>(data::UserEntityFlags::kSolid));
 							else if (fragmentIndex == 17)
-								edef.m_flags |= static_cast<uint8_t>(data::UserEntityFlags::kLighting);
+								edef.m_flags |= static_cast<uint8_t>(1 << static_cast<int>(data::UserEntityFlags::kLighting));
 							else if (fragmentIndex == 18)
-								edef.m_flags |= static_cast<uint8_t>(data::UserEntityFlags::kBlending);
+								edef.m_flags |= static_cast<uint8_t>(1 << static_cast<int>(data::UserEntityFlags::kBlending));
 							else if (fragmentIndex == 21)
-								edef.m_flags |= static_cast<uint8_t>(data::UserEntityFlags::kNoMip);
+								edef.m_flags |= static_cast<uint8_t>(1 << static_cast<int>(data::UserEntityFlags::kNoMip));
 							else
 								return rkit::ResultCode::kInternalError;
 						}

@@ -40,6 +40,11 @@ namespace anox
 	{
 	}
 
+	inline Label::Label(uint32_t value)
+		: m_value(value)
+	{
+	}
+
 	inline Label::Label(uint32_t high, uint32_t low)
 		: m_value(low + high * kLabelHighMultiplier)
 	{
@@ -56,7 +61,7 @@ namespace anox
 		return m_value;
 	}
 
-	bool Label::IsValid(uint32_t high, uint32_t low)
+	inline bool Label::IsValid(uint32_t high, uint32_t low)
 	{
 		if (low >= kLabelHighMultiplier)
 			return false;

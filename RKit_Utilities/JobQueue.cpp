@@ -305,13 +305,15 @@ namespace rkit { namespace utils
 
 	void JobSignalerImpl::SignalDone(const Result &result)
 	{
+		RKIT_ASSERT(m_haveSignaled == false);
+
+		m_haveSignaled = true;
+
 		InternalSignalDone(result);
 	}
 
 	void JobSignalerImpl::InternalSignalDone(const Result &result)
 	{
-		m_haveSignaled = true;
-
 		if (!utils::ResultIsOK(result))
 			m_jobQueue.Fault(result);
 
@@ -391,8 +393,8 @@ namespace rkit { namespace utils
 
 	JobQueue::JobQueue(IMallocDriver *alloc)
 		: m_alloc(alloc)
-		, m_isInitialized(false)
 		, m_result(ResultCode::kOK)
+		, m_isInitialized(false)
 	{
 	}
 

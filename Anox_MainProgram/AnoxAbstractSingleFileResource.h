@@ -203,6 +203,7 @@ namespace anox
 	template<class TLoaderInfo>
 	rkit::Result AnoxAbstractSingleFileResourceLoader<TLoaderInfo>::CreateLoadJob(const rkit::RCPtr<typename TLoaderInfo::LoaderBase_t::ResourceBase_t> &resourceBase, const AnoxResourceLoaderSystems &systems, const typename TLoaderInfo::LoaderBase_t::KeyType_t &key, rkit::RCPtr<rkit::Job> &outJob) const
 	{
+		typedef typename TLoaderInfo::State_t State_t;
 		// Jobs:
 		// - Load file job
 		// - Analysis job (queues dependency jobs)
@@ -212,7 +213,7 @@ namespace anox
 		rkit::IJobQueue &jobQueue = fileSystem.GetJobQueue();
 
 		rkit::RCPtr<AnoxAbstractSingleFileResourceLoaderState> loaderState;
-		RKIT_CHECK(rkit::New<AnoxAbstractSingleFileResourceLoaderState>(loaderState));
+		RKIT_CHECK(rkit::New<State_t>(loaderState));
 
 		loaderState->m_functions = &AnoxSingleFileResourceLoaderCallbacksFor<TLoaderInfo>::ms_callbacks;
 		loaderState->m_resource = resourceBase.Get();

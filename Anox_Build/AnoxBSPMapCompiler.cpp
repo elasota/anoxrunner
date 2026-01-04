@@ -23,6 +23,7 @@
 #include "anox/AnoxModule.h"
 #include "anox/AnoxUtilitiesDriver.h"
 
+#include "anox/Label.h"
 
 #include <cmath>
 
@@ -1059,12 +1060,11 @@ namespace anox { namespace buildsystem
 					return rkit::ResultCode::kDataError;
 				}
 
-				uint32_t labelValue = 0;
-				RKIT_CHECK(rkit::SafeMul<uint32_t>(labelHigh, labelHigh, 10000));
-				RKIT_CHECK(rkit::SafeAdd<uint32_t>(labelValue, labelHigh, labelLow));
+				if (!Label::IsValid(labelHigh, labelLow))
+					return rkit::ResultCode::kDataError;
 
 				rkit::endian::LittleUInt32_t labelData;
-				labelData = labelValue;
+				labelData = Label(labelHigh, labelLow).RawValue();
 
 				rkit::CopySpanNonOverlapping(span.SubSpan(0, 4), labelData.GetBytes().ToSpan());
 			}

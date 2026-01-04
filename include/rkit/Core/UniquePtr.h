@@ -2,6 +2,8 @@
 
 #include "SimpleObjectAllocation.h"
 
+#include <stddef.h>
+
 namespace rkit
 {
 	struct IMallocDriver;

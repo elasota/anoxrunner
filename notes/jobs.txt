@@ -1,0 +1,20 @@
+This project uses an async job queue for... almost everything.
+
+To make a job, use an IJobQueue.
+
+CreateJob will accept a JobRunner and a list of dependencies for a job to
+create a new job.  The new job will start when all dependencies are done, or
+abort if one of them fails.
+
+Sometimes you need to create a job before you know what the dependencies are,
+or you need to signal that a job is ready from something that isn't a queued
+job.
+
+To do that, call CreateSignaledJob to create a job and a signaler.  To complete
+the job, call SignalDone on the signaler with its completion status.  If the
+signaler is destroyed before being signaled, then it will automatically signal
+completion with the "kJobAborted" status.
+
+Do not call SignalDone on the same signaler more than once.  Doing so will
+(usually) trigger an assert in debug builds and have unpredictable results
+in release builds.

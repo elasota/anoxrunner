@@ -57,24 +57,24 @@ namespace rkit
 	template<class TFirst, class TSecond>
 	TFirst &Pair<TFirst, TSecond>::First()
 	{
-		return this->GetAt<0>();
+		return this->template GetAt<0>();
 	}
 
 	template<class TFirst, class TSecond>
 	const TFirst &Pair<TFirst, TSecond>::First() const
 	{
-		return this->GetAt<0>();
+		return this->template GetAt<0>();
 	}
 
 	template<class TFirst, class TSecond>
 	TSecond &Pair<TFirst, TSecond>::Second()
 	{
-		return this->GetAt<1>();
+		return this->template GetAt<1>();
 	}
 
 	template<class TFirst, class TSecond>
 	const TSecond &Pair<TFirst, TSecond>::Second() const
 	{
-		return this->GetAt<1>();
+		return this->template GetAt<1>();
 	}
 }

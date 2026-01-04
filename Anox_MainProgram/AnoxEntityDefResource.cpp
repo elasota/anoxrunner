@@ -9,6 +9,7 @@
 
 #include "anox/Data/EntityDef.h"
 
+#include "AnoxDataReader.h"
 #include "AnoxGameFileSystem.h"
 #include "AnoxLoadEntireFileJob.h"
 
@@ -21,6 +22,7 @@ namespace anox
 
 	struct AnoxEntityDefResourceLoaderState final : public AnoxAbstractSingleFileResourceLoaderState
 	{
+		data::UserEntityDef m_edef;
 	};
 
 	struct AnoxEntityDefLoaderInfo
@@ -40,29 +42,19 @@ namespace anox
 	class AnoxEntityDefResource final : public AnoxEntityDefResourceBase
 	{
 	public:
-		const data::UserEntityDef &GetEntityDef() const override;
+		friend struct AnoxEntityDefLoaderInfo;
 
-		data::UserEntityDef &ModifyUserEntityDef();
+		const Values &GetValues() const override;
 
 	private:
-		data::UserEntityDef m_userEntityDef;
+		Values m_values;
 	};
-
-	const data::UserEntityDef &AnoxEntityDefResource::GetEntityDef() const
-	{
-		return m_userEntityDef;
-	}
-
-	data::UserEntityDef &AnoxEntityDefResource::ModifyUserEntityDef()
-	{
-		return m_userEntityDef;
-	}
 
 	rkit::Result AnoxEntityDefLoaderInfo::AnalyzeFile(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
 	{
 		rkit::ReadOnlyMemoryStream stream(state.m_fileContents.ToSpan());
 
-		data::UserEntityDef &edef = resource.ModifyUserEntityDef();
+		data::UserEntityDef &edef = state.m_edef;
 
 		RKIT_CHECK(stream.ReadOneBinary(edef));
 
@@ -79,7 +71,32 @@ namespace anox
 
 	rkit::Result AnoxEntityDefLoaderInfo::LoadFile(State_t &state, Resource_t &resource)
 	{
+		AnoxEntityDefResource::Values &resValues = resource.m_values;
+
+		resource.m_values.m_modelCodeFourCC = state.m_edef.m_modelCode.Get();
+
+		RKIT_CHECK(DataReader::ReadCheckVec(resource.m_values.m_scale, state.m_edef.m_scale, 16));
+
+		rkit::endian::LittleFloat32_t m_scale[3];
+		rkit::endian::LittleUInt32_t m_entityType;
+		uint8_t m_shadowType = 0;
+		rkit::endian::LittleFloat32_t m_bboxMin[3];
+		rkit::endian::LittleFloat32_t m_bboxMax[3];
+		uint8_t m_flags = 0;
+		rkit::endian::LittleFloat32_t m_walkSpeed;
+		rkit::endian::LittleFloat32_t m_runSpeed;
+		rkit::endian::LittleFloat32_t m_speed;
+		rkit::endian::LittleUInt32_t m_targetSequenceID;
+		rkit::endian::LittleUInt32_t m_miscValue;
+		rkit::endian::LittleUInt32_t m_startSequenceID;
+		uint8_t m_descriptionStringLength = 0;
+
 		return rkit::ResultCode::kNotYetImplemented;
+	}
+
+	const AnoxEntityDefResource::Values &AnoxEntityDefResource::GetValues() const
+	{
+		return m_values;
 	}
 
 	rkit::Result AnoxEntityDefResourceLoaderBase::Create(rkit::RCPtr<AnoxEntityDefResourceLoaderBase> &outLoader)

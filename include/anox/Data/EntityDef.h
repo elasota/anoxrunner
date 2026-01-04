@@ -24,11 +24,6 @@ namespace anox { namespace data {
 		kComponent,
 	};
 
-	struct EntityDataVec3
-	{
-		float m_data[3];
-	};
-
 	struct EntityFieldDef
 	{
 		uint32_t m_dataOffset;
@@ -68,10 +63,12 @@ namespace anox { namespace data {
 
 	enum class UserEntityFlags
 	{
-		kSolid = (1 << 0),
-		kLighting = (1 << 1),
-		kBlending = (1 << 2),
-		kNoMip = (1 << 3),
+		kSolid,
+		kLighting,
+		kBlending,
+		kNoMip,
+
+		kCount,
 	};
 
 	enum class UserEntityShadowType
@@ -85,12 +82,6 @@ namespace anox { namespace data {
 
 	struct UserEntityDef
 	{
-		static const uint32_t kExpectedMagic = RKIT_FOURCC('U', 'E', 'D', 'F');
-		static const uint32_t kExpectedVersion = 1;
-
-		rkit::endian::BigUInt32_t m_magic;
-		rkit::endian::LittleUInt32_t m_version;
-
 		rkit::data::ContentID m_modelContentID;
 		rkit::endian::BigUInt32_t m_modelCode;
 		rkit::endian::LittleFloat32_t m_scale[3];
@@ -106,5 +97,7 @@ namespace anox { namespace data {
 		rkit::endian::LittleUInt32_t m_miscValue;
 		rkit::endian::LittleUInt32_t m_startSequenceID;
 		uint8_t m_descriptionStringLength = 0;
+
+		// uint8_t[m_descriptionStringLength]
 	};
 } }
