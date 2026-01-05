@@ -289,6 +289,8 @@ namespace rkit { namespace render
 	{
 		RGBA_UNorm8,
 		RGBA_UNorm8_sRGB,
+		BGRA_UNorm8,
+		BGRA_UNorm8_sRGB,
 		RG_UNorm8,
 		RG_UNorm8_sRGB,
 		R_UNorm8,

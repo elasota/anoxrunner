@@ -25,8 +25,7 @@
 #include <algorithm>
 
 // NOTES ON OWNERSHIP AND REFCOUNT BEHAVIOR:
-// Load Jobs -> AnoxResourceLoadCompletionNotifier -> AnoxResourceLoadFutureContainer -> AnoxResourceTracker
-
+// Load Job Runner -> AnoxResourceLoadCompletionNotifier -> AnoxResourceLoadFutureContainer -> AnoxResourceTracker
 
 namespace anox
 {
@@ -63,6 +62,9 @@ namespace anox
 		rkit::RCPtr<AnoxResourceLoaderSynchronizer> m_sync;
 		rkit::SimpleObjectAllocation<AnoxResourceTracker> m_self;
 
+		// Only modify these fields under the resource mutex lock
+		rkit::RCPtr<rkit::JobSignaler> m_loadCompletionSignaler;
+		rkit::RCPtr<rkit::Job> m_loadCompletionJob;
 		AnoxResourceTracker *m_prevResource = nullptr;
 		AnoxResourceTracker *m_nextResource = nullptr;
 	};
@@ -272,21 +274,31 @@ namespace anox
 	void AnoxResourceTracker::FailLoading()
 	{
 		rkit::RCPtr<rkit::FutureContainer<AnoxResourceRetrieveResult>> futureContainerRCPtr;
+		rkit::RCPtr<rkit::JobSignaler> completionSignaler;
 
 		{
 			rkit::MutexLock lock(*m_sync->m_resourcesMutex);
 
 			futureContainerRCPtr = std::move(m_pendingFutureContainer);
 			m_pendingFutureContainer.Reset();
+
+			completionSignaler = std::move(m_loadCompletionSignaler);
+			m_loadCompletionSignaler.Reset();
+			m_loadCompletionJob.Reset();
 		}
 
 		futureContainerRCPtr->Fail();
+
+		if (completionSignaler)
+			completionSignaler->SignalDone(rkit::ResultCode::kOperationFailed);
 	}
 
 	void AnoxResourceTracker::SucceedLoading()
 	{
 		// Make sure we're keeping hard refs to the resource
 		rkit::RCPtr<rkit::FutureContainer<AnoxResourceRetrieveResult>> futureContainerRCPtr;
+		rkit::RCPtr<rkit::JobSignaler> completionSignaler;
+
 		AnoxResourceRetrieveResult result;
 
 		{
@@ -295,10 +307,17 @@ namespace anox
 			futureContainerRCPtr = std::move(m_pendingFutureContainer);
 			m_pendingFutureContainer.Reset();
 
+			completionSignaler = std::move(m_loadCompletionSignaler);
+			m_loadCompletionSignaler.Reset();
+			m_loadCompletionJob.Reset();
+
 			result.m_resourceHandle = rkit::RCPtr<AnoxResourceBase>(m_resource.Get(), this);
 		}
 
 		futureContainerRCPtr->Complete(std::move(result));
+
+		if (completionSignaler)
+			completionSignaler->SignalDone(rkit::ResultCode::kOK);
 	}
 
 	AnoxResourceLoadCompletionNotifier::AnoxResourceLoadCompletionNotifier(const rkit::RCPtr<AnoxResourceTracker> &resource)
@@ -519,6 +538,19 @@ namespace anox
 			{
 				// Resource is not loaded
 				loadFuture = rkit::Future<AnoxResourceRetrieveResult>(tracker->m_pendingFutureContainer);
+
+				if (outJob)
+				{
+					// We don't create the signaler/completion job normally, only if there are multiple requests for
+					// the same resource
+					if (!tracker->m_loadCompletionSignaler)
+					{
+						RKIT_CHECK(m_jobQueue->CreateSignaledJob(tracker->m_loadCompletionSignaler, tracker->m_loadCompletionJob));
+					}
+
+					*outJob = tracker->m_loadCompletionJob;
+				}
+
 				resLock.Unlock();
 
 				return rkit::ResultCode::kOK;

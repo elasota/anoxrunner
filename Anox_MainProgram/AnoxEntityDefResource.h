@@ -25,7 +25,6 @@ namespace anox
 		{
 			uint32_t m_modelCodeFourCC = 0;
 			rkit::math::Vec3 m_scale;
-			uint32_t m_entityType = 0;
 			data::UserEntityShadowType m_shadowType = data::UserEntityShadowType::kCount;
 			rkit::math::Vec3 m_bboxMin;
 			rkit::math::Vec3 m_bboxMax;

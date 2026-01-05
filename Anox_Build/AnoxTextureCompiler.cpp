@@ -1129,6 +1129,10 @@ namespace anox { namespace buildsystem
 			}
 		}
 
+		// RGB is not supported
+		if (numChannelsToSave == 3)
+			numChannelsToSave = 4;
+
 		pixelSize = static_cast<uint8_t>(numChannelsToSave);
 
 		uint32_t ddsFlags = 0;
@@ -1359,7 +1363,7 @@ namespace anox { namespace buildsystem
 
 	uint32_t TextureCompiler::GetVersion() const
 	{
-		return 3;
+		return 4;
 	}
 
 	rkit::Result TextureCompiler::GetImageMetadataDerived(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName)

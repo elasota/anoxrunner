@@ -1589,8 +1589,6 @@ namespace anox { namespace buildsystem
 				}
 			}
 
-			uint16_t lightmapSize[2] = {};
-
 			for (int axis = 0; axis < 2; axis++)
 			{
 				const rkit::math::SoftFloat80 lightmapMinF80 = (extMin[axis].ToFloat80() * rcp16).Floor();
@@ -1633,8 +1631,6 @@ namespace anox { namespace buildsystem
 
 		rkit::Vector<size_t> stack;
 
-		const size_t kMaxLightmapSizeIncrement = 12;	// 1 << 6 == 4096
-
 		for (const BSPFaceStats &stats : faceStats)
 		{
 			xAxisTotal += stats.m_lightmapDimensions[0];
@@ -1646,7 +1642,6 @@ namespace anox { namespace buildsystem
 		for (size_t faceIndex = 0; faceIndex < faceStats.Count(); faceIndex++)
 		{
 			const BSPFaceStats &stats = faceStats[faceIndex];
-			const BSPFace &face = bsp.m_faces[faceIndex];
 
 			if (!stats.m_numUniqueStyles)
 				continue;
@@ -1754,8 +1749,6 @@ namespace anox { namespace buildsystem
 	rkit::Result BSPMapCompilerBase2::InsertNodeIntoExpandableLightmapTree(uint16_t width, uint16_t height, bool xAxisDominant, rkit::Vector<size_t> &stack, priv::LightmapTree &tree, rkit::Optional<size_t> &outInsertedIndex)
 	{
 		outInsertedIndex.Reset();
-
-		uint16_t requiredExpansionLevel = 0;
 
 		uint32_t tryExpansionLevel = tree.m_expansionLevel;
 

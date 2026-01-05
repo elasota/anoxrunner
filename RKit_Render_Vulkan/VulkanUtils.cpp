@@ -178,6 +178,8 @@ namespace rkit { namespace render { namespace vulkan
 		{
 		case TextureFormat::RGBA_UNorm8:
 		case TextureFormat::RGBA_UNorm8_sRGB:
+		case TextureFormat::BGRA_UNorm8:
+		case TextureFormat::BGRA_UNorm8_sRGB:
 			outBlockSizeBytes = 4;
 			break;
 		case TextureFormat::RG_UNorm8:

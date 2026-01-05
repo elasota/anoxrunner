@@ -8,10 +8,12 @@
 #include "rkit/Core/VectorTrait.h"
 
 #include "anox/Data/EntityDef.h"
+#include "anox/AnoxUtilitiesDriver.h"
 
 #include "AnoxDataReader.h"
 #include "AnoxGameFileSystem.h"
 #include "AnoxLoadEntireFileJob.h"
+#include "anox/AnoxModule.h"
 
 #include "AnoxAbstractSingleFileResource.h"
 
@@ -23,6 +25,7 @@ namespace anox
 	struct AnoxEntityDefResourceLoaderState final : public AnoxAbstractSingleFileResourceLoaderState
 	{
 		data::UserEntityDef m_edef;
+		rkit::FilePos_t m_edefDataPos = 0;
 	};
 
 	struct AnoxEntityDefLoaderInfo
@@ -57,12 +60,14 @@ namespace anox
 		data::UserEntityDef &edef = state.m_edef;
 
 		RKIT_CHECK(stream.ReadOneBinary(edef));
+		state.m_edefDataPos = stream.Tell();
 
 		{
 			rkit::RCPtr<rkit::Job> job;
 			rkit::Future<AnoxResourceRetrieveResult> result;
 			RKIT_CHECK(state.m_systems.m_resManager->GetContentIDKeyedResource(&job, result, resloaders::kMDAModelResourceTypeCode, edef.m_modelContentID));
 
+			RKIT_ASSERT(job.IsValid());
 			RKIT_CHECK(outDeps.AppendRValue(std::move(job)));
 		}
 
@@ -71,27 +76,35 @@ namespace anox
 
 	rkit::Result AnoxEntityDefLoaderInfo::LoadFile(State_t &state, Resource_t &resource)
 	{
+		anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, "Utilities"));
+
 		AnoxEntityDefResource::Values &resValues = resource.m_values;
 
 		resource.m_values.m_modelCodeFourCC = state.m_edef.m_modelCode.Get();
 
 		RKIT_CHECK(DataReader::ReadCheckVec(resource.m_values.m_scale, state.m_edef.m_scale, 16));
+		RKIT_CHECK(DataReader::ReadCheckEnum(resource.m_values.m_shadowType, state.m_edef.m_shadowType));
+		RKIT_CHECK(DataReader::ReadCheckVec(resource.m_values.m_bboxMin, state.m_edef.m_bboxMin, 16));
+		RKIT_CHECK(DataReader::ReadCheckVec(resource.m_values.m_bboxMax, state.m_edef.m_bboxMax, 16));
+		RKIT_CHECK(DataReader::ReadCheckEnumMask(resource.m_values.m_userEntityFlags, state.m_edef.m_flags));
+		RKIT_CHECK(DataReader::ReadCheckFloat(resource.m_values.m_walkSpeed, state.m_edef.m_walkSpeed, 16));
+		RKIT_CHECK(DataReader::ReadCheckFloat(resource.m_values.m_runSpeed, state.m_edef.m_runSpeed, 16));
+		RKIT_CHECK(DataReader::ReadCheckFloat(resource.m_values.m_speed, state.m_edef.m_speed, 16));
+		RKIT_CHECK(DataReader::ReadCheckLabel(resource.m_values.m_targetSequence, state.m_edef.m_targetSequenceID));
+		RKIT_CHECK(DataReader::ReadCheckLabel(resource.m_values.m_startSequence, state.m_edef.m_startSequenceID));
+		resource.m_values.m_miscValue = state.m_edef.m_miscValue.Get();
 
-		rkit::endian::LittleFloat32_t m_scale[3];
-		rkit::endian::LittleUInt32_t m_entityType;
-		uint8_t m_shadowType = 0;
-		rkit::endian::LittleFloat32_t m_bboxMin[3];
-		rkit::endian::LittleFloat32_t m_bboxMax[3];
-		uint8_t m_flags = 0;
-		rkit::endian::LittleFloat32_t m_walkSpeed;
-		rkit::endian::LittleFloat32_t m_runSpeed;
-		rkit::endian::LittleFloat32_t m_speed;
-		rkit::endian::LittleUInt32_t m_targetSequenceID;
-		rkit::endian::LittleUInt32_t m_miscValue;
-		rkit::endian::LittleUInt32_t m_startSequenceID;
-		uint8_t m_descriptionStringLength = 0;
+		rkit::Vector<char> descChars;
+		RKIT_CHECK(descChars.Resize(state.m_edef.m_descriptionStringLength));
 
-		return rkit::ResultCode::kNotYetImplemented;
+		rkit::ReadOnlyMemoryStream stream(state.m_fileContents.ToSpan());
+		RKIT_CHECK(stream.SeekStart(state.m_edefDataPos));
+
+		RKIT_CHECK(stream.ReadAllSpan(descChars.ToSpan()));
+
+		RKIT_CHECK(DataReader::ReadCheckUTF8String(resource.m_values.m_description, descChars.ToSpan()));
+
+		return rkit::ResultCode::kOK;
 	}
 
 	const AnoxEntityDefResource::Values &AnoxEntityDefResource::GetValues() const

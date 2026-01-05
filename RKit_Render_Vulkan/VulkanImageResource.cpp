@@ -67,6 +67,12 @@ namespace rkit { namespace render { namespace vulkan {
 
 		switch (imageSpec.m_format)
 		{
+		case TextureFormat::BGRA_UNorm8:
+			createInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+			break;
+		case TextureFormat::BGRA_UNorm8_sRGB:
+			createInfo.format = VK_FORMAT_B8G8R8A8_SRGB;
+			break;
 		case TextureFormat::RGBA_UNorm8:
 			createInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
 			break;

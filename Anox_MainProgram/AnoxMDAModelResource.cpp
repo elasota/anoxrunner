@@ -8,6 +8,7 @@
 
 #include "anox/Data/MDAModel.h"
 
+#include "AnoxDataReader.h"
 #include "AnoxGameFileSystem.h"
 #include "AnoxLoadEntireFileJob.h"
 #include "AnoxAbstractSingleFileResource.h"
@@ -20,6 +21,8 @@ namespace anox
 	{
 		data::MDAModelHeader m_header;
 		rkit::FilePos_t m_postContentIDsPos = 0;
+
+		rkit::Vector<rkit::Future<AnoxResourceRetrieveResult>> m_materials;
 	};
 
 	class AnoxMDAModelResource final : public AnoxMDAModelResourceBase
@@ -29,6 +32,17 @@ namespace anox
 
 		struct Pass
 		{
+			uint16_t m_materialIndex = 0;
+			bool m_clampFlag = false;
+			bool m_depthWriteFlag = false;
+			data::MDAAlphaTestMode m_alphaTestMode = data::MDAAlphaTestMode::kCount;
+			data::MDABlendMode m_blendMode = data::MDABlendMode::kCount;
+			data::MDAUVGenMode m_uvGenMode = data::MDAUVGenMode::kCount;
+			data::MDARGBGenMode m_rgbGenMode = data::MDARGBGenMode::kCount;
+			data::MDADepthFunc m_depthFunc = data::MDADepthFunc::kCount;
+			data::MDACullType m_cullType = data::MDACullType::kCount;
+			float m_scrollU = 0.f;
+			float m_scrollV = 0.f;
 		};
 
 		struct Skin
@@ -78,9 +92,12 @@ namespace anox
 		const size_t numMaterials = header.m_numMaterials.Get();
 		RKIT_CHECK(materialContentIDs.Resize(numMaterials));
 
+		RKIT_CHECK(stream.ReadAllSpan(materialContentIDs.ToSpan()));
+
 		state.m_postContentIDsPos = stream.Tell();
 
 		RKIT_CHECK(outDeps.Reserve(numMaterials));
+		RKIT_CHECK(state.m_materials.Reserve(numMaterials));
 
 		for (const rkit::data::ContentID &materialContentID : materialContentIDs)
 		{
@@ -88,10 +105,25 @@ namespace anox
 			rkit::Future<AnoxResourceRetrieveResult> result;
 			RKIT_CHECK(state.m_systems.m_resManager->GetContentIDKeyedResource(&job, result, resloaders::kModelMaterialTypeCode, materialContentID));
 
+			RKIT_ASSERT(job.IsValid());
 			RKIT_CHECK(outDeps.AppendRValue(std::move(job)));
+			RKIT_CHECK(state.m_materials.Append(std::move(result)));
 		}
 
-#if 0
+		state.m_postContentIDsPos = stream.Tell();
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result AnoxMDAModelLoaderInfo::LoadFile(State_t &state, Resource_t &resource)
+	{
+		rkit::ReadOnlyMemoryStream stream(state.m_fileContents.GetBuffer(), state.m_fileContents.Count());
+		RKIT_CHECK(stream.SeekStart(state.m_postContentIDsPos));
+
+		const data::MDAModelHeader &header = state.m_header;
+
+		const uint16_t numMaterials = state.m_header.m_numMaterials.Get();
+
 		const uint8_t numAnimations = (header.m_numAnimations7_AnimationType1 & 0x7f);
 		const data::MDAAnimationType animType = static_cast<data::MDAAnimationType>(header.m_numAnimations7_AnimationType1 >> 7);
 
@@ -164,16 +196,10 @@ namespace anox
 			for (size_t i = 0; i < numProfiles; i++)
 				outProfiles[i].m_skins = resource.m_profileSkins.ToSpan().SubSpan(i * numSkins, numSkins);
 
-			size_t numSkinPasses = 0;
-			for (const data::MDASkin &profileSkin : profileSkins)
-			{
-				RKIT_CHECK(rkit::SafeAdd<size_t>(numSkinPasses, numSkinPasses, profileSkin.m_numPasses));
-			}
-
 			const rkit::Result checkResult = rkit::CheckedProcessParallelSpans(outProfileSkins.ToSpan(), profileSkins.ToSpan(),
 				[&numSkinPasses]
 				(AnoxMDAModelResource::Skin &outSkin, const data::MDASkin &inSkin)
-					-> rkit::Result
+				-> rkit::Result
 				{
 					const size_t numPasses = inSkin.m_numPasses;
 					RKIT_CHECK(rkit::SafeAdd(numSkinPasses, numSkinPasses, numPasses));
@@ -209,14 +235,23 @@ namespace anox
 
 			RKIT_CHECK(stream.ReadAllSpan(skinPasses.ToSpan()));
 
-
 			const rkit::Result checkResult = rkit::CheckedProcessParallelSpans(outSkinPasses.ToSpan(), skinPasses.ToSpan(),
-				[]
+				[numMaterials]
 				(AnoxMDAModelResource::Pass &outPass, const data::MDASkinPass &inPass)
-					-> rkit::Result
+				-> rkit::Result
 				{
-
-					return rkit::ResultCode::kNotYetImplemented;
+					RKIT_CHECK(DataReader::ReadCheckUInt(outPass.m_materialIndex, inPass.m_materialIndex, numMaterials));
+					RKIT_CHECK(DataReader::ReadCheckBool(outPass.m_clampFlag, inPass.m_clampFlag));
+					RKIT_CHECK(DataReader::ReadCheckBool(outPass.m_depthWriteFlag, inPass.m_depthWriteFlag));
+					RKIT_CHECK(DataReader::ReadCheckEnum(outPass.m_alphaTestMode, inPass.m_alphaTestMode));
+					RKIT_CHECK(DataReader::ReadCheckEnum(outPass.m_blendMode, inPass.m_blendMode));
+					RKIT_CHECK(DataReader::ReadCheckEnum(outPass.m_uvGenMode, inPass.m_uvGenMode));
+					RKIT_CHECK(DataReader::ReadCheckEnum(outPass.m_rgbGenMode, inPass.m_rgbGenMode));
+					RKIT_CHECK(DataReader::ReadCheckEnum(outPass.m_depthFunc, inPass.m_depthFunc));
+					RKIT_CHECK(DataReader::ReadCheckEnum(outPass.m_cullType, inPass.m_cullType));
+					RKIT_CHECK(DataReader::ReadCheckFloat(outPass.m_scrollU, inPass.m_scrollU, 10));
+					RKIT_CHECK(DataReader::ReadCheckFloat(outPass.m_scrollV, inPass.m_scrollV, 10));
+					return rkit::ResultCode::kOK;
 				});
 
 			RKIT_CHECK(checkResult);
@@ -265,13 +300,7 @@ namespace anox
 			RKIT_CHECK(m_jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(dependenciesDoneJobRunner), loadModelJob));
 		}
 		*/
-#endif
 
-		return rkit::ResultCode::kNotYetImplemented;
-	}
-
-	rkit::Result AnoxMDAModelLoaderInfo::LoadFile(State_t &state, Resource_t &resource)
-	{
 		return rkit::ResultCode::kNotYetImplemented;
 	}
 

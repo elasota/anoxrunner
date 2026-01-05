@@ -1164,6 +1164,15 @@ namespace anox
 				{
 					textureFormat = rkit::render::TextureFormat::RGBA_UNorm8;
 				}
+				else if ((pixelFormatFlags & rgbaLumaFlags) == rgbaFlags
+					&& bitCount == 32
+					&& rMask == 0x00ff0000
+					&& gMask == 0x0000ff00
+					&& bMask == 0x000000ff
+					&& aMask == 0xff000000)
+				{
+					textureFormat = rkit::render::TextureFormat::BGRA_UNorm8;
+				}
 				else if ((pixelFormatFlags & rgbaLumaFlags) == rkit::data::DDSPixelFormatFlags::kRGB
 					&& bitCount == 16
 					&& rMask == 0x00ff

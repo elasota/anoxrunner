@@ -106,7 +106,7 @@ namespace anox
 	struct AnoxAbstractSingleFileResourceLoaderState : public rkit::RefCounted
 	{
 		rkit::Vector<uint8_t> m_fileContents;
-		AnoxResourceBase *m_resource = nullptr;
+		rkit::RCPtr<AnoxResourceBase> m_resource;
 		AnoxResourceLoaderSystems m_systems = {};
 		const AnoxSingleFileResourceLoaderCallbacks *m_functions = nullptr;
 	};
@@ -160,7 +160,7 @@ namespace anox { namespace priv {
 		using VTraitRef = typename rkit::traits::TraitRef<VTrait>;
 		// Analysis phase with dependencies
 		typename TLoaderInfo::State_t &derivedState = static_cast<typename TLoaderInfo::State_t &>(state);
-		typename TLoaderInfo::Resource_t &derivedResource = *static_cast<typename TLoaderInfo::Resource_t *>(state.m_resource);
+		typename TLoaderInfo::Resource_t &derivedResource = *static_cast<typename TLoaderInfo::Resource_t *>(state.m_resource.Get());
 		return TLoaderInfo::AnalyzeFile(derivedState, derivedResource, VTraitRef(outDependencyJobs));
 	}
 
@@ -172,7 +172,7 @@ namespace anox { namespace priv {
 		using VTrait = typename rkit::VectorTrait<JobRC>;
 		// Analysis phase with no dependencies
 		typename TLoaderInfo::State_t &derivedState = static_cast<typename TLoaderInfo::State_t &>(state);
-		typename TLoaderInfo::Resource_t &derivedResource = *static_cast<typename TLoaderInfo::Resource_t *>(state.m_resource);
+		typename TLoaderInfo::Resource_t &derivedResource = *static_cast<typename TLoaderInfo::Resource_t *>(state.m_resource.Get());
 		return TLoaderInfo::AnalyzeFile(derivedState, derivedResource);
 	}
 
@@ -181,7 +181,7 @@ namespace anox { namespace priv {
 	{
 		// No load phase
 		typename TLoaderInfo::State_t &derivedState = static_cast<typename TLoaderInfo::State_t &>(state);
-		typename TLoaderInfo::Resource_t &derivedResource = *static_cast<typename TLoaderInfo::Resource_t *>(state.m_resource);
+		typename TLoaderInfo::Resource_t &derivedResource = *static_cast<typename TLoaderInfo::Resource_t *>(state.m_resource.Get());
 		return rkit::ResultCode::kOK;
 	}
 
@@ -193,7 +193,7 @@ namespace anox { namespace priv {
 
 		// Load phase
 		typename TLoaderInfo::State_t &derivedState = static_cast<typename TLoaderInfo::State_t &>(state);
-		typename TLoaderInfo::Resource_t &derivedResource = *static_cast<typename TLoaderInfo::Resource_t *>(state.m_resource);
+		typename TLoaderInfo::Resource_t &derivedResource = *static_cast<typename TLoaderInfo::Resource_t *>(state.m_resource.Get());
 		return TLoaderInfo::LoadFile(derivedState, derivedResource);
 	}
 } }
@@ -216,7 +216,7 @@ namespace anox
 		RKIT_CHECK(rkit::New<State_t>(loaderState));
 
 		loaderState->m_functions = &AnoxSingleFileResourceLoaderCallbacksFor<TLoaderInfo>::ms_callbacks;
-		loaderState->m_resource = resourceBase.Get();
+		loaderState->m_resource = resourceBase;
 		loaderState->m_systems = systems;
 
 		rkit::RCPtr<rkit::Job> waitForDependenciesJob;

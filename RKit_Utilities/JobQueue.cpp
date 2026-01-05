@@ -270,7 +270,10 @@ namespace rkit { namespace utils
 		bool jobSucceeded = true;
 
 		if (m_dgJobDependencyFailed)
+		{
 			jobSucceeded = false;
+			m_jobRunner.Reset();
+		}
 		else
 		{
 			if (m_jobRunner.IsValid())
@@ -512,6 +515,8 @@ namespace rkit { namespace utils
 
 			for (Job *job : dependencies.GetSpan())
 			{
+				RKIT_ASSERT(job != nullptr);
+
 				if (static_cast<JobImpl *>(job)->m_dgJobCompleted)
 					resultJob->m_numWaitingDependencies--;
 
