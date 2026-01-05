@@ -250,7 +250,7 @@ namespace anox
 			rkit::UniquePtr<rkit::IJobRunner> loadJobRunner;
 			RKIT_CHECK(rkit::New<AnoxAbstractSingleFileLoaderLoadJob>(loadJobRunner, loaderState));
 
-			RKIT_CHECK(fileSystem.GetJobQueue().CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(loadJobRunner), waitForDependenciesJob));
+			RKIT_CHECK(fileSystem.GetJobQueue().CreateJob(&loadJob, rkit::JobType::kNormalPriority, std::move(loadJobRunner), waitForDependenciesJob));
 		}
 		else
 		{
