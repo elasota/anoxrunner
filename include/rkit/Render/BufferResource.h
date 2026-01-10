@@ -17,4 +17,11 @@ namespace rkit { namespace render
 
 		virtual MemoryRequirementsView GetMemoryRequirements() const = 0;
 	};
+
+	struct IBufferCPUMapping : public NoCopy
+	{
+		virtual ~IBufferCPUMapping() {}
+
+		virtual void *GetMappedPtr() const = 0;
+	};
 } } // rkit::render

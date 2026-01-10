@@ -6,16 +6,32 @@
 
 namespace anox
 {
-	rkit::Result DataReader::ReadCheckFloat(float &outFloat, const rkit::endian::LittleFloat32_t &inFloat, int highestExpectedExponent)
+	rkit::Result DataReader::ReadCheckFloats(const rkit::Span<float> &outFloats, const rkit::Span<const rkit::endian::LittleFloat32_t> &inFloats, int highestExpectedExponent)
 	{
-		const uint32_t floatBits = inFloat.GetBits();
+		RKIT_ASSERT(outFloats.Count() == inFloats.Count());
 
-		const int exponent = static_cast<int>((floatBits >> 23) & 0xff) - 0x7f;
+		const size_t numFloats = rkit::Min(outFloats.Count(), inFloats.Count());
 
-		if (exponent > highestExpectedExponent)
+		const rkit::endian::LittleFloat32_t *inFloatsPtr = inFloats.Ptr();
+		float *outFloatsPtr = outFloats.Ptr();
+
+		bool isOK = true;
+		for (size_t i = 0; i < numFloats; i++)
+		{
+			const uint32_t floatBits = inFloatsPtr[i].GetBits();
+
+			const int exponent = static_cast<int>((floatBits >> 23) & 0xff) - 0x7f;
+
+			// Don't use shortcutting here so compiler can possibly vectorize this loop
+			isOK &= (exponent <= highestExpectedExponent);
+		}
+
+		if (!isOK)
 			return rkit::ResultCode::kDataError;
 
-		outFloat = inFloat.Get();
+		for (size_t i = 0; i < numFloats; i++)
+			outFloatsPtr[i] = inFloatsPtr[i].Get();
+
 		return rkit::ResultCode::kOK;
 	}
 

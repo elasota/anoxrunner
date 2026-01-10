@@ -41,6 +41,7 @@ namespace rkit { namespace render
 	struct IBinaryGPUWaitableFence;
 	struct IBufferPrototype;
 	struct IBufferResource;
+	struct IBufferCPUMapping;
 	struct IComputeCommandAllocator;
 	struct ICopyCommandAllocator;
 	struct ICopyCommandQueue;
@@ -60,6 +61,7 @@ namespace rkit { namespace render
 	struct IPipelineLibraryLoader;
 	struct IPipelineLibraryConfigValidator;
 	struct IRenderDeviceCaps;
+	struct IRenderDeviceRequirements;
 	struct ISwapChainPrototype;
 	struct ISwapChain;
 	struct BufferSpec;
@@ -91,6 +93,7 @@ namespace rkit { namespace render
 		virtual Result WaitForDeviceIdle() = 0;
 
 		virtual const IRenderDeviceCaps &GetCaps() const = 0;
+		virtual const IRenderDeviceRequirements &GetRequirements() const = 0;
 
 		virtual Result CreatePipelineLibraryLoader(UniquePtr<IPipelineLibraryLoader> &outLoader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
 			UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart) = 0;
@@ -100,7 +103,7 @@ namespace rkit { namespace render
 
 		virtual Result CreateBufferPrototype(UniquePtr<IBufferPrototype> &outBufferPrototype, const BufferSpec &bufferSpec,
 			const BufferResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &restrictedQueues) = 0;
-		virtual Result CreateBuffer(UniquePtr<IBufferResource> &outBuffer, UniquePtr<IBufferPrototype> &&bufferPrototype,
+		virtual Result CreateBuffer(UniquePtr<IBufferResource> &outBuffer, UniquePtr<IBufferCPUMapping> *outCPUMapping, UniquePtr<IBufferPrototype> &&bufferPrototype,
 			const MemoryRegion &memRegion, const Span<const uint8_t> &initialData) = 0;
 
 		virtual Result CreateImagePrototype(UniquePtr<IImagePrototype> &outImagePrototype, const ImageSpec &imageSpec,

@@ -38,7 +38,8 @@ namespace rkit { namespace render { namespace vulkan
 	class VulkanDevice final : public VulkanDeviceBase
 	{
 	public:
-		VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts, const VkPhysicalDeviceMemoryProperties &memProperties, UniquePtr<IMutex> &&queueMutex);
+		VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks,
+			const RenderDeviceCaps &caps, const RenderDeviceRequirements &reqs, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts, const VkPhysicalDeviceMemoryProperties &memProperties, UniquePtr<IMutex> &&queueMutex);
 		~VulkanDevice();
 
 		CallbackSpan<ICopyCommandQueue *, const void *> GetCopyQueues() const override;
@@ -62,6 +63,7 @@ namespace rkit { namespace render { namespace vulkan
 		const VkAllocationCallbacks *GetAllocCallbacks() const override;
 
 		const IRenderDeviceCaps &GetCaps() const override;
+		const IRenderDeviceRequirements &GetRequirements() const override;
 
 		Result CreatePipelineLibraryLoader(UniquePtr<IPipelineLibraryLoader> &loader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
 			UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart) override;
@@ -91,8 +93,8 @@ namespace rkit { namespace render { namespace vulkan
 
 		Result CreateBufferPrototype(UniquePtr<IBufferPrototype> &outBufferPrototype, const BufferSpec &bufferSpec,
 			const BufferResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &concurrentQueues) override;
-		Result CreateBuffer(UniquePtr<IBufferResource> &outImage, UniquePtr<IBufferPrototype> &&bufferPrototype,
-			const MemoryRegion &memRegion, const Span<const uint8_t> &initialData) override;
+		Result CreateBuffer(UniquePtr<IBufferResource> &outImage, UniquePtr<IBufferCPUMapping> *outBufferMapping,
+			UniquePtr<IBufferPrototype> &&bufferPrototype, const MemoryRegion &memRegion, const Span<const uint8_t> &initialData) override;
 
 		Result CreateImagePrototype(UniquePtr<IImagePrototype> &outImagePrototype, const ImageSpec &imageSpec,
 			const ImageResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &concurrentQueues) override;
@@ -184,6 +186,7 @@ namespace rkit { namespace render { namespace vulkan
 		VkDevice m_device;
 		const VkAllocationCallbacks *m_allocCallbacks;
 		RenderDeviceCaps m_caps;
+		RenderDeviceRequirements m_reqs;
 		RCPtr<RenderVulkanPhysicalDevice> m_physDevice;
 
 		StaticArray<QueueFamily, kNumQueues> m_queueFamilies;
@@ -300,7 +303,8 @@ namespace rkit { namespace render { namespace vulkan
 		return ResultCode::kOK;
 	}
 
-	VulkanDevice::VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts, const VkPhysicalDeviceMemoryProperties &memProperties, UniquePtr<IMutex> &&queueMutex)
+	VulkanDevice::VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks,
+		const RenderDeviceCaps &caps, const RenderDeviceRequirements &reqs, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts, const VkPhysicalDeviceMemoryProperties &memProperties, UniquePtr<IMutex> &&queueMutex)
 		: m_vkg(vkg)
 		, m_vki(vki)
 		, m_vkg_p(vkg_p)
@@ -312,6 +316,7 @@ namespace rkit { namespace render { namespace vulkan
 		, m_memProperties(memProperties)
 		, m_queueMutex(std::move(queueMutex))
 		, m_caps(caps)
+		, m_reqs(reqs)
 		, m_physDevice(physDevice)
 		, m_semaFactory(*this)
 		, m_fenceFactory(*this)
@@ -503,6 +508,11 @@ namespace rkit { namespace render { namespace vulkan
 		return m_caps;
 	}
 
+	const IRenderDeviceRequirements &VulkanDevice::GetRequirements() const
+	{
+		return m_reqs;
+	}
+
 	Result VulkanDevice::CreatePipelineLibraryLoader(UniquePtr<IPipelineLibraryLoader> &outLoader,
 		UniquePtr<IPipelineLibraryConfigValidator> &&validator,
 		UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart)
@@ -667,8 +677,8 @@ namespace rkit { namespace render { namespace vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanDevice::CreateBuffer(UniquePtr<IBufferResource> &outBuffer, UniquePtr<IBufferPrototype> &&bufferPrototypeRef,
-		const MemoryRegion &memRegion, const Span<const uint8_t> &initialData)
+	Result VulkanDevice::CreateBuffer(UniquePtr<IBufferResource> &outBuffer, UniquePtr<IBufferCPUMapping> *outCPUMapping,
+		UniquePtr<IBufferPrototype> &&bufferPrototypeRef, const MemoryRegion &memRegion, const Span<const uint8_t> &initialData)
 	{
 		RKIT_ASSERT(initialData.Count() == 0);
 
@@ -687,9 +697,12 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(m_vkd.vkBindBufferMemory(m_device, buffer, baseHeap.GetDeviceMemory(), static_cast<VkDeviceSize>(baseOffset)));
 
-		RKIT_CHECK(New<VulkanBuffer>(outBuffer, *this, buffer));
+		UniquePtr<VulkanBuffer> ibuffer;
+		RKIT_CHECK(New<VulkanBuffer>(ibuffer, *this, buffer));
 
-		prototype.DetachBuffer();
+
+
+		outBuffer = std::move(ibuffer);
 
 		return ResultCode::kOK;
 	}
@@ -801,7 +814,7 @@ namespace rkit { namespace render { namespace vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanDeviceBase::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const QueueFamilySpec(&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts, const VkPhysicalDeviceMemoryProperties &memProperties)
+	Result VulkanDeviceBase::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const QueueFamilySpec(&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RenderDeviceRequirements &reqs, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts, const VkPhysicalDeviceMemoryProperties &memProperties)
 	{
 		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
 
@@ -809,7 +822,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_CHECK(sysDriver->CreateMutex(queueMutex));
 
 		UniquePtr<VulkanDevice> vkDevice;
-		RKIT_CHECK(New<VulkanDevice>(vkDevice, vkg, vki, vkg_p, vki_p, inst, device, allocCallbacks, caps, physDevice, std::move(enabledExts), memProperties, std::move(queueMutex)));
+		RKIT_CHECK(New<VulkanDevice>(vkDevice, vkg, vki, vkg_p, vki_p, inst, device, allocCallbacks, caps, reqs, physDevice, std::move(enabledExts), memProperties, std::move(queueMutex)));
 		
 		RKIT_CHECK(vkDevice->LoadDeviceAPI());
 		RKIT_CHECK(vkDevice->CreatePools());

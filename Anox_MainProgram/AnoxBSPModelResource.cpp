@@ -33,12 +33,13 @@ namespace anox
 		typedef AnoxBSPModelResource Resource_t;
 		typedef AnoxBSPModelResourceLoaderState State_t;
 
-		static constexpr bool kHasDependencies = true;
-		static constexpr bool kHasAnalysisPhase = true;
-		static constexpr bool kHasLoadPhase = true;
+		static constexpr size_t kNumPhases = 2;
 
-		static rkit::Result AnalyzeFile(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps);
-		static rkit::Result LoadFile(State_t &state, Resource_t &resource);
+		static rkit::Result LoadHeaderAndQueueDependencies(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps);
+		static rkit::Result LoadContents(State_t &state, Resource_t &resource);
+
+		static bool PhaseHasDependencies(size_t phase);
+		static rkit::Result LoadPhase(State_t &state, Resource_t &resource, size_t phase, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps);
 
 		class ChunkReader
 		{
@@ -53,7 +54,7 @@ namespace anox
 		};
 	};
 
-	rkit::Result AnoxBSPModelLoaderInfo::AnalyzeFile(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
+	rkit::Result AnoxBSPModelLoaderInfo::LoadHeaderAndQueueDependencies(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
 	{
 		rkit::ReadOnlyMemoryStream stream(state.m_fileContents.GetBuffer(), state.m_fileContents.Count());
 
@@ -102,9 +103,33 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxBSPModelLoaderInfo::LoadFile(State_t &state, Resource_t &resource)
+	rkit::Result AnoxBSPModelLoaderInfo::LoadContents(State_t &state, Resource_t &resource)
 	{
 		return rkit::ResultCode::kNotYetImplemented;
+	}
+
+	bool AnoxBSPModelLoaderInfo::PhaseHasDependencies(size_t phase)
+	{
+		switch (phase)
+		{
+		case 0:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	rkit::Result AnoxBSPModelLoaderInfo::LoadPhase(State_t &state, Resource_t &resource, size_t phase, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
+	{
+		switch (phase)
+		{
+		case 0:
+			return LoadHeaderAndQueueDependencies(state, resource, outDeps);
+		case 1:
+			return LoadContents(state, resource);
+		default:
+			return rkit::ResultCode::kInternalError;
+		}
 	}
 
 	AnoxBSPModelLoaderInfo::ChunkReader::ChunkReader(rkit::IReadStream &readStream)

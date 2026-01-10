@@ -55,6 +55,7 @@ namespace rkit { namespace render { namespace vulkan
 		Result CopyBufferToImage(IImageResource &imageResource, const ImageRect3D &destRect,
 			IBufferResource &bufferResource, const BufferImageFootprint &bufferFootprint,
 			ImageLayout imageLayout, uint32_t mipLevel, uint32_t arrayLayer, ImagePlane plane) override;
+		Result CommitBufferCPUMapping(const IBufferCPUMapping &cpuMapping) override;
 
 		Result CloseEncoder() override;
 	};
@@ -332,6 +333,11 @@ namespace rkit { namespace render { namespace vulkan
 			vkImageLayout, 1, &bufferImageCopy);
 
 		return ResultCode::kOK;
+	}
+
+	Result VulkanCopyCommandEncoder::CommitBufferCPUMapping(const IBufferCPUMapping &cpuMapping)
+	{
+		return ResultCode::kNotYetImplemented;
 	}
 
 	Result VulkanCopyCommandEncoder::CloseEncoder()

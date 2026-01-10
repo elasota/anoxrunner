@@ -1467,7 +1467,8 @@ namespace anox { namespace buildsystem
 		rkit::Vector<data::MDAModelSubModel> outSubModels;
 		rkit::Vector<data::MDAModelTri> outTris;
 		rkit::Vector<data::MDAModelVert> outVerts;
-		rkit::Vector<data::MDASkeletalModelPoint> outPoints;
+		rkit::Vector<data::MDAModelPoint> outPoints;
+		rkit::Vector<data::MDASkeletalModelBoneIndex> outBoneIndexes;
 		rkit::Vector<data::MDAModelVertMorph> outVertMorphs;
 
 		uint32_t numMorphedPoints = 0;
@@ -1654,6 +1655,7 @@ namespace anox { namespace buildsystem
 		}
 
 		RKIT_CHECK(outPoints.Resize(numPoints));
+		RKIT_CHECK(outBoneIndexes.Resize(numPoints));
 
 		{
 			rkit::Vector<CTCPoint> inPoints;
@@ -1664,7 +1666,8 @@ namespace anox { namespace buildsystem
 
 			for (uint32_t inPointIndex = 0; inPointIndex < numPoints; inPointIndex++)
 			{
-				data::MDASkeletalModelPoint &outPoint = outPoints[inPointToOutPoint[inPointIndex]];
+				data::MDAModelPoint &outPoint = outPoints[inPointToOutPoint[inPointIndex]];
+				data::MDASkeletalModelBoneIndex &outBoneIndex = outBoneIndexes[inPointToOutPoint[inPointIndex]];
 				const CTCPoint &inPoint = inPoints[inPointIndex];
 
 				rkit::StaticArray<float, 3> pos;
@@ -1676,7 +1679,7 @@ namespace anox { namespace buildsystem
 					normal[axis] = inPoint.m_normal[axis].Get();
 				}
 
-				outPoint.m_boneIndex = 0;
+				outBoneIndex.m_boneIndex = 0;
 				outPoint.m_compressedNormal = data::CompressNormal(normal[0], normal[1], normal[2]);
 				for (size_t axis = 0; axis < 3; axis++)
 					outPoint.m_point[axis] = inPoint.m_pos[axis];
@@ -1726,7 +1729,7 @@ namespace anox { namespace buildsystem
 					// Anachronox never uses multi-weight skinning even though the format
 					// supports it
 					if (bpi == 0)
-						outPoints[inPointToOutPoint[inPointIndex]].m_boneIndex = boneIndex;
+						outBoneIndexes[inPointToOutPoint[inPointIndex]].m_boneIndex = boneIndex;
 				}
 			}
 		}
@@ -1905,6 +1908,7 @@ namespace anox { namespace buildsystem
 		RKIT_CHECK(outFile->WriteAllSpan(outTris.ToSpan()));
 		RKIT_CHECK(outFile->WriteAllSpan(outVerts.ToSpan()));
 		RKIT_CHECK(outFile->WriteAllSpan(outPoints.ToSpan()));
+		RKIT_CHECK(outFile->WriteAllSpan(outBoneIndexes.ToSpan()));
 		RKIT_CHECK(outFile->WriteAllSpan(outVertMorphs.ToSpan()));
 
 		return rkit::ResultCode::kOK;
@@ -1926,7 +1930,7 @@ namespace anox { namespace buildsystem
 			const size_t firstVert = outVerts.Count();
 
 			data::MDAModelSubModel subModel = {};
-			subModel.m_materialID = materialID;
+			subModel.m_materialIndex = static_cast<uint16_t>(materialID);
 
 			RKIT_CHECK(AddOneTriCluster(outTris, outVerts, inVertToOutVert, triVerts, triTexCoords, numTris, triAdded.ToSpan()));
 
@@ -3193,7 +3197,7 @@ namespace anox { namespace buildsystem
 				}
 
 				data::MDAModelSubModel outSubModel = {};
-				outSubModel.m_materialID = static_cast<uint8_t>(textureIndex);
+				outSubModel.m_materialIndex = static_cast<uint16_t>(textureIndex);
 				outSubModel.m_numTris = static_cast<uint32_t>(subModel.m_tris.Count());
 				outSubModel.m_numVertsMinusOne = static_cast<uint16_t>(subModel.m_verts.Count() - 1);
 
@@ -3289,6 +3293,7 @@ namespace anox { namespace buildsystem
 				continue;
 
 			// Can emit this tri
+			data::MDAModelTri tri;
 			for (size_t triVert = 0; triVert < 3; triVert++)
 			{
 				const ModelProtoVert &protoVert = verts[triVert];
@@ -3302,21 +3307,27 @@ namespace anox { namespace buildsystem
 				{
 					RKIT_CHECK(uncompiledPoints.Append(vertIndex));
 					RKIT_CHECK(protoVertToVertIndex.SetPrehashed(hash, protoVert, vertIndex));
+
+					data::MDAModelVert mdaVert;
+					mdaVert.m_texCoordU = CompressUV(protoVert.m_uBits);
+					mdaVert.m_texCoordV = CompressUV(protoVert.m_vBits);
+					mdaVert.m_pointID = xyzToPointIndex[protoVert.m_xyzIndex];
+
+					RKIT_CHECK(outSubmodel.m_verts.Append(mdaVert));
 				}
 				else
 					vertIndex = it.Value();
 
-				data::MDAModelVert mdaVert;
-				mdaVert.m_texCoordU = CompressUV(protoVert.m_uBits);
-				mdaVert.m_texCoordV = CompressUV(protoVert.m_vBits);
-				mdaVert.m_pointID = xyzToPointIndex[protoVert.m_xyzIndex];
-
-				RKIT_CHECK(outSubmodel.m_verts.Append(mdaVert));
+				tri.m_verts[triVert] = static_cast<uint16_t>(vertIndex);
 			}
+
+			RKIT_CHECK(outSubmodel.m_tris.Append(tri));
 
 			triEmitted[i] = true;
 			emittedAnything = true;
 		}
+
+		RKIT_ASSERT(outSubmodel.m_verts.Count() == protoVertToVertIndex.Count());
 
 		outEmittedAnything = emittedAnything;
 

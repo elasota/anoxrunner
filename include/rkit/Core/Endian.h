@@ -83,6 +83,8 @@ namespace rkit
 			StaticArray<uint8_t, sizeof(Number_t)> &GetBytes();
 			const StaticArray<uint8_t, sizeof(Number_t)> &GetBytes() const;
 
+			void ConvertToHostOrderInPlace();
+
 		private:
 			enum class BitsSignal
 			{
@@ -244,5 +246,12 @@ namespace rkit { namespace endian
 	const StaticArray<uint8_t, sizeof(typename SwappableNumber<THelper>::Number_t)> &SwappableNumber<THelper>::GetBytes() const
 	{
 		return m_bytes;
+	}
+
+	template<class THelper>
+	void SwappableNumber<THelper>::ConvertToHostOrderInPlace()
+	{
+		const Bits_t bits = this->GetBits();
+		memcpy(m_bytes.GetBuffer(), &bits, sizeof(bits));
 	}
 } } // rkit::endian

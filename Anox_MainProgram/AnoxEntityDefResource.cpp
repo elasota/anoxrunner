@@ -34,12 +34,34 @@ namespace anox
 		typedef AnoxEntityDefResource Resource_t;
 		typedef AnoxEntityDefResourceLoaderState State_t;
 
-		static constexpr bool kHasDependencies = true;
-		static constexpr bool kHasAnalysisPhase = true;
-		static constexpr bool kHasLoadPhase = true;
+		static constexpr size_t kNumPhases = 2;
 
-		static rkit::Result AnalyzeFile(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps);
-		static rkit::Result LoadFile(State_t &state, Resource_t &resource);
+		static rkit::Result LoadHeaderAndQueueDependencies(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps);
+		static rkit::Result LoadContents(State_t &state, Resource_t &resource);
+
+		static bool PhaseHasDependencies(size_t phase)
+		{
+			switch (phase)
+			{
+			case 0:
+				return true;
+			default:
+				return false;
+			}
+		}
+
+		static rkit::Result LoadPhase(State_t &state, Resource_t &resource, size_t phase, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
+		{
+			switch (phase)
+			{
+			case 0:
+				return LoadHeaderAndQueueDependencies(state, resource, outDeps);
+			case 1:
+				return LoadContents(state, resource);
+			default:
+				return rkit::ResultCode::kInternalError;
+			}
+		}
 	};
 
 	class AnoxEntityDefResource final : public AnoxEntityDefResourceBase
@@ -53,7 +75,7 @@ namespace anox
 		Values m_values;
 	};
 
-	rkit::Result AnoxEntityDefLoaderInfo::AnalyzeFile(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
+	rkit::Result AnoxEntityDefLoaderInfo::LoadHeaderAndQueueDependencies(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
 	{
 		rkit::ReadOnlyMemoryStream stream(state.m_fileContents.ToSpan());
 
@@ -74,10 +96,8 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxEntityDefLoaderInfo::LoadFile(State_t &state, Resource_t &resource)
+	rkit::Result AnoxEntityDefLoaderInfo::LoadContents(State_t &state, Resource_t &resource)
 	{
-		anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, "Utilities"));
-
 		AnoxEntityDefResource::Values &resValues = resource.m_values;
 
 		resource.m_values.m_modelCodeFourCC = state.m_edef.m_modelCode.Get();

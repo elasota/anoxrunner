@@ -194,6 +194,20 @@ namespace rkit { namespace math {
 	{
 		return priv::MatrixArrayInitReader<TComponent, TRows, TCols, typename IntListCreateSequence<size_t, TRows>::Type_t>::Create(rows);
 	}
+
+	template<class TComponent, size_t TRows, size_t TCols>
+	Vec<TComponent, TCols> &Matrix<TComponent, TRows, TCols>::operator[](size_t index)
+	{
+		RKIT_ASSERT(index < TRows);
+		return m_rows[index];
+	}
+
+	template<class TComponent, size_t TRows, size_t TCols>
+	const Vec<TComponent, TCols> &Matrix<TComponent, TRows, TCols>::operator[](size_t index) const
+	{
+		RKIT_ASSERT(index < TRows);
+		return m_rows[index];
+	}
 } }
 
 

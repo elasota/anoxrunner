@@ -70,9 +70,14 @@
 
 #include "AnoxGameWindowResources.h"
 #include "AnoxRenderedWindow.h"
+#include "AnoxBuffer.h"
 #include "AnoxTexture.h"
 #include "AnoxGraphicsSettings.h"
 #include "AnoxGraphicTimelinedResource.h"
+
+namespace rkit { namespace render {
+	struct IRenderDeviceCaps;
+} }
 
 namespace anox
 {
@@ -89,6 +94,19 @@ namespace anox
 	private:
 		rkit::UniquePtr<rkit::render::IMemoryHeap> m_heap;
 		rkit::UniquePtr<rkit::render::IImageResource> m_resource;
+	};
+
+	class Buffer final : public IBuffer, public GraphicTimelinedResource
+	{
+	public:
+		explicit Buffer(IGraphicsSubsystem &subsystem);
+
+		rkit::render::IBufferResource *GetRenderResource() const;
+		void SetRenderResources(rkit::UniquePtr<rkit::render::IBufferResource> &&resource, rkit::UniquePtr<rkit::render::IMemoryHeap> &&heap);
+
+	private:
+		rkit::UniquePtr<rkit::render::IMemoryHeap> m_heap;
+		rkit::UniquePtr<rkit::render::IBufferResource> m_resource;
 	};
 
 	class GraphicsSubsystem final : public IGraphicsSubsystem, public rkit::NoCopy
@@ -111,11 +129,15 @@ namespace anox
 		rkit::Result EndFrame() override;
 
 		rkit::Optional<rkit::render::DisplayMode> GetDisplayMode() const override;
+		const rkit::render::IRenderDeviceCaps &GetDeviceCaps() const override;
+		const rkit::render::IRenderDeviceRequirements &GetDeviceRequirements() const override;
 
 		rkit::Result CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies) override;
 		rkit::Result CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<ISubmitJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies) override;
 
 		rkit::Result CreateAsyncCreateTextureJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<ITexture> &outTexture, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData, const rkit::JobDependencyList &dependencies) override;
+		rkit::Result CreateAsyncCreateAndFillBufferJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<IBuffer> &outBuffer,
+			const rkit::RCPtr<BufferInitializer> &bufferInitializer, const rkit::JobDependencyList &dependencies) override;
 
 		void CondemnTimelinedResource(GraphicTimelinedResource &timelinedResource) override;
 
@@ -312,6 +334,23 @@ namespace anox
 		private:
 			rkit::UniquePtr<ISubmitJobRunner> m_submitJob;
 			rkit::render::IBaseCommandQueue &m_cmdQueue;
+		};
+
+		class AllocateBufferStorageAndPostCopyJobRunner final : public rkit::IJobRunner
+		{
+		public:
+			explicit AllocateBufferStorageAndPostCopyJobRunner(GraphicsSubsystem &graphicsSubsystem,
+				const rkit::RCPtr<Buffer> &buffer,
+				const rkit::RCPtr<BufferInitializer> &bufferInitializer,
+				const rkit::RCPtr<rkit::JobSignaler> &doneCopyingSignaler);
+
+			rkit::Result Run() override;
+
+		private:
+			GraphicsSubsystem &m_graphicsSubsystem;
+			const rkit::RCPtr<Buffer> m_buffer;
+			const rkit::RCPtr<BufferInitializer> m_bufferInitializer;
+			rkit::RCPtr<rkit::JobSignaler> m_doneCopyingSignaler;
 		};
 
 		class AllocateTextureStorageAndPostCopyJobRunner final : public rkit::IJobRunner
@@ -612,6 +651,17 @@ namespace anox
 			void OnUploadCompleted() override;
 		};
 
+		struct BufferCommitInitialDataTask final : public UploadTask
+		{
+			rkit::RCPtr<rkit::JobSignaler> m_doneSignaler;
+			rkit::UniquePtr<rkit::render::IBufferCPUMapping> m_cpuMapping;
+
+			rkit::Result StartTask(UploadActionSet &actionSet, GraphicsSubsystem &subsystem) override;
+			rkit::Result PumpTask(bool &isCompleted, UploadActionSet &actionSet, GraphicsSubsystem &subsystem) override;
+			void OnCopyCompleted() override;
+			void OnUploadCompleted() override;
+		};
+
 		rkit::Result CreateAndQueueJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<rkit::IJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies, rkit::RCPtr<rkit::Job> (LogicalQueueBase::*queueMember));
 
 		rkit::Result TransitionDisplayMode();
@@ -739,6 +789,22 @@ namespace anox
 	}
 
 	void Texture::SetRenderResources(rkit::UniquePtr<rkit::render::IImageResource> &&resource, rkit::UniquePtr<rkit::render::IMemoryHeap> &&heap)
+	{
+		m_resource = std::move(resource);
+		m_heap = std::move(heap);
+	}
+
+	Buffer::Buffer(IGraphicsSubsystem &subsystem)
+		: GraphicTimelinedResource(subsystem)
+	{
+	}
+
+	rkit::render::IBufferResource *Buffer::GetRenderResource() const
+	{
+		return m_resource.Get();
+	}
+
+	void Buffer::SetRenderResources(rkit::UniquePtr<rkit::render::IBufferResource> &&resource, rkit::UniquePtr<rkit::render::IMemoryHeap> &&heap)
 	{
 		m_resource = std::move(resource);
 		m_heap = std::move(heap);
@@ -1051,6 +1117,87 @@ namespace anox
 		return m_submitJob->RunBase(m_cmdQueue);
 	}
 
+	GraphicsSubsystem::AllocateBufferStorageAndPostCopyJobRunner::AllocateBufferStorageAndPostCopyJobRunner(GraphicsSubsystem &graphicsSubsystem,
+		const rkit::RCPtr<Buffer> &buffer,
+		const rkit::RCPtr<BufferInitializer> &bufferInitializer,
+		const rkit::RCPtr<rkit::JobSignaler> &doneCopyingSignaler)
+		: m_graphicsSubsystem(graphicsSubsystem)
+		, m_buffer(buffer)
+		, m_bufferInitializer(bufferInitializer)
+		, m_doneCopyingSignaler(doneCopyingSignaler)
+	{
+	}
+
+	rkit::Result GraphicsSubsystem::AllocateBufferStorageAndPostCopyJobRunner::Run()
+	{
+		rkit::render::IRenderDevice *device = m_graphicsSubsystem.GetDevice();
+
+		rkit::UniquePtr<rkit::render::IBufferPrototype> prototype;
+		RKIT_CHECK(device->CreateBufferPrototype(prototype, m_bufferInitializer->m_spec, m_bufferInitializer->m_resSpec));
+
+		rkit::render::MemoryRequirementsView memReqs = prototype->GetMemoryRequirements();
+
+		// Find a good heap
+		rkit::render::HeapSpec heapSpec = {};
+		heapSpec.m_allowBuffers = true;
+		heapSpec.m_allowNonRTDSImages = true;
+		heapSpec.m_heapType = rkit::render::HeapType::kDefault;
+
+		rkit::render::GPUMemorySize_t memSize = memReqs.Size();
+
+		rkit::Optional<rkit::render::HeapKey> heapKey = memReqs.FindSuitableHeap(heapSpec);
+		if (!heapKey.IsSet())
+			return rkit::ResultCode::kInternalError;
+		
+		rkit::UniquePtr<rkit::render::IMemoryHeap> memHeap;
+		RKIT_CHECK(m_graphicsSubsystem.m_renderDevice->CreateMemoryHeap(memHeap, heapKey.Get(), memSize));
+
+		rkit::UniquePtr<rkit::render::IBufferResource> bufferResource;
+
+		const bool haveInitialData = m_bufferInitializer->m_copyOperations.Count() > 0;
+
+		rkit::Span<const uint8_t> deviceInitialData;
+		if (haveInitialData && m_graphicsSubsystem.m_renderDevice->SupportsInitialTextureData() && m_bufferInitializer->m_copyOperations.Count() == 1)
+		{
+			const BufferInitializer::CopyOperation &copyOp = m_bufferInitializer->m_copyOperations[0];
+
+			const size_t requiredSize = m_bufferInitializer->m_spec.m_size;
+
+			if (copyOp.m_offset == 0 && copyOp.m_data.Count() >= requiredSize)
+			{
+				deviceInitialData = copyOp.m_data.SubSpan(0, requiredSize);
+			}
+		}
+
+		rkit::UniquePtr<rkit::render::IBufferCPUMapping> cpuMapping;
+
+		const bool mapForInitialData = (haveInitialData && deviceInitialData.Count() == 0);
+
+		RKIT_CHECK(m_graphicsSubsystem.m_renderDevice->CreateBuffer(bufferResource, (mapForInitialData ? &cpuMapping : nullptr),
+			std::move(prototype), memHeap->GetRegion(), deviceInitialData));
+
+		if (mapForInitialData)
+		{
+			uint8_t *bufferData = static_cast<uint8_t *>(cpuMapping->GetMappedPtr());
+
+			for (const BufferInitializer::CopyOperation &copyOp : m_bufferInitializer->m_copyOperations)
+			{
+				RKIT_ASSERT(copyOp.m_offset <= memSize);
+				RKIT_ASSERT(memSize - copyOp.m_offset >= copyOp.m_data.Count());
+				memcpy(bufferData + copyOp.m_offset, copyOp.m_data.Ptr(), copyOp.m_data.Count());
+			}
+			
+			rkit::RCPtr<BufferCommitInitialDataTask> uploadTask;
+			RKIT_CHECK(rkit::New<BufferCommitInitialDataTask>(uploadTask));
+
+			uploadTask->m_cpuMapping = std::move(cpuMapping);
+			uploadTask->m_doneSignaler = m_doneCopyingSignaler;
+
+			RKIT_CHECK(m_graphicsSubsystem.PostAsyncUploadTask(std::move(uploadTask)));
+		}
+
+		return rkit::ResultCode::kOK;
+	}
 
 	GraphicsSubsystem::AllocateTextureStorageAndPostCopyJobRunner::AllocateTextureStorageAndPostCopyJobRunner(
 		GraphicsSubsystem &graphicsSubsystem,
@@ -1893,6 +2040,28 @@ namespace anox
 	}
 
 
+	rkit::Result GraphicsSubsystem::BufferCommitInitialDataTask::StartTask(UploadActionSet &actionSet, GraphicsSubsystem &subsystem)
+	{
+		return rkit::ResultCode::kNotYetImplemented;
+	}
+
+	rkit::Result GraphicsSubsystem::BufferCommitInitialDataTask::PumpTask(bool &isCompleted, UploadActionSet &actionSet, GraphicsSubsystem &subsystem)
+	{
+		return rkit::ResultCode::kNotYetImplemented;
+	}
+
+	void GraphicsSubsystem::BufferCommitInitialDataTask::OnCopyCompleted()
+	{
+		m_cpuMapping.Reset();
+	}
+
+	void GraphicsSubsystem::BufferCommitInitialDataTask::OnUploadCompleted()
+	{
+		if (m_doneSignaler.IsValid())
+			m_doneSignaler->SignalDone(rkit::ResultCode::kOK);
+	}
+
+
 	GraphicsSubsystem::GraphicsSubsystem(IGameDataFileSystem &fileSystem, rkit::data::IDataDriver &dataDriver, rkit::utils::IThreadPool &threadPool, anox::RenderBackend desiredBackend)
 		: m_fileSystem(fileSystem)
 		, m_threadPool(threadPool)
@@ -2081,7 +2250,7 @@ namespace anox
 
 			RKIT_CHECK(m_renderDevice->CreateMemoryHeap(m_asyncUploadHeap, uploadHeapKey.Get(), prototype->GetMemoryRequirements().Size()));
 
-			RKIT_CHECK(m_renderDevice->CreateBuffer(m_asyncUploadBuffer, std::move(prototype), m_asyncUploadHeap->GetRegion(), rkit::ConstSpan<uint8_t>()));
+			RKIT_CHECK(m_renderDevice->CreateBuffer(m_asyncUploadBuffer, nullptr, std::move(prototype), m_asyncUploadHeap->GetRegion(), rkit::ConstSpan<uint8_t>()));
 
 			m_asyncUploadHeapLowMark = 0;
 			m_asyncUploadHeapHighMark = 0;
@@ -2902,6 +3071,16 @@ namespace anox
 		return m_currentDisplayMode;
 	}
 
+	const rkit::render::IRenderDeviceCaps &GraphicsSubsystem::GetDeviceCaps() const
+	{
+		return m_renderDevice->GetCaps();
+	}
+
+	const rkit::render::IRenderDeviceRequirements &GraphicsSubsystem::GetDeviceRequirements() const
+	{
+		return m_renderDevice->GetRequirements();
+	}
+
 	rkit::render::IRenderDevice *GraphicsSubsystem::GetDevice() const
 	{
 		return m_renderDevice.Get();
@@ -2980,6 +3159,30 @@ namespace anox
 
 		rkit::UniquePtr<AllocateTextureStorageAndPostCopyJobRunner> allocStorageJobRunner;
 		RKIT_CHECK(rkit::New<AllocateTextureStorageAndPostCopyJobRunner>(allocStorageJobRunner, *this, texture, textureData, doneCopyingSignaler));
+
+		RKIT_CHECK(jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(allocStorageJobRunner), dependencies));
+
+		return rkit::ResultCode::kOK;
+	}
+
+	rkit::Result GraphicsSubsystem::CreateAsyncCreateAndFillBufferJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<IBuffer> &outBuffer, const rkit::RCPtr<BufferInitializer> &bufferInitializer, const rkit::JobDependencyList &dependencies)
+	{
+		rkit::RCPtr<Buffer> buffer;
+		RKIT_CHECK(rkit::New<Buffer>(buffer, *this));
+
+		rkit::IJobQueue &jobQueue = *m_threadPool.GetJobQueue();
+
+		rkit::RCPtr<rkit::JobSignaler> doneCopyingSignaler;
+		rkit::RCPtr<rkit::Job> doneCopyingJob;
+		if (outJob)
+		{
+			RKIT_CHECK(jobQueue.CreateSignaledJob(doneCopyingSignaler, doneCopyingJob));
+
+			*outJob = doneCopyingJob;
+		}
+
+		rkit::UniquePtr<AllocateBufferStorageAndPostCopyJobRunner> allocStorageJobRunner;
+		RKIT_CHECK(rkit::New<AllocateBufferStorageAndPostCopyJobRunner>(allocStorageJobRunner, *this, buffer, bufferInitializer, doneCopyingSignaler));
 
 		RKIT_CHECK(jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(allocStorageJobRunner), dependencies));
 

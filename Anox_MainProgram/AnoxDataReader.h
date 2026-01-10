@@ -48,6 +48,7 @@ namespace anox
 	class DataReader
 	{
 	public:
+		static rkit::Result ReadCheckFloats(const rkit::Span<float> &outFloats, const rkit::Span<const rkit::endian::LittleFloat32_t> &inFloats, int highestExpectedExponent);
 		static rkit::Result ReadCheckFloat(float &outFloat, const rkit::endian::LittleFloat32_t &inFloat, int highestExpectedExponent);
 		static rkit::Result ReadCheckUInt(uint64_t &outUInt, const rkit::endian::LittleUInt64_t &inUInt, uint64_t expectedMax);
 		static rkit::Result ReadCheckUInt(uint32_t &outUInt, const rkit::endian::LittleUInt32_t &inUInt, uint32_t expectedMax);
@@ -73,6 +74,7 @@ namespace anox
 }
 
 #include "rkit/Math/Vec.h"
+#include "rkit/Core/Span.h"
 
 namespace anox { namespace priv {
 	template<class TEnum, class TIntegral>
@@ -130,6 +132,11 @@ namespace anox { namespace priv {
 
 namespace anox
 {
+	inline rkit::Result DataReader::ReadCheckFloat(float &outFloat, const rkit::endian::LittleFloat32_t &inFloat, int highestExpectedExponent)
+	{
+		return ReadCheckFloats(rkit::Span<float>(&outFloat, 1), rkit::Span<const rkit::endian::LittleFloat32_t>(&inFloat, 1), highestExpectedExponent);
+	}
+
 	template<size_t TSize>
 	rkit::Result DataReader::ReadCheckVec(rkit::math::Vec<float, TSize> &outVec, const rkit::endian::LittleFloat32_t(&inVec)[TSize], int highestExpectedExponent)
 	{

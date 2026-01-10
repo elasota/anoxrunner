@@ -64,6 +64,9 @@ namespace rkit
 		EnumMask operator&(const EnumMask &other) const;
 		EnumMask operator^(const EnumMask &other) const;
 
+		EnumMask &operator=(const EnumMask<T> &other) = default;
+		EnumMask &operator=(const T &other);
+
 		EnumMask operator~() const;
 
 		EnumMaskIterator<T> begin() const;
@@ -238,6 +241,13 @@ namespace rkit
 	EnumMask<T> EnumMask<T>::operator^(const EnumMask &other) const
 	{
 		return EnumMask<T>(m_boolVector ^ other.m_boolVector);
+	}
+
+	template<class T>
+	EnumMask<T> &EnumMask<T>::operator=(const T &other)
+	{
+		m_boolVector.Set(static_cast<size_t>(other), true);
+		return *this;
 	}
 
 	template<class T>

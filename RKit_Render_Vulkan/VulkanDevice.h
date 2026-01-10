@@ -26,6 +26,7 @@ namespace rkit
 namespace rkit { namespace render
 {
 	class RenderDeviceCaps;
+	class RenderDeviceRequirements;
 	struct HeapSpec;
 } } // rkit::render
 
@@ -82,7 +83,8 @@ namespace rkit { namespace render { namespace vulkan
 			const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p,
 			VkInstance inst, VkDevice device,
 			const QueueFamilySpec (&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks,
-			const RenderDeviceCaps &caps, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts,
+			const RenderDeviceCaps &caps, const RenderDeviceRequirements &reqs,
+			const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts,
 			const VkPhysicalDeviceMemoryProperties &memProperties);
 	};
 } } } // rkit::render::vulkan

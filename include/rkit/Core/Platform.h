@@ -14,6 +14,7 @@
 #		define RKIT_PLATFORM_ARCH RKIT_PLATFORM_ARCH_X64
 #		define RKIT_PLATFORM_ARCH_HAVE_SSE 1
 #		define RKIT_PLATFORM_ARCH_HAVE_SSE2 1
+#		define RKIT_PLATFORM_ARCH_HAVE_SSE41 1
 #	else
 #		error "Need to implement this"
 #	endif

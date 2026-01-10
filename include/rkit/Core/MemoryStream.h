@@ -27,6 +27,9 @@ namespace rkit
 		FilePos_t Tell() const override;
 		FilePos_t GetSize() const override;
 
+		template<class T>
+		Result ExtractSpan(Span<T> &outSpan, size_t count);
+
 	private:
 		char *m_bytes;
 		size_t m_pos;
@@ -166,6 +169,26 @@ inline rkit::FilePos_t rkit::FixedSizeMemoryStream::Tell() const
 inline rkit::FilePos_t rkit::FixedSizeMemoryStream::GetSize() const
 {
 	return m_size;
+}
+
+template<class T>
+rkit::Result rkit::FixedSizeMemoryStream::ExtractSpan(Span<T> &outSpan, size_t count)
+{
+	ResultCode result = ResultCode::kOK;
+
+	const size_t maxCount = (m_size - m_pos) / sizeof(T);
+
+	if (maxCount < count)
+	{
+		count = maxCount;
+		result = ResultCode::kEndOfStream;
+	}
+
+	outSpan = Span<T>(reinterpret_cast<T *>(m_bytes + m_pos), count);
+
+	m_pos += count * sizeof(T);
+
+	return result;
 }
 
 inline rkit::ReadOnlyMemoryStream::ReadOnlyMemoryStream(const Span<const uint8_t> &data)

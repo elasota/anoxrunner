@@ -14,6 +14,7 @@ namespace rkit { namespace render {
 	class HeapKey;
 	struct HeapSpec;
 
+	// A memory address is an address inside of a memory heap
 	class MemoryAddress final
 	{
 	public:
@@ -29,6 +30,7 @@ namespace rkit { namespace render {
 		GPUMemoryOffset_t m_offset = 0;
 	};
 
+	// A memory position is a position inside of a memory allocation (which may be a suballocation)
 	class MemoryPosition final
 	{
 	public:
@@ -48,6 +50,7 @@ namespace rkit { namespace render {
 		GPUMemoryOffset_t m_offset = 0;
 	};
 
+	// A memory region is a range inside of a memory allocation (which may be a suballocation)
 	class MemoryRegion final
 	{
 	public:

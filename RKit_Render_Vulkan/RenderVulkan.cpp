@@ -156,6 +156,8 @@ namespace rkit { namespace render { namespace vulkan
 			void SyncFeature(RenderDeviceBoolCap cap, VkBool32 (VkPhysicalDeviceFeatures::*featureFlag)) const;
 			void SyncLimit(RenderDeviceUInt32Cap cap, uint32_t limit) const;
 
+			void SyncMin(RenderDeviceUInt32Cap cap, uint32_t limit) const;
+
 		private:
 			const RenderDeviceCaps &m_wantedCaps;
 			RenderDeviceCaps &m_grantedCaps;
@@ -539,6 +541,11 @@ namespace rkit { namespace render { namespace vulkan
 			return ResultCode::kOperationFailed;
 		}
 
+		RenderDeviceRequirements requirements;
+		requirements.SetUInt32Req(RenderDeviceUInt32Requirement::kDataBufferOffsetAlignment, static_cast<uint32_t>(deviceProperties.limits.minStorageBufferOffsetAlignment));
+		requirements.SetUInt32Req(RenderDeviceUInt32Requirement::kConstantBufferOffsetAlignment, static_cast<uint32_t>(deviceProperties.limits.minUniformBufferOffsetAlignment));
+		requirements.SetUInt32Req(RenderDeviceUInt32Requirement::kTexelBufferOffsetAlignment, static_cast<uint32_t>(deviceProperties.limits.minTexelBufferOffsetAlignment));
+
 		Vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 		VulkanDeviceBase::QueueFamilySpec queueFamilySpecs[static_cast<size_t>(CommandQueueType::kCount)];
 
@@ -657,7 +664,7 @@ namespace rkit { namespace render { namespace vulkan
 		VkDevice device = VK_NULL_HANDLE;
 		RKIT_VK_CHECK(m_vki.vkCreateDevice(rPhysDevice->GetPhysDevice(), &devCreateInfo, GetAllocCallbacks(), &device));
 
-		Result wrapDeviceResult = VulkanDeviceBase::CreateDevice(outDevice, m_vkg, m_vki, m_vkg_p, m_vki_p, m_vkInstance, device, queueFamilySpecs, GetAllocCallbacks(), grantedCaps, rPhysDevice, std::move(enabledExts), memProperties);
+		Result wrapDeviceResult = VulkanDeviceBase::CreateDevice(outDevice, m_vkg, m_vki, m_vkg_p, m_vki_p, m_vkInstance, device, queueFamilySpecs, GetAllocCallbacks(), grantedCaps, requirements, rPhysDevice, std::move(enabledExts), memProperties);
 		if (!utils::ResultIsOK(wrapDeviceResult))
 		{
 			m_vki.vkDestroyDevice(device, GetAllocCallbacks());

@@ -8,8 +8,10 @@ namespace anox { namespace data
 {
 	enum class MDAAnimationType
 	{
-		kVertexAnimated = 0,
-		kSkeletalAnimated = 1,
+		kVertexAnimated,
+		kSkeletalAnimated,
+
+		kCount,
 	};
 
 	struct MDAModelHeader
@@ -46,10 +48,11 @@ namespace anox { namespace data
 		// MDAModelSubModel m_subModels[m_numSubModels]
 		// MDAModelTri m_tris[m_numSubmodels][submodel.m_numTris]
 		// MDAModelVert m_verts[m_numSubmodels][submodel.m_numVerts]
-		// if skeletal model:
-		//     MDASkeletalModelPoint m_points[m_numPoints]
 		// if vertex model:
 		//     MDAModelPoint m_points[m_numFrames][m_numPoints]
+		// if skeletal model:
+		//     MDAModelPoint m_points[m_numPoints]
+		//     MDASkeletalModelBoneIndex m_pointBoneIndexes[m_numPoints]
 		// MDAModelVertMorph m_vertMorphs[m_numMorphKeys][m_numMorphedPoints]
 	};
 
@@ -186,10 +189,8 @@ namespace anox { namespace data
 		rkit::endian::LittleUInt16_t m_texCoordV;
 	};
 
-	struct MDASkeletalModelPoint
+	struct MDASkeletalModelBoneIndex
 	{
-		rkit::endian::LittleFloat32_t m_point[3];
-		CompressedNormal m_compressedNormal;
 		rkit::endian::LittleUInt16_t m_boneIndex;
 	};
 
@@ -204,11 +205,6 @@ namespace anox { namespace data
 		rkit::endian::LittleFloat32_t m_delta[3];
 	};
 
-	struct MDAModelVertMorphKey
-	{
-		rkit::endian::LittleFloat32_t m_delta[3];
-	};
-
 	struct MDAModelTri
 	{
 		rkit::endian::LittleUInt16_t m_verts[3];
@@ -216,7 +212,7 @@ namespace anox { namespace data
 
 	struct MDAModelSubModel
 	{
-		rkit::endian::LittleUInt32_t m_materialID;
+		rkit::endian::LittleUInt16_t m_materialIndex;
 		rkit::endian::LittleUInt32_t m_numTris;
 		rkit::endian::LittleUInt16_t m_numVertsMinusOne;
 	};

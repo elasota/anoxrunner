@@ -2,18 +2,19 @@
 
 namespace anox
 {
-	AnoxAbstractSingleFileLoaderAnalyzeJob::AnoxAbstractSingleFileLoaderAnalyzeJob(const rkit::RCPtr<AnoxAbstractSingleFileResourceLoaderState> &state,
-		const rkit::RCPtr<rkit::JobSignaler> &waitForDependenciesSignaler)
+	AnoxAbstractSingleFileLoaderPhaseJob::AnoxAbstractSingleFileLoaderPhaseJob(const rkit::RCPtr<AnoxAbstractSingleFileResourceLoaderState> &state,
+		size_t phase, const rkit::RCPtr<rkit::JobSignaler> &waitForDependenciesSignaler)
 		: m_state(state)
+		, m_phase(phase)
 		, m_waitForDependenciesSignaler(waitForDependenciesSignaler)
 	{
 	}
 
-	rkit::Result AnoxAbstractSingleFileLoaderAnalyzeJob::Run()
+	rkit::Result AnoxAbstractSingleFileLoaderPhaseJob::Run()
 	{
 		rkit::HybridVector<rkit::RCPtr<rkit::Job>, 16> dependencyJobs;
 
-		RKIT_CHECK(m_state->m_functions->m_analyzeFile(*m_state, dependencyJobs));
+		RKIT_CHECK(m_state->m_functions->m_loadPhaseCallback(*m_state, m_phase, dependencyJobs));
 
 		if (!dependencyJobs.Count())
 		{
@@ -32,15 +33,5 @@ namespace anox
 		}
 
 		return rkit::ResultCode::kOK;
-	}
-
-	AnoxAbstractSingleFileLoaderLoadJob::AnoxAbstractSingleFileLoaderLoadJob(const rkit::RCPtr<AnoxAbstractSingleFileResourceLoaderState> &state)
-		: m_state(state)
-	{
-	}
-
-	rkit::Result AnoxAbstractSingleFileLoaderLoadJob::Run()
-	{
-		return m_state->m_functions->m_loadFile(*m_state);
 	}
 }
