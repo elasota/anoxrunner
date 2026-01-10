@@ -700,7 +700,12 @@ namespace rkit { namespace render { namespace vulkan
 		UniquePtr<VulkanBuffer> ibuffer;
 		RKIT_CHECK(New<VulkanBuffer>(ibuffer, *this, buffer));
 
+		prototype.DetachBuffer();
 
+		if (outCPUMapping)
+		{
+			return ResultCode::kNotYetImplemented;
+		}
 
 		outBuffer = std::move(ibuffer);
 
