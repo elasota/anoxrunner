@@ -19,6 +19,7 @@
 #include "VulkanResourcePool.h"
 #include "VulkanImageResource.h"
 
+#include "rkit/Render/BufferSpec.h"
 #include "rkit/Render/HeapSpec.h"
 #include "rkit/Render/HeapKey.h"
 #include "rkit/Render/DeviceCaps.h"
@@ -32,6 +33,8 @@
 #include "rkit/Core/Span.h"
 #include "rkit/Core/UniquePtr.h"
 #include "rkit/Core/Vector.h"
+
+#include "rkit/Core/LogDriver.h"
 
 namespace rkit { namespace render { namespace vulkan
 {
@@ -93,8 +96,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		Result CreateBufferPrototype(UniquePtr<IBufferPrototype> &outBufferPrototype, const BufferSpec &bufferSpec,
 			const BufferResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &concurrentQueues) override;
-		Result CreateBuffer(UniquePtr<IBufferResource> &outImage, UniquePtr<IBufferCPUMapping> *outBufferMapping,
-			UniquePtr<IBufferPrototype> &&bufferPrototype, const MemoryRegion &memRegion, const Span<const uint8_t> &initialData) override;
+		Result CreateBuffer(UniquePtr<IBufferResource> &outImage, UniquePtr<IBufferPrototype> &&bufferPrototype, const MemoryRegion &memRegion, const Span<const uint8_t> &initialData) override;
 
 		Result CreateImagePrototype(UniquePtr<IImagePrototype> &outImagePrototype, const ImageSpec &imageSpec,
 			const ImageResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &concurrentQueues) override;
@@ -677,8 +679,7 @@ namespace rkit { namespace render { namespace vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanDevice::CreateBuffer(UniquePtr<IBufferResource> &outBuffer, UniquePtr<IBufferCPUMapping> *outCPUMapping,
-		UniquePtr<IBufferPrototype> &&bufferPrototypeRef, const MemoryRegion &memRegion, const Span<const uint8_t> &initialData)
+	Result VulkanDevice::CreateBuffer(UniquePtr<IBufferResource> &outBuffer, UniquePtr<IBufferPrototype> &&bufferPrototypeRef, const MemoryRegion &memRegion, const Span<const uint8_t> &initialData)
 	{
 		RKIT_ASSERT(initialData.Count() == 0);
 
@@ -693,21 +694,16 @@ namespace rkit { namespace render { namespace vulkan
 		const VulkanMemoryHeap &baseHeap = *static_cast<const VulkanMemoryHeap *>(baseAddress.GetHeap());
 		GPUMemoryOffset_t baseOffset = baseAddress.GetOffset();
 
-		const VkBuffer buffer = prototype.GetBuffer();
+		const VkBuffer vkBuffer = prototype.GetBuffer();
 
-		RKIT_VK_CHECK(m_vkd.vkBindBufferMemory(m_device, buffer, baseHeap.GetDeviceMemory(), static_cast<VkDeviceSize>(baseOffset)));
+		RKIT_VK_CHECK(m_vkd.vkBindBufferMemory(m_device, vkBuffer, baseHeap.GetDeviceMemory(), static_cast<VkDeviceSize>(baseOffset)));
 
-		UniquePtr<VulkanBuffer> ibuffer;
-		RKIT_CHECK(New<VulkanBuffer>(ibuffer, *this, buffer));
+		UniquePtr<VulkanBuffer> buffer;
+		RKIT_CHECK(New<VulkanBuffer>(buffer, *this, vkBuffer, baseAddress, memRegion.GetSize()));
 
 		prototype.DetachBuffer();
 
-		if (outCPUMapping)
-		{
-			return ResultCode::kNotYetImplemented;
-		}
-
-		outBuffer = std::move(ibuffer);
+		outBuffer = std::move(buffer);
 
 		return ResultCode::kOK;
 	}
@@ -772,7 +768,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_CHECK(m_vkd.vkAllocateMemory(m_device, &allocInfo, m_allocCallbacks, &deviceMemory));
 
 		UniquePtr<VulkanMemoryHeap> vkHeap;
-		Result createResult = New<VulkanMemoryHeap>(vkHeap, *this, deviceMemory, size, (memFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0);
+		Result createResult = New<VulkanMemoryHeap>(vkHeap, *this, deviceMemory, size, (memFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0);
 
 		if (!utils::ResultIsOK(createResult))
 			m_vkd.vkFreeMemory(m_device, deviceMemory, m_allocCallbacks);

@@ -15,9 +15,11 @@
 
 namespace rkit { namespace render { namespace vulkan {
 
-	VulkanBuffer::VulkanBuffer(VulkanDeviceBase &device, VkBuffer buffer)
+	VulkanBuffer::VulkanBuffer(VulkanDeviceBase &device, VkBuffer buffer, const MemoryAddress &baseAddress, GPUMemorySize_t size)
 		: m_device(device)
 		, m_buffer(buffer)
+		, m_baseAddress(baseAddress)
+		, m_size(size)
 	{
 	}
 

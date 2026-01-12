@@ -41,7 +41,6 @@ namespace rkit { namespace render
 	struct IBinaryGPUWaitableFence;
 	struct IBufferPrototype;
 	struct IBufferResource;
-	struct IBufferCPUMapping;
 	struct IComputeCommandAllocator;
 	struct ICopyCommandAllocator;
 	struct ICopyCommandQueue;
@@ -103,7 +102,7 @@ namespace rkit { namespace render
 
 		virtual Result CreateBufferPrototype(UniquePtr<IBufferPrototype> &outBufferPrototype, const BufferSpec &bufferSpec,
 			const BufferResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &restrictedQueues) = 0;
-		virtual Result CreateBuffer(UniquePtr<IBufferResource> &outBuffer, UniquePtr<IBufferCPUMapping> *outCPUMapping, UniquePtr<IBufferPrototype> &&bufferPrototype,
+		virtual Result CreateBuffer(UniquePtr<IBufferResource> &outBuffer, UniquePtr<IBufferPrototype> &&bufferPrototype,
 			const MemoryRegion &memRegion, const Span<const uint8_t> &initialData) = 0;
 
 		virtual Result CreateImagePrototype(UniquePtr<IImagePrototype> &outImagePrototype, const ImageSpec &imageSpec,

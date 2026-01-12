@@ -1,7 +1,9 @@
 #pragma once
 
 #include "rkit/Core/SpanProtos.h"
+#include "rkit/Core/UniquePtr.h"
 #include "rkit/Render/BufferResource.h"
+#include "rkit/Render/Memory.h"
 
 #include "VulkanMemoryRequirements.h"
 
@@ -23,14 +25,19 @@ namespace rkit { namespace render { namespace vulkan {
 	class VulkanBuffer final : public IBufferResource
 	{
 	public:
-		VulkanBuffer(VulkanDeviceBase &device, VkBuffer buffer);
+		VulkanBuffer(VulkanDeviceBase &device, VkBuffer buffer, const MemoryAddress &baseAddress, GPUMemorySize_t size);
 		~VulkanBuffer();
 
 		VkBuffer GetVkBuffer() const;
 
+		const MemoryAddress &GetBaseAddress() const;
+		GPUMemorySize_t GetSize() const;
+
 	private:
 		VulkanDeviceBase &m_device;
 		VkBuffer m_buffer;
+		MemoryAddress m_baseAddress;
+		GPUMemorySize_t m_size;
 	};
 
 	class VulkanBufferPrototype final : public IBufferPrototype
@@ -69,5 +76,15 @@ namespace rkit { namespace render { namespace vulkan {
 	inline VkBuffer VulkanBuffer::GetVkBuffer() const
 	{
 		return m_buffer;
+	}
+
+	inline const MemoryAddress &VulkanBuffer::GetBaseAddress() const
+	{
+		return m_baseAddress;
+	}
+
+	inline GPUMemorySize_t VulkanBuffer::GetSize() const
+	{
+		return m_size;
 	}
 } } }

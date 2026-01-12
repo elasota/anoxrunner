@@ -161,11 +161,10 @@ namespace anox
 		typedef AnoxMDAModelResource Resource_t;
 		typedef AnoxMDAModelResourceLoaderState State_t;
 
-		static constexpr size_t kNumPhases = 3;
+		static constexpr size_t kNumPhases = 2;
 
 		static rkit::Result LoadHeaderAndQueueDependencies(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps);
-		static rkit::Result LoadCPUContents(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps);
-		static rkit::Result LoadGPUContents(State_t &state, Resource_t &resource);
+		static rkit::Result LoadContents(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps);
 
 		static void BulkConvertTris(const rkit::Span<data::MDAModelTri> &tris, uint16_t maxVertIndex);
 		static void BulkConvertVerts(const rkit::Span<data::MDAModelVert> &verts, uint32_t maxPointIndex);
@@ -175,14 +174,7 @@ namespace anox
 
 		static bool PhaseHasDependencies(size_t phase)
 		{
-			switch (phase)
-			{
-			case 0:
-			case 1:
-				return true;
-			default:
-				return false;
-			}
+			return true;
 		}
 
 		static rkit::Result LoadPhase(State_t &state, Resource_t &resource, size_t phase, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
@@ -192,9 +184,7 @@ namespace anox
 			case 0:
 				return LoadHeaderAndQueueDependencies(state, resource, outDeps);
 			case 1:
-				return LoadCPUContents(state, resource, outDeps);
-			case 2:
-				return LoadGPUContents(state, resource);
+				return LoadContents(state, resource, outDeps);
 			default:
 				return rkit::ResultCode::kInternalError;
 			}
@@ -237,7 +227,7 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxMDAModelLoaderInfo::LoadCPUContents(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
+	rkit::Result AnoxMDAModelLoaderInfo::LoadContents(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
 	{
 		rkit::FixedSizeMemoryStream stream(state.m_fileContents.GetBuffer(), state.m_fileContents.Count());
 		RKIT_CHECK(stream.SeekStart(state.m_postContentIDsPos));
@@ -628,7 +618,7 @@ namespace anox
 			BufferInitializer &bufInitializer = state.m_triBufferInitializer;
 			bufInitializer.m_copyOperations = state.m_indexCopyOperations.ToSpan();
 			bufInitializer.m_spec.m_size = indexBufferSize;
-			bufInitializer.m_resSpec.m_usage = rkit::render::BufferUsageFlag::kIndexBuffer;
+			bufInitializer.m_resSpec.m_usage = rkit::EnumMask<rkit::render::BufferUsageFlag>({ rkit::render::BufferUsageFlag::kIndexBuffer, rkit::render::BufferUsageFlag::kCopyDest });
 		}
 
 		// Load verts
@@ -667,7 +657,7 @@ namespace anox
 			BufferInitializer &bufInitializer = state.m_vertBufferInitializer;
 			bufInitializer.m_copyOperations = state.m_vertCopyOperations.ToSpan();
 			bufInitializer.m_spec.m_size = vertBufferSize;
-			bufInitializer.m_resSpec.m_usage = rkit::render::BufferUsageFlag::kVertexBuffer;
+			bufInitializer.m_resSpec.m_usage = rkit::EnumMask<rkit::render::BufferUsageFlag>({ rkit::render::BufferUsageFlag::kVertexBuffer, rkit::render::BufferUsageFlag::kCopyDest });
 		}
 
 		// Load points
@@ -696,7 +686,7 @@ namespace anox
 			BufferInitializer &bufInitializer = state.m_pointBufferInitializer;
 			bufInitializer.m_copyOperations = rkit::Span<BufferInitializer::CopyOperation>(&copyOperation, 1);
 			bufInitializer.m_spec.m_size = pointBufferSize;
-			bufInitializer.m_resSpec.m_usage = rkit::render::BufferUsageFlag::kStorageBuffer;
+			bufInitializer.m_resSpec.m_usage = rkit::EnumMask<rkit::render::BufferUsageFlag>({ rkit::render::BufferUsageFlag::kStorageBuffer, rkit::render::BufferUsageFlag::kCopyDest });
 		}
 
 		if (animType == data::MDAAnimationType::kSkeletalAnimated)
@@ -713,7 +703,7 @@ namespace anox
 			BufferInitializer &bufInitializer = state.m_boneIndexBufferInitializer;
 			bufInitializer.m_copyOperations = rkit::Span<BufferInitializer::CopyOperation>(&copyOperation, 1);
 			bufInitializer.m_spec.m_size = boneIndexes.ReinterpretCast<uint8_t>().Count();
-			bufInitializer.m_resSpec.m_usage = rkit::render::BufferUsageFlag::kStorageBuffer;
+			bufInitializer.m_resSpec.m_usage = rkit::EnumMask<rkit::render::BufferUsageFlag>({ rkit::render::BufferUsageFlag::kStorageBuffer, rkit::render::BufferUsageFlag::kCopyDest });
 		}
 
 		if (numMorphedPoints > 0)
@@ -730,12 +720,11 @@ namespace anox
 			BufferInitializer &bufInitializer = state.m_morphBufferInitializer;
 			bufInitializer.m_copyOperations = rkit::Span<BufferInitializer::CopyOperation>(&copyOperation, 1);
 			bufInitializer.m_spec.m_size = vertMorphs.ReinterpretCast<uint8_t>().Count();
-			bufInitializer.m_resSpec.m_usage = rkit::render::BufferUsageFlag::kStorageBuffer;
+			bufInitializer.m_resSpec.m_usage = rkit::EnumMask<rkit::render::BufferUsageFlag>({rkit::render::BufferUsageFlag::kStorageBuffer, rkit::render::BufferUsageFlag::kCopyDest });
 		}
 
 		if (stream.Tell() != stream.GetSize())
 			return rkit::ResultCode::kDataError;
-
 
 		typedef BufferInitializer (AnoxMDAModelResourceLoaderState:: *BufferInitializerField_t);
 		typedef rkit::RCPtr<IBuffer> (AnoxMDAModelResource:: *BufferField_t);
@@ -771,11 +760,6 @@ namespace anox
 		}
 
 		return rkit::ResultCode::kOK;
-	}
-
-	rkit::Result AnoxMDAModelLoaderInfo::LoadGPUContents(State_t &state, Resource_t &resource)
-	{
-		return rkit::ResultCode::kNotYetImplemented;
 	}
 
 	void AnoxMDAModelLoaderInfo::BulkConvertTris(const rkit::Span<data::MDAModelTri> &tris, uint16_t maxTriIndex)

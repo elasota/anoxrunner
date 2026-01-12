@@ -579,6 +579,11 @@ namespace anox
 			rkit::render::IImageResource *m_image = nullptr;
 		};
 
+		struct PrepareBufferForTransferAction
+		{
+			rkit::render::IBufferResource *m_buffer = nullptr;
+		};
+
 		struct BufferToTextureCopyAction
 		{
 			rkit::render::IBufferResource *m_buffer = nullptr;
@@ -594,6 +599,17 @@ namespace anox
 			rkit::render::ImagePlane m_imagePlane = rkit::render::ImagePlane::kCount;
 		};
 
+		struct BufferToBufferCopyAction
+		{
+			rkit::render::IBufferResource *m_srcBuffer = nullptr;
+			rkit::render::GPUMemoryOffset_t m_srcOffset = 0;
+
+			rkit::RCPtr<Buffer> m_destBuffer;
+			rkit::render::GPUMemoryOffset_t m_destOffset = 0;
+
+			rkit::render::GPUMemorySize_t m_size = 0;
+		};
+
 		struct UploadActionSet
 		{
 			// NOTE: While m_stripedMemCpy and m_bufferToTextureCopy are always 1:1,
@@ -602,7 +618,10 @@ namespace anox
 			rkit::Vector<PrepareImageForTransferAction> m_prepareImageForTransfer;
 			rkit::Vector<BufferStripedMemCopyAction> m_stripedMemCpy;
 			rkit::Vector<BufferToTextureCopyAction> m_bufferToTextureCopy;
+			rkit::Vector<BufferToBufferCopyAction> m_bufferToBufferCopy;
 			rkit::Vector<rkit::RCPtr<UploadTask>> m_retiredUploadTasks;
+
+			rkit::Vector<PrepareBufferForTransferAction> m_prepareBufferForTransfer;
 
 			void ClearActions();
 
@@ -651,10 +670,14 @@ namespace anox
 			void OnUploadCompleted() override;
 		};
 
-		struct BufferCommitInitialDataTask final : public UploadTask
+		struct BufferUploadTask final : public UploadTask
 		{
+			rkit::RCPtr<Buffer> m_buffer;
+			rkit::RCPtr<BufferInitializer> m_bufferInitializer;
+
+			size_t m_copyOpIndex = 0;
+			size_t m_srcDataOffset = 0;
 			rkit::RCPtr<rkit::JobSignaler> m_doneSignaler;
-			rkit::UniquePtr<rkit::render::IBufferCPUMapping> m_cpuMapping;
 
 			rkit::Result StartTask(UploadActionSet &actionSet, GraphicsSubsystem &subsystem) override;
 			rkit::Result PumpTask(bool &isCompleted, UploadActionSet &actionSet, GraphicsSubsystem &subsystem) override;
@@ -679,6 +702,10 @@ namespace anox
 		rkit::Result PostAsyncUploadTask(rkit::RCPtr<UploadTask> &&uploadTask);
 		rkit::Result PumpActiveAsyncUploadTask(UploadActionSet &actionSet);
 
+		// This gets the pair of contiguous upload ranges.
+		// The low contiguous amount is the amount following the high mark (i.e. the earliest-available space)
+		// The high contiguous amount is the amount preceding the low mark.
+		// The contiguous high amount will only be non-zero if the low amount is also non-zero.
 		void GetAsyncUploadHeapStats(uint32_t &outContiguousLow, uint32_t &outContiguousHigh) const;
 		void ConsumeAsyncUploadSpace(uint32_t space);
 
@@ -770,6 +797,10 @@ namespace anox
 		rkit::UniquePtr<rkit::render::IMemoryHeap> m_asyncUploadHeap;
 		rkit::UniquePtr<rkit::render::IBufferResource> m_asyncUploadBuffer;
 
+		// The low mark represents the start of committed data in the ring buffer,
+		// the high mark represents the end.  Neither is ever equal to m_asyncUploadHeapSize.
+		// If the high mark and low mark are equal, then the ring may be either empty or full,
+		// determinable by checking m_asyncUploadHeapisFull.
 		uint32_t m_asyncUploadHeapLowMark = 0;
 		uint32_t m_asyncUploadHeapHighMark = 0;
 		uint32_t m_asyncUploadHeapSize = 0;
@@ -1157,43 +1188,53 @@ namespace anox
 		const bool haveInitialData = m_bufferInitializer->m_copyOperations.Count() > 0;
 
 		rkit::Span<const uint8_t> deviceInitialData;
-		if (haveInitialData && m_graphicsSubsystem.m_renderDevice->SupportsInitialTextureData() && m_bufferInitializer->m_copyOperations.Count() == 1)
+		rkit::Vector<uint8_t> unrolledInitialData;
+		if (m_graphicsSubsystem.m_renderDevice->SupportsInitialBufferData() && haveInitialData)
 		{
-			const BufferInitializer::CopyOperation &copyOp = m_bufferInitializer->m_copyOperations[0];
-
-			const size_t requiredSize = m_bufferInitializer->m_spec.m_size;
-
-			if (copyOp.m_offset == 0 && copyOp.m_data.Count() >= requiredSize)
+			if (m_bufferInitializer->m_copyOperations.Count() == 1)
 			{
-				deviceInitialData = copyOp.m_data.SubSpan(0, requiredSize);
+				const BufferInitializer::CopyOperation &copyOp = m_bufferInitializer->m_copyOperations[0];
+
+				const size_t requiredSize = m_bufferInitializer->m_spec.m_size;
+
+				if (copyOp.m_offset == 0 && copyOp.m_data.Count() >= requiredSize)
+				{
+					deviceInitialData = copyOp.m_data.SubSpan(0, requiredSize);
+				}
+			}
+
+			if (deviceInitialData.Count() == 0)
+			{
+				RKIT_CHECK(unrolledInitialData.Resize(m_bufferInitializer->m_spec.m_size));
+
+				for (const BufferInitializer::CopyOperation &copyOp : m_bufferInitializer->m_copyOperations)
+					rkit::CopySpanNonOverlapping(unrolledInitialData.ToSpan().SubSpan(copyOp.m_offset, copyOp.m_data.Count()), copyOp.m_data);
+
+				deviceInitialData = unrolledInitialData.ToSpan();
 			}
 		}
 
-		rkit::UniquePtr<rkit::render::IBufferCPUMapping> cpuMapping;
+		RKIT_CHECK(m_graphicsSubsystem.m_renderDevice->CreateBuffer(bufferResource, std::move(prototype), memHeap->GetRegion(), deviceInitialData));
 
-		const bool mapForInitialData = (haveInitialData && deviceInitialData.Count() == 0);
+		m_buffer->SetRenderResources(std::move(bufferResource), std::move(memHeap));
 
-		RKIT_CHECK(m_graphicsSubsystem.m_renderDevice->CreateBuffer(bufferResource, (mapForInitialData ? &cpuMapping : nullptr),
-			std::move(prototype), memHeap->GetRegion(), deviceInitialData));
-
-		if (mapForInitialData)
+		if (m_graphicsSubsystem.m_renderDevice->SupportsInitialBufferData())
 		{
-			uint8_t *bufferData = static_cast<uint8_t *>(cpuMapping->GetMappedPtr());
+			if (m_doneCopyingSignaler)
+				m_doneCopyingSignaler->SignalDone(rkit::ResultCode::kOK);
+		}
+		else
+		{
+			rkit::RCPtr<BufferUploadTask> bufferUploadTask;
+			RKIT_CHECK(rkit::New<BufferUploadTask>(bufferUploadTask));
 
-			for (const BufferInitializer::CopyOperation &copyOp : m_bufferInitializer->m_copyOperations)
-			{
-				RKIT_ASSERT(copyOp.m_offset <= memSize);
-				RKIT_ASSERT(memSize - copyOp.m_offset >= copyOp.m_data.Count());
-				memcpy(bufferData + copyOp.m_offset, copyOp.m_data.Ptr(), copyOp.m_data.Count());
-			}
-			
-			rkit::RCPtr<BufferCommitInitialDataTask> uploadTask;
-			RKIT_CHECK(rkit::New<BufferCommitInitialDataTask>(uploadTask));
+			rkit::RCPtr<rkit::JobSignaler> m_doneSignaler;
 
-			uploadTask->m_cpuMapping = std::move(cpuMapping);
-			uploadTask->m_doneSignaler = m_doneCopyingSignaler;
+			bufferUploadTask->m_buffer = m_buffer;
+			bufferUploadTask->m_bufferInitializer = m_bufferInitializer;
+			bufferUploadTask->m_doneSignaler = m_doneCopyingSignaler;
 
-			RKIT_CHECK(m_graphicsSubsystem.PostAsyncUploadTask(std::move(uploadTask)));
+			RKIT_CHECK(m_graphicsSubsystem.PostAsyncUploadTask(std::move(bufferUploadTask)));
 		}
 
 		return rkit::ResultCode::kOK;
@@ -1589,8 +1630,10 @@ namespace anox
 		rkit::render::BarrierGroup barrierGroup;
 
 		rkit::HybridVector<rkit::render::ImageMemoryBarrier, 16> imageBarriers;
+		rkit::HybridVector<rkit::render::BufferMemoryBarrier, 16> bufferBarriers;
 
 		RKIT_CHECK(imageBarriers.Reserve(m_syncPoint.m_asyncUploadActionSet.m_prepareImageForTransfer.Count()));
+		RKIT_CHECK(bufferBarriers.Reserve(m_syncPoint.m_asyncUploadActionSet.m_prepareBufferForTransfer.Count()));
 
 		for (const PrepareImageForTransferAction &action : m_syncPoint.m_asyncUploadActionSet.m_prepareImageForTransfer)
 		{
@@ -1607,7 +1650,19 @@ namespace anox
 			RKIT_CHECK(imageBarriers.Append(barrier));
 		}
 
+		for (const PrepareBufferForTransferAction &action : m_syncPoint.m_asyncUploadActionSet.m_prepareBufferForTransfer)
+		{
+			rkit::render::BufferMemoryBarrier barrier = {};
+			barrier.m_priorStages.Add({ rkit::render::PipelineStage::kTopOfPipe });
+			barrier.m_subsequentStages.Add({ rkit::render::PipelineStage::kCopy });
+			barrier.m_subsequentAccess.Add({ rkit::render::ResourceAccess::kCopyDest });
+			barrier.m_buffer = action.m_buffer;
+
+			RKIT_CHECK(bufferBarriers.Append(barrier));
+		}
+
 		barrierGroup.m_imageMemoryBarriers = imageBarriers.ToSpan();
+		barrierGroup.m_bufferMemoryBarriers = bufferBarriers.ToSpan();
 
 		rkit::render::ICopyCommandEncoder *cmdEncoder = nullptr;
 		RKIT_CHECK(cmdBatch->OpenCopyCommandEncoder(cmdEncoder));
@@ -1659,6 +1714,15 @@ namespace anox
 
 			RKIT_CHECK(cmdEncoder->CopyBufferToImage(*texture->GetRenderResource(), copyAction.m_destRect, *copyAction.m_buffer, copyAction.m_footprint,
 				copyAction.m_imageLayout, copyAction.m_mipLevel, copyAction.m_arrayElement, copyAction.m_imagePlane));
+		}
+
+		for (const BufferToBufferCopyAction &copyAction : m_syncPoint.m_asyncUploadActionSet.m_bufferToBufferCopy)
+		{
+			Buffer *destBuffer = copyAction.m_destBuffer;
+			destBuffer->Touch(m_globalSyncPoint);
+
+			RKIT_CHECK(cmdEncoder->CopyBufferToBuffer(*destBuffer->GetRenderResource(), copyAction.m_destOffset,
+				*copyAction.m_srcBuffer, copyAction.m_srcOffset, copyAction.m_size));
 		}
 
 		RKIT_CHECK(cmdBatch->AddSignalFence(*m_fence));
@@ -1901,6 +1965,7 @@ namespace anox
 	{
 		m_bufferToTextureCopy.ShrinkToSize(0);
 		m_prepareImageForTransfer.ShrinkToSize(0);
+		m_prepareBufferForTransfer.ShrinkToSize(0);
 		m_retiredUploadTasks.ShrinkToSize(0);
 		m_stripedMemCpy.ShrinkToSize(0);
 	}
@@ -2040,22 +2105,86 @@ namespace anox
 	}
 
 
-	rkit::Result GraphicsSubsystem::BufferCommitInitialDataTask::StartTask(UploadActionSet &actionSet, GraphicsSubsystem &subsystem)
+	rkit::Result GraphicsSubsystem::BufferUploadTask::StartTask(UploadActionSet &actionSet, GraphicsSubsystem &subsystem)
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		PrepareBufferForTransferAction action = {};
+		action.m_buffer = m_buffer->GetRenderResource();
+
+		return actionSet.m_prepareBufferForTransfer.Append(action);
 	}
 
-	rkit::Result GraphicsSubsystem::BufferCommitInitialDataTask::PumpTask(bool &isCompleted, UploadActionSet &actionSet, GraphicsSubsystem &subsystem)
+	rkit::Result GraphicsSubsystem::BufferUploadTask::PumpTask(bool &isCompleted, UploadActionSet &actionSet, GraphicsSubsystem &subsystem)
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		isCompleted = false;
+
+		const BufferInitializer &initializer = *m_bufferInitializer;
+		const size_t opCount = initializer.m_copyOperations.Count();
+
+		for (;;)
+		{
+			if (m_copyOpIndex == opCount)
+			{
+				isCompleted = true;
+				return rkit::ResultCode::kOK;
+			}
+
+			const BufferInitializer::CopyOperation &copyOp = initializer.m_copyOperations[m_copyOpIndex];
+
+			if (m_srcDataOffset == copyOp.m_data.Count())
+			{
+				m_copyOpIndex++;
+				continue;
+			}
+
+			uint32_t lowContiguous = 0;
+			uint32_t highContiguous = 0;
+			subsystem.GetAsyncUploadHeapStats(lowContiguous, highContiguous);
+
+			if (lowContiguous == 0)
+			{
+				// Totally out of space
+				return rkit::ResultCode::kOK;
+			}
+
+			const size_t amountToCopyRemaining = copyOp.m_data.Count() - m_srcDataOffset;
+			const uint32_t amountCopyable = static_cast<uint32_t>(rkit::Min<size_t>(amountToCopyRemaining, lowContiguous));
+
+			uint32_t amountCopyableAligned = 0;
+			RKIT_CHECK(rkit::SafeAlignUp(amountCopyableAligned, amountCopyable, subsystem.m_asyncUploadHeapAlignment));
+
+			RKIT_ASSERT(amountCopyableAligned < lowContiguous);
+
+			BufferStripedMemCopyAction memCpyAction = {};
+			BufferToBufferCopyAction bufCopyAction = {};
+
+			memCpyAction.m_destPosition = subsystem.m_asyncUploadHeap->GetRegion().GetPosition() + subsystem.m_asyncUploadHeapHighMark;
+			memCpyAction.m_rowCount = 1;
+			memCpyAction.m_rowInPitch = 0;
+			memCpyAction.m_rowOutPitch = 0;
+			memCpyAction.m_rowSizeBytes = amountCopyable;
+			memCpyAction.m_start = copyOp.m_data.Ptr() + m_srcDataOffset;
+
+			bufCopyAction.m_destBuffer = m_buffer;
+			bufCopyAction.m_destOffset = copyOp.m_offset + m_srcDataOffset;
+			bufCopyAction.m_srcBuffer = subsystem.m_asyncUploadBuffer.Get();
+			bufCopyAction.m_srcOffset = subsystem.m_asyncUploadHeapHighMark;
+			bufCopyAction.m_size = amountCopyable;
+
+			subsystem.ConsumeAsyncUploadSpace(amountCopyableAligned);
+			m_srcDataOffset += amountCopyable;
+
+			RKIT_CHECK(actionSet.m_stripedMemCpy.Append(memCpyAction));
+			RKIT_CHECK(actionSet.m_bufferToBufferCopy.Append(bufCopyAction));
+		}
 	}
 
-	void GraphicsSubsystem::BufferCommitInitialDataTask::OnCopyCompleted()
+	void GraphicsSubsystem::BufferUploadTask::OnCopyCompleted()
 	{
-		m_cpuMapping.Reset();
+		// Can destroy the buffer data, but not the buffer itself
+		m_bufferInitializer.Reset();
 	}
 
-	void GraphicsSubsystem::BufferCommitInitialDataTask::OnUploadCompleted()
+	void GraphicsSubsystem::BufferUploadTask::OnUploadCompleted()
 	{
 		if (m_doneSignaler.IsValid())
 			m_doneSignaler->SignalDone(rkit::ResultCode::kOK);
@@ -2250,7 +2379,7 @@ namespace anox
 
 			RKIT_CHECK(m_renderDevice->CreateMemoryHeap(m_asyncUploadHeap, uploadHeapKey.Get(), prototype->GetMemoryRequirements().Size()));
 
-			RKIT_CHECK(m_renderDevice->CreateBuffer(m_asyncUploadBuffer, nullptr, std::move(prototype), m_asyncUploadHeap->GetRegion(), rkit::ConstSpan<uint8_t>()));
+			RKIT_CHECK(m_renderDevice->CreateBuffer(m_asyncUploadBuffer, std::move(prototype), m_asyncUploadHeap->GetRegion(), rkit::ConstSpan<uint8_t>()));
 
 			m_asyncUploadHeapLowMark = 0;
 			m_asyncUploadHeapHighMark = 0;
@@ -2943,7 +3072,7 @@ namespace anox
 		// - Initial layout transition jobs (run here)
 		// - Striped memcopy jobs (run here)
 		// - Buffer-to-image copy jobs
-		if (actionSet.m_prepareImageForTransfer.Count() > 0)
+		if (actionSet.m_prepareImageForTransfer.Count() > 0 || actionSet.m_prepareBufferForTransfer.Count() > 0)
 		{
 			rkit::UniquePtr<AsyncUploadPrepareTargetsSubmitRunner> prepareSubmitRunner;
 			RKIT_CHECK(rkit::New< AsyncUploadPrepareTargetsSubmitRunner>(prepareSubmitRunner));

@@ -36,7 +36,9 @@ namespace rkit { namespace render
 		IBaseCommandQueue *m_destQueue = nullptr;
 
 		uint64_t m_offset = 0;
-		uint64_t m_size = 0;
+		Optional<uint64_t> m_size;
+
+		IBufferResource *m_buffer = nullptr;
 	};
 
 	struct ImageMemoryBarrier

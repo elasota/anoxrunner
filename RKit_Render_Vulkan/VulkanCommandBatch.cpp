@@ -55,7 +55,8 @@ namespace rkit { namespace render { namespace vulkan
 		Result CopyBufferToImage(IImageResource &imageResource, const ImageRect3D &destRect,
 			IBufferResource &bufferResource, const BufferImageFootprint &bufferFootprint,
 			ImageLayout imageLayout, uint32_t mipLevel, uint32_t arrayLayer, ImagePlane plane) override;
-		Result CommitBufferCPUMapping(const IBufferCPUMapping &cpuMapping) override;
+		Result CopyBufferToBuffer(IBufferResource &destResource, GPUMemoryOffset_t destOffset,
+			IBufferResource &srcResource, GPUMemoryOffset_t srcOffset, GPUMemorySize_t size) override;
 
 		Result CloseEncoder() override;
 	};
@@ -211,11 +212,12 @@ namespace rkit { namespace render { namespace vulkan
 			memBarrier.dstQueueFamilyIndex = DefaultQueue(bufferBarrier.m_destQueue)->GetQueueFamily();
 
 			memBarrier.offset = static_cast<VkDeviceSize>(bufferBarrier.m_offset);
-			memBarrier.size = static_cast<VkDeviceSize>(bufferBarrier.m_size);
+			if (bufferBarrier.m_size.IsSet())
+				memBarrier.size = static_cast<VkDeviceSize>(bufferBarrier.m_size.Get());
+			else
+				memBarrier.size = VK_WHOLE_SIZE;
 
-			memBarrier.buffer = 0;
-			if (true)
-				return ResultCode::kNotYetImplemented;
+			memBarrier.buffer = static_cast<VulkanBuffer *>(bufferBarrier.m_buffer)->GetVkBuffer();
 
 			RKIT_CHECK(bufferMemoryBarriers.Append(memBarrier));
 		}
@@ -335,9 +337,26 @@ namespace rkit { namespace render { namespace vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanCopyCommandEncoder::CommitBufferCPUMapping(const IBufferCPUMapping &cpuMapping)
+	Result VulkanCopyCommandEncoder::CopyBufferToBuffer(IBufferResource &destResource, GPUMemoryOffset_t destOffset,
+		IBufferResource &srcResource, GPUMemoryOffset_t srcOffset, GPUMemorySize_t size)
 	{
-		return ResultCode::kNotYetImplemented;
+		RKIT_ASSERT(size != 0);
+
+		VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
+		RKIT_CHECK(m_batch.OpenCommandBuffer(cmdBuffer));
+
+		const VkBuffer srcBuffer = static_cast<VulkanBuffer &>(srcResource).GetVkBuffer();
+		const VkBuffer destBuffer = static_cast<VulkanBuffer &>(destResource).GetVkBuffer();
+
+		VkBufferCopy bufferCopy = {};
+		bufferCopy.srcOffset = srcOffset;
+		bufferCopy.dstOffset = destOffset;
+		bufferCopy.size = size;
+
+		VulkanDeviceBase &device = m_batch.GetDevice();
+		device.GetDeviceAPI().vkCmdCopyBuffer(cmdBuffer, srcBuffer, destBuffer, 1, &bufferCopy);
+
+		return ResultCode::kOK;
 	}
 
 	Result VulkanCopyCommandEncoder::CloseEncoder()
