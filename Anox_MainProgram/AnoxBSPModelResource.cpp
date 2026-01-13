@@ -24,7 +24,7 @@ namespace anox
 
 	struct AnoxBSPModelResourceLoaderState final : public AnoxAbstractSingleFileResourceLoaderState
 	{
-		data::BSPDataChunks m_chunks;
+		data::BSPDataChunksSpans m_chunks;
 	};
 
 	struct AnoxBSPModelLoaderInfo
@@ -44,20 +44,20 @@ namespace anox
 		class ChunkReader
 		{
 		public:
-			explicit ChunkReader(rkit::IReadStream &readStream);
+			explicit ChunkReader(rkit::FixedSizeMemoryStream &readStream);
 
 			template<class T>
-			rkit::Result VisitMember(rkit::Vector<T> &vector) const;
+			rkit::Result VisitMember(rkit::Span<T> &span) const;
 
 		private:
-			rkit::IReadStream &m_readStream;
+			rkit::FixedSizeMemoryStream &m_readStream;
 		};
 	};
 
 	rkit::Result AnoxBSPModelLoaderInfo::LoadHeaderAndQueueDependencies(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
 	{
 		{
-			rkit::ReadOnlyMemoryStream stream(state.m_fileContents.GetBuffer(), state.m_fileContents.Count());
+			rkit::FixedSizeMemoryStream stream(state.m_fileContents.GetBuffer(), state.m_fileContents.Count());
 
 			data::BSPFile bspFile;
 			RKIT_CHECK(stream.ReadAll(&bspFile, sizeof(bspFile)));
@@ -66,12 +66,10 @@ namespace anox
 				|| bspFile.m_version.Get() != data::BSPFile::kVersion)
 				return rkit::ResultCode::kDataError;
 
-			RKIT_CHECK(state.m_chunks.VisitAllChunks(ChunkReader(stream)));
+			RKIT_CHECK(data::BSPDataChunksProcessor::VisitAllChunks(state.m_chunks, ChunkReader(stream)));
 		}
 
-		state.m_fileContents.Reset();
-
-		const data::BSPDataChunks &chunks = state.m_chunks;
+		const data::BSPDataChunksSpans &chunks = state.m_chunks;
 		anox::AnoxResourceManagerBase &resManager = *state.m_systems.m_resManager;
 
 		// No SafeAdd since we don't really care about overflow here
@@ -127,22 +125,26 @@ namespace anox
 		}
 	}
 
-	AnoxBSPModelLoaderInfo::ChunkReader::ChunkReader(rkit::IReadStream &readStream)
+	AnoxBSPModelLoaderInfo::ChunkReader::ChunkReader(rkit::FixedSizeMemoryStream &readStream)
 		: m_readStream(readStream)
 	{
 	}
 
 	template<class T>
-	rkit::Result AnoxBSPModelLoaderInfo::ChunkReader::VisitMember(rkit::Vector<T> &vector) const
+	rkit::Result AnoxBSPModelLoaderInfo::ChunkReader::VisitMember(rkit::Span<T> &span) const
 	{
 		rkit::endian::LittleUInt32_t countData;
-		RKIT_CHECK(m_readStream.ReadAll(&countData, sizeof(countData)));
+		RKIT_CHECK(m_readStream.ReadOneBinary(countData));
 
-		RKIT_CHECK(vector.Resize(countData.Get()));
+		uint32_t count = countData.Get();
 
-		if (vector.Count() > 0)
+		if (count == 0)
 		{
-			RKIT_CHECK(m_readStream.ReadAll(vector.GetBuffer(), vector.Count() * sizeof(T)));
+			span = rkit::Span<T>();
+		}
+		else
+		{
+			RKIT_CHECK(m_readStream.ExtractSpan(span, count));
 		}
 
 		return rkit::ResultCode::kOK;

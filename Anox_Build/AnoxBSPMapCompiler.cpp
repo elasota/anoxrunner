@@ -368,16 +368,16 @@ namespace anox { namespace buildsystem
 			rkit::Vector<rkit::data::ContentID> &outContentIDs, const BSPDataCollection &bsp, const rkit::Vector<BSPFaceStats> &faceStats, const rkit::Vector<rkit::UniquePtr<priv::LightmapTree>> &lightmapTrees);
 		static bool LightmapFitsInNode(const priv::LightmapTreeNode &node, uint16_t width, uint16_t height);
 
-		static rkit::Result BuildGeometry(data::BSPDataChunks &bspOutput, const BSPDataCollection &bsp,
+		static rkit::Result BuildGeometry(data::BSPDataChunksVectors &bspOutput, const BSPDataCollection &bsp,
 			rkit::ConstSpan<BSPFaceStats> stats, rkit::Span<size_t> faceModelIndex,
 			rkit::ConstSpan<size_t> texInfoToUniqueTexIndex, rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions);
 
-		static rkit::Result BuildMaterials(data::BSPDataChunks &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+		static rkit::Result BuildMaterials(data::BSPDataChunksVectors &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 
 		static rkit::Result LoadBSPData(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, BSPDataCollection &bsp, rkit::Vector<LumpLoader> &loaders);
 
-		static rkit::Result WriteBSPModel(const data::BSPDataChunks &bspOutput, rkit::IWriteStream &outStream);
-		static rkit::Result ReadBSPModel(data::BSPDataChunks &bspOutput, rkit::IReadStream &inStream);
+		static rkit::Result WriteBSPModel(const data::BSPDataChunksVectors &bspOutput, rkit::IWriteStream &outStream);
+		static rkit::Result ReadBSPModel(data::BSPDataChunksVectors &bspOutput, rkit::IReadStream &inStream);
 
 		static rkit::Result WriteMaterialList(const rkit::ConstSpan<rkit::CIPath> &uniqueTextures, rkit::IWriteStream &outStream);
 		static rkit::Result ReadMaterialList(rkit::Vector<rkit::CIPath> &uniqueTextures, rkit::IReadStream &inStream);
@@ -786,7 +786,7 @@ namespace anox { namespace buildsystem
 		rkit::Vector<size_t> faceModelIndex;
 		RKIT_CHECK(faceModelIndex.Resize(bsp.m_faces.Count()));
 
-		data::BSPDataChunks bspOutput;
+		data::BSPDataChunksVectors bspOutput;
 		RKIT_CHECK(BuildGeometry(bspOutput, bsp, faceStats.ToSpan(), faceModelIndex.ToSpan(), texInfoToUniqueTexture.ToSpan(), lightmapDimensions.ToSpan()));
 
 		bspOutput.m_lightmaps = std::move(lightmapContentIDs);
@@ -2368,7 +2368,7 @@ namespace anox { namespace buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result BSPMapCompilerBase2::BuildGeometry(data::BSPDataChunks &bspOutput,
+	rkit::Result BSPMapCompilerBase2::BuildGeometry(data::BSPDataChunksVectors &bspOutput,
 		const BSPDataCollection &bsp, rkit::ConstSpan<BSPFaceStats> stats,
 		rkit::Span<size_t> faceModelIndex, rkit::ConstSpan<size_t> texInfoToUniqueTexIndex,
 		rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions)
@@ -3120,7 +3120,7 @@ namespace anox { namespace buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result BSPMapCompilerBase2::BuildMaterials(data::BSPDataChunks &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	rkit::Result BSPMapCompilerBase2::BuildMaterials(data::BSPDataChunksVectors &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		RKIT_CHECK(bspOutput.m_materials.Resize(paths.Count()));
 
@@ -3206,7 +3206,7 @@ namespace anox { namespace buildsystem
 		return path.Format("ax_bsp/{}.materials", identifier.GetChars());
 	}
 
-	rkit::Result BSPMapCompilerBase2::WriteBSPModel(const data::BSPDataChunks &bspOutput, rkit::IWriteStream &outStream)
+	rkit::Result BSPMapCompilerBase2::WriteBSPModel(const data::BSPDataChunksVectors &bspOutput, rkit::IWriteStream &outStream)
 	{
 		data::BSPFile bspFile = {};
 		bspFile.m_fourCC = data::BSPFile::kFourCC;
@@ -3216,12 +3216,12 @@ namespace anox { namespace buildsystem
 
 		VectorWriterVisitor visitor(outStream);
 
-		RKIT_CHECK(bspOutput.VisitAllChunks(visitor));
+		RKIT_CHECK(data::BSPDataChunksProcessor::VisitAllChunks(bspOutput, visitor));
 
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result BSPMapCompilerBase2::ReadBSPModel(data::BSPDataChunks &bspData, rkit::IReadStream &inStream)
+	rkit::Result BSPMapCompilerBase2::ReadBSPModel(data::BSPDataChunksVectors &bspData, rkit::IReadStream &inStream)
 	{
 		data::BSPFile bspFile = {};
 		bspFile.m_fourCC = data::BSPFile::kFourCC;
@@ -3234,8 +3234,7 @@ namespace anox { namespace buildsystem
 			return rkit::ResultCode::kDataError;
 
 		VectorReaderVisitor visitor(inStream);
-
-		RKIT_CHECK(bspData.VisitAllChunks(visitor));
+		RKIT_CHECK(data::BSPDataChunksProcessor::VisitAllChunks(bspData, visitor));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -3359,7 +3358,7 @@ namespace anox { namespace buildsystem
 	{
 		rkit::Vector<rkit::CIPath> uniqueTextures;
 
-		data::BSPDataChunks bspData;
+		data::BSPDataChunksVectors bspData;
 
 		{
 			rkit::String inPathStr;
