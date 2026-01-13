@@ -12,7 +12,6 @@ namespace anox { namespace data {
 
 		rkit::endian::BigUInt32_t m_fourCC;
 		rkit::endian::LittleUInt32_t m_version;
-		rkit::data::ContentID m_entitySpawnContentID;
 	};
 
 	struct BSPTreeNode
