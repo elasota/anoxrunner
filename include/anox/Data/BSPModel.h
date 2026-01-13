@@ -2,15 +2,17 @@
 
 #include "rkit/Core/Endian.h"
 #include "rkit/Core/FourCC.h"
+#include "rkit/Data/ContentID.h"
 
 namespace anox { namespace data {
 	struct BSPFile
 	{
 		static const uint32_t kFourCC = RKIT_FOURCC('B', 'S', 'P', 'M');
-		static const uint32_t kVersion = 1;
+		static const uint32_t kVersion = 2;
 
 		rkit::endian::BigUInt32_t m_fourCC;
 		rkit::endian::LittleUInt32_t m_version;
+		rkit::data::ContentID m_entitySpawnContentID;
 	};
 
 	struct BSPTreeNode
@@ -62,9 +64,9 @@ namespace anox { namespace data {
 	struct BSPDrawVertex
 	{
 		rkit::endian::LittleFloat32_t m_xyz[3];
+		rkit::endian::LittleUInt32_t m_normal;	// Flippable
 		rkit::endian::LittleFloat32_t m_uv[2];
 		rkit::endian::LittleFloat32_t m_lightUV[2];
-		rkit::endian::LittleUInt32_t m_normal;	// Flippable
 	};
 
 	struct BSPDrawFace
@@ -120,7 +122,6 @@ namespace anox { namespace data {
 	{
 		rkit::Vector<rkit::data::ContentID> m_materials;
 		rkit::Vector<rkit::data::ContentID> m_lightmaps;
-		rkit::Vector<rkit::data::ContentID> m_entityDefs;
 		rkit::Vector<data::BSPNormal> m_normals;
 		rkit::Vector<data::BSPPlane> m_planes;
 		rkit::Vector<data::BSPTreeNode> m_treeNodes;
@@ -139,10 +140,6 @@ namespace anox { namespace data {
 		rkit::Vector<rkit::endian::LittleUInt16_t> m_leafBrushes;
 		rkit::Vector<rkit::endian::LittleUInt16_t> m_leafFaces;
 		rkit::Vector<rkit::endian::LittleUInt16_t> m_triIndexes;
-		rkit::Vector<rkit::endian::LittleUInt32_t> m_entityTypes;
-		rkit::Vector<rkit::endian::LittleUInt32_t> m_entityStringLengths;
-		rkit::Vector<uint8_t> m_entityData;
-		rkit::Vector<uint8_t> m_entityStringData;
 
 		template<class TVisitor>
 		rkit::Result VisitAllChunks(const TVisitor &visitor)
@@ -163,7 +160,6 @@ namespace anox { namespace data {
 		{
 			RKIT_CHECK(visitor.VisitMember(self.m_materials));
 			RKIT_CHECK(visitor.VisitMember(self.m_lightmaps));
-			RKIT_CHECK(visitor.VisitMember(self.m_entityDefs));
 			RKIT_CHECK(visitor.VisitMember(self.m_normals));
 			RKIT_CHECK(visitor.VisitMember(self.m_planes));
 			RKIT_CHECK(visitor.VisitMember(self.m_treeNodes));
@@ -182,10 +178,6 @@ namespace anox { namespace data {
 			RKIT_CHECK(visitor.VisitMember(self.m_leafBrushes));
 			RKIT_CHECK(visitor.VisitMember(self.m_leafFaces));
 			RKIT_CHECK(visitor.VisitMember(self.m_triIndexes));
-			RKIT_CHECK(visitor.VisitMember(self.m_entityTypes));
-			RKIT_CHECK(visitor.VisitMember(self.m_entityStringLengths));
-			RKIT_CHECK(visitor.VisitMember(self.m_entityData));
-			RKIT_CHECK(visitor.VisitMember(self.m_entityStringData));
 
 			return rkit::ResultCode::kOK;
 		}

@@ -56,22 +56,26 @@ namespace anox
 
 	rkit::Result AnoxBSPModelLoaderInfo::LoadHeaderAndQueueDependencies(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
 	{
-		rkit::ReadOnlyMemoryStream stream(state.m_fileContents.GetBuffer(), state.m_fileContents.Count());
+		{
+			rkit::ReadOnlyMemoryStream stream(state.m_fileContents.GetBuffer(), state.m_fileContents.Count());
 
-		data::BSPFile bspFile;
-		RKIT_CHECK(stream.ReadAll(&bspFile, sizeof(bspFile)));
+			data::BSPFile bspFile;
+			RKIT_CHECK(stream.ReadAll(&bspFile, sizeof(bspFile)));
 
-		if (bspFile.m_fourCC.Get() != data::BSPFile::kFourCC
-			|| bspFile.m_version.Get() != data::BSPFile::kVersion)
-			return rkit::ResultCode::kDataError;
+			if (bspFile.m_fourCC.Get() != data::BSPFile::kFourCC
+				|| bspFile.m_version.Get() != data::BSPFile::kVersion)
+				return rkit::ResultCode::kDataError;
 
-		RKIT_CHECK(state.m_chunks.VisitAllChunks(ChunkReader(stream)));
+			RKIT_CHECK(state.m_chunks.VisitAllChunks(ChunkReader(stream)));
+		}
+
+		state.m_fileContents.Reset();
 
 		const data::BSPDataChunks &chunks = state.m_chunks;
 		anox::AnoxResourceManagerBase &resManager = *state.m_systems.m_resManager;
 
 		// No SafeAdd since we don't really care about overflow here
-		RKIT_CHECK(outDeps.Reserve(chunks.m_materials.Count() + chunks.m_lightmaps.Count() + chunks.m_entityDefs.Count()));
+		RKIT_CHECK(outDeps.Reserve(chunks.m_materials.Count() + chunks.m_lightmaps.Count()));
 
 		for (const rkit::data::ContentID &materialContentID : chunks.m_materials)
 		{
@@ -87,15 +91,6 @@ namespace anox
 			rkit::RCPtr<rkit::Job> job;
 			rkit::Future<AnoxResourceRetrieveResult> result;
 			RKIT_CHECK(resManager.GetContentIDKeyedResource(&job, result, resloaders::kTextureResourceTypeCode, lightmapContentID));
-
-			RKIT_CHECK(outDeps.Append(job));
-		}
-
-		for (const rkit::data::ContentID &edefContentID : chunks.m_entityDefs)
-		{
-			rkit::RCPtr<rkit::Job> job;
-			rkit::Future<AnoxResourceRetrieveResult> result;
-			RKIT_CHECK(resManager.GetContentIDKeyedResource(&job, result, resloaders::kEntityDefTypeCode, edefContentID));
 
 			RKIT_CHECK(outDeps.Append(job));
 		}

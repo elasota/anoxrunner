@@ -18,6 +18,7 @@
 #include "rkit/Math/SoftFloat.h"
 
 #include "anox/Data/EntityDef.h"
+#include "anox/Data/EntitySpawnData.h"
 #include "anox/Data/BSPModel.h"
 
 #include "anox/AnoxModule.h"
@@ -326,21 +327,6 @@ namespace anox { namespace buildsystem
 			uint32_t m_numNodes = 0;
 		};
 
-		struct ObjectsHeader
-		{
-			uint32_t m_numEntityDefs = 0;
-			uint32_t m_numEntities = 0;
-			uint32_t m_numStrings = 0;
-			uint32_t m_entityBlobSize = 0;
-			uint32_t m_stringBlobSize = 0;
-
-			// ContentID m_edefContentIDs[m_numEntityDefs]
-			// uint32_t m_types[m_numEntities]
-			// uint8_t m_entityData[m_entityBlobSize]
-			// uint32_t m_stringLengths[m_numStrings]
-			// uint8_t m_strings[m_stringBlobSize]
-		};
-
 		class VectorWriterVisitor
 		{
 		public:
@@ -387,8 +373,6 @@ namespace anox { namespace buildsystem
 			rkit::ConstSpan<size_t> texInfoToUniqueTexIndex, rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions);
 
 		static rkit::Result BuildMaterials(data::BSPDataChunks &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
-
-		static rkit::Result ReadObjectData(data::BSPDataChunks &bspOutput, rkit::IReadStream &inStream);
 
 		static rkit::Result LoadBSPData(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, BSPDataCollection &bsp, rkit::Vector<LumpLoader> &loaders);
 
@@ -1156,33 +1140,41 @@ namespace anox { namespace buildsystem
 			|| stringBlobSize > std::numeric_limits<uint32_t>::max())
 			return rkit::ResultCode::kIntegerOverflow;
 
-		BSPMapCompilerBase2::ObjectsHeader objHeader = {};
-		objHeader.m_numEntityDefs = static_cast<uint32_t>(m_edefContentIDs.Count());
-		objHeader.m_entityBlobSize = static_cast<uint32_t>(entityBlobSize);
-		objHeader.m_stringBlobSize = static_cast<uint32_t>(stringBlobSize);
-		objHeader.m_numEntities = static_cast<uint32_t>(m_compiledEntities.Count());
-		objHeader.m_numStrings = static_cast<uint32_t>(m_strings.Count());
+		data::EntitySpawnDataFile spawnDataFile = {};
+		spawnDataFile.m_fourCC = data::EntitySpawnDataFile::kFourCC;
+		spawnDataFile.m_version = data::EntitySpawnDataFile::kVersion;
 
-		RKIT_CHECK(stream.WriteOneBinary(objHeader));
+		data::EntitySpawnDataChunks chunks = {};
+		RKIT_CHECK(chunks.m_entityDefContentIDs.Append(m_edefContentIDs.ToSpan()));
 
-		RKIT_CHECK(stream.WriteAllSpan(m_edefContentIDs.ToSpan()));
+		RKIT_CHECK(chunks.m_entityTypes.Resize(m_compiledEntities.Count()));
+		rkit::ProcessParallelSpans(chunks.m_entityTypes.ToSpan(), m_compiledEntities.ToSpan(),
+			[](rkit::endian::LittleUInt32_t &outEntityType, const CompiledEntity &inEntity)
+			{
+				outEntityType = inEntity.m_type;
+			});
 
 		for (const CompiledEntity &compiledEntity : m_compiledEntities)
 		{
-			RKIT_CHECK(stream.WriteOneBinary(static_cast<uint32_t>(compiledEntity.m_type)));
+			RKIT_CHECK(chunks.m_entityData.Append(compiledEntity.m_dataBlob.ToSpan()));
 		}
-		for (const CompiledEntity &compiledEntity : m_compiledEntities)
-		{
-			RKIT_CHECK(stream.WriteAllSpan(compiledEntity.m_dataBlob.ToSpan()));
-		}
+
+		RKIT_CHECK(chunks.m_entityStringLengths.Resize(m_strings.Count()));
+		rkit::ProcessParallelSpans(chunks.m_entityStringLengths.ToSpan(), m_strings.ToSpan(),
+			[](rkit::endian::LittleUInt32_t &outStrLength, const rkit::AsciiString &inStr)
+			{
+				outStrLength = static_cast<uint32_t>(inStr.Length());
+			});
+
 		for (const rkit::AsciiString &str : m_strings)
 		{
-			RKIT_CHECK(stream.WriteOneBinary(static_cast<uint32_t>(str.Length())));
+			RKIT_CHECK(chunks.m_entityStringData.Append(str.ToSpan()));
+			RKIT_CHECK(chunks.m_entityStringData.Append(0));
 		}
-		for (const rkit::AsciiString &str : m_strings)
-		{
-			RKIT_CHECK(stream.WriteAllSpan(str.ToSpan()));
-		}
+
+		RKIT_CHECK(stream.WriteOneBinary(spawnDataFile));
+
+		RKIT_CHECK(chunks.VisitAllChunks(VectorWriterVisitor(stream)));
 
 		return rkit::ResultCode::kOK;
 	}
@@ -1235,7 +1227,7 @@ namespace anox { namespace buildsystem
 			RKIT_CHECK(outPath.Set(outPathStr));
 
 			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
-			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outStream));
+			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, outPath, outStream));
 
 			RKIT_CHECK(handler.WriteEntityData(*outStream));
 		}
@@ -3155,38 +3147,6 @@ namespace anox { namespace buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result BSPMapCompilerBase2::ReadObjectData(data::BSPDataChunks &bspOutput, rkit::IReadStream &inStream)
-	{
-		ObjectsHeader header = {};
-		RKIT_CHECK(inStream.ReadOneBinary(header));
-
-		rkit::Vector<rkit::data::ContentID> edefContentIDs;
-		rkit::Vector<uint8_t> entityData;
-		rkit::Vector<uint8_t> stringData;
-		rkit::Vector<rkit::endian::LittleUInt32_t> entityTypes;
-		rkit::Vector<rkit::endian::LittleUInt32_t> stringLengths;
-
-		RKIT_CHECK(edefContentIDs.Resize(header.m_numEntityDefs));
-		RKIT_CHECK(entityData.Resize(header.m_entityBlobSize));
-		RKIT_CHECK(stringData.Resize(header.m_stringBlobSize));
-		RKIT_CHECK(entityTypes.Resize(header.m_numEntities));
-		RKIT_CHECK(stringLengths.Resize(header.m_numStrings));
-
-		RKIT_CHECK(inStream.ReadAllSpan(edefContentIDs.ToSpan()));
-		RKIT_CHECK(inStream.ReadAllSpan(entityTypes.ToSpan()));
-		RKIT_CHECK(inStream.ReadAllSpan(entityData.ToSpan()));
-		RKIT_CHECK(inStream.ReadAllSpan(stringLengths.ToSpan()));
-		RKIT_CHECK(inStream.ReadAllSpan(stringData.ToSpan()));
-
-		bspOutput.m_entityDefs = std::move(edefContentIDs);
-		bspOutput.m_entityTypes = std::move(entityTypes);
-		bspOutput.m_entityData = std::move(entityData);
-		bspOutput.m_entityStringLengths = std::move(stringLengths);
-		bspOutput.m_entityStringData = std::move(stringData);
-
-		return rkit::ResultCode::kOK;
-	}
-
 	rkit::Result BSPMapCompilerBase2::LoadBSPData(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, BSPDataCollection &bsp, rkit::Vector<LumpLoader> &loaders)
 	{
 		const rkit::StringView identifier = depsNode->GetIdentifier();
@@ -3428,19 +3388,6 @@ namespace anox { namespace buildsystem
 		}
 
 		RKIT_CHECK(BuildMaterials(bspData, uniqueTextures.ToSpan(), feedback));
-
-		{
-			rkit::String inPathStr;
-			RKIT_CHECK(FormatObjectsPath(inPathStr, depsNode->GetIdentifier()));
-
-			rkit::CIPath inPath;
-			RKIT_CHECK(inPath.Set(inPathStr));
-
-			rkit::UniquePtr<rkit::ISeekableReadStream> inStream;
-			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, inPath, inStream));
-
-			RKIT_CHECK(ReadObjectData(bspData, *inStream));
-		}
 
 		{
 			rkit::String outPathStr;
