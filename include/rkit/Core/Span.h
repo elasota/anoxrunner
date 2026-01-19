@@ -91,6 +91,8 @@ namespace rkit
 
 		T &operator[](size_t index) const;
 
+		T &Last() const;
+
 		template<class TOther>
 		operator Span<TOther>() const;
 
@@ -440,6 +442,13 @@ T &rkit::Span<T>::operator[](size_t index) const
 {
 	RKIT_ASSERT(index < m_count);
 	return m_arr[index];
+}
+
+template<class T>
+T &rkit::Span<T>::Last() const
+{
+	RKIT_ASSERT(m_count != 0);
+	return m_arr[m_count - 1];
 }
 
 template<class T>

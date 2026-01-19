@@ -44,4 +44,7 @@
 	<Type Name="rkit::BasePathSliceView&lt;*,*&gt;">
 		<DisplayString>{m_view.m_span.m_arr}</DisplayString>
 	</Type>
+	<Type Name="rkit::endian::SwappableNumber&lt;rkit::endian::LittleEndianHelper&lt;*&gt;&gt;">
+		<DisplayString>{*(($T1*)m_bytes.m_elements)}</DisplayString>
+	</Type>
 </AutoVisualizer>

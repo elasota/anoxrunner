@@ -33,7 +33,13 @@ namespace anox { namespace data {
 		rkit::endian::LittleInt16_t m_maxBounds[3];
 
 		rkit::endian::LittleUInt16_t m_numLeafBrushes;
-		rkit::endian::LittleUInt16_t m_numLeafDrawSurfaces;
+		rkit::endian::LittleUInt16_t m_numLeafDrawSurfaceLocators;
+	};
+
+	struct BSPLeafDrawSurfaceLocator
+	{
+		rkit::endian::LittleUInt32_t m_drawSurfChunkIndex;
+		rkit::endian::LittleUInt32_t m_bits;
 	};
 
 	struct BSPNormal
@@ -68,7 +74,7 @@ namespace anox { namespace data {
 		rkit::endian::LittleFloat32_t m_lightUV[2];
 	};
 
-	struct BSPDrawFace
+	struct BSPDrawSurface
 	{
 		rkit::endian::LittleUInt32_t m_numTris;
 	};
@@ -76,28 +82,32 @@ namespace anox { namespace data {
 	struct BSPDrawMaterialGroup
 	{
 		rkit::endian::LittleUInt32_t m_materialIndex;
-		rkit::endian::LittleUInt32_t m_numFaces;
+		rkit::endian::LittleUInt32_t m_numLightmapGroups;
 	};
 
 	struct BSPDrawLightmapGroup
 	{
 		rkit::endian::LittleUInt32_t m_atlasIndex;
-		rkit::endian::LittleUInt32_t m_numMaterialGroups;
+		rkit::endian::LittleUInt32_t m_numSurfaces;
 	};
 
 	struct BSPDrawModelGroup
 	{
-		rkit::endian::LittleUInt32_t m_modelIndex;
-		rkit::endian::LittleUInt32_t m_numLightmapGroups;
+		rkit::endian::LittleUInt32_t m_numMaterialGroups;
 	};
 
+	// Models can reference multiple draw clusters, and draw clusters can contain
+	// geometry for multiple models.  Internally, each model group within a cluster
+	// serves one model.
 	struct BSPDrawCluster
 	{
 		rkit::endian::LittleUInt16_t m_numModelGroups;
-		rkit::endian::LittleUInt16_t m_numVerts;
+		rkit::endian::LittleUInt16_t m_numVertsMinusOne;
 	};
 
-	struct BSPModelDrawCluster
+	// This is the list of model-groups drawable for each model
+	// Internally, the draw surfaces must still be contiguous
+	struct BSPModelDrawClusterModelGroupRef
 	{
 		rkit::endian::LittleUInt32_t m_drawClusterIndex;
 		rkit::endian::LittleUInt16_t m_modelGroupIndex;
@@ -105,7 +115,8 @@ namespace anox { namespace data {
 
 	struct BSPModel
 	{
-		rkit::endian::LittleUInt32_t m_numModelDrawClusters;
+		rkit::endian::LittleUInt32_t m_numModelDrawClusterModelGroups;
+		rkit::endian::LittleUInt32_t m_numDrawSurfaces;
 		rkit::endian::LittleFloat32_t m_mins[3];
 		rkit::endian::LittleFloat32_t m_maxs[3];
 		rkit::endian::LittleFloat32_t m_origin[3];
@@ -129,16 +140,17 @@ namespace anox { namespace data {
 		rkit::Span<data::BSPBrush> m_brushes;
 		rkit::Span<data::BSPBrushSide> m_brushSides;
 		rkit::Span<data::BSPDrawVertex> m_drawVerts;
-		rkit::Span<data::BSPDrawFace> m_drawFaces;
+		rkit::Span<data::BSPDrawSurface> m_drawSurfaces;
+		rkit::Span<data::BSPDrawCluster> m_drawClusters;
+		rkit::Span<data::BSPDrawModelGroup> m_drawModelGroups;
 		rkit::Span<data::BSPDrawMaterialGroup> m_materialGroups;
 		rkit::Span<data::BSPDrawLightmapGroup> m_lightmapGroups;
-		rkit::Span<data::BSPDrawModelGroup> m_modelGroups;
-		rkit::Span<data::BSPDrawCluster> m_drawClusters;
 		rkit::Span<data::BSPModel> m_models;
-		rkit::Span<data::BSPModelDrawCluster> m_modelDrawClusters;
+		rkit::Span<data::BSPModelDrawClusterModelGroupRef> m_modelDrawClusterModelGroupRefs;
 		rkit::Span<rkit::endian::LittleUInt16_t> m_leafBrushes;
-		rkit::Span<rkit::endian::LittleUInt16_t> m_leafFaces;
-		rkit::Span<rkit::endian::LittleUInt16_t> m_triIndexes;
+		rkit::Span<rkit::endian::LittleUInt16_t> m_drawTriIndexes;
+		rkit::Span<rkit::endian::LittleUInt16_t> m_model0LeafDrawSurfaceLocatorCounts;
+		rkit::Span<BSPLeafDrawSurfaceLocator> m_model0LeafDrawSurfaceLocators;
 	};
 
 	struct BSPDataChunksVectors
@@ -153,16 +165,17 @@ namespace anox { namespace data {
 		rkit::Vector<data::BSPBrush> m_brushes;
 		rkit::Vector<data::BSPBrushSide> m_brushSides;
 		rkit::Vector<data::BSPDrawVertex> m_drawVerts;
-		rkit::Vector<data::BSPDrawFace> m_drawFaces;
+		rkit::Vector<data::BSPDrawSurface> m_drawSurfaces;
+		rkit::Vector<data::BSPDrawCluster> m_drawClusters;
+		rkit::Vector<data::BSPDrawModelGroup> m_drawModelGroups;
 		rkit::Vector<data::BSPDrawMaterialGroup> m_materialGroups;
 		rkit::Vector<data::BSPDrawLightmapGroup> m_lightmapGroups;
-		rkit::Vector<data::BSPDrawModelGroup> m_modelGroups;
-		rkit::Vector<data::BSPDrawCluster> m_drawClusters;
 		rkit::Vector<data::BSPModel> m_models;
-		rkit::Vector<data::BSPModelDrawCluster> m_modelDrawClusters;
+		rkit::Vector<data::BSPModelDrawClusterModelGroupRef> m_modelDrawClusterModelGroupRefs;
 		rkit::Vector<rkit::endian::LittleUInt16_t> m_leafBrushes;
-		rkit::Vector<rkit::endian::LittleUInt16_t> m_leafFaces;
-		rkit::Vector<rkit::endian::LittleUInt16_t> m_triIndexes;
+		rkit::Vector<rkit::endian::LittleUInt16_t> m_drawTriIndexes;
+		rkit::Vector<rkit::endian::LittleUInt16_t> m_model0LeafDrawSurfaceLocatorCounts;
+		rkit::Vector<BSPLeafDrawSurfaceLocator> m_model0LeafDrawSurfaceLocators;
 	};
 
 	struct BSPDataChunksProcessor
@@ -180,16 +193,17 @@ namespace anox { namespace data {
 			RKIT_CHECK(visitor.template VisitMember<data::BSPBrush>(instance.m_brushes));
 			RKIT_CHECK(visitor.template VisitMember<data::BSPBrushSide>(instance.m_brushSides));
 			RKIT_CHECK(visitor.template VisitMember<data::BSPDrawVertex>(instance.m_drawVerts));
-			RKIT_CHECK(visitor.template VisitMember<data::BSPDrawFace>(instance.m_drawFaces));
+			RKIT_CHECK(visitor.template VisitMember<data::BSPDrawSurface>(instance.m_drawSurfaces));
+			RKIT_CHECK(visitor.template VisitMember<data::BSPDrawCluster>(instance.m_drawClusters));
+			RKIT_CHECK(visitor.template VisitMember<data::BSPDrawModelGroup>(instance.m_drawModelGroups));
 			RKIT_CHECK(visitor.template VisitMember<data::BSPDrawMaterialGroup>(instance.m_materialGroups));
 			RKIT_CHECK(visitor.template VisitMember<data::BSPDrawLightmapGroup>(instance.m_lightmapGroups));
-			RKIT_CHECK(visitor.template VisitMember<data::BSPDrawModelGroup>(instance.m_modelGroups));
-			RKIT_CHECK(visitor.template VisitMember<data::BSPDrawCluster>(instance.m_drawClusters));
 			RKIT_CHECK(visitor.template VisitMember<data::BSPModel>(instance.m_models));
-			RKIT_CHECK(visitor.template VisitMember<data::BSPModelDrawCluster>(instance.m_modelDrawClusters));
+			RKIT_CHECK(visitor.template VisitMember<data::BSPModelDrawClusterModelGroupRef>(instance.m_modelDrawClusterModelGroupRefs));
 			RKIT_CHECK(visitor.template VisitMember<rkit::endian::LittleUInt16_t>(instance.m_leafBrushes));
-			RKIT_CHECK(visitor.template VisitMember<rkit::endian::LittleUInt16_t>(instance.m_leafFaces));
-			RKIT_CHECK(visitor.template VisitMember<rkit::endian::LittleUInt16_t>(instance.m_triIndexes));
+			RKIT_CHECK(visitor.template VisitMember<rkit::endian::LittleUInt16_t>(instance.m_drawTriIndexes));
+			RKIT_CHECK(visitor.template VisitMember<rkit::endian::LittleUInt16_t>(instance.m_model0LeafDrawSurfaceLocatorCounts));
+			RKIT_CHECK(visitor.template VisitMember<BSPLeafDrawSurfaceLocator>(instance.m_model0LeafDrawSurfaceLocators));
 
 			return rkit::ResultCode::kOK;
 		}

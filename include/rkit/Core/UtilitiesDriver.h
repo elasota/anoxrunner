@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rkit/Core/Endian.h"
 #include "rkit/Core/StringProto.h"
 #include "rkit/Core/StreamProtos.h"
 #include "rkit/Core/HashValue.h"
@@ -143,5 +144,8 @@ namespace rkit
 
 		virtual void FormatString(IFormatStringWriter<char> &writer, const StringSliceView &fmt, const FormatParameterList<char> &paramList) const = 0;
 		virtual void FormatString(IFormatStringWriter<wchar_t> &writer, const WStringSliceView &fmt, const FormatParameterList<wchar_t> &paramList) const = 0;
+
+		virtual void SanitizeClampFloats(const Span<float> &outFloats, const Span<const endian::LittleFloat32_t> &inFloats, int maxMagnitude) const = 0;
+		virtual void SanitizeClampUInt16s(const Span<uint16_t> &outFloats, const Span<const endian::LittleUInt16_t> &inFloats, uint16_t maxValue) const = 0;
 	};
 }

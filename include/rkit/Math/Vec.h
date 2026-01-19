@@ -169,6 +169,7 @@ namespace rkit { namespace math { namespace priv {
 		StaticBoolArray<TSize> InternalMultiLessOrEqual(const VecStorage<TComponent, TSize> &other) const;
 
 		VecStorage InternalDotProduct(const VecStorage<TComponent, TSize> &other) const;
+		void InternalWriteToPtr(TComponent *ptr) const;
 
 		template<size_t TIndexCount, size_t... TIndexes>
 		typename VecStorageResolver<TComponent, TIndexCount>::Type_t InternalSwizzle() const;
@@ -278,26 +279,29 @@ namespace rkit { namespace math { namespace priv {
 	};
 
 	template<size_t TSize>
-	struct M128FloatLoader
+	struct M128FloatIO
 	{
 	};
 
 	template<>
-	struct M128FloatLoader<2>
+	struct M128FloatIO<2>
 	{
 		static __m128 Load(const float *f);
+		static void Store(float *f, __m128 v);
 	};
 
 	template<>
-	struct M128FloatLoader<3>
+	struct M128FloatIO<3>
 	{
 		static __m128 Load(const float *f);
+		static void Store(float *f, __m128 v);
 	};
 
 	template<>
-	struct M128FloatLoader<4>
+	struct M128FloatIO<4>
 	{
 		static __m128 Load(const float *f);
+		static void Store(float *f, __m128 v);
 	};
 
 	template<uint32_t T0, uint32_t T1, uint32_t T2, uint32_t T3>
@@ -371,6 +375,7 @@ namespace rkit { namespace math { namespace priv {
 		StaticBoolArray<TComponentCount> InternalMultiLessOrEqual(const VecSSEFloatStorage<TComponentCount> &other) const;
 
 		float InternalDotProduct(const VecSSEFloatStorage<TComponentCount> &other) const;
+		void InternalWriteToPtr(float *ptr) const;
 
 		template<size_t TIndexCount, size_t... TIndexes>
 		typename VecStorageResolver<float, TIndexCount>::Type_t InternalSwizzle() const;
@@ -593,6 +598,10 @@ namespace rkit { namespace math {
 		static Vec<TComponent, TSize> FromArray(const TComponent (&values)[TSize]);
 		static Vec<TComponent, TSize> FromPtr(const TComponent *values);
 
+		void WriteToSpan(const Span<TComponent> &values) const;
+		void WriteToArray(TComponent(&values)[TSize]) const;
+		void WriteToPtr(TComponent *values) const;
+
 		template<size_t TOtherSize>
 		static Vec<TComponent, TSize> FromMultiDotProductSpan(const Span<const Vec<TComponent, TOtherSize>> &values);
 
@@ -665,6 +674,25 @@ namespace rkit { namespace math {
 	Vec<TComponent, TSize> Vec<TComponent, TSize>::FromPtr(const TComponent *values)
 	{
 		return Vec<TComponent, TSize>(StorageType_t::FromPtr(values));
+	}
+
+	template<class TComponent, size_t TSize>
+	void Vec<TComponent, TSize>::WriteToSpan(const Span<TComponent> &values) const
+	{
+		RKIT_ASSERT(values.Count() == TSize);
+		this->WriteToSpan(values.Ptr());
+	}
+
+	template<class TComponent, size_t TSize>
+	void Vec<TComponent, TSize>::WriteToArray(TComponent(&values)[TSize]) const
+	{
+		this->InternalWriteToPtr(values);
+	}
+
+	template<class TComponent, size_t TSize>
+	void Vec<TComponent, TSize>::WriteToPtr(TComponent *values) const
+	{
+		StorageType_t::WriteToPtr(values);
 	}
 
 	template<class TComponent, size_t TSize>
@@ -952,19 +980,34 @@ namespace rkit { namespace math { namespace priv {
 		return _mm_cvtss_f32(_mm_add_ss(step1, step1_element1));
 	}
 
-	inline __m128 M128FloatLoader<2>::Load(const float *f)
+	inline __m128 M128FloatIO<2>::Load(const float *f)
 	{
 		return _mm_set_ps(0.f, 0.f, f[1], f[0]);
 	}
 
-	inline __m128 M128FloatLoader<3>::Load(const float *f)
+	inline __m128 M128FloatIO<3>::Load(const float *f)
 	{
 		return _mm_set_ps(0.f, f[2], f[1], f[0]);
 	}
 
-	inline __m128 M128FloatLoader<4>::Load(const float *f)
+	inline __m128 M128FloatIO<4>::Load(const float *f)
 	{
 		return _mm_loadu_ps(f);
+	}
+
+	inline void M128FloatIO<2>::Store(float *f, __m128 v)
+	{
+		memcpy(f, &v, 8);
+	}
+
+	inline void M128FloatIO<3>::Store(float *f, __m128 v)
+	{
+		memcpy(f, &v, 12);
+	}
+
+	inline void M128FloatIO<4>::Store(float *f, __m128 v)
+	{
+		return _mm_storeu_ps(f, v);
 	}
 
 	template<uint32_t T0, uint32_t T1, uint32_t T2, uint32_t T3>
@@ -991,13 +1034,13 @@ namespace rkit { namespace math { namespace priv {
 	template<size_t TSize>
 	VecSSEFloatStorage<TSize> VecSSEFloatStorage<TSize>::FromArray(const float(&array)[TSize])
 	{
-		return VecSSEFloatStorage<TSize>(M128FloatLoader<TSize>::Load(array));
+		return VecSSEFloatStorage<TSize>(M128FloatIO<TSize>::Load(array));
 	}
 
 	template<size_t TSize>
 	VecSSEFloatStorage<TSize> VecSSEFloatStorage<TSize>::FromPtr(const float *array)
 	{
-		return VecSSEFloatStorage<TSize>(M128FloatLoader<TSize>::Load(array));
+		return VecSSEFloatStorage<TSize>(M128FloatIO<TSize>::Load(array));
 	}
 
 	template<size_t TSize>
@@ -1169,6 +1212,12 @@ namespace rkit { namespace math { namespace priv {
 	float VecSSEFloatStorage<TSize>::InternalDotProduct(const VecSSEFloatStorage<TSize> &other) const
 	{
 		return M128DotProductCalculator<TSize>::Compute(m_v, other.m_v);
+	}
+
+	template<size_t TSize>
+	void VecSSEFloatStorage<TSize>::InternalWriteToPtr(float *ptr) const
+	{
+		return M128FloatIO<TSize>::Store(ptr, m_v);
 	}
 
 	template<size_t TSize>

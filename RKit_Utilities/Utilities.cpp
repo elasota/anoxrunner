@@ -3,6 +3,7 @@
 #include "rkit/Core/UtilitiesDriver.h"
 #include "rkit/Core/ModuleGlue.h"
 #include "rkit/Core/NewDelete.h"
+#include "rkit/Core/Platform.h"
 #include "rkit/Core/String.h"
 #include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/Mutex.h"
@@ -24,6 +25,14 @@
 #include "ThreadPool.h"
 
 #include "ryu/ryu.h"
+
+#ifdef RKIT_PLATFORM_ARCH_HAVE_SSE2
+#include <emmintrin.h>
+#endif
+
+#ifdef RKIT_PLATFORM_ARCH_HAVE_SSE41
+#include <smmintrin.h>
+#endif
 
 namespace rkit
 {
@@ -122,6 +131,9 @@ namespace rkit
 
 		void FormatString(IFormatStringWriter<char> &writer, const StringSliceView &fmt, const FormatParameterList<char> &paramList) const override;
 		void FormatString(IFormatStringWriter<wchar_t> &writer, const WStringSliceView &fmt, const FormatParameterList<wchar_t> &paramList) const override;
+
+		void SanitizeClampFloats(const Span<float> &outFloats, const Span<const endian::LittleFloat32_t> &inFloats, int maxMagnitude) const override;
+		void SanitizeClampUInt16s(const Span<uint16_t> &outFloats, const Span<const endian::LittleUInt16_t> &inFloats, uint16_t maxValue) const override;
 
 	private:
 		static bool ValidateFilePathSlice(const Span<const char> &name, bool permitWildcards);
@@ -2674,6 +2686,97 @@ namespace rkit
 	void UtilitiesDriver::FormatString(IFormatStringWriter<wchar_t> &writer, const WStringSliceView &fmt, const FormatParameterList<wchar_t> &paramList) const
 	{
 		FormatStringImpl(writer, fmt, paramList);
+	}
+
+	void UtilitiesDriver::SanitizeClampFloats(const Span<float> &outFloats, const Span<const endian::LittleFloat32_t> &inFloats, int maxMagnitude) const
+	{
+		const endian::LittleFloat32_t *inFloatsPtr = inFloats.Ptr();
+		float *outFloatsPtr = outFloats.Ptr();
+
+		const size_t numFloats = rkit::Min(inFloats.Count(), outFloats.Count());
+		const uint32_t magAdjusted = ((maxMagnitude + 0x7f) << 23);
+
+		const uint32_t fracBits = (1u << 23) - 1u;
+		const uint32_t signBit = 1u << (23 + 8);
+		const uint32_t fracSignMask = fracBits + signBit;
+
+#ifdef RKIT_PLATFORM_ARCH_HAVE_SSE2
+		const __m128i magAdjustedVector = _mm_set1_epi32(magAdjusted);
+		const __m128i fracSignMaskVector = _mm_set1_epi32(fracSignMask);
+
+		// Single-precision float
+		const size_t numVectorFloats = numFloats / 4u * 4u;
+
+		for (size_t startIndex = 0; startIndex < numVectorFloats; startIndex += 4u)
+		{
+			const __m128i bitsVector = _mm_loadu_si128(reinterpret_cast<const __m128i *>(inFloatsPtr + startIndex));
+			const __m128i fracSignBits = _mm_and_si128(fracSignMaskVector, bitsVector);
+			const __m128i expBits = _mm_andnot_si128(fracSignMaskVector, bitsVector);
+
+			// This only needs SSE2
+			const __m128i clampedExpBits = _mm_min_epi16(expBits, magAdjustedVector);
+			const __m128i recombined = _mm_or_si128(fracSignBits, clampedExpBits);
+
+			_mm_storeu_si128(reinterpret_cast<__m128i *>(outFloatsPtr + startIndex), recombined);
+		}
+#else
+		const size_t numVectorFloats = 0;
+#endif
+
+		for (size_t i = numVectorFloats; i < numFloats; i++)
+		{
+			uint32_t floatBits = inFloatsPtr[i].GetBits();
+
+			const uint32_t fracSignBits = (floatBits & fracSignMask);
+			const uint32_t expBits = (floatBits & ~fracSignMask);
+			const uint32_t clampedExpBits = rkit::Min(expBits, magAdjusted);
+			const uint32_t recombined = (clampedExpBits | fracSignBits);
+
+			memcpy(&outFloatsPtr[i], &recombined, 4);
+		}
+	}
+
+	void UtilitiesDriver::SanitizeClampUInt16s(const Span<uint16_t> &outUInts, const Span<const endian::LittleUInt16_t> &inUInts, uint16_t maxValue) const
+	{
+		const endian::LittleUInt16_t *inUIntsPtr = inUInts.Ptr();
+		uint16_t *outUIntsPtr = outUInts.Ptr();
+
+		const size_t numUInts = rkit::Min(inUInts.Count(), outUInts.Count());
+
+#if defined(RKIT_PLATFORM_ARCH_HAVE_SSE41)
+		const __m128i maxValueVector = _mm_set1_epi16(maxValue);
+
+		const size_t numVectorUInts = numUInts / 8u * 8u;
+
+		for (size_t startIndex = 0; startIndex < numVectorUInts; startIndex += 8u)
+		{
+			const __m128i values = _mm_loadu_si128(reinterpret_cast<const __m128i *>(inUIntsPtr + startIndex));
+			const __m128i adjusted = _mm_min_epu16(values, maxValueVector);
+			_mm_storeu_si128(reinterpret_cast<__m128i *>(outUIntsPtr + startIndex), adjusted);
+		}
+#elif defined(RKIT_PLATFORM_ARCH_HAVE_SSE2)
+		const __m128i signBitFlip = _mm_set1_epi16(-0x8000);
+		const __m128i maxValueFlippedVector = _mm_set1_epi16(maxValue ^ 0x8000u);
+
+		const size_t numVectorUInts = numUInts / 8u * 8u;
+
+		for (size_t startIndex = 0; startIndex < numVectorUInts; startIndex += 8u)
+		{
+			const __m128i values = _mm_loadu_si128(reinterpret_cast<const __m128i *>(inUIntsPtr + startIndex));
+			const __m128i valuesFlipped = _mm_xor_si128(signBitFlip, values);
+			const __m128i adjusted = _mm_xor_si128(signBitFlip, _mm_min_epi16(valuesFlipped, maxValueFlippedVector));
+
+			_mm_storeu_si128(reinterpret_cast<__m128i *>(outUIntsPtr + startIndex), adjusted);
+		}
+#else
+		const size_t numVectorUInts = 0;
+#endif
+
+		for (size_t i = numVectorUInts; i < numUInts; i++)
+		{
+			uint16_t result = Min(maxValue, inUInts[i].Get());
+			memcpy(&outUInts[i], &result, 2);
+		}
 	}
 }
 
