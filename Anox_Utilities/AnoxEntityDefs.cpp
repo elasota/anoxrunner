@@ -109,6 +109,7 @@ namespace anox { namespace utils { namespace priv {
 	sizeof(#name) - 1, \
 	kSize, \
 	sizeof(::anox::data::EClass_ ## name), \
+	alignof(::anox::data::EClass_ ## name), \
 	g_fieldDefs, \
 	sizeof(g_fieldDefs) / sizeof(g_fieldDefs[0]) - 1
 

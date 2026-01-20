@@ -32,6 +32,7 @@ namespace anox
 	{
 		static const uint32_t kRawFileResourceTypeCode = RKIT_FOURCC('F', 'I', 'L', 'E');
 		static const uint32_t kBSPModelResourceTypeCode = RKIT_FOURCC('B', 'S', 'P', 'M');
+		static const uint32_t kSpawnDefsResourceTypeCode = RKIT_FOURCC('S', 'P', 'W', 'N');
 		static const uint32_t kWorldMaterialTypeCode = RKIT_FOURCC('M', 'T', 'L', 'W');
 		static const uint32_t kModelMaterialTypeCode = RKIT_FOURCC('M', 'T', 'L', 'M');
 		static const uint32_t kTextureResourceTypeCode = RKIT_FOURCC('T', 'X', 'T', 'R');
@@ -49,7 +50,7 @@ namespace anox
 
 	struct IGraphicsResourceFactory;
 
-	class AnoxResourceBase
+	class AnoxResourceBase : public rkit::NoCopy
 	{
 	public:
 		virtual ~AnoxResourceBase() {}

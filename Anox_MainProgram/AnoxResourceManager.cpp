@@ -20,6 +20,7 @@
 #include "AnoxFileResource.h"
 #include "AnoxMaterialResource.h"
 #include "AnoxMDAModelResource.h"
+#include "AnoxSpawnDefsResource.h"
 #include "AnoxTextureResource.h"
 
 #include <algorithm>
@@ -442,6 +443,13 @@ namespace anox
 			RKIT_CHECK(AnoxBSPModelResourceLoaderBase::Create(bspLoaderFactory));
 
 			RKIT_CHECK(RegisterCIPathKeyedLoader(resloaders::kBSPModelResourceTypeCode, std::move(bspLoaderFactory)));
+		}
+
+		{
+			rkit::RCPtr<AnoxSpawnDefsResourceLoaderBase> spawnDefsLoaderFactory;
+			RKIT_CHECK(AnoxSpawnDefsResourceLoaderBase::Create(spawnDefsLoaderFactory));
+
+			RKIT_CHECK(RegisterCIPathKeyedLoader(resloaders::kSpawnDefsResourceTypeCode, std::move(spawnDefsLoaderFactory)));
 		}
 
 		{

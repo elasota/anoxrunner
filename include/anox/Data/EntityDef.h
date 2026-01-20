@@ -47,6 +47,7 @@ namespace anox { namespace data {
 
 		size_t m_dataSize;
 		size_t m_structSize;
+		size_t m_structAlignment;
 
 		const EntityFieldDef *m_fields;
 		size_t m_numFields;

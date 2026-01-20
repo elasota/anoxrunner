@@ -1,9 +1,12 @@
 #pragma once
 
 #include "rkit/Core/Endian.h"
+#include "rkit/Core/Optional.h"
 #include "rkit/Data/ContentID.h"
 
 #include "rkit/Math/Vec.h"
+
+#include "anox/Label.h"
 
 namespace anox { namespace data {
 
@@ -18,10 +21,10 @@ namespace anox { namespace data {
 #define FIELD_VEC4(name) rkit::math::Vec4 m_ ## name;
 #define FIELD_BOOL(name) bool m_ ## name;
 #define FIELD_BOOL_ON_OFF(name) bool m_ ## name;
-#define FIELD_STRING(name) uint32_t m_ ## name;
+#define FIELD_STRING(name) ::rkit::Optional<uint32_t> m_ ## name;
 #define FIELD_FLOAT(name) float m_ ## name;
 #define FIELD_UINT(name) uint32_t m_ ## name;
-#define FIELD_LABEL(name) uint32_t m_ ## name;
+#define FIELD_LABEL(name) Label m_ ## name;
 #define FIELD_COMPONENT(name) EClass_ ## name m_ ## name;
 #define FIELD_EDEF(name) uint32_t m_ ## name;
 #define FIELD_BSPMODEL(name) uint32_t m_ ## name;

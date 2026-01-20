@@ -1,9 +1,26 @@
 #pragma once
 
+namespace rkit { namespace priv {
+	struct OpaqueDestructor
+	{
+		template<class T>
+		static void Destruct(T *obj);
+
+		template<class T>
+		static void DestructImpl(T *obj);
+	};
+} }
+
 namespace rkit
 {
 	template<class TImpl>
 	class Opaque;
+
+	template<class TType>
+	class OpaqueDeleter
+	{
+	public:
+	};
 
 	template<class TBase>
 	class OpaqueImplementation
@@ -48,8 +65,6 @@ namespace rkit
 		template<class TBase>
 		static void Destruct(TImpl *impl);
 
-		DestructFunc_t m_implDtor;
-
 #if RKIT_IS_DEBUG
 		TImpl &m_impl;
 #endif
@@ -62,6 +77,14 @@ namespace rkit
 #include <stdint.h>
 #include <new>
 #include <utility>
+
+namespace rkit { namespace priv {
+	template<class T>
+	inline void OpaqueDestructor::DestructImpl<T>(T *obj)
+	{
+		obj->~T();
+	}
+} }
 
 namespace rkit
 {

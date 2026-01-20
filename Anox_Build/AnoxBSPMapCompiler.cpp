@@ -927,7 +927,7 @@ namespace anox { namespace buildsystem
 				switch (dispo)
 				{
 				case PropertyDisposition::kPresent:
-					RKIT_CHECK(ParseField(blobBytes, *fieldDef, property.Second()));
+					RKIT_CHECK(ParseField(blobBytes.SubSpan(offset), *fieldDef, property.Second()));
 					break;
 				case PropertyDisposition::kAngleRecast:
 					return rkit::ResultCode::kNotYetImplemented;

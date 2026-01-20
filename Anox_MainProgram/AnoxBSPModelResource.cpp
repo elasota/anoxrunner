@@ -953,19 +953,17 @@ namespace anox
 						return rkit::ResultCode::kDataError;
 				}
 			}
-			
 		}
 
-		// TODO: Process outModel0LeafDrawSurfaceLocators
-		// TODO: Validate model numDrawSurfaces counters
+		// TODO: Post graphic uploads
 
 
-		return rkit::ResultCode::kNotYetImplemented;
+		return rkit::ResultCode::kOK;
 	}
 
 	rkit::Result AnoxBSPModelLoaderInfo::LoadContents(State_t &state, Resource_t &resource)
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		return rkit::ResultCode::kOK;
 	}
 
 	bool AnoxBSPModelLoaderInfo::PhaseHasDependencies(size_t phase)

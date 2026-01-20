@@ -568,7 +568,8 @@ namespace anox
 	{
 		struct Locals
 		{
-			AnoxResourceRetrieveResult loadResult;
+			AnoxResourceRetrieveResult modelLoadResult;
+			AnoxResourceRetrieveResult objectsLoadResult;
 			rkit::CIPath path;
 		};
 
@@ -578,16 +579,27 @@ namespace anox
 		};
 
 		CORO_BEGIN
-			rkit::String fullPathStr;
-			CORO_CHECK(fullPathStr.Format("ax_bsp/maps/{}.bsp.bspmodel", params.mapName));
+			{
+				rkit::String fullPathStr;
+				CORO_CHECK(fullPathStr.Format("ax_bsp/maps/{}.bsp.bspmodel", params.mapName));
 
-			CORO_CHECK(locals.path.Set(fullPathStr));
+				CORO_CHECK(locals.path.Set(fullPathStr));
+			}
 
 			rkit::log::LogInfo("GameLogic: Loading map");
 
-			CORO_CALL(self->AsyncLoadCIPathKeyedResource, locals.loadResult, anox::resloaders::kBSPModelResourceTypeCode, locals.path);
+			CORO_CALL(self->AsyncLoadCIPathKeyedResource, locals.modelLoadResult, anox::resloaders::kBSPModelResourceTypeCode, locals.path);
 
 			rkit::log::LogInfo("GameLogic: Map loaded successfully");
+
+			{
+				rkit::String fullPathStr;
+				CORO_CHECK(fullPathStr.Format("ax_bsp/maps/{}.bsp.objects", params.mapName));
+
+				CORO_CHECK(locals.path.Set(fullPathStr));
+			}
+
+			CORO_CALL(self->AsyncLoadCIPathKeyedResource, locals.objectsLoadResult, anox::resloaders::kSpawnDefsResourceTypeCode, locals.path);
 
 			int n = 0;
 		CORO_END

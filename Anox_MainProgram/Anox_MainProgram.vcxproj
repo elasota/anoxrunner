@@ -160,6 +160,7 @@
     <ClCompile Include="AnoxMDAModelResource.cpp" />
     <ClCompile Include="AnoxRenderedWindow.cpp" />
     <ClCompile Include="AnoxResourceManager.cpp" />
+    <ClCompile Include="AnoxSpawnDefsResource.cpp" />
     <ClCompile Include="AnoxTextureResource.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -195,6 +196,7 @@
     <ClInclude Include="AnoxGraphicsResourceManager.h" />
     <ClInclude Include="AnoxGraphicsSettings.h" />
     <ClInclude Include="AnoxResourceManager.h" />
+    <ClInclude Include="AnoxSpawnDefsResource.h" />
     <ClInclude Include="AnoxTexture.h" />
     <ClInclude Include="AnoxTextureResource.h" />
     <ClInclude Include="GraphicsMemoryAllocator.h" />
