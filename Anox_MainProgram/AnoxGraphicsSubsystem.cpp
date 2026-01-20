@@ -1964,6 +1964,7 @@ namespace anox
 	void GraphicsSubsystem::UploadActionSet::ClearActions()
 	{
 		m_bufferToTextureCopy.ShrinkToSize(0);
+		m_bufferToBufferCopy.ShrinkToSize(0);
 		m_prepareImageForTransfer.ShrinkToSize(0);
 		m_prepareBufferForTransfer.ShrinkToSize(0);
 		m_retiredUploadTasks.ShrinkToSize(0);
