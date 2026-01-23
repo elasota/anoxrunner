@@ -6,9 +6,12 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <PreprocessorDefinitions>RKIT_IS_DEBUG=1;RKIT_IS_FINAL=0;_CRTDBG_MAP_ALLOC=1;RKIT_CORELIB_DLL=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>RKIT_IS_DEBUG=1;RKIT_IS_FINAL=0;_CRTDBG_MAP_ALLOC=1;RKIT_CORELIB_DLL=1;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SupportJustMyCode>false</SupportJustMyCode>
     </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+    </Link>
   </ItemDefinitionGroup>
   <ItemGroup />
 </Project>

@@ -5,6 +5,7 @@
 #include "rkit/Core/StreamProtos.h"
 #include "rkit/Core/HashValue.h"
 #include "rkit/Core/FormatProtos.h"
+#include "rkit/Core/Result.h"
 
 #include "rkit/Utilities/TextParserProtos.h"
 

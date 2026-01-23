@@ -13,6 +13,7 @@
 #include "rkit/Core/String.h"
 #include "rkit/Core/UtilitiesDriver.h"
 
+#include "AnoxBSPModelResource.h"
 #include "AnoxCaptureHarness.h"
 #include "AnoxCommandRegistry.h"
 #include "AnoxCommandStack.h"
@@ -24,6 +25,7 @@
 namespace anox
 {
 	class AnoxCommandStackBase;
+	class AnoxBSPModelResourceBase;
 
 	class AnoxGameLogic final : public IGameLogic
 	{
@@ -61,6 +63,7 @@ namespace anox
 		CORO_DECL_METHOD(StartUp);
 		CORO_DECL_METHOD(RunFrame);
 		CORO_DECL_METHOD(LoadMap, const rkit::StringSliceView &mapName);
+		CORO_DECL_METHOD(SpawnMapInitialObjects, const rkit::StringSliceView &mapName);
 		CORO_DECL_METHOD(LoadContentIDKeyedResource, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::data::ContentID &cid);
 		CORO_DECL_METHOD(LoadCIPathKeyedResource, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::CIPathView &path);
 		CORO_DECL_METHOD(LoadStringKeyedResource, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::StringView &str);
@@ -77,6 +80,8 @@ namespace anox
 		rkit::UniquePtr<AnoxCommandStackBase> m_commandStack;
 
 		rkit::UniquePtr<game::GlobalVars> m_globalVars;
+
+		rkit::RCPtr<AnoxBSPModelResourceBase> m_bspModel;
 	};
 
 	AnoxGameLogic::AnoxGameLogic(IAnoxGame *game)
@@ -569,7 +574,6 @@ namespace anox
 		struct Locals
 		{
 			AnoxResourceRetrieveResult modelLoadResult;
-			AnoxResourceRetrieveResult objectsLoadResult;
 			rkit::CIPath path;
 		};
 
@@ -579,6 +583,8 @@ namespace anox
 		};
 
 		CORO_BEGIN
+			self->m_bspModel.Reset();
+
 			{
 				rkit::String fullPathStr;
 				CORO_CHECK(fullPathStr.Format("ax_bsp/maps/{}.bsp.bspmodel", params.mapName));
@@ -590,16 +596,36 @@ namespace anox
 
 			CORO_CALL(self->AsyncLoadCIPathKeyedResource, locals.modelLoadResult, anox::resloaders::kBSPModelResourceTypeCode, locals.path);
 
+			self->m_bspModel = locals.modelLoadResult.m_resourceHandle.StaticCast<AnoxBSPModelResourceBase>();
+
 			rkit::log::LogInfo("GameLogic: Map loaded successfully");
+		CORO_END
+	};
 
-			{
-				rkit::String fullPathStr;
-				CORO_CHECK(fullPathStr.Format("ax_bsp/maps/{}.bsp.objects", params.mapName));
+	CORO_DEF_METHOD(AnoxGameLogic, SpawnMapInitialObjects)
+	{
+		struct Locals
+		{
+			AnoxResourceRetrieveResult objectsLoadResult;
+			rkit::CIPath path;
+		};
 
-				CORO_CHECK(locals.path.Set(fullPathStr));
-			}
+		struct Params
+		{
+			rkit::StringSliceView mapName;
+		};
+
+		CORO_BEGIN
+			rkit::String fullPathStr;
+			CORO_CHECK(fullPathStr.Format("ax_bsp/maps/{}.bsp.objects", params.mapName));
+
+			CORO_CHECK(locals.path.Set(fullPathStr));
+
+			rkit::log::LogInfo("GameLogic: Loading spawn objects");
 
 			CORO_CALL(self->AsyncLoadCIPathKeyedResource, locals.objectsLoadResult, anox::resloaders::kSpawnDefsResourceTypeCode, locals.path);
+
+			rkit::log::LogInfo("GameLogic: Spawning objects");
 
 			int n = 0;
 		CORO_END
@@ -610,6 +636,7 @@ namespace anox
 		struct Locals
 		{
 			const IConfigurationState *configState = nullptr;
+			rkit::StringSliceView mapName;
 		};
 
 		struct Params {};
@@ -627,10 +654,9 @@ namespace anox
 			IConfigurationValueView mapNameValue;
 			CORO_CHECK(kvt.GetValueFromKey("mapName", mapNameValue));
 
-			rkit::StringSliceView mapName;
-			CORO_CHECK(mapNameValue.Get(mapName));
+			CORO_CHECK(mapNameValue.Get(locals.mapName));
 
-			for (char c : mapName)
+			for (char c : locals.mapName)
 			{
 				if (c >= 'a' && c <= 'z')
 					continue;
@@ -641,7 +667,8 @@ namespace anox
 				CORO_CHECK(rkit::ResultCode::kDataError);
 			}
 
-			CORO_CALL(self->AsyncLoadMap, mapName);
+			CORO_CALL(self->AsyncLoadMap, locals.mapName);
+			CORO_CALL(self->AsyncSpawnMapInitialObjects, locals.mapName);
 		CORO_END
 	};
 
