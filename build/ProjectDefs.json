@@ -1,0 +1,212 @@
+{
+	"Anox_Build" :
+	{
+		"type": "module",
+		"dev_only": true,
+		"refs":
+		[
+			"RKit_Build",
+			"RKit_Build_Vulkan",
+			"RKit_PNG"
+		]
+	},
+	"Anox_Utilities" :
+	{
+		"type": "module",
+		"refs":
+		[
+			"Anox_Build"
+		]
+	},
+	"Anox_MainProgram" :
+	{
+		"type": "module",
+		"refs":
+		[
+			"Anox_Utilities",
+			"RKit_Data",
+			"RKit_Render_Vulkan"
+		]
+	},
+	"RKit_Boot_Win" :
+	{
+		"type": "exe",
+		"extra_files":
+		[
+			{
+				"path": "deploy/RKitModuleConfig.json",
+				"type": "content"
+			}
+		],
+		"refs":
+		[
+			"RKit_Mem",
+			"RKit_System_Win32",
+			"RKit_ProgramLauncher",
+			"Anox_MainProgram"
+		]
+	},
+	"RKit_Build" :
+	{
+		"type": "module",
+		"dev_only": true
+	},
+	"RKit_Build_Vulkan" :
+	{
+		"type": "module",
+		"dev_only": true,
+		"configs":
+		[
+			"VulkanSDK"
+		],
+		"refs":
+		[
+			"RKit_ShaderC_DLL"
+		]
+	},
+	"RKit_CoreLib" :
+	{
+		"type": "module",
+		"configs":
+		[
+			"CoreLib_Internal"
+		]
+	},
+	"RKit_Data" :
+	{
+		"type": "module"
+	},
+	"RKit_Mem" :
+	{
+		"type": "module"
+	},
+	"RKit_PNG" :
+	{
+		"type": "module",
+		"configs":
+		[
+			"libpng_export"
+		],
+		"refs":
+		[
+			"libpng"
+		]
+	},
+	"RKit_ProgramLauncher" :
+	{
+		"type": "module",
+		"refs":
+		[
+			"RKit_Utilities"
+		]
+	},
+	"RKit_Render_Vulkan" :
+	{
+		"type": "module",
+		"configs":
+		[
+			"VulkanSDK"
+		]
+	},
+	"RKit_ShaderC_DLL" :
+	{
+		"type": "module",
+		"dev_only": true,
+		"configs":
+		[
+			"RKit_ShaderC_DLL/shaderc_debug",
+			"VulkanSDK"
+		]
+	},
+	"RKit_System_Win32" :
+	{
+		"type": "module",
+		"configs":
+		[
+			"RKit_System_Win32/RKit_System_Win32"
+		]
+	},
+	"RKit_Utilities" :
+	{
+		"type": "module",
+		"configs":
+		[
+			"ryu_export",
+			"rapidjson_export",
+			"zlib_export"
+		],
+		"refs":
+		[
+			"ryu",
+			"zlib"
+		]
+	},
+	"libpng" :
+	{
+		"type": "lib",
+		"configs":
+		[
+			"zlib_export"
+		],
+		"extra_files":
+		[
+			"thirdparty/libpng/png.c",
+			"thirdparty/libpng/pngerror.c",
+			"thirdparty/libpng/pngget.c",
+			"thirdparty/libpng/pngmem.c",
+			"thirdparty/libpng/pngread.c",
+			"thirdparty/libpng/pngrio.c",
+			"thirdparty/libpng/pngrtran.c",
+			"thirdparty/libpng/pngrutil.c",
+			"thirdparty/libpng/pngset.c",
+			"thirdparty/libpng/pngtrans.c",
+			"thirdparty/libpng/pngwio.c",
+			"thirdparty/libpng/pngwrite.c",
+			"thirdparty/libpng/pngwtran.c",
+			"thirdparty/libpng/pngwutil.c",
+		],
+		"refs":
+		[
+			"zlib"
+		]
+	},
+	"ryu" :
+	{
+		"type": "lib",
+		"configs":
+		[
+			"ryu_internal"
+		],
+		"extra_files":
+		[
+			"thirdparty/ryu/ryu/d2s.c",
+			"thirdparty/ryu/ryu/f2s.c",
+			"thirdparty/ryu/ryu/s2d.c",
+			"thirdparty/ryu/ryu/s2f.c"
+		]
+	},
+	"Tool_ExtractDAT" :
+	{
+		"type": "module",
+		"dev_only": true
+	},
+	"zlib" :
+	{
+		"type": "linked_module",
+		"configs":
+		[
+			"zlib_internal"
+		],
+		"extra_files":
+		[
+			"thirdparty/zlib/adler32.c",
+			"thirdparty/zlib/crc32.c",
+			"thirdparty/zlib/deflate.c",
+			"thirdparty/zlib/inffast.c",
+			"thirdparty/zlib/inflate.c",
+			"thirdparty/zlib/inftrees.c",
+			"thirdparty/zlib/trees.c",
+			"thirdparty/zlib/zutil.c"
+		]
+	}
+}

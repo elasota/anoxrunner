@@ -17,8 +17,13 @@
 *.ipdb
 *.nativecodeanalysis.sarif
 *.nativecodeanalysis.xml
+*.vcxproj
+launchSettings.json
 vc.nativecodeanalysis.all.xml
 CodeAnalysisResultManifest.txt
 
 x64/Debug/*
 x64/Release/*
+
+build/ProjectGenerator/obj/*
+build/ProjectGenerator/bin/*
