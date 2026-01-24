@@ -18,9 +18,11 @@
 *.nativecodeanalysis.sarif
 *.nativecodeanalysis.xml
 *.vcxproj
+*.vcxproj.filters
 launchSettings.json
 vc.nativecodeanalysis.all.xml
 CodeAnalysisResultManifest.txt
+RKit.sln
 
 x64/Debug/*
 x64/Release/*

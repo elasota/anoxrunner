@@ -14,6 +14,7 @@ namespace ProjectGenerator
             Include,
             Content,
             Misc,
+            Resource,
         }
 
 

@@ -229,6 +229,12 @@ namespace ProjectGenerator
 
         private void GenerateProject(GlobalConfiguration gconfig, string name, ProjectDef projDef, ProjectResolver resolver, TargetDefs targetDefs, OutputFileCollection outputFiles, InternalState state)
         {
+            GenerateProjectFile(gconfig, name, projDef, resolver, targetDefs, outputFiles, state);
+            GenerateFiltersFile(gconfig, name, projDef, resolver, targetDefs, outputFiles, state);
+        }
+
+        private void GenerateProjectFile(GlobalConfiguration gconfig, string name, ProjectDef projDef, ProjectResolver resolver, TargetDefs targetDefs, OutputFileCollection outputFiles, InternalState state)
+        {
             string projectDir = name;
             string projectPath = Path.Combine(projectDir, name + ".vcxproj");
 
@@ -257,8 +263,6 @@ namespace ProjectGenerator
 
             AddPropertySheetImports(projElement, projectDir, projDef, targetDefs);
 
-            xmlDocument.AppendChild(projElement);
-
             AddFiles(projElement, gconfig.RootPath!, projectDir, resolver);
 
             AddProjectRefs(projElement, projectDir, projDef, resolver, state);
@@ -269,15 +273,218 @@ namespace ProjectGenerator
                 projElement.AppendChild(propsImportElement);
             }
 
+            xmlDocument.AppendChild(projElement);
+
             Stream outStream = outputFiles.Open(projectPath);
             using (XmlTextWriter writer = new XmlTextWriter(outStream, Encoding.UTF8))
             {
                 writer.Formatting = Formatting.Indented;
                 xmlDocument.WriteTo(writer);
             }
+        }
 
-            byte[] xmlBytes = ((MemoryStream)outStream).ToArray();
-            string xmlString = Encoding.UTF8.GetString(xmlBytes);
+        private void GenerateFiltersFile(GlobalConfiguration gconfig, string name, ProjectDef projDef, ProjectResolver resolver, TargetDefs targetDefs, OutputFileCollection outputFiles, InternalState state)
+        {
+            string projectDir = name;
+            string projectPath = Path.Combine(projectDir, name + ".vcxproj.filters");
+
+            XmlDocument xmlDocument = new XmlDocument();
+            xmlDocument.AppendChild(xmlDocument.CreateXmlDeclaration("1.0", "utf-8", null));
+
+            XmlElement projElement = xmlDocument.CreateElement("Project", _xmlNS);
+            projElement.SetAttribute("ToolsVersion", "4.0");
+
+            AddFilterGroups(projElement, projectDir, resolver.ResolvedFiles);
+
+            xmlDocument.AppendChild(projElement);
+
+            Stream outStream = outputFiles.Open(projectPath);
+            using (XmlTextWriter writer = new XmlTextWriter(outStream, Encoding.UTF8))
+            {
+                writer.Formatting = Formatting.Indented;
+                xmlDocument.WriteTo(writer);
+            }
+        }
+
+        private static void AddFilterGroup(XmlElement itemGroupElement, string name, string guidStr, string? extensions)
+        {
+            XmlDocument document = itemGroupElement.OwnerDocument;
+
+            XmlElement filterElement = document.CreateElement("Filter", _xmlNS);
+            filterElement.SetAttribute("Include", name);
+
+            XmlElement uidElement = document.CreateElement("UniqueIdentifier", _xmlNS);
+            uidElement.AppendChild(document.CreateTextNode("{" + guidStr + "}"));
+
+            filterElement.AppendChild(uidElement);
+
+            if (extensions != null)
+            {
+                XmlElement extensionsElement = document.CreateElement("Extensions", _xmlNS);
+                extensionsElement.AppendChild(document.CreateTextNode(extensions));
+
+                filterElement.AppendChild(extensionsElement);
+            }
+
+            itemGroupElement.AppendChild(filterElement);
+        }
+
+        private static void AddFilterGroups(XmlElement projElement, string projectDir, IReadOnlyList<ProjectResolver.ResolvedFile> resolvedFiles)
+        {
+            XmlDocument document = projElement.OwnerDocument;
+
+            HashSet<ProjectDef.FileType> fileTypesSet = new HashSet<ProjectDef.FileType>();
+
+            List<string> fileBins = new List<string>();
+            List<string> uniqueFileBins = new List<string>();
+            HashSet<string> uniqueFileBinsSet = new HashSet<string>();
+
+            List<string> reservedBinsList = new List<string>();
+            reservedBinsList.Add("Source Files");
+            reservedBinsList.Add("Header Files");
+            reservedBinsList.Add("Resource Files");
+
+            HashSet<string> reservedBinsSet = new HashSet<string>();
+            foreach (string binName in reservedBinsList)
+            {
+                reservedBinsSet.Add(binName.ToUpperInvariant());
+            }
+
+            foreach (ProjectResolver.ResolvedFile file in resolvedFiles)
+            {
+                fileTypesSet.Add(file.FileType);
+
+                string bin = "";
+                switch (file.FileType)
+                {
+                    case ProjectDef.FileType.Include:
+                        bin = "Header Files";
+                        break;
+                    case ProjectDef.FileType.Source:
+                        bin = "Source Files";
+                        break;
+                    case ProjectDef.FileType.Resource:
+                        bin = "Resource Files";
+                        break;
+                    case ProjectDef.FileType.Misc:
+                        bin = "";
+                        break;
+                    case ProjectDef.FileType.Content:
+                        bin = "Content";
+                        break;
+                    default:
+                        throw new NotImplementedException();
+                }
+
+                string fullFilterPath = Path.Combine(bin, file.FilterPath);
+
+                string fullBin = Path.GetDirectoryName(fullFilterPath).Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+
+                AddBin(fullBin, uniqueFileBins, uniqueFileBinsSet, reservedBinsSet);
+
+                fileBins.Add(fullBin);
+            }
+
+            uniqueFileBins.Sort(int (string a, string b) => string.Compare(a, b, StringComparison.OrdinalIgnoreCase));
+
+            {
+                XmlElement itemGroupElement = document.CreateElement("ItemGroup", _xmlNS);
+
+                if (fileTypesSet.Contains(ProjectDef.FileType.Source))
+                    AddFilterGroup(itemGroupElement, "Source Files", "4FC737F1-C7A5-4376-A066-2A32D752A2FF", "cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx");
+
+                if (fileTypesSet.Contains(ProjectDef.FileType.Include))
+                    AddFilterGroup(itemGroupElement, "Header Files", "93995380-89BD-4b04-88EB-625FBE52EBFB", "h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd");
+
+                if (fileTypesSet.Contains(ProjectDef.FileType.Resource))
+                    AddFilterGroup(itemGroupElement, "Resource Files", "67DA6AB6-F800-4c08-8B7A-83BB121AAD01", "rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms");
+
+                if (fileTypesSet.Contains(ProjectDef.FileType.Content))
+                    AddFilterGroup(itemGroupElement, "Content", UpperGuid(StringToGuid("Content")), null);
+
+                foreach (string bin in uniqueFileBins)
+                {
+                    AddFilterGroup(itemGroupElement, bin, UpperGuid(StringToGuid(@"#FilterPrefix#" + bin)), null);
+                }
+
+                projElement.AppendChild(itemGroupElement);
+            }
+
+            AddFiltersItemGroup(projElement, projectDir, resolvedFiles, fileBins, "ClCompile",
+                bool (ProjectDef.FileType fileType) => (fileType == ProjectDef.FileType.Source));
+
+            AddFiltersItemGroup(projElement, projectDir, resolvedFiles, fileBins, "ClInclude",
+                bool (ProjectDef.FileType fileType) => (fileType == ProjectDef.FileType.Include));
+
+            AddFiltersItemGroup(projElement, projectDir, resolvedFiles, fileBins, "None",
+                bool (ProjectDef.FileType fileType) =>
+                (fileType == ProjectDef.FileType.Content || fileType == ProjectDef.FileType.Misc)
+                );
+        }
+        private static void AddFiltersItemGroup(XmlElement projElement, string projectDir, IReadOnlyList<ProjectResolver.ResolvedFile> resolvedFiles, IReadOnlyList<string> fileBins, string elementType, Func<ProjectDef.FileType, bool> filter)
+        {
+            if (resolvedFiles.Count != fileBins.Count)
+                throw new ArgumentException();
+
+            XmlDocument document = projElement.OwnerDocument;
+
+            XmlElement? itemGroupElement = null;
+
+            for (int i = 0; i < resolvedFiles.Count; i++)
+            {
+                ProjectResolver.ResolvedFile file = resolvedFiles[i];
+                string fileBin = fileBins[i];
+
+                if (!filter(file.FileType))
+                    continue;
+
+                if (itemGroupElement == null)
+                    itemGroupElement = document.CreateElement("ItemGroup", _xmlNS);
+
+                XmlElement itemElement = document.CreateElement(elementType, _xmlNS);
+                itemElement.SetAttribute("Include", ComputeRelativePath(projectDir, file.FilePath));
+
+                string? filterDir = Path.GetDirectoryName(Path.Combine(fileBin, file.FilterPath));
+                if (filterDir != null)
+                {
+                    filterDir = filterDir.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+
+                    XmlElement filterElement = document.CreateElement("Filter", _xmlNS);
+                    filterElement.AppendChild(document.CreateTextNode(filterDir));
+
+                    itemElement.AppendChild(filterElement);
+                }
+
+                itemGroupElement.AppendChild(itemElement);
+            }
+
+            if (itemGroupElement != null)
+                projElement.AppendChild(itemGroupElement);
+        }
+
+        private static void AddBin(string fullBin, List<string> fileBins, HashSet<string> fileBinsSet, HashSet<string> reservedBinsSet)
+        {
+            if (fullBin.Length > 0)
+            {
+                string binKey = fullBin.ToUpperInvariant();
+
+                if (!reservedBinsSet.Contains(binKey) && !fileBinsSet.Contains(binKey))
+                {
+                    for (int i = fullBin.Length; i > 0; i--)
+                    {
+                        char ch = fullBin[i - 1];
+
+                        if (ch == Path.PathSeparator)
+                        {
+                            AddBin(fullBin.Substring(0, i - 1), fileBins, fileBinsSet, reservedBinsSet);
+                            break;
+                        }
+                    }
+
+                    fileBinsSet.Add(binKey);
+                    fileBins.Add(fullBin);
+                }
+            }
         }
 
         private void AddProjectRefs(XmlElement projElement, string projectDir, ProjectDef projDef, ProjectResolver resolver, InternalState state)
