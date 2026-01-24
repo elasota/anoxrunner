@@ -26,6 +26,13 @@
 			"Anox_Utilities",
 			"RKit_Data",
 			"RKit_Render_Vulkan"
+		],
+		"extra_dirs":
+		[
+			{
+				"path": "include/anox",
+				"target": "anox"
+			}
 		]
 	},
 	"RKit_Boot_Win" :
@@ -150,6 +157,14 @@
 		],
 		"extra_files":
 		[
+			"thirdparty/libpng/png.h",
+			"thirdparty/libpng/pngconf.h",
+			"thirdparty/libpng/pngdebug.h",
+			"thirdparty/libpng/pnginfo.h",
+			"thirdparty/libpng/pnglibconf.h",
+			"thirdparty/libpng/pngpriv.h",
+			"thirdparty/libpng/pngstruct.h",
+			
 			"thirdparty/libpng/png.c",
 			"thirdparty/libpng/pngerror.c",
 			"thirdparty/libpng/pngget.c",
@@ -199,6 +214,9 @@
 		],
 		"extra_files":
 		[
+			"thirdparty/zlib/zlib.h",
+			"thirdparty/zlib/zutil.h",
+
 			"thirdparty/zlib/adler32.c",
 			"thirdparty/zlib/crc32.c",
 			"thirdparty/zlib/deflate.c",

@@ -178,7 +178,10 @@ namespace ProjectGenerator
         {
             bool recursive = projDirMapping.Recursive ?? true;
 
-            RecursiveExpandDirMapping(resolvedFiles, projDirMapping.SourceDirectory, projDirMapping.FilterDirectory, rootPath, recursive);
+            string normalizedSourceDir = projDirMapping.SourceDirectory.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            string normalizedFilterDir = projDirMapping.FilterDirectory.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+
+            RecursiveExpandDirMapping(resolvedFiles, normalizedSourceDir, normalizedFilterDir, rootPath, recursive);
         }
 
         private static void RecursiveExpandDirMappingDirectory(List<ResolvedFile> resolvedFiles, DirectoryInfo sourceDirInfo, string sourceDirectory, string filterDirectory, bool recursive)

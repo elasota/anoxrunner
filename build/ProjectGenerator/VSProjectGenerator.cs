@@ -444,13 +444,10 @@ namespace ProjectGenerator
                 XmlElement itemElement = document.CreateElement(elementType, _xmlNS);
                 itemElement.SetAttribute("Include", ComputeRelativePath(projectDir, file.FilePath));
 
-                string? filterDir = Path.GetDirectoryName(Path.Combine(fileBin, file.FilterPath));
-                if (filterDir != null)
+                if (!string.IsNullOrEmpty(fileBin))
                 {
-                    filterDir = filterDir.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
-
                     XmlElement filterElement = document.CreateElement("Filter", _xmlNS);
-                    filterElement.AppendChild(document.CreateTextNode(filterDir));
+                    filterElement.AppendChild(document.CreateTextNode(fileBin));
 
                     itemElement.AppendChild(filterElement);
                 }

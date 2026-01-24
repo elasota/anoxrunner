@@ -180,6 +180,68 @@ namespace ProjectGenerator
                         _refs.Add(refElement.GetString()!);
                     }
                 }
+                else if (propertyName == "extra_dirs")
+                {
+                    if (property.Value.ValueKind != JsonValueKind.Array)
+                        throw new JsonException("Invalid project def 'extra_dirs' type");
+
+                    foreach (JsonElement refElement in property.Value.EnumerateArray())
+                    {
+                        if (refElement.ValueKind == JsonValueKind.String)
+                        {
+                            _dirMappings.Add(new DirectoryMapping()
+                            {
+                                SourceDirectory = refElement.GetString()!,
+                                FilterDirectory = "",
+                            });
+                        }
+                        else if (refElement.ValueKind == JsonValueKind.Object)
+                        {
+                            string? path = null;
+                            string target = "";
+                            bool? recursive = null;
+                            foreach (JsonProperty prop in refElement.EnumerateObject())
+                            {
+
+                                if (prop.Name == "path")
+                                {
+                                    if (prop.Value.ValueKind != JsonValueKind.String)
+                                        throw new JsonException("Invalid value type for 'extra_dirs.path'");
+
+                                    path = prop.Value.GetString();
+                                }
+                                else if (prop.Name == "target")
+                                {
+                                    if (prop.Value.ValueKind != JsonValueKind.String)
+                                        throw new JsonException("Invalid value type for 'extra_dirs.target'");
+
+                                    target = prop.Value.GetString();
+                                }
+                                else if (prop.Name == "target")
+                                {
+                                    if (prop.Value.ValueKind == JsonValueKind.True)
+                                        recursive = true;
+                                    else if (prop.Value.ValueKind == JsonValueKind.False)
+                                        recursive = false;
+                                    else
+                                        throw new JsonException("Invalid value type for 'extra_dirs.recursive'");
+                                }
+                            }
+
+                            if (path == null)
+                                throw new JsonException("'extra_dirs' entry had no path'");
+
+                            _dirMappings.Add(new DirectoryMapping()
+                            {
+                                SourceDirectory = path,
+                                FilterDirectory = target,
+                                Recursive = recursive,
+                            });
+                        }
+                        else
+                            throw new JsonException("Invalid project def 'extra_dirs' type");
+                    }
+                }
                 else
                     throw new JsonException($"Unknown project def property {propertyName}");
             }
