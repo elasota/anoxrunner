@@ -1163,8 +1163,16 @@ namespace anox
 	{
 		rkit::render::IRenderDevice *device = m_graphicsSubsystem.GetDevice();
 
+		const bool haveInitialData = m_bufferInitializer->m_copyOperations.Count() > 0;
+
+		rkit::render::BufferResourceSpec resSpec = m_bufferInitializer->m_resSpec;
+		if (!m_graphicsSubsystem.m_renderDevice->SupportsInitialBufferData() && haveInitialData)
+		{
+			resSpec.m_usage.Add({ rkit::render::BufferUsageFlag::kCopyDest });
+		}
+
 		rkit::UniquePtr<rkit::render::IBufferPrototype> prototype;
-		RKIT_CHECK(device->CreateBufferPrototype(prototype, m_bufferInitializer->m_spec, m_bufferInitializer->m_resSpec));
+		RKIT_CHECK(device->CreateBufferPrototype(prototype, m_bufferInitializer->m_spec, resSpec));
 
 		rkit::render::MemoryRequirementsView memReqs = prototype->GetMemoryRequirements();
 
@@ -1184,8 +1192,6 @@ namespace anox
 		RKIT_CHECK(m_graphicsSubsystem.m_renderDevice->CreateMemoryHeap(memHeap, heapKey.Get(), memSize));
 
 		rkit::UniquePtr<rkit::render::IBufferResource> bufferResource;
-
-		const bool haveInitialData = m_bufferInitializer->m_copyOperations.Count() > 0;
 
 		rkit::Span<const uint8_t> deviceInitialData;
 		rkit::Vector<uint8_t> unrolledInitialData;

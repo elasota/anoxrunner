@@ -18,6 +18,7 @@
 
 #include "rkit/Math/SoftFloat.h"
 
+#include "anox/Data/CompressedNormal.h"
 #include "anox/Data/EntityDef.h"
 #include "anox/Data/EntitySpawnData.h"
 #include "anox/Data/BSPModel.h"
@@ -267,6 +268,7 @@ namespace anox { namespace buildsystem
 	// Packing: XYZ UV LightmapUV NormalIndex
 	typedef U32Cluster<8> BSPGeometryVertex_t;
 	typedef U32Cluster<3> BSPVec3_t;
+	typedef U32Cluster<2> IndexedNormal_t;
 	typedef U32Cluster<2> IndexedPlane_t;
 
 	struct BSPGeometryClusterLookups
@@ -2057,51 +2059,35 @@ namespace anox { namespace buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
-	static rkit::Result IndexNormal(uint32_t &outNormalIndex, rkit::HashMap<BSPVec3_t, size_t> &normalLookup, const BSPVec3_t &normal)
+	static rkit::Result IndexNonFlippableNormal(uint32_t &outNormalIndex, rkit::HashMap<IndexedNormal_t, size_t> &normalLookup, const IndexedNormal_t &normal)
 	{
-		rkit::HashMap<BSPVec3_t, size_t>::ConstIterator_t it = normalLookup.Find(normal);
+		rkit::HashMap<IndexedNormal_t, size_t>::ConstIterator_t it = normalLookup.Find(normal);
 		if (it == normalLookup.end())
 		{
-			BSPVec3_t flippedNormal = {};
-			for (int axis = 0; axis < 3; axis++)
-				flippedNormal.m_values[axis] = SanitizeFloatBits(normal.m_values[axis] ^ 0x80000000u);
+			size_t newIndex = normalLookup.Count();
 
-			it = normalLookup.Find(flippedNormal);
-			if (it == normalLookup.end())
+			if (newIndex == 0x80000000u)
 			{
-				size_t newIndex = normalLookup.Count();
-
-				if (newIndex == 0x80000000u)
-				{
-					rkit::log::Error("Too many unique normals");
-					return rkit::ResultCode::kDataError;
-				}
-
-				RKIT_CHECK(normalLookup.Set(normal, newIndex));
-
-				outNormalIndex = static_cast<uint32_t>(newIndex << 1);
+				rkit::log::Error("Too many unique normals");
+				return rkit::ResultCode::kDataError;
 			}
-			else
-				outNormalIndex = static_cast<uint32_t>((it.Value() << 1) | 1u);
+
+			RKIT_CHECK(normalLookup.Set(normal, newIndex));
+
+			outNormalIndex = static_cast<uint32_t>(newIndex);
 		}
-		else
-			outNormalIndex = static_cast<uint32_t>((it.Value() << 1));
 
 		return rkit::ResultCode::kOK;
 	}
 
-	static rkit::Result IndexPlane(uint32_t &outPlaneIndex, rkit::HashMap<IndexedPlane_t, size_t> &planeLookup,
-		rkit::HashMap<BSPVec3_t, size_t> &normalLookup, const BSPVec3_t &normal, uint32_t distBits)
+	static rkit::Result IndexNonFlippablePlane(uint32_t &outPlaneIndex, rkit::HashMap<IndexedPlane_t, size_t> &planeLookup,
+		rkit::HashMap<IndexedNormal_t, size_t> &normalLookup, const IndexedNormal_t &normal, uint32_t distBits)
 	{
 		uint32_t normalIndex = 0;
-		RKIT_CHECK(IndexNormal(normalIndex, normalLookup, normal));
-
-		bool isFlipped = ((normalIndex & 1) != 0);
-		if (isFlipped)
-			distBits = SanitizeFloatBits(distBits ^ 0x80000000u);
+		RKIT_CHECK(IndexNonFlippableNormal(normalIndex, normalLookup, normal));
 
 		IndexedPlane_t planeKey = {};
-		planeKey.m_values[0] = (normalIndex >> 1);
+		planeKey.m_values[0] = normalIndex;
 		planeKey.m_values[1] = distBits;
 
 		uint32_t planeIndex = 0;
@@ -2118,32 +2104,41 @@ namespace anox { namespace buildsystem
 
 			RKIT_CHECK(planeLookup.Set(planeKey, newIndex));
 
-			planeIndex = static_cast<uint32_t>(newIndex << 1);
+			planeIndex = static_cast<uint32_t>(newIndex);
 		}
 		else
-			planeIndex = static_cast<uint32_t>(it.Value() << 1);
-
-		if (isFlipped)
-			planeIndex |= 1;
+			planeIndex = static_cast<uint32_t>(it.Value());
 
 		outPlaneIndex = planeIndex;
 
 		return rkit::ResultCode::kOK;
 	}
 
-	static rkit::Result IndexPlane(uint32_t &outPlaneIndex, rkit::HashMap<IndexedPlane_t, size_t> &planeLookup,
-		rkit::HashMap<BSPVec3_t, size_t> &normalLookup, const BSPPlane &bspPlane)
+	static rkit::Result IndexFlippablePlane(uint32_t &outPlaneIndex, rkit::HashMap<IndexedPlane_t, size_t> &planeLookup,
+		rkit::HashMap<IndexedNormal_t, size_t> &normalLookup, const BSPPlane &bspPlane)
 	{
-		BSPVec3_t normal = {};
-		for (int axis = 0; axis < 3; axis++)
-			normal.m_values[axis] = SanitizeFloatBits(bspPlane.m_normal[axis].GetBits());
-		const uint32_t distBits = SanitizeFloatBits(bspPlane.m_dist.GetBits());
+		IndexedNormal_t indexedNormal = {};
+		bool isNegated = false;
+		data::CompressNormal64NoNegate(indexedNormal.m_values[0], indexedNormal.m_values[1], isNegated, bspPlane.m_normal[0].Get(), bspPlane.m_normal[1].Get(), bspPlane.m_normal[2].Get());
 
-		return IndexPlane(outPlaneIndex, planeLookup, normalLookup, normal, distBits);
+		uint32_t distBits = bspPlane.m_dist.GetBits();
+		if (isNegated)
+			distBits ^= 0x80000000u;
+		distBits = SanitizeFloatBits(distBits);
+
+		uint32_t planeIndex = 0;
+		RKIT_CHECK(IndexNonFlippablePlane(planeIndex, planeLookup, normalLookup, indexedNormal, distBits));
+
+		planeIndex <<= 1;
+		if (isNegated)
+			planeIndex |= 1;
+
+		outPlaneIndex = planeIndex;
+		return rkit::ResultCode::kOK;
 	}
 
 	static rkit::Result EmitFace(bool &outEmitted, BSPGeometryCluster &geoCluster, BSPGeometryClusterLookups &lookups,
-		rkit::HashMap<BSPVec3_t, size_t> &normalLookup,
+		rkit::HashMap<IndexedNormal_t, size_t> &normalLookup,
 		size_t originalFaceIndex, const BSPFaceStats &stats, size_t faceModelIndex,
 		size_t uniqueTexIndex, const BSPDataCollection &bsp, rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> atlasDimensions)
 	{
@@ -2178,7 +2173,7 @@ namespace anox { namespace buildsystem
 			rcpLightmapDimensions[1] = 1.0f / static_cast<float>(lmDimensions16.GetAt<1>());
 		}
 
-		BSPVec3_t normal;
+		rkit::StaticArray<float, 3> normal;
 		for (int axis = 0; axis < 3; axis++)
 		{
 			const uint16_t planeIndex = face.m_plane.Get();
@@ -2190,11 +2185,20 @@ namespace anox { namespace buildsystem
 
 			const BSPPlane &plane = bsp.m_planes[planeIndex];
 
-			normal.m_values[axis] = SanitizeFloatBits(plane.m_normal[axis].GetBits());
+			normal[axis] = plane.m_normal[axis].Get();
 		}
 
-		uint32_t normalIndex = 0;
-		RKIT_CHECK(IndexNormal(normalIndex, normalLookup, normal));
+		uint32_t flippableNormalIndex = 0;
+		{
+			bool isFlipped = false;
+			IndexedNormal_t compressedNormal = {};
+
+			data::CompressNormal64NoNegate(compressedNormal.m_values[0], compressedNormal.m_values[1], isFlipped, normal[0], normal[1], normal[2]);
+			RKIT_CHECK(IndexNonFlippableNormal(flippableNormalIndex, normalLookup, compressedNormal));
+			flippableNormalIndex <<= 1;
+			if (isFlipped)
+				flippableNormalIndex |= 1;
+		}
 
 		for (size_t i = 0; i < numFaceEdges; i++)
 		{
@@ -2284,7 +2288,7 @@ namespace anox { namespace buildsystem
 			bspVert.m_values[4] = texUVBits.m_values[1];
 			bspVert.m_values[5] = lmUVBits.m_values[0];
 			bspVert.m_values[6] = lmUVBits.m_values[1];
-			bspVert.m_values[7] = static_cast<uint32_t>(normalIndex);
+			bspVert.m_values[7] = static_cast<uint32_t>(flippableNormalIndex);
 
 			windingVerts[i] = bspVert;
 		}
@@ -2381,7 +2385,7 @@ namespace anox { namespace buildsystem
 		rkit::Vector<size_t> leafModel;
 		rkit::Vector<size_t> brushOrder;
 
-		rkit::HashMap<BSPVec3_t, size_t> normalLookup;
+		rkit::HashMap<IndexedNormal_t, size_t> normalLookup;
 		rkit::HashMap<IndexedPlane_t, size_t> planeLookup;
 
 		rkit::BoolVector leafUsedBits;
@@ -2399,16 +2403,18 @@ namespace anox { namespace buildsystem
 		// Index axial planes first
 		for (uint32_t axis = 0; axis < 3; axis++)
 		{
-			BSPVec3_t normal = {};
-			for (int subAxis = 0; subAxis < 3; subAxis++)
-				normal.m_values[subAxis] = 0;
+			float normal[3] = { 0.f, 0.f, 0.f };
 
-			normal.m_values[axis] = rkit::math::SoftFloat32(1.0f).ToBits();
+			normal[axis] = 1.f;
+
+			IndexedNormal_t compressedNormal = {};
+			bool negated = false;
+			data::CompressNormal64NoNegate(compressedNormal.m_values[0], compressedNormal.m_values[1], negated, normal[0], normal[1], normal[2]);
 
 			uint32_t normalIndex = 0;
-			RKIT_CHECK(IndexNormal(normalIndex, normalLookup, normal));
+			RKIT_CHECK(IndexNonFlippableNormal(normalIndex, normalLookup, compressedNormal));
 
-			RKIT_ASSERT(normalIndex == (axis << 1));
+			RKIT_ASSERT(normalIndex == axis);
 		}
 
 		// Gather BSP nodes
@@ -2460,7 +2466,7 @@ namespace anox { namespace buildsystem
 					}
 
 					uint32_t outPlaneIndex = 0;
-					RKIT_CHECK(IndexPlane(outPlaneIndex, planeLookup, normalLookup, bsp.m_planes[inPlaneIndex]));
+					RKIT_CHECK(IndexFlippablePlane(outPlaneIndex, planeLookup, normalLookup, bsp.m_planes[inPlaneIndex]));
 
 					int32_t backNode = node.m_back.Get();
 					int32_t frontNode = node.m_front.Get();
@@ -2582,7 +2588,7 @@ namespace anox { namespace buildsystem
 				}
 
 				uint32_t indexedPlane = 0;
-				RKIT_CHECK(IndexPlane(indexedPlane, planeLookup, normalLookup, bsp.m_planes[planeIndex]));
+				RKIT_CHECK(IndexFlippablePlane(indexedPlane, planeLookup, normalLookup, bsp.m_planes[planeIndex]));
 			}
 		}
 
@@ -2899,13 +2905,13 @@ namespace anox { namespace buildsystem
 		RKIT_CHECK(bspOutput.m_brushes.Resize(brushOrder.Count()));
 
 		// Emit normals
-		for (rkit::HashMapKeyValueView<BSPVec3_t, const size_t> it : normalLookup)
+		for (rkit::HashMapKeyValueView<IndexedNormal_t, const size_t> it : normalLookup)
 		{
-			const BSPVec3_t &inNormal = it.Key();
+			const IndexedNormal_t &inNormal = it.Key();
 			data::BSPNormal &outNormal = bspOutput.m_normals[it.Value()];
 
-			for (int axis = 0; axis < 3; axis++)
-				outNormal.m_xyz[axis] = rkit::endian::LittleFloat32_t::FromBits(inNormal.m_values[axis]);
+			outNormal.m_normal.m_part0 = inNormal.m_values[0];
+			outNormal.m_normal.m_part1 = inNormal.m_values[1];
 		}
 
 		// Emit planes
@@ -2918,6 +2924,7 @@ namespace anox { namespace buildsystem
 			outPlane.m_dist = rkit::endian::LittleFloat32_t::FromBits(inPlane.m_values[1]);
 		}
 
+		// Emit BSP tree
 		for (size_t outNodeIndex = 0; outNodeIndex < nodeOrder.Count(); outNodeIndex++)
 		{
 			size_t inNodeIndex = nodeOrder[outNodeIndex];
@@ -2928,7 +2935,7 @@ namespace anox { namespace buildsystem
 			RKIT_ASSERT(nodeUsedBits[inNodeIndex]);
 
 			uint32_t planeIndex = 0;
-			RKIT_CHECK(IndexPlane(planeIndex, planeLookup, normalLookup, bsp.m_planes[inNode.m_plane.Get()]));
+			RKIT_CHECK(IndexFlippablePlane(planeIndex, planeLookup, normalLookup, bsp.m_planes[inNode.m_plane.Get()]));
 
 			for (int axis = 0; axis < 3; axis++)
 			{
@@ -2936,6 +2943,7 @@ namespace anox { namespace buildsystem
 				outNode.m_maxBounds[axis] = inNode.m_maxBounds[axis];
 			}
 
+			// Not actually flippable, we just flip the nodes
 			outNode.m_plane = (planeIndex >> 1);
 
 			int32_t inFrontNode = inNode.m_front.Get();
@@ -3035,7 +3043,7 @@ namespace anox { namespace buildsystem
 				}
 
 				uint32_t planeIndex = 0;
-				RKIT_CHECK(IndexPlane(planeIndex, planeLookup, normalLookup, bsp.m_planes[inBrushSide.m_plane.Get()]));
+				RKIT_CHECK(IndexFlippablePlane(planeIndex, planeLookup, normalLookup, bsp.m_planes[inBrushSide.m_plane.Get()]));
 
 				outBrushSide.m_plane = planeIndex;
 

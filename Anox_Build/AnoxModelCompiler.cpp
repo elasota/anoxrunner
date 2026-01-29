@@ -1680,7 +1680,7 @@ namespace anox { namespace buildsystem
 				}
 
 				outBoneIndex.m_boneIndex = 0;
-				outPoint.m_compressedNormal = data::CompressNormal(normal[0], normal[1], normal[2]);
+				outPoint.m_compressedNormal.m_value = data::CompressNormal32(normal[0], normal[1], normal[2]);
 				for (size_t axis = 0; axis < 3; axis++)
 					outPoint.m_point[axis] = inPoint.m_pos[axis];
 			}
@@ -2832,7 +2832,7 @@ namespace anox { namespace buildsystem
 				for (size_t axis = 0; axis < 3; axis++)
 					normal[axis] = normalFloats[normalIndex * 3 + axis].Get();
 
-				outPoint.m_compressedNormal = data::CompressNormal(normal[0], normal[1], normal[2]);
+				outPoint.m_compressedNormal.m_value = data::CompressNormal32(normal[0], normal[1], normal[2]);
 			}
 		}
 

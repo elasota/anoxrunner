@@ -2,7 +2,7 @@
 
 namespace anox { namespace data
 {
-	struct CompressedNormal
+	struct CompressedNormal32
 	{
 		// Compressed normal format:
 		// 0: Add primary to X instead of Z
@@ -18,68 +18,79 @@ namespace anox { namespace data
 		// Z = (primary * (1 - bit[0]) + (secondary * (1 - bit[1])) - 8191
 		// X,Y,Z = X,Y,Z * (1 - (bit[2] * 2))
 		// X,Y,Z = normalize(X,Y,Z)
-		rkit::endian::LittleUInt32_t m_compressedNormal;
+		rkit::endian::LittleUInt32_t m_value;
+	};
+
+	struct CompressedNormal64NoNegate
+	{
+		rkit::endian::LittleUInt32_t m_part0;
+		rkit::endian::LittleUInt32_t m_part1;
+	};
+
+	struct CompressedNormal64
+	{
+		rkit::endian::LittleUInt32_t m_part0;
+		rkit::endian::LittleUInt32_t m_part1;
 	};
 } } // anox::data
 
 #include <math.h>
 
-namespace anox { namespace data
-{
-	inline void DecompressNormal(const CompressedNormal &cn, float &outX, float &outY, float &outZ)
+#include "rkit/Math/Functions.h"
+
+namespace anox { namespace data { namespace priv {
+	template<class TPartial, class THighPrecisionInt, class TFloat, int TBits>
+	inline void DecompressNormalTemplate(float &outX, float &outY, float &outZ, TPartial primary, TPartial secondary, bool primaryX, bool secondaryY, bool negate)
 	{
-		const uint32_t bits = cn.m_compressedNormal.GetBits();
+		const TPartial offsetAmount = static_cast<TPartial>(-((1 << (TBits - 1)) - 1));
+		TPartial x = offsetAmount;
+		TPartial y = offsetAmount;
+		TPartial z = offsetAmount;
 
-		const int16_t primary = (bits >> 4) & 0x3fff;
-		const int16_t secondary = (bits >> 18) & 0x3fff;
-
-		int16_t x = -8191;
-		int16_t y = -8191;
-		int16_t z = -8191;
-
-		if (bits & 1)
+		if (primaryX)
 			x += primary;
 		else
 			z += primary;
 
-		if (bits & 2)
+		if (secondaryY)
 			y += secondary;
 		else
 			z += secondary;
 
-		if (bits & 4)
+		const THighPrecisionInt xsq = static_cast<THighPrecisionInt>(x) * x;
+		const THighPrecisionInt ysq = static_cast<THighPrecisionInt>(y) * y;
+		const THighPrecisionInt zsq = static_cast<THighPrecisionInt>(z) * z;
+
+		if (negate)
 		{
 			x = -x;
 			y = -y;
 			z = -z;
 		}
 
-		const int32_t xsq = static_cast<int32_t>(x) * x;
-		const int32_t ysq = static_cast<int32_t>(y) * y;
-		const int32_t zsq = static_cast<int32_t>(z) * z;
-
-		const double len = sqrt(xsq + ysq + zsq);
+		const TFloat len = rkit::math::SamePrecisionSqrt(static_cast<TFloat>(xsq + ysq + zsq));
 
 		outX = static_cast<float>(x / len);
 		outY = static_cast<float>(y / len);
 		outZ = static_cast<float>(z / len);
 	}
 
-	inline CompressedNormal CompressNormal(float x, float y, float z)
+	template<class TPartial, class TFloat, int TBits>
+	void CompressNormalTemplate(TPartial &outPrimary, TPartial &outSecondary, bool &outPrimaryX, bool &outSecondaryY, bool &outNegate, float x, float y, float z)
 	{
-		const uint32_t kXIsPrimary = 1;
-		const uint32_t kYIsSecondary = 2;
-		const uint32_t kNegate = 4;
-
 		uint32_t channelBits = 0;
 
-		float primary = 0.f;
-		float secondary = 0.f;
-		float magnitude = 0.f;
+		TFloat primary = 0.f;
+		TFloat secondary = 0.f;
+		TFloat magnitude = 0.f;
 
-		const float magX = fabsf(x);
-		const float magY = fabsf(y);
-		const float magZ = fabsf(z);
+		const TFloat magX = rkit::math::SamePrecisionAbs(x);
+		const TFloat magY = rkit::math::SamePrecisionAbs(y);
+		const TFloat magZ = rkit::math::SamePrecisionAbs(z);
+
+		bool secondaryY = false;
+		bool primaryX = false;
+		bool negate = false;
 
 		if (magX > magZ)
 		{
@@ -89,7 +100,7 @@ namespace anox { namespace data
 				primary = z;
 				secondary = y;
 				magnitude = x;
-				channelBits = kYIsSecondary;
+				secondaryY = true;
 			}
 			else
 			{
@@ -97,7 +108,7 @@ namespace anox { namespace data
 				primary = x;
 				secondary = z;
 				magnitude = y;
-				channelBits = kXIsPrimary;
+				primaryX = true;
 			}
 		}
 		else
@@ -108,7 +119,8 @@ namespace anox { namespace data
 				primary = x;
 				secondary = y;
 				magnitude = z;
-				channelBits = (kXIsPrimary | kYIsSecondary);
+				primaryX = true;
+				secondaryY = true;
 			}
 			else
 			{
@@ -116,12 +128,12 @@ namespace anox { namespace data
 				primary = x;
 				secondary = z;
 				magnitude = y;
-				channelBits = kXIsPrimary;
+				primaryX = true;
 			}
 		}
 
 		if (magnitude > 0)
-			channelBits |= kNegate;
+			negate = true;
 
 		primary /= -magnitude;
 		secondary /= -magnitude;
@@ -136,14 +148,118 @@ namespace anox { namespace data
 		else if (secondary > 1.0f)
 			secondary = 1.0f;
 
-		const uint32_t primaryAdjusted = static_cast<uint32_t>(floorf(primary * 8191.0f + 8191.5f));
-		const uint32_t secondaryAdjusted = static_cast<uint32_t>(floorf(secondary * 8191.0f + 8191.5f));
+		const uint32_t intHalf = (static_cast<uint32_t>(1) << (TBits - 1)) - 1u;
+		const TFloat floatHalf = static_cast<TFloat>(intHalf);
+		const TFloat floatHalfPlusOneHalf = floatHalf + 0.5f;
 
-		const uint32_t packedBits = (primaryAdjusted << 4) | (secondaryAdjusted << 18) | channelBits;
+		const uint32_t primaryAdjusted = static_cast<uint32_t>(rkit::math::SamePrecisionFloor<TFloat>(primary * floatHalf + floatHalfPlusOneHalf));
+		const uint32_t secondaryAdjusted = static_cast<uint32_t>(rkit::math::SamePrecisionFloor<TFloat>(secondary * floatHalf + floatHalfPlusOneHalf));
 
-		CompressedNormal result;
-		result.m_compressedNormal = packedBits;
+		outPrimary = static_cast<TPartial>(primaryAdjusted);
+		outSecondary = static_cast<TPartial>(secondaryAdjusted);
 
-		return result;
+		outPrimaryX = primaryX;
+		outSecondaryY = secondaryY;
+		outNegate = negate;
+	}
+} } } // anox::data::priv
+
+namespace anox { namespace data {
+	inline void DecompressNormal32(uint32_t bits, float &outX, float &outY, float &outZ)
+	{
+		const int16_t primary = (bits >> 4) & 0x3fff;
+		const int16_t secondary = (bits >> 18) & 0x3fff;
+
+		const bool primaryX = ((bits & 1) != 0);
+		const bool secondaryY = ((bits & 2) != 0);
+		const bool negate = ((bits & 4) != 0);
+
+		return priv::DecompressNormalTemplate<int16_t, int32_t, float, 14>(outX, outY, outZ, primary, secondary, primaryX, secondaryY, negate);
+	}
+
+	inline uint32_t CompressNormal32(float x, float y, float z)
+	{
+		uint32_t primary = 0;
+		uint32_t secondary = 0;
+		bool primaryX = false;
+		bool secondaryY = false;
+		bool negate = false;
+		priv::CompressNormalTemplate<uint32_t, float, 14>(primary, secondary, primaryX, secondaryY, negate, x, y, z);
+
+		uint32_t packed = (primary << 4) | (secondary << 18);
+		if (primaryX)
+			packed |= 1;
+		if (secondaryY)
+			packed |= 2;
+		if (negate)
+			packed |= 4;
+
+		return packed;
+	}
+
+	inline void DecompressNormal64(uint32_t part0, uint32_t part1, float &outX, float &outY, float &outZ)
+	{
+		const int32_t primary = static_cast<int32_t>(part0 & 0x3fffffffu);
+		const int32_t secondary = static_cast<int32_t>(part1 & 0x3fffffffu);
+
+		const bool primaryX = ((part0 & 0x40000000u) != 0);
+		const bool secondaryY = ((part1 & 0x40000000u) != 0);
+		const bool negate = ((part0 & 0x80000000u) != 0);
+
+		return priv::DecompressNormalTemplate<int32_t, int64_t, double, 30>(outX, outY, outZ, primary, secondary, primaryX, secondaryY, negate);
+	}
+
+	inline void DecompressNormal64NoNegate(uint32_t part0, uint32_t part1, float &outX, float &outY, float &outZ)
+	{
+		const int32_t primary = static_cast<int32_t>(part0 & 0x7fffffffu);
+		const int32_t secondary = static_cast<int32_t>(part1 & 0x7fffffffu);
+
+		const bool primaryX = ((part0 & 0x80000000u) != 0);
+		const bool secondaryY = ((part1 & 0x80000000u) != 0);
+
+		return priv::DecompressNormalTemplate<int32_t, int64_t, double, 31>(outX, outY, outZ, primary, secondary, primaryX, secondaryY, false);
+	}
+
+	inline void CompressNormal64(uint32_t &outPart0, uint32_t &outPart1, float x, float y, float z)
+	{
+		uint32_t primary = 0;
+		uint32_t secondary = 0;
+		bool primaryX = false;
+		bool secondaryY = false;
+		bool negate = false;
+		priv::CompressNormalTemplate<uint32_t, double, 31>(primary, secondary, primaryX, secondaryY, negate, x, y, z);
+
+		uint32_t part0 = primary;
+		uint32_t part1 = secondary;
+		if (primaryX)
+			part0 |= 0x40000000u;
+		if (secondaryY)
+			part1 |= 0x40000000u;
+		if (negate)
+			part0 |= 0x80000000u;
+
+		outPart0 = part0;
+		outPart1 = part1;
+	}
+
+	inline void CompressNormal64NoNegate(uint32_t &outPart0, uint32_t &outPart1, bool &outWasNegated, float x, float y, float z)
+	{
+		uint32_t primary = 0;
+		uint32_t secondary = 0;
+		bool primaryX = false;
+		bool secondaryY = false;
+		bool negate = false;
+		priv::CompressNormalTemplate<uint32_t, double, 31>(primary, secondary, primaryX, secondaryY, negate, x, y, z);
+
+		uint32_t part0 = primary;
+		uint32_t part1 = secondary;
+		if (primaryX)
+			part0 |= 0x80000000u;
+		if (secondaryY)
+			part1 |= 0x80000000u;
+
+		outPart0 = part0;
+		outPart1 = part1;
+		outWasNegated = negate;
 	}
 } } // anox::data

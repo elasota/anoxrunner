@@ -1,8 +1,10 @@
 #include "AnoxBSPModelResource.h"
 #include "AnoxMaterialResource.h"
 #include "AnoxAbstractSingleFileResource.h"
+#include "anox/AnoxGraphicsSubsystem.h"
 #include "AnoxGameFileSystem.h"
 
+#include "anox/Data/CompressedNormal.h"
 #include "anox/Data/BSPModel.h"
 
 #include "anox/Data/EntityStructs.h"
@@ -22,24 +24,12 @@
 
 namespace anox
 {
+	struct AnoxBSPModelLoaderInfo;
+
 	class AnoxBSPModelResource final : public AnoxBSPModelResourceBase
 	{
 	public:
-		rkit::Vector<rkit::math::Vec3> &ModifyNormals();
-		rkit::Vector<Plane> &ModifyPlanes();
-		rkit::Vector<TreeNode> &ModifyTreeNodes();
-		rkit::Vector<Model> &ModifyModels();
-		rkit::Vector<Leaf> &ModifyLeafs();
-		rkit::Vector<uint16_t> &ModifyLeafBrushes();
-		rkit::Vector<Brush> &ModifyBrushes();
-		rkit::Vector<BrushSide> &ModifyBrushSides();
-		rkit::Vector<DrawSurfaceLocator> &ModifyModel0LeafDrawSurfaceLocators();
-		rkit::Vector<DrawSurface> &ModifyDrawSurfaces();
-		rkit::Vector<DrawLightmapGroup> &ModifyDrawLightmapGroups();
-		rkit::Vector<DrawMaterialGroup> &ModifyDrawMaterialGroups();
-		rkit::Vector<DrawModelGroup> &ModifyDrawModelGroups();
-		rkit::Vector<DrawCluster> &ModifyDrawClusters();
-		rkit::Vector<DrawClusterModelGroupRef> &ModifyDrawClusterModelGroupRefs();
+		friend struct AnoxBSPModelLoaderInfo;
 
 	private:
 		rkit::Vector<rkit::math::Vec3> m_normals;
@@ -57,6 +47,10 @@ namespace anox
 		rkit::Vector<DrawModelGroup> m_drawModelGroups;
 		rkit::Vector<DrawCluster> m_drawClusters;
 		rkit::Vector<DrawClusterModelGroupRef> m_drawClusterModelGroupRefs;
+
+		rkit::RCPtr<IBuffer> m_vertexBuffer;
+		rkit::RCPtr<IBuffer> m_indexBuffer;
+		rkit::RCPtr<IBuffer> m_normalsBuffer;
 	};
 
 	struct AnoxBSPModelResourceGPUResources final : public rkit::RefCounted
@@ -71,12 +65,26 @@ namespace anox
 
 		struct DrawNormal
 		{
-			float m_normal[3];
+			uint32_t m_part0;
+			uint32_t m_part1;
+		};
+
+		struct InitCopyOp
+		{
+			BufferInitializer m_initializer;
+			BufferInitializer::CopyOperation m_copyOp;
 		};
 
 		rkit::Vector<DrawVert> m_verts;
 		rkit::Vector<DrawNormal> m_normals;
 		rkit::Vector<uint16_t> m_triIndexes;
+
+		InitCopyOp m_vertsInitCopy;
+		InitCopyOp m_normalsInitCopy;
+		InitCopyOp m_indexesInitCopy;
+
+		// Keepalive for buffer upload tasks, since it stores the destination buffers
+		rkit::RCPtr<AnoxResourceBase> m_resourceKeepAlive;
 	};
 
 	struct AnoxBSPModelResourceLoaderState final : public AnoxAbstractSingleFileResourceLoaderState
@@ -110,81 +118,6 @@ namespace anox
 			rkit::FixedSizeMemoryStream &m_readStream;
 		};
 	};
-
-	rkit::Vector<rkit::math::Vec3> &AnoxBSPModelResource::ModifyNormals()
-	{
-		return m_normals;
-	}
-
-	rkit::Vector<AnoxBSPModelResource::Plane> &AnoxBSPModelResource::ModifyPlanes()
-	{
-		return m_planes;
-	}
-
-	rkit::Vector<AnoxBSPModelResource::TreeNode> &AnoxBSPModelResource::ModifyTreeNodes()
-	{
-		return m_treeNodes;
-	}
-
-	rkit::Vector<AnoxBSPModelResource::Model> &AnoxBSPModelResource::ModifyModels()
-	{
-		return m_models;
-	}
-
-	rkit::Vector<AnoxBSPModelResource::Leaf> &AnoxBSPModelResource::ModifyLeafs()
-	{
-		return m_leafs;
-	}
-
-	rkit::Vector<uint16_t> &AnoxBSPModelResource::ModifyLeafBrushes()
-	{
-		return m_leafBrushes;
-	}
-
-	rkit::Vector<AnoxBSPModelResource::Brush> &AnoxBSPModelResource::ModifyBrushes()
-	{
-		return m_brushes;
-	}
-
-	rkit::Vector<AnoxBSPModelResource::BrushSide> &AnoxBSPModelResource::ModifyBrushSides()
-	{
-		return m_brushSides;
-	}
-
-	rkit::Vector<AnoxBSPModelResource::DrawSurfaceLocator> &AnoxBSPModelResource::ModifyModel0LeafDrawSurfaceLocators()
-	{
-		return m_model0LeafDrawSurfaceLocators;
-	}
-
-	rkit::Vector<AnoxBSPModelResource::DrawSurface> &AnoxBSPModelResource::ModifyDrawSurfaces()
-	{
-		return m_drawSurfaces;
-	}
-
-	rkit::Vector<AnoxBSPModelResource::DrawLightmapGroup> &AnoxBSPModelResource::ModifyDrawLightmapGroups()
-	{
-		return m_drawLightmapGroups;
-	}
-
-	rkit::Vector<AnoxBSPModelResource::DrawMaterialGroup> &AnoxBSPModelResource::ModifyDrawMaterialGroups()
-	{
-		return m_drawMaterialGroups;
-	}
-
-	rkit::Vector<AnoxBSPModelResource::DrawModelGroup> &AnoxBSPModelResource::ModifyDrawModelGroups()
-	{
-		return m_drawModelGroups;
-	}
-
-	rkit::Vector<AnoxBSPModelResource::DrawCluster> &AnoxBSPModelResource::ModifyDrawClusters()
-	{
-		return m_drawClusters;
-	}
-
-	rkit::Vector<AnoxBSPModelResource::DrawClusterModelGroupRef> &AnoxBSPModelResource::ModifyDrawClusterModelGroupRefs()
-	{
-		return m_drawClusterModelGroupRefs;
-	}
 
 	rkit::Result AnoxBSPModelLoaderInfo::LoadHeaderAndQueueDependencies(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
 	{
@@ -227,8 +160,6 @@ namespace anox
 			RKIT_CHECK(outDeps.Append(job));
 		}
 
-		static_assert(sizeof(data::BSPNormal) == 12, "Wrong normal size");
-
 		const size_t numLightmaps = chunks.m_lightmaps.Count();
 		const size_t numMaterials = chunks.m_materials.Count();
 		const uint32_t numNormals = static_cast<uint32_t>(chunks.m_normals.Count());
@@ -255,20 +186,13 @@ namespace anox
 
 		const uint32_t numDrawTris = numDrawTriIndexes / 3u;
 
-		rkit::Vector<rkit::math::Vec3> &outNormals = resource.ModifyNormals();
+		rkit::Vector<rkit::math::Vec3> &outNormals = resource.m_normals;
 		RKIT_CHECK(outNormals.Resize(numNormals));
 
 		rkit::ProcessParallelSpans(outNormals.ToSpan(), chunks.m_normals,
 			[](rkit::math::Vec3 &outNormal, const data::BSPNormal &inNormal)
 			{
-				float sanitizedNormal[3] =
-				{
-					rkit::sanitizers::SanitizeClampFloat(inNormal.m_xyz[0], 1),
-					rkit::sanitizers::SanitizeClampFloat(inNormal.m_xyz[1], 1),
-					rkit::sanitizers::SanitizeClampFloat(inNormal.m_xyz[2], 1),
-				};
-
-				outNormal = rkit::math::Vec3::FromArray(sanitizedNormal);
+				data::DecompressNormal64NoNegate(inNormal.m_normal.m_part0.Get(), inNormal.m_normal.m_part1.Get(), outNormal[0], outNormal[1], outNormal[2]);
 			});
 
 		if (numPlanes >= 0x80000000u || numLeafs >= 0x80000000u || numTreeNodes >= 0x80000000u)
@@ -279,8 +203,8 @@ namespace anox
 
 		const uint32_t maxNormalIndex = numNormals - 1;
 
-		RKIT_CHECK(resource.ModifyPlanes().Resize(numPlanes));
-		rkit::ProcessParallelSpans(resource.ModifyPlanes().ToSpan(), chunks.m_planes,
+		RKIT_CHECK(resource.m_planes.Resize(numPlanes));
+		rkit::ProcessParallelSpans(resource.m_planes.ToSpan(), chunks.m_planes,
 			[maxNormalIndex](AnoxBSPModelResourceBase::Plane &outPlane, const data::BSPPlane &inPlane)
 			{
 				outPlane.m_dist = rkit::sanitizers::SanitizeClampFloat(inPlane.m_dist, 20);
@@ -288,9 +212,9 @@ namespace anox
 			});
 
 
-		rkit::Vector<AnoxBSPModelResource::TreeNode> &outTreeNodes = resource.ModifyTreeNodes();
-		rkit::Vector<AnoxBSPModelResource::Model> &outModels = resource.ModifyModels();
-		rkit::Vector<AnoxBSPModelResource::Leaf> &outLeafs = resource.ModifyLeafs();
+		rkit::Vector<AnoxBSPModelResource::TreeNode> &outTreeNodes = resource.m_treeNodes;
+		rkit::Vector<AnoxBSPModelResource::Model> &outModels = resource.m_models;
+		rkit::Vector<AnoxBSPModelResource::Leaf> &outLeafs = resource.m_leafs;
 
 		{
 			// Parse BSP tree
@@ -452,7 +376,7 @@ namespace anox
 				return rkit::ResultCode::kDataError;
 		}
 
-		rkit::Vector<uint16_t> &outLeafBrushes = resource.ModifyLeafBrushes();
+		rkit::Vector<uint16_t> &outLeafBrushes = resource.m_leafBrushes;
 
 		RKIT_CHECK(outLeafBrushes.Resize(numLeafBrushes));
 		RKIT_CHECK(outLeafs.Resize(numLeafs));
@@ -473,7 +397,7 @@ namespace anox
 
 			const rkit::Span<const uint16_t> leafBrushesSpan = outLeafBrushes.ToSpan();
 
-			rkit::Result checkResult = rkit::CheckedProcessParallelSpans(resource.ModifyLeafs().ToSpan(), chunks.m_leafs,
+			rkit::Result checkResult = rkit::CheckedProcessParallelSpans(resource.m_leafs.ToSpan(), chunks.m_leafs,
 				[&leafBrushIndex, leafBrushesSpan, numLeafBrushes]
 				(AnoxBSPModelResourceBase::Leaf &outLeaf, const data::BSPTreeLeaf &inLeaf)
 				-> rkit::Result
@@ -512,8 +436,8 @@ namespace anox
 				return rkit::ResultCode::kDataError;
 		}
 
-		rkit::Vector<AnoxBSPModelResource::Brush> &outBrushes = resource.ModifyBrushes();
-		rkit::Vector<AnoxBSPModelResource::BrushSide> &outBrushSides = resource.ModifyBrushSides();
+		rkit::Vector<AnoxBSPModelResource::Brush> &outBrushes = resource.m_brushes;
+		rkit::Vector<AnoxBSPModelResource::BrushSide> &outBrushSides = resource.m_brushSides;
 		RKIT_CHECK(outBrushes.Resize(numBrushes));
 		RKIT_CHECK(outBrushSides.Resize(numBrushSides));
 
@@ -562,12 +486,12 @@ namespace anox
 				});
 		}
 
-		const size_t model0LeafCount = resource.ModifyModels()[0].m_numLeafs;
+		const size_t model0LeafCount = resource.m_models[0].m_numLeafs;
 
 		if (chunks.m_model0LeafDrawSurfaceLocatorCounts.Count() != model0LeafCount)
 			return rkit::ResultCode::kDataError;
 
-		rkit::Vector<AnoxBSPModelResource::DrawSurfaceLocator> &outModel0LeafDrawSurfaceLocators = resource.ModifyModel0LeafDrawSurfaceLocators();
+		rkit::Vector<AnoxBSPModelResource::DrawSurfaceLocator> &outModel0LeafDrawSurfaceLocators = resource.m_model0LeafDrawSurfaceLocators;
 		RKIT_CHECK(outModel0LeafDrawSurfaceLocators.Resize(numModel0LeafDrawSurfaceLocators));
 
 		{
@@ -584,7 +508,7 @@ namespace anox
 
 			uint32_t locatorStartIndex = 0;
 
-			const rkit::Span<AnoxBSPModelResource::DrawSurfaceLocator> locatorsSpan = resource.ModifyModel0LeafDrawSurfaceLocators().ToSpan();
+			const rkit::Span<AnoxBSPModelResource::DrawSurfaceLocator> locatorsSpan = outModel0LeafDrawSurfaceLocators.ToSpan();
 
 			rkit::Result checkResult = rkit::CheckedProcessParallelSpans(
 				outLeafs.ToSpan().SubSpan(0, outModels[0].m_numLeafs), chunks.m_model0LeafDrawSurfaceLocatorCounts,
@@ -626,16 +550,22 @@ namespace anox
 		rkit::RCPtr<AnoxBSPModelResourceGPUResources> gpuResources;
 		RKIT_CHECK(rkit::New<AnoxBSPModelResourceGPUResources>(gpuResources));
 
+		gpuResources->m_resourceKeepAlive = state.m_resource;
+
 		RKIT_CHECK(gpuResources->m_normals.Resize(numNormals));
 
 		{
 			rkit::Vector<AnoxBSPModelResourceGPUResources::DrawNormal> &outDrawNormals = gpuResources->m_normals;
 			RKIT_CHECK(outDrawNormals.Resize(numNormals));
 
-			rkit::ProcessParallelSpans(outDrawNormals.ToSpan(), outNormals.ToSpan(),
-				[](AnoxBSPModelResourceGPUResources::DrawNormal &outNormal, const rkit::math::Vec3 &inNormal)
+			rkit::ProcessParallelSpans(outDrawNormals.ToSpan(), chunks.m_normals,
+				[](AnoxBSPModelResourceGPUResources::DrawNormal &outNormal, const data::BSPNormal &inNormal)
 				{
-					inNormal.WriteToArray(outNormal.m_normal);
+					const uint32_t part0 = inNormal.m_normal.m_part0.Get();
+					const uint32_t part1 = inNormal.m_normal.m_part1.Get();
+
+					outNormal.m_part0 = part0;
+					outNormal.m_part1 = part1;
 				});
 		}
 
@@ -660,7 +590,7 @@ namespace anox
 				});
 		}
 
-		rkit::Vector<AnoxBSPModelResource::DrawSurface> &outDrawSurfaces = resource.ModifyDrawSurfaces();
+		rkit::Vector<AnoxBSPModelResource::DrawSurface> &outDrawSurfaces = resource.m_drawSurfaces;
 
 		if (numDrawVerts > 0)
 		{
@@ -697,7 +627,7 @@ namespace anox
 		{
 			uint32_t firstDrawSurfaceIndex = 0;
 
-			rkit::Vector<AnoxBSPModelResource::DrawLightmapGroup> &outLightmapGroups = resource.ModifyDrawLightmapGroups();
+			rkit::Vector<AnoxBSPModelResource::DrawLightmapGroup> &outLightmapGroups = resource.m_drawLightmapGroups;
 			RKIT_CHECK(outLightmapGroups.Resize(numDrawLightmapGroups));
 
 			const rkit::Span<AnoxBSPModelResource::DrawSurface> drawSurfacesSpan = outDrawSurfaces.ToSpan();
@@ -738,10 +668,10 @@ namespace anox
 		{
 			uint32_t firstLightmapGroupIndex = 0;
 
-			rkit::Vector<AnoxBSPModelResource::DrawMaterialGroup> &outMaterialGroups = resource.ModifyDrawMaterialGroups();
+			rkit::Vector<AnoxBSPModelResource::DrawMaterialGroup> &outMaterialGroups = resource.m_drawMaterialGroups;
 			RKIT_CHECK(outMaterialGroups.Resize(numDrawMaterialGroups));
 
-			const rkit::Span<AnoxBSPModelResource::DrawLightmapGroup> drawLightmapGroupSpan = resource.ModifyDrawLightmapGroups().ToSpan();
+			const rkit::Span<AnoxBSPModelResource::DrawLightmapGroup> drawLightmapGroupSpan = resource.m_drawLightmapGroups.ToSpan();
 
 			rkit::Result checkResult = rkit::CheckedProcessParallelSpans(outMaterialGroups.ToSpan(), chunks.m_materialGroups,
 				[&firstLightmapGroupIndex, numDrawLightmapGroups, numMaterials, drawLightmapGroupSpan]
@@ -779,10 +709,10 @@ namespace anox
 		{
 			uint32_t firstMaterialGroupIndex = 0;
 
-			rkit::Vector<AnoxBSPModelResource::DrawModelGroup> &outModelGroups = resource.ModifyDrawModelGroups();
+			rkit::Vector<AnoxBSPModelResource::DrawModelGroup> &outModelGroups = resource.m_drawModelGroups;
 			RKIT_CHECK(outModelGroups.Resize(numDrawModelGroups));
 
-			const rkit::Span<AnoxBSPModelResource::DrawMaterialGroup> materialGroupsSpan = resource.ModifyDrawMaterialGroups().ToSpan();
+			const rkit::Span<AnoxBSPModelResource::DrawMaterialGroup> materialGroupsSpan = resource.m_drawMaterialGroups.ToSpan();
 
 			rkit::Result checkResult = rkit::CheckedProcessParallelSpans(outModelGroups.ToSpan(), chunks.m_drawModelGroups,
 				[&firstMaterialGroupIndex, numDrawMaterialGroups, materialGroupsSpan]
@@ -818,10 +748,10 @@ namespace anox
 		{
 			uint32_t firstModelGroupIndex = 0;
 
-			rkit::Vector<AnoxBSPModelResource::DrawCluster> &outClusters = resource.ModifyDrawClusters();
+			rkit::Vector<AnoxBSPModelResource::DrawCluster> &outClusters = resource.m_drawClusters;
 			RKIT_CHECK(outClusters.Resize(numDrawClusters));
 
-			const rkit::Span<AnoxBSPModelResource::DrawModelGroup> modelGroupsSpan = resource.ModifyDrawModelGroups().ToSpan();
+			const rkit::Span<AnoxBSPModelResource::DrawModelGroup> modelGroupsSpan = resource.m_drawModelGroups.ToSpan();
 
 			rkit::Result checkResult = rkit::CheckedProcessParallelSpans(outClusters.ToSpan(), chunks.m_drawClusters,
 				[&firstModelGroupIndex, numDrawModelGroups, modelGroupsSpan]
@@ -858,7 +788,7 @@ namespace anox
 		{
 			uint32_t firstVertIndex = 0;
 
-			for (AnoxBSPModelResource::DrawCluster &cluster : resource.ModifyDrawClusters().ToSpan())
+			for (AnoxBSPModelResource::DrawCluster &cluster : resource.m_drawClusters.ToSpan())
 			{
 				const uint32_t numAvailableVerts = numDrawVerts - firstVertIndex;
 				const uint32_t clusterNumVerts = cluster.m_numVerts;
@@ -890,7 +820,7 @@ namespace anox
 			uint32_t firstDrawSurfaceIndex = 0;
 			uint32_t firstModelDrawClusterModelGroupRefIndex = 0;
 
-			for (AnoxBSPModelResource::Model &model : resource.ModifyModels())
+			for (AnoxBSPModelResource::Model &model : resource.m_models)
 			{
 				const uint32_t availableDrawSurfaces = numDrawSurfaces - firstDrawSurfaceIndex;
 				const uint32_t availableModelDrawClusterModelGroupRefs = numModelDrawClusterModelGroupRefs - firstModelDrawClusterModelGroupRefIndex;
@@ -909,7 +839,7 @@ namespace anox
 			if (firstDrawSurfaceIndex != numDrawSurfaces || firstModelDrawClusterModelGroupRefIndex != numModelDrawClusterModelGroupRefs)
 				return rkit::ResultCode::kDataError;
 
-			rkit::Vector<AnoxBSPModelResource::DrawClusterModelGroupRef> &outRefs = resource.ModifyDrawClusterModelGroupRefs();
+			rkit::Vector<AnoxBSPModelResource::DrawClusterModelGroupRef> &outRefs = resource.m_drawClusterModelGroupRefs;
 
 			RKIT_CHECK(outRefs.Resize(numModelDrawClusterModelGroupRefs));
 
@@ -922,10 +852,10 @@ namespace anox
 
 			const AnoxBSPModelResource::DrawSurface *drawSurfacesPtr = outDrawSurfaces.GetBuffer();
 
-			const rkit::Span<const AnoxBSPModelResource::DrawCluster> clustersSpan = resource.ModifyDrawClusters().ToSpan();
+			const rkit::Span<const AnoxBSPModelResource::DrawCluster> clustersSpan = resource.m_drawClusters.ToSpan();
 			const rkit::Span<const AnoxBSPModelResource::DrawClusterModelGroupRef> allRefsSpan = outRefs.ToSpan();
 
-			for (const AnoxBSPModelResource::Model &model : resource.ModifyModels())
+			for (const AnoxBSPModelResource::Model &model : resource.m_models)
 			{
 				const rkit::Span<const AnoxBSPModelResource::DrawClusterModelGroupRef> refs = allRefsSpan.SubSpan(model.m_firstModelDrawClusterModelGroupRefIndex, model.m_numModelDrawClusterModelGroups);
 
@@ -955,8 +885,68 @@ namespace anox
 			}
 		}
 
-		// TODO: Post graphic uploads
+		// Post vertex buffer upload
+		{
+			rkit::RCPtr<rkit::Job> uploadJob;
 
+			AnoxBSPModelResourceGPUResources::InitCopyOp &vertexInitCopy = gpuResources->m_vertsInitCopy;
+			BufferInitializer::CopyOperation &copyOp = vertexInitCopy.m_copyOp;
+			BufferInitializer &initializer = vertexInitCopy.m_initializer;
+
+			copyOp.m_data = gpuResources->m_verts.ToSpan().ReinterpretCast<const uint8_t>();
+			copyOp.m_offset = 0;
+			initializer.m_copyOperations = rkit::ConstSpan<BufferInitializer::CopyOperation>(&copyOp, 1);
+			initializer.m_spec.m_size = copyOp.m_data.Count();
+			initializer.m_resSpec.m_usage.Add({ rkit::render::BufferUsageFlag::kVertexBuffer });
+
+			RKIT_CHECK(state.m_systems.m_graphicsSystem->CreateAsyncCreateAndFillBufferJob(&uploadJob,
+				resource.m_vertexBuffer,
+				gpuResources.FieldRef(&AnoxBSPModelResourceGPUResources::m_vertsInitCopy).FieldRef(&AnoxBSPModelResourceGPUResources::InitCopyOp::m_initializer),
+				nullptr));
+			RKIT_CHECK(outDeps.Append(uploadJob));
+		}
+
+		// Post index buffer upload
+		{
+			rkit::RCPtr<rkit::Job> uploadJob;
+
+			AnoxBSPModelResourceGPUResources::InitCopyOp &indexInitCopy = gpuResources->m_indexesInitCopy;
+			BufferInitializer::CopyOperation &copyOp = indexInitCopy.m_copyOp;
+			BufferInitializer &initializer = indexInitCopy.m_initializer;
+
+			copyOp.m_data = gpuResources->m_triIndexes.ToSpan().ReinterpretCast<const uint8_t>();
+			copyOp.m_offset = 0;
+			initializer.m_copyOperations = rkit::ConstSpan<BufferInitializer::CopyOperation>(&copyOp, 1);
+			initializer.m_spec.m_size = copyOp.m_data.Count();
+			initializer.m_resSpec.m_usage.Add({ rkit::render::BufferUsageFlag::kStorageBuffer });
+
+			RKIT_CHECK(state.m_systems.m_graphicsSystem->CreateAsyncCreateAndFillBufferJob(&uploadJob,
+				resource.m_vertexBuffer,
+				gpuResources.FieldRef(&AnoxBSPModelResourceGPUResources::m_indexesInitCopy).FieldRef(&AnoxBSPModelResourceGPUResources::InitCopyOp::m_initializer),
+				nullptr));
+			RKIT_CHECK(outDeps.Append(uploadJob));
+		}
+
+		// Post normal buffer upload
+		{
+			rkit::RCPtr<rkit::Job> uploadJob;
+
+			AnoxBSPModelResourceGPUResources::InitCopyOp &indexInitCopy = gpuResources->m_normalsInitCopy;
+			BufferInitializer::CopyOperation &copyOp = indexInitCopy.m_copyOp;
+			BufferInitializer &initializer = indexInitCopy.m_initializer;
+
+			copyOp.m_data = gpuResources->m_normals.ToSpan().ReinterpretCast<const uint8_t>();
+			copyOp.m_offset = 0;
+			initializer.m_copyOperations = rkit::ConstSpan<BufferInitializer::CopyOperation>(&copyOp, 1);
+			initializer.m_spec.m_size = copyOp.m_data.Count();
+			initializer.m_resSpec.m_usage.Add({ rkit::render::BufferUsageFlag::kStorageBuffer });
+
+			RKIT_CHECK(state.m_systems.m_graphicsSystem->CreateAsyncCreateAndFillBufferJob(&uploadJob,
+				resource.m_vertexBuffer,
+				gpuResources.FieldRef(&AnoxBSPModelResourceGPUResources::m_normalsInitCopy).FieldRef(&AnoxBSPModelResourceGPUResources::InitCopyOp::m_initializer),
+				nullptr));
+			RKIT_CHECK(outDeps.Append(uploadJob));
+		}
 
 		return rkit::ResultCode::kOK;
 	}

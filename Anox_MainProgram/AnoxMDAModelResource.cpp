@@ -847,7 +847,7 @@ namespace anox
 	{
 		for (data::MDAModelPoint &pt : points)
 		{
-			pt.m_compressedNormal.m_compressedNormal.ConvertToHostOrderInPlace();
+			pt.m_compressedNormal.m_value.ConvertToHostOrderInPlace();
 			for (rkit::endian::LittleFloat32_t &pointElement : pt.m_point)
 				pointElement.ConvertToHostOrderInPlace();
 		}

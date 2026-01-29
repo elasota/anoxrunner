@@ -197,7 +197,7 @@ namespace anox { namespace data
 	struct MDAModelPoint
 	{
 		rkit::endian::LittleFloat32_t m_point[3];
-		CompressedNormal m_compressedNormal;
+		CompressedNormal32 m_compressedNormal;
 	};
 
 	struct MDAModelVertMorph

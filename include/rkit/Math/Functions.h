@@ -1,3 +1,5 @@
+#pragma once
+
 #include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/CoreLib.h"
 #include "rkit/Core/Platform.h"
@@ -5,6 +7,29 @@
 #if RKIT_PLATFORM_ARCH_HAVE_SSE
 #include <immintrin.h>
 #endif
+
+namespace rkit { namespace math { namespace priv {
+	template<class T>
+	struct SamePrecisionMathHelper
+	{
+	};
+
+	template<>
+	struct SamePrecisionMathHelper<float>
+	{
+		static float Sqrt(float f);
+		static float Abs(float f);
+		static float Floor(float f);
+	};
+
+	template<>
+	struct SamePrecisionMathHelper<double>
+	{
+		static double Sqrt(double f);
+		static double Abs(double f);
+		static double Floor(double f);
+	};
+} } }
 
 namespace rkit { namespace math {
 	float RKIT_CORELIB_API SoftwareSqrtf(float f);
@@ -14,6 +39,21 @@ namespace rkit { namespace math {
 namespace rkit { namespace math {
 	float Sqrtf(float f);
 	double Sqrt(double f);
+
+	float Absf(float f);
+	double Abs(double f);
+
+	float Floorf(float f);
+	double Floor(double f);
+
+	template<class T>
+	T SamePrecisionSqrt(const T &value);
+
+	template<class T>
+	T SamePrecisionAbs(const T &value);
+
+	template<class T>
+	T SamePrecisionFloor(const T &value);
 
 	float FastRsqrtDeterministic(float value);
 	float FastRsqrtNonDeterministic(float value);
@@ -29,16 +69,76 @@ namespace rkit { namespace math {
 } }
 
 #include <string.h>
+#include <math.h>
+
+#if RKIT_PLATFORM_ARCH_HAVE_SSE
+#include <xmmintrin.h>
+#endif
 
 #if RKIT_PLATFORM_ARCH_HAVE_SSE2
 #include <emmintrin.h>
+#endif
+
+#if RKIT_PLATFORM_ARCH_HAVE_SSE41
+#include <smmintrin.h>
 #endif
 
 #if RKIT_PLATFORM_ARCH_FAMILY == RKIT_PLATFORM_ARCH_FAMILY_X86
 #include <intrin.h>
 #endif
 
+namespace rkit { namespace math { namespace priv {
+	inline float SamePrecisionMathHelper<float>::Sqrt(float f)
+	{
+		return math::Sqrtf(f);
+	}
+
+	inline float SamePrecisionMathHelper<float>::Abs(float f)
+	{
+		return math::Absf(f);
+	}
+
+	inline float SamePrecisionMathHelper<float>::Floor(float f)
+	{
+		return math::Floorf(f);
+	}
+
+	inline double SamePrecisionMathHelper<double>::Sqrt(double f)
+	{
+		return math::Sqrt(f);
+	}
+
+	inline double SamePrecisionMathHelper<double>::Abs(double f)
+	{
+		return math::Abs(f);
+	}
+
+	inline double SamePrecisionMathHelper<double>::Floor(double f)
+	{
+		return math::Floor(f);
+	}
+} } }
+
 namespace rkit { namespace math {
+
+	template<class T>
+	T SamePrecisionSqrt(const T &value)
+	{
+		return priv::SamePrecisionMathHelper<T>::Sqrt(value);
+	}
+
+	template<class T>
+	T SamePrecisionAbs(const T &value)
+	{
+		return priv::SamePrecisionMathHelper<T>::Abs(value);
+	}
+
+	template<class T>
+	T SamePrecisionFloor(const T &value)
+	{
+		return priv::SamePrecisionMathHelper<T>::Floor(value);
+	}
+
 	// Jan Kadlec - Improving the fast inverse square root
 	inline float FastRsqrtDeterministic(float value)
 	{
@@ -61,6 +161,42 @@ namespace rkit { namespace math {
 		return static_cast<uint32_t>((static_cast<int64_t>(a) * b) >> 32);
 	}
 
+#if RKIT_PLATFORM_ARCH_HAVE_SSE41
+	inline double Floor(double f)
+	{
+		return _mm_cvtsd_f64(_mm_floor_sd(_mm_setzero_pd(), _mm_load_sd(&f)));
+	}
+#else
+	inline double Floor(double f)
+	{
+		return ::floor(f);
+	}
+#endif
+
+#if RKIT_PLATFORM_ARCH_HAVE_SSE41
+	inline float Floorf(float f)
+	{
+		return _mm_cvtss_f32(_mm_floor_ss(_mm_setzero_ps(), _mm_load_ss(&f)));
+	}
+#else
+	inline double Floor(double f)
+	{
+		return ::floorf(f);
+	}
+#endif
+
+#if RKIT_PLATFORM_ARCH_HAVE_SSE2
+	inline double Sqrt(double f)
+	{
+		return _mm_cvtsd_f64(_mm_sqrt_sd(_mm_setzero_pd(), _mm_load_sd(&f)));
+	}
+#else
+	inline double Sqrt(double f)
+	{
+		return ::sqrt(f);
+	}
+#endif
+
 #if RKIT_PLATFORM_ARCH_HAVE_SSE
 	inline float Sqrtf(float f)
 	{
@@ -70,6 +206,16 @@ namespace rkit { namespace math {
 	inline float FastRsqrtNonDeterministic(float value)
 	{
 		return _mm_cvtss_f32(_mm_rsqrt_ss(_mm_load_ss(&value)));
+	}
+#else
+	inline float Sqrtf(float f)
+	{
+		return ::sqrtf(f);
+	}
+
+	inline float FastRsqrtNonDeterministic(float value)
+	{
+		return FastRsqrtDeterministic(value);
 	}
 #endif
 
@@ -172,4 +318,14 @@ namespace rkit { namespace math {
 		outHigh = static_cast<int64_t>(accum2);
 	}
 #endif
+
+	inline float Absf(float f)
+	{
+		return ::fabsf(f);
+	}
+
+	inline double Abs(double f)
+	{
+		return ::fabs(f);
+	}
 } }

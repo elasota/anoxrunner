@@ -44,7 +44,7 @@ namespace anox { namespace data {
 
 	struct BSPNormal
 	{
-		rkit::endian::LittleFloat32_t m_xyz[3];
+		CompressedNormal64NoNegate m_normal;
 	};
 
 	struct BSPPlane
