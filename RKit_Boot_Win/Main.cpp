@@ -24,23 +24,24 @@ namespace rkit
 {
 	struct ModuleDriver_Win32 final : public IModuleDriver
 	{
-		IModule *LoadModuleInternal(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams, IMallocDriver &mallocDriver) override;
+		IModule *LoadModuleInternal(uint32_t moduleNamespace, const Utf8Char_t *moduleName, const ModuleInitParameters *initParams, IMallocDriver &mallocDriver) override;
 	};
 
 	struct ConsoleLogDriver_Win32 final : public ILogDriver
 	{
 		void LogMessage(LogSeverity severity, const rkit::StringSliceView &msg) override;
-		void VLogMessage(LogSeverity severity, const rkit::StringSliceView &fmt, const FormatParameterList<char> &args) override;
+		void VLogMessage(LogSeverity severity, const rkit::StringSliceView &fmt, const FormatParameterList<Utf8Char_t> &args) override;
 
-		static void FormatMessageToFile(FILE *f, const rkit::StringSliceView &fmt, const FormatParameterList<char> &args);
+		static void FormatMessageToFile(FILE *f, const rkit::StringSliceView &fmt, const FormatParameterList<Utf8Char_t> &args);
 
 	private:
-		class FileOutputFormatter final : public IFormatStringWriter<char>
+		class FileOutputFormatter final : public IFormatStringWriter<Utf8Char_t>
 		{
 		public:
 			explicit FileOutputFormatter(FILE *f);
 
-			void WriteChars(const ConstSpan<char> &chars) override;
+			void WriteChars(const ConstSpan<Utf8Char_t> &chars) override;
+			CharacterEncoding GetEncoding() const override;
 
 		private:
 			FILE *m_f;
@@ -100,15 +101,18 @@ namespace rkit
 	static Win32GlobalsBuffer g_winGlobalsBuffer;
 	static Win32Globals &g_winGlobals = *reinterpret_cast<Win32Globals *>(g_winGlobalsBuffer.m_bytes);
 
-	IModule *ModuleDriver_Win32::LoadModuleInternal(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams, IMallocDriver &mallocDriver)
+	IModule *ModuleDriver_Win32::LoadModuleInternal(uint32_t moduleNamespace, const Utf8Char_t *moduleName, const ModuleInitParameters *initParams, IMallocDriver &mallocDriver)
 	{
+		// FIXME
+		const char *moduleNameAscii = reinterpret_cast<const char *>(moduleName);
+
 		// Base module driver does no deduplication
-		char *nameBuf = static_cast<char *>(mallocDriver.Alloc(strlen(moduleName) + strlen("????_.dll") + 1));
+		char *nameBuf = static_cast<char *>(mallocDriver.Alloc(strlen(moduleNameAscii) + strlen("????_.dll") + 1));
 		if (!nameBuf)
 			return nullptr;
 
 		strcpy(nameBuf, "RKit_");
-		strcat(nameBuf, moduleName);
+		strcat(nameBuf, moduleNameAscii);
 		strcat(nameBuf, ".dll");
 
 		rkit::utils::ExtractFourCC(moduleNamespace, nameBuf[0], nameBuf[1], nameBuf[2], nameBuf[3]);
@@ -170,7 +174,7 @@ namespace rkit
 		}
 	}
 
-	void ConsoleLogDriver_Win32::VLogMessage(LogSeverity severity, const StringSliceView &fmt, const FormatParameterList<char> &args)
+	void ConsoleLogDriver_Win32::VLogMessage(LogSeverity severity, const StringSliceView &fmt, const FormatParameterList<Utf8Char_t> &args)
 	{
 		if (severity == LogSeverity::kInfo)
 		{
@@ -192,7 +196,7 @@ namespace rkit
 	}
 
 
-	void ConsoleLogDriver_Win32::FormatMessageToFile(FILE *f, const rkit::StringSliceView &fmt, const FormatParameterList<char> &args)
+	void ConsoleLogDriver_Win32::FormatMessageToFile(FILE *f, const rkit::StringSliceView &fmt, const FormatParameterList<Utf8Char_t> &args)
 	{
 		FileOutputFormatter outputFormatter(f);
 
@@ -205,9 +209,14 @@ namespace rkit
 	{
 	}
 
-	void ConsoleLogDriver_Win32::FileOutputFormatter::WriteChars(const ConstSpan<char> &chars)
+	void ConsoleLogDriver_Win32::FileOutputFormatter::WriteChars(const ConstSpan<Utf8Char_t> &chars)
 	{
 		fwrite(chars.Ptr(), 1, chars.Count(), m_f);
+	}
+
+	CharacterEncoding ConsoleLogDriver_Win32::FileOutputFormatter::GetEncoding() const
+	{
+		return CharacterEncoding::kUTF8;
 	}
 
 
@@ -391,6 +400,7 @@ namespace rkit
 static int WinMainCommon(HINSTANCE hInstance)
 {
 	setlocale(LC_ALL, "C");
+	::SetConsoleOutputCP(CP_UTF8);
 
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
@@ -407,7 +417,7 @@ static int WinMainCommon(HINSTANCE hInstance)
 	rkit::mem::MemModuleInitParameters memModuleParams = {};
 	memModuleParams.m_mmapDriver = &rkit::g_winGlobals.m_memMapDriver;
 
-	rkit::IModule *memModule = drivers->m_moduleDriver->LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "Mem", &memModuleParams);
+	rkit::IModule *memModule = drivers->m_moduleDriver->LoadModule(::rkit::IModuleDriver::kDefaultNamespace, u8"Mem", &memModuleParams);
 	if (!memModule)
 	{
 		return rkit::utils::ResultToExitCode(rkit::Result(rkit::ResultCode::kModuleLoadFailed));
@@ -417,23 +427,23 @@ static int WinMainCommon(HINSTANCE hInstance)
 	drivers->m_logDriver.m_obj = &rkit::g_winGlobals.m_consoleLogDriver;
 #endif
 
-	rkit::WString16 modulePathStr;
-	rkit::WString16 moduleDirStr;
+	rkit::Utf16String modulePathStr;
+	rkit::Utf16String moduleDirStr;
 
 	{
 		DWORD requiredSize = 16;
 
 		for (;;)
 		{
-			rkit::Vector<wchar_t> moduleFileNameChars;
+			rkit::Vector<rkit::Utf16Char_t> moduleFileNameChars;
 
 			rkit::Result resizeResult = moduleFileNameChars.Resize(requiredSize);
 			if (!rkit::utils::ResultIsOK(resizeResult))
 				return rkit::utils::ResultToExitCode(resizeResult);
 
-			rkit::WStringConstructionBuffer cbuf;
+			rkit::Utf16StringConstructionBuffer cbuf;
 
-			DWORD moduleStrSize = GetModuleFileNameW(nullptr, moduleFileNameChars.GetBuffer(), requiredSize);
+			DWORD moduleStrSize = GetModuleFileNameW(nullptr, reinterpret_cast<wchar_t *>(moduleFileNameChars.GetBuffer()), requiredSize);
 
 			if (moduleStrSize == requiredSize)
 			{
@@ -470,12 +480,12 @@ static int WinMainCommon(HINSTANCE hInstance)
 		modulePathStr.Clear();
 		moduleDirStr.Clear();
 
-		systemModule = ::rkit::g_winGlobals.m_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "System_Win32", &systemParams);
+		systemModule = ::rkit::g_winGlobals.m_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, u8"System_Win32", &systemParams);
 		if (!systemModule)
 			return rkit::utils::ResultToExitCode(rkit::Result(rkit::ResultCode::kModuleLoadFailed));
 	}
 
-	rkit::IModule *programLauncherModule = ::rkit::g_winGlobals.m_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "ProgramLauncher");
+	rkit::IModule *programLauncherModule = ::rkit::g_winGlobals.m_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, u8"ProgramLauncher");
 	if (!programLauncherModule)
 	{
 		systemModule->Unload();

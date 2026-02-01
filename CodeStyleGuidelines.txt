@@ -23,7 +23,7 @@ Do not use malloc/free.  Use IMallocDriver.
 Do not use new/delete.  Use New/Delete from NewDelete.h.
 Do not use new[]/delete[], use vectors.
 
-Private helper functions and templates go in rkit::priv
+Private helper functions and templates go in "priv" namespaces
 
 
 Nested namespace defs that contain definitions use this syntax:
@@ -35,3 +35,9 @@ namespace A { namespace B { namespace C
 
 Namespaces must be closed and reopened between declarations and definitions in
 header files.  This is so that includes can be inserted between them easily.
+
+Do not use #if N
+Use #if N != 0 instead
+
+Do not use wchar_t, use Utf16Char_t and recast it to wchar_t as needed for
+Windows API calls.

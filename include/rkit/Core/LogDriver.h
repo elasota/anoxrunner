@@ -20,7 +20,7 @@ namespace rkit
 		virtual ~ILogDriver() {}
 
 		virtual void LogMessage(LogSeverity severity, const rkit::StringSliceView &msg) = 0;
-		virtual void VLogMessage(LogSeverity severity, const rkit::StringSliceView &msg, const FormatParameterList<char> &args) = 0;
+		virtual void VLogMessage(LogSeverity severity, const rkit::StringSliceView &msg, const FormatParameterList<Utf8Char_t> &args) = 0;
 	};
 }
 
@@ -31,7 +31,7 @@ namespace rkit
 {
 	namespace log
 	{
-		inline void VMessageFmt(LogSeverity severity, const rkit::StringSliceView &fmt, const FormatParameterList<char> &args)
+		inline void VMessageFmt(LogSeverity severity, const rkit::StringSliceView &fmt, const FormatParameterList<Utf8Char_t> &args)
 		{
 			if (ILogDriver *logDriver = GetDrivers().m_logDriver)
 				logDriver->VLogMessage(severity, fmt, args);
@@ -40,7 +40,7 @@ namespace rkit
 		template<class... TArgs>
 		inline void MessageFmt(LogSeverity severity, const rkit::StringSliceView &fmt, const TArgs &... args)
 		{
-			VMessageFmt(severity, fmt, CreateFormatParameterList<char>(args...));
+			VMessageFmt(severity, fmt, CreateFormatParameterList<Utf8Char_t>(args...));
 		}
 
 		inline void Message(LogSeverity severity, const rkit::StringSliceView &msg)
@@ -57,7 +57,7 @@ namespace rkit
 		template<class... TArgs>
 		inline void ErrorFmt(const rkit::StringSliceView &fmt, const TArgs &...args)
 		{
-			VMessageFmt(LogSeverity::kError, fmt, CreateFormatParameterList<char>(args...));
+			VMessageFmt(LogSeverity::kError, fmt, CreateFormatParameterList<Utf8Char_t>(args...));
 		}
 
 		inline void Warning(const rkit::StringSliceView &msg)
@@ -68,7 +68,7 @@ namespace rkit
 		template<class... TArgs>
 		inline void LogWarningFmt(const rkit::StringSliceView &fmt, const TArgs &...args)
 		{
-			VMessageFmt(LogSeverity::kWarning, fmt, CreateFormatParameterList<char>(args...));
+			VMessageFmt(LogSeverity::kWarning, fmt, CreateFormatParameterList<Utf8Char_t>(args...));
 		}
 
 		inline void LogInfo(const rkit::StringSliceView &msg)
@@ -79,7 +79,7 @@ namespace rkit
 		template<class... TArgs>
 		inline void LogInfoFmt(const rkit::StringSliceView &fmt, const TArgs &...args)
 		{
-			VMessageFmt(LogSeverity::kInfo, fmt, CreateFormatParameterList<char>(args...));
+			VMessageFmt(LogSeverity::kInfo, fmt, CreateFormatParameterList<Utf8Char_t>(args...));
 		}
 	}
 }

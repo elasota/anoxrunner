@@ -179,7 +179,7 @@ namespace rkit { namespace utils
 
 			String threadName;
 #if RKIT_IS_DEBUG
-			RKIT_CHECK(threadName.Format("Worker {}", static_cast<int>(i)));
+			RKIT_CHECK(threadName.Format(u8"Worker {}", static_cast<int>(i)));
 #endif
 
 			RKIT_CHECK(GetDrivers().m_systemDriver->CreateThread(td.m_thread, std::move(context), threadName));

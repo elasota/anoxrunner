@@ -84,7 +84,7 @@ namespace rkit { namespace render { namespace vulkan
 			VkInstance inst, VkDevice device,
 			const QueueFamilySpec (&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks,
 			const RenderDeviceCaps &caps, const RenderDeviceRequirements &reqs,
-			const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts,
+			const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<AsciiStringView> &&enabledExts,
 			const VkPhysicalDeviceMemoryProperties &memProperties);
 	};
 } } } // rkit::render::vulkan

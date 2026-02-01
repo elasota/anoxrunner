@@ -21,25 +21,14 @@ namespace rkit
 		kValid,
 	};
 
-	template<class TDestChar, CharacterEncoding TDestEncoding, class TSrcChar, CharacterEncoding TSrcEncoding>
-	struct PathEncodingConverter
-	{
-	};
-
-	template<class TChar, CharacterEncoding TEncoding>
-	struct PathEncodingConverter<TChar, TEncoding, TChar, TEncoding>
-	{
-		static size_t ConvertSpan(const Span<TChar> &destSpan, const ConstSpan<TChar> &srcSpan);
-	};
-
 	template<uint32_t TTraitFlags>
 	struct DefaultPathTraits
 	{
 		// Type of a character
-		typedef char Char_t;
+		typedef Utf8Char_t Char_t;
 
 		// Canonical delimiter
-		static const Char_t kDefaultDelimiter = '/';
+		static const Char_t kDefaultDelimiter = u8'/';
 
 		// Encoding
 		static const CharacterEncoding kEncoding = CharacterEncoding::kUTF8;
@@ -50,30 +39,14 @@ namespace rkit
 		// Checks if a component is valid and canonical
 		static PathValidationResult ValidateComponent(const BaseStringSliceView<Char_t, kEncoding> &span, bool isAbsolute, bool isFirst);
 
-		// Converts a span from its original encoding to a new encoding
-		template<class TOriginalChar, CharacterEncoding TSrcEncoding>
-		static size_t ConvertSpan(const Span<Char_t> &destSpan, const ConstSpan<TOriginalChar> &srcSpan);
-
 		// Converts a component to a canonical component
 		static void MakeComponentValid(const Span<Char_t> &component, bool isAbsolute, bool isFirst);
 	};
 
 #if RKIT_PLATFORM == RKIT_PLATFORM_WIN32
-	template<>
-	struct PathEncodingConverter<char, CharacterEncoding::kUTF8, wchar_t, CharacterEncoding::kUTF16>
-	{
-		static size_t ConvertSpan(const Span<char> &destSpan, const ConstSpan<wchar_t> &srcSpan);
-	};
-
-	template<>
-	struct PathEncodingConverter<wchar_t, CharacterEncoding::kUTF16, char, CharacterEncoding::kUTF8>
-	{
-		static size_t ConvertSpan(const Span<wchar_t> &destSpan, const ConstSpan<char> &srcSpan);
-	};
-
 	struct OSPathTraits : public DefaultPathTraits<PathTraitFlags::kIsCaseInsensitive>
 	{
-		typedef wchar_t Char_t;
+		typedef OSPathChar_t Char_t;
 		static const Char_t kDefaultDelimiter = '\\';
 		static const CharacterEncoding kEncoding = CharacterEncoding::kUTF16;
 
@@ -82,7 +55,7 @@ namespace rkit
 		static void MakeComponentValid(const Span<Char_t> &component, bool isAbsolute, bool isFirst);
 	};
 
-	#define RKIT_OS_PATH_LITERAL(value) L ## value
+	#define RKIT_OS_PATH_LITERAL(value) u ## value
 #else
 #error "Unknown platform FS traits"
 #endif
@@ -276,14 +249,6 @@ namespace rkit
 
 namespace rkit
 {
-	template<class TChar, CharacterEncoding TEncoding>
-	size_t PathEncodingConverter<TChar, TEncoding, TChar, TEncoding>::ConvertSpan(const Span<TChar> &destSpan, const ConstSpan<TChar> &srcSpan)
-	{
-		const size_t amountToCopy = Min(destSpan.Count(), srcSpan.Count());
-		CopySpanNonOverlapping(destSpan.SubSpan(0, amountToCopy), srcSpan.SubSpan(0, amountToCopy));
-		return srcSpan.Count();
-	}
-
 	template<uint32_t TTraitFlags>
 	inline bool DefaultPathTraits<TTraitFlags>::IsDelimiter(Char_t ch)
 	{
@@ -317,13 +282,6 @@ namespace rkit
 			return PathValidationResult::kInvalid;
 
 		return requiresFixup ? PathValidationResult::kConvertible : PathValidationResult::kValid;
-	}
-
-	template<uint32_t TTraitFlags>
-	template<class TOriginalChar, CharacterEncoding TSrcEncoding>
-	size_t DefaultPathTraits<TTraitFlags>::ConvertSpan(const Span<Char_t> &destSpan, const ConstSpan<TOriginalChar> &srcSpan)
-	{
-		return PathEncodingConverter<Char_t, kEncoding, TOriginalChar, TSrcEncoding>::ConvertSpan(destSpan, srcSpan);
 	}
 
 	template<uint32_t TTraitFlags>
@@ -390,7 +348,7 @@ namespace rkit
 	template<bool TIsAbsolute, class TPathTraits>
 	BasePathIterator<TIsAbsolute, TPathTraits> &BasePathIterator<TIsAbsolute, TPathTraits>::operator--()
 	{
-		const BaseString<Char_t> &str = m_path.ToString();
+		const BaseString<Char_t, TPathTraits::kEncoding> &str = m_path.ToString();
 		const size_t length = str.Length();
 		const Char_t *chars = str.CStr();
 
@@ -561,7 +519,7 @@ namespace rkit
 			scanPos++;
 		}
 
-		BaseStringSliceView<Char_t> slice = m_view.SubString(startPos, scanPos - startPos);
+		BaseStringSliceView<Char_t, TPathTraits::kEncoding> slice = m_view.SubString(startPos, scanPos - startPos);
 		return BasePathSliceView<false, TPathTraits>(slice);
 	}
 
@@ -861,20 +819,16 @@ namespace rkit
 			return ResultCode::kOK;
 		}
 
-		BaseStringConstructionBuffer<Char_t> constructionBuffer;
-		RKIT_CHECK(constructionBuffer.Allocate(str.Length()));
-
-		PathEncodingConverter<Char_t, TPathTraits::kEncoding, TOtherChar, TOtherPathEncoding>::ConvertSpan(constructionBuffer.GetSpan(), str.ToSpan());
-		BaseString<Char_t, TPathTraits::kEncoding> newStr(std::move(constructionBuffer));
+		BaseString<Char_t, TPathTraits::kEncoding> newStr;
+		RKIT_CHECK(newStr.ConvertFrom(str));
 
 		return Set(newStr);
 	}
 
-
 	template<bool TIsAbsolute, class TPathTraits>
 	Result BasePath<TIsAbsolute, TPathTraits>::SetFromUTF8(const StringSliceView &str)
 	{
-		return SetFromEncodedString<char, CharacterEncoding::kUTF8>(str);
+		return SetFromEncodedString<Utf8Char_t, CharacterEncoding::kUTF8>(str);
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -894,8 +848,11 @@ namespace rkit
 			return ResultCode::kOK;
 		}
 
-		const BaseStringView<typename TOtherPathTraits::Char_t, TOtherPathTraits::kEncoding> &otherStr = path.ToStringView();
-		const ConstSpan<typename TOtherPathTraits::Char_t> otherCharsSpan = otherStr.ToSpan();
+		const CharacterEncoding kOtherEncoding = TOtherPathTraits::kEncoding;
+		typedef typename TOtherPathTraits::Char_t OtherChar_t;
+
+		const BaseStringView<OtherChar_t, kOtherEncoding> &otherStr = path.ToStringView();
+		const ConstSpan<OtherChar_t> otherCharsSpan = otherStr.ToSpan();
 
 		size_t newSize = 0;
 
@@ -904,13 +861,22 @@ namespace rkit
 
 			for (size_t scanPos = 0; scanPos <= otherCharsSpan.Count(); scanPos++)
 			{
-				if (scanPos == otherCharsSpan.Count() || otherCharsSpan[scanPos] == TOtherPathTraits::kDefaultDelimiter)
+				if (scanPos == otherCharsSpan.Count() || TOtherPathTraits::IsDelimiter(otherCharsSpan[scanPos]))
 				{
 					const size_t endPos = scanPos;
 
-					const ConstSpan<typename TOtherPathTraits::Char_t> chunk = otherCharsSpan.SubSpan(startPos, scanPos - startPos);
+					const ConstSpan<OtherChar_t> chunk = otherCharsSpan.SubSpan(startPos, scanPos - startPos);
 
-					size_t convertedChunkSize = PathEncodingConverter<Char_t, TPathTraits::kEncoding, typename TOtherPathTraits::Char_t, TOtherPathTraits::kEncoding>::ConvertSpan(Span<Char_t>(), chunk);
+					size_t convertedChunkSize = 0;
+
+					if (chunk.Count() > 0)
+					{
+						const size_t amountConsumed = text::ConvertText(nullptr, TPathTraits::kEncoding, std::numeric_limits<size_t>::max(), convertedChunkSize,
+							chunk.Ptr(), kOtherEncoding, chunk.Count(), text::UnknownCharBehavior::kFail, 0);
+
+						if (!amountConsumed)
+							return ResultCode::kInvalidUnicode;
+					}
 
 					newSize = newSize + convertedChunkSize + 1;
 
@@ -934,22 +900,31 @@ namespace rkit
 
 			for (size_t scanPos = 0; scanPos <= otherCharsSpan.Count(); scanPos++)
 			{
-				if (scanPos == otherCharsSpan.Count() || otherCharsSpan[scanPos] == TOtherPathTraits::kDefaultDelimiter)
+				if (scanPos == otherCharsSpan.Count() || TOtherPathTraits::IsDelimiter(otherCharsSpan[scanPos]))
 				{
 					if (emitPos > 0)
 						outSpan[emitPos++] = kDefaultDelimiter;
 
 					const size_t endPos = scanPos;
 
-					const ConstSpan<typename TOtherPathTraits::Char_t> chunk = otherCharsSpan.SubSpan(startPos, scanPos - startPos);
+					const ConstSpan<OtherChar_t> chunk = otherCharsSpan.SubSpan(startPos, scanPos - startPos);
 					const Span<Char_t> outChunkSpan = outSpan.SubSpan(emitPos, outSpan.Count() - emitPos);
 
-					size_t convertedChunkSize = PathEncodingConverter<Char_t, TPathTraits::kEncoding, typename TOtherPathTraits::Char_t, TOtherPathTraits::kEncoding>::ConvertSpan(outChunkSpan, chunk);
+					size_t convertedChunkSize = 0;
+
+					if (chunk.Count() > 0)
+					{
+						const size_t amountConsumed = text::ConvertText(outChunkSpan.Ptr(), TPathTraits::kEncoding, outChunkSpan.Count(), convertedChunkSize,
+							chunk.Ptr(), kOtherEncoding, chunk.Count(), text::UnknownCharBehavior::kFail, 0);
+
+						if (!amountConsumed)
+							return ResultCode::kInvalidUnicode;
+					}
 
 					const bool isFirst = (emitPos == 0);
 					const bool isLast = (scanPos == otherCharsSpan.Count());
 
-					PathValidationResult validationResult = TPathTraits::ValidateComponent(BaseStringSliceView<Char_t, kEncoding>(outChunkSpan), TIsAbsolute, isFirst);
+					PathValidationResult validationResult = TPathTraits::ValidateComponent(BaseStringSliceView<Char_t, kEncoding>(outChunkSpan.SubSpan(0, convertedChunkSize)), TIsAbsolute, isFirst);
 
 					switch (validationResult)
 					{
@@ -1178,28 +1153,6 @@ namespace rkit
 
 namespace rkit
 {
-	inline size_t PathEncodingConverter<char, CharacterEncoding::kUTF8, wchar_t, CharacterEncoding::kUTF16>::ConvertSpan(const Span<char> &destSpan, const ConstSpan<wchar_t> &srcSpan)
-	{
-		Span<uint8_t> retypedDestSpan = Span<uint8_t>(reinterpret_cast<uint8_t *>(destSpan.Ptr()), destSpan.Count());
-
-		size_t sz = 0;
-		Result result = GetDrivers().m_utilitiesDriver->ConvertUTF16WCharToUTF8(sz, retypedDestSpan, srcSpan);
-		RKIT_ASSERT(::rkit::utils::ResultIsOK(result));
-
-		return sz;
-	}
-
-	inline size_t PathEncodingConverter<wchar_t, CharacterEncoding::kUTF16, char, CharacterEncoding::kUTF8>::ConvertSpan(const Span<wchar_t> &destSpan, const ConstSpan<char> &srcSpan)
-	{
-		size_t sz = 0;
-		ConstSpan<uint8_t> retypedSrcSpan = ConstSpan<uint8_t>(reinterpret_cast<const uint8_t *>(srcSpan.Ptr()), srcSpan.Count());
-
-		Result result = GetDrivers().m_utilitiesDriver->ConvertUTF8ToUTF16WChar(sz, destSpan, retypedSrcSpan);
-		RKIT_ASSERT(::rkit::utils::ResultIsOK(result));
-
-		return sz;
-	}
-
 	inline bool OSPathTraits::IsDelimiter(Char_t ch)
 	{
 		return ch == '/' || ch == '\\';

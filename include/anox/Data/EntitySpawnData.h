@@ -23,7 +23,7 @@ namespace anox { namespace data {
 		rkit::Vector<rkit::endian::LittleUInt32_t> m_entityTypes;
 		rkit::Vector<rkit::endian::LittleUInt32_t> m_entityStringLengths;
 		rkit::Vector<uint8_t> m_entityData;
-		rkit::Vector<char> m_entityStringData;
+		rkit::Vector<uint8_t> m_entityStringData;
 
 		template<class TVisitor>
 		rkit::Result VisitAllChunks(const TVisitor &visitor)

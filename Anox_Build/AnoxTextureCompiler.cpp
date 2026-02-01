@@ -393,7 +393,7 @@ namespace anox { namespace buildsystem { namespace priv
 	{
 		if (width == 0 || height == 0)
 		{
-			rkit::log::Error("Image had 0 dimension");
+			rkit::log::Error(u8"Image had 0 dimension");
 			return rkit::ResultCode::kDataError;
 		}
 
@@ -522,7 +522,7 @@ namespace anox { namespace buildsystem
 		{
 			if (dotPosition == 0)
 			{
-				rkit::log::ErrorFmt("Texture job '{}' was invalid", identifier.GetChars());
+				rkit::log::ErrorFmt(u8"Texture job '{}' was invalid", identifier.GetChars());
 				return rkit::ResultCode::kInternalError;
 			}
 
@@ -534,7 +534,7 @@ namespace anox { namespace buildsystem
 			char digit = identifier[dotPosition];
 			if (digit < '0' || digit > '9')
 			{
-				rkit::log::ErrorFmt("Texture job '{}' was invalid", identifier.GetChars());
+				rkit::log::ErrorFmt(u8"Texture job '{}' was invalid", identifier.GetChars());
 				return rkit::ResultCode::kInternalError;
 			}
 
@@ -542,7 +542,7 @@ namespace anox { namespace buildsystem
 
 			if (dispositionUInt >= static_cast<uint32_t>(ImageImportDisposition::kCount))
 			{
-				rkit::log::ErrorFmt("Texture job '{}' was invalid", identifier.GetChars());
+				rkit::log::ErrorFmt(u8"Texture job '{}' was invalid", identifier.GetChars());
 				return rkit::ResultCode::kInternalError;
 			}
 		}
@@ -557,7 +557,7 @@ namespace anox { namespace buildsystem
 		{
 			if (dotPosition == 0)
 			{
-				rkit::log::ErrorFmt("Texture job '{}' was invalid", identifier.GetChars());
+				rkit::log::ErrorFmt(u8"Texture job '{}' was invalid", identifier.GetChars());
 				return rkit::ResultCode::kInternalError;
 			}
 
@@ -572,16 +572,16 @@ namespace anox { namespace buildsystem
 		rkit::CIPath path;
 		RKIT_CHECK(path.Set(shortName));
 
-		if (extension == ".pcx")
+		if (extension == u8".pcx")
 			return CompilePCX(depsNode, feedback, path, disposition);
 
-		if (extension == ".png")
+		if (extension == u8".png")
 			return CompilePNG(depsNode, feedback, m_pngDriver, path, disposition);
 
-		if (extension == ".tga")
+		if (extension == u8".tga")
 			return CompileTGA(depsNode, feedback, path, disposition);
 
-		rkit::log::ErrorFmt("Texture job '{}' used an unsupported format", identifier.GetChars());
+		rkit::log::ErrorFmt(u8"Texture job '{}' used an unsupported format", identifier.GetChars());
 		return rkit::ResultCode::kOperationFailed;
 	}
 
@@ -595,7 +595,7 @@ namespace anox { namespace buildsystem
 
 		if (tgaHeader.m_pixelSizeBits % 8 != 0)
 		{
-			rkit::log::Error("Unsupported pixel bits");
+			rkit::log::Error(u8"Unsupported pixel bits");
 			return rkit::ResultCode::kDataError;
 		}
 
@@ -618,19 +618,19 @@ namespace anox { namespace buildsystem
 
 		if (pcxHeader.m_numColorPlanes != 1 && pcxHeader.m_numColorPlanes != 3 && pcxHeader.m_numColorPlanes != 4)
 		{
-			rkit::log::ErrorFmt("PCX file '{}' has an unsupported number of planes", shortName.GetChars());
+			rkit::log::ErrorFmt(u8"PCX file '{}' has an unsupported number of planes", shortName.GetChars());
 			return rkit::ResultCode::kMalformedFile;
 		}
 
 		if (pcxHeader.m_bitsPerPlane != 8)
 		{
-			rkit::log::ErrorFmt("PCX file '{}' has an unsupported bits per plane", shortName.GetChars());
+			rkit::log::ErrorFmt(u8"PCX file '{}' has an unsupported bits per plane", shortName.GetChars());
 			return rkit::ResultCode::kMalformedFile;
 		}
 
 		if (pcxHeader.m_minX.Get() > pcxHeader.m_maxX.Get() || pcxHeader.m_minY.Get() > pcxHeader.m_maxY.Get())
 		{
-			rkit::log::Error("Invalid PCX dimensions");
+			rkit::log::Error(u8"Invalid PCX dimensions");
 			return rkit::ResultCode::kDataError;
 		}
 
@@ -662,7 +662,7 @@ namespace anox { namespace buildsystem
 		if (tgaHeader.m_identSize == 'B' && tgaHeader.m_colorMapType == 'M')
 		{
 			// Actually a bmp file (e.g. models/objects/wall01.tga
-			rkit::log::Warning("TGA file is actually a BMP");
+			rkit::log::Warning(u8"TGA file is actually a BMP");
 			return rkit::ResultCode::kNotYetImplemented;
 		}
 
@@ -670,7 +670,7 @@ namespace anox { namespace buildsystem
 
 		if (tgaHeader.m_colorMapLength.Get() > 0)
 		{
-			rkit::log::Error("Color mapped TGA not supported");
+			rkit::log::Error(u8"Color mapped TGA not supported");
 			return rkit::ResultCode::kNotYetImplemented;
 		}
 
@@ -683,7 +683,7 @@ namespace anox { namespace buildsystem
 
 		if (tgaHeader.m_pixelSizeBits % 8 != 0)
 		{
-			rkit::log::Error("TGA bit format not supported");
+			rkit::log::Error(u8"TGA bit format not supported");
 			return rkit::ResultCode::kNotYetImplemented;
 		}
 
@@ -721,7 +721,7 @@ namespace anox { namespace buildsystem
 
 					if (remainingPixelsToDecompress < additionalPixelsToOutput)
 					{
-						rkit::log::Error("Compressed data overran target buffer");
+						rkit::log::Error(u8"Compressed data overran target buffer");
 						return rkit::ResultCode::kDataError;
 					}
 
@@ -792,7 +792,7 @@ namespace anox { namespace buildsystem
 			}
 			break;
 			default:
-				rkit::log::Error("TGA bit size unsupported");
+				rkit::log::Error(u8"TGA bit size unsupported");
 				return rkit::ResultCode::kNotYetImplemented;
 			}
 		}
@@ -814,13 +814,13 @@ namespace anox { namespace buildsystem
 
 		if (pcxHeader.m_numColorPlanes != 1 && pcxHeader.m_numColorPlanes != 3 && pcxHeader.m_numColorPlanes != 4)
 		{
-			rkit::log::ErrorFmt("PCX file '{}' has an unsupported number of planes", shortName.ToStringView());
+			rkit::log::ErrorFmt(u8"PCX file '{}' has an unsupported number of planes", shortName.ToStringView());
 			return rkit::ResultCode::kMalformedFile;
 		}
 
 		if (pcxHeader.m_bitsPerPlane != 8)
 		{
-			rkit::log::ErrorFmt("PCX file '{}' has an unsupported bits per plane", shortName.ToStringView());
+			rkit::log::ErrorFmt(u8"PCX file '{}' has an unsupported bits per plane", shortName.ToStringView());
 			return rkit::ResultCode::kMalformedFile;
 		}
 
@@ -829,13 +829,13 @@ namespace anox { namespace buildsystem
 
 		if (scanLinePitch == 0)
 		{
-			rkit::log::ErrorFmt("PCX file '{}' has zero size", shortName.GetChars());
+			rkit::log::ErrorFmt(u8"PCX file '{}' has zero size", shortName.GetChars());
 			return rkit::ResultCode::kMalformedFile;
 		}
 
 		if (pcxHeader.m_minX.Get() > pcxHeader.m_maxX.Get() || pcxHeader.m_minY.Get() > pcxHeader.m_maxY.Get())
 		{
-			rkit::log::ErrorFmt("PCX file '{}' has invalid dimensions", shortName.GetChars());
+			rkit::log::ErrorFmt(u8"PCX file '{}' has invalid dimensions", shortName.GetChars());
 			return rkit::ResultCode::kMalformedFile;
 		}
 
@@ -844,7 +844,7 @@ namespace anox { namespace buildsystem
 
 		if (scanLinePlanePitch < width)
 		{
-			rkit::log::ErrorFmt("PCX file '{}' has invalid pitch", shortName.GetChars());
+			rkit::log::ErrorFmt(u8"PCX file '{}' has invalid pitch", shortName.GetChars());
 			return rkit::ResultCode::kMalformedFile;
 		}
 
@@ -875,7 +875,7 @@ namespace anox { namespace buildsystem
 
 					if (count > bytesRemaining)
 					{
-						rkit::log::ErrorFmt("PCX file '{}' RLE data was corrupted", shortName.GetChars());
+						rkit::log::ErrorFmt(u8"PCX file '{}' RLE data was corrupted", shortName.GetChars());
 						return rkit::ResultCode::kMalformedFile;
 					}
 				}
@@ -911,7 +911,7 @@ namespace anox { namespace buildsystem
 
 				if (checkByte != 12)
 				{
-					rkit::log::ErrorFmt("PCX file '{}' palette check byte was invalid", shortName.GetChars());
+					rkit::log::ErrorFmt(u8"PCX file '{}' palette check byte was invalid", shortName.GetChars());
 					return rkit::ResultCode::kMalformedFile;
 				}
 
@@ -937,7 +937,7 @@ namespace anox { namespace buildsystem
 					uint8_t elementValue = inScanline[x];
 					if (elementValue > palette.Count())
 					{
-						rkit::log::ErrorFmt("PCX file '{}' had an out-of-range value", shortName.GetChars());
+						rkit::log::ErrorFmt(u8"PCX file '{}' had an out-of-range value", shortName.GetChars());
 						return rkit::ResultCode::kMalformedFile;
 					}
 
@@ -1380,22 +1380,22 @@ namespace anox { namespace buildsystem
 
 		if (extPos == 0)
 		{
-			rkit::log::ErrorFmt("Missing file extension: {}", path);
+			rkit::log::ErrorFmt(u8"Missing file extension: {}", path);
 			return rkit::ResultCode::kDataError;
 		}
 
 		const rkit::StringSliceView extension = path.SubString(extPos);
 
-		if (extension == ".pcx")
+		if (extension == u8".pcx")
 			return GetPCXMetadata(imageSpec, feedback, shortName);
 
-		if (extension == ".png")
+		if (extension == u8".png")
 			return GetPNGMetadata(imageSpec, feedback, pngDriver, shortName);
 
-		if (extension == ".tga")
+		if (extension == u8".tga")
 			return GetTGAMetadata(imageSpec, feedback, shortName);
 
-		rkit::log::ErrorFmt("Unsupported file format: {}", path);
+		rkit::log::ErrorFmt(u8"Unsupported file format: {}", path);
 		return rkit::ResultCode::kDataError;
 	}
 
@@ -1415,29 +1415,29 @@ namespace anox { namespace buildsystem
 
 		if (extPos == 0)
 		{
-			rkit::log::ErrorFmt("Missing file extension: {}", path);
+			rkit::log::ErrorFmt(u8"Missing file extension: {}", path);
 			return rkit::ResultCode::kDataError;
 		}
 
 		const rkit::StringSliceView extension = path.SubString(extPos);
 
-		if (extension == ".pcx")
+		if (extension == u8".pcx")
 			return GetPCX(image, feedback, buildFileLocation, shortName, disposition);
 
-		if (extension == ".png")
+		if (extension == u8".png")
 			return GetPNG(image, feedback, pngDriver, buildFileLocation, shortName, disposition);
 
-		if (extension == ".tga")
+		if (extension == u8".tga")
 			return GetTGA(image, feedback, buildFileLocation, shortName, disposition);
 
-		rkit::log::ErrorFmt("Unsupported file format: {}", path);
+		rkit::log::ErrorFmt(u8"Unsupported file format: {}", path);
 		return rkit::ResultCode::kDataError;
 	}
 
 
 	rkit::Result TextureCompilerBase::ResolveIntermediatePath(rkit::String &outString, const rkit::StringView &identifierWithDisposition)
 	{
-		return outString.Format("ax_tex/{}.dds", identifierWithDisposition.GetChars());
+		return outString.Format(u8"ax_tex/{}.dds", identifierWithDisposition.GetChars());
 	}
 
 	rkit::Result TextureCompilerBase::GetImageMetadata(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName)
@@ -1454,7 +1454,7 @@ namespace anox { namespace buildsystem
 
 	rkit::Result TextureCompilerBase::CreateImportIdentifier(rkit::String &result, const rkit::StringView &imagePath, ImageImportDisposition disposition)
 	{
-		return result.Format("{}.{}", imagePath.GetChars(), static_cast<int>(disposition));
+		return result.Format(u8"{}.{}", imagePath.GetChars(), static_cast<int>(disposition));
 	}
 
 	rkit::Result TextureCompilerBase::Create(rkit::UniquePtr<TextureCompilerBase> &outCompiler, rkit::png::IPngDriver &pngDriver)

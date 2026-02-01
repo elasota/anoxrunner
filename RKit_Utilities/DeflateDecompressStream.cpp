@@ -8,12 +8,12 @@ namespace rkit
 		: m_stream(std::move(stream))
 		, m_seekable(seekable)
 		, m_alloc(alloc)
+		, m_buffer{}
+		, m_compressedSizeRemaining(0)
+		, m_zstream{}
 		, m_streamInitialized(false)
 		, m_filePos(0)
-		, m_compressedSizeRemaining(0)
 		, m_decompressedSize(decompressedSize)
-		, m_buffer{}
-		, m_zstream{}
 	{
 	}
 

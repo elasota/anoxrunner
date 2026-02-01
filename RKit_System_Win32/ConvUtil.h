@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rkit/Core/CoreDefs.h"
 #include "rkit/Win32/IncludeWindows.h"
 #include "rkit/Core/Timestamp.h"
 
@@ -11,8 +12,8 @@ namespace rkit
 	class ConvUtil_Win32
 	{
 	public:
-		static Result UTF8ToUTF16(const char *str8, Vector<wchar_t> &outStr16);
-		static Result UTF16ToUTF8(const wchar_t *str16, Vector<char> &outStr16);
+		static Result UTF8ToUTF16(const Utf8Char_t *str8, Vector<wchar_t> &outStr16);
+		static Result UTF16ToUTF8(const wchar_t *str16, Vector<Utf8Char_t> &outStr16);
 
 		static UTCMSecTimestamp_t FileTimeToUTCMSec(const FILETIME &ftime);
 		static FILETIME UTCMSecToFileTime(UTCMSecTimestamp_t timestamp);

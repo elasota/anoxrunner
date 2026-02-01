@@ -170,7 +170,7 @@ namespace rkit { namespace render
 		struct ChangeDisplayModeParams : public NoCopy
 		{
 			ChangeDisplayModeParams();
-			ChangeDisplayModeParams(ChangeDisplayModeParams &&other);
+			ChangeDisplayModeParams(ChangeDisplayModeParams &&other) noexcept;
 			~ChangeDisplayModeParams();
 
 			typedef Result (RenderWindow_Win32:: *CallbackMethod_t)();
@@ -557,7 +557,7 @@ namespace rkit { namespace render
 	{
 	}
 
-	RenderWindow_Win32::ChangeDisplayModeParams::ChangeDisplayModeParams(ChangeDisplayModeParams &&other)
+	RenderWindow_Win32::ChangeDisplayModeParams::ChangeDisplayModeParams(ChangeDisplayModeParams &&other) noexcept
 		: m_callback(other.m_callback)
 		, m_completedFlag(other.m_completedFlag)
 		, m_signalEvent(other.m_signalEvent)
@@ -634,7 +634,7 @@ namespace rkit { namespace render
 		RKIT_CHECK(sysDriver->CreateEvent(m_changeDisplayModeEvent, true, false));
 		RKIT_CHECK(sysDriver->CreateMutex(m_actionsMutex));
 
-		RKIT_CHECK(sysDriver->CreateThread(m_thread, std::move(ctx), "RenderWindow"));
+		RKIT_CHECK(sysDriver->CreateThread(m_thread, std::move(ctx), u8"RenderWindow"));
 
 		m_startEvent->Wait();
 		m_startEvent.Reset();
@@ -1037,7 +1037,7 @@ namespace rkit { namespace render
 
 		if (!SetWindowPos(m_hWnd, HWND_TOP, monitorInfo.rcMonitor.left, monitorInfo.rcMonitor.top, monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left, monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top, SWP_FRAMECHANGED))
 		{
-			rkit::log::Warning("BecomeBorderlessFullScreen: SetWindowPos failed");
+			rkit::log::Warning(u8"BecomeBorderlessFullScreen: SetWindowPos failed");
 		}
 
 		return ResultCode::kOK;

@@ -25,8 +25,8 @@ namespace anox { namespace buildsystem
 	public:
 		virtual ~UserEntityDictionaryBase() {}
 
-		virtual bool FindEntityDef(const rkit::AsciiStringSliceView &name, uint32_t &outEDefID) const = 0;
-		virtual rkit::AsciiStringView GetEDefType(uint32_t edefID) const = 0;
+		virtual bool FindEntityDef(const rkit::ByteStringSliceView &name, uint32_t &outEDefID) const = 0;
+		virtual rkit::ByteStringView GetEDefType(uint32_t edefID) const = 0;
 		virtual uint32_t GetEDefCount() const = 0;
 
 		virtual rkit::Result WriteEDef(rkit::IWriteStream &stream, uint32_t edefID) const = 0;

@@ -28,8 +28,8 @@ namespace anox
 			bool IsValid() const;
 			bool IsDirectory() const;
 			uint32_t GetFileSize() const;
-			rkit::StringView GetFilePath() const;
-			rkit::StringSliceView GetDirectoryPath() const;
+			rkit::AsciiStringView GetFilePath() const;
+			rkit::AsciiStringSliceView GetDirectoryPath() const;
 
 			uint32_t GetNumFiles() const;
 			FileHandle GetFileByIndex(uint32_t index) const;
@@ -82,7 +82,7 @@ namespace anox
 
 			virtual ~IArchive() {}
 
-			virtual FileHandle FindFile(const rkit::StringSliceView &fileName, bool allowDirectories) const = 0;
+			virtual FileHandle FindFile(const rkit::ByteStringSliceView &fileName, bool allowDirectories) const = 0;
 
 			ArchiveFileListView GetFiles() const;
 			FileHandle GetRootDirectory() const;
@@ -92,8 +92,8 @@ namespace anox
 			virtual FileHandle GetFileByIndex(uint32_t fileIndex) const = 0;
 			virtual rkit::Result OpenFileByIndex(uint32_t fileIndex, rkit::UniquePtr<rkit::ISeekableReadStream> &outStream) const = 0;
 			virtual uint32_t GetFileSizeByIndex(uint32_t fileIndex) const = 0;
-			virtual rkit::StringView GetFilePathByIndex(uint32_t fileIndex) const = 0;
-			virtual rkit::StringSliceView GetDirectoryPathByIndex(uint32_t fileIndex) const = 0;
+			virtual rkit::AsciiStringView GetFilePathByIndex(uint32_t fileIndex) const = 0;
+			virtual rkit::AsciiStringSliceView GetDirectoryPathByIndex(uint32_t fileIndex) const = 0;
 
 			virtual FileHandle GetDirectoryByIndex(uint32_t dirIndex) const = 0;
 			virtual uint32_t GetDirectoryFirstFile(uint32_t dirIndex) const = 0;
@@ -146,20 +146,20 @@ inline bool anox::afs::FileHandle::IsDirectory() const
 	return m_isDirectory;
 }
 
-inline rkit::StringView anox::afs::FileHandle::GetFilePath() const
+inline rkit::AsciiStringView anox::afs::FileHandle::GetFilePath() const
 {
 	if (m_archive == nullptr)
-		return rkit::StringView();
+		return rkit::AsciiStringView();
 
 	RKIT_ASSERT(!m_isDirectory);
 
 	return m_archive->GetFilePathByIndex(m_fileIndex);
 }
 
-inline rkit::StringSliceView anox::afs::FileHandle::GetDirectoryPath() const
+inline rkit::AsciiStringSliceView anox::afs::FileHandle::GetDirectoryPath() const
 {
 	if (m_archive == nullptr)
-		return rkit::StringSliceView();
+		return rkit::AsciiStringSliceView();
 
 	RKIT_ASSERT(m_isDirectory);
 

@@ -22,11 +22,11 @@ namespace rkit
 	{
 	public:
 		UniqueThreadRef();
-		UniqueThreadRef(UniqueThreadRef &&other);
+		UniqueThreadRef(UniqueThreadRef &&other) noexcept;
 		explicit UniqueThreadRef(UniquePtr<IThread> &&thread);
 		~UniqueThreadRef();
 
-		UniqueThreadRef &operator=(UniqueThreadRef &&other);
+		UniqueThreadRef &operator=(UniqueThreadRef &&other) noexcept;
 
 		bool IsValid() const;
 
@@ -50,7 +50,7 @@ namespace rkit
 	{
 	}
 
-	inline UniqueThreadRef::UniqueThreadRef(UniqueThreadRef &&other)
+	inline UniqueThreadRef::UniqueThreadRef(UniqueThreadRef &&other) noexcept
 		: m_thread(std::move(other.m_thread))
 		, m_finalResult(other.m_finalResult)
 	{
@@ -68,7 +68,7 @@ namespace rkit
 			m_thread->Finalize(m_finalResult);
 	}
 
-	inline UniqueThreadRef &UniqueThreadRef::operator=(UniqueThreadRef &&other)
+	inline UniqueThreadRef &UniqueThreadRef::operator=(UniqueThreadRef &&other) noexcept
 	{
 		if (m_thread.IsValid())
 		{

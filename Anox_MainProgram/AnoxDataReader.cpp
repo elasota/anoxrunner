@@ -61,7 +61,7 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result DataReader::ReadCheckUTF8String(rkit::String &outString, const rkit::Span<const char> &chars)
+	rkit::Result DataReader::ReadCheckUTF8String(rkit::String &outString, const rkit::Span<const rkit::Utf8Char_t> &chars)
 	{
 		rkit::StringSliceView view(chars);
 		if (!view.Validate())

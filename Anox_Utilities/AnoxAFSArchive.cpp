@@ -27,15 +27,15 @@ namespace anox
 				rkit::Vector<FileInfo> m_files;
 				rkit::Vector<Directory> m_subDirectories;
 
-				rkit::StringSliceView m_fullDirPath;
-				rkit::StringSliceView m_name;
-				rkit::HashMap<rkit::StringSliceView, size_t> m_subDirectoriesByName;
-				rkit::HashMap<rkit::StringSliceView, size_t> m_filesByName;
+				rkit::AsciiStringSliceView m_fullDirPath;
+				rkit::AsciiStringSliceView m_name;
+				rkit::HashMap<rkit::ByteStringSliceView, size_t> m_subDirectoriesByName;
+				rkit::HashMap<rkit::ByteStringSliceView, size_t> m_filesByName;
 			};
 
 			static rkit::Result RecursiveInsertFile(Directory &dir, const FileInfo &file, size_t sliceStart);
-			static rkit::Result InsertFile(Directory &dir, const FileInfo &file, const rkit::StringSliceView &nameSlice);
-			static rkit::Result InsertDirectory(Directory &dir, Directory *&outDirectory, const rkit::StringSliceView &fullDirPath, const rkit::StringSliceView &nameSlice);
+			static rkit::Result InsertFile(Directory &dir, const FileInfo &file, const rkit::AsciiStringSliceView &nameSlice);
+			static rkit::Result InsertDirectory(Directory &dir, Directory *&outDirectory, const rkit::AsciiStringSliceView &fullDirPath, const rkit::AsciiStringSliceView &nameSlice);
 			static void RecursiveSortAndCountDirectories(Directory &dir, size_t &outNumFiles, size_t &outNumDirectories);
 			static void RecursiveUnrollDirectory(rkit::Vector<FileInfo> &files, size_t &numFiles, rkit::Vector<DirectoryInfo> &directories, size_t &numDirectories, const Directory &dir, size_t placementIndex);
 
@@ -118,7 +118,7 @@ namespace anox
 
 		rkit::Result Archive::DirectoryTreeBuilder::RecursiveInsertFile(Directory &dir, const FileInfo &file, size_t sliceStart)
 		{
-			rkit::StringView fullName = file.m_fullPath;
+			rkit::AsciiStringView fullName = file.m_fullPath;
 			rkit::Optional<size_t> slashPos;
 
 			for (size_t i = sliceStart; i < fullName.Length(); i++)
@@ -146,17 +146,17 @@ namespace anox
 			return rkit::ResultCode::kOK;
 		}
 
-		rkit::Result Archive::DirectoryTreeBuilder::InsertFile(Directory &dir, const FileInfo &file, const rkit::StringSliceView &nameSlice)
+		rkit::Result Archive::DirectoryTreeBuilder::InsertFile(Directory &dir, const FileInfo &file, const rkit::AsciiStringSliceView &nameSlice)
 		{
 			if (nameSlice.Length() == 0)
 				return rkit::ResultCode::kDataError;
 
-			rkit::HashValue_t nameHash = rkit::Hasher<rkit::StringSliceView>::ComputeHash(0, nameSlice);
+			rkit::HashValue_t nameHash = rkit::Hasher<rkit::ByteStringSliceView>::ComputeHash(0, nameSlice.RemoveEncoding());
 
-			if (dir.m_subDirectoriesByName.FindPrehashed(nameHash, nameSlice) != dir.m_subDirectoriesByName.end())
+			if (dir.m_subDirectoriesByName.FindPrehashed(nameHash, nameSlice.RemoveEncoding()) != dir.m_subDirectoriesByName.end())
 				return rkit::ResultCode::kDataError;
 
-			rkit::HashMap<rkit::StringSliceView, size_t>::ConstIterator_t it = dir.m_filesByName.FindPrehashed(nameHash, nameSlice);
+			rkit::HashMap<rkit::ByteStringSliceView, size_t>::ConstIterator_t it = dir.m_filesByName.FindPrehashed(nameHash, nameSlice.RemoveEncoding());
 
 			if (it != dir.m_filesByName.end())
 				return rkit::ResultCode::kDataError;
@@ -166,22 +166,22 @@ namespace anox
 
 			RKIT_CHECK(dir.m_files.Append(file));
 
-			RKIT_CHECK(dir.m_filesByName.SetPrehashed(nameHash, nameSlice, fileIndex));
+			RKIT_CHECK(dir.m_filesByName.SetPrehashed(nameHash, nameSlice.RemoveEncoding(), fileIndex));
 
 			return rkit::ResultCode::kOK;
 		}
 
-		rkit::Result Archive::DirectoryTreeBuilder::InsertDirectory(Directory &dir, Directory *&outDirectory, const rkit::StringSliceView &fullDirPath, const rkit::StringSliceView &nameSlice)
+		rkit::Result Archive::DirectoryTreeBuilder::InsertDirectory(Directory &dir, Directory *&outDirectory, const rkit::AsciiStringSliceView &fullDirPath, const rkit::AsciiStringSliceView &nameSlice)
 		{
 			if (nameSlice.Length() == 0)
 				return rkit::ResultCode::kDataError;
 
-			rkit::HashValue_t nameHash = rkit::Hasher<rkit::StringSliceView>::ComputeHash(0, nameSlice);
+			rkit::HashValue_t nameHash = rkit::Hasher<rkit::ByteStringSliceView>::ComputeHash(0, nameSlice.RemoveEncoding());
 
-			if (dir.m_filesByName.FindPrehashed(nameHash, nameSlice) != dir.m_filesByName.end())
+			if (dir.m_filesByName.FindPrehashed(nameHash, nameSlice.RemoveEncoding()) != dir.m_filesByName.end())
 				return rkit::ResultCode::kDataError;
 
-			rkit::HashMap<rkit::StringSliceView, size_t>::ConstIterator_t it = dir.m_subDirectoriesByName.FindPrehashed(nameHash, nameSlice);
+			rkit::HashMap<rkit::ByteStringSliceView, size_t>::ConstIterator_t it = dir.m_subDirectoriesByName.FindPrehashed(nameHash, nameSlice.RemoveEncoding());
 
 			if (it != dir.m_subDirectoriesByName.end())
 			{
@@ -197,7 +197,7 @@ namespace anox
 			newDir->m_fullDirPath = fullDirPath;
 			newDir->m_name = nameSlice;
 
-			RKIT_CHECK(dir.m_subDirectoriesByName.SetPrehashed(nameHash, nameSlice, dirIndex));
+			RKIT_CHECK(dir.m_subDirectoriesByName.SetPrehashed(nameHash, nameSlice.RemoveEncoding(), dirIndex));
 
 			outDirectory = newDir;
 			return rkit::ResultCode::kOK;
@@ -222,7 +222,7 @@ namespace anox
 
 			if (header.m_magic.Get() != anox::afs::HeaderData::kAFSMagic || header.m_version.Get() != anox::afs::HeaderData::kAFSVersion)
 			{
-				rkit::log::Error("AFS file header was invalid");
+				rkit::log::Error(u8"AFS file header was invalid");
 				return rkit::ResultCode::kInvalidParameter;
 			}
 
@@ -230,7 +230,7 @@ namespace anox
 
 			if (catalogSize % sizeof(afs::FileData) != 0)
 			{
-				rkit::log::Error("AFS catalog size was invalid");
+				rkit::log::Error(u8"AFS catalog size was invalid");
 				return rkit::ResultCode::kInvalidParameter;
 			}
 
@@ -267,7 +267,13 @@ namespace anox
 
 				charsWriteLoc[filePathLen] = '\0';
 
-				fileInfo.m_fullPath = rkit::StringView(charsWriteLoc, filePathLen);
+				if (!rkit::CharacterEncodingValidator<rkit::CharacterEncoding::kASCII>::ValidateSpan(rkit::Span<const char>(charsWriteLoc, filePathLen)))
+				{
+					rkit::log::Error(u8"Archive file name had invalid ASCII characters");
+					return rkit::ResultCode::kInvalidUnicode;
+				}
+
+				fileInfo.m_fullPath = rkit::AsciiStringView(charsWriteLoc, filePathLen);
 
 				if (!allowBrokenFilePaths)
 				{
@@ -302,7 +308,7 @@ namespace anox
 			return rkit::ResultCode::kOK;
 		}
 
-		FileHandle Archive::FindFile(const rkit::StringSliceView &fileName, bool allowDirectories) const
+		FileHandle Archive::FindFile(const rkit::ByteStringSliceView &fileName, bool allowDirectories) const
 		{
 			size_t numFiles = m_files.Count();
 
@@ -310,7 +316,7 @@ namespace anox
 			{
 				const FileInfo &finfo = m_files[i];
 
-				if (finfo.m_fullPath == fileName)
+				if (finfo.m_fullPath.RemoveEncoding() == fileName)
 					return FileHandle(this, static_cast<uint32_t>(i), false);
 			}
 
@@ -346,12 +352,12 @@ namespace anox
 			return m_files[fileIndex].m_uncompressedSize;
 		}
 
-		rkit::StringView Archive::GetFilePathByIndex(uint32_t fileIndex) const
+		rkit::AsciiStringView Archive::GetFilePathByIndex(uint32_t fileIndex) const
 		{
 			return m_files[fileIndex].m_fullPath;
 		}
 
-		rkit::StringSliceView Archive::GetDirectoryPathByIndex(uint32_t fileIndex) const
+		rkit::AsciiStringSliceView Archive::GetDirectoryPathByIndex(uint32_t fileIndex) const
 		{
 			return m_directories[fileIndex].m_fullPath;
 		}

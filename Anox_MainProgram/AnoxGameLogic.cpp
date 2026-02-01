@@ -39,26 +39,26 @@ namespace anox
 		rkit::Result SaveGame(rkit::UniquePtr<IConfigurationState> &outConfig) override;
 
 	private:
-		class DestructiveSpanArgParser final : public rkit::ISpan<rkit::StringView>
+		class DestructiveSpanArgParser final : public rkit::ISpan<rkit::ByteStringView>
 		{
 		public:
 			DestructiveSpanArgParser();
 
-			void Acquire(const rkit::Span<char> &line);
+			void Acquire(const rkit::Span<uint8_t> &line);
 
-			rkit::StringView GetCommand() const;
+			rkit::ByteStringView GetCommand() const;
 
 			size_t Count() const override;
-			rkit::StringView operator[](size_t index) const override;
+			rkit::ByteStringView operator[](size_t index) const override;
 
 		private:
-			rkit::StringView m_cmd;
-			rkit::ConstSpan<char> m_line;
+			rkit::ByteStringView m_cmd;
+			rkit::ConstSpan<uint8_t> m_line;
 			size_t m_count;
 		};
 
 		static rkit::Result InsertAlias(AnoxCommandStackBase &commandStack, const AnoxRegisteredAlias &alias);
-		static rkit::Result ApplyConsoleVar(const AnoxRegisteredConsoleVar &consoleVar, const rkit::ISpan<rkit::StringView> &args);
+		static rkit::Result ApplyConsoleVar(const AnoxRegisteredConsoleVar &consoleVar, const rkit::ISpan<rkit::ByteStringView> &args);
 
 		CORO_DECL_METHOD(StartUp);
 		CORO_DECL_METHOD(RunFrame);
@@ -69,11 +69,11 @@ namespace anox
 		CORO_DECL_METHOD(LoadStringKeyedResource, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::StringView &str);
 		CORO_DECL_METHOD(ExecCommandFile, AnoxCommandStackBase &commandStack, const rkit::CIPathView &path);
 		CORO_DECL_METHOD(RunCommands, AnoxCommandStackBase &commandStack);
-		CORO_DECL_METHOD(RunCommand, AnoxCommandStackBase &commandStack, const rkit::Span<char> &line);
+		CORO_DECL_METHOD(RunCommand, AnoxCommandStackBase &commandStack, const rkit::Span<uint8_t> &line);
 		CORO_DECL_METHOD_OVERRIDE(StartSession);
 
-		CORO_DECL_METHOD(Cmd_Exec, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::StringView> &args);
-		CORO_DECL_METHOD(Cmd_Map, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::StringView> &args);
+		CORO_DECL_METHOD(Cmd_Exec, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args);
+		CORO_DECL_METHOD(Cmd_Map, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args);
 
 		IAnoxGame *m_game;
 		rkit::UniquePtr<rkit::coro::Thread> m_mainCoroThread;
@@ -91,8 +91,8 @@ namespace anox
 
 	rkit::Result AnoxGameLogic::Start()
 	{
-		RKIT_CHECK(m_game->GetCommandRegistry()->RegisterCommand("exec", this->AsyncCmd_Exec()));
-		RKIT_CHECK(m_game->GetCommandRegistry()->RegisterCommand("map", this->AsyncCmd_Map()));
+		RKIT_CHECK(m_game->GetCommandRegistry()->RegisterCommand(u8"exec", this->AsyncCmd_Exec()));
+		RKIT_CHECK(m_game->GetCommandRegistry()->RegisterCommand(u8"map", this->AsyncCmd_Map()));
 
 		RKIT_CHECK(AnoxCommandStackBase::Create(m_commandStack, 64 * 1024, 1024));
 
@@ -162,9 +162,9 @@ namespace anox
 	{
 	}
 
-	void AnoxGameLogic::DestructiveSpanArgParser::Acquire(const rkit::Span<char> &lineRef)
+	void AnoxGameLogic::DestructiveSpanArgParser::Acquire(const rkit::Span<uint8_t> &lineRef)
 	{
-		rkit::Span<char> line = lineRef;
+		rkit::Span<uint8_t> line = lineRef;
 
 		size_t argCount = 0;
 
@@ -212,7 +212,7 @@ namespace anox
 						if (line[startIndex] == '\"')
 							startIndex++;
 
-						m_cmd = rkit::StringView(line.Ptr() + startIndex, i - startIndex);
+						m_cmd = rkit::ByteStringView(line.Ptr() + startIndex, i - startIndex);
 					}
 					else if (argCount == 2)
 						m_line = line.SubSpan(startIndex);
@@ -226,7 +226,7 @@ namespace anox
 		m_count = argCount - 1;
 	}
 
-	rkit::StringView AnoxGameLogic::DestructiveSpanArgParser::GetCommand() const
+	rkit::ByteStringView AnoxGameLogic::DestructiveSpanArgParser::GetCommand() const
 	{
 		return m_cmd;
 	}
@@ -236,7 +236,7 @@ namespace anox
 		return m_count;
 	}
 
-	rkit::StringView AnoxGameLogic::DestructiveSpanArgParser::operator[](size_t index) const
+	rkit::ByteStringView AnoxGameLogic::DestructiveSpanArgParser::operator[](size_t index) const
 	{
 		size_t numArgsParsed = 0;
 
@@ -253,7 +253,7 @@ namespace anox
 						if (m_line[startIndex] == '\"')
 							startIndex++;
 
-						return rkit::StringView(m_line.Ptr() + startIndex, endIndex - startIndex);
+						return rkit::ByteStringView(m_line.Ptr() + startIndex, endIndex - startIndex);
 					}
 				}
 
@@ -262,7 +262,7 @@ namespace anox
 		}
 
 		RKIT_ASSERT(false);
-		return rkit::StringView();
+		return rkit::ByteStringView();
 	}
 
 	rkit::Result AnoxGameLogic::InsertAlias(AnoxCommandStackBase &commandStack, const AnoxRegisteredAlias &alias)
@@ -290,9 +290,9 @@ namespace anox
 
 			if (isSplit)
 			{
-				rkit::StringSliceView slice = alias.m_text.SubString(startPos, endPos - startPos);
+				rkit::ByteStringSliceView slice = alias.m_text.SubString(startPos, endPos - startPos);
 
-				RKIT_CHECK(commandStack.Push(slice));
+				RKIT_CHECK(commandStack.PushBStr(slice));
 				endPos = startPos;
 			}
 		}
@@ -300,7 +300,7 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxGameLogic::ApplyConsoleVar(const AnoxRegisteredConsoleVar &consoleVar, const rkit::ISpan<rkit::StringView> &args)
+	rkit::Result AnoxGameLogic::ApplyConsoleVar(const AnoxRegisteredConsoleVar &consoleVar, const rkit::ISpan<rkit::ByteStringView> &args)
 	{
 		return rkit::ResultCode::kNotYetImplemented;
 	}
@@ -316,8 +316,8 @@ namespace anox
 		};
 
 		CORO_BEGIN
-			CORO_CALL(self->AsyncExecCommandFile, *self->m_commandStack, rkit::CIPathView("configs/default.cfg"));
-			CORO_CHECK(self->m_commandStack->Push("d1"));
+			CORO_CALL(self->AsyncExecCommandFile, *self->m_commandStack, rkit::CIPathView(u8"configs/default.cfg"));
+			CORO_CHECK(self->m_commandStack->Push(u8"d1"));
 			CORO_CALL(self->AsyncRunCommands, *self->m_commandStack);
 		CORO_END
 	};
@@ -348,7 +348,7 @@ namespace anox
 	{
 		struct Locals
 		{
-			rkit::Span<char> line;
+			rkit::Span<uint8_t> line;
 		};
 
 		struct Params
@@ -369,7 +369,7 @@ namespace anox
 		struct Locals
 		{
 			DestructiveSpanArgParser parser;
-			rkit::HashValue_t cmdHash = 0;
+			AnoxPrehashedRegistryKeyView cmdView;
 			AnoxCommandRegistryBase *cmdRegistry = nullptr;
 
 			const AnoxRegisteredCommand *cmd = nullptr;
@@ -380,38 +380,38 @@ namespace anox
 		struct Params
 		{
 			AnoxCommandStackBase &commandStack;
-			rkit::Span<char> line;
+			rkit::Span<uint8_t> line;
 		};
 
 		CORO_BEGIN
 			locals.parser.Acquire(params.line);
 
-			locals.cmdHash = rkit::Hasher<rkit::StringView>::ComputeHash(0, locals.parser.GetCommand());
+			locals.cmdView = AnoxPrehashedRegistryKeyView(locals.parser.GetCommand());
 
 			locals.cmdRegistry = self->m_game->GetCommandRegistry();
 
-			locals.cmd = locals.cmdRegistry->FindCommand(locals.parser.GetCommand(), locals.cmdHash);
+			locals.cmd = locals.cmdRegistry->FindCommand(locals.cmdView);
 
 			CORO_IF(locals.cmd != nullptr)
 				CORO_CALL(locals.cmd->AsyncCall, params.commandStack, locals.parser);
 				CORO_RETURN;
 			CORO_END_IF
 
-			locals.alias = locals.cmdRegistry->FindAlias(locals.parser.GetCommand(), locals.cmdHash);
+			locals.alias = locals.cmdRegistry->FindAlias(locals.cmdView);
 
 			CORO_IF(locals.alias != nullptr)
 				CORO_CHECK(InsertAlias(params.commandStack, *locals.alias));
 				CORO_RETURN;
 			CORO_END_IF
 
-			locals.consoleVar = locals.cmdRegistry->FindConsoleVar(locals.parser.GetCommand(), locals.cmdHash);
+			locals.consoleVar = locals.cmdRegistry->FindConsoleVar(locals.cmdView);
 
 			CORO_IF(locals.consoleVar != nullptr)
 				CORO_CHECK(ApplyConsoleVar(*locals.consoleVar, locals.parser));
 				CORO_RETURN;
 			CORO_END_IF
 
-			rkit::log::ErrorFmt("Unknown console command {}", locals.parser.GetCommand().GetChars());
+			rkit::log::ErrorFmt(u8"Unknown console command {}", locals.parser.GetCommand());
 		CORO_END
 	};
 
@@ -426,19 +426,28 @@ namespace anox
 		struct Params
 		{
 			AnoxCommandStackBase &cmdStack;
-			const rkit::ISpan<rkit::StringView> &args;
+			const rkit::ISpan<rkit::ByteStringView> &args;
 		};
 
 		CORO_BEGIN
 			if (params.args.Count() < 1)
 			{
-				rkit::log::Error("Usage: exec <file>");
+				rkit::log::Error(u8"Usage: exec <file>");
 				CORO_RETURN;
 			}
 
-			CORO_CHECK(locals.path.Set(rkit::CIPathView("configs")));
+			CORO_CHECK(locals.path.Set(rkit::CIPathView(u8"configs")));
 
-			rkit::StringView configPathStr = params.args[0];
+			rkit::ByteStringView configPathBStr = params.args[0];
+
+			if (!rkit::CharacterEncodingValidator<rkit::CharacterEncoding::kASCII>::ValidateSpan(configPathBStr.ToSpan()))
+			{
+				rkit::log::Error(u8"exec file was invalid");
+				CORO_RETURN;
+			}
+
+			rkit::StringView configPathStr = configPathBStr.ToUTF8Unsafe();
+
 			rkit::PathValidationResult validationResult = rkit::CIPath::Validate(configPathStr);
 			rkit::CIPathView configRelPath;
 
@@ -451,7 +460,7 @@ namespace anox
 			}
 			else
 			{
-				rkit::log::Error("Malformed exec file path");
+				rkit::log::Error(u8"Malformed exec file path");
 				CORO_RETURN;
 			}
 
@@ -472,17 +481,17 @@ namespace anox
 		struct Params
 		{
 			AnoxCommandStackBase &cmdStack;
-			const rkit::ISpan<rkit::StringView> &args;
+			const rkit::ISpan<rkit::ByteStringView> &args;
 		};
 
 		CORO_BEGIN
 			if (params.args.Count() < 1)
 			{
-				rkit::log::Error("Usage: map <map name>");
+				rkit::log::Error(u8"Usage: map <map name>");
 				CORO_RETURN;
 			}
 
-			rkit::StringView mapNameStr = params.args[0];
+			rkit::ByteStringView mapNameStr = params.args[0];
 
 			for (char c : mapNameStr)
 			{
@@ -495,11 +504,13 @@ namespace anox
 				if (c == '_')
 					continue;
 
-				rkit::log::Error("Malformed map file path");
+				rkit::log::Error(u8"Malformed map file path");
 				CORO_RETURN;
 			}
 
-			CORO_CALL(self->m_game->AsyncRestartGame, mapNameStr);
+			rkit::StringView unicodeStrView(reinterpret_cast<const rkit::Utf8Char_t *>(mapNameStr.GetChars()), mapNameStr.Length());
+
+			CORO_CALL(self->m_game->AsyncRestartGame, unicodeStrView);
 		CORO_END
 	};
 
@@ -587,18 +598,18 @@ namespace anox
 
 			{
 				rkit::String fullPathStr;
-				CORO_CHECK(fullPathStr.Format("ax_bsp/maps/{}.bsp.bspmodel", params.mapName));
+				CORO_CHECK(fullPathStr.Format(u8"ax_bsp/maps/{}.bsp.bspmodel", params.mapName));
 
 				CORO_CHECK(locals.path.Set(fullPathStr));
 			}
 
-			rkit::log::LogInfo("GameLogic: Loading map");
+			rkit::log::LogInfo(u8"GameLogic: Loading map");
 
 			CORO_CALL(self->AsyncLoadCIPathKeyedResource, locals.modelLoadResult, anox::resloaders::kBSPModelResourceTypeCode, locals.path);
 
 			self->m_bspModel = locals.modelLoadResult.m_resourceHandle.StaticCast<AnoxBSPModelResourceBase>();
 
-			rkit::log::LogInfo("GameLogic: Map loaded successfully");
+			rkit::log::LogInfo(u8"GameLogic: Map loaded successfully");
 		CORO_END
 	};
 
@@ -617,15 +628,15 @@ namespace anox
 
 		CORO_BEGIN
 			rkit::String fullPathStr;
-			CORO_CHECK(fullPathStr.Format("ax_bsp/maps/{}.bsp.objects", params.mapName));
+			CORO_CHECK(fullPathStr.Format(u8"ax_bsp/maps/{}.bsp.objects", params.mapName));
 
 			CORO_CHECK(locals.path.Set(fullPathStr));
 
-			rkit::log::LogInfo("GameLogic: Loading spawn objects");
+			rkit::log::LogInfo(u8"GameLogic: Loading spawn objects");
 
 			CORO_CALL(self->AsyncLoadCIPathKeyedResource, locals.objectsLoadResult, anox::resloaders::kSpawnDefsResourceTypeCode, locals.path);
 
-			rkit::log::LogInfo("GameLogic: Spawning objects");
+			rkit::log::LogInfo(u8"GameLogic: Spawning objects");
 
 			int n = 0;
 		CORO_END
@@ -642,7 +653,7 @@ namespace anox
 		struct Params {};
 
 		CORO_BEGIN
-			rkit::log::LogInfo("GameLogic: Starting session");
+			rkit::log::LogInfo(u8"GameLogic: Starting session");
 
 			CORO_CHECK(self->m_game->GetCaptureHarness()->GetConfigurationState(locals.configState));
 
@@ -652,7 +663,7 @@ namespace anox
 			CORO_CHECK(root.Get(kvt));
 
 			IConfigurationValueView mapNameValue;
-			CORO_CHECK(kvt.GetValueFromKey("mapName", mapNameValue));
+			CORO_CHECK(kvt.GetValueFromKey(u8"mapName", mapNameValue));
 
 			CORO_CHECK(mapNameValue.Get(locals.mapName));
 
@@ -663,7 +674,7 @@ namespace anox
 				if (c >= '0' && c <= '9')
 					continue;
 
-				rkit::log::Error("Invalid map name");
+				rkit::log::Error(u8"Invalid map name");
 				CORO_CHECK(rkit::ResultCode::kDataError);
 			}
 

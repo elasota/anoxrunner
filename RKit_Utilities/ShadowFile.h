@@ -12,6 +12,8 @@ namespace rkit { namespace utils
 	class ShadowFileBase : public IShadowFile
 	{
 	public:
+		virtual ~ShadowFileBase() {}
+
 		virtual Result LoadShadowFile() = 0;
 		virtual Result InitializeShadowFile() = 0;
 

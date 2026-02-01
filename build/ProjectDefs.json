@@ -7,6 +7,7 @@
 		[
 			"RKit_Build",
 			"RKit_Build_Vulkan",
+			"RKit_CoreLib",
 			"RKit_PNG"
 		]
 	},
@@ -15,7 +16,8 @@
 		"type": "module",
 		"refs":
 		[
-			"Anox_Build"
+			"Anox_Build",
+			"RKit_CoreLib"
 		]
 	},
 	"Anox_MainProgram" :
@@ -24,6 +26,7 @@
 		"refs":
 		[
 			"Anox_Utilities",
+			"RKit_CoreLib",
 			"RKit_Data",
 			"RKit_Render_Vulkan"
 		],
@@ -47,6 +50,7 @@
 		],
 		"refs":
 		[
+			"RKit_CoreLib",
 			"RKit_Mem",
 			"RKit_System_Win32",
 			"RKit_ProgramLauncher",
@@ -56,7 +60,11 @@
 	"RKit_Build" :
 	{
 		"type": "module",
-		"dev_only": true
+		"dev_only": true,
+		"refs":
+		[
+			"RKit_CoreLib"
+		]
 	},
 	"RKit_Build_Vulkan" :
 	{
@@ -68,12 +76,13 @@
 		],
 		"refs":
 		[
-			"RKit_ShaderC_DLL"
+			"RKit_ShaderC_DLL",
+			"RKit_CoreLib"
 		]
 	},
 	"RKit_CoreLib" :
 	{
-		"type": "module",
+		"type": "linked_module",
 		"configs":
 		[
 			"CoreLib_Internal"
@@ -113,6 +122,10 @@
 		"configs":
 		[
 			"VulkanSDK"
+		],
+		"refs":
+		[
+			"RKit_CoreLib"
 		]
 	},
 	"RKit_ShaderC_DLL" :
@@ -131,6 +144,10 @@
 		"configs":
 		[
 			"RKit_System_Win32/RKit_System_Win32"
+		],
+		"refs":
+		[
+			"RKit_CoreLib"
 		]
 	},
 	"RKit_Utilities" :
@@ -144,8 +161,16 @@
 		],
 		"refs":
 		[
+			"RKit_CoreLib",
 			"ryu",
 			"zlib"
+		],
+		"extra_dirs":
+		[
+			{
+				"path": "include/rkit",
+				"target": "rkit"
+			}
 		]
 	},
 	"libpng" :
@@ -203,7 +228,11 @@
 	"Tool_ExtractDAT" :
 	{
 		"type": "module",
-		"dev_only": true
+		"dev_only": true,
+		"refs":
+		[
+			"RKit_CoreLib"
+		]
 	},
 	"zlib" :
 	{

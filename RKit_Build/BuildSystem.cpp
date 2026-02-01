@@ -19,7 +19,7 @@ namespace rkit { namespace buildsystem
 		void ShutdownDriver() override;
 
 		uint32_t GetDriverNamespaceID() const override { return rkit::IModuleDriver::kDefaultNamespace; }
-		rkit::StringView GetDriverName() const override { return "BuildSystem"; }
+		rkit::StringView GetDriverName() const override { return u8"BuildSystem"; }
 
 		Result CreateBuildSystemInstance(UniquePtr<IBuildSystemInstance> &outInstance) const override;
 		Result CreatePackageObjectWriter(UniquePtr<IPackageObjectWriter> &outWriter) const override;

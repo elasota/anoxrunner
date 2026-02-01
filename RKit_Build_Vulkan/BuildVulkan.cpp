@@ -25,7 +25,7 @@ namespace rkit { namespace buildsystem
 		Result RegisterBuildSystemAddOn(IBuildSystemInstance *instance) override;
 
 		uint32_t GetDriverNamespaceID() const override { return rkit::IModuleDriver::kDefaultNamespace; }
-		rkit::StringView GetDriverName() const override { return "Build_Vulkan"; }
+		rkit::StringView GetDriverName() const override { return u8"Build_Vulkan"; }
 
 		bool m_isGlslangInitialized = false;
 
@@ -42,10 +42,10 @@ namespace rkit { namespace buildsystem
 		vulkan::ShaderCModuleInitParameters shaderCInitParams = {};
 		shaderCInitParams.m_outApiGroup = &apiGroup;
 
-		m_shaderCModule = GetDrivers().m_moduleDriver->LoadModule(kDefaultNamespace, "ShaderC_DLL", &shaderCInitParams);
+		m_shaderCModule = GetDrivers().m_moduleDriver->LoadModule(kDefaultNamespace, u8"ShaderC_DLL", &shaderCInitParams);
 		if (!m_shaderCModule)
 		{
-			rkit::log::Error("ShaderC module failed to load");
+			rkit::log::Error(u8"ShaderC module failed to load");
 			return rkit::ResultCode::kOperationFailed;
 		}
 
@@ -56,7 +56,7 @@ namespace rkit { namespace buildsystem
 
 		if (!m_glslc->glslang_initialize_process())
 		{
-			rkit::log::Error("glslang failed to init");
+			rkit::log::Error(u8"glslang failed to init");
 			return rkit::ResultCode::kOperationFailed;
 		}
 

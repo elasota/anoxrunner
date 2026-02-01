@@ -22,7 +22,7 @@ namespace rkit { namespace utils
 	class ParserCharReader
 	{
 	public:
-		explicit ParserCharReader(const Span<const char> &chars);
+		explicit ParserCharReader(const Span<const uint8_t> &chars);
 
 		void SetAllowQuotes(bool allowQuotes);
 		void SetAllowCEscapes(bool allowCEscapes);
@@ -32,21 +32,21 @@ namespace rkit { namespace utils
 		void Reset(const TextParserLocation &loc);
 
 		bool SkipOne();
-		bool ReadOne(char &outChar);
-		bool PeekOne(char &outChar, size_t distanceAhead);
-		bool PeekOne(char &outChar);
+		bool ReadOne(uint8_t &outChar);
+		bool PeekOne(uint8_t &outChar, size_t distanceAhead);
+		bool PeekOne(uint8_t &outChar);
 
-		Span<const char> GetSpan(size_t start, size_t size) const;
+		Span<const uint8_t> GetSpan(size_t start, size_t size) const;
 
 	private:
 		static const size_t kMaxBufferedChars = 2;
 
-		void Advance(char charToConsume);
+		void Advance(uint8_t charToConsume);
 
 		TextParserLocation m_loc;
 
-		Span<const char> m_chars;
-		char m_charBuffer[kMaxBufferedChars];
+		Span<const uint8_t> m_chars;
+		uint8_t m_charBuffer[kMaxBufferedChars];
 		size_t m_numBufferedChars;
 
 		size_t m_readPos;
@@ -57,22 +57,22 @@ namespace rkit { namespace utils
 	class TextParser final : public TextParserBase, public NoCopy
 	{
 	public:
-		TextParser(const Span<const char> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType);
+		TextParser(const Span<const uint8_t> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType);
 
 		Result SkipWhitespace(bool skipNewLines);
-		Result ReadSimpleToken(Span<const char> &outSpan);
-		Result ReadCToken(Span<const char> &outSpan);
+		Result ReadSimpleToken(Span<const uint8_t> &outSpan);
+		Result ReadCToken(Span<const uint8_t> &outSpan);
 
-		Result SetSimpleDelimiters(const Span<const char> &delimiters) override;
+		Result SetSimpleDelimiters(const Span<const uint8_t> &delimiters) override;
 
 		Result SkipWhitespace() override;
-		Result ReadToken(bool &haveToken, Span<const char> &outSpan) override;
-		Result ReadToEndOfLine(Span<const char> &outSpan) override;
+		Result ReadToken(bool &haveToken, Span<const uint8_t> &outSpan) override;
+		Result ReadToEndOfLine(Span<const uint8_t> &outSpan) override;
 
 		void GetLocation(size_t &outLine, size_t &outCol) const override;
 
-		Result RequireToken(Span<const char> &outSpan) override;
-		Result ExpectToken(const StringView &str) override;
+		Result RequireToken(Span<const uint8_t> &outSpan) override;
+		Result ExpectToken(const Span<const uint8_t> &str) override;
 
 	private:
 		Result ReadCIdentifier();
@@ -82,13 +82,13 @@ namespace rkit { namespace utils
 		Result ReadCHexNumber();
 		Result ReadCString();
 
-		static bool IsAlphaChar(char c);
-		static bool IsNumericChar(char c);
-		static bool IsIdentifierChar(char c);
+		static bool IsAlphaChar(uint8_t c);
+		static bool IsNumericChar(uint8_t c);
+		static bool IsIdentifierChar(uint8_t c);
 
 		utils::TextParserCommentType m_commentType;
 		utils::TextParserLexerType m_lexType;
-		Vector<char> m_simpleDelimiters;
+		Vector<uint8_t> m_simpleDelimiters;
 
 		bool m_isInLineComment;
 		bool m_isInCBlockComment;
@@ -100,7 +100,7 @@ namespace rkit { namespace utils
 
 namespace rkit { namespace utils
 {
-	ParserCharReader::ParserCharReader(const Span<const char> &chars)
+	ParserCharReader::ParserCharReader(const Span<const uint8_t> &chars)
 		: m_chars(chars)
 		, m_readPos(0)
 		, m_charBuffer{}
@@ -141,7 +141,7 @@ namespace rkit { namespace utils
 	{
 		if (m_numBufferedChars > 0)
 		{
-			char c = m_charBuffer[--m_numBufferedChars];
+			uint8_t c = m_charBuffer[--m_numBufferedChars];
 			Advance(c);
 
 			return true;
@@ -150,17 +150,17 @@ namespace rkit { namespace utils
 		if (m_readPos == m_chars.Count())
 			return false;
 
-		char c = m_chars[m_readPos++];
+		uint8_t c = m_chars[m_readPos++];
 		Advance(c);
 
 		return true;
 	}
 
-	bool ParserCharReader::ReadOne(char &outChar)
+	bool ParserCharReader::ReadOne(uint8_t &outChar)
 	{
 		if (m_numBufferedChars > 0)
 		{
-			char c = m_charBuffer[--m_numBufferedChars];
+			uint8_t c = m_charBuffer[--m_numBufferedChars];
 			Advance(c);
 
 			outChar = c;
@@ -170,14 +170,14 @@ namespace rkit { namespace utils
 		if (m_readPos == m_chars.Count())
 			return false;
 
-		char c = m_chars[m_readPos++];
+		uint8_t c = m_chars[m_readPos++];
 		Advance(c);
 
 		outChar = c;
 		return true;
 	}
 
-	bool ParserCharReader::PeekOne(char &outChar, size_t distanceAhead)
+	bool ParserCharReader::PeekOne(uint8_t &outChar, size_t distanceAhead)
 	{
 		RKIT_ASSERT(distanceAhead < kMaxBufferedChars);
 
@@ -193,12 +193,12 @@ namespace rkit { namespace utils
 		return true;
 	}
 
-	bool ParserCharReader::PeekOne(char &outChar)
+	bool ParserCharReader::PeekOne(uint8_t &outChar)
 	{
 		return PeekOne(outChar, 0);
 	}
 
-	void ParserCharReader::Advance(char charToConsume)
+	void ParserCharReader::Advance(uint8_t charToConsume)
 	{
 		m_loc.m_pos++;
 
@@ -223,12 +223,12 @@ namespace rkit { namespace utils
 		}
 	}
 
-	Span<const char> ParserCharReader::GetSpan(size_t start, size_t size) const
+	Span<const uint8_t> ParserCharReader::GetSpan(size_t start, size_t size) const
 	{
 		return m_chars.SubSpan(start, size);
 	}
 
-	TextParser::TextParser(const Span<const char> &contents, TextParserCommentType commentType, TextParserLexerType lexType)
+	TextParser::TextParser(const Span<const uint8_t> &contents, TextParserCommentType commentType, TextParserLexerType lexType)
 		: m_charReader(contents)
 		, m_commentType(commentType)
 		, m_lexType(lexType)
@@ -245,7 +245,7 @@ namespace rkit { namespace utils
 
 	Result TextParser::SkipWhitespace(bool skipNewLines)
 	{
-		char c;
+		uint8_t c;
 
 		if (m_isInQuotedString)
 			return ResultCode::kOK;
@@ -271,7 +271,7 @@ namespace rkit { namespace utils
 
 			if (m_isInCBlockComment && c == '*')
 			{
-				char c2;
+				uint8_t c2;
 				(void)m_charReader.SkipOne();
 				bool secondRead = m_charReader.ReadOne(c2);
 
@@ -292,7 +292,7 @@ namespace rkit { namespace utils
 
 			if (m_commentType == TextParserCommentType::kC && c == '/')
 			{
-				char c2 = 0;
+				uint8_t c2 = 0;
 				if (m_charReader.PeekOne(c2, 1))
 				{
 					if (c2 == '*')
@@ -328,16 +328,16 @@ namespace rkit { namespace utils
 		return ResultCode::kOK;
 	}
 
-	Result TextParser::ReadSimpleToken(Span<const char> &outSpan)
+	Result TextParser::ReadSimpleToken(Span<const uint8_t> &outSpan)
 	{
 		size_t startLoc = m_charReader.GetLocation().m_pos;
 		size_t endLoc = startLoc;
 
-		Span<const char> simpleDelimiters = m_simpleDelimiters.ToSpan();
+		Span<const uint8_t> simpleDelimiters = m_simpleDelimiters.ToSpan();
 
 		for (;;)
 		{
-			char c;
+			uint8_t c;
 			if (!m_charReader.PeekOne(c))
 			{
 				endLoc = m_charReader.GetLocation().m_pos;
@@ -347,7 +347,7 @@ namespace rkit { namespace utils
 			endLoc = m_charReader.GetLocation().m_pos;
 
 			bool isSimpleDelimiter = false;
-			for (char sdc : simpleDelimiters)
+			for (uint8_t sdc : simpleDelimiters)
 			{
 				if (sdc == c)
 				{
@@ -378,12 +378,12 @@ namespace rkit { namespace utils
 		return ResultCode::kOK;
 	}
 
-	Result TextParser::ReadCToken(Span<const char> &outSpan)
+	Result TextParser::ReadCToken(Span<const uint8_t> &outSpan)
 	{
 		size_t startLoc = m_charReader.GetLocation().m_pos;
 		size_t endLoc = startLoc;
 
-		char c;
+		uint8_t c;
 		if (!m_charReader.ReadOne(c))
 			return ResultCode::kTextParsingFailed;
 
@@ -407,7 +407,7 @@ namespace rkit { namespace utils
 		{
 			if (c == '+')
 			{
-				char nextChar = '\0';
+				uint8_t nextChar = '\0';
 				if (m_charReader.PeekOne(nextChar))
 				{
 					if (nextChar == '=' || nextChar == '+')
@@ -416,7 +416,7 @@ namespace rkit { namespace utils
 			}
 			else if (c == '-')
 			{
-				char nextChar = '\0';
+				uint8_t nextChar = '\0';
 				if (m_charReader.PeekOne(nextChar))
 				{
 					if (nextChar == '=' || nextChar == '-' || nextChar == '>')
@@ -425,7 +425,7 @@ namespace rkit { namespace utils
 			}
 			else if (c == '!' || c == '~' || c == '/' || c == '*' || c == '=' || c == '^')
 			{
-				char nextChar = '\0';
+				uint8_t nextChar = '\0';
 				if (m_charReader.PeekOne(nextChar))
 				{
 					if (nextChar == '=')
@@ -434,7 +434,7 @@ namespace rkit { namespace utils
 			}
 			else if (c == '|' || c == '&')
 			{
-				char nextChar = '\0';
+				uint8_t nextChar = '\0';
 				if (m_charReader.PeekOne(nextChar))
 				{
 					if (nextChar == '=' || nextChar == c)
@@ -443,7 +443,7 @@ namespace rkit { namespace utils
 			}
 			else if (c == '<' || c == '>')
 			{
-				char nextChar = '\0';
+				uint8_t nextChar = '\0';
 				if (m_charReader.PeekOne(nextChar))
 				{
 					if (nextChar == '=')
@@ -474,7 +474,7 @@ namespace rkit { namespace utils
 	}
 
 
-	Result TextParser::SetSimpleDelimiters(const Span<const char> &delimiters)
+	Result TextParser::SetSimpleDelimiters(const Span<const uint8_t> &delimiters)
 	{
 		m_simpleDelimiters.Reset();
 		RKIT_CHECK(m_simpleDelimiters.Reserve(delimiters.Count()));
@@ -488,11 +488,11 @@ namespace rkit { namespace utils
 		return SkipWhitespace(true);
 	}
 
-	Result TextParser::ReadToken(bool &haveToken, Span<const char> &outSpan)
+	Result TextParser::ReadToken(bool &haveToken, Span<const uint8_t> &outSpan)
 	{
 		RKIT_CHECK(SkipWhitespace());
 
-		char c;
+		uint8_t c;
 		if (!m_charReader.PeekOne(c))
 		{
 			haveToken = false;
@@ -513,11 +513,11 @@ namespace rkit { namespace utils
 		return ResultCode::kInternalError;
 	}
 
-	Result TextParser::ReadToEndOfLine(Span<const char> &outSpan)
+	Result TextParser::ReadToEndOfLine(Span<const uint8_t> &outSpan)
 	{
 		size_t startPos = m_charReader.GetLocation().m_pos;
 
-		char c;
+		uint8_t c;
 		while (m_charReader.PeekOne(c))
 		{
 			if (c == '\r' || c == '\n')
@@ -539,50 +539,50 @@ namespace rkit { namespace utils
 		outCol = loc.m_col;
 	}
 
-	Result TextParser::RequireToken(Span<const char> &outSpan)
+	Result TextParser::RequireToken(Span<const uint8_t> &outSpan)
 	{
 		bool haveToken = false;
 		RKIT_CHECK(ReadToken(haveToken, outSpan));
 
 		if (!haveToken)
 		{
-			rkit::log::Error("Unexpected end of file");
+			rkit::log::Error(u8"Unexpected end of file");
 			return ResultCode::kTextParsingFailed;
 		}
 
 		return ResultCode::kOK;
 	}
 
-	Result TextParser::ExpectToken(const StringView &str)
+	Result TextParser::ExpectToken(const Span<const uint8_t> &str)
 	{
 		size_t line = 0;
 		size_t col = 0;
 		GetLocation(line, col);
 
-		Span<const char> span;
+		Span<const uint8_t> span;
 
 		RKIT_CHECK(RequireToken(span));
 
-		if (span.Count() != str.Length() || memcmp(span.Ptr(), str.GetChars(), span.Count()))
+		if (!CompareSpansEqual(span, str))
 		{
-			rkit::log::ErrorFmt("[{}:{}] Expected '{}'", line, col, str.GetChars());
+			rkit::log::ErrorFmt(u8"[{}:{}] Expected '{}'", line, col, StringView(reinterpret_cast<const Utf8Char_t *>(str.Ptr()), str.Count()));
 			return ResultCode::kTextParsingFailed;
 		}
 
 		return ResultCode::kOK;
 	}
 
-	bool TextParser::IsAlphaChar(char c)
+	bool TextParser::IsAlphaChar(uint8_t c)
 	{
 		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 	}
 
-	bool TextParser::IsNumericChar(char c)
+	bool TextParser::IsNumericChar(uint8_t c)
 	{
 		return (c >= '0' && c <= '9');
 	}
 
-	bool TextParser::IsIdentifierChar(char c)
+	bool TextParser::IsIdentifierChar(uint8_t c)
 	{
 		return IsAlphaChar(c) || IsNumericChar(c) || (c == '_');
 	}
@@ -591,7 +591,7 @@ namespace rkit { namespace utils
 	{
 		for (;;)
 		{
-			char c = '\0';
+			uint8_t c = '\0';
 			if (!m_charReader.PeekOne(c))
 				return ResultCode::kOK;
 
@@ -611,7 +611,7 @@ namespace rkit { namespace utils
 	{
 		for (;;)
 		{
-			char c = '\0';
+			uint8_t c = '\0';
 			if (!m_charReader.PeekOne(c))
 				return ResultCode::kOK;
 
@@ -633,7 +633,7 @@ namespace rkit { namespace utils
 	{
 		for (;;)
 		{
-			char c = '\0';
+			uint8_t c = '\0';
 			if (!m_charReader.PeekOne(c))
 				return ResultCode::kOK;
 
@@ -653,7 +653,7 @@ namespace rkit { namespace utils
 
 	Result TextParser::ReadCHexOrOctalNumber()
 	{
-		char secondChar = '\0';
+		uint8_t secondChar = '\0';
 		if (!m_charReader.PeekOne(secondChar))
 			return ResultCode::kOK;
 
@@ -668,9 +668,10 @@ namespace rkit { namespace utils
 
 	Result TextParser::ReadCString()
 	{
+		// FIXME: Validate encoding here
 		for (;;)
 		{
-			char c = '\0';
+			uint8_t c = '\0';
 
 			if (!m_charReader.ReadOne(c))
 				return ResultCode::kTextParsingFailed;
@@ -696,7 +697,7 @@ namespace rkit { namespace utils
 
 	Result TextParser::ReadCHexNumber()
 	{
-		char nextChar = '\0';
+		uint8_t nextChar = '\0';
 
 		while (m_charReader.PeekOne(nextChar))
 		{
@@ -715,7 +716,7 @@ namespace rkit { namespace utils
 	}
 } } // rkit::utils
 
-rkit::Result rkit::utils::TextParserBase::Create(const Span<const char> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<TextParserBase> &outParser)
+rkit::Result rkit::utils::TextParserBase::Create(const Span<const uint8_t> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<TextParserBase> &outParser)
 {
 	RKIT_CHECK(New<TextParser>(outParser, contents, commentType, lexType));
 	return ResultCode::kOK;

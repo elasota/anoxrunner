@@ -44,7 +44,7 @@ namespace rkit
 
 		Result LoadUtilitiesModule()
 		{
-			IModule *utilitiesModule = GetDrivers().m_moduleDriver->LoadModule(::rkit::IModuleDriver::kDefaultNamespace, "Utilities");
+			IModule *utilitiesModule = GetDrivers().m_moduleDriver->LoadModule(::rkit::IModuleDriver::kDefaultNamespace, u8"Utilities");
 
 			if (!utilitiesModule)
 				return ResultCode::kModuleLoadFailed;
@@ -113,7 +113,7 @@ namespace rkit
 		Result LoadModuleConfig(ModuleConfig &outConfig)
 		{
 			UniquePtr<ISeekableReadStream> configStream;
-			Result openResult = GetDrivers().m_systemDriver->OpenFileRead(configStream, FileLocation::kProgramDirectory, "rkitmoduleconfig.json");
+			Result openResult = GetDrivers().m_systemDriver->OpenFileRead(configStream, FileLocation::kProgramDirectory, u8"rkitmoduleconfig.json");
 
 			if (utils::GetResultCode(openResult) == ResultCode::kFileOpenError)
 				return ResultCode::kConfigMissing;
@@ -131,19 +131,19 @@ namespace rkit
 
 			bool has = false;
 			utils::JsonValue defaultProgramJV;
-			RKIT_CHECK(TryGetJsonObjectValueOfType(docJV, "DefaultProgram", utils::JsonElementType::kObject, has, defaultProgramJV));
+			RKIT_CHECK(TryGetJsonObjectValueOfType(docJV, u8"DefaultProgram", utils::JsonElementType::kObject, has, defaultProgramJV));
 
 			if (!has)
 				return ResultCode::kConfigInvalid;
 
 			utils::JsonValue modulesJV;
-			RKIT_CHECK(TryGetJsonObjectValueOfType(docJV, "Modules", utils::JsonElementType::kObject, has, modulesJV));
+			RKIT_CHECK(TryGetJsonObjectValueOfType(docJV, u8"Modules", utils::JsonElementType::kObject, has, modulesJV));
 
 			if (!has)
 				return ResultCode::kConfigInvalid;
 
 			utils::JsonValue programsJV;
-			RKIT_CHECK(TryGetJsonObjectValueOfType(docJV, "Programs", utils::JsonElementType::kObject, has, programsJV));
+			RKIT_CHECK(TryGetJsonObjectValueOfType(docJV, u8"Programs", utils::JsonElementType::kObject, has, programsJV));
 
 			if (!has)
 				return ResultCode::kConfigInvalid;
@@ -152,7 +152,7 @@ namespace rkit
 
 			{
 				StringView defaultProgramNamespaceSV;
-				RKIT_CHECK(TryGetJsonObjectValueString(defaultProgramJV, "Namespace", has, defaultProgramNamespaceSV));
+				RKIT_CHECK(TryGetJsonObjectValueString(defaultProgramJV, u8"Namespace", has, defaultProgramNamespaceSV));
 
 				if (!has)
 					return ResultCode::kConfigInvalid;
@@ -162,7 +162,7 @@ namespace rkit
 
 			{
 				StringView defaultProgramNameSV;
-				RKIT_CHECK(TryGetJsonObjectValueString(defaultProgramJV, "Name", has, defaultProgramNameSV));
+				RKIT_CHECK(TryGetJsonObjectValueString(defaultProgramJV, u8"Name", has, defaultProgramNameSV));
 
 				if (!has)
 					return ResultCode::kConfigInvalid;
@@ -270,7 +270,7 @@ namespace rkit
 			uint32_t programNamespaceID = moduleConfig.m_defaultProgramNamespace;
 			StringView programName = moduleConfig.m_defaultProgramName;
 
-			if (cmdLine.Count() >= 2 && cmdLine[1] == "-tool")
+			if (cmdLine.Count() >= 2 && cmdLine[1] == u8"-tool")
 			{
 				if (cmdLine.Count() == 2)
 					return ResultCode::kInvalidCommandLine;
@@ -316,7 +316,7 @@ namespace rkit
 
 		void UnloadAllTrackedModules();
 
-		IModule *LoadModuleInternal(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters* initParams, IMallocDriver &mallocDriver) override;
+		IModule *LoadModuleInternal(uint32_t moduleNamespace, const Utf8Char_t *moduleName, const ModuleInitParameters* initParams, IMallocDriver &mallocDriver) override;
 
 		void Uninstall();
 
@@ -377,9 +377,9 @@ namespace rkit
 			m_lastModule->Unload();
 	}
 
-	IModule *TrackedModuleDriver::LoadModuleInternal(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams, IMallocDriver &mallocDriver)
+	IModule *TrackedModuleDriver::LoadModuleInternal(uint32_t moduleNamespace, const Utf8Char_t *moduleName, const ModuleInitParameters *initParams, IMallocDriver &mallocDriver)
 	{
-		StringView moduleNameStringView = StringView(moduleName, strlen(moduleName));
+		StringView moduleNameStringView = StringView::FromCString(moduleName);
 		TrackedModule *scanModule = m_firstModule;
 
 		while (scanModule != nullptr)

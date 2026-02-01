@@ -3,6 +3,7 @@
 #include "AnoxEntityDefCompiler.h"
 #include "AnoxMaterialCompiler.h"
 
+#include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/BoolVector.h"
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/LogDriver.h"
@@ -453,7 +454,7 @@ namespace anox { namespace buildsystem
 
 		struct IEntityDataHandler
 		{
-			typedef rkit::Pair<rkit::AsciiString, rkit::AsciiString> Property_t;
+			typedef rkit::Pair<rkit::AsciiString, rkit::ByteString> Property_t;
 			typedef rkit::ConstSpan<Property_t> PropertySpan_t;
 
 			virtual rkit::Result ParseBuiltinEntity(const data::EntityClassDef &classDef, const PropertySpan_t &properties) = 0;
@@ -493,20 +494,22 @@ namespace anox { namespace buildsystem
 
 			rkit::Result ParseEntityCommon(const rkit::data::ContentID *contentID, const data::EntityClassDef &classDef, const PropertySpan_t &properties);
 			static PropertyDisposition FindFieldDef(const data::EntityClassDef &classDef, const rkit::AsciiStringSliceView &str, uint32_t baseOffset, const data::EntityFieldDef *&outFieldDef, uint32_t &outOffset);
-			static rkit::Result ParseField(const rkit::Span<uint8_t> &span, const data::EntityFieldDef &fieldDef, const rkit::AsciiStringSliceView &propertyValue);
-			static rkit::Result ParseFloatSequence(const rkit::Span<uint8_t> &span, size_t numFloats, const rkit::AsciiStringSliceView &propertyValue);
+			static rkit::Result ParseField(const rkit::Span<uint8_t> &span, const data::EntityFieldDef &fieldDef, const rkit::ByteStringSliceView &propertyValue);
+			static rkit::Result ParseFloatSequence(const rkit::Span<uint8_t> &span, size_t numFloats, const rkit::ByteStringSliceView &propertyValue);
 
 			rkit::buildsystem::IDependencyNodeCompilerFeedback *m_feedback;
 
 			rkit::Vector<CompiledEntity> m_compiledEntities;
-			rkit::Vector<rkit::AsciiString> m_strings;
+			rkit::Vector<rkit::ByteString> m_strings;
 			rkit::Vector<rkit::data::ContentID> m_edefContentIDs;
 		};
 
 		static rkit::Result ParseEntityData(const UserEntityDictionaryBase &dict, const rkit::ConstSpan<char> &entityData, IEntityDataHandler &handler);
 
 		static void SkipWhitespace(rkit::ConstSpan<char> &span);
-		static rkit::Result ParseQuotedString(rkit::ConstSpan<char> &span, rkit::AsciiString &outString);
+
+		template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+		static rkit::Result ParseQuotedString(rkit::ConstSpan<char> &span, rkit::BaseString<TChar, TEncoding, TStaticSize> &outString);
 	};
 
 
@@ -544,7 +547,7 @@ namespace anox { namespace buildsystem
 
 		for (const BSPTexInfo &texInfo : bsp.m_texInfos)
 		{
-			char fixedName[sizeof(texInfo.m_textureName) + 1];
+			rkit::Utf8Char_t fixedName[sizeof(texInfo.m_textureName) + 1];
 
 			size_t texNameLength = 0;
 			while (texNameLength < sizeof(texInfo.m_textureName))
@@ -562,7 +565,7 @@ namespace anox { namespace buildsystem
 			{
 				if ((fixedName[i] & 0x80) != 0)
 				{
-					rkit::log::Error("Invalid material");
+					rkit::log::Error(u8"Invalid material");
 					return rkit::ResultCode::kDataError;
 				}
 
@@ -571,21 +574,21 @@ namespace anox { namespace buildsystem
 					fixedName[i] = '/';
 			}
 
-			const rkit::ConstSpan<char> span(fixedName, texNameLength);
+			const rkit::ConstSpan<rkit::Utf8Char_t> span(fixedName, texNameLength);
 
-			if (rkit::CompareSpansEqual(span, rkit::StringView("null").ToSpan()))
+			if (rkit::CompareSpansEqual(span, rkit::StringView(u8"null").ToSpan()))
 				continue;
 
 			if (rkit::CIPath::Validate(rkit::StringSliceView(span)) != rkit::PathValidationResult::kValid)
 			{
-				rkit::log::Error("Texture name was invalid");
+				rkit::log::Error(u8"Texture name was invalid");
 				return rkit::ResultCode::kDataError;
 			}
 
 			rkit::String texPath;
-			RKIT_CHECK(texPath.Set("textures/"));
+			RKIT_CHECK(texPath.Set(u8"textures/"));
 			RKIT_CHECK(texPath.Append(span));
-			RKIT_CHECK(texPath.Append('.'));
+			RKIT_CHECK(texPath.Append(u8'.'));
 			RKIT_CHECK(texPath.Append(MaterialCompiler::GetWorldMaterialExtension()));
 
 			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kWorldMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, texPath));
@@ -717,7 +720,7 @@ namespace anox { namespace buildsystem
 			{
 				const BSPTexInfo &texInfo = bsp.m_texInfos[texInfoIndex];
 
-				char fixedName[33] = {};
+				rkit::Utf8Char_t fixedName[33] = {};
 				static_assert(sizeof(fixedName) == sizeof(texInfo.m_textureName) + 1, "Wrong texture name size");
 
 				size_t nameLength = 0;
@@ -899,7 +902,7 @@ namespace anox { namespace buildsystem
 
 		for (const Property_t &property : properties)
 		{
-			if (property.GetAt<0>() == "message" && property.GetAt<1>() == "")
+			if (property.GetAt<0>() == "message" && property.GetAt<1>().Length() == 0)
 				continue;
 
 			uint32_t offset = 0;
@@ -920,7 +923,7 @@ namespace anox { namespace buildsystem
 
 				if (!ignored)
 				{
-					rkit::log::ErrorFmt("Class {} is missing field {}", classDef.m_name, property.GetAt<0>().CStr());
+					rkit::log::ErrorFmt(u8"Class {} is missing field {}", classDef.m_name, property.GetAt<0>().ToUTF8View());
 					return rkit::ResultCode::kDataError;
 				}
 			}
@@ -983,7 +986,7 @@ namespace anox { namespace buildsystem
 				continue;
 			}
 
-			if (rkit::AsciiStringView(fieldDef.m_name, fieldDef.m_nameLength).EqualsNoCase(fieldName))
+			if (rkit::StringView(fieldDef.m_name, fieldDef.m_nameLength).RemoveEncoding().EqualsNoCase(fieldName.RemoveEncoding()))
 			{
 				RKIT_ASSERT(dispo == PropertyDisposition::kMissing);
 				dispo = PropertyDisposition::kPresent;
@@ -996,7 +999,7 @@ namespace anox { namespace buildsystem
 		{
 			for (const anox::data::EntityFieldDef &fieldDef : fieldDefs)
 			{
-				if (rkit::AsciiStringView(fieldDef.m_name, fieldDef.m_nameLength).EqualsNoCase("angles"))
+				if (rkit::StringView(fieldDef.m_name, fieldDef.m_nameLength).EqualsNoCase(u8"angles"))
 				{
 					RKIT_ASSERT(dispo == PropertyDisposition::kMissing);
 					dispo = PropertyDisposition::kAngleRecast;
@@ -1009,7 +1012,7 @@ namespace anox { namespace buildsystem
 		return dispo;
 	}
 
-	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseField(const rkit::Span<uint8_t> &span, const data::EntityFieldDef &fieldDef, const rkit::AsciiStringSliceView &propertyValue)
+	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseField(const rkit::Span<uint8_t> &span, const data::EntityFieldDef &fieldDef, const rkit::ByteStringSliceView &propertyValue)
 	{
 		switch (fieldDef.m_fieldType)
 		{
@@ -1027,23 +1030,25 @@ namespace anox { namespace buildsystem
 
 				if (!colonPos.IsSet())
 				{
-					rkit::log::Error("Invalid label value");
+					rkit::log::Error(u8"Invalid label value");
 					return rkit::ResultCode::kDataError;
 				}
 
-				const rkit::ConstSpan<char> valueChars = propertyValue.ToSpan();
+				const rkit::ConstSpan<uint8_t> valueChars = propertyValue.ToSpan();
 
 				rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
 				uint32_t labelHigh = 0;
 				uint32_t labelLow = 0;
-				if (!utils->ParseUInt32(rkit::StringSliceView(valueChars.SubSpan(0, colonPos.Get())), 10, labelHigh))
+
+				// FIXME: Crappy type punning
+				if (!utils->ParseUInt32(rkit::ByteStringSliceView(valueChars.SubSpan(0, colonPos.Get())), 10, labelHigh))
 				{
-					rkit::log::Error("Invalid label value");
+					rkit::log::Error(u8"Invalid label value");
 					return rkit::ResultCode::kDataError;
 				}
-				if (!utils->ParseUInt32(rkit::StringSliceView(valueChars.SubSpan(colonPos.Get() + 1)), 10, labelLow))
+				if (!utils->ParseUInt32(rkit::ByteStringSliceView(valueChars.SubSpan(colonPos.Get() + 1)), 10, labelLow))
 				{
-					rkit::log::Error("Invalid label value");
+					rkit::log::Error(u8"Invalid label value");
 					return rkit::ResultCode::kDataError;
 				}
 
@@ -1079,7 +1084,7 @@ namespace anox { namespace buildsystem
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseFloatSequence(const rkit::Span<uint8_t> &span, size_t numFloats, const rkit::AsciiStringSliceView &propertyValue)
+	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseFloatSequence(const rkit::Span<uint8_t> &span, size_t numFloats, const rkit::ByteStringSliceView &propertyValue)
 	{
 		rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
 
@@ -1096,19 +1101,17 @@ namespace anox { namespace buildsystem
 			while (endPos < propertyValue.Length() && propertyValue[endPos] != ' ')
 				endPos++;
 
-			const rkit::ConstSpan<char> charsSpan = propertyValue.SubString(startPos, endPos - startPos).ToSpan();
+			const rkit::ConstSpan<uint8_t> charsSpan = propertyValue.SubString(startPos, endPos - startPos).ToSpan();
 			if (charsSpan.Count() == 0)
 			{
-				rkit::log::Error("Malformed float value composite");
+				rkit::log::Error(u8"Malformed float value composite");
 				return rkit::ResultCode::kDataError;
 			}
 
-			rkit::String floatStr;
-			RKIT_CHECK(floatStr.Set(rkit::StringSliceView(charsSpan)));
 			float f = 0.f;
-			if (!utils->ParseFloat(floatStr, f))
+			if (!utils->ParseFloat(rkit::ByteStringSliceView(charsSpan), f))
 			{
-				rkit::log::Error("Malformed float value");
+				rkit::log::Error(u8"Malformed float value");
 				return rkit::ResultCode::kDataError;
 			}
 
@@ -1133,7 +1136,7 @@ namespace anox { namespace buildsystem
 		{
 			entityBlobSize += compiledEntity.m_dataBlob.Count();
 		}
-		for (const rkit::AsciiString &str : m_strings)
+		for (const rkit::ByteString &str : m_strings)
 		{
 			stringBlobSize += str.Length();
 		}
@@ -1164,12 +1167,12 @@ namespace anox { namespace buildsystem
 
 		RKIT_CHECK(chunks.m_entityStringLengths.Resize(m_strings.Count()));
 		rkit::ProcessParallelSpans(chunks.m_entityStringLengths.ToSpan(), m_strings.ToSpan(),
-			[](rkit::endian::LittleUInt32_t &outStrLength, const rkit::AsciiString &inStr)
+			[](rkit::endian::LittleUInt32_t &outStrLength, const rkit::ByteString &inStr)
 			{
 				outStrLength = static_cast<uint32_t>(inStr.Length());
 			});
 
-		for (const rkit::AsciiString &str : m_strings)
+		for (const rkit::ByteString &str : m_strings)
 		{
 			RKIT_CHECK(chunks.m_entityStringData.Append(str.ToSpan()));
 			RKIT_CHECK(chunks.m_entityStringData.Append(0));
@@ -1245,7 +1248,7 @@ namespace anox { namespace buildsystem
 
 	rkit::Result BSPEntityCompiler::ParseEntityData(const UserEntityDictionaryBase &dict, const rkit::ConstSpan<char> &entityDataRef, IEntityDataHandler &handler)
 	{
-		anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, "Utilities"));
+		anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, u8"Utilities"));
 
 		const data::EntityDefsSchema &schema = anoxUtils->GetEntityDefs();
 
@@ -1264,7 +1267,7 @@ namespace anox { namespace buildsystem
 
 			entityData = entityData.SubSpan(1);
 
-			rkit::Vector<rkit::Pair<rkit::AsciiString, rkit::AsciiString>> keyValuePairs;
+			rkit::Vector<rkit::Pair<rkit::AsciiString, rkit::ByteString>> keyValuePairs;
 
 			for (;;)
 			{
@@ -1280,17 +1283,17 @@ namespace anox { namespace buildsystem
 
 
 				rkit::AsciiString keyString;
-				rkit::AsciiString valueString;
+				rkit::ByteString valueString;
 
 				RKIT_CHECK(ParseQuotedString(entityData, keyString));
 
 				SkipWhitespace(entityData);
 				RKIT_CHECK(ParseQuotedString(entityData, valueString));
 
-				RKIT_CHECK(keyValuePairs.Append(rkit::Pair<rkit::AsciiString, rkit::AsciiString>(std::move(keyString), std::move(valueString))));
+				RKIT_CHECK(keyValuePairs.Append(rkit::Pair<rkit::AsciiString, rkit::ByteString>(std::move(keyString), std::move(valueString))));
 			}
 
-			rkit::Optional<rkit::AsciiString> classnameOpt;
+			rkit::Optional<rkit::ByteString> classnameOpt;
 			for (size_t i = 0; i < keyValuePairs.Count(); i++)
 			{
 				if (keyValuePairs[i].GetAt<0>() == "classname")
@@ -1305,14 +1308,14 @@ namespace anox { namespace buildsystem
 			if (!classnameOpt.IsSet())
 				return rkit::ResultCode::kDataError;
 
-			rkit::AsciiStringView classname = classnameOpt.Get();
+			rkit::ByteStringView classname = classnameOpt.Get();
 
 			rkit::AsciiStringView userEntityType;
 
 			bool isUserClass = true;
 			for (const anox::data::EntityClassDef *classDef : classDefs)
 			{
-				if (classname.EqualsNoCase(rkit::AsciiStringSliceView(classDef->m_name, classDef->m_nameLength)))
+				if (classname.EqualsNoCase(rkit::StringView(classDef->m_name, classDef->m_nameLength).RemoveEncoding()))
 				{
 					RKIT_CHECK(handler.ParseBuiltinEntity(*classDef, keyValuePairs.ToSpan()));
 
@@ -1324,9 +1327,9 @@ namespace anox { namespace buildsystem
 			bool isBadClass = false;
 			if (isUserClass)
 			{
-				for (const char *badClass : rkit::ConstSpan<const char *>(schema.m_badClassDefs, schema.m_numBadClassDefs))
+				for (const rkit::Utf8Char_t *badClass : rkit::ConstSpan<const rkit::Utf8Char_t *>(schema.m_badClassDefs, schema.m_numBadClassDefs))
 				{
-					if (classname.EqualsNoCase(rkit::AsciiStringView::FromCString(badClass)))
+					if (classname.EqualsNoCase(rkit::StringView::FromCString(badClass).RemoveEncoding()))
 					{
 						isBadClass = true;
 						break;
@@ -1340,16 +1343,16 @@ namespace anox { namespace buildsystem
 				if (!dict.FindEntityDef(classname, edefID))
 					return rkit::ResultCode::kDataError;
 
-				rkit::AsciiStringSliceView type = dict.GetEDefType(edefID);
+				rkit::ByteStringView type = dict.GetEDefType(edefID);
 
-				rkit::AsciiString fullType;
-				RKIT_CHECK(fullType.Set("userentity_"));
+				rkit::ByteString fullType;
+				RKIT_CHECK(fullType.Set(rkit::StringView(u8"userentity_").RemoveEncoding()));
 				RKIT_CHECK(fullType.Append(type));
 
 				const data::EntityClassDef *userEntityClassDef = nullptr;
 				for (const anox::data::EntityClassDef *classDef : classDefs)
 				{
-					if (rkit::AsciiStringSliceView(classDef->m_name, classDef->m_nameLength).EqualsNoCase(fullType))
+					if (rkit::StringSliceView(classDef->m_name, classDef->m_nameLength).RemoveEncoding().EqualsNoCase(fullType))
 					{
 						userEntityClassDef = classDef;
 						break;
@@ -1374,7 +1377,8 @@ namespace anox { namespace buildsystem
 		}
 	}
 
-	rkit::Result BSPEntityCompiler::ParseQuotedString(rkit::ConstSpan<char> &span, rkit::AsciiString &outString)
+	template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+	rkit::Result BSPEntityCompiler::ParseQuotedString(rkit::ConstSpan<char> &span, rkit::BaseString<TChar, TEncoding, TStaticSize> &outString)
 	{
 		if (span.Count() == 0 || span[0] != '\"')
 			return rkit::ResultCode::kDataError;
@@ -1392,9 +1396,14 @@ namespace anox { namespace buildsystem
 		if (spanLength == span.Count())
 			return rkit::ResultCode::kDataError;
 
-		const rkit::ConstSpan<char> stringSpan = span.SubSpan(0, spanLength);
+		static_assert(sizeof(TChar) == sizeof(char), "Wrong char size");
+
+		const rkit::ConstSpan<TChar> stringSpan = span.SubSpan(0, spanLength).ReinterpretCast<const TChar>();
 
 		span = span.SubSpan(spanLength + 1);
+
+		if (!rkit::CharacterEncodingValidator<TEncoding>::ValidateSpan(stringSpan))
+			return rkit::ResultCode::kInvalidUnicode;
 
 		return outString.Set(stringSpan);
 	}
@@ -1409,7 +1418,7 @@ namespace anox { namespace buildsystem
 
 		if (lumpSize % structureSize != 0)
 		{
-			rkit::log::ErrorFmt("Size of lump {} was invalid", static_cast<int>(lumpIndex));
+			rkit::log::ErrorFmt(u8"Size of lump {} was invalid", static_cast<int>(lumpIndex));
 			return rkit::ResultCode::kDataError;
 		}
 
@@ -1477,7 +1486,7 @@ namespace anox { namespace buildsystem
 			const uint16_t textureIndex = face.m_texture.Get();
 			if (textureIndex >= bsp.m_texInfos.Count())
 			{
-				rkit::log::Error("Texture index was out of range");
+				rkit::log::Error(u8"Texture index was out of range");
 				return rkit::ResultCode::kDataError;
 			}
 
@@ -1513,7 +1522,7 @@ namespace anox { namespace buildsystem
 
 			if (firstEdge > bsp.m_faceEdges.Count())
 			{
-				rkit::log::Error("Face leading edge was out of range");
+				rkit::log::Error(u8"Face leading edge was out of range");
 				return rkit::ResultCode::kDataError;
 			}
 
@@ -1521,7 +1530,7 @@ namespace anox { namespace buildsystem
 
 			if (bsp.m_faceEdges.Count() - firstEdge < numEdges)
 			{
-				rkit::log::Error("Face trailing edge was out of range");
+				rkit::log::Error(u8"Face trailing edge was out of range");
 				return rkit::ResultCode::kDataError;
 			}
 
@@ -1537,7 +1546,7 @@ namespace anox { namespace buildsystem
 
 				if (edge == std::numeric_limits<int32_t>::min())
 				{
-					rkit::log::Error("Edge index is invalid");
+					rkit::log::Error(u8"Edge index is invalid");
 					return rkit::ResultCode::kDataError;
 				}
 
@@ -1555,7 +1564,7 @@ namespace anox { namespace buildsystem
 
 				if (vertIndex >= bsp.m_verts.Count())
 				{
-					rkit::log::Error("Edge vert index is invalid");
+					rkit::log::Error(u8"Edge vert index is invalid");
 					return rkit::ResultCode::kDataError;
 				}
 
@@ -1594,7 +1603,7 @@ namespace anox { namespace buildsystem
 
 				if (intMax < intMin)
 				{
-					rkit::log::Error("Invalid lightmap dimensions");
+					rkit::log::Error(u8"Invalid lightmap dimensions");
 					return rkit::ResultCode::kDataError;
 				}
 
@@ -1607,7 +1616,7 @@ namespace anox { namespace buildsystem
 
 				if (intMax > maxOfIntMax)
 				{
-					rkit::log::Error("Invalid lightmap dimensions");
+					rkit::log::Error(u8"Invalid lightmap dimensions");
 					return rkit::ResultCode::kDataError;
 				}
 
@@ -1641,7 +1650,7 @@ namespace anox { namespace buildsystem
 			if (!stats.m_numUniqueStyles)
 				continue;
 
-#if ANOX_CLUSTER_LIGHTMAPS
+#if !!ANOX_CLUSTER_LIGHTMAPS
 			priv::LightmapIdentifier ident = {};
 			ident.m_faceIndex = static_cast<uint32_t>(faceIndex);
 			ident.m_uniqueStyleIndex = 0;
@@ -1895,13 +1904,13 @@ namespace anox { namespace buildsystem
 
 		if (leafIndex >= leafUsedBits.Count())
 		{
-			rkit::log::Error("Leaf index out of range");
+			rkit::log::Error(u8"Leaf index out of range");
 			return rkit::ResultCode::kDataError;
 		}
 
 		if (leafUsedBits[leafIndex])
 		{
-			rkit::log::Error("Leaf used multiple times");
+			rkit::log::Error(u8"Leaf used multiple times");
 			return rkit::ResultCode::kDataError;
 		}
 
@@ -2068,7 +2077,7 @@ namespace anox { namespace buildsystem
 
 			if (newIndex == 0x80000000u)
 			{
-				rkit::log::Error("Too many unique normals");
+				rkit::log::Error(u8"Too many unique normals");
 				return rkit::ResultCode::kDataError;
 			}
 
@@ -2098,7 +2107,7 @@ namespace anox { namespace buildsystem
 
 			if (newIndex == 0x80000000u)
 			{
-				rkit::log::Error("Too many unique planes");
+				rkit::log::Error(u8"Too many unique planes");
 				return rkit::ResultCode::kDataError;
 			}
 
@@ -2152,13 +2161,13 @@ namespace anox { namespace buildsystem
 
 		if (firstFaceEdge > bsp.m_faceEdges.Count() || (bsp.m_faceEdges.Count()) - firstFaceEdge < numFaceEdges)
 		{
-			rkit::log::Error("Invalid face edge range");
+			rkit::log::Error(u8"Invalid face edge range");
 			return rkit::ResultCode::kDataError;
 		}
 
 		if (numFaceEdges < 3)
 		{
-			rkit::log::Error("Invalid face");
+			rkit::log::Error(u8"Invalid face");
 			return rkit::ResultCode::kDataError;
 		}
 
@@ -2179,7 +2188,7 @@ namespace anox { namespace buildsystem
 			const uint16_t planeIndex = face.m_plane.Get();
 			if (planeIndex >= bsp.m_planes.Count())
 			{
-				rkit::log::Error("Invalid plane index");
+				rkit::log::Error(u8"Invalid plane index");
 				return rkit::ResultCode::kDataError;
 			}
 
@@ -2210,7 +2219,7 @@ namespace anox { namespace buildsystem
 
 			if (edgeIndex == std::numeric_limits<int32_t>::min())
 			{
-				rkit::log::Error("Edge index is invalid");
+				rkit::log::Error(u8"Edge index is invalid");
 				return rkit::ResultCode::kDataError;
 			}
 
@@ -2226,7 +2235,7 @@ namespace anox { namespace buildsystem
 
 			if (static_cast<uint32_t>(edgeIndex) >= bsp.m_edges.Count())
 			{
-				rkit::log::Error("Edge index is invalid");
+				rkit::log::Error(u8"Edge index is invalid");
 				return rkit::ResultCode::kDataError;
 			}
 
@@ -2235,7 +2244,7 @@ namespace anox { namespace buildsystem
 
 			if (vertIndex >= bsp.m_verts.Count())
 			{
-				rkit::log::Error("Vert index is invalid");
+				rkit::log::Error(u8"Vert index is invalid");
 				return rkit::ResultCode::kDataError;
 			}
 
@@ -2249,7 +2258,7 @@ namespace anox { namespace buildsystem
 
 			if (texInfoIndex >= bsp.m_texInfos.Count())
 			{
-				rkit::log::Error("Tex info index is invalid");
+				rkit::log::Error(u8"Tex info index is invalid");
 				return rkit::ResultCode::kDataError;
 			}
 
@@ -2442,7 +2451,7 @@ namespace anox { namespace buildsystem
 
 					if (currentNode >= bsp.m_nodes.Count())
 					{
-						rkit::log::Error("Node out of range");
+						rkit::log::Error(u8"Node out of range");
 						return rkit::ResultCode::kDataError;
 					}
 
@@ -2450,7 +2459,7 @@ namespace anox { namespace buildsystem
 
 					if (nodeUsedBits[currentNode])
 					{
-						rkit::log::Error("Node was in the tree multiple times");
+						rkit::log::Error(u8"Node was in the tree multiple times");
 						return rkit::ResultCode::kDataError;
 					}
 
@@ -2461,7 +2470,7 @@ namespace anox { namespace buildsystem
 					const uint32_t inPlaneIndex = node.m_plane.Get();
 					if (inPlaneIndex >= bsp.m_planes.Count())
 					{
-						rkit::log::Error("Plane index out of range");
+						rkit::log::Error(u8"Plane index out of range");
 						return rkit::ResultCode::kDataError;
 					}
 
@@ -2539,7 +2548,7 @@ namespace anox { namespace buildsystem
 
 			if (firstLeafBrush > bsp.m_leafBrushes.Count() || bsp.m_leafBrushes.Count() - firstLeafBrush < numLeafBrushes)
 			{
-				rkit::log::Error("Leafbrush count out of range");
+				rkit::log::Error(u8"Leafbrush count out of range");
 				return rkit::ResultCode::kDataError;
 			}
 
@@ -2549,7 +2558,7 @@ namespace anox { namespace buildsystem
 
 				if (brushIndex > bsp.m_brushes.Count())
 				{
-					rkit::log::Error("Brush index out of range");
+					rkit::log::Error(u8"Brush index out of range");
 					return rkit::ResultCode::kDataError;
 				}
 
@@ -2571,7 +2580,7 @@ namespace anox { namespace buildsystem
 
 			if (firstBrushSide > bsp.m_brushSides.Count() || bsp.m_brushSides.Count() - firstBrushSide < numBrushSides)
 			{
-				rkit::log::Error("Brushside count out of range");
+				rkit::log::Error(u8"Brushside count out of range");
 				return rkit::ResultCode::kDataError;
 			}
 
@@ -2583,7 +2592,7 @@ namespace anox { namespace buildsystem
 
 				if (planeIndex >= bsp.m_planes.Count())
 				{
-					rkit::log::Error("Plane index out of range");
+					rkit::log::Error(u8"Plane index out of range");
 					return rkit::ResultCode::kDataError;
 				}
 
@@ -2610,7 +2619,7 @@ namespace anox { namespace buildsystem
 
 			if (firstLeafFace > bsp.m_leafFaces.Count() || (bsp.m_leafFaces.Count() - firstLeafFace) < numLeafFaces)
 			{
-				rkit::log::Error("Invalid face list");
+				rkit::log::Error(u8"Invalid face list");
 				return rkit::ResultCode::kDataError;
 			}
 
@@ -2619,7 +2628,7 @@ namespace anox { namespace buildsystem
 				const uint16_t faceIndex = bsp.m_leafFaces[lfi + firstLeafFace].Get();
 				if (faceIndex >= faceUsedBits.Count())
 				{
-					rkit::log::Error("Invalid face index");
+					rkit::log::Error(u8"Invalid face index");
 					return rkit::ResultCode::kDataError;
 				}
 
@@ -2629,7 +2638,7 @@ namespace anox { namespace buildsystem
 				{
 					if (faceModelIndex[faceIndex] != modelIndex)
 					{
-						rkit::log::Error("Face used in multiple models");
+						rkit::log::Error(u8"Face used in multiple models");
 						return rkit::ResultCode::kDataError;
 					}
 					continue;
@@ -2734,7 +2743,7 @@ namespace anox { namespace buildsystem
 
 				if (!emittedIntoLastCluster)
 				{
-					rkit::log::Error("Failed to emit face");
+					rkit::log::Error(u8"Failed to emit face");
 					return rkit::ResultCode::kInternalError;
 				}
 			}
@@ -3034,7 +3043,7 @@ namespace anox { namespace buildsystem
 				{
 					if (texInfoIndex >= bsp.m_texInfos.Count())
 					{
-						rkit::log::Error("Invalid texinfo index");
+						rkit::log::Error(u8"Invalid texinfo index");
 						return rkit::ResultCode::kDataError;
 					}
 
@@ -3188,7 +3197,7 @@ namespace anox { namespace buildsystem
 
 			rkit::data::ContentID contentID = {};
 
-			if (path != "null")
+			if (path != u8"null")
 			{
 				RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, contentID));
 			}
@@ -3211,7 +3220,7 @@ namespace anox { namespace buildsystem
 
 		if (!bspStream.IsValid())
 		{
-			rkit::log::ErrorFmt("Failed to open '{}'", identifier.GetChars());
+			rkit::log::ErrorFmt(u8"Failed to open '{}'", identifier.GetChars());
 			return rkit::ResultCode::kFileOpenError;
 		}
 
@@ -3230,32 +3239,32 @@ namespace anox { namespace buildsystem
 
 	rkit::Result BSPMapCompilerBase2::FormatLightmapPath(rkit::String &path, const rkit::StringView &identifier, size_t lightmapIndex)
 	{
-		return path.Format("ax_bsp/{}_lm{}.dds", identifier.GetChars(), lightmapIndex);
+		return path.Format(u8"ax_bsp/{}_lm{}.dds", identifier.GetChars(), lightmapIndex);
 	}
 
 	rkit::Result BSPMapCompilerBase2::FormatModelPath(rkit::String &path, const rkit::StringView &identifier)
 	{
-		return path.Format("ax_bsp/{}.bspmodel", identifier.GetChars());
+		return path.Format(u8"ax_bsp/{}.bspmodel", identifier.GetChars());
 	}
 
 	rkit::Result BSPMapCompilerBase2::FormatObjectsPath(rkit::String &path, const rkit::StringView &identifier)
 	{
-		return path.Format("ax_bsp/{}.objects", identifier.GetChars());
+		return path.Format(u8"ax_bsp/{}.objects", identifier.GetChars());
 	}
 
 	rkit::Result BSPMapCompilerBase2::FormatFaceStatsPath(rkit::String &path, const rkit::StringView &identifier)
 	{
-		return path.Format("ax_bsp/{}.facestats", identifier.GetChars());
+		return path.Format(u8"ax_bsp/{}.facestats", identifier.GetChars());
 	}
 
 	rkit::Result BSPMapCompilerBase2::FormatGeometryPath(rkit::String &path, const rkit::StringView &identifier)
 	{
-		return path.Format("ax_bsp/{}.geo", identifier.GetChars());
+		return path.Format(u8"ax_bsp/{}.geo", identifier.GetChars());
 	}
 
 	rkit::Result BSPMapCompilerBase2::FormatMaterialListPath(rkit::String &path, const rkit::StringView &identifier)
 	{
-		return path.Format("ax_bsp/{}.materials", identifier.GetChars());
+		return path.Format(u8"ax_bsp/{}.materials", identifier.GetChars());
 	}
 
 	rkit::Result BSPMapCompilerBase2::WriteBSPModel(const data::BSPDataChunksVectors &bspOutput, rkit::IWriteStream &outStream)
@@ -3329,7 +3338,7 @@ namespace anox { namespace buildsystem
 				rkit::StringConstructionBuffer strBuf;
 				RKIT_CHECK(strBuf.Allocate(nameLength));
 
-				const rkit::Span<char> strSpan = strBuf.GetSpan();
+				const rkit::Span<rkit::Utf8Char_t> strSpan = strBuf.GetSpan();
 				RKIT_CHECK(inStream.ReadAll(strSpan.Ptr(), strSpan.Count()));
 
 				rkit::String str(std::move(strBuf));
@@ -3491,7 +3500,7 @@ namespace anox { namespace buildsystem
 
 				const BSPFaceStats &stats = faceStats[faceIndex];
 
-#if ANOX_CLUSTER_LIGHTMAPS
+#if !!ANOX_CLUSTER_LIGHTMAPS
 				const uint8_t numUniqueStylesToCopy = stats.m_numUniqueStyles;
 #else
 				const uint8_t numUniqueStylesToCopy = 1;
@@ -3510,7 +3519,7 @@ namespace anox { namespace buildsystem
 
 				if (lightmapDataOffs > bsp.m_lightMapData.Count() || bsp.m_lightMapData.Count() - static_cast<size_t>(lightmapDataOffs) < inOneLightmapsSizeBytes * stats.m_numInputStyles)
 				{
-					rkit::log::Error("Lightmap data out of range");
+					rkit::log::Error(u8"Lightmap data out of range");
 					return rkit::ResultCode::kDataError;
 				}
 
@@ -3657,7 +3666,7 @@ namespace anox { namespace buildsystem
 
 	rkit::Result BSPMapCompiler::FormatWorldMaterialPath(rkit::String &str, const rkit::StringSliceView &textureName)
 	{
-		return str.Format("textures/{}.{}", textureName, MaterialCompiler::GetWorldMaterialExtension());
+		return str.Format(u8"textures/{}.{}", textureName, MaterialCompiler::GetWorldMaterialExtension());
 	}
 
 	template<class TStructure>

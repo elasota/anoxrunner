@@ -30,7 +30,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		Result FirstChanceVulkanFailure(VkResult result)
 		{
-			rkit::log::ErrorFmt("Vulkan error {}", static_cast<unsigned int>(result));
+			rkit::log::ErrorFmt(u8"Vulkan error {}", static_cast<unsigned int>(result));
 			return utils::CreateResultWithExtCode(ResultCode::kGraphicsAPIException, static_cast<uint32_t>(result));
 		}
 	}
@@ -110,12 +110,12 @@ namespace rkit { namespace render { namespace vulkan
 		void ShutdownDriver() override;
 
 		uint32_t GetDriverNamespaceID() const override { return rkit::IModuleDriver::kDefaultNamespace; }
-		rkit::StringView GetDriverName() const override { return "Render_Vulkan"; }
+		rkit::StringView GetDriverName() const override { return u8"Render_Vulkan"; }
 
 		const VkAllocationCallbacks *GetAllocCallbacks() const;
 
-		bool IsInstanceExtensionEnabled(const StringView &extName) const;
-		bool IsInstanceExtensionEnabled(const char *layerName, const StringView &extName) const;
+		bool IsInstanceExtensionEnabled(const AsciiStringView &extName) const;
+		bool IsInstanceExtensionEnabled(const char *layerName, const AsciiStringView &extName) const;
 
 		Result EnumerateAdapters(Vector<UniquePtr<IRenderAdapter>> &adapters) const override;
 		Result CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, const IRenderDeviceCaps &requiredCaps, const IRenderDeviceCaps &optionalCaps, IRenderAdapter &adapter) override;
@@ -133,14 +133,14 @@ namespace rkit { namespace render { namespace vulkan
 		struct ExtensionEnumerationFinal
 		{
 			const char *m_layerName = nullptr;
-			Vector<StringView> m_extensions;
+			Vector<AsciiStringView> m_extensions;
 		};
 
 		struct QueryItem
 		{
-			QueryItem(const StringView &name, bool isRequired);
+			QueryItem(const AsciiStringView &name, bool isRequired);
 
-			StringView m_name;
+			AsciiStringView m_name;
 			bool m_required = false;
 			bool m_isAvailableInLayer = false;
 			bool m_isAvailableInBase = false;
@@ -171,8 +171,8 @@ namespace rkit { namespace render { namespace vulkan
 		public:
 			InstanceExtensionEnumerator(Vector<QueryItem> &layers, Vector<QueryItem> &extensions);
 
-			Result AddExtension(const StringView &ext, bool required) override;
-			Result AddLayer(const StringView &layer, bool required) override;
+			Result AddExtension(const AsciiStringView &ext, bool required) override;
+			Result AddLayer(const AsciiStringView &layer, bool required) override;
 
 		private:
 			Vector<QueryItem> &m_layers;
@@ -184,7 +184,7 @@ namespace rkit { namespace render { namespace vulkan
 		public:
 			explicit DeviceExtensionEnumerator(Vector<QueryItem> &extensions);
 
-			Result AddExtension(const StringView &ext, bool required) override;
+			Result AddExtension(const AsciiStringView &ext, bool required) override;
 
 		private:
 			Vector<QueryItem> &m_extensions;
@@ -432,7 +432,7 @@ namespace rkit { namespace render { namespace vulkan
 		return m_allocationCallbacks->GetCallbacks();
 	}
 
-	bool RenderVulkanDriver::IsInstanceExtensionEnabled(const char *layerName, const StringView &extName) const
+	bool RenderVulkanDriver::IsInstanceExtensionEnabled(const char *layerName, const AsciiStringView &extName) const
 	{
 		for (const ExtensionEnumerationFinal &candidate : m_instanceExtensions)
 		{
@@ -447,7 +447,7 @@ namespace rkit { namespace render { namespace vulkan
 
 			if (isLayerMatch)
 			{
-				for (const StringView &candidateExtName : candidate.m_extensions)
+				for (const AsciiStringView &candidateExtName : candidate.m_extensions)
 				{
 					if (candidateExtName == extName)
 						return true;
@@ -537,7 +537,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		if (!grantedCaps.MeetsOrExceeds(requiredCaps))
 		{
-			rkit::log::Error("Device failed to meet capability requirements");
+			rkit::log::Error(u8"Device failed to meet capability requirements");
 			return ResultCode::kOperationFailed;
 		}
 
@@ -557,7 +557,7 @@ namespace rkit { namespace render { namespace vulkan
 
 			if (queueRequest.m_numQueues == 0)
 			{
-				rkit::log::Error("Command queue request didn't request any queues");
+				rkit::log::Error(u8"Command queue request didn't request any queues");
 				return ResultCode::kInvalidParameter;
 			}
 
@@ -565,7 +565,7 @@ namespace rkit { namespace render { namespace vulkan
 
 			if (haveRequestedQueue[queueTypeInt])
 			{
-				rkit::log::Error("Queue type was requested multiple times");
+				rkit::log::Error(u8"Queue type was requested multiple times");
 				return ResultCode::kInvalidParameter;
 			}
 
@@ -575,7 +575,7 @@ namespace rkit { namespace render { namespace vulkan
 
 			if (queueRequest.m_numQueues > numQueuesAvailable)
 			{
-				rkit::log::Error("Too many queues requested");
+				rkit::log::Error(u8"Too many queues requested");
 				return ResultCode::kInvalidParameter;
 			}
 
@@ -589,7 +589,7 @@ namespace rkit { namespace render { namespace vulkan
 
 			if (queueRequest.m_numQueues == 0)
 			{
-				rkit::log::Error("Command queue request didn't request any queues");
+				rkit::log::Error(u8"Command queue request didn't request any queues");
 				return ResultCode::kInvalidParameter;
 			}
 
@@ -622,7 +622,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		for (const VkExtensionProperties &extProp : extProps)
 		{
-			StringView strView = StringView::FromCString(extProp.extensionName);
+			AsciiStringView strView = AsciiStringView::FromCString(extProp.extensionName);
 
 			for (QueryItem &queryItem : requestedDeviceExtensions)
 			{
@@ -634,7 +634,7 @@ namespace rkit { namespace render { namespace vulkan
 			}
 		}
 
-		Vector<StringView> enabledExts;
+		Vector<AsciiStringView> enabledExts;
 
 		for (const QueryItem &queryItem : requestedDeviceExtensions)
 		{
@@ -647,7 +647,7 @@ namespace rkit { namespace render { namespace vulkan
 			{
 				if (queryItem.m_required)
 				{
-					rkit::log::ErrorFmt("Missing required Vulkan device extension {}", queryItem.m_name.GetChars());
+					rkit::log::ErrorFmt(u8"Missing required Vulkan device extension {}", queryItem.m_name.ToUTF8());
 					return ResultCode::kOperationFailed;
 				}
 			}
@@ -674,7 +674,7 @@ namespace rkit { namespace render { namespace vulkan
 		return ResultCode::kOK;
 	}
 
-	bool RenderVulkanDriver::IsInstanceExtensionEnabled(const StringView &extName) const
+	bool RenderVulkanDriver::IsInstanceExtensionEnabled(const AsciiStringView &extName) const
 	{
 		return IsInstanceExtensionEnabled(nullptr, extName);
 	}
@@ -686,12 +686,12 @@ namespace rkit { namespace render { namespace vulkan
 		public:
 			explicit GlobalFunctionResolver(RenderVulkanDriver &vkDriver, ISystemLibrary &lib) : m_vkDriver(vkDriver), m_lib(lib) {}
 
-			bool ResolveProc(void *pfnAddr, const FunctionLoaderInfo &fli, const StringView &name) const override
+			bool ResolveProc(void *pfnAddr, const FunctionLoaderInfo &fli, const AsciiStringView &name) const override
 			{
 				return this->m_lib.GetFunction(pfnAddr, name);
 			}
 
-			bool IsExtensionEnabled(const StringView &ext) const override
+			bool IsExtensionEnabled(const AsciiStringView &ext) const override
 			{
 				return m_vkDriver.IsInstanceExtensionEnabled(nullptr, ext);
 			}
@@ -719,14 +719,14 @@ namespace rkit { namespace render { namespace vulkan
 		public:
 			explicit InstanceFunctionResolver(RenderVulkanDriver &vkDriver, VkInstance inst) : m_vkDriver(vkDriver), m_inst(inst) {}
 
-			bool ResolveProc(void *pfnAddr, const FunctionLoaderInfo &fli, const StringView &name) const override
+			bool ResolveProc(void *pfnAddr, const FunctionLoaderInfo &fli, const AsciiStringView &name) const override
 			{
 				PFN_vkVoidFunction func = this->m_vkDriver.GetGlobalAPI().vkGetInstanceProcAddr(m_inst, name.GetChars());
 				fli.m_copyVoidFunctionCallback(pfnAddr, func);
 				return func != static_cast<PFN_vkVoidFunction>(nullptr);
 			}
 
-			bool IsExtensionEnabled(const StringView &ext) const override
+			bool IsExtensionEnabled(const AsciiStringView &ext) const override
 			{
 				return m_vkDriver.IsInstanceExtensionEnabled(nullptr, ext);
 			}
@@ -793,14 +793,14 @@ namespace rkit { namespace render { namespace vulkan
 	void RenderVulkanDriver::DebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *data)
 	{
 		if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
-			rkit::log::Error(StringView::FromCString(data->pMessage));
+			rkit::log::Error(StringView::FromCString(ReinterpretAnsiCharToUtf8Char(data->pMessage)));
 		else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-			rkit::log::Warning(StringView::FromCString(data->pMessage));
+			rkit::log::Warning(StringView::FromCString(ReinterpretAnsiCharToUtf8Char(data->pMessage)));
 		else
-			rkit::log::LogInfo(StringView::FromCString(data->pMessage));
+			rkit::log::LogInfo(StringView::FromCString(ReinterpretAnsiCharToUtf8Char(data->pMessage)));
 	}
 
-	RenderVulkanDriver::QueryItem::QueryItem(const StringView &name, bool isRequired)
+	RenderVulkanDriver::QueryItem::QueryItem(const AsciiStringView &name, bool isRequired)
 		: m_name(name)
 		, m_required(isRequired)
 		, m_isAvailableInLayer(false)
@@ -849,7 +849,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 	}
 
-	Result RenderVulkanDriver::InstanceExtensionEnumerator::AddExtension(const StringView &ext, bool required)
+	Result RenderVulkanDriver::InstanceExtensionEnumerator::AddExtension(const AsciiStringView &ext, bool required)
 	{
 		for (QueryItem &item : m_extensions)
 		{
@@ -865,7 +865,7 @@ namespace rkit { namespace render { namespace vulkan
 		return m_extensions.Append(QueryItem(ext, required));
 	}
 
-	Result RenderVulkanDriver::InstanceExtensionEnumerator::AddLayer(const StringView &layer, bool required)
+	Result RenderVulkanDriver::InstanceExtensionEnumerator::AddLayer(const AsciiStringView &layer, bool required)
 	{
 		for (QueryItem &item : m_layers)
 		{
@@ -886,7 +886,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 	}
 
-	Result RenderVulkanDriver::DeviceExtensionEnumerator::AddExtension(const StringView &ext, bool required)
+	Result RenderVulkanDriver::DeviceExtensionEnumerator::AddExtension(const AsciiStringView &ext, bool required)
 	{
 		for (QueryItem &item : m_extensions)
 		{
@@ -970,7 +970,7 @@ namespace rkit { namespace render { namespace vulkan
 		{
 			for (const VkLayerProperties &availableLayer : availableLayers)
 			{
-				if (requestedLayer.m_name == StringView::FromCString(availableLayer.layerName))
+				if (requestedLayer.m_name == AsciiStringView::FromCString(availableLayer.layerName))
 				{
 					requestedLayer.m_isAvailableInBase = true;
 					break;
@@ -981,7 +981,7 @@ namespace rkit { namespace render { namespace vulkan
 			{
 				if (requestedLayer.m_required)
 				{
-					rkit::log::ErrorFmt("Missing required Vulkan layer {}", requestedLayer.m_name.GetChars());
+					rkit::log::ErrorFmt(u8"Missing required Vulkan layer {}", requestedLayer.m_name.ToUTF8());
 					return ResultCode::kOperationFailed;
 				}
 				else
@@ -1004,7 +1004,7 @@ namespace rkit { namespace render { namespace vulkan
 			{
 				for (const VkExtensionProperties &availableExtension : layerExts.m_extensions)
 				{
-					if (requestedExtension.m_name == StringView::FromCString(availableExtension.extensionName))
+					if (requestedExtension.m_name == AsciiStringView::FromCString(availableExtension.extensionName))
 					{
 						if (layerExts.m_layerName)
 							requestedExtension.m_isAvailableInLayer = true;
@@ -1019,7 +1019,7 @@ namespace rkit { namespace render { namespace vulkan
 			{
 				if (requestedExtension.m_required)
 				{
-					rkit::log::ErrorFmt("Missing required Vulkan extension {}", requestedExtension.m_name.GetChars());
+					rkit::log::ErrorFmt(u8"Missing required Vulkan extension {}", requestedExtension.m_name.ToUTF8());
 					return ResultCode::kOperationFailed;
 				}
 				else
@@ -1043,7 +1043,7 @@ namespace rkit { namespace render { namespace vulkan
 			{
 				for (QueryItem &requestedExtension : requestedInstanceExtensions)
 				{
-					if (requestedExtension.m_name == StringView::FromCString(availableExtension.extensionName))
+					if (requestedExtension.m_name == AsciiStringView::FromCString(availableExtension.extensionName))
 					{
 						RKIT_CHECK(extEnumFinal.m_extensions.Append(requestedExtension.m_name));
 						break;
@@ -1062,7 +1062,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		VkApplicationInfo appInfo = {};
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-		appInfo.pApplicationName = utils->GetProgramName().GetChars();
+		appInfo.pApplicationName = ReinterpretUtf8CharToAnsiChar(utils->GetProgramName().GetChars());
 
 		uint32_t vMajor = 0;
 		uint32_t vMinor = 0;

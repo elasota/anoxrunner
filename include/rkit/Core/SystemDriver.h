@@ -53,7 +53,7 @@ namespace rkit
 	{
 		virtual ~ISystemLibrary() {}
 
-		virtual bool GetFunction(void *fnPtrAddress, const StringView &fnName) = 0;
+		virtual bool GetFunction(void *fnPtrAddress, const AsciiStringView &fnName) = 0;
 	};
 
 	enum class FileLocation

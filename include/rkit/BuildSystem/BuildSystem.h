@@ -122,17 +122,17 @@ namespace rkit
 	{
 		inline CIPathView GetShaderSourceBasePath()
 		{
-			return "rkit/render/src";
+			return u8"rkit/render/src";
 		}
 
 		inline CIPathView GetCompiledPipelineIntermediateBasePath()
 		{
-			return "rpll_c/pipe";
+			return u8"rpll_c/pipe";
 		}
 
 		inline CIPathView GetCompiledGlobalsIntermediateBasePath()
 		{
-			return "rpll_c/glob";
+			return u8"rpll_c/glob";
 		}
 	}
 }

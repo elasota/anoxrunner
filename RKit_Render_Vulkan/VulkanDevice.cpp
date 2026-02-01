@@ -42,7 +42,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 	public:
 		VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks,
-			const RenderDeviceCaps &caps, const RenderDeviceRequirements &reqs, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts, const VkPhysicalDeviceMemoryProperties &memProperties, UniquePtr<IMutex> &&queueMutex);
+			const RenderDeviceCaps &caps, const RenderDeviceRequirements &reqs, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<AsciiStringView> &&enabledExts, const VkPhysicalDeviceMemoryProperties &memProperties, UniquePtr<IMutex> &&queueMutex);
 		~VulkanDevice();
 
 		CallbackSpan<ICopyCommandQueue *, const void *> GetCopyQueues() const override;
@@ -120,8 +120,8 @@ namespace rkit { namespace render { namespace vulkan
 		public:
 			explicit FunctionResolver(const VulkanInstanceAPI &vki, const VulkanDevice &device);
 
-			bool ResolveProc(void *pfnAddr, const FunctionLoaderInfo &fli, const StringView &name) const override;
-			bool IsExtensionEnabled(const StringView &ext) const override;
+			bool ResolveProc(void *pfnAddr, const FunctionLoaderInfo &fli, const AsciiStringView &name) const override;
+			bool IsExtensionEnabled(const AsciiStringView &ext) const override;
 
 		private:
 			const VulkanInstanceAPI &m_vki;
@@ -194,7 +194,7 @@ namespace rkit { namespace render { namespace vulkan
 		StaticArray<QueueFamily, kNumQueues> m_queueFamilies;
 		Vector<VulkanQueueProxyBase *> m_allQueues;
 
-		Vector<StringView> m_deviceExtensions;
+		Vector<AsciiStringView> m_deviceExtensions;
 		VkPhysicalDeviceMemoryProperties m_memProperties;
 
 		UniquePtr<IMutex> m_queueMutex;
@@ -212,7 +212,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 	}
 
-	bool VulkanDevice::FunctionResolver::ResolveProc(void *pfnAddr, const FunctionLoaderInfo &fli, const StringView &name) const
+	bool VulkanDevice::FunctionResolver::ResolveProc(void *pfnAddr, const FunctionLoaderInfo &fli, const AsciiStringView &name) const
 	{
 		PFN_vkVoidFunction func = m_vki.vkGetDeviceProcAddr(m_device.GetDevice(), name.GetChars());
 		if (func == nullptr)
@@ -224,9 +224,9 @@ namespace rkit { namespace render { namespace vulkan
 		}
 	}
 
-	bool VulkanDevice::FunctionResolver::IsExtensionEnabled(const StringView &ext) const
+	bool VulkanDevice::FunctionResolver::IsExtensionEnabled(const AsciiStringView &ext) const
 	{
-		for (const StringView &enabledExt : m_device.m_deviceExtensions)
+		for (const AsciiStringView &enabledExt : m_device.m_deviceExtensions)
 		{
 			if (enabledExt == ext)
 				return true;
@@ -306,7 +306,7 @@ namespace rkit { namespace render { namespace vulkan
 	}
 
 	VulkanDevice::VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks,
-		const RenderDeviceCaps &caps, const RenderDeviceRequirements &reqs, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts, const VkPhysicalDeviceMemoryProperties &memProperties, UniquePtr<IMutex> &&queueMutex)
+		const RenderDeviceCaps &caps, const RenderDeviceRequirements &reqs, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<AsciiStringView> &&enabledExts, const VkPhysicalDeviceMemoryProperties &memProperties, UniquePtr<IMutex> &&queueMutex)
 		: m_vkg(vkg)
 		, m_vki(vki)
 		, m_vkg_p(vkg_p)
@@ -815,7 +815,7 @@ namespace rkit { namespace render { namespace vulkan
 		return ResultCode::kOK;
 	}
 
-	Result VulkanDeviceBase::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const QueueFamilySpec(&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RenderDeviceRequirements &reqs, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<StringView> &&enabledExts, const VkPhysicalDeviceMemoryProperties &memProperties)
+	Result VulkanDeviceBase::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const QueueFamilySpec(&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RenderDeviceRequirements &reqs, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<AsciiStringView> &&enabledExts, const VkPhysicalDeviceMemoryProperties &memProperties)
 	{
 		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
 

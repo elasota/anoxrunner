@@ -33,7 +33,7 @@ namespace rkit { namespace data
 	{
 		static const size_t kLength = 50;
 
-		char m_chars[kLength + 1];
+		Utf8Char_t m_chars[kLength + 1];
 
 		StringView ToStringView() const;
 	};
@@ -107,7 +107,7 @@ namespace rkit { namespace data
 
 	inline ContentIDString ContentID::ToString() const
 	{
-		const char *chars = "0123456789abcdefghijklmnopqrstuvwxyz";
+		const Utf8Char_t *chars = u8"0123456789abcdefghijklmnopqrstuvwxyz";
 
 		ContentIDString result;
 

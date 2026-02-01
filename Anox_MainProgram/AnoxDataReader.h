@@ -56,7 +56,7 @@ namespace anox
 		static rkit::Result ReadCheckUInt(uint8_t &outUInt, uint8_t inUInt, uint8_t expectedMax);
 		static rkit::Result ReadCheckBool(bool &outBool, uint8_t inBool);
 		static rkit::Result ReadCheckLabel(Label &outLabel, const rkit::endian::LittleUInt32_t &inLabel);
-		static rkit::Result ReadCheckUTF8String(rkit::String &outString, const rkit::Span<const char> &chars);
+		static rkit::Result ReadCheckUTF8String(rkit::String &outString, const rkit::Span<const rkit::Utf8Char_t> &chars);
 
 		template<class TEnum, class TIntegral>
 		static rkit::Result ReadCheckEnum(TEnum &outValue, const TIntegral &inUInt);

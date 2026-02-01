@@ -159,7 +159,7 @@ namespace anox
 				outEDef = inFuture.GetResult().m_resourceHandle.StaticCast<AnoxEntityDefResourceBase>();
 			});
 
-		anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, "Utilities"));
+		anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, u8"Utilities"));
 		const data::EntityDefsSchema &schema = anoxUtils->GetEntityDefs();
 
 		const size_t numSpawnDefs = resource.m_chunks.m_entityTypes.Count();

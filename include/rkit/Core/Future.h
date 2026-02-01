@@ -10,6 +10,8 @@ namespace rkit
 {
 	enum class FutureState
 	{
+		kEmpty,
+
 		kWaiting,
 		kFailed,
 		kAborted,
@@ -20,6 +22,8 @@ namespace rkit
 
 	struct FutureContainerBase : public RefCounted
 	{
+		FutureContainerBase();
+
 		void Fail();
 		void Abort();
 
@@ -69,6 +73,11 @@ namespace rkit
 
 namespace rkit
 {
+	inline FutureContainerBase::FutureContainerBase()
+		: m_state(static_cast<StatePrimitive_t>(FutureState::kWaiting))
+	{
+	}
+
 	inline void FutureContainerBase::Fail()
 	{
 		RKIT_ASSERT(this->GetState() == FutureState::kWaiting);

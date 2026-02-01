@@ -1,6 +1,8 @@
 #pragma once
 
-#if defined(_MSC_VER)
+#include "rkit/Core/Platform.h"
+
+#if defined(_MSC_VER) && RKIT_PLATFORM_ARCH_FAMILY_X86 != 0
 #include <intrin.h>
 #endif
 
@@ -8,7 +10,7 @@
 
 namespace rkit { namespace bitops {
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && RKIT_PLATFORM_ARCH_FAMILY_X86 != 0
 	inline int8_t FindLowestSet(uint32_t value)
 	{
 		unsigned long index = 0;

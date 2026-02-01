@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/Endian.h"
 #include "rkit/Core/FourCC.h"
 
@@ -30,7 +31,7 @@ namespace anox { namespace data {
 		uint32_t m_structOffset;
 		EntityFieldType m_fieldType;
 
-		const char *m_name;
+		const rkit::Utf8Char_t *m_name;
 		size_t m_nameLength;
 
 		const EntityClassDef *m_classDef;
@@ -42,7 +43,7 @@ namespace anox { namespace data {
 
 		uint32_t m_entityClassIndex;
 
-		const char *m_name;
+		const rkit::Utf8Char_t *m_name;
 		size_t m_nameLength;
 
 		size_t m_dataSize;
@@ -58,7 +59,7 @@ namespace anox { namespace data {
 		const EntityClassDef *const *m_classDefs;
 		size_t m_numClassDefs;
 
-		const char *const *m_badClassDefs;
+		const rkit::Utf8Char_t *const *m_badClassDefs;
 		size_t m_numBadClassDefs;
 	};
 

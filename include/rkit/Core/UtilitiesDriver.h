@@ -82,15 +82,15 @@ namespace rkit
 
 		virtual HashValue_t ComputeHash(HashValue_t baseHash, const void *value, size_t size) const = 0;
 
-		virtual Result CreateTextParser(const Span<const char> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<utils::ITextParser> &outParser) const = 0;
+		virtual Result CreateTextParser(const Span<const uint8_t> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<utils::ITextParser> &outParser) const = 0;
 		virtual Result ReadEntireFile(ISeekableReadStream &stream, Vector<uint8_t> &outBytes) const = 0;
 
-		virtual bool ValidateFilePath(const Span<const char> &fileName, bool permitWildcards) const = 0;
+		virtual bool ValidateFilePath(const Span<const Utf8Char_t> &fileName, bool permitWildcards) const = 0;
 
-		virtual void NormalizeFilePath(const Span<char> &chars) const = 0;
+		virtual void NormalizeFilePath(const Span<Utf8Char_t> &chars) const = 0;
 		virtual bool FindFilePathExtension(const StringSliceView &str, StringSliceView &outExt) const = 0;
 
-		virtual Result EscapeCStringInPlace(const Span<char> &chars, size_t &outNewLength) const = 0;
+		virtual Result EscapeCStringInPlace(const Span<Utf8Char_t> &chars, size_t &outNewLength) const = 0;
 
 		virtual const utils::ISha256Calculator *GetSha256Calculator() const = 0;
 
@@ -109,7 +109,7 @@ namespace rkit
 		virtual bool ContainsWildcards(const StringSliceView &str) const = 0;
 		virtual bool MatchesWildcard(const StringSliceView &candidate, const StringSliceView &wildcard) const = 0;
 
-		virtual bool DefaultIsPathComponentValid(const BaseStringSliceView<char, CharacterEncoding::kUTF8> &span, bool isFirst, bool allowWildcards) const = 0;
+		virtual bool DefaultIsPathComponentValid(const BaseStringSliceView<rkit::Utf8Char_t, CharacterEncoding::kUTF8> &span, bool isFirst, bool allowWildcards) const = 0;
 
 		virtual Result ConvertUTF16ToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const uint16_t> &src) const = 0;
 		virtual Result ConvertUTF16WCharToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const wchar_t> &src) const = 0;
@@ -117,34 +117,33 @@ namespace rkit
 		virtual Result ConvertUTF8ToUTF16(size_t &outSize, const Span<uint16_t> &dest, const Span<const uint8_t> &src) const = 0;
 		virtual Result ConvertUTF8ToUTF16WChar(size_t &outSize, const Span<wchar_t> &dest, const Span<const uint8_t> &src) const = 0;
 
-		virtual bool IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t, CharacterEncoding::kUTF16> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const = 0;
+		virtual bool IsPathComponentValidOnWindows(const BaseStringSliceView<OSPathChar_t, CharacterEncoding::kOSPath> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const = 0;
 
 		virtual Result CreateCoroThread(UniquePtr<coro::Thread> &thread, size_t stackSize) const = 0;
 
 		virtual Result CreateBlockingReader(UniquePtr<ISeekableReadStream> &outReadStream, UniquePtr<IAsyncReadFile> &&asyncFile, FilePos_t fileSize) const = 0;
 
-		virtual bool ParseFloat(const StringView &str, float &f) const = 0;
-		virtual bool ParseDouble(const StringView &str, double &d) const = 0;
+		virtual bool ParseFloat(const ByteStringSliceView &str, float &f) const = 0;
+		virtual bool ParseDouble(const ByteStringSliceView &str, double &d) const = 0;
 
-		virtual bool ParseInt32(const StringSliceView &str, uint8_t radix, int32_t &i) const = 0;
-		virtual bool ParseInt64(const StringSliceView &str, uint8_t radix, int64_t &i) const = 0;
-		virtual bool ParseUInt32(const StringSliceView &str, uint8_t radix, uint32_t &i) const = 0;
-		virtual bool ParseUInt64(const StringSliceView &str, uint8_t radix, uint64_t &i) const = 0;
+		virtual bool ParseInt32(const ByteStringSliceView &str, uint8_t radix, int32_t &i) const = 0;
+		virtual bool ParseInt64(const ByteStringSliceView &str, uint8_t radix, int64_t &i) const = 0;
+		virtual bool ParseUInt32(const ByteStringSliceView &str, uint8_t radix, uint32_t &i) const = 0;
+		virtual bool ParseUInt64(const ByteStringSliceView &str, uint8_t radix, uint64_t &i) const = 0;
 
 		virtual Result CreateImage(const utils::ImageSpec &spec, UniquePtr<utils::IImage> &image) const = 0;
 		virtual Result CloneImage(UniquePtr<utils::IImage> &outImage, const utils::IImage &image) const = 0;
 		virtual Result BlitImageSigned(utils::IImage &destImage, const utils::IImage &srcImage, ptrdiff_t srcX, ptrdiff_t srcY, ptrdiff_t destX, ptrdiff_t destY, size_t width, size_t height) const = 0;
 		virtual Result BlitImage(utils::IImage &destImage, const utils::IImage &srcImage, size_t srcX, size_t srcY, size_t destX, size_t destY, size_t width, size_t height) const = 0;
 
-		virtual void FormatSignedInt(IFormatStringWriter<char> &writer, intmax_t value) const = 0;
-		virtual void FormatUnsignedInt(IFormatStringWriter<char> &writer, uintmax_t value) const = 0;
-		virtual void FormatFloat(IFormatStringWriter<char> &writer, float f) const = 0;
-		virtual void FormatDouble(IFormatStringWriter<char> &writer, double f) const = 0;
+		virtual void FormatSignedInt(IFormatStringWriter<Utf8Char_t> &writer, intmax_t value) const = 0;
+		virtual void FormatUnsignedInt(IFormatStringWriter<Utf8Char_t> &writer, uintmax_t value) const = 0;
+		virtual void FormatFloat(IFormatStringWriter<Utf8Char_t> &writer, float f) const = 0;
+		virtual void FormatDouble(IFormatStringWriter<Utf8Char_t> &writer, double f) const = 0;
 		virtual void FormatCString(IFormatStringWriter<char> &writer, const char *str) const = 0;
-		virtual void WFormatCString(IFormatStringWriter<wchar_t> &writer, const wchar_t *str) const = 0;
+		virtual void FormatUtf8String(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t *str) const = 0;
 
-		virtual void FormatString(IFormatStringWriter<char> &writer, const StringSliceView &fmt, const FormatParameterList<char> &paramList) const = 0;
-		virtual void FormatString(IFormatStringWriter<wchar_t> &writer, const WStringSliceView &fmt, const FormatParameterList<wchar_t> &paramList) const = 0;
+		virtual void FormatString(IFormatStringWriter<Utf8Char_t> &writer, const StringSliceView &fmt, const FormatParameterList<Utf8Char_t> &paramList) const = 0;
 
 		virtual void SanitizeClampFloats(const Span<float> &outFloats, const Span<const endian::LittleFloat32_t> &inFloats, int maxMagnitude) const = 0;
 		virtual void SanitizeClampUInt16s(const Span<uint16_t> &outFloats, const Span<const endian::LittleUInt16_t> &inFloats, uint16_t maxValue) const = 0;

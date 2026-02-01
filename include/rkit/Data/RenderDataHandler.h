@@ -150,7 +150,7 @@ namespace rkit { namespace data
 
 	struct RenderRTTIEnumOption
 	{
-		const char *m_name;
+		const Utf8Char_t *m_name;
 		size_t m_nameLength;
 
 		unsigned int m_value;
@@ -162,7 +162,7 @@ namespace rkit { namespace data
 
 		RenderRTTIMainType m_mainType;
 
-		const char *m_name;
+		const Utf8Char_t *m_name;
 		size_t m_nameLength;
 	};
 
@@ -200,7 +200,7 @@ namespace rkit { namespace data
 
 	struct RenderRTTIStructField
 	{
-		const char *m_name;
+		const Utf8Char_t *m_name;
 		size_t m_nameLength;
 
 		const RenderRTTITypeBase *(*m_getTypeFunc)();

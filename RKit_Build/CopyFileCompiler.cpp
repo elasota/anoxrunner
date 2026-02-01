@@ -27,7 +27,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(feedback->OpenInput(BuildFileLocation::kSourceDir, inPath, inFile));
 
 		CIPath outPath;
-		RKIT_CHECK(outPath.Set(StringSliceView("loose")));
+		RKIT_CHECK(outPath.Set(StringSliceView(u8"loose")));
 		RKIT_CHECK(outPath.Append(inPath));
 
 		UniquePtr<ISeekableReadWriteStream> outFile;

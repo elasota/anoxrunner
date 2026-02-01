@@ -22,6 +22,7 @@ namespace rkit
 		kDataError,
 
 		kIntegerOverflow,
+		kDivisionByZero,
 
 		kKeyNotFound,
 

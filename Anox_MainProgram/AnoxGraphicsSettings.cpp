@@ -16,19 +16,19 @@ namespace anox
 {
 	bool RestartRequiringGraphicsSettings::ResolveConfigEnum(const rkit::StringView &configName, rkit::data::RenderRTTIMainType &outMainType, unsigned int &outValue) const
 	{
-		if (configName == "CFG_DepthCompareOp")
+		if (configName == u8"CFG_DepthCompareOp")
 		{
 			ANOX_SETTING_RETURN_ENUM(ComparisonFunction, Less);
 			return true;
 		}
 
-		if (configName == "CFG_DepthStencilTargetFormat")
+		if (configName == u8"CFG_DepthStencilTargetFormat")
 		{
 			ANOX_SETTING_RETURN_ENUM(DepthStencilFormat, DepthUNorm16);
 			return true;
 		}
 
-		if (configName == "CFG_RenderTargetFormat")
+		if (configName == u8"CFG_RenderTargetFormat")
 		{
 			ANOX_SETTING_RETURN_ENUM(RenderTargetFormat, RGBA_UNorm8);
 			return true;

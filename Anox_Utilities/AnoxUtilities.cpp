@@ -26,7 +26,7 @@ namespace anox
 		void ShutdownDriver() override;
 
 		uint32_t GetDriverNamespaceID() const override { return anox::kAnoxNamespaceID; }
-		rkit::StringView GetDriverName() const override { return "Utilities"; }
+		rkit::StringView GetDriverName() const override { return u8"Utilities"; }
 
 		rkit::Result OpenAFSArchive(rkit::UniquePtr<rkit::ISeekableReadStream> &&stream, rkit::UniquePtr<anox::afs::IArchive> &outArchive) override;
 		rkit::Result RunDataBuild(const rkit::StringView &targetName, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataDir, const rkit::OSAbsPathView &dataSourceDir, rkit::render::BackendType backendType) override;

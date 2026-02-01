@@ -27,6 +27,6 @@ namespace rkit { namespace buildsystem
 		uint32_t GetVersion() const override;
 
 	private:
-		static Result HandlePathChunk(Vector<char> &constructedPath, bool &outOK, size_t chunkIndex, IDependencyNode *node, const Span<const char> &chunk);
+		static Result HandlePathChunk(Vector<Utf8Char_t> &constructedPath, bool &outOK, size_t chunkIndex, IDependencyNode *node, const Span<const Utf8Char_t> &chunk);
 	};
 } } // rkit::buildsystem

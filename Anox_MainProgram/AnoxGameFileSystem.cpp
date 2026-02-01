@@ -32,7 +32,7 @@ namespace anox
 	rkit::Result AnoxGameFileSystem::OpenNamedFileBlocking(rkit::RCPtr<rkit::Job> &openJob, const rkit::FutureContainerPtr<rkit::UniquePtr<rkit::ISeekableReadStream>> &outStream, const rkit::CIPathView &path)
 	{
 		rkit::CIPath fullPath;
-		RKIT_CHECK(fullPath.Set(rkit::CIPathView("files")));
+		RKIT_CHECK(fullPath.Set(rkit::CIPathView(u8"files")));
 		RKIT_CHECK(fullPath.Append(path));
 
 		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->AsyncOpenFileRead(m_jobQueue, openJob, nullptr, outStream, rkit::FileLocation::kGameDirectory, fullPath));
@@ -43,7 +43,7 @@ namespace anox
 	rkit::Result AnoxGameFileSystem::OpenNamedFileAsync(rkit::RCPtr<rkit::Job> &openJob, const rkit::FutureContainerPtr<rkit::AsyncFileOpenReadResult> &outStream, const rkit::CIPathView &path)
 	{
 		rkit::CIPath fullPath;
-		RKIT_CHECK(fullPath.Set(rkit::CIPathView("files")));
+		RKIT_CHECK(fullPath.Set(rkit::CIPathView(u8"files")));
 		RKIT_CHECK(fullPath.Append(path));
 
 		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->AsyncOpenFileAsyncRead(m_jobQueue, openJob, nullptr, outStream, rkit::FileLocation::kGameDirectory, fullPath));
@@ -55,7 +55,7 @@ namespace anox
 		rkit::data::ContentIDString contentIDString = contentID.ToString();
 
 		rkit::CIPath fullPath;
-		RKIT_CHECK(fullPath.Set(rkit::CIPathView("content")));
+		RKIT_CHECK(fullPath.Set(rkit::CIPathView(u8"content")));
 		RKIT_CHECK(fullPath.Append(rkit::CIPathView(contentIDString.ToStringView())));
 
 		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->AsyncOpenFileAsyncRead(m_jobQueue, openJob, nullptr, outStream, rkit::FileLocation::kGameDirectory, fullPath));

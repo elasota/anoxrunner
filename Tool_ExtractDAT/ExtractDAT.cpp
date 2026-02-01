@@ -33,7 +33,7 @@ namespace anox
 
 rkit::Result anox::ExtractDATProgram::Run()
 {
-	rkit::IModule *anoxUtilsModule = rkit::GetDrivers().m_moduleDriver->LoadModule(anox::kAnoxNamespaceID, "Utilities");
+	rkit::IModule *anoxUtilsModule = rkit::GetDrivers().m_moduleDriver->LoadModule(anox::kAnoxNamespaceID, u8"Utilities");
 	if (!anoxUtilsModule)
 		return rkit::ResultCode::kModuleLoadFailed;
 
@@ -41,24 +41,24 @@ rkit::Result anox::ExtractDATProgram::Run()
 
 	if (args.Count() != 2)
 	{
-		::rkit::log::Error("Usage: ExtractDAT <input> <output>");
+		::rkit::log::Error(u8"Usage: ExtractDAT <input> <output>");
 		return rkit::ResultCode::kInvalidParameter;
 	}
 
 	rkit::OSAbsPath inPath;
-	RKIT_CHECK((inPath.SetFromEncodedString<char, rkit::CharacterEncoding::kUTF8>(args[0])));
+	RKIT_CHECK(inPath.SetFromEncodedString(args[0]));
 
 	rkit::UniquePtr<rkit::ISeekableReadStream> datFileStream;
 	rkit::Result openResult = rkit::GetDrivers().m_systemDriver->OpenFileReadAbs(datFileStream, inPath);
 	if (rkit::utils::GetResultCode(openResult) == rkit::ResultCode::kFileOpenError)
 	{
-		::rkit::log::Error("Failed to open input file");
+		::rkit::log::Error(u8"Failed to open input file");
 		return rkit::ResultCode::kFileOpenError;
 	}
 
 	RKIT_CHECK(openResult);
 
-	anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver*>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, "Utilities"));
+	anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver*>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, u8"Utilities"));
 
 	RKIT_ASSERT(anoxUtils);
 
@@ -71,19 +71,17 @@ rkit::Result anox::ExtractDATProgram::Run()
 		RKIT_CHECK(fh.Open(fileStream));
 
 		uint32_t fileSize = fh.GetFileSize();
-		rkit::StringView filePath = fh.GetFilePath();
+		rkit::AsciiStringView filePath = fh.GetFilePath();
 
 
 		rkit::OSAbsPath outPath;
-		RKIT_CHECK((outPath.SetFromEncodedString<char, rkit::CharacterEncoding::kUTF8>(args[1])));
-
-		rkit::log::LogInfo(fh.GetFilePath());
+		RKIT_CHECK(outPath.SetFromEncodedString(args[1]));
 
 		if (true)
 			return rkit::ResultCode::kNotYetImplemented;	// fix path handling here
 
 		rkit::OSRelPath fpath;
-		RKIT_CHECK((fpath.SetFromEncodedString<char, rkit::CharacterEncoding::kUTF8>(fh.GetFilePath())));
+		RKIT_CHECK(fpath.SetFromEncodedString(filePath.ToUTF8()));
 
 		RKIT_CHECK(outPath.Append(fpath));
 

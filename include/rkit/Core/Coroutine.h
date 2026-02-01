@@ -210,7 +210,7 @@ namespace rkit { namespace coro
 	public:
 		template<class TCoroutine>
 		explicit FunctionStarter(const TCoroutine &coroutine)
-			: m_metadata(CoroMetadataResolver<TCoroutine>::ms_metadata)
+			: m_metadata(CoroMetadataResolver<true, TCoroutine>::ms_metadata)
 		{
 			this->CheckType(coroutine);
 		}

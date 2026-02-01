@@ -25,6 +25,7 @@ namespace rkit { namespace priv {
 		bool m_overflowed = false;
 
 		void WriteChars(const Span<const TChar> &chars) override;
+		CharacterEncoding GetEncoding() const override;
 	};
 } }
 
@@ -88,6 +89,8 @@ namespace rkit
 		typedef BaseStringView<TChar, TEncoding> View_t;
 		typedef BaseStringSliceView<TChar, TEncoding> SliceView_t;
 
+		static const size_t kStaticSize = TStaticSize;
+
 		BaseString();
 		BaseString(const BaseString &other);
 		BaseString(BaseString &&other) noexcept;
@@ -100,6 +103,13 @@ namespace rkit
 
 		Result Set(const SliceView_t &strView);
 		Result Set(const Span<const TChar> &strView);
+
+		template<class TOtherChar, CharacterEncoding TOtherEncoding>
+		Result ConvertFrom(const BaseStringSliceView<TOtherChar, TOtherEncoding> &strView);
+
+		template<class TOtherChar>
+		Result ConvertFromSpan(const Span<const TOtherChar> &chars, CharacterEncoding encoding);
+
 		Result Append(const SliceView_t &strView);
 		Result Append(const Span<const TChar> &span);
 		Result Append(TChar ch);
@@ -144,7 +154,13 @@ namespace rkit
 
 		Ordering Compare(const BaseStringSliceView<TChar, TEncoding> &other) const;
 
-		void FormatValue(IFormatStringWriter<TChar> &writer) const;
+		template<class TOtherChar>
+		void FormatValue(IFormatStringWriter<TOtherChar> &writer) const;
+
+		// Only valid for ASCII
+		BaseStringView<Utf8Char_t, CharacterEncoding::kUTF8> ToUTF8View() const;
+		// Only valid for UTF-8 and ASCII
+		BaseStringView<uint8_t, CharacterEncoding::kByte> ToByteView() const;
 
 	private:
 		bool IsStaticString() const;
@@ -175,10 +191,12 @@ namespace rkit
 
 #include "RKitAssert.h"
 #include "Algorithm.h"
+#include "CharacterEncodingValidator.h"
 #include "Format.h"
 #include "MallocDriver.h"
 #include "StaticArray.h"
 #include "StringView.h"
+#include "TypeTraits.h"
 #include "UtilitiesDriver.h"
 #include "Result.h"
 
@@ -333,6 +351,12 @@ void rkit::priv::StringFormatHelper<TChar, TEncoding>::WriteChars(const Span<con
 	}
 	else
 		m_charsRequired += chars.Count();
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding>
+rkit::CharacterEncoding rkit::priv::StringFormatHelper<TChar, TEncoding>::GetEncoding() const
+{
+	return TEncoding;
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
@@ -558,9 +582,25 @@ rkit::Ordering rkit::BaseString<TChar, TEncoding, TStaticSize>::Compare(const Ba
 
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
-void rkit::BaseString<TChar, TEncoding, TStaticSize>::FormatValue(IFormatStringWriter<TChar> &writer) const
+template<class TOtherChar>
+void rkit::BaseString<TChar, TEncoding, TStaticSize>::FormatValue(IFormatStringWriter<TOtherChar> &writer) const
 {
-	return static_cast<BaseStringSliceView<TChar, TEncoding>>(*this).FormatValue(writer);
+	const BaseStringSliceView<TChar, TEncoding> view = *this;
+	view.FormatValue(writer);
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::BaseStringView<rkit::Utf8Char_t, rkit::CharacterEncoding::kUTF8> rkit::BaseString<TChar, TEncoding, TStaticSize>::ToUTF8View() const
+{
+	const rkit::BaseStringView<TChar, TEncoding> view = *this;
+	return view.ToUTF8();
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+rkit::BaseStringView<uint8_t, rkit::CharacterEncoding::kByte> rkit::BaseString<TChar, TEncoding, TStaticSize>::ToByteView() const
+{
+	const rkit::BaseStringView<TChar, TEncoding> view = *this;
+	return view.RemoveEncoding();
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
@@ -575,7 +615,6 @@ void rkit::BaseString<TChar, TEncoding, TStaticSize>::Clear()
 	Evict();
 	UnsafeReset();
 }
-
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
 rkit::BaseStringSliceView<TChar, TEncoding> rkit::BaseString<TChar, TEncoding, TStaticSize>::SubString(size_t start, size_t length) const
@@ -633,6 +672,84 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::Set(const Span<con
 
 	(*this) = std::move(newString);
 
+	return ResultCode::kOK;
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+template<class TOtherChar, rkit::CharacterEncoding TOtherEncoding>
+rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::ConvertFrom(const BaseStringSliceView<TOtherChar, TOtherEncoding> &strView)
+{
+	return this->ConvertFromSpan(strView.ToSpan(), TOtherEncoding);
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+template<class TOtherChar>
+rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::ConvertFromSpan(const Span<const TOtherChar> &charsRef, CharacterEncoding encoding)
+{
+	if (charsRef.Count() == 0)
+	{
+		Clear();
+		return ResultCode::kOK;
+	}
+
+	Span<const TOtherChar> inChars = charsRef;
+
+	if (sizeof(TOtherChar) == sizeof(TChar) && IsCharacterEncodingCompatible(encoding, TEncoding))
+		return this->Set(inChars.ReinterpretCast<const TChar>());
+
+	StaticArray<TChar, TStaticSize - 1> staticBuffer;
+	size_t staticCharsEmitted = 0;
+
+	// Don't try static convert unless it seems likely to succeed
+	if (inChars.Count() < TStaticSize)
+	{
+		const size_t charsDigested = text::ConvertText(staticBuffer.GetBuffer(), TEncoding, TStaticSize - 1, staticCharsEmitted,
+			inChars.Ptr(), encoding, inChars.Count(), text::UnknownCharBehavior::kFail, 0);
+
+		if (charsDigested == 0)
+			return ResultCode::kInvalidUnicode;
+
+		if (charsDigested == inChars.Count())
+		{
+			// The entire string thing fit in static buffer
+			Clear();
+			CopySpanNonOverlapping(Span<TChar>(m_staticString, staticCharsEmitted), staticBuffer.ToSpan().SubSpan(0, staticCharsEmitted));
+			m_staticString[staticCharsEmitted] = static_cast<TChar>(0);
+			m_length = staticCharsEmitted;
+			return ResultCode::kOK;
+		}
+
+		inChars = inChars.SubSpan(charsDigested);
+	}
+
+	// Should have some remaining
+	RKIT_ASSERT(inChars.Count() > 0);
+
+	BaseStringConstructionBuffer<TChar> cbuf;
+
+	size_t remainingCharsEmitted = 0;
+	const size_t charsDigested = text::ConvertText(nullptr, TEncoding, std::numeric_limits<size_t>::max() - staticCharsEmitted, remainingCharsEmitted,
+		inChars.Ptr(), encoding, inChars.Count(), text::UnknownCharBehavior::kFail, 0);
+
+	if (charsDigested != inChars.Count())
+		return ResultCode::kOutOfMemory;
+
+	RKIT_CHECK(cbuf.Allocate(staticCharsEmitted + remainingCharsEmitted));
+	Span<TChar> outChars = cbuf.GetSpan();
+
+	// Copy static part
+	if (staticCharsEmitted > 0)
+		CopySpanNonOverlapping(outChars.SubSpan(0, staticCharsEmitted), staticBuffer.ToSpan().SubSpan(staticCharsEmitted));
+
+	// Copy remaining part
+	size_t remainingCharsEmitted2 = 0;
+	const size_t charsDigested2 = text::ConvertText(outChars.Ptr() + staticCharsEmitted, TEncoding, std::numeric_limits<size_t>::max() - staticCharsEmitted,
+		remainingCharsEmitted2, inChars.Ptr(), encoding, inChars.Count(), text::UnknownCharBehavior::kFail, 0);
+
+	RKIT_ASSERT(charsDigested2 == charsDigested);
+	RKIT_ASSERT(remainingCharsEmitted2 == remainingCharsEmitted);
+
+	(*this) = std::move(cbuf);
 	return ResultCode::kOK;
 }
 

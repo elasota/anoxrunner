@@ -17,7 +17,7 @@ namespace anox
 
 	struct AnoxRegisteredCommand
 	{
-		typedef rkit::coro::MethodStarter<void(AnoxCommandStackBase &, const rkit::ISpan<rkit::StringView> &args)> MethodStarter_t;
+		typedef rkit::coro::MethodStarter<void(AnoxCommandStackBase &, const rkit::ISpan<rkit::ByteStringView> &args)> MethodStarter_t;
 
 		inline const MethodStarter_t &AsyncCall() const
 		{
@@ -29,7 +29,7 @@ namespace anox
 
 	struct AnoxRegisteredAlias
 	{
-		rkit::String m_text;
+		rkit::ByteString m_text;
 	};
 
 	enum class AnoxConsoleVarType
@@ -53,53 +53,83 @@ namespace anox
 		void *m_value;
 	};
 
+	class AnoxPrehashedRegistryKeyView
+	{
+	public:
+		AnoxPrehashedRegistryKeyView() = default;
+		AnoxPrehashedRegistryKeyView(const rkit::ByteStringSliceView &name);
+
+		template<size_t TSize>
+		AnoxPrehashedRegistryKeyView(const rkit::Utf8Char_t (&chars)[TSize]);
+
+		const rkit::ByteStringSliceView &GetName() const;
+		rkit::HashValue_t GetHash() const;
+
+		static uint8_t NormalizeChar(uint8_t ch);
+
+		AnoxPrehashedRegistryKeyView &operator=(const AnoxPrehashedRegistryKeyView &other) = default;
+
+	private:
+		static rkit::HashValue_t InitHash(const rkit::ByteStringSliceView &name);
+
+		rkit::ByteStringSliceView m_name;
+		rkit::HashValue_t m_hash = 0;
+	};
 
 	class AnoxCommandRegistryBase
 	{
 	public:
 		virtual ~AnoxCommandRegistryBase() {}
 
-		virtual rkit::Result RegisterCommand(const rkit::StringSliceView &name, const AnoxRegisteredCommand::MethodStarter_t &methodStarter) = 0;
-		virtual rkit::Result RegisterAlias(const rkit::StringSliceView &name, const rkit::StringSliceView &commandText) = 0;
-		virtual rkit::Result RegisterConsoleVar(const rkit::StringSliceView &name, AnoxConsoleVarType varType, void *varValue) = 0;
+		virtual rkit::Result RegisterCommand(const AnoxPrehashedRegistryKeyView &name, const AnoxRegisteredCommand::MethodStarter_t &methodStarter) = 0;
+		virtual rkit::Result RegisterAlias(const AnoxPrehashedRegistryKeyView &name, const rkit::ByteStringSliceView &commandText) = 0;
+		virtual rkit::Result RegisterConsoleVar(const AnoxPrehashedRegistryKeyView &name, AnoxConsoleVarType varType, void *varValue) = 0;
 
-		virtual const AnoxRegisteredCommand *FindCommand(const rkit::StringSliceView &name, rkit::HashValue_t hash) const = 0;
-		virtual const AnoxRegisteredAlias *FindAlias(const rkit::StringSliceView &name, rkit::HashValue_t hash) const = 0;
-		virtual const AnoxRegisteredConsoleVar *FindConsoleVar(const rkit::StringSliceView &name, rkit::HashValue_t hash) const = 0;
+		virtual const AnoxRegisteredCommand *FindCommand(const AnoxPrehashedRegistryKeyView &name) const = 0;
+		virtual const AnoxRegisteredAlias *FindAlias(const AnoxPrehashedRegistryKeyView &name) const = 0;
+		virtual const AnoxRegisteredConsoleVar *FindConsoleVar(const AnoxPrehashedRegistryKeyView &name) const = 0;
 
-		const AnoxRegisteredCommand *FindCommand(const rkit::StringSliceView &name) const;
-		const AnoxRegisteredAlias *FindAlias(const rkit::StringSliceView &name) const;
-		const AnoxRegisteredConsoleVar *FindConsoleVar(const rkit::StringSliceView &name) const;
+		virtual rkit::Result TrySetCVar(const AnoxRegisteredConsoleVar &cvar, const AnoxPrehashedRegistryKeyView &str, bool &outSetOK) const = 0;
 
-		virtual rkit::Result TrySetCVar(const AnoxRegisteredConsoleVar &cvar, const rkit::StringSliceView &str, bool &outSetOK) const = 0;
-
-		static bool RequiresEscape(const rkit::StringSliceView &token);
-		static rkit::Result EscapeToken(rkit::String &outString, const rkit::StringSliceView &token);
+		static bool RequiresEscape(const rkit::ByteStringSliceView &token);
+		static rkit::Result EscapeToken(rkit::ByteString &outString, const rkit::ByteStringSliceView &token);
 
 		static rkit::Result Create(rkit::UniquePtr<AnoxCommandRegistryBase> &outRegistry);
 	};
 }
 
+#include "rkit/Core/StringView.h"
+
 namespace anox
 {
-	inline const AnoxRegisteredCommand *AnoxCommandRegistryBase::FindCommand(const rkit::StringSliceView &name) const
+	template<size_t TSize>
+	AnoxPrehashedRegistryKeyView::AnoxPrehashedRegistryKeyView(const rkit::Utf8Char_t(&chars)[TSize])
+		: m_name(rkit::StringView(chars).RemoveEncoding())
+		, m_hash(InitHash(m_name))
 	{
-		const rkit::HashValue_t hash = rkit::Hasher<rkit::StringSliceView>::ComputeHash(0, name);
-
-		return this->FindCommand(name, hash);
 	}
 
-	inline const AnoxRegisteredAlias *AnoxCommandRegistryBase::FindAlias(const rkit::StringSliceView &name) const
+	inline AnoxPrehashedRegistryKeyView::AnoxPrehashedRegistryKeyView(const rkit::ByteStringSliceView &name)
+		: m_name(name)
+		, m_hash(InitHash(m_name))
 	{
-		const rkit::HashValue_t hash = rkit::Hasher<rkit::StringSliceView>::ComputeHash(0, name);
-
-		return this->FindAlias(name, hash);
 	}
 
-	inline const AnoxRegisteredConsoleVar *AnoxCommandRegistryBase::FindConsoleVar(const rkit::StringSliceView &name) const
+	inline const rkit::ByteStringSliceView &AnoxPrehashedRegistryKeyView::GetName() const
 	{
-		const rkit::HashValue_t hash = rkit::Hasher<rkit::StringSliceView>::ComputeHash(0, name);
+		return m_name;
+	}
 
-		return this->FindConsoleVar(name, hash);
+	inline rkit::HashValue_t AnoxPrehashedRegistryKeyView::GetHash() const
+	{
+		return m_hash;
+	}
+
+	inline uint8_t AnoxPrehashedRegistryKeyView::NormalizeChar(uint8_t ch)
+	{
+		if (ch >= 'A' && ch <= 'Z')
+			return ch - 'A' + 'a';
+		else
+			return ch;
 	}
 }

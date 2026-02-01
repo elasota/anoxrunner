@@ -28,7 +28,7 @@ namespace rkit { namespace png {
 		Result SavePNG(const utils::IImage &image, ISeekableWriteStream &stream) const override;
 
 		uint32_t GetDriverNamespaceID() const override { return rkit::IModuleDriver::kDefaultNamespace; }
-		rkit::StringView GetDriverName() const override { return "PNG"; }
+		rkit::StringView GetDriverName() const override { return u8"PNG"; }
 	};
 
 	typedef rkit::CustomDriverModuleStub<PngDriver> PngModule;
@@ -161,13 +161,13 @@ namespace rkit { namespace png {
 
 	void PNGCBAPI PngHandlerBase::StaticErrorCB(png_structp png, png_const_charp msg)
 	{
-		rkit::log::Error(rkit::StringView::FromCString(msg));
+		rkit::log::Error(rkit::StringView::FromCString(reinterpret_cast<const Utf8Char_t *>(msg)));
 		png_longjmp(png, 1);
 	}
 
 	void PNGCBAPI PngHandlerBase::StaticWarnCB(png_structp png, png_const_charp msg)
 	{
-		rkit::log::Warning(rkit::StringView::FromCString(msg));
+		rkit::log::Warning(rkit::StringView::FromCString(reinterpret_cast<const Utf8Char_t *>(msg)));
 	}
 
 	png_voidp PNGCBAPI PngHandlerBase::StaticAllocCB(png_structp png, png_alloc_size_t sz)
@@ -223,7 +223,7 @@ namespace rkit { namespace png {
 
 		if (!m_png)
 		{
-			rkit::log::Error("Creating PNG failed");
+			rkit::log::Error(u8"Creating PNG failed");
 			return ResultCode::kDataError;
 		}
 
@@ -231,7 +231,7 @@ namespace rkit { namespace png {
 
 		if (!m_png)
 		{
-			rkit::log::Error("Creating PNG info failed");
+			rkit::log::Error(u8"Creating PNG info failed");
 			return ResultCode::kDataError;
 		}
 
@@ -247,7 +247,7 @@ namespace rkit { namespace png {
 
 		if (bitDepth != 8)
 		{
-			rkit::log::Error("Unsupported bit depth");
+			rkit::log::Error(u8"Unsupported bit depth");
 			return ResultCode::kDataError;
 		}
 
@@ -265,7 +265,7 @@ namespace rkit { namespace png {
 
 		if (!m_png)
 		{
-			rkit::log::Error("Creating PNG failed");
+			rkit::log::Error(u8"Creating PNG failed");
 			return ResultCode::kDataError;
 		}
 
@@ -273,7 +273,7 @@ namespace rkit { namespace png {
 
 		if (!m_png)
 		{
-			rkit::log::Error("Creating PNG info failed");
+			rkit::log::Error(u8"Creating PNG info failed");
 			return ResultCode::kDataError;
 		}
 
@@ -290,13 +290,13 @@ namespace rkit { namespace png {
 
 		if (bitDepth != 8)
 		{
-			rkit::log::Error("Unsupported bit depth");
+			rkit::log::Error(u8"Unsupported bit depth");
 			return ResultCode::kDataError;
 		}
 
 		if (channels != 3 && channels != 4 && channels != 1)
 		{
-			rkit::log::Error("Unsupported bit depth");
+			rkit::log::Error(u8"Unsupported bit depth");
 			return ResultCode::kDataError;
 		}
 
@@ -362,7 +362,7 @@ namespace rkit { namespace png {
 
 		if (!m_png)
 		{
-			rkit::log::Error("Creating PNG failed");
+			rkit::log::Error(u8"Creating PNG failed");
 			return ResultCode::kDataError;
 		}
 
@@ -370,7 +370,7 @@ namespace rkit { namespace png {
 
 		if (!m_png)
 		{
-			rkit::log::Error("Creating PNG info failed");
+			rkit::log::Error(u8"Creating PNG info failed");
 			return ResultCode::kDataError;
 		}
 
@@ -381,7 +381,7 @@ namespace rkit { namespace png {
 			bitDepth = 8;
 			break;
 		default:
-			rkit::log::Error("Unknown pixel packing");
+			rkit::log::Error(u8"Unknown pixel packing");
 			return ResultCode::kDataError;
 		}
 
@@ -401,7 +401,7 @@ namespace rkit { namespace png {
 			colorType = PNG_COLOR_TYPE_RGBA;
 			break;
 		default:
-			rkit::log::Error("Unsupported channel count");
+			rkit::log::Error(u8"Unsupported channel count");
 			return ResultCode::kDataError;
 		}
 

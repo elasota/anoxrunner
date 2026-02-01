@@ -28,7 +28,7 @@ namespace anox
 
 			rkit::Result Open(rkit::UniquePtr<rkit::ISeekableReadStream> &&stream, bool allowBrokenFilePaths);
 
-			FileHandle FindFile(const rkit::StringSliceView &fileName, bool allowDirectories) const override;
+			FileHandle FindFile(const rkit::ByteStringSliceView &fileName, bool allowDirectories) const override;
 
 		private:
 			class DirectoryTreeBuilder;
@@ -37,8 +37,8 @@ namespace anox
 			{
 				FileInfo();
 
-				rkit::StringView m_fullPath;
-				rkit::StringSliceView m_fileName;
+				rkit::AsciiStringView m_fullPath;
+				rkit::AsciiStringSliceView m_fileName;
 				uint32_t m_filePosition;
 				uint32_t m_compressedSize;
 				uint32_t m_uncompressedSize;
@@ -48,8 +48,8 @@ namespace anox
 			{
 				DirectoryInfo();
 				
-				rkit::StringSliceView m_fullPath;
-				rkit::StringSliceView m_name;
+				rkit::AsciiStringSliceView m_fullPath;
+				rkit::AsciiStringSliceView m_name;
 				uint32_t m_firstFile;
 				uint32_t m_numFiles;
 				uint32_t m_firstSubDirectory;
@@ -60,8 +60,8 @@ namespace anox
 			FileHandle GetFileByIndex(uint32_t fileIndex) const override;
 			rkit::Result OpenFileByIndex(uint32_t fileIndex, rkit::UniquePtr<rkit::ISeekableReadStream> &outStream) const override;
 			uint32_t GetFileSizeByIndex(uint32_t fileIndex) const override;
-			rkit::StringView GetFilePathByIndex(uint32_t fileIndex) const override;
-			rkit::StringSliceView GetDirectoryPathByIndex(uint32_t fileIndex) const override;
+			rkit::AsciiStringView GetFilePathByIndex(uint32_t fileIndex) const override;
+			rkit::AsciiStringSliceView GetDirectoryPathByIndex(uint32_t fileIndex) const override;
 
 			FileHandle GetDirectoryByIndex(uint32_t dirIndex) const override;
 			uint32_t GetDirectoryFirstFile(uint32_t dirIndex) const override;

@@ -2,6 +2,30 @@
 
 namespace rkit
 {
+	template<class TType>
+	struct IsAliasingCharType
+	{
+		static const bool kValue = false;
+	};
+
+	template<>
+	struct IsAliasingCharType<char>
+	{
+		static const bool kValue = true;
+	};
+
+	template<>
+	struct IsAliasingCharType<signed char>
+	{
+		static const bool kValue = true;
+	};
+
+	template<>
+	struct IsAliasingCharType<unsigned char>
+	{
+		static const bool kValue = true;
+	};
+
 	template<class TTypeA, class TTypeB>
 	struct IsSameType
 	{

@@ -194,7 +194,7 @@ namespace rkit
 
 		HANDLE m_handle;
 		WIN32_FIND_DATAW m_findData;
-		Vector<char> m_fileNameUTF8;
+		Vector<Utf8Char_t> m_fileNameUTF8;
 		bool m_exhausted;
 		bool m_haveItem;
 	};
@@ -207,7 +207,7 @@ namespace rkit
 
 		void SetHModule(const HMODULE &hmodule);
 
-		bool GetFunction(void *fnPtr, const StringView &fnName) override;
+		bool GetFunction(void *fnPtr, const AsciiStringView &fnName) override;
 
 	private:
 		HMODULE m_hmodule;
@@ -337,21 +337,21 @@ namespace rkit
 		static DWORD OpenFlagsToDisposition(bool createIfNotExists, bool truncateIfExists);
 		Result OpenFileGeneral(UniquePtr<File_Win32> &outStream, const OSAbsPathView &path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition, DWORD extraFlags);
 		Result OpenFileAsyncGeneral(UniquePtr<AsyncFile_Win32> &outStream, FilePos_t &outInitialSize, const OSAbsPathView &path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition, DWORD extraFlags);
-		static Result CheckCreateDirectories(Vector<wchar_t> &pathChars);
+		static Result CheckCreateDirectories(Vector<Utf16Char_t> &pathChars);
 
 		Result ResolveAbsPath(OSAbsPath &outPath, FileLocation location, const CIPathView &path);
 
 		static DWORD WINAPI ThreadStartRoutine(LPVOID lpThreadParameter);
 
 		IMallocDriver *m_alloc;
-		Vector<Vector<char> > m_commandLineCharBuffers;
+		Vector<Vector<Utf8Char_t> > m_commandLineCharBuffers;
 		Vector<StringView> m_commandLine;
 		UniquePtr<render::DisplayManagerBase_Win32> m_displayManager;
 		UniquePtr<AsyncIOThread_Win32> m_asioThread;
 		LPWSTR *m_argvW;
 
-		WString16 m_exePathStr;
-		WString16 m_programDirStr;
+		Utf16String m_exePathStr;
+		Utf16String m_programDirStr;
 
 		OSAbsPath m_gameDirectoryOverride;
 		OSAbsPath m_settingsDirectory;
@@ -409,22 +409,22 @@ namespace rkit
 		static SimpleObjectAllocation<SystemDriver_Win32> ms_systemDriver;
 	};
 
-	Result ConvUtil_Win32::UTF8ToUTF16(const char *str8, Vector<wchar_t> &outStr16)
+	Result ConvUtil_Win32::UTF8ToUTF16(const Utf8Char_t *str8, Vector<wchar_t> &outStr16)
 	{
-		int charsRequired = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str8, -1, nullptr, 0);
+		int charsRequired = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, ReinterpretUtf8CharToAnsiChar(str8), -1, nullptr, 0);
 		if (charsRequired == 0)
 			return ResultCode::kInvalidUnicode;
 
 		RKIT_CHECK(outStr16.Resize(charsRequired));
 
-		int convResult = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str8, -1, outStr16.GetBuffer(), static_cast<int>(outStr16.Count()));
+		int convResult = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, ReinterpretUtf8CharToAnsiChar(str8), -1, outStr16.GetBuffer(), static_cast<int>(outStr16.Count()));
 		if (convResult == 0)
 			return ResultCode::kInvalidUnicode;
 
 		return ResultCode::kOK;
 	}
 
-	Result ConvUtil_Win32::UTF16ToUTF8(const wchar_t *str16, Vector<char> &outStr8)
+	Result ConvUtil_Win32::UTF16ToUTF8(const wchar_t *str16, Vector<Utf8Char_t> &outStr8)
 	{
 		int bytesRequired = WideCharToMultiByte(CP_UTF8, 0, str16, -1, nullptr, 0, nullptr, nullptr);
 		if (bytesRequired == 0)
@@ -432,7 +432,7 @@ namespace rkit
 
 		RKIT_CHECK(outStr8.Resize(bytesRequired));
 
-		int convResult = WideCharToMultiByte(CP_UTF8, 0, str16, -1, outStr8.GetBuffer(), static_cast<int>(outStr8.Count()), nullptr, nullptr);
+		int convResult = WideCharToMultiByte(CP_UTF8, 0, str16, -1, ReinterpretUtf8CharToAnsiChar(outStr8.GetBuffer()), static_cast<int>(outStr8.Count()), nullptr, nullptr);
 		if (convResult == 0)
 			return ResultCode::kInvalidUnicode;
 
@@ -1019,7 +1019,7 @@ namespace rkit
 	{
 		RKIT_CHECK(ConvUtil_Win32::UTF16ToUTF8(m_findData.cFileName, m_fileNameUTF8));
 
-		outItem.m_fileName = OSRelPathView(WString16View(m_findData.cFileName, wcslen(m_findData.cFileName)));
+		outItem.m_fileName = OSRelPathView(Utf16StringView::FromCString(reinterpret_cast<const Utf16Char_t *>(&m_findData.cFileName[0])));
 		outItem.m_attribs.m_isDirectory = ((m_findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0);
 		outItem.m_attribs.m_fileSize = (static_cast<FilePos_t>(m_findData.nFileSizeHigh) << 32) + m_findData.nFileSizeLow;
 		outItem.m_attribs.m_fileTime = ConvUtil_Win32::FileTimeToUTCMSec(m_findData.ftLastWriteTime);
@@ -1057,7 +1057,7 @@ namespace rkit
 		m_hmodule = hmodule;
 	}
 
-	bool SystemLibrary_Win32::GetFunction(void *fnPtr, const StringView &fnName)
+	bool SystemLibrary_Win32::GetFunction(void *fnPtr, const AsciiStringView &fnName)
 	{
 		void *procAddr = GetProcAddress(m_hmodule, fnName.GetChars());
 		if (!procAddr)
@@ -1228,7 +1228,7 @@ namespace rkit
 
 		for (size_t i = 0; i < numArgs; i++)
 		{
-			Vector<char> &charBuffer = m_commandLineCharBuffers[i];
+			Vector<Utf8Char_t> &charBuffer = m_commandLineCharBuffers[i];
 
 			RKIT_CHECK(ConvUtil_Win32::UTF16ToUTF8(m_argvW[i], charBuffer));
 
@@ -1274,8 +1274,8 @@ namespace rkit
 		Vector<wchar_t> exprWChar(m_alloc);
 		Vector<wchar_t> fileWChar(m_alloc);
 
-		Result exprConvResult = ConvUtil_Win32::UTF8ToUTF16(expr, exprWChar);
-		Result fileConvResult = ConvUtil_Win32::UTF8ToUTF16(file, fileWChar);
+		Result exprConvResult = ConvUtil_Win32::UTF8ToUTF16(ReinterpretAnsiCharToUtf8Char(expr), exprWChar);
+		Result fileConvResult = ConvUtil_Win32::UTF8ToUTF16(ReinterpretAnsiCharToUtf8Char(file), fileWChar);
 
 		if (!rkit::utils::ResultIsOK(exprConvResult) || !rkit::utils::ResultIsOK(fileConvResult))
 		{
@@ -1526,7 +1526,7 @@ namespace rkit
 
 	Result SystemDriver_Win32::CopyFileFromAbsToAbs(const OSAbsPathView &srcPath, const OSAbsPathView &destPath, bool overwrite)
 	{
-		BOOL succeeded = ::CopyFileW(srcPath.GetChars(), destPath.GetChars(), !overwrite);
+		BOOL succeeded = ::CopyFileW(reinterpret_cast<const wchar_t *>(srcPath.GetChars()), reinterpret_cast<const wchar_t *>(destPath.GetChars()), !overwrite);
 
 		if (succeeded)
 			return ResultCode::kOK;
@@ -1567,7 +1567,7 @@ namespace rkit
 		if (overwrite)
 			flags |= MOVEFILE_REPLACE_EXISTING;
 
-		BOOL succeeded = ::MoveFileExW(srcPath.GetChars(), destPath.GetChars(), flags);
+		BOOL succeeded = ::MoveFileExW(reinterpret_cast<const wchar_t *>(srcPath.GetChars()), reinterpret_cast<const wchar_t *>(destPath.GetChars()), flags);
 
 		if (succeeded)
 			return ResultCode::kOK;
@@ -1607,16 +1607,18 @@ namespace rkit
 		UniquePtr<DirectoryScan_Win32> dirScan;
 		RKIT_CHECK(New<DirectoryScan_Win32>(dirScan));
 
-		ConstSpan<wchar_t> pathChars = path.ToStringView().ToSpan();
+		ConstSpan<Utf16Char_t> pathChars = path.ToStringView().ToSpan();
 
-		Vector<wchar_t> wildcardPath;
+		Vector<Utf16Char_t> wildcardPath;
 		RKIT_CHECK(wildcardPath.Resize(pathChars.Count()));
 
 		CopySpanNonOverlapping(wildcardPath.ToSpan(), pathChars);
 
-		RKIT_CHECK(wildcardPath.Append(ConstSpan<wchar_t>(L"\\*", 3)));
+		const Utf16Char_t wildcardSuffix[3] = {'\\', '*', 0};
 
-		HANDLE ffHandle = FindFirstFileW(wildcardPath.GetBuffer(), dirScan->GetFindData());
+		RKIT_CHECK(wildcardPath.Append(ConstSpan<Utf16Char_t>(u"\\*")));
+
+		HANDLE ffHandle = FindFirstFileW(reinterpret_cast<const wchar_t *>(wildcardPath.GetBuffer()), dirScan->GetFindData());
 		if (ffHandle == INVALID_HANDLE_VALUE)
 			return ResultCode::kFileOpenError;
 
@@ -1629,7 +1631,7 @@ namespace rkit
 
 	Result SystemDriver_Win32::GetFileAttributesAbs(const OSAbsPathView &path, bool &outExists, FileAttributes &outAttribs)
 	{
-		DWORD attribs = GetFileAttributesW(path.GetChars());
+		DWORD attribs = GetFileAttributesW(reinterpret_cast<const wchar_t *>(path.GetChars()));
 
 		if (attribs == INVALID_FILE_ATTRIBUTES)
 		{
@@ -1646,7 +1648,7 @@ namespace rkit
 			return ResultCode::kOK;
 		} 
 
-		HANDLE hFile = CreateFileW(path.GetChars(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+		HANDLE hFile = CreateFileW(reinterpret_cast<const wchar_t *>(path.GetChars()), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 
 		if (hFile == INVALID_HANDLE_VALUE)
 			return ResultCode::kFileOpenError;
@@ -1675,27 +1677,27 @@ namespace rkit
 
 	Result SystemDriver_Win32::SetSettingsDirectory(const StringView &path)
 	{
-		BaseStringConstructionBuffer<wchar_t> docsPathStrBuf;
+		BaseStringConstructionBuffer<Utf16Char_t> docsPathStrBuf;
 
-		wchar_t *docsPath = nullptr;
-		HRESULT hr = SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &docsPath);
+		Utf16Char_t *docsPath = nullptr;
+		HRESULT hr = SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, reinterpret_cast<wchar_t **>(&docsPath));
 		if (!SUCCEEDED(hr))
 			return utils::CreateResultWithExtCode(ResultCode::kOperationFailed, static_cast<uint32_t>(hr));
 
-		size_t docsPathLength = wcslen(docsPath);
+		Utf16StringView docsPathCharsView = Utf16StringView::FromCString(docsPath);
 
-		Result resizeResult = docsPathStrBuf.Allocate(docsPathLength);
+		Result resizeResult = docsPathStrBuf.Allocate(docsPathCharsView.Length());
 		if (!utils::ResultIsOK(resizeResult))
 		{
 			CoTaskMemFree(docsPath);
 			return resizeResult;
 		}
 
-		CopySpanNonOverlapping(docsPathStrBuf.GetSpan().SubSpan(0, docsPathLength), ConstSpan<wchar_t>(docsPath, docsPathLength));
+		CopySpanNonOverlapping(docsPathStrBuf.GetSpan(), docsPathCharsView.ToSpan());
 		CoTaskMemFree(docsPath);
 
 		OSAbsPath osPath;
-		RKIT_CHECK(osPath.Set(WString16(std::move(docsPathStrBuf))));
+		RKIT_CHECK(osPath.Set(Utf16String(std::move(docsPathStrBuf))));
 
 		OSRelPath settingsSubPath;
 		RKIT_CHECK(settingsSubPath.SetFromUTF8(path));
@@ -1766,7 +1768,7 @@ namespace rkit
 		return m_hInstance;
 	}
 
-	Result SystemDriver_Win32::CheckCreateDirectories(Vector<wchar_t> &pathChars)
+	Result SystemDriver_Win32::CheckCreateDirectories(Vector<Utf16Char_t> &pathChars)
 	{
 		size_t dirScanTermination = 0;
 		for (size_t i = 0; i < pathChars.Count(); i++)
@@ -1784,7 +1786,7 @@ namespace rkit
 			if (pathChars[i] == '\\')
 			{
 				pathChars[i] = 0;
-				BOOL isDirectory = PathIsDirectoryW(pathChars.GetBuffer());
+				BOOL isDirectory = PathIsDirectoryW(reinterpret_cast<const wchar_t *>(pathChars.GetBuffer()));
 				pathChars[i] = '\\';
 				if (isDirectory)
 					break;
@@ -1803,7 +1805,7 @@ namespace rkit
 				{
 					pathChars[i] = 0;
 
-					if (!CreateDirectoryW(pathChars.GetBuffer(), nullptr))
+					if (!CreateDirectoryW(reinterpret_cast<const wchar_t *>(pathChars.GetBuffer()), nullptr))
 						return ResultCode::kFileOpenError;
 
 					pathChars[i] = '\\';
@@ -1876,7 +1878,7 @@ namespace rkit
 	{
 		if (createDirectories)
 		{
-			Vector<wchar_t> dirCharsVector;
+			Vector<Utf16Char_t> dirCharsVector;
 			RKIT_CHECK(dirCharsVector.Resize(path.Length() + 1));
 
 			CopySpanNonOverlapping(dirCharsVector.ToSpan().SubSpan(0, path.Length()), path.ToStringView().ToSpan());
@@ -1885,7 +1887,7 @@ namespace rkit
 			RKIT_CHECK(CheckCreateDirectories(dirCharsVector));
 		}
 
-		HANDLE fHandle = CreateFileW(path.GetChars(), access, shareMode, nullptr, disposition, FILE_ATTRIBUTE_NORMAL | extraFlags, nullptr);
+		HANDLE fHandle = CreateFileW(reinterpret_cast<const wchar_t *>(path.GetChars()), access, shareMode, nullptr, disposition, FILE_ATTRIBUTE_NORMAL | extraFlags, nullptr);
 
 		if (fHandle == INVALID_HANDLE_VALUE)
 			return utils::SoftFaultResult(ResultCode::kFileOpenError);

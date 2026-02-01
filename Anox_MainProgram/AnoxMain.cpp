@@ -51,7 +51,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 	rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
 	rkit::IUtilitiesDriver *utilsDriver = rkit::GetDrivers().m_utilitiesDriver;
 
-	RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->SetProgramName("Anox Runner"));
+	RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->SetProgramName(u8"Anox Runner"));
 
 	rkit::Span<const rkit::StringView> args = sysDriver->GetCommandLine();
 
@@ -74,77 +74,77 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 		const rkit::StringView &arg = args[i];
 
 #if !RKIT_IS_FINAL
-		if (arg == "-idir")
+		if (arg == u8"-idir")
 		{
 			i++;
 
 			if (i == args.Count())
 			{
-				rkit::log::Error("Expected path after -idir");
+				rkit::log::Error(u8"Expected path after -idir");
 				return rkit::ResultCode::kInvalidParameter;
 			}
 
 			if (!rkit::utils::ResultIsOK(buildIntermediateDirectory.SetFromUTF8(args[i])))
 			{
-				rkit::log::Error("-idir path was invalid");
+				rkit::log::Error(u8"-idir path was invalid");
 				return rkit::ResultCode::kInvalidParameter;
 			}
 		}
-		else if (arg == "-ddir")
+		else if (arg == u8"-ddir")
 		{
 			i++;
 
 			if (i == args.Count())
 			{
-				rkit::log::Error("Expected path after -ddir");
+				rkit::log::Error(u8"Expected path after -ddir");
 				return rkit::ResultCode::kInvalidParameter;
 			}
 
 			if (!rkit::utils::ResultIsOK(dataDirectory.SetFromUTF8(args[i])))
 			{
-				rkit::log::Error("-ddir path was invalid");
+				rkit::log::Error(u8"-ddir path was invalid");
 				return rkit::ResultCode::kInvalidParameter;
 			}
 		}
-		else if (arg == "-dsrcdir")
+		else if (arg == u8"-dsrcdir")
 		{
 			i++;
 
 			if (i == args.Count())
 			{
-				rkit::log::Error("Expected path after -ddir");
+				rkit::log::Error(u8"Expected path after -ddir");
 				return rkit::ResultCode::kInvalidParameter;
 			}
 
 			if (!rkit::utils::ResultIsOK(dataSourceDirectory.SetFromUTF8(args[i])))
 			{
-				rkit::log::Error("-ddir path was invalid");
+				rkit::log::Error(u8"-ddir path was invalid");
 				return rkit::ResultCode::kInvalidParameter;
 			}
 		}
-		else if (arg == "-sdir")
+		else if (arg == u8"-sdir")
 		{
 			i++;
 
 			if (i == args.Count())
 			{
-				rkit::log::Error("Expected path after -sdir");
+				rkit::log::Error(u8"Expected path after -sdir");
 				return rkit::ResultCode::kInvalidParameter;
 			}
 
 			if (!rkit::utils::ResultIsOK(buildSourceDirectory.SetFromUTF8(args[i])))
 			{
-				rkit::log::Error("-sdir path was invalid");
+				rkit::log::Error(u8"-sdir path was invalid");
 				return rkit::ResultCode::kInvalidParameter;
 			}
 		}
-		else if (arg == "-build")
+		else if (arg == u8"-build")
 		{
 			i++;
 
 			if (i == args.Count())
 			{
-				rkit::log::Error("Expected build target after -build");
+				rkit::log::Error(u8"Expected build target after -build");
 				return rkit::ResultCode::kInvalidParameter;
 			}
 
@@ -152,22 +152,23 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 
 			autoBuild = true;
 		}
-		else if (arg == "-run")
+		else if (arg == u8"-run")
 			run = true;
-		else if (arg == "-threads")
+		else if (arg == u8"-threads")
 		{
 			i++;
 
 			if (i == args.Count())
 			{
-				rkit::log::Error("Expected build target after -build");
+				rkit::log::Error(u8"Expected build target after -build");
 				return rkit::ResultCode::kInvalidParameter;
 			}
 
-			long numThreadsArg = atol(args[i].GetChars());
+			// FIXME: Use CoreLib or something instead
+			long numThreadsArg = atol(reinterpret_cast<const char *>(args[i].GetChars()));
 			if (numThreadsArg < 1 || numThreadsArg > 512)
 			{
-				rkit::log::Error("Invalid thread count for -threads");
+				rkit::log::Error(u8"Invalid thread count for -threads");
 				return rkit::ResultCode::kInvalidParameter;
 			}
 
@@ -175,7 +176,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 		}
 		else
 		{
-			rkit::log::ErrorFmt("Unknown argument {}", arg.GetChars());
+			rkit::log::ErrorFmt(u8"Unknown argument {}", arg.GetChars());
 			return rkit::ResultCode::kInvalidParameter;
 		}
 #endif
@@ -187,24 +188,24 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 	}
 
 	// FIXME: Move this to RKit Config
-	RKIT_CHECK(sysDriver->SetSettingsDirectory("AnoxRunner"));
+	RKIT_CHECK(sysDriver->SetSettingsDirectory(u8"AnoxRunner"));
 
 	if (autoBuild)
 	{
-		rkit::IModule *utilsModule = rkit::GetDrivers().m_moduleDriver->LoadModule(kAnoxNamespaceID, "Utilities");
+		rkit::IModule *utilsModule = rkit::GetDrivers().m_moduleDriver->LoadModule(kAnoxNamespaceID, u8"Utilities");
 		if (!utilsModule)
 		{
-			rkit::log::Error("Couldn't load utilities module");
+			rkit::log::Error(u8"Couldn't load utilities module");
 			return rkit::ResultCode::kModuleLoadFailed;
 		}
 
-		IUtilitiesDriver *utilsDriver = static_cast<IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, "Utilities"));
+		IUtilitiesDriver *utilsDriver = static_cast<IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, u8"Utilities"));
 
 		RKIT_CHECK(utilsDriver->RunDataBuild(buildTarget, buildSourceDirectory, buildIntermediateDirectory, dataDirectory, dataSourceDirectory, renderBackendType));
 	}
 
 
-#if RKIT_IS_FINAL
+#if !!RKIT_IS_FINAL
 	run = true;
 #endif
 

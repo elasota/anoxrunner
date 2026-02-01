@@ -8,7 +8,7 @@ namespace anox { namespace game {
 	public:
 		static rkit::Result SerializeGlobals(GlobalVars &vars, IConfigKeyValueTableSerializer &serializer)
 		{
-			RKIT_CHECK(serializer.SerializeField("mapName", vars.m_mapName));
+			RKIT_CHECK(serializer.SerializeField(u8"mapName", vars.m_mapName));
 
 			return rkit::ResultCode::kOK;
 		}

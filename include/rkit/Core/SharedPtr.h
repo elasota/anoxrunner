@@ -34,7 +34,7 @@ namespace rkit
 		T *operator->() const;
 
 		SharedPtr<T> &operator=(const SharedPtr<T> &other);
-		SharedPtr<T> &operator=(SharedPtr<T> &&other);
+		SharedPtr<T> &operator=(SharedPtr<T> &&other) noexcept;
 
 		static Result Create(SharedPtr<T> &outRCPtr, IMallocDriver *alloc, UniquePtr<T> &&original);
 
@@ -157,7 +157,7 @@ rkit::SharedPtr<T> &rkit::SharedPtr<T>::operator=(const SharedPtr<T> &other)
 }
 
 template<class T>
-rkit::SharedPtr<T> &rkit::SharedPtr<T>::operator=(SharedPtr<T> &&other)
+rkit::SharedPtr<T> &rkit::SharedPtr<T>::operator=(SharedPtr<T> &&other) noexcept
 {
 	if (this != &other)
 	{

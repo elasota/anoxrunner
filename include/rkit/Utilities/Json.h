@@ -22,18 +22,18 @@ namespace rkit
 			kNumber,
 		};
 
-		typedef Result(*JsonObjectIteratorCallback_t)(void *userdata, const char *keyCharPtr, size_t keyLength, const JsonValue &jsonValue, bool &shouldContinue);
+		typedef Result(*JsonObjectIteratorCallback_t)(void *userdata, const Utf8Char_t *keyCharPtr, size_t keyLength, const JsonValue &jsonValue, bool &shouldContinue);
 
 		struct JsonValueVFTable
 		{
 			Result(*m_toBool)(const void *jsonValue, bool &outBool);
-			Result(*m_toString)(const void *jsonValue, const char *&outCharPtr, size_t &outLength);
+			Result(*m_toString)(const void *jsonValue, const Utf8Char_t *&outCharPtr, size_t &outLength);
 			Result(*m_toNumber)(const void *jsonValue, double &outNumber);
 			Result(*m_getArraySize)(const void *jsonValue, size_t &outSize);
 			Result(*m_getArrayElement)(const void *jsonValue, size_t index, JsonValue &outJsonValue);
 			Result(*m_iterateObject)(const void *jsonValue, void *userdata, JsonObjectIteratorCallback_t callback);
-			Result(*m_objectHasElement)(const void *jsonValue, const char *keyChars, size_t keyLength, bool &outHasElement);
-			Result(*m_getObjectElement)(const void *jsonValue, const char *keyChars, size_t keyLength, JsonValue &outJsonValue);
+			Result(*m_objectHasElement)(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, bool &outHasElement);
+			Result(*m_getObjectElement)(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, JsonValue &outJsonValue);
 		};
 
 		struct JsonValue
@@ -88,7 +88,7 @@ namespace rkit
 			public:
 				explicit IterateObjectWithCallableHelper(const TCallable &callable);
 
-				static Result Thunk(void *userdata, const char *keyCharPtr, size_t keyLength, const JsonValue &jsonValue, bool &shouldContinue);
+				static Result Thunk(void *userdata, const Utf8Char_t *keyCharPtr, size_t keyLength, const JsonValue &jsonValue, bool &shouldContinue);
 
 			private:
 				const TCallable &m_callable;
@@ -102,7 +102,7 @@ namespace rkit
 
 				explicit IterateObjectWithMethodHelper(TClass *obj, MethodPtrType_t method);
 
-				static Result Thunk(void *userdata, const char *keyCharPtr, size_t keyLength, const JsonValue &jsonValue, bool &shouldContinue);
+				static Result Thunk(void *userdata, const Utf8Char_t *keyCharPtr, size_t keyLength, const JsonValue &jsonValue, bool &shouldContinue);
 
 			public:
 				TClass *m_obj;
@@ -141,7 +141,7 @@ inline rkit::utils::JsonValue::JsonValue(JsonElementType type, const JsonValueVF
 
 inline rkit::Result rkit::utils::JsonValue::ToString(StringView &outStrView) const
 {
-	const char *charPtr = nullptr;
+	const Utf8Char_t *charPtr = nullptr;
 	size_t length = 0;
 	RKIT_CHECK(m_vptr->m_toString(m_jsonValuePtr, charPtr, length));
 
@@ -190,7 +190,7 @@ rkit::utils::JsonValue::IterateObjectWithCallableHelper<TCallable>::IterateObjec
 }
 
 template<class TCallable>
-rkit::Result rkit::utils::JsonValue::IterateObjectWithCallableHelper<TCallable>::Thunk(void *userdata, const char *keyCharPtr, size_t keyLength, const JsonValue &jsonValue, bool &shouldContinue)
+rkit::Result rkit::utils::JsonValue::IterateObjectWithCallableHelper<TCallable>::Thunk(void *userdata, const Utf8Char_t *keyCharPtr, size_t keyLength, const JsonValue &jsonValue, bool &shouldContinue)
 {
 	const TCallable &callable = static_cast<IterateObjectWithCallableHelper<TCallable>*>(userdata)->m_callable;
 
@@ -205,7 +205,7 @@ rkit::utils::JsonValue::IterateObjectWithMethodHelper<TClass>::IterateObjectWith
 }
 
 template<class TClass>
-rkit::Result rkit::utils::JsonValue::IterateObjectWithMethodHelper<TClass>::Thunk(void *userdata, const char *keyCharPtr, size_t keyLength, const JsonValue &jsonValue, bool &shouldContinue)
+rkit::Result rkit::utils::JsonValue::IterateObjectWithMethodHelper<TClass>::Thunk(void *userdata, const Utf8Char_t *keyCharPtr, size_t keyLength, const JsonValue &jsonValue, bool &shouldContinue)
 {
 	IterateObjectWithMethodHelper<TClass> *self = static_cast<IterateObjectWithMethodHelper<TClass> *>(userdata);
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CoreDefs.h"
 #include "CharacterEncoding.h"
 #include "Ordering.h"
 #include "Span.h"
@@ -26,21 +27,21 @@ namespace rkit
 		};
 
 		template<class TChar>
-		struct CharCompareByValue<TChar, CharacterEncoding::kUnspecified>
+		struct CharCompareByValue<TChar, CharacterEncoding::kByte>
 		{
 			static Ordering Compare(const TChar *str1, const TChar *str2, size_t len);
 		};
 
 		template<>
-		struct CharCompareByValue<char, CharacterEncoding::kUTF8>
+		struct CharCompareByValue<Utf8Char_t, CharacterEncoding::kUTF8>
 		{
-			static Ordering Compare(const char *str1, const char *str2, size_t len);
+			static Ordering Compare(const Utf8Char_t *str1, const Utf8Char_t *str2, size_t len);
 		};
 
 		template<>
-		struct CharCompareByValue<wchar_t, CharacterEncoding::kUTF16>
+		struct CharCompareByValue<Utf16Char_t, CharacterEncoding::kUTF16>
 		{
-			static Ordering Compare(const wchar_t *str1, const wchar_t *str2, size_t len);
+			static Ordering Compare(const Utf16Char_t *str1, const Utf16Char_t *str2, size_t len);
 		};
 
 		template<>
@@ -114,19 +115,19 @@ namespace rkit
 	}
 
 	template<class TChar>
-	Ordering priv::CharCompareByValue<TChar, CharacterEncoding::kUnspecified>::Compare(const TChar *str1, const TChar *str2, size_t len)
+	Ordering priv::CharCompareByValue<TChar, CharacterEncoding::kByte>::Compare(const TChar *str1, const TChar *str2, size_t len)
 	{
 		return priv::CharCompareAs<TChar, TChar>::Compare(str1, str2, len);
 	}
 
-	inline Ordering priv::CharCompareByValue<char, CharacterEncoding::kUTF8>::Compare(const char *str1, const char *str2, size_t len)
+	inline Ordering priv::CharCompareByValue<Utf8Char_t, CharacterEncoding::kUTF8>::Compare(const Utf8Char_t *str1, const Utf8Char_t *str2, size_t len)
 	{
-		return priv::CharCompareAs<char, uint8_t>::Compare(str1, str2, len);
+		return priv::CharCompareAs<Utf8Char_t, uint8_t>::Compare(str1, str2, len);
 	}
 
-	inline Ordering priv::CharCompareByValue<wchar_t, CharacterEncoding::kUTF16>::Compare(const wchar_t *str1, const wchar_t *str2, size_t len)
+	inline Ordering priv::CharCompareByValue<Utf16Char_t, CharacterEncoding::kUTF16>::Compare(const Utf16Char_t *str1, const Utf16Char_t *str2, size_t len)
 	{
-		return priv::CharCompareAs<wchar_t, uint16_t>::Compare(str1, str2, len);
+		return priv::CharCompareAs<Utf16Char_t, uint16_t>::Compare(str1, str2, len);
 	}
 
 	inline Ordering priv::CharCompareByValue<char, CharacterEncoding::kASCII>::Compare(const char *str1, const char *str2, size_t len)

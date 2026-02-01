@@ -96,7 +96,7 @@ namespace anox
 
 	struct AnoxKeybind
 	{
-		rkit::String m_cmd;
+		rkit::ByteString m_cmd;
 	};
 
 	// This class exists to handle Quake-style keybind registration
@@ -105,8 +105,8 @@ namespace anox
 	public:
 		explicit AnoxKeybindManager(IAnoxGame &game);
 
-		bool ResolveKeyCode(const rkit::StringSliceView &keyName, KeyCode_t &outKeyCode) const override;
-		bool ResolveKeyName(KeyCode_t keyCode, char &outSingleChar, rkit::StringSliceView &outName) const override;
+		bool ResolveKeyCode(const rkit::ByteStringSliceView &keyName, KeyCode_t &outKeyCode) const override;
+		bool ResolveKeyName(KeyCode_t keyCode, char &outSingleChar, rkit::AsciiStringSliceView &outName) const override;
 
 		rkit::Result Register(AnoxCommandRegistryBase &commandRegistry) override;
 
@@ -122,12 +122,12 @@ namespace anox
 		static KeyCode_t CreateAsciiKeyCode(char c);
 		static KeyCode_t CreatePCKeyboardKeyCode(PCKeyboardKey keyCode);
 
-		rkit::Result Cmd_Bind(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::StringView> &args);
-		rkit::Result Cmd_Unbind(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::StringView> &args);
-		rkit::Result Cmd_Set(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::StringView> &args);
-		rkit::Result Cmd_Alias(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::StringView> &args);
+		rkit::Result Cmd_Bind(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args);
+		rkit::Result Cmd_Unbind(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args);
+		rkit::Result Cmd_Set(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args);
+		rkit::Result Cmd_Alias(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args);
 
-		static rkit::Result ConcatenateArgs(const rkit::ISpan<rkit::StringView> &args, size_t firstArg, rkit::String &storageStr, rkit::StringView &outStrView);
+		static rkit::Result ConcatenateArgs(const rkit::ISpan<rkit::ByteStringView> &args, size_t firstArg, rkit::ByteString &storageStr, rkit::ByteStringView &outStrView);
 
 		IAnoxGame &m_game;
 		rkit::StaticArray<AnoxKeybind, 128> m_asciiCharKeys;
@@ -221,11 +221,11 @@ namespace anox
 		static_assert(sizeof(AnoxKeybindManager::ms_pcKeyboardKeyNames) / sizeof(AnoxKeybindManager::ms_pcKeyboardKeyNames[0]) == static_cast<size_t>(PCKeyboardKey::kCount), "Mismatched PC key count");
 	}
 
-	bool AnoxKeybindManager::ResolveKeyCode(const rkit::StringSliceView &keyName, KeyCode_t &outKeyCode) const
+	bool AnoxKeybindManager::ResolveKeyCode(const rkit::ByteStringSliceView &keyName, KeyCode_t &outKeyCode) const
 	{
 		if (keyName.Length() == 1)
 		{
-			char keyChar = keyName[0];
+			uint8_t keyChar = keyName[0];
 
 			if (keyChar >= 'A' && keyChar <= 'Z')
 				keyChar += ('a' - 'A');
@@ -254,7 +254,7 @@ namespace anox
 		for (size_t i = 0; i < static_cast<size_t>(PCKeyboardKey::kCount); i++)
 		{
 			const char *candidateStr = ms_pcKeyboardKeyNames[i];
-			if (keyName.EqualsNoCase(rkit::StringSliceView(candidateStr, strlen(candidateStr))))
+			if (keyName.EqualsNoCase(rkit::AsciiStringView::FromCString(candidateStr).RemoveEncoding()))
 			{
 				outKeyCode = CreatePCKeyboardKeyCode(static_cast<PCKeyboardKey>(i));
 				return true;
@@ -264,23 +264,23 @@ namespace anox
 		return false;
 	}
 
-	bool AnoxKeybindManager::ResolveKeyName(uint32_t keyCode, char &outSingleChar, rkit::StringSliceView &outName) const
+	bool AnoxKeybindManager::ResolveKeyName(uint32_t keyCode, char &outSingleChar, rkit::AsciiStringSliceView &outName) const
 	{
 		return false;
 	}
 
-	rkit::Result AnoxKeybindManager::Cmd_Bind(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::StringView> &args)
+	rkit::Result AnoxKeybindManager::Cmd_Bind(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args)
 	{
 		if (args.Count() < 1)
 		{
-			rkit::log::Error("Usage: bind <key> <parameters>");
+			rkit::log::Error(u8"Usage: bind <key> <parameters>");
 			return rkit::ResultCode::kOK;
 		}
 
 		KeyCode_t keyCode = 0;
 		if (!ResolveKeyCode(args[0], keyCode))
 		{
-			rkit::log::ErrorFmt("Unknown key {}", args[0].GetChars());
+			rkit::log::ErrorFmt(u8"Unknown key {}", args[0]);
 			return rkit::ResultCode::kOK;
 		}
 
@@ -290,12 +290,12 @@ namespace anox
 
 		if (args.Count() == 1)
 		{
-			rkit::log::LogInfoFmt("Keybind for '{}': {}", args[0].GetChars(), keyBind->m_cmd.CStr());
+			rkit::log::LogInfoFmt(u8"Keybind for '{}': {}", args[0], keyBind->m_cmd);
 		}
 		else
 		{
-			rkit::String storageStr;
-			rkit::StringView concatenated;
+			rkit::ByteString storageStr;
+			rkit::ByteStringView concatenated;
 
 			RKIT_CHECK(ConcatenateArgs(args, 1, storageStr, concatenated));
 
@@ -305,18 +305,18 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxKeybindManager::Cmd_Unbind(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::StringView> &args)
+	rkit::Result AnoxKeybindManager::Cmd_Unbind(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args)
 	{
 		if (args.Count() < 1)
 		{
-			rkit::log::Error("Usage: unbind <key>");
+			rkit::log::Error(u8"Usage: unbind <key>");
 			return rkit::ResultCode::kOK;
 		}
 
 		KeyCode_t keyCode = 0;
 		if (!ResolveKeyCode(args[0], keyCode))
 		{
-			rkit::log::ErrorFmt("Unknown key {}", args[0].GetChars());
+			rkit::log::ErrorFmt(u8"Unknown key {}", args[0]);
 			return rkit::ResultCode::kOK;
 		}
 
@@ -329,11 +329,11 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxKeybindManager::Cmd_Set(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::StringView> &args)
+	rkit::Result AnoxKeybindManager::Cmd_Set(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args)
 	{
 		if (args.Count() < 2)
 		{
-			rkit::log::Error("Usage: set <variable> <value> [u | s]");
+			rkit::log::Error(u8"Usage: set <variable> <value> [u | s]");
 			return rkit::ResultCode::kOK;
 		}
 
@@ -354,7 +354,7 @@ namespace anox
 			}
 
 			if (!setOK)
-				rkit::log::ErrorFmt("Failed to set '{0}' to '{1}'", args[0].GetChars(), args[1].GetChars());
+				rkit::log::ErrorFmt(u8"Failed to set '{0}' to '{1}'", args[0], args[1]);
 
 			return rkit::ResultCode::kOK;
 		}
@@ -362,16 +362,16 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxKeybindManager::Cmd_Alias(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::StringView> &args)
+	rkit::Result AnoxKeybindManager::Cmd_Alias(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args)
 	{
 		if (args.Count() < 2)
 		{
-			rkit::log::Error("Usage: alias <name> <commands>");
+			rkit::log::Error(u8"Usage: alias <name> <commands>");
 			return rkit::ResultCode::kOK;
 		}
 
-		rkit::String storageStr;
-		rkit::StringView aliasCommand;
+		rkit::ByteString storageStr;
+		rkit::ByteStringView aliasCommand;
 
 		RKIT_CHECK(ConcatenateArgs(args, 1, storageStr, aliasCommand));
 
@@ -380,11 +380,11 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxKeybindManager::ConcatenateArgs(const rkit::ISpan<rkit::StringView> &args, size_t firstArg, rkit::String &storageStr, rkit::StringView &outStrView)
+	rkit::Result AnoxKeybindManager::ConcatenateArgs(const rkit::ISpan<rkit::ByteStringView> &args, size_t firstArg, rkit::ByteString &storageStr, rkit::ByteStringView &outStrView)
 	{
 		if (args.Count() <= firstArg)
 		{
-			outStrView = rkit::StringView();
+			outStrView = rkit::ByteStringView();
 		}
 		else if (args.Count() == firstArg + 1)
 		{
@@ -392,7 +392,7 @@ namespace anox
 		}
 		else
 		{
-			rkit::Vector<char> concatenatedCmd;
+			rkit::Vector<uint8_t> concatenatedCmd;
 			for (size_t i = firstArg; i < args.Count(); i++)
 			{
 				if (concatenatedCmd.Count() > 0)
@@ -400,8 +400,8 @@ namespace anox
 					RKIT_CHECK(concatenatedCmd.Append(' '));
 				}
 
-				rkit::String tempStr;
-				rkit::StringView token = args[i];
+				rkit::ByteString tempStr;
+				rkit::ByteStringView token = args[i];
 
 				if (AnoxCommandRegistryBase::RequiresEscape(token))
 				{
@@ -423,10 +423,10 @@ namespace anox
 	{
 		rkit::coro::MethodWrapper<AnoxKeybindManager, AnoxRegisteredCommand::MethodStarter_t::Signature_t> wrapper(this);
 
-		RKIT_CHECK(commandRegistry.RegisterCommand("bind", wrapper.Create<&AnoxKeybindManager::Cmd_Bind>()));
-		RKIT_CHECK(commandRegistry.RegisterCommand("unbind", wrapper.Create<&AnoxKeybindManager::Cmd_Unbind>()));
-		RKIT_CHECK(commandRegistry.RegisterCommand("alias", wrapper.Create<&AnoxKeybindManager::Cmd_Alias>()));
-		RKIT_CHECK(commandRegistry.RegisterCommand("set", wrapper.Create<&AnoxKeybindManager::Cmd_Set>()));
+		RKIT_CHECK(commandRegistry.RegisterCommand(u8"bind", wrapper.Create<&AnoxKeybindManager::Cmd_Bind>()));
+		RKIT_CHECK(commandRegistry.RegisterCommand(u8"unbind", wrapper.Create<&AnoxKeybindManager::Cmd_Unbind>()));
+		RKIT_CHECK(commandRegistry.RegisterCommand(u8"alias", wrapper.Create<&AnoxKeybindManager::Cmd_Alias>()));
+		RKIT_CHECK(commandRegistry.RegisterCommand(u8"set", wrapper.Create<&AnoxKeybindManager::Cmd_Set>()));
 
 		return rkit::ResultCode::kOK;
 	}

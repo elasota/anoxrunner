@@ -20,32 +20,19 @@ namespace rkit
 	struct IFormatStringWriter
 	{
 		virtual void WriteChars(const Span<const TChar> &chars) = 0;
+		virtual CharacterEncoding GetEncoding() const = 0;
 	};
 }
 
 namespace rkit { namespace priv {
 	struct DefaultFormatters
 	{
-		static void FormatSignedInt(IFormatStringWriter<char> &writer, intmax_t value);
-		static void FormatUnsignedInt(IFormatStringWriter<char> &writer, uintmax_t value);
-		static void FormatFloat(IFormatStringWriter<char> &writer, float f);
-		static void FormatDouble(IFormatStringWriter<char> &writer, double f);
+		static void FormatSignedInt(IFormatStringWriter<Utf8Char_t> &writer, intmax_t value);
+		static void FormatUnsignedInt(IFormatStringWriter<Utf8Char_t> &writer, uintmax_t value);
+		static void FormatFloat(IFormatStringWriter<Utf8Char_t> &writer, float f);
+		static void FormatDouble(IFormatStringWriter<Utf8Char_t> &writer, double f);
+		static void FormatUtf8String(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t *str);
 		static void FormatCString(IFormatStringWriter<char> &writer, const char *str);
-		static void WFormatCString(IFormatStringWriter<wchar_t> &writer, const wchar_t *str);
-	};
-
-	class AsciiToWCharConverter final : public IFormatStringWriter<char>
-	{
-	public:
-		AsciiToWCharConverter() = delete;
-		AsciiToWCharConverter(const AsciiToWCharConverter &) = delete;
-
-		explicit AsciiToWCharConverter(IFormatStringWriter<wchar_t> &wcharWriter);
-
-		void WriteChars(const Span<const char> &chars) override;
-
-	private:
-		IFormatStringWriter<wchar_t> &m_wcharWriter;
 	};
 
 	template<class T, size_t TSize, bool TIsIntegral, bool TIsSigned>
@@ -61,28 +48,18 @@ namespace rkit { namespace priv {
 	template<class TSignedInt, size_t TSize>
 	struct DefaultFormatter<TSignedInt, TSize, true, true>
 	{
-		inline static void Format(IFormatStringWriter<char> &writer, TSignedInt value)
+		inline static void Format(IFormatStringWriter<Utf8Char_t> &writer, TSignedInt value)
 		{
 			return DefaultFormatters::FormatSignedInt(writer, value);
-		}
-
-		inline static void Format(IFormatStringWriter<wchar_t> &writer, TSignedInt value)
-		{
-			return DefaultFormatters::FormatSignedInt(AsciiToWCharConverter(writer), value);
 		}
 	};
 
 	template<class TUnsignedInt, size_t TSize>
 	struct DefaultFormatter<TUnsignedInt, TSize, true, false>
 	{
-		static void Format(IFormatStringWriter<char> &writer, TUnsignedInt value)
+		static void Format(IFormatStringWriter<Utf8Char_t> &writer, TUnsignedInt value)
 		{
 			DefaultFormatters::FormatSignedInt(writer, value);
-		}
-
-		static void Format(IFormatStringWriter<wchar_t> &writer, TUnsignedInt value)
-		{
-			DefaultFormatters::FormatSignedInt(AsciiToWCharConverter(writer), value);
 		}
 	};
 } }
@@ -128,74 +105,38 @@ namespace rkit
 	};
 
 	template<>
-	struct Formatter<const char *>
+	struct Formatter<const Utf8Char_t *>
 	{
-		inline static void Format(IFormatStringWriter<char> &writer, const char *value)
+		inline static void Format(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t *value)
 		{
-			priv::DefaultFormatters::FormatCString(writer, value);
+			priv::DefaultFormatters::FormatUtf8String(writer, value);
 		}
 	};
 
 	template<>
-	struct Formatter<char *>
+	struct Formatter<Utf8Char_t *>
 	{
-		inline static void Format(IFormatStringWriter<char> &writer, char *value)
+		inline static void Format(IFormatStringWriter<Utf8Char_t> &writer, Utf8Char_t *value)
 		{
-			Formatter<const char *>::Format(writer, value);
+			Formatter<const Utf8Char_t *>::Format(writer, value);
 		}
 	};
 
 	template<size_t TArraySize>
-	struct Formatter<const char[TArraySize]>
+	struct Formatter<const Utf8Char_t[TArraySize]>
 	{
-		inline static void Format(IFormatStringWriter<char> &writer, const char (&value)[TArraySize])
+		inline static void Format(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t(&value)[TArraySize])
 		{
-			Formatter<const char *>::Format(writer, value);
+			Formatter<const Utf8Char_t *>::Format(writer, value);
 		}
 	};
 
 	template<size_t TArraySize>
-	struct Formatter<char[TArraySize]>
+	struct Formatter<Utf8Char_t[TArraySize]>
 	{
-		inline static void Format(IFormatStringWriter<char> &writer, const char (&value)[TArraySize])
+		inline static void Format(IFormatStringWriter<char> &writer, const Utf8Char_t(&value)[TArraySize])
 		{
-			Formatter<const char *>::Format(writer, value);
-		}
-	};
-
-	template<>
-	struct Formatter<const wchar_t *>
-	{
-		inline static void Format(IFormatStringWriter<wchar_t> &writer, const wchar_t *value)
-		{
-			priv::DefaultFormatters::WFormatCString(writer, value);
-		}
-	};
-
-	template<>
-	struct Formatter<wchar_t *>
-	{
-		inline static void Format(IFormatStringWriter<wchar_t> &writer, wchar_t *value)
-		{
-			Formatter<const wchar_t *>::Format(writer, value);
-		}
-	};
-
-	template<size_t TArraySize>
-	struct Formatter<const wchar_t[TArraySize]>
-	{
-		inline static void Format(IFormatStringWriter<wchar_t> &writer, const wchar_t (&value)[TArraySize])
-		{
-			Formatter<const wchar_t *>::Format(writer, value);
-		}
-	};
-
-	template<size_t TArraySize>
-	struct Formatter<wchar_t[TArraySize]>
-	{
-		inline static void Format(IFormatStringWriter<wchar_t> &writer, const wchar_t (&value)[TArraySize])
-		{
-			Formatter<const wchar_t *>::Format(writer, value);
+			Formatter<const Utf8Char_t *>::Format(writer, value);
 		}
 	};
 }
@@ -217,6 +158,7 @@ namespace rkit { namespace priv {
 	};
 } }
 
+#include "CoreLib.h"
 #include "Span.h"
 #include "Drivers.h"
 #include "UtilitiesDriver.h"
@@ -277,33 +219,33 @@ namespace rkit { namespace priv {
 		cb(writer, *static_cast<const TType *>(dataPtr));
 	}
 
-	inline void DefaultFormatters::FormatSignedInt(IFormatStringWriter<char> &writer, intmax_t value)
+	inline void DefaultFormatters::FormatSignedInt(IFormatStringWriter<Utf8Char_t> &writer, intmax_t value)
 	{
 		GetDrivers().m_utilitiesDriver->FormatSignedInt(writer, value);
 	}
 
-	inline void DefaultFormatters::FormatUnsignedInt(IFormatStringWriter<char> &writer, uintmax_t value)
+	inline void DefaultFormatters::FormatUnsignedInt(IFormatStringWriter<Utf8Char_t> &writer, uintmax_t value)
 	{
 		GetDrivers().m_utilitiesDriver->FormatUnsignedInt(writer, value);
 	}
 
-	inline void DefaultFormatters::FormatFloat(IFormatStringWriter<char> &writer, float f)
+	inline void DefaultFormatters::FormatFloat(IFormatStringWriter<Utf8Char_t> &writer, float f)
 	{
 		GetDrivers().m_utilitiesDriver->FormatFloat(writer, f);
 	}
 
-	inline void DefaultFormatters::FormatDouble(IFormatStringWriter<char> &writer, double f)
+	inline void DefaultFormatters::FormatDouble(IFormatStringWriter<Utf8Char_t> &writer, double f)
 	{
 		GetDrivers().m_utilitiesDriver->FormatDouble(writer, f);
+	}
+
+	inline void DefaultFormatters::FormatUtf8String(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t *str)
+	{
+		GetDrivers().m_utilitiesDriver->FormatUtf8String(writer, str);
 	}
 
 	inline void DefaultFormatters::FormatCString(IFormatStringWriter<char> &writer, const char *str)
 	{
 		GetDrivers().m_utilitiesDriver->FormatCString(writer, str);
-	}
-
-	inline void DefaultFormatters::WFormatCString(IFormatStringWriter<wchar_t> &writer, const wchar_t *str)
-	{
-		GetDrivers().m_utilitiesDriver->WFormatCString(writer, str);
 	}
 } }

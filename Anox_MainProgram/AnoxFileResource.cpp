@@ -53,7 +53,7 @@ namespace anox
 		rkit::RCPtr<rkit::Job> openJob;
 
 		rkit::CIPath loosePath;
-		RKIT_CHECK(loosePath.AppendComponent("loose"));
+		RKIT_CHECK(loosePath.AppendComponent(u8"loose"));
 		RKIT_CHECK(loosePath.Append(key));
 
 		rkit::RCPtr<rkit::Vector<uint8_t>> resourceBufferRCPtr = resource.StaticCast<AnoxFileResource>().FieldRef(&AnoxFileResource::m_fileBytes);

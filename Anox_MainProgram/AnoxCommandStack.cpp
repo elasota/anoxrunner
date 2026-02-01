@@ -15,14 +15,14 @@ namespace anox
 		rkit::Result Init(size_t maxCapacity, size_t maxLines);
 
 		rkit::Result Parse(const rkit::Span<const uint8_t> &stream) override;
-		rkit::Result Push(const rkit::StringSliceView &strView) override;
-		rkit::Result PushMultiple(const rkit::ISpan<rkit::StringSliceView> &spans) override;
+		rkit::Result PushBStr(const rkit::ByteStringSliceView &strView) override;
+		rkit::Result PushMultiple(const rkit::ISpan<rkit::ByteStringSliceView> &spans) override;
 
-		bool Pop(rkit::Span<char> &outString) override;
+		bool Pop(rkit::Span<uint8_t> &outString) override;
 
 	private:
-		rkit::Vector<char> m_contentsBuffer;
-		rkit::Vector<rkit::Span<char>> m_lines;
+		rkit::Vector<uint8_t> m_contentsBuffer;
+		rkit::Vector<rkit::Span<uint8_t>> m_lines;
 		size_t m_contentsSize;
 		size_t m_numLines;
 	};
@@ -47,7 +47,7 @@ namespace anox
 
 		size_t startPos = 0;
 
-		rkit::Vector<rkit::StringSliceView> lines;
+		rkit::Vector<rkit::ByteStringSliceView> lines;
 
 		size_t endPos = 0;
 		bool isInQuote = false;
@@ -124,7 +124,7 @@ namespace anox
 				// If there's anything left, add it
 				if (lineSpan.Count() > 0)
 				{
-					rkit::StringSliceView slice(lineSpan.ReinterpretCast<const char>());
+					rkit::ByteStringSliceView slice(lineSpan);
 					RKIT_CHECK(lines.Append(slice));
 				}
 			}
@@ -147,12 +147,12 @@ namespace anox
 		return rkit::ResultCode::kOK;
 	}
 
-	rkit::Result AnoxCommandStack::Push(const rkit::StringSliceView &strView)
+	rkit::Result AnoxCommandStack::PushBStr(const rkit::ByteStringSliceView &strView)
 	{
-		return PushMultiple(rkit::Span<const rkit::StringSliceView>(&strView, 1).ToValueISpan());
+		return PushMultiple(rkit::Span<const rkit::ByteStringSliceView>(&strView, 1).ToValueISpan());
 	}
 
-	rkit::Result AnoxCommandStack::PushMultiple(const rkit::ISpan<rkit::StringSliceView> &slices)
+	rkit::Result AnoxCommandStack::PushMultiple(const rkit::ISpan<rkit::ByteStringSliceView> &slices)
 	{
 		size_t sizeAvailable = m_contentsBuffer.Count() - m_contentsSize;
 		size_t linesAvailable = m_lines.Count() - m_numLines;
@@ -161,18 +161,18 @@ namespace anox
 
 		if (linesAvailable < numSlices)
 		{
-			rkit::log::Error("Not enough command stack space available");
+			rkit::log::Error(u8"Not enough command stack space available");
 			return rkit::ResultCode::kOperationFailed;
 		}
 
 		size_t sizeRequired = 0;
 		for (size_t i = 0; i < numSlices; i++)
 		{
-			const rkit::StringSliceView slice = slices[i];
+			const rkit::ByteStringSliceView slice = slices[i];
 
 			if (sizeAvailable < 1)
 			{
-				rkit::log::Error("Not enough command stack space available");
+				rkit::log::Error(u8"Not enough command stack space available");
 				return rkit::ResultCode::kOperationFailed;
 			}
 
@@ -180,7 +180,7 @@ namespace anox
 
 			if (sizeAvailable < slice.Length())
 			{
-				rkit::log::Error("Not enough command stack space available");
+				rkit::log::Error(u8"Not enough command stack space available");
 				return rkit::ResultCode::kOperationFailed;
 			}
 
@@ -190,12 +190,12 @@ namespace anox
 		size_t insertPos = m_contentsSize;
 		m_contentsSize += sizeRequired;
 
-		rkit::Span<char> contentsSpan = m_contentsBuffer.ToSpan();
+		rkit::Span<uint8_t> contentsSpan = m_contentsBuffer.ToSpan();
 
 		for (size_t i = 0; i < numSlices; i++)
 		{
-			const rkit::StringSliceView slice = slices[i];
-			const rkit::Span<char> targetSpan = contentsSpan.SubSpan(insertPos, slice.Length());
+			const rkit::ByteStringSliceView slice = slices[i];
+			const rkit::Span<uint8_t> targetSpan = contentsSpan.SubSpan(insertPos, slice.Length());
 
 			rkit::CopySpanNonOverlapping(targetSpan, slice.ToSpan());
 			insertPos += slice.Length();
@@ -211,7 +211,7 @@ namespace anox
 	}
 
 
-	bool AnoxCommandStack::Pop(rkit::Span<char> &outString)
+	bool AnoxCommandStack::Pop(rkit::Span<uint8_t> &outString)
 	{
 		if (m_numLines > 0)
 		{

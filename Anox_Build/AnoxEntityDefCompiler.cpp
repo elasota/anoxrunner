@@ -16,11 +16,11 @@
 namespace anox { namespace buildsystem {
 	struct UserEntityDef2
 	{
-		rkit::AsciiString m_className;
+		rkit::ByteString m_className;
 		rkit::AsciiString m_modelPath;
 		uint32_t m_modelCode = 0;
 		float m_scale[3] = { 0, 0, 0 };
-		rkit::AsciiString m_type;
+		rkit::ByteString m_type;
 		data::UserEntityShadowType m_shadowType = data::UserEntityShadowType::kShadow;
 		float m_bboxMin[3] = { 0, 0, 0 };
 		float m_bboxMax[3] = { 0, 0, 0 };
@@ -31,16 +31,16 @@ namespace anox { namespace buildsystem {
 		Label m_targetSequence;
 		rkit::endian::LittleUInt32_t m_miscValue;
 		Label m_startSequence;
-		rkit::AsciiString m_description;
+		rkit::ByteString m_description;
 	};
 
 	class UserEntityDictionary final : public UserEntityDictionaryBase
 	{
 	public:
 		explicit UserEntityDictionary(rkit::Vector<UserEntityDef2> &&edefs);
-		bool FindEntityDef(const rkit::AsciiStringSliceView &name, uint32_t &outEDefID) const override;
+		bool FindEntityDef(const rkit::ByteStringSliceView &name, uint32_t &outEDefID) const override;
 
-		rkit::AsciiStringView GetEDefType(uint32_t edefID) const override;
+		rkit::ByteStringView GetEDefType(uint32_t edefID) const override;
 		uint32_t GetEDefCount() const override;
 
 		rkit::Result WriteEDef(rkit::IWriteStream &stream, uint32_t edefID) const override;
@@ -62,7 +62,7 @@ namespace anox { namespace buildsystem {
 
 		uint32_t GetVersion() const override;
 
-		static rkit::Result ParseLabel(const rkit::ConstSpan<char> &span, Label &outLabel);
+		static rkit::Result ParseLabel(const rkit::ConstSpan<uint8_t> &span, Label &outLabel);
 
 	private:
 		static rkit::Result IndexString(rkit::Vector<rkit::AsciiString> &strings, rkit::HashMap<rkit::AsciiString, uint16_t> &stringToIndex, const rkit::AsciiString &str, uint16_t &outIndex);
@@ -73,11 +73,11 @@ namespace anox { namespace buildsystem {
 	{
 		rkit::QuickSort(m_defs.begin(), m_defs.end(), [](const UserEntityDef2 &a, const UserEntityDef2 &b)
 			{
-				return a.m_className < b.m_className;
+				return a.m_className.ToByteView() < b.m_className.ToByteView();
 			});
 	}
 
-	bool UserEntityDictionary::FindEntityDef(const rkit::AsciiStringSliceView &name, uint32_t &outEDefID) const
+	bool UserEntityDictionary::FindEntityDef(const rkit::ByteStringSliceView &name, uint32_t &outEDefID) const
 	{
 		size_t minInclusive = 0;
 		size_t maxExclusive = m_defs.Count();
@@ -86,7 +86,7 @@ namespace anox { namespace buildsystem {
 		{
 			const size_t testIndex = (minInclusive + maxExclusive) / 2;
 
-			rkit::Ordering ordering = m_defs[testIndex].m_className.Compare(name);
+			rkit::Ordering ordering = m_defs[testIndex].m_className.ToByteView().Compare(name);
 			if (ordering == rkit::Ordering::kEqual)
 			{
 				outEDefID = static_cast<uint32_t>(testIndex);
@@ -105,7 +105,7 @@ namespace anox { namespace buildsystem {
 		return false;
 	}
 
-	rkit::AsciiStringView UserEntityDictionary::GetEDefType(uint32_t edefID) const
+	rkit::ByteStringView UserEntityDictionary::GetEDefType(uint32_t edefID) const
 	{
 		return m_defs[edefID].m_type;
 	}
@@ -133,12 +133,12 @@ namespace anox { namespace buildsystem {
 	rkit::Result EntityDefCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		const rkit::StringView identifier = depsNode->GetIdentifier();
-		const rkit::StringView prefix = "edefs/edef";
+		const rkit::StringView prefix = u8"edefs/edef";
 		if (!identifier.StartsWith(prefix))
 			return rkit::ResultCode::kInternalError;
 
 		uint32_t edefID = 0;
-		if (!rkit::GetDrivers().m_utilitiesDriver->ParseUInt32(identifier.SubString(prefix.Length()), 10, edefID))
+		if (!rkit::GetDrivers().m_utilitiesDriver->ParseUInt32(identifier.SubString(prefix.Length()).RemoveEncoding(), 10, edefID))
 			return rkit::ResultCode::kInternalError;
 
 		rkit::UniquePtr<UserEntityDictionaryBase> dictionary;
@@ -153,7 +153,7 @@ namespace anox { namespace buildsystem {
 		const rkit::AsciiStringView modelPath = edef.m_modelPath;
 
 		rkit::String modelPathStr;
-		RKIT_CHECK(modelPathStr.Set(modelPath.ToSpan()));
+		RKIT_CHECK(modelPathStr.ConvertFrom(modelPath));
 		RKIT_CHECK(modelPathStr.MakeLower());
 
 		if (modelPath.EndsWithNoCase(".md2"))
@@ -176,15 +176,15 @@ namespace anox { namespace buildsystem {
 
 	rkit::Result EntityDefCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
-		anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, "Utilities"));
+		anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, u8"Utilities"));
 
 		const rkit::StringView identifier = depsNode->GetIdentifier();
-		const rkit::StringView prefix = "edefs/edef";
+		const rkit::StringView prefix = u8"edefs/edef";
 		if (!identifier.StartsWith(prefix))
 			return rkit::ResultCode::kInternalError;
 
 		uint32_t edefID = 0;
-		if (!rkit::GetDrivers().m_utilitiesDriver->ParseUInt32(identifier.SubString(prefix.Length()), 10, edefID))
+		if (!rkit::GetDrivers().m_utilitiesDriver->ParseUInt32(identifier.SubString(prefix.Length()).RemoveEncoding(), 10, edefID))
 			return rkit::ResultCode::kInternalError;
 
 		rkit::UniquePtr<UserEntityDictionaryBase> dictionary;
@@ -200,7 +200,7 @@ namespace anox { namespace buildsystem {
 
 		if (edef.m_description.Length() > 255)
 		{
-			rkit::log::Error("Description too long");
+			rkit::log::Error(u8"Description too long");
 			return rkit::ResultCode::kDataError;
 		}
 
@@ -209,17 +209,17 @@ namespace anox { namespace buildsystem {
 		{
 			const data::EntityDefsSchema &schema = anoxUtils->GetEntityDefs();
 
-			rkit::AsciiString fullType;
-			RKIT_CHECK(fullType.Set("userentity_"));
+			rkit::ByteString fullType;
+			RKIT_CHECK(fullType.Set(rkit::StringView(u8"userentity_").RemoveEncoding()));
 			RKIT_CHECK(fullType.Append(edef.m_type));
 
 			for (size_t i = 0; i < schema.m_numClassDefs; i++)
 			{
 				const data::EntityClassDef &classDef = *schema.m_classDefs[i];
 
-				rkit::AsciiStringSliceView className(classDef.m_name, classDef.m_nameLength);
+				rkit::StringSliceView className(classDef.m_name, classDef.m_nameLength);
 
-				if (className == fullType)
+				if (className.RemoveEncoding() == fullType)
 				{
 					classDefIndex = i;
 					break;
@@ -228,7 +228,7 @@ namespace anox { namespace buildsystem {
 
 			if (!classDefIndex.IsSet())
 			{
-				rkit::log::Error("Invalid userentity type");
+				rkit::log::Error(u8"Invalid userentity type");
 				return rkit::ResultCode::kDataError;
 			}
 		}
@@ -247,7 +247,7 @@ namespace anox { namespace buildsystem {
 			const rkit::AsciiStringView modelPath = edef.m_modelPath;
 
 			rkit::String modelPathStr;
-			RKIT_CHECK(modelPathStr.Set(modelPath.ToSpan()));
+			RKIT_CHECK(modelPathStr.ConvertFrom(modelPath));
 			RKIT_CHECK(modelPathStr.MakeLower());
 
 			rkit::CIPath outputModelPath;
@@ -323,7 +323,7 @@ namespace anox { namespace buildsystem {
 		return 2;
 	}
 
-	rkit::Result EntityDefCompiler::ParseLabel(const rkit::ConstSpan<char> &span, Label &outLabel)
+	rkit::Result EntityDefCompiler::ParseLabel(const rkit::ConstSpan<uint8_t> &span, Label &outLabel)
 	{
 		rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
 
@@ -363,8 +363,8 @@ namespace anox { namespace buildsystem {
 
 		uint32_t highPart = 0;
 		uint32_t lowPart = 0;
-		if (!utils->ParseUInt32(rkit::StringSliceView(span.SubSpan(0, dividerPos)), 10, highPart)
-			|| !utils->ParseUInt32(rkit::StringSliceView(span.SubSpan(dividerPos + 1)), 10, lowPart)
+		if (!utils->ParseUInt32(rkit::ByteStringSliceView(span.SubSpan(0, dividerPos)), 10, highPart)
+			|| !utils->ParseUInt32(rkit::ByteStringSliceView(span.SubSpan(dividerPos + 1)), 10, lowPart)
 			|| !Label::IsValid(highPart, lowPart))
 			return rkit::ResultCode::kDataError;
 
@@ -375,29 +375,28 @@ namespace anox { namespace buildsystem {
 
 	rkit::Result EntityDefCompilerBase::FormatEDef(rkit::String &edefIdentifier, uint32_t edefID)
 	{
-		return edefIdentifier.Format("edefs/edef{}", edefID);
+		return edefIdentifier.Format(u8"edefs/edef{}", edefID);
 	}
 
 	rkit::Result EntityDefCompilerBase::LoadUserEntityDictionary(rkit::UniquePtr<UserEntityDictionaryBase> &outDictionary, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		rkit::UniquePtr<rkit::ISeekableReadStream> inFile;
-		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, "models/entity.dat", inFile));
+		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, u8"models/entity.dat", inFile));
 
 		if (inFile->GetSize() >= std::numeric_limits<size_t>::max())
 			return rkit::ResultCode::kOutOfMemory;
 
 		const size_t fileSize = static_cast<size_t>(inFile->GetSize());
 
-		rkit::Vector<char> edefCharsArray;
+		rkit::Vector<uint8_t> edefCharsArray;
 		RKIT_CHECK(edefCharsArray.Resize(fileSize));
 
-		RKIT_CHECK(inFile->ReadAll(edefCharsArray.GetBuffer(), edefCharsArray.Count()));
+		RKIT_CHECK(inFile->ReadAllSpan(edefCharsArray.ToSpan()));
 
-		rkit::ConstSpan<char> fileChars = edefCharsArray.ToSpan();
+		rkit::ConstSpan<uint8_t> fileChars = edefCharsArray.ToSpan();
 
-
-		rkit::Vector<rkit::AsciiString> strings;
-		rkit::HashMap<rkit::AsciiString, uint16_t> stringToIndex;
+		rkit::Vector<rkit::ByteString> strings;
+		rkit::HashMap<rkit::ByteString, uint16_t> stringToIndex;
 
 		rkit::Vector<UserEntityDef2> edefs;
 
@@ -410,7 +409,7 @@ namespace anox { namespace buildsystem {
 				continue;
 
 			// Don't really care about CRLF compaction because we ignore empty lines for this
-			rkit::ConstSpan<char> lineChars = fileChars.SubSpan(lineStart, lineEnd - lineStart);
+			rkit::ConstSpan<uint8_t> lineChars = fileChars.SubSpan(lineStart, lineEnd - lineStart);
 
 			lineStart = lineEnd + 1;
 
@@ -430,7 +429,7 @@ namespace anox { namespace buildsystem {
 			if (lineChars[0] == ';')
 				continue;
 
-			rkit::StaticArray<rkit::ConstSpan<char>, 24> fragments;
+			rkit::StaticArray<rkit::ConstSpan<uint8_t>, 24> fragments;
 			size_t numFragments = 0;
 
 			size_t fragmentStart = 0;
@@ -451,7 +450,7 @@ namespace anox { namespace buildsystem {
 
 			for (size_t realFragmentIndex = 0; realFragmentIndex < numFragments; realFragmentIndex++)
 			{
-				rkit::ConstSpan<char> fragment = fragments[realFragmentIndex];
+				rkit::ConstSpan<uint8_t> fragment = fragments[realFragmentIndex];
 
 				size_t fragmentIndex = realFragmentIndex;
 				if (numFragments == 20 && fragmentIndex >= 18)
@@ -477,7 +476,7 @@ namespace anox { namespace buildsystem {
 							const size_t fragmentLen = fragment.Count();
 							if (fragmentLen > 5 && fragment[fragmentLen - 5] == '!')
 							{
-								const rkit::ConstSpan<char> code = fragment.SubSpan(fragmentLen - 4);
+								const rkit::ConstSpan<uint8_t> code = fragment.SubSpan(fragmentLen - 4);
 
 								edef.m_modelCode = rkit::utils::ComputeFourCC(code[0], code[1], code[2], code[3]);
 
@@ -485,15 +484,21 @@ namespace anox { namespace buildsystem {
 							}
 						}
 
-						rkit::AsciiString str;
-						RKIT_CHECK(str.Set(fragment));
-
 						if (fragmentIndex == 0)
-							edef.m_className = str;
+						{
+							RKIT_CHECK(edef.m_className.Set(fragment));
+						}
 						else if (fragmentIndex == 1)
-							edef.m_modelPath = str;
+						{
+							if (!rkit::CharacterEncodingValidator<rkit::CharacterEncoding::kASCII>::ValidateSpan(fragment))
+								return rkit::ResultCode::kDataError;
+
+							RKIT_CHECK(edef.m_modelPath.Set(rkit::AsciiStringSliceView(fragment.ReinterpretCast<const char>())));
+						}
 						else if (fragmentIndex == 23)
-							edef.m_description = str;
+						{
+							RKIT_CHECK(edef.m_description.Set(fragment));
+						}
 					}
 					break;
 				case 2:
@@ -509,11 +514,10 @@ namespace anox { namespace buildsystem {
 				case 15:
 				case 16:
 					{
-						rkit::String str;
-						RKIT_CHECK(str.Set(fragment));
+						rkit::ByteStringSliceView str(fragment);
 
 						double d = 0.0;
-						if (str == "128F")
+						if (str == rkit::StringView(u8"128F").RemoveEncoding())
 						{
 							// Broken ob_billkawa entry
 							d = 128.0;
@@ -545,14 +549,14 @@ namespace anox { namespace buildsystem {
 					break;
 				case 12:
 					{
-						rkit::AsciiStringSliceView slice(fragment);
+						rkit::ByteStringSliceView slice(fragment);
 						data::UserEntityShadowType shadowType = data::UserEntityShadowType::kNoShadow;
 
-						if (slice == "shadow")
+						if (slice == rkit::StringView(u8"shadow").RemoveEncoding())
 							shadowType = data::UserEntityShadowType::kShadow;
-						else if (slice == "noshadow")
+						else if (slice == rkit::StringView(u8"noshadow").RemoveEncoding())
 							shadowType = data::UserEntityShadowType::kNoShadow;
-						else if (slice == "lightning")
+						else if (slice == rkit::StringView(u8"lightning").RemoveEncoding())
 							shadowType = data::UserEntityShadowType::kLightning;
 						else
 							return rkit::ResultCode::kDataError;
@@ -565,8 +569,8 @@ namespace anox { namespace buildsystem {
 				case 18:
 				case 21:
 					{
-						rkit::AsciiStringSliceView slice(fragment);
-						if (slice == "1")
+						rkit::ByteStringSliceView slice(fragment);
+						if (slice == rkit::AsciiStringView("1").RemoveEncoding())
 						{
 							if (fragmentIndex == 13)
 								edef.m_flags |= static_cast<uint8_t>(1 << static_cast<int>(data::UserEntityFlags::kSolid));
@@ -579,7 +583,9 @@ namespace anox { namespace buildsystem {
 							else
 								return rkit::ResultCode::kInternalError;
 						}
-						else if (slice == "0" || slice == "" || slice == "0:0")	// 0:0 for broken npc_alien_rowdy
+						else if (slice == rkit::AsciiStringView("0").RemoveEncoding()
+							|| slice.Length() == 0
+							|| slice == rkit::AsciiStringView("0:0").RemoveEncoding())	// 0:0 for broken npc_alien_rowdy
 						{
 						}
 						else
@@ -594,15 +600,15 @@ namespace anox { namespace buildsystem {
 					break;
 				case 20:
 					{
-						rkit::AsciiStringSliceView slice(fragment);
-						if (slice != "0")
+						rkit::ByteStringSliceView slice(fragment);
+						if (slice != rkit::AsciiStringView("0").RemoveEncoding())
 							return rkit::ResultCode::kDataError;
 					}
 					break;
 				case 22:
 					{
-						rkit::AsciiStringSliceView slice(fragment);
-						if (slice != "none")
+						rkit::ByteStringSliceView slice(fragment);
+						if (slice != rkit::AsciiStringView("none").RemoveEncoding())
 						{
 							Label label;
 							RKIT_CHECK(EntityDefCompiler::ParseLabel(fragment, edef.m_startSequence));

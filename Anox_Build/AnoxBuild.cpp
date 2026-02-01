@@ -32,7 +32,7 @@ namespace anox
 		rkit::Result RegisterBuildSystemAddOn(rkit::buildsystem::IBuildSystemInstance *instance) override;
 
 		uint32_t GetDriverNamespaceID() const override { return anox::kAnoxNamespaceID; }
-		rkit::StringView GetDriverName() const override { return "Build"; }
+		rkit::StringView GetDriverName() const override { return u8"Build"; }
 
 		rkit::png::IPngDriver *m_pngDriver = nullptr;
 	};
@@ -44,17 +44,17 @@ namespace anox
 
 rkit::Result anox::BuildDriver::InitDriver(const rkit::DriverInitParameters *)
 {
-	if (!rkit::GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, "PNG"))
+	if (!rkit::GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, u8"PNG"))
 	{
-		rkit::log::Error("PNG module missing");
+		rkit::log::Error(u8"PNG module missing");
 		return rkit::ResultCode::kModuleLoadFailed;
 	}
 
-	rkit::ICustomDriver *pngDriver = rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, "PNG");
+	rkit::ICustomDriver *pngDriver = rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, u8"PNG");
 
 	if (!pngDriver)
 	{
-		rkit::log::Error("PNG driver failed to load");
+		rkit::log::Error(u8"PNG driver failed to load");
 		return rkit::ResultCode::kModuleLoadFailed;
 	}
 
@@ -109,7 +109,7 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 
 		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kBSPMapNodeID, std::move(mapCompiler)));
 
-		RKIT_CHECK(instance->RegisterNodeTypeByExtension("bsp", kAnoxNamespaceID, buildsystem::kBSPMapNodeID));
+		RKIT_CHECK(instance->RegisterNodeTypeByExtension(u8"bsp", kAnoxNamespaceID, buildsystem::kBSPMapNodeID));
 	}
 
 	{
@@ -161,7 +161,7 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kCTCModelNodeID, std::move(ctcCompiler)));
 	}
 
-	RKIT_CHECK(instance->RegisterNodeTypeByExtension("cfg", rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kCopyFileNodeID));
+	RKIT_CHECK(instance->RegisterNodeTypeByExtension(u8"cfg", rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kCopyFileNodeID));
 
 	return rkit::ResultCode::kOK;
 }

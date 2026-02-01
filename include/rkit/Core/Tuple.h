@@ -56,12 +56,12 @@ namespace rkit
 	{
 	public:
 		Tuple();
-		Tuple(Tuple<T> &&other);
+		Tuple(Tuple<T> &&other) noexcept;
 		Tuple(const Tuple<T> &other);
 		explicit Tuple(const T &value);
-		explicit Tuple(T &&value);
+		explicit Tuple(T &&value) noexcept;
 
-		Tuple &operator=(Tuple<T> &&other);
+		Tuple &operator=(Tuple<T> &&other) noexcept;
 		Tuple &operator=(const Tuple<T> &other);
 
 		template<size_t TIndex>
@@ -79,13 +79,13 @@ namespace rkit
 	{
 	public:
 		Tuple();
-		Tuple(Tuple<TFirst, TMore...> &&other);
+		Tuple(Tuple<TFirst, TMore...> &&other) noexcept;
 		Tuple(const Tuple<TFirst, TMore...> &other);
 
 		template<class TFirstArg, class... TMoreArgs>
 		explicit Tuple(TFirstArg firstArg, TMoreArgs... moreArgs);
 
-		Tuple<TFirst, TMore...> &operator=(Tuple<TFirst, TMore...> &&other);
+		Tuple<TFirst, TMore...> &operator=(Tuple<TFirst, TMore...> &&other) noexcept;
 		Tuple<TFirst, TMore...> &operator=(const Tuple<TFirst, TMore...> &other);
 
 		template<size_t TIndex>
@@ -139,7 +139,7 @@ namespace rkit
 	}
 
 	template<class T>
-	Tuple<T>::Tuple(Tuple<T> &&other)
+	Tuple<T>::Tuple(Tuple<T> &&other) noexcept
 		: m_value(std::move(other.m_value))
 	{
 	}
@@ -157,13 +157,13 @@ namespace rkit
 	}
 
 	template<class T>
-	Tuple<T>::Tuple(T &&value)
+	Tuple<T>::Tuple(T &&value) noexcept
 		: m_value(std::move(value))
 	{
 	}
 
 	template<class T>
-	Tuple<T> &Tuple<T>::operator=(Tuple<T> &&other)
+	Tuple<T> &Tuple<T>::operator=(Tuple<T> &&other) noexcept
 	{
 		m_value = std::move(other.m_value);
 		return *this;
@@ -199,7 +199,7 @@ namespace rkit
 	}
 
 	template<class TFirst, class... TMore>
-	Tuple<TFirst, TMore...>::Tuple(Tuple<TFirst, TMore...> &&other)
+	Tuple<TFirst, TMore...>::Tuple(Tuple<TFirst, TMore...> &&other) noexcept
 		: m_first(std::move(other.m_first))
 		, m_more(std::move(other.m_more))
 	{
@@ -221,7 +221,7 @@ namespace rkit
 	}
 
 	template<class TFirst, class... TMore>
-	Tuple<TFirst, TMore...> &Tuple<TFirst, TMore...>::operator=(Tuple<TFirst, TMore...> &&other)
+	Tuple<TFirst, TMore...> &Tuple<TFirst, TMore...>::operator=(Tuple<TFirst, TMore...> &&other) noexcept
 	{
 		m_first = std::move(other.m_first);
 		m_more = std::move(other.m_more);

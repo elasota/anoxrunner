@@ -98,18 +98,18 @@ namespace anox
 
 	rkit::Result AnoxGame::Start()
 	{
-		rkit::IModule *dataModule = rkit::GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, "Data");
+		rkit::IModule *dataModule = rkit::GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, u8"Data");
 		if (!dataModule)
 		{
-			rkit::log::Error("Couldn't load data module");
+			rkit::log::Error(u8"Couldn't load data module");
 			return rkit::ResultCode::kModuleLoadFailed;
 		}
 
-		m_dataDriver = static_cast<rkit::data::IDataDriver *>(rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, "Data"));
+		m_dataDriver = static_cast<rkit::data::IDataDriver *>(rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, u8"Data"));
 
 		if (!m_dataDriver)
 		{
-			rkit::log::Error("Data driver wasn't available");
+			rkit::log::Error(u8"Data driver wasn't available");
 			return rkit::ResultCode::kModuleLoadFailed;
 		}
 

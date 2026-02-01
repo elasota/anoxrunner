@@ -10,6 +10,8 @@
 #include "rkit/Core/Unicode.h"
 #include "rkit/Core/Vector.h"
 
+#include "rkit/Core/CoreLib.h"
+
 #include "rkit/Utilities/ThreadPool.h"
 
 #include "CoroThread.h"
@@ -68,15 +70,15 @@ namespace rkit
 
 		HashValue_t ComputeHash(HashValue_t baseHash, const void *data, size_t size) const override;
 
-		Result CreateTextParser(const Span<const char> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<utils::ITextParser> &outParser) const override;
+		Result CreateTextParser(const Span<const uint8_t> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<utils::ITextParser> &outParser) const override;
 		Result ReadEntireFile(ISeekableReadStream &stream, Vector<uint8_t> &outBytes) const override;
 
-		bool ValidateFilePath(const Span<const char> &fileName, bool permitWildcards) const override;
+		bool ValidateFilePath(const Span<const Utf8Char_t> &fileName, bool permitWildcards) const override;
 
-		void NormalizeFilePath(const Span<char> &chars) const override;
+		void NormalizeFilePath(const Span<Utf8Char_t> &chars) const override;
 		bool FindFilePathExtension(const StringSliceView &str, StringSliceView &outExt) const override;
 
-		Result EscapeCStringInPlace(const Span<char> &chars, size_t &outNewLength) const override;
+		Result EscapeCStringInPlace(const Span<Utf8Char_t> &chars, size_t &outNewLength) const override;
 
 		const utils::ISha256Calculator *GetSha256Calculator() const override;
 
@@ -95,7 +97,7 @@ namespace rkit
 		bool ContainsWildcards(const StringSliceView &str) const override;
 		bool MatchesWildcard(const StringSliceView &candidate, const StringSliceView &wildcard) const override;
 
-		bool DefaultIsPathComponentValid(const BaseStringSliceView<char, CharacterEncoding::kUTF8> &span, bool isFirst, bool allowWildcards) const override;
+		bool DefaultIsPathComponentValid(const StringSliceView &span, bool isFirst, bool allowWildcards) const override;
 
 		Result ConvertUTF16ToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const uint16_t> &src) const override;
 		Result ConvertUTF16WCharToUTF8(size_t &outSize, const Span<uint8_t> &dest, const Span<const wchar_t> &src) const override;
@@ -103,40 +105,39 @@ namespace rkit
 		Result ConvertUTF8ToUTF16(size_t &outSize, const Span<uint16_t> &dest, const Span<const uint8_t> &src) const override;
 		Result ConvertUTF8ToUTF16WChar(size_t &outSize, const Span<wchar_t> &dest, const Span<const uint8_t> &src) const override;
 
-		bool IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t, CharacterEncoding::kUTF16> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const override;
+		bool IsPathComponentValidOnWindows(const BaseStringSliceView<OSPathChar_t, CharacterEncoding::kOSPath> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const override;
 
 		Result CreateCoroThread(UniquePtr<coro::Thread> &thread, size_t stackSize) const override;
 
 		Result CreateBlockingReader(UniquePtr<ISeekableReadStream> &outReadStream, UniquePtr<IAsyncReadFile> &&asyncFile, FilePos_t fileSize) const override;
 
-		bool ParseDouble(const StringView &str, double &d) const override;
-		bool ParseFloat(const StringView &str, float &f) const override;
+		bool ParseDouble(const ByteStringSliceView &str, double &d) const override;
+		bool ParseFloat(const ByteStringSliceView &str, float &f) const override;
 
-		bool ParseInt32(const StringSliceView &str, uint8_t radix, int32_t &i) const override;
-		bool ParseInt64(const StringSliceView &str, uint8_t radix, int64_t &i) const override;
-		bool ParseUInt32(const StringSliceView &str, uint8_t radix, uint32_t &i) const override;
-		bool ParseUInt64(const StringSliceView &str, uint8_t radix, uint64_t &i) const override;
+		bool ParseInt32(const ByteStringSliceView &str, uint8_t radix, int32_t &i) const override;
+		bool ParseInt64(const ByteStringSliceView &str, uint8_t radix, int64_t &i) const override;
+		bool ParseUInt32(const ByteStringSliceView &str, uint8_t radix, uint32_t &i) const override;
+		bool ParseUInt64(const ByteStringSliceView &str, uint8_t radix, uint64_t &i) const override;
 
 		Result CreateImage(const utils::ImageSpec &spec, UniquePtr<utils::IImage> &image) const override;
 		Result CloneImage(UniquePtr<utils::IImage> &outImage, const utils::IImage &image) const override;
 		Result BlitImageSigned(utils::IImage &destImage, const utils::IImage &srcImage, ptrdiff_t srcX, ptrdiff_t srcY, ptrdiff_t destX, ptrdiff_t destY, size_t width, size_t height) const override;
 		Result BlitImage(utils::IImage &destImage, const utils::IImage &srcImage, size_t srcX, size_t srcY, size_t destX, size_t destY, size_t width, size_t height) const override;
 
-		void FormatSignedInt(IFormatStringWriter<char> &writer, intmax_t value) const override;
-		void FormatUnsignedInt(IFormatStringWriter<char> &writer, uintmax_t value) const override;
-		void FormatFloat(IFormatStringWriter<char> &writer, float f) const override;
-		void FormatDouble(IFormatStringWriter<char> &writer, double f) const override;
+		void FormatSignedInt(IFormatStringWriter<Utf8Char_t> &writer, intmax_t value) const override;
+		void FormatUnsignedInt(IFormatStringWriter<Utf8Char_t> &writer, uintmax_t value) const override;
+		void FormatFloat(IFormatStringWriter<Utf8Char_t> &writer, float f) const override;
+		void FormatDouble(IFormatStringWriter<Utf8Char_t> &writer, double f) const override;
+		void FormatUtf8String(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t *str) const override;
 		void FormatCString(IFormatStringWriter<char> &writer, const char *str) const override;
-		void WFormatCString(IFormatStringWriter<wchar_t> &writer, const wchar_t *str) const override;
 
-		void FormatString(IFormatStringWriter<char> &writer, const StringSliceView &fmt, const FormatParameterList<char> &paramList) const override;
-		void FormatString(IFormatStringWriter<wchar_t> &writer, const WStringSliceView &fmt, const FormatParameterList<wchar_t> &paramList) const override;
+		void FormatString(IFormatStringWriter<Utf8Char_t> &writer, const StringSliceView &fmt, const FormatParameterList<Utf8Char_t> &paramList) const override;
 
 		void SanitizeClampFloats(const Span<float> &outFloats, const Span<const endian::LittleFloat32_t> &inFloats, int maxMagnitude) const override;
 		void SanitizeClampUInt16s(const Span<uint16_t> &outFloats, const Span<const endian::LittleUInt16_t> &inFloats, uint16_t maxValue) const override;
 
 	private:
-		static bool ValidateFilePathSlice(const Span<const char> &name, bool permitWildcards);
+		static bool ValidateFilePathSlice(const Span<const Utf8Char_t> &name, bool permitWildcards);
 
 		static bool MatchesWildcardWithMinLiteralCount(const StringSliceView &candidate, const StringSliceView &wildcard, size_t minLiteralCount);
 
@@ -146,16 +147,16 @@ namespace rkit
 		template<class TWChar>
 		static Result TypedConvertUTF8ToUTF16(size_t &outSize, const Span<TWChar> &dest, const Span<const uint8_t> &src);
 
-		static bool TryParseDigit(char c, uint8_t &outDigit);
+		static bool TryParseDigit(uint8_t c, uint8_t &outDigit);
 
 		template<class TInteger>
-		static bool ParsePositiveInt(const StringSliceView &str, size_t startDigit, uint8_t radix, TInteger &i);
+		static bool ParsePositiveInt(const ByteStringSliceView &str, size_t startDigit, uint8_t radix, TInteger &i);
 
 		template<class TInteger>
-		static bool ParseNegativeInt(const StringSliceView &str, size_t startDigit, uint8_t radix, TInteger &i);
+		static bool ParseNegativeInt(const ByteStringSliceView &str, size_t startDigit, uint8_t radix, TInteger &i);
 
 		template<class TInteger>
-		static bool ParseSignedInt(const StringSliceView &str, uint8_t radix, TInteger &i);
+		static bool ParseSignedInt(const ByteStringSliceView &str, uint8_t radix, TInteger &i);
 
 		template<class TChar, CharacterEncoding TEncoding>
 		static void FormatStringImpl(IFormatStringWriter<TChar> &writer, const BaseStringSliceView<TChar, TEncoding> &fmtRef, const FormatParameterList<TChar> &paramListRef);
@@ -362,7 +363,7 @@ namespace rkit
 		return hash;
 	}
 
-	Result UtilitiesDriver::CreateTextParser(const Span<const char> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<utils::ITextParser> &outParser) const
+	Result UtilitiesDriver::CreateTextParser(const Span<const uint8_t> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<utils::ITextParser> &outParser) const
 	{
 		UniquePtr<utils::TextParserBase> parser;
 		RKIT_CHECK(utils::TextParserBase::Create(contents, commentType, lexType, parser));
@@ -391,7 +392,7 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
-	bool UtilitiesDriver::ValidateFilePathSlice(const rkit::Span<const char> &sliceName, bool permitWildcards)
+	bool UtilitiesDriver::ValidateFilePathSlice(const rkit::Span<const Utf8Char_t> &sliceName, bool permitWildcards)
 	{
 		if (sliceName.Count() == 0)
 			return false;
@@ -470,7 +471,7 @@ namespace rkit
 		return true;
 	}
 
-	bool UtilitiesDriver::ValidateFilePath(const Span<const char> &name, bool permitWildcards) const
+	bool UtilitiesDriver::ValidateFilePath(const Span<const Utf8Char_t> &name, bool permitWildcards) const
 	{
 		size_t sliceStart = 0;
 		for (size_t i = 0; i < name.Count(); i++)
@@ -487,9 +488,9 @@ namespace rkit
 		return ValidateFilePathSlice(name.SubSpan(sliceStart, name.Count() - sliceStart), permitWildcards);
 	}
 
-	void UtilitiesDriver::NormalizeFilePath(const Span<char> &chars) const
+	void UtilitiesDriver::NormalizeFilePath(const Span<Utf8Char_t> &chars) const
 	{
-		for (char &ch : chars)
+		for (Utf8Char_t &ch : chars)
 		{
 			if (ch == '\\')
 				ch = '/';
@@ -514,9 +515,9 @@ namespace rkit
 		return false;
 	}
 
-	Result UtilitiesDriver::EscapeCStringInPlace(const Span<char> &charsRef, size_t &outNewLength) const
+	Result UtilitiesDriver::EscapeCStringInPlace(const Span<Utf8Char_t> &charsRef, size_t &outNewLength) const
 	{
-		Span<char> span = charsRef;
+		Span<Utf8Char_t> span = charsRef;
 
 		if (span.Count() < 2)
 			return ResultCode::kInvalidCString;
@@ -1702,7 +1703,7 @@ namespace rkit
 		return MatchesWildcardWithMinLiteralCount(candidateRef, wildcardRef, minLiteralChars);
 	}
 
-	bool UtilitiesDriver::DefaultIsPathComponentValid(const BaseStringSliceView<char, CharacterEncoding::kUTF8> &span, bool isFirst, bool allowWildcards) const
+	bool UtilitiesDriver::DefaultIsPathComponentValid(const StringSliceView &span, bool isFirst, bool allowWildcards) const
 	{
 		if (span.Length() == 0)
 			return false;
@@ -1894,7 +1895,7 @@ namespace rkit
 		return TypedConvertUTF8ToUTF16(outSize, dest, src);
 	}
 
-	bool UtilitiesDriver::IsPathComponentValidOnWindows(const BaseStringSliceView<wchar_t, CharacterEncoding::kUTF16> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const
+	bool UtilitiesDriver::IsPathComponentValidOnWindows(const BaseStringSliceView<OSPathChar_t, CharacterEncoding::kOSPath> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const
 	{
 		if (isAbsolute && isFirst)
 		{
@@ -2186,7 +2187,7 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
-	bool UtilitiesDriver::TryParseDigit(char c, uint8_t &outDigit)
+	bool UtilitiesDriver::TryParseDigit(uint8_t c, uint8_t &outDigit)
 	{
 		if (c >= '0' && c <= '9')
 		{
@@ -2210,7 +2211,7 @@ namespace rkit
 	}
 
 	template<class TInteger>
-	bool UtilitiesDriver::ParsePositiveInt(const StringSliceView &str, size_t startDigit, uint8_t radixLow, TInteger &i)
+	bool UtilitiesDriver::ParsePositiveInt(const ByteStringSliceView &str, size_t startDigit, uint8_t radixLow, TInteger &i)
 	{
 		TInteger radix = radixLow;
 		if (radix < 2 || radix > 16 || startDigit == str.Length())
@@ -2249,7 +2250,7 @@ namespace rkit
 	}
 
 	template<class TInteger>
-	bool UtilitiesDriver::ParseNegativeInt(const StringSliceView &str, size_t startDigit, uint8_t radixLow, TInteger &i)
+	bool UtilitiesDriver::ParseNegativeInt(const ByteStringSliceView &str, size_t startDigit, uint8_t radixLow, TInteger &i)
 	{
 		int16_t radix = radixLow;
 		if (radix < 2 || radix > 16 || startDigit == str.Length())
@@ -2288,7 +2289,7 @@ namespace rkit
 	}
 
 	template<class TInteger>
-	bool UtilitiesDriver::ParseSignedInt(const StringSliceView &str, uint8_t radix, TInteger &i)
+	bool UtilitiesDriver::ParseSignedInt(const ByteStringSliceView &str, uint8_t radix, TInteger &i)
 	{
 		if (str.Length() == 0)
 			return false;
@@ -2317,46 +2318,40 @@ namespace rkit
 		return ResultCode::kNotYetImplemented;
 	}
 
-	bool UtilitiesDriver::ParseDouble(const StringView &str, double &d) const
+	bool UtilitiesDriver::ParseDouble(const ByteStringSliceView &str, double &d) const
 	{
-		char *endPtr = nullptr;
-		double result = strtod(str.GetChars(), &endPtr);
-
-		if (endPtr != str.GetChars() + str.Length())
+		size_t len = str.Length();
+		if (!utils::CharsToDouble(d, str.GetChars(), len))
 			return false;
 
-		d = result;
-		return true;
+		return len == str.Length();
 	}
 
-	bool UtilitiesDriver::ParseFloat(const StringView &str, float &d) const
+	bool UtilitiesDriver::ParseFloat(const ByteStringSliceView &str, float &f) const
 	{
-		char *endPtr = nullptr;
-		float result = strtof(str.GetChars(), &endPtr);
-
-		if (endPtr != str.GetChars() + str.Length())
+		size_t len = str.Length();
+		if (!utils::CharsToFloat(f, str.GetChars(), len))
 			return false;
 
-		d = result;
-		return true;
+		return len == str.Length();
 	}
 
-	bool UtilitiesDriver::ParseInt32(const StringSliceView &str, uint8_t radix, int32_t &i) const
+	bool UtilitiesDriver::ParseInt32(const ByteStringSliceView &str, uint8_t radix, int32_t &i) const
 	{
 		return ParseSignedInt<int32_t>(str, radix, i);
 	}
 
-	bool UtilitiesDriver::ParseInt64(const StringSliceView &str, uint8_t radix, int64_t &i) const
+	bool UtilitiesDriver::ParseInt64(const ByteStringSliceView &str, uint8_t radix, int64_t &i) const
 	{
 		return ParseSignedInt<int64_t>(str, radix, i);
 	}
 
-	bool UtilitiesDriver::ParseUInt32(const StringSliceView &str, uint8_t radix, uint32_t &i) const
+	bool UtilitiesDriver::ParseUInt32(const ByteStringSliceView &str, uint8_t radix, uint32_t &i) const
 	{
 		return ParsePositiveInt<uint32_t>(str, 0, radix, i);
 	}
 
-	bool UtilitiesDriver::ParseUInt64(const StringSliceView &str, uint8_t radix, uint64_t &i) const
+	bool UtilitiesDriver::ParseUInt64(const ByteStringSliceView &str, uint8_t radix, uint64_t &i) const
 	{
 		return ParsePositiveInt<uint64_t>(str, 0, radix, i);
 	}
@@ -2484,18 +2479,18 @@ namespace rkit
 		return ResultCode::kOK;
 	}
 
-	void UtilitiesDriver::FormatSignedInt(IFormatStringWriter<char> &writer, intmax_t value) const
+	void UtilitiesDriver::FormatSignedInt(IFormatStringWriter<Utf8Char_t> &writer, intmax_t value) const
 	{
 		if (value == 0)
 		{
-			writer.WriteChars(ConstSpan<char>("0", 1));
+			writer.WriteChars(ConstSpan<Utf8Char_t>(u8"0", 1));
 			return;
 		}
 
 		const size_t kMaxChars = ((sizeof(value) * 8) + 2) / 3 + 1;
-		char outChars[kMaxChars];
+		Utf8Char_t outChars[kMaxChars];
 
-		const char *kDigits = "0123456789";
+		const Utf8Char_t *kDigits = u8"0123456789";
 
 		size_t strStartPos = kMaxChars;
 
@@ -2524,21 +2519,21 @@ namespace rkit
 			}
 		}
 
-		writer.WriteChars(ConstSpan<char>(outChars + strStartPos, kMaxChars - strStartPos));
+		writer.WriteChars(ConstSpan<Utf8Char_t>(outChars + strStartPos, kMaxChars - strStartPos));
 	}
 
-	void UtilitiesDriver::FormatUnsignedInt(IFormatStringWriter<char> &writer, uintmax_t value) const
+	void UtilitiesDriver::FormatUnsignedInt(IFormatStringWriter<Utf8Char_t> &writer, uintmax_t value) const
 	{
 		if (value == 0)
 		{
-			writer.WriteChars(ConstSpan<char>("0", 1));
+			writer.WriteChars(ConstSpan<Utf8Char_t>(u8"0", 1));
 			return;
 		}
 
 		const size_t kMaxChars = ((sizeof(value) * 8) + 2) / 3;
-		char outChars[kMaxChars];
+		Utf8Char_t outChars[kMaxChars];
 
-		const char *kDigits = "0123456789";
+		const Utf8Char_t *kDigits = u8"0123456789";
 
 		size_t strStartPos = kMaxChars;
 
@@ -2551,23 +2546,23 @@ namespace rkit
 			outChars[strStartPos] = kDigits[remainder];
 		}
 
-		writer.WriteChars(ConstSpan<char>(outChars + strStartPos, kMaxChars - strStartPos));
+		writer.WriteChars(ConstSpan<Utf8Char_t>(outChars + strStartPos, kMaxChars - strStartPos));
 	}
 
-	void UtilitiesDriver::FormatFloat(IFormatStringWriter<char> &writer, float f) const
+	void UtilitiesDriver::FormatFloat(IFormatStringWriter<Utf8Char_t> &writer, float f) const
 	{
-		char floatChars[16];
-		int nChars = f2s_buffered_n(f, floatChars);
+		Utf8Char_t floatChars[16];
+		int nChars = f2s_buffered_n(f, ReinterpretUtf8CharToAnsiChar(floatChars));
 
-		writer.WriteChars(ConstSpan<char>(floatChars, static_cast<size_t>(nChars)));
+		writer.WriteChars(ConstSpan<Utf8Char_t>(floatChars, static_cast<size_t>(nChars)));
 	}
 
-	void UtilitiesDriver::FormatDouble(IFormatStringWriter<char> &writer, double f) const
+	void UtilitiesDriver::FormatDouble(IFormatStringWriter<Utf8Char_t> &writer, double f) const
 	{
-		char doubleChars[25];
-		int nChars = d2s_buffered_n(f, doubleChars);
+		Utf8Char_t doubleChars[25];
+		int nChars = d2s_buffered_n(f, ReinterpretUtf8CharToAnsiChar(doubleChars));
 
-		writer.WriteChars(ConstSpan<char>(doubleChars, static_cast<size_t>(nChars)));
+		writer.WriteChars(ConstSpan<Utf8Char_t>(doubleChars, static_cast<size_t>(nChars)));
 	}
 
 	void UtilitiesDriver::FormatCString(IFormatStringWriter<char> &writer, const char *str) const
@@ -2575,9 +2570,9 @@ namespace rkit
 		writer.WriteChars(ConstSpan<char>(str, strlen(str)));
 	}
 
-	void UtilitiesDriver::WFormatCString(IFormatStringWriter<wchar_t> &writer, const wchar_t *str) const
+	void UtilitiesDriver::FormatUtf8String(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t *str) const
 	{
-		writer.WriteChars(ConstSpan<wchar_t>(str, wcslen(str)));
+		writer.WriteChars(StringView::FromCString(str).ToSpan());
 	}
 
 	template<class TChar, CharacterEncoding TEncoding>
@@ -2678,12 +2673,7 @@ namespace rkit
 		}
 	}
 
-	void UtilitiesDriver::FormatString(IFormatStringWriter<char> &writer, const StringSliceView &fmt, const FormatParameterList<char> &paramList) const
-	{
-		FormatStringImpl(writer, fmt, paramList);
-	}
-
-	void UtilitiesDriver::FormatString(IFormatStringWriter<wchar_t> &writer, const WStringSliceView &fmt, const FormatParameterList<wchar_t> &paramList) const
+	void UtilitiesDriver::FormatString(IFormatStringWriter<Utf8Char_t> &writer, const StringSliceView &fmt, const FormatParameterList<Utf8Char_t> &paramList) const
 	{
 		FormatStringImpl(writer, fmt, paramList);
 	}
@@ -2743,7 +2733,7 @@ namespace rkit
 
 		const size_t numUInts = rkit::Min(inUInts.Count(), outUInts.Count());
 
-#if defined(RKIT_PLATFORM_ARCH_HAVE_SSE41)
+#if RKIT_PLATFORM_ARCH_HAVE_SSE41 != 0
 		const __m128i maxValueVector = _mm_set1_epi16(maxValue);
 
 		const size_t numVectorUInts = numUInts / 8u * 8u;
@@ -2754,7 +2744,7 @@ namespace rkit
 			const __m128i adjusted = _mm_min_epu16(values, maxValueVector);
 			_mm_storeu_si128(reinterpret_cast<__m128i *>(outUIntsPtr + startIndex), adjusted);
 		}
-#elif defined(RKIT_PLATFORM_ARCH_HAVE_SSE2)
+#elif RKIT_PLATFORM_ARCH_HAVE_SSE2 != 0
 		const __m128i signBitFlip = _mm_set1_epi16(-0x8000);
 		const __m128i maxValueFlippedVector = _mm_set1_epi16(maxValue ^ 0x8000u);
 

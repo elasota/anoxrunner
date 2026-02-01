@@ -1,9 +1,11 @@
 #pragma once
 
+#include "CoreDefs.h"
 #include "CharacterEncoding.h"
 
 #include <stdint.h>
 #include <stddef.h>
+#include <uchar.h>
 
 namespace rkit
 {
@@ -25,23 +27,26 @@ namespace rkit
 	template<class TChar>
 	class BaseStringConstructionBuffer;
 
+	typedef BaseString<uint8_t, CharacterEncoding::kByte, 16> ByteString;
 	typedef BaseString<char, CharacterEncoding::kASCII, 16> AsciiString;
-	typedef BaseString<char, CharacterEncoding::kUTF8, 16> String;
-	typedef BaseString<wchar_t, CharacterEncoding::kUnspecified, 16> WString;
-	typedef BaseString<wchar_t, CharacterEncoding::kUTF16, 16> WString16;
+	typedef BaseString<Utf8Char_t, CharacterEncoding::kUTF8, 16> String;
+	typedef BaseString<Utf16Char_t, CharacterEncoding::kUTF16, 16> Utf16String;
 
+	typedef BaseStringView<uint8_t, CharacterEncoding::kByte> ByteStringView;
 	typedef BaseStringView<char, CharacterEncoding::kASCII> AsciiStringView;
-	typedef BaseStringView<char, CharacterEncoding::kUTF8> StringView;
-	typedef BaseStringView<wchar_t, CharacterEncoding::kUnspecified> WStringView;
-	typedef BaseStringView<wchar_t, CharacterEncoding::kUTF16> WString16View;
+	typedef BaseStringView<Utf8Char_t, CharacterEncoding::kUTF8> StringView;
+	typedef BaseStringView<Utf16Char_t, CharacterEncoding::kUTF16> Utf16StringView;
 
+	typedef BaseStringSliceView<uint8_t, CharacterEncoding::kByte> ByteStringSliceView;
 	typedef BaseStringSliceView<char, CharacterEncoding::kASCII> AsciiStringSliceView;
-	typedef BaseStringSliceView<char, CharacterEncoding::kUTF8> StringSliceView;
-	typedef BaseStringSliceView<wchar_t, CharacterEncoding::kUnspecified> WStringSliceView;
+	typedef BaseStringSliceView<Utf8Char_t, CharacterEncoding::kUTF8> StringSliceView;
+	typedef BaseStringSliceView<Utf16Char_t, CharacterEncoding::kUTF16> Utf16StringSliceView;
 
-	typedef BaseStringPoolBuilder<char, CharacterEncoding::kUTF8> StringPoolBuilder;
-	typedef BaseStringPoolBuilder<wchar_t, CharacterEncoding::kUnspecified> WStringPoolBuilder;
+	typedef BaseStringPoolBuilder<Utf8Char_t, CharacterEncoding::kUTF8> StringPoolBuilder;
+	typedef BaseStringPoolBuilder<Utf16Char_t, CharacterEncoding::kUTF16> Utf16StringPoolBuilder;
 
-	typedef BaseStringConstructionBuffer<char> StringConstructionBuffer;
-	typedef BaseStringConstructionBuffer<wchar_t> WStringConstructionBuffer;
+	typedef BaseStringConstructionBuffer<uint8_t> ByteStringConstructionBuffer;
+	typedef BaseStringConstructionBuffer<char> AsciiStringConstructionBuffer;
+	typedef BaseStringConstructionBuffer<Utf8Char_t> StringConstructionBuffer;
+	typedef BaseStringConstructionBuffer<Utf16Char_t> Utf16StringConstructionBuffer;
 }

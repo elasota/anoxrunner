@@ -24,13 +24,13 @@ namespace rkit { namespace render { namespace vulkan { namespace platform
 {
 	struct IInstanceExtensionEnumerator
 	{
-		virtual Result AddExtension(const StringView &ext, bool required) = 0;
-		virtual Result AddLayer(const StringView &layer, bool required) = 0;
+		virtual Result AddExtension(const AsciiStringView &ext, bool required) = 0;
+		virtual Result AddLayer(const AsciiStringView &layer, bool required) = 0;
 	};
 
 	struct IDeviceExtensionEnumerator
 	{
-		virtual Result AddExtension(const StringView &ext, bool required) = 0;
+		virtual Result AddExtension(const AsciiStringView &ext, bool required) = 0;
 	};
 
 	Result AddInstanceExtensions(IInstanceExtensionEnumerator &enumerator);

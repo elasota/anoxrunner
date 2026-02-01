@@ -15,11 +15,11 @@ namespace rkit
 
 		virtual ~IModuleDriver() {}
 
-		IModule *LoadModule(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams);
-		IModule *LoadModule(uint32_t moduleNamespace, const char *moduleName);
+		IModule *LoadModule(uint32_t moduleNamespace, const Utf8Char_t *moduleName, const ModuleInitParameters *initParams);
+		IModule *LoadModule(uint32_t moduleNamespace, const Utf8Char_t *moduleName);
 
 	protected:
-		virtual IModule *LoadModuleInternal(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams, IMallocDriver &mallocDriver) = 0;
+		virtual IModule *LoadModuleInternal(uint32_t moduleNamespace, const Utf8Char_t *moduleName, const ModuleInitParameters *initParams, IMallocDriver &mallocDriver) = 0;
 	};
 }
 
@@ -27,12 +27,12 @@ namespace rkit
 
 namespace rkit
 {
-	inline IModule *IModuleDriver::LoadModule(uint32_t moduleNamespace, const char *moduleName)
+	inline IModule *IModuleDriver::LoadModule(uint32_t moduleNamespace, const Utf8Char_t *moduleName)
 	{
 		return this->LoadModule(moduleNamespace, moduleName, nullptr);
 	}
 
-	inline IModule *IModuleDriver::LoadModule(uint32_t moduleNamespace, const char *moduleName, const ModuleInitParameters *initParams)
+	inline IModule *IModuleDriver::LoadModule(uint32_t moduleNamespace, const Utf8Char_t *moduleName, const ModuleInitParameters *initParams)
 	{
 		return this->LoadModuleInternal(moduleNamespace, moduleName, initParams, *GetDrivers().m_mallocDriver);
 	}

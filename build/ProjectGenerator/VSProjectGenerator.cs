@@ -471,7 +471,7 @@ namespace ProjectGenerator
                     {
                         char ch = fullBin[i - 1];
 
-                        if (ch == Path.PathSeparator)
+                        if (ch == Path.DirectorySeparatorChar)
                         {
                             AddBin(fullBin.Substring(0, i - 1), fileBins, fileBinsSet, reservedBinsSet);
                             break;

@@ -582,7 +582,7 @@ namespace rkit { namespace render { namespace vulkan
 
 					if (descriptorDesc->m_arraySize == 0)
 					{
-						rkit::log::Error("Pipeline contains unbounded descriptors, but device doesn't support unbounded descriptors");
+						rkit::log::Error(u8"Pipeline contains unbounded descriptors, but device doesn't support unbounded descriptors");
 						return ResultCode::kOperationFailed;
 					}
 
@@ -594,7 +594,7 @@ namespace rkit { namespace render { namespace vulkan
 						{
 							if (vkBinding.descriptorType != VK_DESCRIPTOR_TYPE_SAMPLER)
 							{
-								rkit::log::Error("Pipeline contains a static sampler assigned to a descriptor that isn't a sampler or sampled texture");
+								rkit::log::Error(u8"Pipeline contains a static sampler assigned to a descriptor that isn't a sampler or sampled texture");
 								return ResultCode::kOperationFailed;
 							}
 						}
@@ -1597,7 +1597,7 @@ namespace rkit { namespace render { namespace vulkan
 			size = 4;
 			break;
 		default:
-			rkit::log::Error("Push constants element was not DWORD-sized");
+			rkit::log::Error(u8"Push constants element was not DWORD-sized");
 			return ResultCode::kMalformedFile;
 		}
 
@@ -1992,7 +1992,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		if (renderPassDesc->m_renderTargets.Count() != pipelineDesc->m_renderTargets.Count())
 		{
-			rkit::log::Error("Pipeline render target count didn't match render pass count");
+			rkit::log::Error(u8"Pipeline render target count didn't match render pass count");
 			return ResultCode::kMalformedFile;
 		}
 
@@ -2248,7 +2248,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		const size_t kNumTriplets = (utils::Sha256DigestBytes::kSize + 2) / 3;
 		const size_t kNumChars = kNumTriplets * 4;
-		StaticArray<char, kNumChars + 1> chars;
+		StaticArray<Utf8Char_t, kNumChars + 1> chars;
 
 		for (size_t i = 0; i < kNumTriplets; i++)
 		{
@@ -2274,13 +2274,13 @@ namespace rkit { namespace render { namespace vulkan
 			for (size_t ci = 0; ci < 4; ci++)
 			{
 				size_t charIndex = charIndexes[ci];
-				chars[i * 4 + ci] = ("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-")[charIndex];
+				chars[i * 4 + ci] = (u8"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-")[charIndex];
 			}
 		}
 
 		chars[kNumChars] = '\0';
 
-		return path.Format("{}/pl_{}/p_{}.bin", chars.GetBuffer(), pipelineIndex, permutationIndex);
+		return path.Format(u8"{}/pl_{}/p_{}.bin", chars.GetBuffer(), pipelineIndex, permutationIndex);
 	}
 
 	template<class T, class TDefaultResolver>

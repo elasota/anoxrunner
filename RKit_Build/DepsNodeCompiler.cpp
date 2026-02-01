@@ -23,7 +23,7 @@ namespace rkit { namespace buildsystem
 
 	Result DepsNodeCompiler::RunAnalysis(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
 	{
-		GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, "Data");
+		GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, u8"Data");
 
 		CIPath nodePath;
 		RKIT_CHECK(nodePath.Set(depsNode->GetIdentifier()));
@@ -33,7 +33,7 @@ namespace rkit { namespace buildsystem
 
 		if (!stream.Get())
 		{
-			rkit::log::ErrorFmt("Failed to open deps file '{}'", depsNode->GetIdentifier().GetChars());
+			rkit::log::ErrorFmt(u8"Failed to open deps file '{}'", depsNode->GetIdentifier());
 			return ResultCode::kFileOpenError;
 		}
 
@@ -44,14 +44,12 @@ namespace rkit { namespace buildsystem
 
 		stream.Reset();
 
-		Span<const char> fileChars(reinterpret_cast<char *>(fileContents.GetBuffer()), fileContents.Count());
-
 		UniquePtr<utils::ITextParser> parser;
-		RKIT_CHECK(utils->CreateTextParser(fileChars, utils::TextParserCommentType::kBash, utils::TextParserLexerType::kSimple, parser));
+		RKIT_CHECK(utils->CreateTextParser(fileContents.ToSpan(), utils::TextParserCommentType::kBash, utils::TextParserLexerType::kSimple, parser));
 
 		for (;;)
 		{
-			Span<const char> token;
+			Span<const uint8_t> token;
 
 			RKIT_CHECK(parser->SkipWhitespace());
 
@@ -99,13 +97,13 @@ namespace rkit { namespace buildsystem
 					}
 				}
 
-				ConstSpan<char> chunkSpan = token.SubSpan(chunkStart, chunkEnd - chunkStart);
+				ConstSpan<uint8_t> chunkSpan = token.SubSpan(chunkStart, chunkEnd - chunkStart);
 
 				if (chunkSpan.Count() == 1 && chunkSpan[0] == '.')
 				{
 					if (!isFirst)
 					{
-						rkit::log::ErrorFmt("{}:{}: '.' path element may only be the first element", line, col);
+						rkit::log::ErrorFmt(u8"{}:{}: '.' path element may only be the first element", line, col);
 						return ResultCode::kMalformedFile;
 					}
 
@@ -115,7 +113,7 @@ namespace rkit { namespace buildsystem
 				else
 				{
 					bool hasWildcards = false;
-					for (char c : chunkSpan)
+					for (uint8_t c : chunkSpan)
 					{
 						if (c == '?' || c == '*')
 						{
@@ -125,14 +123,22 @@ namespace rkit { namespace buildsystem
 						}
 					}
 
-					StringSliceView chunkSlice = StringSliceView(chunkSpan.Ptr(), chunkSpan.Count());
+					StringSliceView chunkSlice;
+					if (!CharacterEncodingValidator<CharacterEncoding::kUTF8>::ValidateSpan(chunkSpan))
+					{
+						rkit::log::ErrorFmt(u8"{}:{}: Invalid unicode", line, col);
+						return ResultCode::kMalformedFile;
+					}
+
+					// FIXME: Do this better
+					chunkSlice = StringSliceView(reinterpret_cast<const Utf8Char_t *>(chunkSpan.Ptr()), chunkSpan.Count());
 
 					if (!hasWildcards)
 					{
 
 						if (CIPath::Validate(chunkSlice) == PathValidationResult::kInvalid)
 						{
-							rkit::log::ErrorFmt("{}:{}: Path is invalid", line, col);
+							rkit::log::ErrorFmt(u8"{}:{}: Path is invalid", line, col);
 							return ResultCode::kMalformedFile;
 						}
 
@@ -218,14 +224,14 @@ namespace rkit { namespace buildsystem
 
 				if (haveAnyWildcards && !exists)
 				{
-					rkit::log::ErrorFmt("{}:{}: Input file was not found", line, col);
+					rkit::log::ErrorFmt(u8"{}:{}: Input file was not found", line, col);
 					return ResultCode::kMalformedFile;
 				}
 
 				StringSliceView extStrView;
 				if (!utils->FindFilePathExtension(path[path.NumComponents() - 1], extStrView))
 				{
-					rkit::log::ErrorFmt("{}:{}: Path has no extension", line, col);
+					rkit::log::ErrorFmt(u8"{}:{}: Path has no extension", line, col);
 					return ResultCode::kMalformedFile;
 				}
 
@@ -233,7 +239,7 @@ namespace rkit { namespace buildsystem
 				uint32_t nodeType = 0;
 				if (!feedback->FindNodeTypeByFileExtension(extStrView, nodeNamespace, nodeType))
 				{
-					rkit::log::ErrorFmt("{}:{}: Unrecognized file extension: '{}'", line, col, extStrView.GetChars());
+					rkit::log::ErrorFmt(u8"{}:{}: Unrecognized file extension: '{}'", line, col, extStrView.GetChars());
 					return ResultCode::kMalformedFile;
 				}
 
@@ -254,7 +260,7 @@ namespace rkit { namespace buildsystem
 		return 1;
 	}
 
-	Result DepsNodeCompiler::HandlePathChunk(Vector<char> &constructedPath, bool &outOK, size_t chunkIndex, IDependencyNode *node, const Span<const char> &chunk)
+	Result DepsNodeCompiler::HandlePathChunk(Vector<Utf8Char_t> &constructedPath, bool &outOK, size_t chunkIndex, IDependencyNode *node, const Span<const Utf8Char_t> &chunk)
 	{
 		if (chunk.Count() == 1 && chunk[0] == '.' && chunkIndex == 0)
 		{

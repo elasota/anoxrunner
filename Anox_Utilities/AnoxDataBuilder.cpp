@@ -108,7 +108,7 @@ namespace anox { namespace utils
 		if (!rebuiltAnyPipelines)
 			return rkit::ResultCode::kOK;
 
-		rkit::log::LogInfo("Combining pipeline libraries...");
+		rkit::log::LogInfo(u8"Combining pipeline libraries...");
 
 		rkit::UniquePtr<rkit::buildsystem::IPipelineLibraryCombiner> combiner;
 		RKIT_CHECK(m_bsDriver->CreatePipelineLibraryCombiner(combiner));
@@ -122,7 +122,7 @@ namespace anox { namespace utils
 
 				if (!stream.IsValid())
 				{
-					rkit::log::ErrorFmt("Failed to open pipeline '{}' for merge", product.m_filePath.GetChars());
+					rkit::log::ErrorFmt(u8"Failed to open pipeline '{}' for merge", product.m_filePath.GetChars());
 					return rkit::ResultCode::kOperationFailed;
 				}
 
@@ -131,7 +131,7 @@ namespace anox { namespace utils
 		}
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
-		RKIT_CHECK(bsi.OpenFileWrite(rkit::buildsystem::BuildFileLocation::kOutputFiles, "pipelines_vk.rkp", outStream));
+		RKIT_CHECK(bsi.OpenFileWrite(rkit::buildsystem::BuildFileLocation::kOutputFiles, u8"pipelines_vk.rkp", outStream));
 
 		RKIT_CHECK(combiner->WritePackage(*outStream));
 
@@ -140,17 +140,17 @@ namespace anox { namespace utils
 
 	rkit::Result AnoxDataBuilder::Run(const rkit::StringView &targetName, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataDir, const rkit::OSAbsPathView &dataSourceDir, rkit::render::BackendType backendType)
 	{
-		rkit::IModule *buildModule = rkit::GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, "Build");
+		rkit::IModule *buildModule = rkit::GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, u8"Build");
 		if (!buildModule)
 		{
-			rkit::log::Error("Couldn't load build module");
+			rkit::log::Error(u8"Couldn't load build module");
 			return rkit::ResultCode::kModuleLoadFailed;
 		}
 
-		m_bsDriver = static_cast<rkit::buildsystem::IBuildSystemDriver *>(rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, "BuildSystem"));
+		m_bsDriver = static_cast<rkit::buildsystem::IBuildSystemDriver *>(rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, u8"BuildSystem"));
 		if (!m_bsDriver)
 		{
-			rkit::log::Error("Couldn't find build system driver");
+			rkit::log::Error(u8"Couldn't find build system driver");
 			return rkit::ResultCode::kModuleLoadFailed;
 		}
 
@@ -158,8 +158,8 @@ namespace anox { namespace utils
 		rkit::OSAbsPath dataContentDir;
 
 		{
-			rkit::CIPathView filesSubDir("files");
-			rkit::CIPathView contentSubDir("content");
+			rkit::CIPathView filesSubDir(u8"files");
+			rkit::CIPathView contentSubDir(u8"content");
 
 			rkit::OSRelPath osFilesSubDir;
 			RKIT_CHECK(osFilesSubDir.ConvertFrom(filesSubDir));
@@ -186,7 +186,7 @@ namespace anox { namespace utils
 		switch (backendType)
 		{
 		case rkit::render::BackendType::Vulkan:
-			renderAddOnDriverName = "Build_Vulkan";
+			renderAddOnDriverName = u8"Build_Vulkan";
 			break;
 		default:
 			return rkit::ResultCode::kInternalError;
@@ -197,14 +197,14 @@ namespace anox { namespace utils
 			rkit::IModule *renderBuildModule = rkit::GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, renderAddOnDriverName.GetChars());
 			if (!renderBuildModule)
 			{
-				rkit::log::Error("Couldn't load render build add-on module");
+				rkit::log::Error(u8"Couldn't load render build add-on module");
 				return rkit::ResultCode::kModuleLoadFailed;
 			}
 
 			rkit::buildsystem::IBuildSystemAddOnDriver *addOnDriver = static_cast<rkit::buildsystem::IBuildSystemAddOnDriver *>(rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, renderAddOnDriverName));
 			if (!addOnDriver)
 			{
-				rkit::log::Error("Couldn't load render build add-on driver");
+				rkit::log::Error(u8"Couldn't load render build add-on driver");
 				return rkit::ResultCode::kModuleLoadFailed;
 			}
 
@@ -213,17 +213,17 @@ namespace anox { namespace utils
 
 		// Add Anox add-on
 		{
-			rkit::IModule *renderBuildModule = rkit::GetDrivers().m_moduleDriver->LoadModule(anox::kAnoxNamespaceID, "Build");
+			rkit::IModule *renderBuildModule = rkit::GetDrivers().m_moduleDriver->LoadModule(anox::kAnoxNamespaceID, u8"Build");
 			if (!renderBuildModule)
 			{
-				rkit::log::Error("Couldn't load game build add-on module");
+				rkit::log::Error(u8"Couldn't load game build add-on module");
 				return rkit::ResultCode::kModuleLoadFailed;
 			}
 
-			rkit::buildsystem::IBuildSystemAddOnDriver *addOnDriver = static_cast<rkit::buildsystem::IBuildSystemAddOnDriver *>(rkit::GetDrivers().FindDriver(anox::kAnoxNamespaceID, "Build"));
+			rkit::buildsystem::IBuildSystemAddOnDriver *addOnDriver = static_cast<rkit::buildsystem::IBuildSystemAddOnDriver *>(rkit::GetDrivers().FindDriver(anox::kAnoxNamespaceID, u8"Build"));
 			if (!addOnDriver)
 			{
-				rkit::log::Error("Couldn't load game build add-on driver");
+				rkit::log::Error(u8"Couldn't load game build add-on driver");
 				return rkit::ResultCode::kModuleLoadFailed;
 			}
 
@@ -235,7 +235,7 @@ namespace anox { namespace utils
 		rkit::buildsystem::IDependencyGraphFactory *graphFactory = instance->GetDependencyGraphFactory();
 
 		rkit::buildsystem::IDependencyNode *rootDepsNode;
-		RKIT_CHECK(instance->FindOrCreateNamedNode(rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kDepsNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, "rootfiles.deps", rootDepsNode));
+		RKIT_CHECK(instance->FindOrCreateNamedNode(rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kDepsNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, u8"rootfiles.deps", rootDepsNode));
 
 		RKIT_CHECK(instance->AddRootNode(rootDepsNode));
 
@@ -528,7 +528,7 @@ namespace anox { namespace utils
 						else
 						{
 							rkit::StringSliceView remainder = path.ToStringView().SubString(firstComponent.Length() + 1);
-							afs::FileHandle dirHandle = archive.m_archive->FindFile(remainder, true);
+							afs::FileHandle dirHandle = archive.m_archive->FindFile(remainder.RemoveEncoding(), true);
 						}
 
 						if (dirHandle.IsValid() && dirHandle.IsDirectory())
@@ -545,7 +545,7 @@ namespace anox { namespace utils
 									RKIT_ASSERT(subHandle.IsValid() && !subHandle.IsDirectory());
 
 									rkit::CIPath subPath;
-									RKIT_CHECK(subPath.Set(subHandle.GetFilePath()));
+									RKIT_CHECK(subPath.Set(subHandle.GetFilePath().ToUTF8()));
 
 									rkit::buildsystem::FileStatus fileStatus;
 
@@ -569,7 +569,7 @@ namespace anox { namespace utils
 									RKIT_ASSERT(subHandle.IsValid() && subHandle.IsDirectory());
 
 									rkit::buildsystem::FileStatus fileStatus;
-									RKIT_CHECK(fileStatus.m_filePath.Set(subHandle.GetFilePath()));
+									RKIT_CHECK(fileStatus.m_filePath.Set(subHandle.GetFilePath().ToUTF8()));
 									fileStatus.m_fileSize = 0;
 									fileStatus.m_fileTime = archive.m_fileAttribs.m_fileTime;
 									fileStatus.m_isDirectory = true;
@@ -615,7 +615,7 @@ namespace anox { namespace utils
 			{
 				if (archive.m_archiveName == archiveName)
 				{
-					outFileHandle = archive.m_archive->FindFile(itemName, allowDirectories);
+					outFileHandle = archive.m_archive->FindFile(itemName.RemoveEncoding(), allowDirectories);
 					if (outFileHandle.IsValid())
 					{
 						outArchive = &archive;
@@ -674,7 +674,7 @@ namespace anox { namespace utils
 
 		{
 			rkit::OSRelPath anoxdataComponent;
-			RKIT_CHECK(anoxdataComponent.SetFromUTF8("anoxdata"));
+			RKIT_CHECK(anoxdataComponent.SetFromUTF8(u8"anoxdata"));
 			RKIT_CHECK(m_sourceDir.Append(anoxdataComponent));
 		}
 		RKIT_CHECK(m_intermedDir.Set(intermedDir));
@@ -708,7 +708,7 @@ namespace anox { namespace utils
 
 					if (!rkit::utils::ResultIsOK(openResult))
 					{
-						rkit::log::ErrorFmt("Failed to open archive");
+						rkit::log::ErrorFmt(u8"Failed to open archive");
 						return openResult;
 					}
 

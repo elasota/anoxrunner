@@ -44,6 +44,8 @@ namespace rkit
 
 		const TChar &operator[](size_t index) const;
 
+		BaseStringSliceView<TChar, TEncoding> &operator=(const BaseStringSliceView &other) = default;
+
 		BaseStringSliceView SubString(size_t start) const;
 		BaseStringSliceView SubString(size_t start, size_t length) const;
 
@@ -76,7 +78,17 @@ namespace rkit
 
 		void FormatValue(IFormatStringWriter<TChar> &writer) const;
 
+		template<class TOtherChar>
+		void FormatValue(IFormatStringWriter<TOtherChar> &writer) const;
+
+		BaseStringSliceView<uint8_t, CharacterEncoding::kByte> RemoveEncoding() const;
+		BaseStringSliceView<Utf8Char_t, CharacterEncoding::kUTF8> ToUTF8() const;
+		BaseStringSliceView<Utf8Char_t, CharacterEncoding::kUTF8> ToUTF8Unsafe() const;
+
 	private:
+		template<class TOtherChar>
+		void FormatValueConvert(IFormatStringWriter<TOtherChar> &writer, CharacterEncoding encoding) const;
+
 		Span<const TChar> m_span;
 	};
 
@@ -92,7 +104,12 @@ namespace rkit
 
 		static BaseStringView FromCString(const TChar *chars);
 
-		void FormatValue(IFormatStringWriter<TChar> &writer) const;
+		template<class TOtherChar>
+		void FormatValue(IFormatStringWriter<TOtherChar> &writer) const;
+
+		BaseStringView<uint8_t, CharacterEncoding::kByte> RemoveEncoding() const;
+		BaseStringView<Utf8Char_t, CharacterEncoding::kUTF8> ToUTF8() const;
+		BaseStringView<Utf8Char_t, CharacterEncoding::kUTF8> ToUTF8Unsafe() const;
 	};
 }
 
@@ -318,7 +335,69 @@ bool rkit::BaseStringSliceView<TChar, TEncoding>::Validate() const
 template<class TChar, rkit::CharacterEncoding TEncoding>
 void rkit::BaseStringSliceView<TChar, TEncoding>::FormatValue(IFormatStringWriter<TChar> &writer) const
 {
-	writer.WriteChars(m_span);
+	const CharacterEncoding outEncoding = writer.GetEncoding();
+	if (IsCharacterEncodingCompatible(TEncoding, outEncoding))
+		writer.WriteChars(m_span);
+	else
+		this->template FormatValueConvert<TChar>(writer, outEncoding);
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding>
+template<class TOtherChar>
+void rkit::BaseStringSliceView<TChar, TEncoding>::FormatValue(IFormatStringWriter<TOtherChar> &writer) const
+{
+	this->template FormatValueConvert<TOtherChar>(writer, writer.GetEncoding());
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding>
+template<class TOtherChar>
+void rkit::BaseStringSliceView<TChar, TEncoding>::FormatValueConvert(IFormatStringWriter<TOtherChar> &writer, CharacterEncoding encoding) const
+{
+	const size_t kBufferSize = 512;
+
+	TOtherChar outputBuf[kBufferSize];
+	uint32_t defaultChar = text::GetDefaultUnknownCharForEncoding(encoding);
+
+	rkit::CharacterEncoding normalizedEncoding = TEncoding;
+	if (normalizedEncoding == CharacterEncoding::kByte)
+		normalizedEncoding = CharacterEncoding::kASCII;
+
+	Span<const TChar> inSpan = m_span;
+	while (inSpan.Count() > 0)
+	{
+		size_t charsEmitted = 0;
+		size_t charsConsumed = text::ConvertText(outputBuf, encoding, kBufferSize, charsEmitted, inSpan.Ptr(), normalizedEncoding, inSpan.Count(), text::UnknownCharBehavior::kReplaceInvalid, defaultChar);
+
+		RKIT_ASSERT(charsConsumed != 0);
+		writer.WriteChars(Span<const TOtherChar>(outputBuf, charsEmitted));
+
+		if (charsConsumed == 0)
+			break;
+
+		inSpan = inSpan.SubSpan(charsConsumed);
+	}
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding>
+rkit::BaseStringSliceView<uint8_t, rkit::CharacterEncoding::kByte> rkit::BaseStringSliceView<TChar, TEncoding>::RemoveEncoding() const
+{
+	static_assert(sizeof(TChar) == 1, "RemoveEncoding is only valid on byte encodings");
+	return BaseStringSliceView<uint8_t, CharacterEncoding::kByte>(m_span.ReinterpretCast<const uint8_t>());
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding>
+rkit::BaseStringSliceView<rkit::Utf8Char_t, rkit::CharacterEncoding::kUTF8> rkit::BaseStringSliceView<TChar, TEncoding>::ToUTF8() const
+{
+	static_assert(sizeof(TChar) == 1, "ToUTF8 is only valid on byte encodings");
+	static_assert(TEncoding == CharacterEncoding::kASCII || TEncoding == CharacterEncoding::kUTF8, "ToUTF8 is only valid on ASCII and UTF-8 encodings");
+	return BaseStringSliceView<Utf8Char_t, CharacterEncoding::kUTF8>(m_span.ReinterpretCast<const Utf8Char_t>());
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding>
+rkit::BaseStringSliceView<rkit::Utf8Char_t, rkit::CharacterEncoding::kUTF8> rkit::BaseStringSliceView<TChar, TEncoding>::ToUTF8Unsafe() const
+{
+	static_assert(sizeof(TChar) == 1, "ToUTF8Unsafe is only valid on byte encodings");
+	return BaseStringSliceView<Utf8Char_t, CharacterEncoding::kUTF8>(m_span.ReinterpretCast<const Utf8Char_t>());
 }
 
 template<class TChar>
@@ -347,7 +426,7 @@ rkit::HashValue_t rkit::Hasher<rkit::BaseStringSliceView<TChar, TEncoding>>::Com
 {
 	HashValue_t hash = baseHash;
 
-	for (const BaseStringView<TChar> &strView : span)
+	for (const BaseStringView<TChar, TEncoding> &strView : span)
 		hash = ComputeHash(baseHash, strView);
 
 	return hash;
@@ -389,7 +468,32 @@ rkit::BaseStringView<TChar, TEncoding> rkit::BaseStringView<TChar, TEncoding>::F
 
 
 template<class TChar, rkit::CharacterEncoding TEncoding>
-void rkit::BaseStringView<TChar, TEncoding>::FormatValue(IFormatStringWriter<TChar> &writer) const
+template<class TOtherChar>
+void rkit::BaseStringView<TChar, TEncoding>::FormatValue(IFormatStringWriter<TOtherChar> &writer) const
 {
-	static_cast<rkit::BaseStringSliceView<TChar, TEncoding>>(*this).FormatValue(writer);
+	const rkit::BaseStringSliceView<TChar, TEncoding> &sliceView = *this;
+	sliceView.FormatValue(writer);
+}
+
+
+template<class TChar, rkit::CharacterEncoding TEncoding>
+rkit::BaseStringView<uint8_t, rkit::CharacterEncoding::kByte> rkit::BaseStringView<TChar, TEncoding>::RemoveEncoding() const
+{
+	static_assert(sizeof(TChar) == 1, "RemoveEncoding is only available on byte encodings");
+	return rkit::BaseStringView<uint8_t, rkit::CharacterEncoding::kByte>(reinterpret_cast<const uint8_t *>(this->GetChars()), this->Length());
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding>
+rkit::BaseStringView<rkit::Utf8Char_t, rkit::CharacterEncoding::kUTF8> rkit::BaseStringView<TChar, TEncoding>::ToUTF8() const
+{
+	static_assert(sizeof(TChar) == 1, "ToUTF8 is only available on byte encodings");
+	static_assert(TEncoding == CharacterEncoding::kUTF8 || TEncoding == CharacterEncoding::kASCII, "ToUTF8 is only available on ASCII and UTF-8 strings");
+	return rkit::BaseStringView<Utf8Char_t, rkit::CharacterEncoding::kUTF8>(reinterpret_cast<const rkit::Utf8Char_t *>(this->GetChars()), this->Length());
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding>
+rkit::BaseStringView<rkit::Utf8Char_t, rkit::CharacterEncoding::kUTF8> rkit::BaseStringView<TChar, TEncoding>::ToUTF8Unsafe() const
+{
+	static_assert(sizeof(TChar) == 1, "ToUTF8Unsafe is only available on byte encodings");
+	return rkit::BaseStringView<Utf8Char_t, rkit::CharacterEncoding::kUTF8>(reinterpret_cast<const rkit::Utf8Char_t *>(this->GetChars()), this->Length());
 }

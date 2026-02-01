@@ -208,7 +208,7 @@ namespace rkit
 
 		m_threadContext = threadContext.Get();
 
-		RKIT_CHECK(m_sysDriver.CreateThread(m_thread, std::move(threadContext), "AsyncIO"));
+		RKIT_CHECK(m_sysDriver.CreateThread(m_thread, std::move(threadContext), u8"AsyncIO"));
 
 		m_startAndTerminateEvent->Wait();
 

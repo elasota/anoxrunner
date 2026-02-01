@@ -76,7 +76,7 @@ namespace anox { namespace utils { namespace priv {
 		fld_dataOffset_ ## name, \
 		fld_structOffset_ ## name, \
 		fld_type_ ## name, \
-		#name, \
+		u8 ## #name, \
 		sizeof(#name) - 1, \
 		classDef, \
 	},
@@ -105,7 +105,7 @@ namespace anox { namespace utils { namespace priv {
 
 #define CLASS_FILL_IN(name, cid) \
 	static_cast<uint32_t>(::anox::data::EClass_ID::k_ ## cid), \
-	#name, \
+	u8 ## #name, \
 	sizeof(#name) - 1, \
 	kSize, \
 	sizeof(::anox::data::EClass_ ## name), \
@@ -165,17 +165,17 @@ namespace anox { namespace utils { namespace priv {
 #undef CLASS_BASE_INVISIBLE
 #undef END_CLASS
 
-	static const char *const g_badClasses[] =
+	static const rkit::Utf8Char_t *const g_badClasses[] =
 	{
-		"ob_building-1",
-		"ob_building-4",
-		"ob_building-5",
-		"ob_building-6",
-		"ob_flame-stop",
-		"boots_cine",
-		"pathcorner",
-		"ob_Scrate_healths",
-		"npc_tme",
+		u8"ob_building-1",
+		u8"ob_building-4",
+		u8"ob_building-5",
+		u8"ob_building-6",
+		u8"ob_flame-stop",
+		u8"boots_cine",
+		u8"pathcorner",
+		u8"ob_Scrate_healths",
+		u8"npc_tme",
 	};
 
 	static const ::anox::data::EntityDefsSchema g_schema =

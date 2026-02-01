@@ -19,11 +19,11 @@
 
 #include "rkit/Math/TRMat34.h"
 
-#if RKIT_PLATFORM_ARCH_HAVE_SSE2
+#if RKIT_PLATFORM_ARCH_HAVE_SSE2 != 0
 #include <emmintrin.h>
 #endif
 
-#if RKIT_PLATFORM_ARCH_HAVE_SSE41
+#if RKIT_PLATFORM_ARCH_HAVE_SSE41 != 0
 #include <smmintrin.h>
 #endif
 
@@ -771,9 +771,9 @@ namespace anox
 		rkit::endian::LittleUInt16_t *srcIndexesPtr = srcIndexes.Ptr();
 		const size_t numIndexes = srcIndexes.Count();
 
-#if defined(RKIT_PLATFORM_ARCH_HAVE_SSE41) || defined(RKIT_PLATFORM_ARCH_HAVE_SSE2)
+#if RKIT_PLATFORM_ARCH_HAVE_SSE41 || RKIT_PLATFORM_ARCH_HAVE_SSE2
 
-#if defined(RKIT_PLATFORM_ARCH_HAVE_SSE41)
+#if RKIT_PLATFORM_ARCH_HAVE_SSE41 != 0
 		const __m128i vmaxIndex = _mm_set1_epi16(static_cast<int16_t>(maxTriIndex));
 #else
 		const __m128i signBitFlip = _mm_set1_epi16(-0x8000);
@@ -787,7 +787,7 @@ namespace anox
 		{
 			const __m128i srcIndexes = _mm_loadu_si128(reinterpret_cast<const __m128i *>(srcIndexesPtr + startIndex));
 
-#if defined(RKIT_PLATFORM_ARCH_HAVE_SSE41)
+#if RKIT_PLATFORM_ARCH_HAVE_SSE41 != 0
 			const __m128i adjusted = _mm_min_epu16(srcIndexes, vmaxIndex);
 #else
 			const __m128i adjusted = _mm_xor_si128(signBitFlip, _mm_min_epi16(_mm_xor_si128(signBitFlip, srcIndexes), vmaxIndexFlipped));
@@ -813,7 +813,7 @@ namespace anox
 		data::MDAModelVert *srcVertsPtr = verts.Ptr();
 		const size_t numVerts = verts.Count();
 
-#if defined(RKIT_PLATFORM_ARCH_HAVE_SSE41)
+#if RKIT_PLATFORM_ARCH_HAVE_SSE41 != 0
 		const size_t numBulkVerts = numVerts / 2u * 2u;
 		const __m128i pointIDMax = _mm_set_epi32(-1, static_cast<int32_t>(maxPointIndex), -1, static_cast<int32_t>(maxPointIndex));
 

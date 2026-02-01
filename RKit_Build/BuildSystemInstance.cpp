@@ -140,7 +140,7 @@ bool rkit::buildsystem::NodeTypeKey::operator!=(const NodeTypeKey &other) const
 
 rkit::buildsystem::FileLocationKey::FileLocationKey()
 	: m_location(BuildFileLocation::kInvalid)
-	, m_path("")
+	, m_path(u8"")
 {
 }
 
@@ -188,7 +188,7 @@ rkit::HashValue_t rkit::buildsystem::FileLocationKey::ComputeHash(HashValue_t ba
 
 rkit::buildsystem::DirectoryScanKey::DirectoryScanKey()
 	: m_location(BuildFileLocation::kInvalid)
-	, m_path("")
+	, m_path(u8"")
 	, m_directoryMode(false)
 {
 }
@@ -605,16 +605,16 @@ namespace rkit { namespace buildsystem
 		{
 			explicit PrintableFourCC(uint32_t fourCC);
 
-			const char *GetChars() const;
+			StringView GetStr() const;
 
-			char m_chars[5];
+			Utf8Char_t m_chars[5];
 		};
 
 		struct ContentID
 		{
 			static const size_t kContentStringSize = 51;	// 255 bits
 
-			char m_chars[kContentStringSize + 1];
+			Utf8Char_t m_chars[kContentStringSize + 1];
 
 			StringView GetStringView() const;
 		};
@@ -1550,7 +1550,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(m_buildInstance->RegisterCASSource(contentID, location, path));
 
 		CIPath casPath;
-		RKIT_CHECK(casPath.AppendComponent("cas"));
+		RKIT_CHECK(casPath.AppendComponent(u8"cas"));
 		RKIT_CHECK(casPath.Append(path));
 
 		UniquePtr<ISeekableReadWriteStream> casIDFile;
@@ -1679,7 +1679,7 @@ namespace rkit { namespace buildsystem
 
 		if (!exists)
 		{
-			rkit::log::Error("A problem occurred refreshing the file status of an output");
+			rkit::log::Error(u8"A problem occurred refreshing the file status of an output");
 			return ResultCode::kFileOpenError;
 		}
 
@@ -1832,8 +1832,8 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(RegisterNodeCompiler(kDefaultNamespace, kRenderPipelineLibraryNodeID, std::move(pipelineLibraryCompiler)));
 		RKIT_CHECK(RegisterNodeCompiler(kDefaultNamespace, kCopyFileNodeID, std::move(copyFileCompiler)));
 
-		RKIT_CHECK(RegisterNodeTypeByExtension("deps", kDefaultNamespace, kDepsNodeID));
-		RKIT_CHECK(RegisterNodeTypeByExtension("rkp", kDefaultNamespace, kRenderPipelineLibraryNodeID));
+		RKIT_CHECK(RegisterNodeTypeByExtension(u8"deps", kDefaultNamespace, kDepsNodeID));
+		RKIT_CHECK(RegisterNodeTypeByExtension(u8"rkp", kDefaultNamespace, kRenderPipelineLibraryNodeID));
 
 		return ResultCode::kOK;
 	}
@@ -1864,8 +1864,7 @@ namespace rkit { namespace buildsystem
 			StringConstructionBuffer strBuf;
 			RKIT_CHECK(strBuf.Allocate(strLength));
 
-			Span<char> chars = strBuf.GetSpan();
-			RKIT_CHECK(stream.ReadAll(chars.Ptr(), chars.Count()));
+			RKIT_CHECK(stream.ReadAllSpan(strBuf.GetSpan()));
 
 			stringsVector[i] = String(std::move(strBuf));
 		}
@@ -2092,7 +2091,7 @@ namespace rkit { namespace buildsystem
 
 			if (node->GetDependencyState() == DependencyState::NotCompiled)
 			{
-				rkit::log::LogInfoFmt("Build Compile : {} {} {}", FourCCToPrintable(node->GetDependencyNodeNamespace()).GetChars(), FourCCToPrintable(node->GetDependencyNodeType()).GetChars(), node->GetIdentifier().GetChars());
+				rkit::log::LogInfoFmt(u8"Build Compile : {} {} {}", FourCCToPrintable(node->GetDependencyNodeNamespace()).GetStr(), FourCCToPrintable(node->GetDependencyNodeType()).GetStr(), node->GetIdentifier());
 				RKIT_CHECK(node->RunCompile(this));
 				node->SetState(DependencyState::UpToDate);
 			}
@@ -2105,7 +2104,7 @@ namespace rkit { namespace buildsystem
 		}
 
 		// Step 5: Copy CAS files
-		rkit::log::LogInfo("Updating CAS files...");
+		rkit::log::LogInfo(u8"Updating CAS files...");
 		for (size_t i = 0; i < m_relevantNodes.Count(); i++)
 		{
 			const DependencyNode *node = m_relevantNodes[i];
@@ -2264,7 +2263,7 @@ namespace rkit { namespace buildsystem
 
 		if (compilerIt == m_nodeCompilers.end())
 		{
-			rkit::log::ErrorFmt("Unknown dependency node type {} / {}", static_cast<unsigned int>(nodeNamespace), static_cast<unsigned int>(nodeType));
+			rkit::log::ErrorFmt(u8"Unknown dependency node type {} / {}", static_cast<unsigned int>(nodeNamespace), static_cast<unsigned int>(nodeType));
 			return ResultCode::kInvalidParameter;
 		}
 
@@ -2356,7 +2355,7 @@ namespace rkit { namespace buildsystem
 			{
 				if (node->GetCompiler()->HasAnalysisStage())
 				{
-					rkit::log::LogInfoFmt("Build Analysis: {} {} {}", FourCCToPrintable(node->GetDependencyNodeNamespace()).GetChars(), FourCCToPrintable(node->GetDependencyNodeType()).GetChars(), node->GetIdentifier().GetChars());
+					rkit::log::LogInfoFmt(u8"Build Analysis: {} {} {}", FourCCToPrintable(node->GetDependencyNodeNamespace()).GetStr(), FourCCToPrintable(node->GetDependencyNodeType()).GetStr(), node->GetIdentifier());
 					RKIT_CHECK(node->RunAnalysis(this));
 				}
 
@@ -2548,7 +2547,7 @@ namespace rkit { namespace buildsystem
 
 		if (nodeDepNode->GetDependencyCheckPhase() != DependencyCheckPhase::None)
 		{
-			ErrorBlameNode(nodeDepNode, "Circular dependency");
+			ErrorBlameNode(nodeDepNode, u8"Circular dependency");
 			return ResultCode::kOperationFailed;
 		}
 
@@ -2773,7 +2772,7 @@ namespace rkit { namespace buildsystem
 
 		if (!utils::ResultIsOK(openResult))
 		{
-			rkit::log::ErrorFmt("Failed to open output file '{}'", path.GetChars());
+			rkit::log::ErrorFmt(u8"Failed to open output file '{}'", path.GetChars());
 			return ResultCode::kFileOpenError;
 		}
 
@@ -2834,7 +2833,7 @@ namespace rkit { namespace buildsystem
 			HashMap<data::ContentID, CASSource>::ConstIterator_t it = m_casSources.Find(contentID);
 			if (it == m_casSources.end())
 			{
-				rkit::log::ErrorFmt("Couldn't find CAS source for content '{}'", contentIDString.ToStringView().GetChars());
+				rkit::log::ErrorFmt(u8"Couldn't find CAS source for content '{}'", contentIDString.ToStringView().GetChars());
 				return ResultCode::kInternalError;
 			}
 
@@ -2843,7 +2842,7 @@ namespace rkit { namespace buildsystem
 			{
 				String tempName;
 				RKIT_CHECK(tempName.Set(contentIDString.ToStringView()));
-				RKIT_CHECK(tempName.Append(".tmp"));
+				RKIT_CHECK(tempName.Append(u8".tmp"));
 
 				OSRelPath osRelPath;
 				RKIT_CHECK(osRelPath.ConvertFrom(CIPathView(tempName)));
@@ -2857,7 +2856,7 @@ namespace rkit { namespace buildsystem
 
 			if (!inStream.IsValid())
 			{
-				rkit::log::ErrorFmt("Couldn't open CAS source '{}'", it.Value().m_path.CStr());
+				rkit::log::ErrorFmt(u8"Couldn't open CAS source '{}'", it.Value().m_path.CStr());
 				return ResultCode::kInternalError;
 			}
 
@@ -2958,7 +2957,7 @@ namespace rkit { namespace buildsystem
 
 	void BuildSystemInstance::ErrorBlameNode(DependencyNode *node, const StringView &msg)
 	{
-		rkit::log::ErrorFmt("Node {}: {}", node->GetIdentifier().GetChars(), msg.GetChars());
+		rkit::log::ErrorFmt(u8"Node {}: {}", node->GetIdentifier().GetChars(), msg.GetChars());
 	}
 
 	Result BuildSystemInstance::ConstructIntermediatePath(OSAbsPath &outStr, const CIPathView &path) const
@@ -3004,7 +3003,7 @@ namespace rkit { namespace buildsystem
 
 	CIPathView BuildSystemInstance::GetCacheFileName()
 	{
-		return "buildsystem.cache";
+		return u8"buildsystem.cache";
 	}
 
 	IDependencyNode *BuildSystemInstance::GetRelevantNodeByIndex(const IBuildSystemInstance *const &instance, size_t index)
@@ -3018,9 +3017,9 @@ namespace rkit { namespace buildsystem
 		m_chars[4] = '\0';
 	}
 
-	const char *BuildSystemInstance::PrintableFourCC::GetChars() const
+	StringView BuildSystemInstance::PrintableFourCC::GetStr() const
 	{
-		return m_chars;
+		return StringView(m_chars, 4);
 	}
 
 	StringView BuildSystemInstance::ContentID::GetStringView() const

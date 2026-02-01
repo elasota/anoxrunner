@@ -11,12 +11,14 @@ namespace rkit { namespace priv {
 	{
 	};
 
+	// Unsigned char larger than canonical
 	template<class TChar, class TUCanonical>
 	struct UnicodeCharacterHelper2<TChar, TUCanonical, true, true, false>
 	{
 		static bool CheckMakeCanonical(TChar ch, TUCanonical &outCh);
 	};
 
+	// Signed char larger than canonical
 	template<class TChar, class TUCanonical>
 	struct UnicodeCharacterHelper2<TChar, TUCanonical, false, true, false>
 	{
@@ -35,6 +37,41 @@ namespace rkit { namespace priv {
 	};
 } }
 
+namespace rkit { namespace priv {
+	template<CharacterEncoding TEncoding>
+	struct CharacterEncodingValidatorImpl
+	{
+	};
+
+	template<>
+	struct CharacterEncodingValidatorImpl<CharacterEncoding::kASCII>
+	{
+		template<class TChar>
+		static bool ValidateSpan(const Span<const TChar> &span);
+	};
+
+	template<>
+	struct CharacterEncodingValidatorImpl<CharacterEncoding::kUTF8>
+	{
+		template<class TChar>
+		static bool ValidateSpan(const Span<const TChar> &span);
+	};
+
+	template<>
+	struct CharacterEncodingValidatorImpl<CharacterEncoding::kUTF16>
+	{
+		template<class TChar>
+		static bool ValidateSpan(const Span<const TChar> &span);
+	};
+
+	template<>
+	struct CharacterEncodingValidatorImpl<CharacterEncoding::kByte>
+	{
+		template<class TChar>
+		static bool ValidateSpan(const Span<const TChar> &span);
+	};
+} }
+
 namespace rkit
 {
 	template<class T>
@@ -43,38 +80,14 @@ namespace rkit
 	template<CharacterEncoding TEncoding>
 	struct CharacterEncodingValidator
 	{
-	};
-
-	template<>
-	struct CharacterEncodingValidator<CharacterEncoding::kASCII>
-	{
 		template<class TChar>
-		static bool ValidateSpan(const Span<const TChar> &span);
-	};
-
-	template<>
-	struct CharacterEncodingValidator<CharacterEncoding::kUTF8>
-	{
-		template<class TChar>
-		static bool ValidateSpan(const Span<const TChar> &span);
-	};
-
-	template<>
-	struct CharacterEncodingValidator<CharacterEncoding::kUTF16>
-	{
-		template<class TChar>
-		static bool ValidateSpan(const Span<const TChar> &span);
-	};
-
-	template<>
-	struct CharacterEncodingValidator<CharacterEncoding::kUnspecified>
-	{
-		template<class TChar>
-		static bool ValidateSpan(const Span<const TChar> &span);
+		static bool ValidateSpan(const Span<TChar> &span);
 	};
 }
 
 #include <stdint.h>
+
+#include "TypeTraits.h"
 
 namespace rkit { namespace priv {
 
@@ -109,10 +122,9 @@ namespace rkit { namespace priv {
 	}
 } }
 
-namespace rkit
-{	
+namespace rkit { namespace priv {
 	template<class TChar>
-	bool CharacterEncodingValidator<CharacterEncoding::kASCII>::ValidateSpan(const Span<const TChar> &span)
+	bool CharacterEncodingValidatorImpl<CharacterEncoding::kASCII>::ValidateSpan(const Span<const TChar> &span)
 	{
 		for (const TChar &ch : span)
 		{
@@ -128,7 +140,7 @@ namespace rkit
 	}
 
 	template<class TChar>
-	bool CharacterEncodingValidator<CharacterEncoding::kUTF8>::ValidateSpan(const Span<const TChar> &span)
+	bool CharacterEncodingValidatorImpl<CharacterEncoding::kUTF8>::ValidateSpan(const Span<const TChar> &span)
 	{
 		size_t remaining = span.Count();
 		const TChar *chars = span.Ptr();
@@ -183,7 +195,7 @@ namespace rkit
 	}
 
 	template<class TChar>
-	bool CharacterEncodingValidator<CharacterEncoding::kUTF16>::ValidateSpan(const Span<const TChar> &span)
+	bool CharacterEncodingValidatorImpl<CharacterEncoding::kUTF16>::ValidateSpan(const Span<const TChar> &span)
 	{
 		size_t remaining = span.Count();
 		const TChar *chars = span.Ptr();
@@ -222,8 +234,19 @@ namespace rkit
 	}
 
 	template<class TChar>
-	bool CharacterEncodingValidator<CharacterEncoding::kUnspecified>::ValidateSpan(const Span<const TChar> &span)
+	bool CharacterEncodingValidatorImpl<CharacterEncoding::kByte>::ValidateSpan(const Span<const TChar> &span)
 	{
 		return true;
+	}
+} }
+
+
+namespace rkit
+{
+	template<CharacterEncoding TEncoding>
+	template<class TChar>
+	bool CharacterEncodingValidator<TEncoding>::ValidateSpan(const Span<TChar> &span)
+	{
+		return priv::CharacterEncodingValidatorImpl<TEncoding>::template ValidateSpan<typename RemoveConst<TChar>::Type_t>(span);
 	}
 }

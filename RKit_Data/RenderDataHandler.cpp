@@ -28,12 +28,12 @@ namespace rkit { namespace data
 	};\
 	namespace render_rtti_ ## name\
 	{\
-		const char g_name[] = #name;\
+		const Utf8Char_t g_name[] = u8 ## #name;\
 		RenderRTTIEnumOption g_options[] =\
 		{
 
 #define RTTI_ENUM_OPTION(name)	\
-			{ #name, sizeof(#name) - 1, static_cast<unsigned int>(EnumType_t::name) },
+			{ u8 ## #name, sizeof(#name) - 1, static_cast<unsigned int>(EnumType_t::name) },
 
 
 #define RTTI_ENUM_END	\
@@ -76,7 +76,7 @@ namespace rkit { namespace data
 	};\
 	namespace render_rtti_ ## name ## StringIndex\
 	{\
-		const char g_name[] = #name;\
+		const Utf8Char_t g_name[] = u8 ## #name;\
 		RenderRTTIStringIndexType g_type =\
 		{\
 			{\
@@ -109,7 +109,7 @@ namespace rkit { namespace data
 	};\
 	namespace render_rtti_ ## name\
 	{\
-		const char g_name[] = #name;\
+		const Utf8Char_t g_name[] = u8 ## #name;\
 		RenderRTTIStructField g_fields[] =\
 		{
 
@@ -120,7 +120,7 @@ namespace rkit { namespace data
 
 #define RTTI_STRUCT_FIELD_WITH_VISIBILITY_AND_NULLABILITY(name, visibility, nullability)	\
 	{\
-		#name,\
+		u8 ## #name,\
 		sizeof(#name) - 1,\
 		RTTIResolver<decltype(StructType_t::m_ ## name)>::GetRTTIType,\
 		visibility,\
@@ -678,7 +678,7 @@ namespace rkit { namespace data
 
 			RenderRTTIMainType::ValueType,
 
-			"ValueType",
+			u8"ValueType",
 			sizeof("ValueType") - 1,
 		};
 
@@ -700,7 +700,7 @@ namespace rkit { namespace data
 
 			RenderRTTIMainType::BinaryContent,
 
-			"BinaryContent",
+			u8"BinaryContent",
 			sizeof("BinaryContent") - 1,
 		};
 
@@ -1301,7 +1301,7 @@ namespace rkit { namespace data
 
 		Vector<ConfigKey> m_configKeys;
 		Vector<StringOffsetAndSize> m_strings;
-		Vector<char> m_stringChars;
+		Vector<Utf8Char_t> m_stringChars;
 		Vector<size_t> m_binaryContentSizes;
 
 		bool m_hasTempStrings = false;
@@ -1375,13 +1375,13 @@ namespace rkit { namespace data
 
 		if (identifier != handler->GetPackageIdentifier())
 		{
-			rkit::log::Error("Package identifier doesn't match");
+			rkit::log::Error(u8"Package identifier doesn't match");
 			return ResultCode::kMalformedFile;
 		}
 
 		if (packageVersion != handler->GetPackageVersion())
 		{
-			rkit::log::Error("Package version doesn't match");
+			rkit::log::Error(u8"Package version doesn't match");
 			return ResultCode::kMalformedFile;
 		}
 
@@ -1419,12 +1419,12 @@ namespace rkit { namespace data
 		{
 			RKIT_CHECK(stream.ReadAll(m_stringChars.GetBuffer(), numCharsTotal));
 
-			const char *stringChars = m_stringChars.GetBuffer();
+			const Utf8Char_t *stringChars = m_stringChars.GetBuffer();
 			for (const StringOffsetAndSize &str : m_strings)
 			{
 				if (stringChars[str.m_offset + str.m_size] != '\0')
 				{
-					rkit::log::Error("Malformed string data");
+					rkit::log::Error(u8"Malformed string data");
 					return ResultCode::kMalformedFile;
 				}
 			}
@@ -1438,13 +1438,13 @@ namespace rkit { namespace data
 
 			if (configKey.m_stringIndex >= m_strings.Count())
 			{
-				rkit::log::Error("Config key string index was invalid");
+				rkit::log::Error(u8"Config key string index was invalid");
 				return ResultCode::kMalformedFile;
 			}
 
 			if (mainType >= static_cast<uint64_t>(data::RenderRTTIMainType::Count))
 			{
-				rkit::log::Error("Config key main type was invalid");
+				rkit::log::Error(u8"Config key main type was invalid");
 				return ResultCode::kMalformedFile;
 			}
 		}
@@ -1493,7 +1493,7 @@ namespace rkit { namespace data
 						objectIndex--;
 						if (objectIndex >= objectList.GetCount())
 						{
-							rkit::log::Error("Invalid object index");
+							rkit::log::Error(u8"Invalid object index");
 							return ResultCode::kMalformedFile;
 						}
 
@@ -1748,7 +1748,7 @@ namespace rkit { namespace data
 					RKIT_CHECK(ReadUIntForSize(stream, rtti->m_maxValueExclusive - 1, enumValue));
 					if (enumValue >= rtti->m_maxValueExclusive)
 					{
-						rkit::log::Error("Configurable enum value was out of range");
+						rkit::log::Error(u8"Configurable enum value was out of range");
 						return ResultCode::kMalformedFile;
 					}
 
@@ -1756,7 +1756,7 @@ namespace rkit { namespace data
 				}
 				return ResultCode::kOK;
 			default:
-				rkit::log::Error("Configurable enum state was invalid");
+				rkit::log::Error(u8"Configurable enum state was invalid");
 				return ResultCode::kMalformedFile;
 			}
 		}
@@ -1766,7 +1766,7 @@ namespace rkit { namespace data
 			RKIT_CHECK(ReadUIntForSize(stream, rtti->m_maxValueExclusive - 1, enumValue));
 			if (enumValue >= rtti->m_maxValueExclusive)
 			{
-				rkit::log::Error("Enum value was out of range");
+				rkit::log::Error(u8"Enum value was out of range");
 				return ResultCode::kMalformedFile;
 			}
 
@@ -1831,7 +1831,7 @@ namespace rkit { namespace data
 				ioFuncs = &rtti->m_configurableFunctions;
 				break;
 			default:
-				rkit::log::Error("Invalid configurable number state");
+				rkit::log::Error(u8"Invalid configurable number state");
 				return ResultCode::kInternalError;
 			}
 		}
@@ -1904,7 +1904,7 @@ namespace rkit { namespace data
 
 				if (v >= 2)
 				{
-					rkit::log::Error("Invalid 1-bit value");
+					rkit::log::Error(u8"Invalid 1-bit value");
 					return ResultCode::kMalformedFile;
 				}
 
@@ -1988,7 +1988,7 @@ namespace rkit { namespace data
 			}
 			return ResultCode::kOK;
 		default:
-			rkit::log::Error("Invalid valuetype");
+			rkit::log::Error(u8"Invalid valuetype");
 			return ResultCode::kMalformedFile;
 		}
 	}
@@ -2046,7 +2046,7 @@ namespace rkit { namespace data
 		const IRenderRTTIListBase *list = m_indexables[static_cast<size_t>(structType->m_indexableType)].Get();
 		if (objectIndex >= list->GetCount())
 		{
-			rkit::log::Error("Object index was out of range");
+			rkit::log::Error(u8"Object index was out of range");
 			return ResultCode::kMalformedFile;
 		}
 
@@ -2072,7 +2072,7 @@ namespace rkit { namespace data
 
 		if (spanIndex >= spanInfos.Count())
 		{
-			rkit::log::Error("Invalid object span index");
+			rkit::log::Error(u8"Invalid object span index");
 			return ResultCode::kMalformedFile;
 		}
 
@@ -2091,7 +2091,7 @@ namespace rkit { namespace data
 			{
 				if (!ptrList.GetElement(start + i))
 				{
-					rkit::log::Error("Object ptr was invalid");
+					rkit::log::Error(u8"Object ptr was invalid");
 					return ResultCode::kMalformedFile;
 				}
 			}
@@ -2109,7 +2109,7 @@ namespace rkit { namespace data
 
 		if (index >= m_configKeys.Count())
 		{
-			rkit::log::Error("Configuration key index was out of range");
+			rkit::log::Error(u8"Configuration key index was out of range");
 			return ResultCode::kMalformedFile;
 		}
 
@@ -2121,7 +2121,7 @@ namespace rkit { namespace data
 	{
 		if (upperLimit != nullptr && structType >= upperLimit)
 		{
-			rkit::log::Error("Structure type was recursive");
+			rkit::log::Error(u8"Structure type was recursive");
 			return ResultCode::kMalformedFile;
 		}
 
@@ -2129,7 +2129,7 @@ namespace rkit { namespace data
 
 		if (structType->m_members.Count() >= complexityLimit || complexity + structType->m_members.Count() >= complexityLimit)
 		{
-			rkit::log::Error("Structure type has too many fields");
+			rkit::log::Error(u8"Structure type has too many fields");
 			return ResultCode::kMalformedFile;
 		}
 
@@ -2137,7 +2137,7 @@ namespace rkit { namespace data
 
 		if (depth > 16)
 		{
-			rkit::log::Error("Structure type tree is too deep");
+			rkit::log::Error(u8"Structure type tree is too deep");
 			return ResultCode::kMalformedFile;
 		}
 

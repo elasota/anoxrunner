@@ -114,7 +114,7 @@ namespace anox
 		RKIT_CHECK(DataReader::ReadCheckLabel(resource.m_values.m_startSequence, state.m_edef.m_startSequenceID));
 		resource.m_values.m_miscValue = state.m_edef.m_miscValue.Get();
 
-		rkit::Vector<char> descChars;
+		rkit::Vector<rkit::Utf8Char_t> descChars;
 		RKIT_CHECK(descChars.Resize(state.m_edef.m_descriptionStringLength));
 
 		rkit::ReadOnlyMemoryStream stream(state.m_fileContents.ToSpan());

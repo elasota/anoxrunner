@@ -63,8 +63,10 @@ namespace rkit { namespace utils
 			Result m_errorResult;
 		};
 
-		typedef rapidjson::EncodedInputStream<rapidjson::UTF8<>, PrivInputByteStream> EncodedInputStream_t;
-		typedef rapidjson::GenericDocument<rapidjson::UTF8<>, rapidjson::MemoryPoolAllocator<PrivAllocator>, PrivAllocator> Document_t;
+		typedef rapidjson::UTF8<Utf8Char_t> Utf8Encoding_t;
+
+		typedef rapidjson::EncodedInputStream<Utf8Encoding_t, PrivInputByteStream> EncodedInputStream_t;
+		typedef rapidjson::GenericDocument<Utf8Encoding_t, rapidjson::MemoryPoolAllocator<PrivAllocator>, PrivAllocator> Document_t;
 		typedef Document_t::GenericValue GenericValue_t;
 
 		Result CheckInit();
@@ -74,13 +76,13 @@ namespace rkit { namespace utils
 		static const JsonValueVFTable kJsonValueVFTable;
 
 		static Result VFToBool(const void *jsonValue, bool &outBool);
-		static Result VFToString(const void *jsonValue, const char *&outCharPtr, size_t &outLength);
+		static Result VFToString(const void *jsonValue, const Utf8Char_t *&outCharPtr, size_t &outLength);
 		static Result VFToNumber(const void *jsonValue, double &outNumber);
 		static Result VFGetArraySize(const void *jsonValue, size_t &outSize);
 		static Result VFGetArrayElement(const void *jsonValue, size_t index, JsonValue &outJsonValue);
 		static Result VFIterateObject(const void *jsonValue, void *userdata, JsonObjectIteratorCallback_t callback);
-		static Result VFObjectHasElement(const void *jsonValue, const char *keyChars, size_t keyLength, bool &outHasElement);
-		static Result VFGetObjectElement(const void *jsonValue, const char *keyChars, size_t keyLength, JsonValue &outJsonValue);
+		static Result VFObjectHasElement(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, bool &outHasElement);
+		static Result VFGetObjectElement(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, JsonValue &outJsonValue);
 
 		PrivAllocator m_allocator;
 		rapidjson::MemoryPoolAllocator<PrivAllocator> m_poolAllocator;
@@ -221,7 +223,7 @@ namespace rkit { namespace utils
 		if (!m_haveStarted)
 		{
 			m_haveStarted = true;
-			m_document.ParseStream<rapidjson::kParseValidateEncodingFlag, rapidjson::UTF8<>, EncodedInputStream_t>(m_encodedInputStream);
+			m_document.ParseStream<rapidjson::kParseValidateEncodingFlag, Utf8Encoding_t, EncodedInputStream_t>(m_encodedInputStream);
 			if (m_document.HasParseError())
 				return ResultCode::kInvalidJson;
 		}
@@ -278,7 +280,7 @@ namespace rkit { namespace utils
 		return ResultCode::kOK;
 	}
 
-	Result JsonDocument::VFToString(const void *jsonValue, const char *&outCharPtr, size_t &outLength)
+	Result JsonDocument::VFToString(const void *jsonValue, const Utf8Char_t *&outCharPtr, size_t &outLength)
 	{
 		const GenericValue_t *gValue = static_cast<const GenericValue_t *>(jsonValue);
 
@@ -352,7 +354,7 @@ namespace rkit { namespace utils
 		return ResultCode::kOK;
 	}
 
-	Result JsonDocument::VFObjectHasElement(const void *jsonValue, const char *keyChars, size_t keyLength, bool &outHasElement)
+	Result JsonDocument::VFObjectHasElement(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, bool &outHasElement)
 	{
 		const GenericValue_t *gValue = static_cast<const GenericValue_t *>(jsonValue);
 
@@ -364,7 +366,7 @@ namespace rkit { namespace utils
 		return ResultCode::kOK;
 	}
 
-	Result JsonDocument::VFGetObjectElement(const void *jsonValue, const char *keyChars, size_t keyLength, JsonValue &outJsonValue)
+	Result JsonDocument::VFGetObjectElement(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, JsonValue &outJsonValue)
 	{
 		typedef Document_t::ConstMemberIterator ConstMemberIterator_t;
 		const GenericValue_t *gValue = static_cast<const GenericValue_t *>(jsonValue);

@@ -875,7 +875,7 @@ namespace anox
 		rkit::Result openResult = sysDriver->OpenFileRead(cacheReadStream, rkit::FileLocation::kUserSettingsDirectory, m_pipelinesCacheFileName);
 		if (!rkit::utils::ResultIsOK(openResult))
 		{
-			rkit::log::Error("Failed to open pipeline cache");
+			rkit::log::Error(u8"Failed to open pipeline cache");
 			return openResult;
 		}
 
@@ -957,7 +957,7 @@ namespace anox
 					{
 						if (foundBranch)
 						{
-							rkit::log::Error("A shader permutation selector had multiple valid permutations for the same value");
+							rkit::log::Error(u8"A shader permutation selector had multiple valid permutations for the same value");
 							return rkit::ResultCode::kMalformedFile;
 						}
 
@@ -986,13 +986,13 @@ namespace anox
 
 			if (keyResolution.IsSet() && !foundBranch)
 			{
-				rkit::log::Error("A shader permutation selector could not match the specified value");
+				rkit::log::Error(u8"A shader permutation selector could not match the specified value");
 				return rkit::ResultCode::kMalformedFile;
 			}
 
 			if (branchPermutationOffset != tree->m_width)
 			{
-				rkit::log::Error("A shader permutation tree's branch set was misaligned");
+				rkit::log::Error(u8"A shader permutation tree's branch set was misaligned");
 				return rkit::ResultCode::kMalformedFile;
 			}
 
@@ -1795,13 +1795,13 @@ namespace anox
 		{
 			if (!m_gfxSettings.ResolveConfigEnum(keyName, resolution.m_mainType, resolution.m_value))
 			{
-				rkit::log::ErrorFmt("Enum config key '{}' in the pipeline cache was unresolvable", keyName.GetChars());
+				rkit::log::ErrorFmt(u8"Enum config key '{}' in the pipeline cache was unresolvable", keyName.GetChars());
 				return rkit::ResultCode::kConfigInvalid;
 			}
 
 			if (resolution.m_mainType != expectedMainType)
 			{
-				rkit::log::ErrorFmt("Enum config key '{}' in the pipeline cache was the wrong type", keyName.GetChars());
+				rkit::log::ErrorFmt(u8"Enum config key '{}' in the pipeline cache was the wrong type", keyName.GetChars());
 				return rkit::ResultCode::kConfigInvalid;
 			}
 
@@ -1820,7 +1820,7 @@ namespace anox
 
 		if (!m_gfxSettings.ResolveConfigFloat(keyName, outValue))
 		{
-			rkit::log::ErrorFmt("Float config key '{}' in the pipeline cache was unresolvable", keyName.GetChars());
+			rkit::log::ErrorFmt(u8"Float config key '{}' in the pipeline cache was unresolvable", keyName.GetChars());
 			return rkit::ResultCode::kConfigInvalid;
 		}
 
@@ -1836,7 +1836,7 @@ namespace anox
 
 		if (!m_gfxSettings.ResolveConfigSInt(keyName, outValue))
 		{
-			rkit::log::ErrorFmt("SInt config key '{}' in the pipeline cache was unresolvable", keyName.GetChars());
+			rkit::log::ErrorFmt(u8"SInt config key '{}' in the pipeline cache was unresolvable", keyName.GetChars());
 			return rkit::ResultCode::kConfigInvalid;
 		}
 
@@ -1852,7 +1852,7 @@ namespace anox
 
 		if (!m_gfxSettings.ResolveConfigUInt(keyName, outValue))
 		{
-			rkit::log::ErrorFmt("UInt config key '{}' in the pipeline cache was unresolvable", keyName.GetChars());
+			rkit::log::ErrorFmt(u8"UInt config key '{}' in the pipeline cache was unresolvable", keyName.GetChars());
 			return rkit::ResultCode::kConfigInvalid;
 		}
 
@@ -2265,13 +2265,13 @@ namespace anox
 		if (progressMonitor)
 		{
 			// FIXME: Localize
-			RKIT_CHECK(progressMonitor->SetText("Starting graphics system..."));
+			RKIT_CHECK(progressMonitor->SetText(u8"Starting graphics system..."));
 		}
 
 		// Create render driver
 		rkit::render::RenderDriverInitProperties driverParams = {};
 
-#if RKIT_IS_DEBUG
+#if !!RKIT_IS_DEBUG
 		driverParams.m_validationLevel = rkit::render::ValidationLevel::kAggressive;
 		driverParams.m_enableLogging = true;
 #endif
@@ -2287,7 +2287,7 @@ namespace anox
 
 		if (!renderDriver)
 		{
-			rkit::log::Error("Missing render driver");
+			rkit::log::Error(u8"Missing render driver");
 			return rkit::ResultCode::kModuleLoadFailed;
 		}
 
@@ -2296,7 +2296,7 @@ namespace anox
 
 		if (adapters.Count() == 0)
 		{
-			rkit::log::Error("No available adapters");
+			rkit::log::Error(u8"No available adapters");
 			return rkit::ResultCode::kOperationFailed;
 		}
 
@@ -2335,7 +2335,7 @@ namespace anox
 		RKIT_CHECK(m_renderDevice->CreateCPUFenceWaiter(m_fenceWaiter));
 
 		// FIXME: Localize
-		RKIT_CHECK(progressMonitor->SetText("Loading shader package..."));
+		RKIT_CHECK(progressMonitor->SetText(u8"Loading shader package..."));
 
 		m_pipelinesCacheFileName = pipelinesCacheFile;
 		m_setupStep = DeviceSetupStep::kOpenPipelinePackage;
@@ -2380,7 +2380,7 @@ namespace anox
 			rkit::Optional<rkit::render::HeapKey> uploadHeapKey = prototype->GetMemoryRequirements().FindSuitableHeap(heapSpec);
 			if (!uploadHeapKey.IsSet())
 			{
-				rkit::log::Error("No heap available for use as upload heap");
+				rkit::log::Error(u8"No heap available for use as upload heap");
 				return rkit::ResultCode::kInternalError;
 			}
 
@@ -2600,7 +2600,7 @@ namespace anox
 
 		if (!m_dmaQueue || !m_logicalQueues[static_cast<size_t>(LogicalQueueType::kGraphics)])
 		{
-			rkit::log::Error("Missing a required graphics API queue type");
+			rkit::log::Error(u8"Missing a required graphics API queue type");
 			return rkit::ResultCode::kOperationFailed;
 		}
 
@@ -2614,7 +2614,7 @@ namespace anox
 
 		if (!isGraphicsQueueCompatible)
 		{
-			rkit::log::Error("Graphics queue wasn't capable of presenting to the desired display");
+			rkit::log::Error(u8"Graphics queue wasn't capable of presenting to the desired display");
 			return rkit::ResultCode::kOperationFailed;
 		}
 
@@ -2639,11 +2639,11 @@ namespace anox
 			scfr.m_colorTargetImage = m_gameWindow->GetSwapChain()->GetImageForFrame(i);
 
 			{
-				rkit::render::RenderPassRef_t simpleColorTargetRP = m_pipelineLibrary->FindRenderPass("RP_SimpleColorTarget");
+				rkit::render::RenderPassRef_t simpleColorTargetRP = m_pipelineLibrary->FindRenderPass(u8"RP_SimpleColorTarget");
 
 				if (!simpleColorTargetRP.IsValid())
 				{
-					rkit::log::Error("RP_SimpleColorTarget render pass is missing");
+					rkit::log::Error(u8"RP_SimpleColorTarget render pass is missing");
 					return rkit::ResultCode::kDataError;
 				}
 
@@ -2698,9 +2698,9 @@ namespace anox
 		switch (m_backend.Get())
 		{
 		case anox::RenderBackend::kVulkan:
-			backendModule = "Render_Vulkan";
-			pipelinesFile = "pipelines_vk.rkp";
-			pipelinesCacheFile = "pipeline_cache_vk.rsf";
+			backendModule = u8"Render_Vulkan";
+			pipelinesFile = u8"pipelines_vk.rkp";
+			pipelinesCacheFile = u8"pipeline_cache_vk.rsf";
 			canUpdatePipelineCache = true;
 			break;
 
@@ -2760,7 +2760,7 @@ namespace anox
 				rkit::render::IProgressMonitor *progressMonitor = m_gameWindow->GetDisplay().GetProgressMonitor();
 				if (progressMonitor)
 				{
-					RKIT_CHECK(progressMonitor->SetText("Optimizing shaders..."));
+					RKIT_CHECK(progressMonitor->SetText(u8"Optimizing shaders..."));
 				}
 
 				rkit::RCPtr<rkit::Job> initJobRC;
@@ -2813,7 +2813,7 @@ namespace anox
 			rkit::render::IProgressMonitor *progressMonitor = m_gameWindow->GetDisplay().GetProgressMonitor();
 			if (progressMonitor)
 			{
-				RKIT_CHECK(progressMonitor->SetText("Building shader cache..."));
+				RKIT_CHECK(progressMonitor->SetText(u8"Building shader cache..."));
 				RKIT_CHECK(progressMonitor->SetRange(0, numTotalPipelines));
 			}
 
@@ -2835,7 +2835,7 @@ namespace anox
 			rkit::render::IProgressMonitor *progressMonitor = m_gameWindow->GetDisplay().GetProgressMonitor();
 			if (progressMonitor)
 			{
-				RKIT_CHECK(progressMonitor->SetText("Reloading shaders..."));
+				RKIT_CHECK(progressMonitor->SetText(u8"Reloading shaders..."));
 			}
 
 			RKIT_CHECK(KickOffMergedPipelineLoad());

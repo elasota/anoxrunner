@@ -18,7 +18,7 @@ namespace rkit { namespace data
 		void ShutdownDriver() override;
 
 		uint32_t GetDriverNamespaceID() const override { return rkit::IModuleDriver::kDefaultNamespace; }
-		rkit::StringView GetDriverName() const override { return "Data"; }
+		rkit::StringView GetDriverName() const override { return u8"Data"; }
 
 		IRenderDataHandler *GetRenderDataHandler() const override;
 

@@ -4,7 +4,7 @@
 #include "rkit/Core/CoreLib.h"
 #include "rkit/Core/Platform.h"
 
-#if RKIT_PLATFORM_ARCH_HAVE_SSE
+#if RKIT_PLATFORM_ARCH_HAVE_SSE != 0
 #include <immintrin.h>
 #endif
 
@@ -30,11 +30,6 @@ namespace rkit { namespace math { namespace priv {
 		static double Floor(double f);
 	};
 } } }
-
-namespace rkit { namespace math {
-	float RKIT_CORELIB_API SoftwareSqrtf(float f);
-	double RKIT_CORELIB_API SoftwareSqrt(double f);
-} }
 
 namespace rkit { namespace math {
 	float Sqrtf(float f);
@@ -71,15 +66,15 @@ namespace rkit { namespace math {
 #include <string.h>
 #include <math.h>
 
-#if RKIT_PLATFORM_ARCH_HAVE_SSE
+#if RKIT_PLATFORM_ARCH_HAVE_SSE != 0
 #include <xmmintrin.h>
 #endif
 
-#if RKIT_PLATFORM_ARCH_HAVE_SSE2
+#if RKIT_PLATFORM_ARCH_HAVE_SSE2 != 0
 #include <emmintrin.h>
 #endif
 
-#if RKIT_PLATFORM_ARCH_HAVE_SSE41
+#if RKIT_PLATFORM_ARCH_HAVE_SSE41 != 0
 #include <smmintrin.h>
 #endif
 
@@ -161,7 +156,7 @@ namespace rkit { namespace math {
 		return static_cast<uint32_t>((static_cast<int64_t>(a) * b) >> 32);
 	}
 
-#if RKIT_PLATFORM_ARCH_HAVE_SSE41
+#if RKIT_PLATFORM_ARCH_HAVE_SSE41 != 0
 	inline double Floor(double f)
 	{
 		return _mm_cvtsd_f64(_mm_floor_sd(_mm_setzero_pd(), _mm_load_sd(&f)));
@@ -173,19 +168,19 @@ namespace rkit { namespace math {
 	}
 #endif
 
-#if RKIT_PLATFORM_ARCH_HAVE_SSE41
+#if RKIT_PLATFORM_ARCH_HAVE_SSE41 != 0
 	inline float Floorf(float f)
 	{
 		return _mm_cvtss_f32(_mm_floor_ss(_mm_setzero_ps(), _mm_load_ss(&f)));
 	}
 #else
-	inline double Floor(double f)
+	inline float Floorf(float f)
 	{
 		return ::floorf(f);
 	}
 #endif
 
-#if RKIT_PLATFORM_ARCH_HAVE_SSE2
+#if RKIT_PLATFORM_ARCH_HAVE_SSE2 != 0
 	inline double Sqrt(double f)
 	{
 		return _mm_cvtsd_f64(_mm_sqrt_sd(_mm_setzero_pd(), _mm_load_sd(&f)));
@@ -197,7 +192,7 @@ namespace rkit { namespace math {
 	}
 #endif
 
-#if RKIT_PLATFORM_ARCH_HAVE_SSE
+#if RKIT_PLATFORM_ARCH_HAVE_SSE != 0
 	inline float Sqrtf(float f)
 	{
 		return _mm_cvtss_f32(_mm_sqrt_ss(_mm_load_ss(&f)));

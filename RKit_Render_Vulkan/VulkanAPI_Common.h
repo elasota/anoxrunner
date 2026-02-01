@@ -29,7 +29,7 @@ namespace rkit { namespace render { namespace vulkan
 		void *m_pfnAddress = nullptr;
 		bool m_isOptional = false;
 		const char *m_requiredExtension = nullptr;
-		StringView m_fnName;
+		AsciiStringView m_fnName;
 	};
 
 #define RKIT_VK_API_WITH_PROPERTIES(fn, isOptional, requiredExtension)\
@@ -38,7 +38,7 @@ namespace rkit { namespace render { namespace vulkan
 	{\
 		ThisType_t *ftableTyped = static_cast<ThisType_t*>(ftable);\
 		loaderInfo.m_pfnAddress = &ftableTyped->fn;\
-		loaderInfo.m_fnName = StringView(#fn);\
+		loaderInfo.m_fnName = AsciiStringView(#fn);\
 		loaderInfo.m_isOptional = isOptional;\
 		loaderInfo.m_requiredExtension = requiredExtension;\
 		loaderInfo.m_copyVoidFunctionCallback = WriteVoidFunctionTemplate<PFN_ ## fn>;\

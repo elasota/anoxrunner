@@ -50,7 +50,7 @@ namespace rkit
 		class BinaryBlobRef : public NoCopy
 		{
 		public:
-			BinaryBlobRef(BinaryBlobRef &&other);
+			BinaryBlobRef(BinaryBlobRef &&other) noexcept;
 
 			explicit BinaryBlobRef(UniquePtr<IBinaryBlob> &&blob);
 
@@ -126,7 +126,7 @@ namespace rkit
 {
 	namespace buildsystem
 	{
-		inline BinaryBlobRef::BinaryBlobRef(BinaryBlobRef &&other)
+		inline BinaryBlobRef::BinaryBlobRef(BinaryBlobRef &&other) noexcept
 			: m_blob(std::move(other.m_blob))
 		{
 		}

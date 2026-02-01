@@ -14,10 +14,22 @@
 #		define RKIT_PLATFORM_ARCH RKIT_PLATFORM_ARCH_X64
 #		define RKIT_PLATFORM_ARCH_HAVE_SSE 1
 #		define RKIT_PLATFORM_ARCH_HAVE_SSE2 1
-#		define RKIT_PLATFORM_ARCH_HAVE_SSE41 1
+//#		define RKIT_PLATFORM_ARCH_HAVE_SSE41 1
 #	else
 #		error "Need to implement this"
 #	endif
 #else
 #	error "Need to implement this"
+#endif
+
+#ifndef RKIT_PLATFORM_ARCH_HAVE_SSE
+#	define RKIT_PLATFORM_ARCH_HAVE_SSE 0
+#endif
+
+#ifndef RKIT_PLATFORM_ARCH_HAVE_SSE2
+#	define RKIT_PLATFORM_ARCH_HAVE_SSE2 0
+#endif
+
+#ifndef RKIT_PLATFORM_ARCH_HAVE_SSE41
+#	define RKIT_PLATFORM_ARCH_HAVE_SSE41 0
 #endif

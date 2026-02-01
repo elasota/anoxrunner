@@ -74,7 +74,7 @@ namespace rkit { namespace math { namespace priv {
 		static Matrix<TComponent, TIndexCount, TRightCols> ComputeMatMat(const Vec<TComponent, TCommonDimension>(&leftRows)[TIndexCount], const Vec<TComponent, TRightCols>(&rightRows)[TCommonDimension]);
 	};
 
-#if RKIT_PLATFORM_ARCH_HAVE_SSE
+#if RKIT_PLATFORM_ARCH_HAVE_SSE != 0
 	template<>
 	struct MatrixTransposer<float, 3, 3>
 	{
