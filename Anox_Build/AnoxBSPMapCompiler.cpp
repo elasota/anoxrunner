@@ -742,7 +742,7 @@ namespace anox { namespace buildsystem
 				rkit::CIPath texName;
 				RKIT_CHECK(texName.Set(rkit::StringView(fixedName, nameLength)));
 
-				const rkit::HashMapConstIterator it = textureNameToUniqueTexture.Find(texName);
+				const rkit::HashMap<rkit::CIPath, size_t>::ConstIterator_t it = textureNameToUniqueTexture.Find(texName);
 
 				size_t uniqueTexIndex = 0;
 				if (it == textureNameToUniqueTexture.end())

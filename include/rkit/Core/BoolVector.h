@@ -62,6 +62,7 @@ namespace rkit
 	{
 	public:
 		BoolSpanLValue(BoolVector::Chunk_t &chunk, uint8_t bit);
+		BoolSpanLValue(BoolSpanLValue &&) = default;
 
 		bool operator=(bool value) const;
 		operator bool() const;

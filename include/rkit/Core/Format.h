@@ -83,6 +83,8 @@ namespace rkit
 		template<class... TParameter>
 		SizedFormatParameterList(const TParameter &... parameter);
 
+		SizedFormatParameterList(SizedFormatParameterList &&) = default;
+
 		operator FormatParameterList<TChar>() const;
 
 	private:
