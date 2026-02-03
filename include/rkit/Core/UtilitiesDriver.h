@@ -70,10 +70,6 @@ namespace rkit
 		virtual Result CreateMutexProtectedReadStream(SharedPtr<IMutexProtectedReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream) const = 0;
 		virtual Result CreateMutexProtectedWriteStream(SharedPtr<IMutexProtectedWriteStream> &outStream, UniquePtr<ISeekableWriteStream> &&stream) const = 0;
 
-		virtual Result OpenShadowFileRead(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadStream &stream) const = 0;
-		virtual Result OpenShadowFileReadWrite(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadWriteStream &stream) const = 0;
-		virtual Result InitializeShadowFile(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadWriteStream &stream) const = 0;
-
 		virtual Result CreateRestartableDeflateDecompressStream(UniquePtr<ISeekableReadStream> &outStream, UniquePtr<ISeekableReadStream> &&compressedStream, FilePos_t decompressedSize) const = 0;
 		virtual Result CreateDeflateDecompressStream(UniquePtr<IReadStream> &outStream, UniquePtr<IReadStream> &&compressedStream) const = 0;
 		virtual Result CreateRangeLimitedReadStream(UniquePtr<ISeekableReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream, FilePos_t startPos, FilePos_t size) const = 0;
@@ -120,8 +116,6 @@ namespace rkit
 		virtual bool IsPathComponentValidOnWindows(const BaseStringSliceView<OSPathChar_t, CharacterEncoding::kOSPath> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const = 0;
 
 		virtual Result CreateCoroThread(UniquePtr<coro::Thread> &thread, size_t stackSize) const = 0;
-
-		virtual Result CreateBlockingReader(UniquePtr<ISeekableReadStream> &outReadStream, UniquePtr<IAsyncReadFile> &&asyncFile, FilePos_t fileSize) const = 0;
 
 		virtual bool ParseFloat(const ByteStringSliceView &str, float &f) const = 0;
 		virtual bool ParseDouble(const ByteStringSliceView &str, double &d) const = 0;

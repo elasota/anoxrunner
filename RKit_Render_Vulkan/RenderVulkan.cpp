@@ -31,7 +31,7 @@ namespace rkit { namespace render { namespace vulkan
 		Result FirstChanceVulkanFailure(VkResult result)
 		{
 			rkit::log::ErrorFmt(u8"Vulkan error {}", static_cast<unsigned int>(result));
-			RKIT_THROW((PackedResultAndExtCode{ ResultCode::kGraphicsAPIException, static_cast<uint32_t>(result) }));
+			RKIT_THROW(utils::PackResult(ResultCode::kGraphicsAPIException, static_cast<uint32_t>(result)));
 		}
 	}
 

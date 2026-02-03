@@ -32,7 +32,7 @@ namespace rkit { namespace render { namespace vulkan { namespace platform
 		struct WindowThreadInitTaskData
 		{
 			VulkanSurface_Win32 *m_surf = nullptr;
-			PackedResultAndExtCode m_result;
+			PackedResultAndExtCode m_result = utils::PackResult(ResultCode::kOK);
 			UniquePtr<IEvent> m_doneEvent;
 		};
 

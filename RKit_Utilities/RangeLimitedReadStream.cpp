@@ -33,7 +33,7 @@ namespace rkit
 	Result RangeLimitedReadStream::SeekStart(FilePos_t pos)
 	{
 		if (pos > m_fileSize)
-			return ResultCode::kIOSeekOutOfRange;
+			RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 		RKIT_CHECK(m_stream->SeekStart(pos + m_baseStreamStart));
 
@@ -48,7 +48,7 @@ namespace rkit
 		{
 			FilePos_t backwardDist = rkit::ToUnsignedAbs<FileOffset_t, FilePos_t>(offset);
 			if (backwardDist > m_filePos)
-				return ResultCode::kIOSeekOutOfRange;
+				RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 			return SeekStart(m_filePos - backwardDist);
 		}
@@ -57,7 +57,7 @@ namespace rkit
 			FilePos_t distRemaining = m_fileSize - m_filePos;
 
 			if (static_cast<FilePos_t>(offset) > distRemaining)
-				return ResultCode::kIOSeekOutOfRange;
+				RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 			return SeekStart(m_filePos - static_cast<FilePos_t>(offset));
 		}
@@ -69,12 +69,12 @@ namespace rkit
 		{
 			FilePos_t backwardDist = rkit::ToUnsignedAbs<FileOffset_t, FilePos_t>(offset);
 			if (backwardDist > m_fileSize)
-				return ResultCode::kIOSeekOutOfRange;
+				RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 			return SeekStart(m_filePos - backwardDist);
 		}
 		else
-			return ResultCode::kIOSeekOutOfRange;
+			RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 	}
 
 	FilePos_t RangeLimitedReadStream::Tell() const

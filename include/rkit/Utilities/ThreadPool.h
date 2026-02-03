@@ -21,7 +21,7 @@ namespace rkit { namespace utils
 	{
 		virtual ~IThreadPool() {}
 
-		virtual Result Close() = 0;
+		virtual PackedResultAndExtCode Close() = 0;
 		virtual IJobQueue *GetJobQueue() const = 0;
 		virtual const ISpan<JobType> &GetMainThreadJobTypes() const = 0;
 		virtual const ISpan<JobType> &GetAllJobTypes() const = 0;

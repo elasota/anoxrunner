@@ -21,7 +21,7 @@ namespace rkit { namespace utils
 
 		Result Initialize();
 
-		Result Close() override;
+		PackedResultAndExtCode Close() override;
 		IJobQueue *GetJobQueue() const override;
 		const ISpan<JobType> &GetMainThreadJobTypes() const override;
 		const ISpan<JobType> &GetAllJobTypes() const override;
@@ -38,7 +38,7 @@ namespace rkit { namespace utils
 			JobType operator[](size_t index) const override;
 		};
 
-		Result PrivClose();
+		PackedResultAndExtCode PrivClose();
 
 		uint32_t m_numThreads;
 
@@ -82,7 +82,7 @@ namespace rkit { namespace utils
 	{
 	}
 
-	Result ThreadPool::Close()
+	PackedResultAndExtCode ThreadPool::Close()
 	{
 		return PrivClose();
 	}
@@ -110,13 +110,13 @@ namespace rkit { namespace utils
 		(void) PrivClose();
 	}
 
-	Result ThreadPool::PrivClose()
+	PackedResultAndExtCode ThreadPool::PrivClose()
 	{
-		Result finalResult = ResultCode::kOK;
+		PackedResultAndExtCode finalResult = utils::PackResult(ResultCode::kOK);
 
 		if (m_jobQueue.IsValid())
 		{
-			Result result = m_jobQueue->Close();
+			PackedResultAndExtCode result = m_jobQueue->Close();
 
 			if (!utils::ResultIsOK(result))
 				finalResult = result;
@@ -124,7 +124,7 @@ namespace rkit { namespace utils
 
 		for (ThreadData &threadData : m_threads)
 		{
-			Result result = threadData.m_thread.Finalize();
+			PackedResultAndExtCode result = threadData.m_thread.Finalize();
 
 			if (!utils::ResultIsOK(result))
 				finalResult = result;

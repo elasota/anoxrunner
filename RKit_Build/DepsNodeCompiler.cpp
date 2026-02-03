@@ -34,7 +34,7 @@ namespace rkit { namespace buildsystem
 		if (!stream.Get())
 		{
 			rkit::log::ErrorFmt(u8"Failed to open deps file '{}'", depsNode->GetIdentifier());
-			return ResultCode::kFileOpenError;
+			RKIT_THROW(ResultCode::kFileOpenError);
 		}
 
 		IUtilitiesDriver *utils = GetDrivers().m_utilitiesDriver;
@@ -104,7 +104,7 @@ namespace rkit { namespace buildsystem
 					if (!isFirst)
 					{
 						rkit::log::ErrorFmt(u8"{}:{}: '.' path element may only be the first element", line, col);
-						return ResultCode::kMalformedFile;
+						RKIT_THROW(ResultCode::kMalformedFile);
 					}
 
 					RKIT_ASSERT(pathScans.Count() == 1);
@@ -127,7 +127,7 @@ namespace rkit { namespace buildsystem
 					if (!CharacterEncodingValidator<CharacterEncoding::kUTF8>::ValidateSpan(chunkSpan))
 					{
 						rkit::log::ErrorFmt(u8"{}:{}: Invalid unicode", line, col);
-						return ResultCode::kMalformedFile;
+						RKIT_THROW(ResultCode::kMalformedFile);
 					}
 
 					// FIXME: Do this better
@@ -139,7 +139,7 @@ namespace rkit { namespace buildsystem
 						if (CIPath::Validate(chunkSlice) == PathValidationResult::kInvalid)
 						{
 							rkit::log::ErrorFmt(u8"{}:{}: Path is invalid", line, col);
-							return ResultCode::kMalformedFile;
+							RKIT_THROW(ResultCode::kMalformedFile);
 						}
 
 						Vector<CIPath> newPaths;
@@ -225,14 +225,14 @@ namespace rkit { namespace buildsystem
 				if (haveAnyWildcards && !exists)
 				{
 					rkit::log::ErrorFmt(u8"{}:{}: Input file was not found", line, col);
-					return ResultCode::kMalformedFile;
+					RKIT_THROW(ResultCode::kMalformedFile);
 				}
 
 				StringSliceView extStrView;
 				if (!utils->FindFilePathExtension(path[path.NumComponents() - 1], extStrView))
 				{
 					rkit::log::ErrorFmt(u8"{}:{}: Path has no extension", line, col);
-					return ResultCode::kMalformedFile;
+					RKIT_THROW(ResultCode::kMalformedFile);
 				}
 
 				uint32_t nodeNamespace = 0;
@@ -240,7 +240,7 @@ namespace rkit { namespace buildsystem
 				if (!feedback->FindNodeTypeByFileExtension(extStrView, nodeNamespace, nodeType))
 				{
 					rkit::log::ErrorFmt(u8"{}:{}: Unrecognized file extension: '{}'", line, col, extStrView.GetChars());
-					return ResultCode::kMalformedFile;
+					RKIT_THROW(ResultCode::kMalformedFile);
 				}
 
 				RKIT_CHECK(feedback->AddNodeDependency(nodeNamespace, nodeType, BuildFileLocation::kSourceDir, path.ToString()));

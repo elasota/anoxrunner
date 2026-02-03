@@ -83,11 +83,11 @@ namespace rkit { namespace utils
 		~JobSignalerImpl();
 
 	protected:
-		void SignalDoneImpl(const PackedResultAndExtCode &result) override;
+		void SignalDoneImpl(PackedResultAndExtCode result) override;
 
 	private:
 		// Needed due to vtable being trashed in destructor
-		void InternalSignalDone(const PackedResultAndExtCode &result);
+		void InternalSignalDone(PackedResultAndExtCode result);
 
 		bool m_haveSignaled = false;
 
@@ -166,8 +166,8 @@ namespace rkit { namespace utils
 
 		void Fault(const PackedResultAndExtCode &result) override;
 
-		Result CheckFault() override;
-		Result Close() override;
+		PackedResultAndExtCode CheckFault() override;
+		PackedResultAndExtCode Close() override;
 
 		Result Init();
 
@@ -281,7 +281,7 @@ namespace rkit { namespace utils
 			{
 				PackedResultAndExtCode result = RKIT_TRY_EVAL(m_jobRunner->Run());
 
-				jobSucceeded = (result.m_resultCode == ResultCode::kOK);
+				jobSucceeded = utils::ResultIsOK(result);
 				if (!jobSucceeded)
 					m_jobQueue.Fault(result);
 
@@ -304,10 +304,10 @@ namespace rkit { namespace utils
 	{
 		// DO NOT call SignalDone or SignalDoneImpl, since SignalDoneImpl is virtual and not valid here
 		if (!m_haveSignaled)
-			InternalSignalDone(PackedResultAndExtCode{ ResultCode::kJobAborted, 0 });
+			InternalSignalDone(utils::PackResult(ResultCode::kJobAborted));
 	}
 
-	void JobSignalerImpl::SignalDoneImpl(const PackedResultAndExtCode &result)
+	void JobSignalerImpl::SignalDoneImpl(PackedResultAndExtCode result)
 	{
 		RKIT_ASSERT(m_haveSignaled == false);
 
@@ -316,9 +316,9 @@ namespace rkit { namespace utils
 		InternalSignalDone(result);
 	}
 
-	void JobSignalerImpl::InternalSignalDone(const PackedResultAndExtCode &result)
+	void JobSignalerImpl::InternalSignalDone(PackedResultAndExtCode result)
 	{
-		const bool succeeded = (result.m_resultCode == ResultCode::kOK);
+		const bool succeeded = utils::ResultIsOK(result);
 		if (!succeeded)
 			m_jobQueue.Fault(result);
 
@@ -398,7 +398,7 @@ namespace rkit { namespace utils
 
 	JobQueue::JobQueue(IMallocDriver *alloc)
 		: m_alloc(alloc)
-		, m_result{ ResultCode::kOK, 0 }
+		, m_result(utils::PackResult(ResultCode::kOK))
 		, m_isInitialized(false)
 	{
 	}
@@ -1004,11 +1004,11 @@ namespace rkit { namespace utils
 	void JobQueue::Fault(const PackedResultAndExtCode &result)
 	{
 		MutexLock lock(*m_resultMutex);
-		if (result.m_resultCode != ResultCode::kOK && m_result.m_resultCode == ResultCode::kOK)
+		if (!utils::ResultIsOK(result) && utils::ResultIsOK(m_result))
 			m_result = result;
 	}
 
-	Result JobQueue::CheckFault()
+	PackedResultAndExtCode JobQueue::CheckFault()
 	{
 		PackedResultAndExtCode result;
 
@@ -1017,13 +1017,10 @@ namespace rkit { namespace utils
 			result = m_result;
 		}
 
-		if (result.m_resultCode != ResultCode::kOK)
-			RKIT_THROW(result);
-
-		RKIT_RETURN_OK;
+		return result;
 	}
 
-	Result JobQueue::Close()
+	PackedResultAndExtCode JobQueue::Close()
 	{
 		PrivClose();
 		return CheckFault();

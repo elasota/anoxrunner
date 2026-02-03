@@ -700,7 +700,7 @@ namespace rkit
 		PathValidationResult validationResult = TPathTraits::ValidateComponent(str, TIsAbsolute, false);
 
 		if (validationResult == PathValidationResult::kInvalid)
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		size_t totalChars = str.Length() + 1;
 		RKIT_CHECK(SafeAdd<size_t>(totalChars, m_path.Length(), totalChars));

@@ -4,8 +4,6 @@
 
 namespace rkit
 {
-	struct PackedResultAndExtCode;
-
 	struct IThreadContext
 	{
 		virtual ~IThreadContext() {}
@@ -32,7 +30,7 @@ namespace rkit
 
 		bool IsValid() const;
 
-		Result Finalize();
+		PackedResultAndExtCode Finalize();
 
 	private:
 		UniqueThreadRef(const UniqueThreadRef &) = delete;
@@ -48,7 +46,7 @@ namespace rkit
 namespace rkit
 {
 	inline UniqueThreadRef::UniqueThreadRef()
-		: m_finalResult{ ResultCode::kInvalidParameter, 0 }
+		: m_finalResult(utils::PackResult(ResultCode::kInvalidParameter))
 	{
 	}
 
@@ -60,7 +58,7 @@ namespace rkit
 
 	inline UniqueThreadRef::UniqueThreadRef(UniquePtr<IThread> &&thread)
 		: m_thread(std::move(thread))
-		, m_finalResult{ ResultCode::kOK, 0 }
+		, m_finalResult(utils::PackResult(ResultCode::kOK))
 	{
 	}
 
@@ -74,7 +72,7 @@ namespace rkit
 	{
 		if (m_thread.IsValid())
 		{
-			PackedResultAndExtCode oldThreadResult;
+			PackedResultAndExtCode oldThreadResult = utils::PackResult(ResultCode::kOK);
 
 			m_thread->Finalize(oldThreadResult);
 		}
@@ -89,7 +87,7 @@ namespace rkit
 		return m_thread.IsValid();
 	}
 
-	inline Result UniqueThreadRef::Finalize()
+	inline PackedResultAndExtCode UniqueThreadRef::Finalize()
 	{
 		if (m_thread.IsValid())
 		{
@@ -97,9 +95,6 @@ namespace rkit
 			m_thread.Reset();
 		}
 
-		if (m_finalResult.m_resultCode != ResultCode::kOK)
-			RKIT_THROW(m_finalResult);
-
-		RKIT_RETURN_OK;
+		return m_finalResult;
 	}
 }

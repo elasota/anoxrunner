@@ -335,7 +335,7 @@ namespace rkit { namespace png {
 		png_voidp ioPtr = png_get_io_ptr(png);
 		PackedResultAndExtCode result = RKIT_TRY_EVAL(static_cast<PngLoader *>(ioPtr)->m_stream.ReadAll(buffer, sz));
 
-		if (result.m_resultCode != ResultCode::kOK)
+		if (!utils::ResultIsOK(result))
 			png_error(png, "Read error");
 	}
 
@@ -426,7 +426,7 @@ namespace rkit { namespace png {
 		png_voidp ioPtr = png_get_io_ptr(png);
 		PackedResultAndExtCode result = RKIT_TRY_EVAL(static_cast<PngSaver *>(ioPtr)->m_stream.WriteAll(buffer, sz));
 
-		if (result.m_resultCode != ResultCode::kOK)
+		if (!utils::ResultIsOK(result))
 			png_error(png, "Write error");
 
 	}
@@ -436,7 +436,7 @@ namespace rkit { namespace png {
 		png_voidp ioPtr = png_get_io_ptr(png);
 		PackedResultAndExtCode result = RKIT_TRY_EVAL(static_cast<PngSaver *>(ioPtr)->m_stream.Flush());
 
-		if (result.m_resultCode != ResultCode::kOK)
+		if (!utils::ResultIsOK(result))
 			png_error(png, "Flush error");
 	}
 

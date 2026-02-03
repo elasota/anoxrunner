@@ -584,6 +584,7 @@ namespace rkit { namespace render
 		: m_alloc(alloc)
 		, m_hInst(hInst)
 		, m_actions(alloc, alloc)
+		, m_msgProcResult(utils::PackResult(ResultCode::kOK))
 	{
 	}
 
@@ -850,9 +851,9 @@ namespace rkit { namespace render
 
 	Result RenderWindow_Win32::ThreadFunc()
 	{
-		PackedResultAndExtCode result;
+		PackedResultAndExtCode result = utils::PackResult(ResultCode::kOK);
 
-		while (result.m_resultCode == ResultCode::kOK)
+		while (utils::ResultIsOK(result))
 		{
 			ActionQueueItem *aqi = nullptr;
 			{
@@ -900,7 +901,7 @@ namespace rkit { namespace render
 
 	Result RenderWindow_Win32::ThreadProcessWinMessages()
 	{
-		while (!m_actionLoopWasKicked && m_msgProcResult.m_resultCode == ResultCode::kOK)
+		while (!m_actionLoopWasKicked && utils::ResultIsOK(m_msgProcResult))
 		{
 			MSG msg;
 			BOOL msgGetResult = GetMessageW(&msg, m_hWnd, 0, 0);
@@ -1044,7 +1045,7 @@ namespace rkit { namespace render
 		*displayModeParams.m_completedFlag = false;
 		PackedResultAndExtCode result = RKIT_TRY_EVAL( (this->*(displayModeParams.m_callback))() );
 
-		const bool completedOK = (result.m_resultCode == ResultCode::kOK);
+		const bool completedOK = utils::ResultIsOK(result);
 		*displayModeParams.m_completedFlag = completedOK;
 
 		if (completedOK)
@@ -1120,7 +1121,7 @@ namespace rkit { namespace render
 
 		m_window.m_startEvent->Signal();
 
-		if (result.m_resultCode == ResultCode::kOK)
+		if (utils::ResultIsOK(result))
 		{
 			result = RKIT_TRY_EVAL(m_window.ThreadFunc());
 		}

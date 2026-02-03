@@ -15,7 +15,7 @@ namespace rkit { namespace buildsystem
 
 	Result CopyFileCompiler::RunAnalysis(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
 	{
-		return ResultCode::kInternalError;
+		RKIT_THROW(ResultCode::kInternalError);
 	}
 
 	Result CopyFileCompiler::RunCompile(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)

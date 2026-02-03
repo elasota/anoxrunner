@@ -332,7 +332,7 @@ namespace rkit { namespace buildsystem
 					}
 				}
 
-				return ResultCode::kMalformedFile;
+				RKIT_THROW(ResultCode::kMalformedFile);
 			}
 
 			outIndex = it.Value();
@@ -528,7 +528,7 @@ namespace rkit { namespace buildsystem
 			RKIT_ASSERT(!isConfigurable);
 			return WriteBinaryContentIndex(pkgBuilder, obj, stream);
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 	}
 
@@ -549,7 +549,7 @@ namespace rkit { namespace buildsystem
 			case static_cast<uint8_t>(render::ConfigurableValueState::Explicit):
 				return WriteUIntForSize(rtti->m_readConfigurableValueFunc(obj), rtti->m_maxValueExclusive - 1, stream);
 			default:
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 			}
 		}
 		else
@@ -591,7 +591,7 @@ namespace rkit { namespace buildsystem
 				ioFuncs = &rtti->m_configurableFunctions;
 				break;
 			default:
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 			}
 		}
 		else
@@ -607,7 +607,7 @@ namespace rkit { namespace buildsystem
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize64)
 				return WriteFloat64(value, stream);
 			else
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 		}
 		break;
 		case data::RenderRTTINumberRepresentation::SignedInt:
@@ -622,7 +622,7 @@ namespace rkit { namespace buildsystem
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize64)
 				return WriteSInt64(value, stream);
 			else
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 		}
 		case data::RenderRTTINumberRepresentation::UnsignedInt:
 		{
@@ -636,10 +636,10 @@ namespace rkit { namespace buildsystem
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize64)
 				return WriteUInt64(value, stream);
 			else
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 		}
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 	}
 
@@ -660,7 +660,7 @@ namespace rkit { namespace buildsystem
 		case render::ValueTypeType::Structure:
 			return WriteObjectPtr(pkgBuilder, &valueType->m_value.m_structureType, pkgBuilder.GetDataHandler()->GetStructureTypePtrRTTI(), false, stream);
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 	}
 
@@ -701,7 +701,7 @@ namespace rkit { namespace buildsystem
 		else if (purpose == render::GlobalStringIndex_t::kPurpose)
 			str = pkgBuilder.GetStringResolver()->ResolveGlobalString(rtti->m_readStringIndexFunc(obj));
 		else
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 
 		RKIT_CHECK(pkgBuilder.IndexString(str, index));
 		RKIT_CHECK(WriteCompactIndex(index, stream));
@@ -717,7 +717,7 @@ namespace rkit { namespace buildsystem
 		if (objPtr == nullptr)
 		{
 			if (!isNullable)
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 		}
 		else
 		{
@@ -793,7 +793,7 @@ namespace rkit { namespace buildsystem
 		if (index <= 0x3fffffffffffffffu)
 			return WriteUInt64((static_cast<uint64_t>(index) << 2) | 3, stream);
 
-		return ResultCode::kIntegerOverflow;
+		RKIT_THROW(ResultCode::kIntegerOverflow);
 	}
 
 	Result PackageObjectWriter::WriteUInt8(uint8_t ui, IWriteStream &stream)
@@ -925,7 +925,7 @@ namespace rkit { namespace buildsystem
 		if (newSize == m_stream.GetSize())
 			RKIT_RETURN_OK;
 
-		return ResultCode::kOperationFailed;
+		RKIT_THROW(ResultCode::kOperationFailed);
 	}
 
 	void Sha256Wrapper::FinishSHA()

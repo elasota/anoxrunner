@@ -55,12 +55,15 @@ inline rkit::Result rkit::BaseStringPoolBuilder<TChar, TEncoding>::IndexString(c
 		size_t index = m_strings.Count();
 		RKIT_CHECK(m_strings.Append(std::move(strPtr)));
 
-		PackedResultAndExtCode hashMapInsertResult = RKIT_EVAL_RESULT(m_stringToIndex.Set(GetStringByIndex(index), index));
-		if (hashMapInsertResult.m_resultCode != ResultCode::kOK)
-		{
-			m_strings.RemoveRange(index, 1);
-			return hashMapInsertResult;
-		}
+		RKIT_TRY_CATCH_RETHROW(m_stringToIndex.Set(GetStringByIndex(index), index),
+			CatchContext
+			(
+				[this, index]
+				{
+					m_strings.RemoveRange(index, 1);
+				}
+			)
+		);
 
 		outIndex = index;
 	}

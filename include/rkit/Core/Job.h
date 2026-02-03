@@ -30,10 +30,10 @@ namespace rkit
 	public:
 		void SignalDone(ResultCode resultCode);
 		void SignalDone(ResultCode resultCode, uint32_t extCode);
-		void SignalDone(const PackedResultAndExtCode &result);
+		void SignalDone(PackedResultAndExtCode result);
 
 	protected:
-		virtual void SignalDoneImpl(const PackedResultAndExtCode &result) = 0;
+		virtual void SignalDoneImpl(PackedResultAndExtCode result) = 0;
 	};
 }
 
@@ -41,15 +41,15 @@ namespace rkit
 {
 	inline void JobSignaler::SignalDone(ResultCode resultCode)
 	{
-		this->SignalDoneImpl(PackedResultAndExtCode{ resultCode, 0 });
+		this->SignalDoneImpl(utils::PackResult(resultCode));
 	}
 
 	inline void JobSignaler::SignalDone(ResultCode resultCode, uint32_t extCode)
 	{
-		this->SignalDoneImpl(PackedResultAndExtCode{ resultCode, extCode });
+		this->SignalDoneImpl(utils::PackResult(resultCode, extCode));
 	}
 
-	inline void JobSignaler::SignalDone(const PackedResultAndExtCode &result)
+	inline void JobSignaler::SignalDone(PackedResultAndExtCode result)
 	{
 		this->SignalDoneImpl(result);
 	}

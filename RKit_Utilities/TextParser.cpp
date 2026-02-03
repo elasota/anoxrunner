@@ -255,7 +255,7 @@ namespace rkit { namespace utils
 			if (!m_charReader.PeekOne(c))
 			{
 				if (m_isInQuotedString)
-					return ResultCode::kTextParsingFailed;
+					RKIT_THROW(ResultCode::kTextParsingFailed);
 
 				RKIT_RETURN_OK;
 			}
@@ -385,7 +385,7 @@ namespace rkit { namespace utils
 
 		uint8_t c;
 		if (!m_charReader.ReadOne(c))
-			return ResultCode::kTextParsingFailed;
+			RKIT_THROW(ResultCode::kTextParsingFailed);
 
 		if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_')
 		{
@@ -463,7 +463,7 @@ namespace rkit { namespace utils
 			{
 			}
 			else
-				return ResultCode::kTextParsingFailed;
+				RKIT_THROW(ResultCode::kTextParsingFailed);
 		}
 
 		endLoc = m_charReader.GetLocation().m_pos;
@@ -510,7 +510,7 @@ namespace rkit { namespace utils
 			return ReadCToken(outSpan);
 		}
 
-		return ResultCode::kInternalError;
+		RKIT_THROW(ResultCode::kInternalError);
 	}
 
 	Result TextParser::ReadToEndOfLine(Span<const uint8_t> &outSpan)
@@ -547,7 +547,7 @@ namespace rkit { namespace utils
 		if (!haveToken)
 		{
 			rkit::log::Error(u8"Unexpected end of file");
-			return ResultCode::kTextParsingFailed;
+			RKIT_THROW(ResultCode::kTextParsingFailed);
 		}
 
 		RKIT_RETURN_OK;
@@ -566,7 +566,7 @@ namespace rkit { namespace utils
 		if (!CompareSpansEqual(span, str))
 		{
 			rkit::log::ErrorFmt(u8"[{}:{}] Expected '{}'", line, col, StringView(reinterpret_cast<const Utf8Char_t *>(str.Ptr()), str.Count()));
-			return ResultCode::kTextParsingFailed;
+			RKIT_THROW(ResultCode::kTextParsingFailed);
 		}
 
 		RKIT_RETURN_OK;
@@ -621,7 +621,7 @@ namespace rkit { namespace utils
 				continue;
 			}
 			else if (IsIdentifierChar(c))
-				return ResultCode::kTextParsingFailed;
+				RKIT_THROW(ResultCode::kTextParsingFailed);
 			else
 				break;
 		}
@@ -643,7 +643,7 @@ namespace rkit { namespace utils
 				continue;
 			}
 			else if (IsIdentifierChar(c))
-				return ResultCode::kTextParsingFailed;
+				RKIT_THROW(ResultCode::kTextParsingFailed);
 			else
 				break;
 		}
@@ -674,7 +674,7 @@ namespace rkit { namespace utils
 			uint8_t c = '\0';
 
 			if (!m_charReader.ReadOne(c))
-				return ResultCode::kTextParsingFailed;
+				RKIT_THROW(ResultCode::kTextParsingFailed);
 
 			if (c == '\"')
 				break;
@@ -682,13 +682,13 @@ namespace rkit { namespace utils
 			if (c == '\\')
 			{
 				if (!m_charReader.ReadOne(c))
-					return ResultCode::kTextParsingFailed;
+					RKIT_THROW(ResultCode::kTextParsingFailed);
 
 				if (c == 't' || c == 'n' || c == 'r' || c == '\"' || c == '\'')
 				{
 				}
 				else
-					return ResultCode::kTextParsingFailed;
+					RKIT_THROW(ResultCode::kTextParsingFailed);
 			}
 		}
 
@@ -706,7 +706,7 @@ namespace rkit { namespace utils
 				m_charReader.SkipOne();
 
 				if (nextChar == '_' || (nextChar > 'F' && nextChar <= 'Z') || (nextChar > 'f' && nextChar <= 'z'))
-					return ResultCode::kTextParsingFailed;
+					RKIT_THROW(ResultCode::kTextParsingFailed);
 			}
 			else
 				break;

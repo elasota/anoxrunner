@@ -22,7 +22,6 @@
 #include "MutexProtectedStream.h"
 #include "RangeLimitedReadStream.h"
 #include "Sha2Calculator.h"
-#include "ShadowFile.h"
 #include "TextParser.h"
 #include "ThreadPool.h"
 
@@ -57,10 +56,6 @@ namespace rkit
 		Result CreateMutexProtectedReadWriteStream(SharedPtr<IMutexProtectedReadWriteStream> &outStream, UniquePtr<ISeekableReadWriteStream> &&stream) const override;
 		Result CreateMutexProtectedReadStream(SharedPtr<IMutexProtectedReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream) const override;
 		Result CreateMutexProtectedWriteStream(SharedPtr<IMutexProtectedWriteStream> &outStream, UniquePtr<ISeekableWriteStream> &&stream) const override;
-
-		Result OpenShadowFileRead(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadStream &stream) const override;
-		Result OpenShadowFileReadWrite(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadWriteStream &stream) const override;
-		Result InitializeShadowFile(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadWriteStream &stream) const override;
 
 		Result CreateRestartableDeflateDecompressStream(UniquePtr<ISeekableReadStream> &outStream, UniquePtr<ISeekableReadStream> &&compressedStream, FilePos_t decompressedSize) const override;
 		Result CreateDeflateDecompressStream(UniquePtr<IReadStream> &outStream, UniquePtr<IReadStream> &&compressedStream) const override;
@@ -108,8 +103,6 @@ namespace rkit
 		bool IsPathComponentValidOnWindows(const BaseStringSliceView<OSPathChar_t, CharacterEncoding::kOSPath> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const override;
 
 		Result CreateCoroThread(UniquePtr<coro::Thread> &thread, size_t stackSize) const override;
-
-		Result CreateBlockingReader(UniquePtr<ISeekableReadStream> &outReadStream, UniquePtr<IAsyncReadFile> &&asyncFile, FilePos_t fileSize) const override;
 
 		bool ParseDouble(const ByteStringSliceView &str, double &d) const override;
 		bool ParseFloat(const ByteStringSliceView &str, float &f) const override;
@@ -267,42 +260,6 @@ namespace rkit
 		RKIT_RETURN_OK;
 	}
 
-	Result UtilitiesDriver::OpenShadowFileRead(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadStream &stream) const
-	{
-		UniquePtr<utils::ShadowFileBase> shadowFile;
-		RKIT_CHECK(utils::ShadowFileBase::Create(shadowFile, stream, nullptr));
-
-		RKIT_CHECK(shadowFile->LoadShadowFile());
-
-		outShadowFile = std::move(shadowFile);
-
-		RKIT_RETURN_OK;
-	}
-
-	Result UtilitiesDriver::OpenShadowFileReadWrite(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadWriteStream &stream) const
-	{
-		UniquePtr<utils::ShadowFileBase> shadowFile;
-		RKIT_CHECK(utils::ShadowFileBase::Create(shadowFile, stream, &stream));
-
-		RKIT_CHECK(shadowFile->LoadShadowFile());
-
-		outShadowFile = std::move(shadowFile);
-
-		RKIT_RETURN_OK;
-	}
-
-	Result UtilitiesDriver::InitializeShadowFile(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadWriteStream &stream) const
-	{
-		UniquePtr<utils::ShadowFileBase> shadowFile;
-		RKIT_CHECK(utils::ShadowFileBase::Create(shadowFile, stream, &stream));
-
-		RKIT_CHECK(shadowFile->InitializeShadowFile());
-
-		outShadowFile = std::move(shadowFile);
-
-		RKIT_RETURN_OK;
-	}
-
 	Result UtilitiesDriver::CreateRestartableDeflateDecompressStream(UniquePtr<ISeekableReadStream> &outStream, UniquePtr<ISeekableReadStream> &&compressedStream, FilePos_t decompressedSize) const
 	{
 		IMallocDriver *alloc = GetDrivers().m_mallocDriver;
@@ -382,7 +339,7 @@ namespace rkit
 		else
 		{
 			if (fileSizeRemaining > std::numeric_limits<size_t>::max())
-				return ResultCode::kOutOfMemory;
+				RKIT_THROW(ResultCode::kOutOfMemory);
 
 			RKIT_CHECK(outBytes.Resize(static_cast<size_t>(fileSizeRemaining)));
 
@@ -520,7 +477,7 @@ namespace rkit
 		Span<Utf8Char_t> span = charsRef;
 
 		if (span.Count() < 2)
-			return ResultCode::kInvalidCString;
+			RKIT_THROW(ResultCode::kInvalidCString);
 
 		size_t outPos = 0;
 		size_t inPos = 1;
@@ -533,7 +490,7 @@ namespace rkit
 			else if (c == '\\')
 			{
 				if (inPos == endInPos)
-					return ResultCode::kInvalidCString;
+					RKIT_THROW(ResultCode::kInvalidCString);
 
 				char escC = charsRef[inPos++];
 				if (escC == 't')
@@ -547,7 +504,7 @@ namespace rkit
 				else if (escC == '\'')
 					c = '\'';
 				else
-					return ResultCode::kInvalidCString;
+					RKIT_THROW(ResultCode::kInvalidCString);
 
 				span[outPos++] = c;
 			}
@@ -2120,7 +2077,7 @@ namespace rkit
 			size_t wordsDigested = 0;
 			uint32_t codePoint = 0;
 			if (!UTF16::Decode(srcWords, availableSrc, wordsDigested, codePoint))
-				return ResultCode::kInvalidUnicode;
+				RKIT_THROW(ResultCode::kInvalidUnicode);
 
 			availableSrc -= wordsDigested;
 			srcWords += wordsDigested;
@@ -2161,7 +2118,7 @@ namespace rkit
 			size_t bytesDigested = 0;
 			uint32_t codePoint = 0;
 			if (!UTF8::Decode(srcBytes, availableSrc, bytesDigested, codePoint))
-				return ResultCode::kInvalidUnicode;
+				RKIT_THROW(ResultCode::kInvalidUnicode);
 
 			availableSrc -= bytesDigested;
 			srcBytes += bytesDigested;
@@ -2313,11 +2270,6 @@ namespace rkit
 		RKIT_RETURN_OK;
 	}
 
-	Result UtilitiesDriver::CreateBlockingReader(UniquePtr<ISeekableReadStream> &outReadStream, UniquePtr<IAsyncReadFile> &&asyncFile, FilePos_t fileSize) const
-	{
-		return ResultCode::kNotYetImplemented;
-	}
-
 	bool UtilitiesDriver::ParseDouble(const ByteStringSliceView &str, double &d) const
 	{
 		size_t len = str.Length();
@@ -2461,7 +2413,7 @@ namespace rkit
 		height = rkit::Min(rkit::Min(height, maxDestHeight), maxSrcHeight);
 
 		if (requiresConversion)
-			return ResultCode::kNotYetImplemented;
+			RKIT_THROW(ResultCode::kNotYetImplemented);
 
 		const size_t bytesPerPixel = utils::img::BytesPerPixel(srcSpec.m_numChannels, srcSpec.m_pixelPacking);
 		const size_t srcByteOffset = srcX * bytesPerPixel;

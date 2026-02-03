@@ -348,7 +348,7 @@ rkit::Result rkit::ResizableRingBuffer<TTraits>::Allocate(AddrOffset_t size, Add
 
 		void *mem = m_alloc->Alloc(infoBlockAllocSize);
 		if (!mem)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		LinkedInfoBlockChunk *linkedChunk = static_cast<LinkedInfoBlockChunk *>(mem);
 		FlaggedInfoBlock *infoBlocks = reinterpret_cast<FlaggedInfoBlock *>(reinterpret_cast<char *>(mem) + paddedInfoBlockChunkSize);

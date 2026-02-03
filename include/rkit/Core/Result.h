@@ -7,11 +7,7 @@
 
 namespace rkit
 {
-	struct PackedResultAndExtCode
-	{
-		ResultCode m_resultCode = ResultCode::kOK;
-		uint32_t m_extCode = 0;
-	};
+	enum class PackedResultAndExtCode : uint64_t;
 
 	class RKIT_NODISCARD CatchContext
 	{
@@ -34,6 +30,17 @@ namespace rkit
 		void (*m_invokeThunk)(const void *);
 	};
 }
+
+
+namespace rkit { namespace utils
+{
+	inline ResultCode UnpackResultCode(PackedResultAndExtCode packedResult);
+	inline uint32_t UnpackExtCode(PackedResultAndExtCode packedResult);
+	inline PackedResultAndExtCode PackResult(ResultCode resultCode);
+	inline PackedResultAndExtCode PackResult(ResultCode resultCode, uint32_t extCode);
+	inline bool ResultIsOK(PackedResultAndExtCode packedCode);
+	inline bool ResultIsOK(ResultCode resultCode);
+} } // rkit::utils
 
 #if RKIT_USE_CLASS_RESULT != 0
 
@@ -247,28 +254,28 @@ namespace rkit
 	public:
 		ResultException() = delete;
 		explicit ResultException(ResultCode resultCode);
-		explicit ResultException(const PackedResultAndExtCode &packedResult);
+		explicit ResultException(PackedResultAndExtCode packedResult);
 		ResultException(const ResultException &) = default;
 
 		ResultException &operator=(const ResultException &) = default;
 
-		const PackedResultAndExtCode &GetPackedResult() const;
+		PackedResultAndExtCode GetPackedResult() const;
 
 	private:
 		PackedResultAndExtCode m_packedResult;
 	};
 
 	inline ResultException::ResultException(ResultCode resultCode)
-		: m_packedResult{ resultCode, 0 }
+		: m_packedResult(utils::PackResult(resultCode))
 	{
 	}
 
-	inline ResultException::ResultException(const PackedResultAndExtCode &packedResult)
+	inline ResultException::ResultException(PackedResultAndExtCode packedResult)
 		: m_packedResult(packedResult)
 	{
 	}
 
-	inline const PackedResultAndExtCode &ResultException::GetPackedResult() const
+	inline PackedResultAndExtCode ResultException::GetPackedResult() const
 	{
 		return m_packedResult;
 	}
@@ -282,7 +289,7 @@ namespace rkit { namespace priv {
 		try
 		{
 			tryBody();
-			return PackedResultAndExtCode{ ResultCode::kOK, 0 };
+			return utils::PackResult(ResultCode::kOK);
 		}
 		catch (ResultException rex)
 		{
@@ -290,7 +297,7 @@ namespace rkit { namespace priv {
 		}
 		catch (...)
 		{
-			return PackedResultAndExtCode{ ResultCode::kCppException, 0 };
+			return utils::PackResult(ResultCode::kCppException);
 		}
 	}
 } }
@@ -303,9 +310,44 @@ namespace rkit { namespace priv {
 
 #endif
 
+namespace rkit { namespace utils
+{
+	inline ResultCode UnpackResultCode(PackedResultAndExtCode packedResult)
+	{
+		return static_cast<ResultCode>(static_cast<uint64_t>(packedResult) & 0xffffffffu);
+	}
+
+	inline uint32_t UnpackExtCode(PackedResultAndExtCode packedResult)
+	{
+		return static_cast<uint32_t>((static_cast<uint64_t>(packedResult) >> 32) & 0xffffffffu);
+	}
+
+	inline PackedResultAndExtCode PackResult(ResultCode resultCode)
+	{
+		return static_cast<PackedResultAndExtCode>(static_cast<uint64_t>(resultCode));
+	}
+
+	inline PackedResultAndExtCode PackResult(ResultCode resultCode, uint32_t extCode)
+	{
+		const uint64_t extCodeBits = static_cast<uint64_t>(extCode) << 32;
+		const uint64_t resultCodeBits = static_cast<uint64_t>(resultCode);
+		return static_cast<PackedResultAndExtCode>(extCodeBits | resultCodeBits);
+	}
+
+	inline bool ResultIsOK(PackedResultAndExtCode packedCode)
+	{
+		return static_cast<uint64_t>(packedCode) == static_cast<uint64_t>(ResultCode::kOK);
+	}
+
+	inline bool ResultIsOK(ResultCode resultCode)
+	{
+		return resultCode == ResultCode::kOK;
+	}
+} } // rkit::utils
 
 namespace rkit
 {
+
 	template<class TCatchBody>
 	CatchContext::CatchContext(const TCatchBody &catchBody)
 		: m_catchBody(&catchBody)
@@ -325,9 +367,9 @@ namespace rkit
 		catchBody();
 	}
 
-	inline Result ThrowIfError(const PackedResultAndExtCode &result)
+	inline Result ThrowIfError(PackedResultAndExtCode result)
 	{
-		if (result.m_resultCode == ResultCode::kOK)
+		if (utils::ResultIsOK(result))
 			RKIT_RETURN_OK;
 
 		RKIT_THROW(result);

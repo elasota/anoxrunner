@@ -12,7 +12,7 @@ namespace rkit
 
 	struct IJobQueue;
 
-	typedef void (*AsyncIOCompletionCallback_t)(void *userdata, const Result &result, size_t bytesProcessed);
+	typedef void (*AsyncIOCompletionCallback_t)(void *userdata, const PackedResultAndExtCode &result, size_t bytesProcessed);
 
 
 	// NOTE: Async requests may return immediately

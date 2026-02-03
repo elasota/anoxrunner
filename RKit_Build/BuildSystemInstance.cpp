@@ -428,6 +428,7 @@ namespace rkit { namespace buildsystem
 		class DependencyNodeCompilerFeedback final : public IDependencyNodeCompilerFeedback
 		{
 		public:
+			DependencyNodeCompilerFeedback() = delete;
 			explicit DependencyNodeCompilerFeedback(BuildSystemInstance *instance, DependencyNode *node, bool isCompilePhase);
 
 			Result CheckInputExists(BuildFileLocation location, const CIPathView &path, bool &outExists) override;
@@ -459,7 +460,7 @@ namespace rkit { namespace buildsystem
 			DependencyNode *m_dependencyNode;
 			bool m_isCompilePhase;
 
-			Result m_fault;
+			PackedResultAndExtCode m_fault;
 		};
 
 		class FeedbackWrapperStream final : public ISeekableReadWriteStream
@@ -1099,7 +1100,7 @@ namespace rkit { namespace buildsystem
 		uint64_t index64 = size;
 
 		if (index64 > 0x3fffffffffffffffu)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		uint8_t bytes[8];
 		bytes[0] = static_cast<uint8_t>((index64 << 2) & 0xffu);
@@ -1135,7 +1136,7 @@ namespace rkit { namespace buildsystem
 	Result serializer::DeserializeResolver::GetString(size_t index, StringView &outString) const
 	{
 		if (index >= m_strings.Count())
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		outString = m_strings[index];
 		RKIT_RETURN_OK;
@@ -1144,7 +1145,7 @@ namespace rkit { namespace buildsystem
 	Result serializer::DeserializeResolver::GetDependencyNode(size_t index, IDependencyNode *&outNode) const
 	{
 		if (index >= m_nodes.Count())
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		outNode = m_nodes[index].Get();
 		RKIT_RETURN_OK;
@@ -1289,7 +1290,7 @@ namespace rkit { namespace buildsystem
 			RKIT_CHECK(stream.ReadAll(bytes + 1, 7));
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		};
 
 		uint64_t u64 = static_cast<uint64_t>((bytes[0] >> 2) & 0x3f);
@@ -1297,7 +1298,7 @@ namespace rkit { namespace buildsystem
 			u64 |= static_cast<uint64_t>(static_cast<uint64_t>(bytes[i]) << (i * 8 - 2));
 
 		if (u64 > std::numeric_limits<size_t>::max())
-			return ResultCode::kIntegerOverflow;
+			RKIT_THROW(ResultCode::kIntegerOverflow);
 
 		sz = static_cast<size_t>(u64);
 		RKIT_RETURN_OK;
@@ -1344,7 +1345,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(stream.ReadAll(&contentSize, sizeof(contentSize)));
 
 		if (contentSize > std::numeric_limits<size_t>::max())
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		RKIT_CHECK(outContent.Resize(static_cast<size_t>(contentSize)));
 
@@ -1422,7 +1423,7 @@ namespace rkit { namespace buildsystem
 		: m_buildInstance(instance)
 		, m_dependencyNode(node)
 		, m_isCompilePhase(isCompilePhase)
-		, m_fault(ResultCode::kOK)
+		, m_fault(utils::PackResult(ResultCode::kOK))
 	{
 	}
 
@@ -1474,7 +1475,7 @@ namespace rkit { namespace buildsystem
 	{
 		RKIT_CHECK(TryOpenInput(location, path, inputFile));
 		if (!inputFile.IsValid())
-			return ResultCode::kFileOpenError;
+			RKIT_THROW(ResultCode::kFileOpenError);
 
 		RKIT_RETURN_OK;
 	}
@@ -1660,15 +1661,12 @@ namespace rkit { namespace buildsystem
 
 	void DependencyNode::DependencyNodeCompilerFeedback::MarkOutputFileFinished(size_t productIndex, BuildFileLocation location, const CIPathView &path)
 	{
-		Result result = CheckedMarkOutputFileFinished(productIndex, location, path);
-
-		if (!utils::ResultIsOK(result))
-			m_fault = result;
+		m_fault = RKIT_TRY_EVAL(CheckedMarkOutputFileFinished(productIndex, location, path));
 	}
 
 	Result DependencyNode::DependencyNodeCompilerFeedback::CheckFault() const
 	{
-		return m_fault;
+		return ThrowIfError(m_fault);
 	}
 
 	Result DependencyNode::DependencyNodeCompilerFeedback::CheckedMarkOutputFileFinished(size_t productIndex, BuildFileLocation location, const CIPathView &path)
@@ -1680,7 +1678,7 @@ namespace rkit { namespace buildsystem
 		if (!exists)
 		{
 			rkit::log::Error(u8"A problem occurred refreshing the file status of an output");
-			return ResultCode::kFileOpenError;
+			RKIT_THROW(ResultCode::kFileOpenError);
 		}
 
 		RKIT_CHECK(m_dependencyNode->MarkProductFinished(m_isCompilePhase, productIndex, fileStatusView));
@@ -1887,7 +1885,7 @@ namespace rkit { namespace buildsystem
 
 			HashMap<NodeTypeKey, UniquePtr<IDependencyNodeCompiler>>::ConstIterator_t it = m_nodeCompilers.Find(NodeTypeKey(nodeNamespace, nodeType));
 			if (it == m_nodeCompilers.end())
-				return ResultCode::kOperationFailed;
+				RKIT_THROW(ResultCode::kOperationFailed);
 
 			IDependencyNodeCompiler *compiler = it.Value().Get();
 
@@ -1918,7 +1916,7 @@ namespace rkit { namespace buildsystem
 	Result BuildSystemInstance::LoadCache()
 	{
 		if (m_nodes.Count() != 0)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		OSAbsPath cacheFullPath;
 		RKIT_CHECK(ConstructIntermediatePath(cacheFullPath, GetCacheFileName()));
@@ -1926,16 +1924,15 @@ namespace rkit { namespace buildsystem
 		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
 
 		UniquePtr<ISeekableReadStream> graphStream;
-		Result openResult = sysDriver->OpenFileReadAbs(graphStream, cacheFullPath);
+		RKIT_CHECK(sysDriver->TryOpenFileReadAbs(graphStream, cacheFullPath));
 
-		if (utils::GetResultCode(openResult) == ResultCode::kFileOpenError)
+		if (!graphStream.IsValid())
 			RKIT_RETURN_OK;
-
-		RKIT_CHECK(openResult);
 
 		BuildCacheFileHeader header;
 		size_t countRead = 0;
-		if (!utils::ResultIsOK(graphStream->ReadPartial(&header, sizeof(header), countRead)) || countRead != sizeof(header))
+		RKIT_CHECK(graphStream->ReadPartial(&header, sizeof(header), countRead));
+		if (countRead != sizeof(header))
 			RKIT_RETURN_OK;
 
 		if (header.m_identifier != BuildCacheFileHeader::kCacheIdentifier || header.m_version != BuildCacheFileHeader::kCacheVersion || header.m_activeInstance >= 2)
@@ -1943,8 +1940,11 @@ namespace rkit { namespace buildsystem
 
 		const BuildCacheInstanceInfo &cacheInstance = header.m_instances[header.m_activeInstance];
 
-		if (!utils::ResultIsOK(CheckedLoadCache(*graphStream, cacheInstance.m_filePos)))
+		PackedResultAndExtCode result = RKIT_TRY_EVAL(CheckedLoadCache(*graphStream, cacheInstance.m_filePos));
+
+		if (!utils::ResultIsOK(result))
 		{
+			rkit::log::Error("A problem occurred while loading the build system cache");
 			m_nodeLookup.Clear();
 			m_nodes.Reset();
 		}
@@ -2264,7 +2264,7 @@ namespace rkit { namespace buildsystem
 		if (compilerIt == m_nodeCompilers.end())
 		{
 			rkit::log::ErrorFmt(u8"Unknown dependency node type {} / {}", static_cast<unsigned int>(nodeNamespace), static_cast<unsigned int>(nodeType));
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 		}
 
 		UniquePtr<DependencyNode> depNode;
@@ -2287,7 +2287,7 @@ namespace rkit { namespace buildsystem
 		Vector<uint8_t> content = std::move(contentRef);
 
 		if (content.Count() == 0)
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		return CreateNode(nodeNamespace, nodeType, buildFileLocation, CreateContentID(content.ToSpan()).GetStringView(), std::move(content), outNode);
 	}
@@ -2310,11 +2310,16 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(m_nodes.Append(std::move(node)));
 
-		rkit::Result htabAddResult = m_nodeLookup.Set(nodeKey, nodePtr);
-		if (!utils::ResultIsOK(htabAddResult))
-			m_nodes.RemoveRange(m_nodes.Count() - 1, 1);
+		RKIT_TRY_CATCH_RETHROW(m_nodeLookup.Set(nodeKey, nodePtr),
+			CatchContext(
+				[this]
+				{
+					m_nodes.RemoveRange(m_nodes.Count() - 1, 1);
+				}
+			)
+		);
 
-		return htabAddResult;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::AddRelevantNode(DependencyNode *node)
@@ -2548,7 +2553,7 @@ namespace rkit { namespace buildsystem
 		if (nodeDepNode->GetDependencyCheckPhase() != DependencyCheckPhase::None)
 		{
 			ErrorBlameNode(nodeDepNode, u8"Circular dependency");
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 		}
 
 		RKIT_CHECK(AddRelevantNode(nodeDepNode));
@@ -2764,17 +2769,18 @@ namespace rkit { namespace buildsystem
 			RKIT_CHECK(ConstructOutputContentPath(fullPath, path));
 		}
 		else
-			return ResultCode::kFileOpenError;
+			RKIT_THROW(ResultCode::kFileOpenError);
 
 
 		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
-		Result openResult = sysDriver->OpenFileReadWriteAbs(outFile, fullPath, true, true, true);
-
-		if (!utils::ResultIsOK(openResult))
-		{
-			rkit::log::ErrorFmt(u8"Failed to open output file '{}'", path.GetChars());
-			return ResultCode::kFileOpenError;
-		}
+		RKIT_TRY_CATCH_RETHROW(sysDriver->OpenFileReadWriteAbs(outFile, fullPath, true, true, true),
+			CatchContext(
+				[path]
+				{
+					rkit::log::ErrorFmt(u8"Failed to open output file '{}'", path.GetChars());
+				}
+			)
+		);
 
 		RKIT_RETURN_OK;
 	}
@@ -2834,7 +2840,7 @@ namespace rkit { namespace buildsystem
 			if (it == m_casSources.end())
 			{
 				rkit::log::ErrorFmt(u8"Couldn't find CAS source for content '{}'", contentIDString.ToStringView().GetChars());
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 			}
 
 			OSAbsPath tempPath;
@@ -2857,7 +2863,7 @@ namespace rkit { namespace buildsystem
 			if (!inStream.IsValid())
 			{
 				rkit::log::ErrorFmt(u8"Couldn't open CAS source '{}'", it.Value().m_path.CStr());
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 			}
 
 			UniquePtr<ISeekableWriteStream> outStream;

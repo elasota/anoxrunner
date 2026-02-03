@@ -949,9 +949,9 @@ rkit::Result rkit::HashSet<TKey, TSize>::Add(TCandidateKey &&key)
 
 	RKIT_CHECK(this->CreatePositionForNewEntry(hash, position));
 
-	RKIT_TRY(TKeyConstructor::Construct(this->m_keys + position, std::forward<TKey>(key)),
-		CatchRethrow(
-			[]
+	RKIT_TRY_CATCH_RETHROW(TKeyConstructor::Construct(this->m_keys + position, std::forward<TKey>(key)),
+		CatchContext(
+			[this, position]
 			{
 				this->m_keys[position].~TKey();
 				this->RemoveEntryNoDestruct(position);

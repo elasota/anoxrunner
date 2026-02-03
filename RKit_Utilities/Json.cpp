@@ -126,6 +126,7 @@ namespace rkit { namespace utils
 		, m_preloadedEnd(0)
 		, m_preloadPosInFile(0)
 		, m_isEOF(false)
+		, m_errorResult(utils::PackResult(ResultCode::kOK))
 	{
 		Preload();
 	}
@@ -187,7 +188,7 @@ namespace rkit { namespace utils
 		size_t amountPreloaded = 0;
 
 		PackedResultAndExtCode result = RKIT_TRY_EVAL(m_readStream->ReadPartial(m_preloadBuffer + m_preloadedStart, preloadCapacity, amountPreloaded));
-		if (result.m_resultCode != ResultCode::kOK)
+		if (!utils::ResultIsOK(result))
 		{
 			m_isEOF = true;
 			m_errorResult = result;

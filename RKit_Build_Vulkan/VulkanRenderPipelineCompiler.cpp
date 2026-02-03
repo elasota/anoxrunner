@@ -1280,7 +1280,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		UniquePtr<IncludeResultBase> includeResult;
 		PackedResultAndExtCode result = RKIT_TRY_EVAL(job->ProcessInclude(StringView::FromCString(ReinterpretAnsiCharToUtf8Char(header_name)), StringView::FromCString(ReinterpretAnsiCharToUtf8Char(includer_name)), include_depth, is_system, includeResult));
 
-		if (result.m_resultCode != ResultCode::kOK)
+		if (!utils::ResultIsOK(result))
 			return nullptr;
 
 		SimpleObjectAllocation<IncludeResultBase> allocation = includeResult.Detach();

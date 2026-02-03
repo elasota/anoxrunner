@@ -49,7 +49,7 @@ rkit::Result anox::ExtractDATProgram::Run()
 	RKIT_CHECK(inPath.SetFromEncodedString(args[0]));
 
 	rkit::UniquePtr<rkit::ISeekableReadStream> datFileStream;
-	RKIT_TRY_CATCH_RETHROW(rkit::GetDrivers().m_systemDriver->TryOpenFileReadAbs(datFileStream, inPath),
+	RKIT_TRY_CATCH_RETHROW(rkit::GetDrivers().m_systemDriver->OpenFileReadAbs(datFileStream, inPath, false),
 		rkit::CatchContext(
 			[]
 			{
@@ -86,9 +86,7 @@ rkit::Result anox::ExtractDATProgram::Run()
 		RKIT_CHECK(outPath.Append(fpath));
 
 		rkit::UniquePtr<rkit::ISeekableWriteStream> writeStream;
-		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->TryOpenFileWriteAbs(writeStream, outPath, true, true, true));
-		if (!writeStream.IsValid())
-			RKIT_THROW(rkit::ResultCode::kFileOpenError);
+		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->OpenFileWriteAbs(writeStream, outPath, true, true, true, false));
 
 		uint8_t buffer[1024];
 
