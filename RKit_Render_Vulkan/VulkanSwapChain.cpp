@@ -123,7 +123,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		m_imageIndex = imageIndex;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VulkanSwapChainSyncPoint::VulkanSwapChainSyncPoint(VulkanDeviceBase &device)
@@ -151,7 +151,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_CHECK(vkd.vkCreateSemaphore(device, &semaCreateInfo, callbacks, &m_acquireSema));
 		RKIT_VK_CHECK(vkd.vkCreateSemaphore(device, &semaCreateInfo, callbacks, &m_presentSema));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	size_t VulkanSwapChainSyncPoint::GetFrameIndex() const
@@ -179,7 +179,7 @@ namespace rkit { namespace render { namespace vulkan
 			RKIT_VK_CHECK(acquireResult);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanSwapChainSyncPoint::Present(VulkanQueueProxyBase &queue, VkSwapchainKHR swapChain)
@@ -199,7 +199,7 @@ namespace rkit { namespace render { namespace vulkan
 			RKIT_VK_CHECK(presentResult);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VulkanSwapChainPrototype::VulkanSwapChainPrototype(VulkanDeviceBase &device, IDisplay &display)
@@ -212,7 +212,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		RKIT_CHECK(platform::CreateSurfaceFromDisplay(m_surface, m_device, m_display));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanSwapChainPrototype::CheckQueueCompatibility(bool &outIsCompatible, const IBaseCommandQueue &commandQueue) const
@@ -224,7 +224,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outIsCompatible = (supported != VK_FALSE);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	IDisplay &VulkanSwapChainPrototype::GetDisplay() const
@@ -277,13 +277,13 @@ namespace rkit { namespace render { namespace vulkan
 			RKIT_CHECK(prototype.CheckQueueCompatibility(isCompatible, m_queue));
 
 			if (!isCompatible)
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 		}
 
 		m_surface = prototype.TakeSurface();
 
 		if (!m_surface.IsValid())
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 
 		VkSurfaceCapabilitiesKHR surfaceCaps = {};
 		RKIT_VK_CHECK(vki.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_device.GetPhysDevice().GetPhysDevice(), m_surface->GetSurface(), &surfaceCaps));
@@ -292,10 +292,10 @@ namespace rkit { namespace render { namespace vulkan
 		if (numImages < surfaceCaps.minImageCount)
 			numImages = surfaceCaps.minImageCount;
 		else if (surfaceCaps.maxImageCount != 0 && numImages > surfaceCaps.maxImageCount)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		if (m_display.GetSimultaneousImageCount() > surfaceCaps.maxImageArrayLayers)
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 
 		const uint32_t simultaneousImageCount = m_display.GetSimultaneousImageCount();
 
@@ -320,7 +320,7 @@ namespace rkit { namespace render { namespace vulkan
 			swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
 		swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -365,7 +365,7 @@ namespace rkit { namespace render { namespace vulkan
 			m_imageResources[i].SetImage(m_images[i], aspectMask);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void VulkanSwapChain::GetExtents(uint32_t &outWidth, uint32_t &outHeight) const
@@ -407,7 +407,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outSwapChain = std::move(swapChain);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanSwapChainPrototypeBase::Create(UniquePtr<VulkanSwapChainPrototypeBase> &outSwapChainPrototype, VulkanDeviceBase &device, IDisplay &display)
@@ -419,7 +419,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outSwapChainPrototype = std::move(swapChainPrototype);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanSwapChainSyncPointBase::Create(UniquePtr<VulkanSwapChainSyncPointBase> &outSyncPoint, VulkanDeviceBase &device)
@@ -431,6 +431,6 @@ namespace rkit { namespace render { namespace vulkan
 
 		outSyncPoint = std::move(syncPoint);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } } // rkit::render::vulkan

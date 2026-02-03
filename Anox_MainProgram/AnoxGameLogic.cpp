@@ -99,7 +99,7 @@ namespace anox
 		RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->CreateCoroThread(m_mainCoroThread, 1 * 1024 * 1024));
 		RKIT_CHECK(m_mainCoroThread->EnterFunction(AsyncStartUp()));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxGameLogic::RunFrame()
@@ -134,7 +134,7 @@ namespace anox
 			};
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxGameLogic::CreateNewGame(rkit::UniquePtr<IConfigurationState> &outConfig, const rkit::StringSliceView &mapName)
@@ -149,7 +149,7 @@ namespace anox
 
 		outConfig = std::move(globalVarsConfig);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxGameLogic::SaveGame(rkit::UniquePtr<IConfigurationState> &outConfig)
@@ -297,7 +297,7 @@ namespace anox
 			}
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxGameLogic::ApplyConsoleVar(const AnoxRegisteredConsoleVar &consoleVar, const rkit::ISpan<rkit::ByteStringView> &args)

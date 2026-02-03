@@ -20,7 +20,7 @@ namespace rkit { namespace buildsystem { namespace vulkan {
 
 		shaderCParams->m_outApiGroup->m_glslApi = &ms_glslcApi;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void ShaderCModule::Shutdown()

@@ -106,7 +106,7 @@ namespace anox
 		RKIT_CHECK(rkit::New<AnoxMaterialProcessJobRunner>(analysisJobRunner, resource, state, jobQueue, *systems.m_resManager));
 		RKIT_CHECK(jobQueue.CreateJob(&outJob, rkit::JobType::kNormalPriority, std::move(processJobRunner), waitForDependenciesJob));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxMaterialResourceLoader::CreateResourceObject(rkit::UniquePtr<AnoxMaterialResourceBase> &outResource) const
@@ -160,7 +160,7 @@ namespace anox
 
 		RKIT_CHECK(m_jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(signalJobRunner), bitmapJobs.ToSpan()));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	AnoxMaterialProcessJobRunner::AnoxMaterialProcessJobRunner(const rkit::RCPtr<AnoxMaterialResource> &resource,

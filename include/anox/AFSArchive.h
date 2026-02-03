@@ -123,7 +123,7 @@ inline anox::afs::FileHandle::FileHandle(const IArchive *archive, uint32_t fileI
 inline rkit::Result anox::afs::FileHandle::Open(rkit::UniquePtr<rkit::ISeekableReadStream> &outStream) const
 {
 	if (m_archive == nullptr || m_isDirectory)
-		return rkit::ResultCode::kFileOpenError;
+		RKIT_THROW(rkit::ResultCode::kFileOpenError);
 
 	return m_archive->OpenFileByIndex(m_fileIndex, outStream);
 }

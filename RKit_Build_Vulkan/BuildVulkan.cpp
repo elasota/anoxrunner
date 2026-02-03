@@ -46,23 +46,23 @@ namespace rkit { namespace buildsystem
 		if (!m_shaderCModule)
 		{
 			rkit::log::Error(u8"ShaderC module failed to load");
-			return rkit::ResultCode::kOperationFailed;
+			RKIT_THROW(rkit::ResultCode::kOperationFailed);
 		}
 
 		m_glslc = apiGroup.m_glslApi;
 
 		if (!m_glslc)
-			return rkit::ResultCode::kInternalError;
+			RKIT_THROW(rkit::ResultCode::kInternalError);
 
 		if (!m_glslc->glslang_initialize_process())
 		{
 			rkit::log::Error(u8"glslang failed to init");
-			return rkit::ResultCode::kOperationFailed;
+			RKIT_THROW(rkit::ResultCode::kOperationFailed);
 		}
 
 		m_isGlslangInitialized = true;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void BuildVulkanDriver::ShutdownDriver()
@@ -94,7 +94,7 @@ namespace rkit { namespace buildsystem
 			RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kDefaultNamespace, vulkan::CreateNodeTypeIDForStage(stage), std::move(stageCompiler)));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } // rkit::buildsystem
 

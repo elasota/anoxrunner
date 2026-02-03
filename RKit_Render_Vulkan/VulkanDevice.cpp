@@ -258,7 +258,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateSemaphore(m_device.GetDevice(), &semaCreateInfo, m_device.GetAllocCallbacks(), &resource));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void VulkanDevice::SemaFactory::RetireResource(VkSemaphore &resource) const
@@ -267,7 +267,7 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanDevice::SemaFactory::UnretireResource(VkSemaphore &resource) const
 	{
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VulkanDevice::FenceFactory::FenceFactory(VulkanDevice &device)
@@ -293,7 +293,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateFence(m_device.GetDevice(), &fenceCreateInfo, m_device.GetAllocCallbacks(), &resource));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void VulkanDevice::FenceFactory::RetireResource(VkFence &resource) const
@@ -302,7 +302,7 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanDevice::FenceFactory::UnretireResource(VkFence &resource) const
 	{
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VulkanDevice::VulkanDevice(const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const VkAllocationCallbacks *allocCallbacks,
@@ -347,7 +347,7 @@ namespace rkit { namespace render { namespace vulkan
 			RKIT_CHECK(VulkanQueueProxyBase::Create(queueFamily.m_queues[i], alloc, queueType, *this, queue, queueFamilyIndex, m_vkd));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::FinalizeQueueList()
@@ -368,7 +368,7 @@ namespace rkit { namespace render { namespace vulkan
 			}
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class T>
@@ -418,7 +418,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outFence = std::move(fence);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::CreateBinaryGPUWaitableFence(UniquePtr<IBinaryGPUWaitableFence> &outFence)
@@ -430,7 +430,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outFence = std::move(fence);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::CreateSwapChainSyncPoint(UniquePtr<ISwapChainSyncPoint> &outSyncPoint)
@@ -440,7 +440,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outSyncPoint = std::move(syncPoint);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::CreateRenderPassInstance(UniquePtr<IRenderPassInstance> &outRPI, const RenderPassRef_t &renderPass, const RenderPassResources &resources)
@@ -451,7 +451,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outRPI = std::move(rpi);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::CreateCPUFenceWaiter(UniquePtr<ICPUFenceWaiter> &outFenceWaiter)
@@ -462,7 +462,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outFenceWaiter = std::move(fw);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::ResetBinaryFences(const ISpan<IBinaryCPUWaitableFence *> &fences)
@@ -484,7 +484,7 @@ namespace rkit { namespace render { namespace vulkan
 			RKIT_VK_CHECK(m_vkd.vkResetFences(m_device, static_cast<uint32_t>(fencesThisRound), staticFences.GetBuffer()));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::WaitForDeviceIdle()
@@ -492,7 +492,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_CHECK(m_vkd.vkDeviceWaitIdle(m_device));
 
 		// FIXME: Wait for swapchains too
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VkInstance VulkanDevice::GetInstance() const
@@ -525,7 +525,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outLoader = std::move(loader);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -645,13 +645,13 @@ namespace rkit { namespace render { namespace vulkan
 
 		outSwapChainPrototype = std::move(vkSwapChainPrototype);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::CreateSwapChain(UniquePtr<ISwapChain> &outSwapChain, UniquePtr<ISwapChainPrototype> &&prototypeRef, uint8_t numImages, render::RenderTargetFormat fmt, SwapChainWriteBehavior writeBehavior, IBaseCommandQueue &commandQueue)
 	{
 		if (!prototypeRef.IsValid())
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 
 		UniquePtr<ISwapChainPrototype> prototype = std::move(prototypeRef);
 
@@ -664,7 +664,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outSwapChain = std::move(vkSwapChain);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -676,7 +676,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outBufferPrototype = std::move(prototype);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::CreateBuffer(UniquePtr<IBufferResource> &outBuffer, UniquePtr<IBufferPrototype> &&bufferPrototypeRef, const MemoryRegion &memRegion, const Span<const uint8_t> &initialData)
@@ -705,7 +705,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outBuffer = std::move(buffer);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::CreateImagePrototype(UniquePtr<IImagePrototype> &outImagePrototype, const ImageSpec &imageSpec,
@@ -716,7 +716,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outImagePrototype = std::move(prototype);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::CreateImage(UniquePtr<IImageResource> &outImage, UniquePtr<IImagePrototype> &&imagePrototypeRef,
@@ -743,7 +743,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		prototype.DetachImage();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::CreateMemoryHeap(UniquePtr<IMemoryHeap> &outHeap, const HeapKey &heapKey, GPUMemorySize_t size)
@@ -751,7 +751,7 @@ namespace rkit { namespace render { namespace vulkan
 		UniquePtr<VulkanMemoryHeap> memoryHeap;
 
 		if (size > std::numeric_limits<VkDeviceSize>::max())
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		VulkanHeapKey vkHeapKey = DecodeHeapKey(heapKey);
 		RKIT_ASSERT(vkHeapKey.m_memoryType < m_memProperties.memoryTypeCount);
@@ -768,10 +768,14 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_CHECK(m_vkd.vkAllocateMemory(m_device, &allocInfo, m_allocCallbacks, &deviceMemory));
 
 		UniquePtr<VulkanMemoryHeap> vkHeap;
-		Result createResult = New<VulkanMemoryHeap>(vkHeap, *this, deviceMemory, size, (memFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0);
-
-		if (!utils::ResultIsOK(createResult))
-			m_vkd.vkFreeMemory(m_device, deviceMemory, m_allocCallbacks);
+		RKIT_TRY_CATCH_RETHROW(New<VulkanMemoryHeap>(vkHeap, *this, deviceMemory, size, (memFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0),
+			CatchContext(
+				[this, deviceMemory]
+				{
+					m_vkd.vkFreeMemory(m_device, deviceMemory, m_allocCallbacks);
+				}
+			)
+		);
 
 		if (vkHeapKey.m_cpuAccessible)
 		{
@@ -781,7 +785,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outHeap = std::move(vkHeap);
 
-		return createResult;
+		RKIT_RETURN_OK;
 	}
 
 	bool VulkanDevice::SupportsInitialTextureData() const
@@ -804,7 +808,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_CHECK(LoadVulkanAPI(m_vkd, FunctionResolver(m_vki, *this)));
 		RKIT_CHECK(LoadVulkanAPI(m_vkd_p, FunctionResolver(m_vki, *this)));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::CreatePools()
@@ -812,7 +816,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_CHECK(CreateResourcePool<VkSemaphore>(m_semaPool, m_semaFactory, true));
 		RKIT_CHECK(CreateResourcePool<VkFence>(m_fencePool, m_fenceFactory, true));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDeviceBase::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const QueueFamilySpec(&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RenderDeviceRequirements &reqs, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<AsciiStringView> &&enabledExts, const VkPhysicalDeviceMemoryProperties &memProperties)
@@ -846,6 +850,6 @@ namespace rkit { namespace render { namespace vulkan
 
 		outDevice = std::move(vkDevice);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } } // rkit::render::vulkan

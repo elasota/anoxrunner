@@ -177,7 +177,7 @@ namespace rkit { namespace buildsystem
 									RKIT_CHECK(m_newPaths.Append(std::move(path)));
 								}
 
-								return ResultCode::kOK;
+								RKIT_RETURN_OK;
 							}
 
 							static Result StaticApplyResult(void *userdata, const CIPathView &path)
@@ -247,12 +247,12 @@ namespace rkit { namespace buildsystem
 			}
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DepsNodeCompiler::RunCompile(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
 	{
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	uint32_t DepsNodeCompiler::GetVersion() const
@@ -278,7 +278,7 @@ namespace rkit { namespace buildsystem
 			RKIT_CHECK(constructedPath.Append(identifier.SubString(0, baseDirEnd).ToSpan()));
 
 			outOK = true;
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		if (chunk.Count() == 2 && chunk[0] == '.' && chunk[1] == '.')
@@ -293,13 +293,13 @@ namespace rkit { namespace buildsystem
 			if (parentDirEnd == 0)
 			{
 				outOK = false;
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 
 			RKIT_CHECK(constructedPath.Resize(parentDirEnd));
 
 			outOK = true;
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		if (constructedPath.Count() != 0)
@@ -310,6 +310,6 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(constructedPath.Append(chunk));
 
 		outOK = true;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } // rkit::buildsystem

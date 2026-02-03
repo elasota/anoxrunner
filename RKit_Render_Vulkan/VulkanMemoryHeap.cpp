@@ -26,7 +26,7 @@ namespace rkit { namespace render { namespace vulkan {
 	{
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkMapMemory(m_device.GetDevice(), m_memory, 0, VK_WHOLE_SIZE, 0, &m_cpuPtr));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	GPUMemorySize_t VulkanMemoryHeap::GetSize() const

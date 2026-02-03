@@ -224,7 +224,7 @@ namespace anox
 
 		state.m_postContentIDsPos = stream.Tell();
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxMDAModelLoaderInfo::LoadContents(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
@@ -304,7 +304,7 @@ namespace anox
 						destProfile.m_fourCC = srcProfile.m_fourCC.Get();
 
 						startPos += conditionLength + 1;
-						return rkit::ResultCode::kOK;
+						RKIT_RETURN_OK;
 					});
 				RKIT_CHECK(processResult);
 			}
@@ -339,7 +339,7 @@ namespace anox
 
 					outSkin.m_sortMode = static_cast<data::MDASortMode>(inSkin.m_sortMode);
 
-					return rkit::ResultCode::kOK;
+					RKIT_RETURN_OK;
 				});
 
 			RKIT_CHECK(checkResult);
@@ -381,7 +381,7 @@ namespace anox
 					RKIT_CHECK(DataReader::ReadCheckEnum(outPass.m_cullType, inPass.m_cullType));
 					RKIT_CHECK(DataReader::ReadCheckFloat(outPass.m_scrollU, inPass.m_scrollU, 10));
 					RKIT_CHECK(DataReader::ReadCheckFloat(outPass.m_scrollV, inPass.m_scrollV, 10));
-					return rkit::ResultCode::kOK;
+					RKIT_RETURN_OK;
 				});
 
 			RKIT_CHECK(checkResult);
@@ -434,7 +434,7 @@ namespace anox
 						const uint16_t maxNumFrames = numFrames - outAnimation.m_firstFrame;
 						RKIT_CHECK(DataReader::ReadCheckUInt(outAnimation.m_firstFrame, inAnimation.m_numFrames, maxNumFrames));
 
-						return rkit::ResultCode::kOK;
+						RKIT_RETURN_OK;
 					});
 				RKIT_CHECK(checkResult);
 			}
@@ -475,7 +475,7 @@ namespace anox
 
 					boneIndex++;
 
-					return rkit::ResultCode::kOK;
+					RKIT_RETURN_OK;
 				});
 
 			RKIT_CHECK(checkResult);
@@ -500,7 +500,7 @@ namespace anox
 				{
 					outBone.m_fourCC = inBone.m_boneIDFourCC.Get();
 
-					return rkit::ResultCode::kOK;
+					RKIT_RETURN_OK;
 				});
 
 			RKIT_CHECK(checkResult);
@@ -543,7 +543,7 @@ namespace anox
 						RKIT_CHECK(DataReader::ReadCheckVec(outFrameBone.m_matrix[row], inBoneFrame.m_matrix[row], 15));
 					}
 
-					return rkit::ResultCode::kOK;
+					RKIT_RETURN_OK;
 				});
 
 			RKIT_CHECK(checkResult);
@@ -571,7 +571,7 @@ namespace anox
 
 					RKIT_CHECK(rkit::SafeAdd<size_t>(numTrisTotal, numTrisTotal, outSubModel.m_numTris));
 
-					return rkit::ResultCode::kOK;
+					RKIT_RETURN_OK;
 				});
 
 			RKIT_CHECK(checkResult);
@@ -611,7 +611,7 @@ namespace anox
 					copyOp.m_data = triSpan.ReinterpretCast<uint8_t>();
 					copyOp.m_offset = bufferOffset;
 
-					return rkit::ResultCode::kOK;
+					RKIT_RETURN_OK;
 				});
 			RKIT_CHECK(checkResult);
 
@@ -650,7 +650,7 @@ namespace anox
 					copyOp.m_data = vertSpan.ReinterpretCast<uint8_t>();
 					copyOp.m_offset = bufferOffset;
 
-					return rkit::ResultCode::kOK;
+					RKIT_RETURN_OK;
 				});
 			RKIT_CHECK(checkResult);
 
@@ -759,7 +759,7 @@ namespace anox
 			}
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void AnoxMDAModelLoaderInfo::BulkConvertTris(const rkit::Span<data::MDAModelTri> &tris, uint16_t maxTriIndex)
@@ -879,6 +879,6 @@ namespace anox
 
 		outLoader = std::move(loader);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 }

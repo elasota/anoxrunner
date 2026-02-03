@@ -46,7 +46,7 @@ namespace rkit
 			m_zstream.next_in = m_buffer;
 
 			if (inflateInit2(&m_zstream, 15) != Z_OK)
-				return ResultCode::kOutOfMemory;
+				RKIT_THROW(ResultCode::kOutOfMemory);
 
 			m_streamInitialized = true;
 		}
@@ -65,7 +65,7 @@ namespace rkit
 			{
 				outCountRead = count;
 				m_filePos += outCountRead;
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 
 			if (availOut > outSizeLimit)
@@ -75,14 +75,14 @@ namespace rkit
 
 			int inflateResult = inflate(&m_zstream, Z_NO_FLUSH);
 			if (inflateResult < 0 && inflateResult != Z_BUF_ERROR)
-				return ResultCode::kDecompressionFailed;
+				RKIT_THROW(ResultCode::kDecompressionFailed);
 
 			size_t numDecompressedBytes = static_cast<size_t>(m_zstream.next_out - initialOut);
 			if (numDecompressedBytes == count)
 			{
 				outCountRead = count;
 				m_filePos += outCountRead;
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 
 			if (inflateResult == Z_OK)
@@ -97,7 +97,7 @@ namespace rkit
 				{
 					outCountRead = static_cast<size_t>(m_zstream.next_out - initialOut);
 					m_filePos += outCountRead;
-					return ResultCode::kOK;
+					RKIT_RETURN_OK;
 				}
 
 				m_zstream.next_in = m_buffer;
@@ -132,7 +132,7 @@ namespace rkit
 			RKIT_ASSERT(Tell() == pos);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DeflateDecompressStream::SeekCurrent(FileOffset_t offset)
@@ -151,7 +151,7 @@ namespace rkit
 		{
 			const FilePos_t negativeOffset = static_cast<FilePos_t>(-(offset + 1)) + 1;
 			if (negativeOffset > pos)
-				return ResultCode::kIOSeekOutOfRange;
+				RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 			return SeekStart(pos - negativeOffset);
 		}
@@ -160,12 +160,12 @@ namespace rkit
 			const FilePos_t unsignedOffset = static_cast<FilePos_t>(offset);
 			const FilePos_t maxOffset = m_decompressedSize.Get() - pos;
 			if (unsignedOffset > maxOffset)
-				return ResultCode::kIOSeekOutOfRange;
+				RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 			return SeekStart(pos + unsignedOffset);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DeflateDecompressStream::RestartDecompression()
@@ -180,7 +180,7 @@ namespace rkit
 			m_filePos = 0;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	FilePos_t DeflateDecompressStream::Tell() const

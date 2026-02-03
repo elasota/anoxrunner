@@ -127,7 +127,7 @@ namespace rkit { namespace render { namespace vulkan
 		if (oldPool)
 			oldPool->RetireResource(oldResIndex);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class T>

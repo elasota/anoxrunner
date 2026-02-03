@@ -147,7 +147,7 @@ inline rkit::Result rkit::utils::JsonValue::ToString(StringView &outStrView) con
 
 	outStrView = StringView(charPtr, length);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline rkit::utils::JsonElementType rkit::utils::JsonValue::GetType() const

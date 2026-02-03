@@ -32,6 +32,6 @@ namespace anox
 			RKIT_CHECK(jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(dependenciesDoneJobRunner), dependencyJobs.ToSpan()));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 }

@@ -110,7 +110,7 @@ namespace anox
 			RKIT_CHECK(this->CreateResourceObject(resource));
 
 			outResource = std::move(resource);
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 	};
 

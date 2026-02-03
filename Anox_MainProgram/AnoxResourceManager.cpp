@@ -232,7 +232,7 @@ namespace anox
 	{
 		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->CreateMutex(m_resourcesMutex));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -348,7 +348,7 @@ namespace anox
 		RKIT_CHECK(m_key.Set(path));
 		m_keyView = m_key;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	const rkit::CIPathView &CIPathKeyedResourceTracker::GetKey() const
@@ -369,7 +369,7 @@ namespace anox
 	rkit::Result AnoxCompleteResourceLoadJobRunner::Run()
 	{
 		m_loadCompleter->OnLoadCompleted();
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	StringKeyedResourceTracker::StringKeyedResourceTracker(const rkit::RCPtr<AnoxResourceLoaderSynchronizer> &sync, uint32_t resourceType, rkit::UniquePtr<AnoxResourceBase> &&resource)
@@ -382,7 +382,7 @@ namespace anox
 		RKIT_CHECK(m_key.Set(str));
 		m_keyView = m_key;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	const rkit::StringView &StringKeyedResourceTracker::GetKey() const
@@ -403,7 +403,7 @@ namespace anox
 	rkit::Result ContentIDKeyedResourceTracker::SetKey(const rkit::data::ContentID &cid)
 	{
 		m_key = cid;
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	const rkit::data::ContentID &ContentIDKeyedResourceTracker::GetKey() const
@@ -487,7 +487,7 @@ namespace anox
 			RKIT_CHECK(RegisterContentKeyedLoader(resloaders::kMDAModelResourceTypeCode, std::move(mdaLoader)));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxResourceManager::RegisterContentKeyedLoader(uint32_t resourceType, rkit::RCPtr<AnoxKeyedResourceLoader<rkit::data::ContentID>> &&loader)
@@ -515,7 +515,7 @@ namespace anox
 
 		RKIT_CHECK(m_loaders.Set(resourceType, std::move(keyedFactory)));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class TKeyedTracker, class TKeyViewType, AnoxResourceKeyType TKeyType>
@@ -561,7 +561,7 @@ namespace anox
 
 				resLock.Unlock();
 
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else
 			{
@@ -589,7 +589,7 @@ namespace anox
 					futureContainer->Fail();
 
 				loadFuture = rkit::Future<AnoxResourceRetrieveResult>(futureContainer);
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
@@ -685,7 +685,7 @@ namespace anox
 
 		loadFuture = rkit::Future<AnoxResourceRetrieveResult>(std::move(pendingFutureContainer));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxResourceManager::GetContentIDKeyedResource(rkit::RCPtr<rkit::Job> *outJob, rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::data::ContentID &cid)
@@ -797,7 +797,7 @@ namespace anox
 
 		outResLoader = std::move(resLoader);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 }
 

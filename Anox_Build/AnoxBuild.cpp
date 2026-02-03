@@ -60,7 +60,7 @@ rkit::Result anox::BuildDriver::InitDriver(const rkit::DriverInitParameters *)
 
 	m_pngDriver = static_cast<rkit::png::IPngDriver *>(pngDriver);
 
-	return rkit::ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 void anox::BuildDriver::ShutdownDriver()
@@ -163,7 +163,7 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 
 	RKIT_CHECK(instance->RegisterNodeTypeByExtension(u8"cfg", rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kCopyFileNodeID));
 
-	return rkit::ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 

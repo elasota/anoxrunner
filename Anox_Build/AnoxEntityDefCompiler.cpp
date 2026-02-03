@@ -171,7 +171,7 @@ namespace anox { namespace buildsystem {
 		else
 			return rkit::ResultCode::kDataError;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result EntityDefCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
@@ -290,7 +290,7 @@ namespace anox { namespace buildsystem {
 		RKIT_CHECK(outFile->WriteAll(&outDef, sizeof(outDef)));
 		RKIT_CHECK(outFile->WriteAllSpan(edef.m_description.ToSpan()));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result EntityDefCompiler::IndexString(rkit::Vector<rkit::AsciiString> &strings, rkit::HashMap<rkit::AsciiString, uint16_t> &stringToIndex, const rkit::AsciiString &str, uint16_t &outIndex)
@@ -315,7 +315,7 @@ namespace anox { namespace buildsystem {
 		else
 			outIndex = it.Value();
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	uint32_t EntityDefCompiler::GetVersion() const
@@ -355,7 +355,7 @@ namespace anox { namespace buildsystem {
 			{
 				// Deal with broken npc_rowdy_alien
 				outLabel = Label();
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 
 			return rkit::ResultCode::kDataError;
@@ -370,7 +370,7 @@ namespace anox { namespace buildsystem {
 
 		outLabel = Label(highPart, lowPart);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result EntityDefCompilerBase::FormatEDef(rkit::String &edefIdentifier, uint32_t edefID)
@@ -625,7 +625,7 @@ namespace anox { namespace buildsystem {
 
 		RKIT_CHECK(rkit::New<UserEntityDictionary>(outDictionary, std::move(edefs)));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result EntityDefCompilerBase::Create(rkit::UniquePtr<EntityDefCompilerBase> &outCompiler)

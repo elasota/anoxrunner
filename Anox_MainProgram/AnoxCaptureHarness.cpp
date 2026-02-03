@@ -46,13 +46,13 @@ namespace anox
 
 	rkit::Result AnoxRealTimeCaptureHarness::Initialize()
 	{
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxRealTimeCaptureHarness::GetConfigurationState(const IConfigurationState *&outConfigStatePtr)
 	{
 		outConfigStatePtr = m_initialConfiguration.Get();
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxRealTimeCaptureHarness::GetSessionState(const IConfigurationState *&outConfigStatePtr)
@@ -77,7 +77,7 @@ namespace anox
 
 	rkit::Result AnoxRealTimeCaptureHarness::TerminateSession()
 	{
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result ICaptureHarness::CreateRealTime(rkit::UniquePtr<ICaptureHarness> &outHarness, IAnoxGame &game,
@@ -90,6 +90,6 @@ namespace anox
 
 		outHarness = std::move(harness);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 }

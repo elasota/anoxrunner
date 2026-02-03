@@ -205,7 +205,7 @@ namespace anox { namespace data {
 			RKIT_CHECK(visitor.template VisitMember<rkit::endian::LittleUInt16_t>(instance.m_model0LeafDrawSurfaceLocatorCounts));
 			RKIT_CHECK(visitor.template VisitMember<BSPLeafDrawSurfaceLocator>(instance.m_model0LeafDrawSurfaceLocators));
 
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 	};
 } }

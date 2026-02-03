@@ -490,7 +490,7 @@ namespace anox { namespace buildsystem
 			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kModelMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, texturePath.ToString()));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxModelCompilerCommon::ResolveTexturePath(rkit::CIPath &textureDefPath, const rkit::CIPathView &md2Path, const MD2TextureDef &textureDef, bool constructFullMaterialPath)
@@ -525,7 +525,7 @@ namespace anox { namespace buildsystem
 		RKIT_CHECK(textureDefPath.Set(md2Path.AbsSlice(md2Path.NumComponents() - 1)));
 		RKIT_CHECK(textureDefPath.AppendComponent(materialPathView.ToUTF8()));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	bool AnoxMDACompiler::HasAnalysisStage() const
@@ -555,13 +555,13 @@ namespace anox { namespace buildsystem
 
 				inOutPath = md2Path;
 				outIsActuallyMD2 = true;
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 
 			return rkit::ResultCode::kDataError;
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxMDACompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
@@ -627,7 +627,7 @@ namespace anox { namespace buildsystem
 			}
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxMDACompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
@@ -1139,7 +1139,7 @@ namespace anox { namespace buildsystem
 			return rkit::ResultCode::kDataError;
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxMDACompiler::ExpectTokenIs(rkit::ConstSpan<char> &token, const rkit::AsciiStringView &candidate)
@@ -1150,7 +1150,7 @@ namespace anox { namespace buildsystem
 			return rkit::ResultCode::kDataError;
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	bool AnoxMDACompiler::ParseOneLine(rkit::ConstSpan<char> &outLine, rkit::ConstSpan<char> &fileSpan)
@@ -1219,7 +1219,7 @@ namespace anox { namespace buildsystem
 			return rkit::ResultCode::kDataError;
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	bool AnoxMDACompiler::ParseToken(rkit::ConstSpan<char> &outToken, rkit::ConstSpan<char> &lineSpan)
@@ -1376,7 +1376,7 @@ namespace anox { namespace buildsystem
 			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kModelMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, texturePath.ToString()));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxCTCCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
@@ -1911,7 +1911,7 @@ namespace anox { namespace buildsystem
 		RKIT_CHECK(outFile->WriteAllSpan(outBoneIndexes.ToSpan()));
 		RKIT_CHECK(outFile->WriteAllSpan(outVertMorphs.ToSpan()));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxCTCCompiler::AddTriClusters(rkit::Vector<data::MDAModelSubModel> &outSubModels,
@@ -1950,7 +1950,7 @@ namespace anox { namespace buildsystem
 			RKIT_CHECK(outSubModels.Append(subModel));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxCTCCompiler::AddOneTriCluster(
@@ -2042,7 +2042,7 @@ namespace anox { namespace buildsystem
 			}
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	AnoxCTCCompiler::Matrix3x4 AnoxCTCCompiler::OrthoMatrixMul(const Matrix3x4 &a, const Matrix3x4 &b)
@@ -3229,7 +3229,7 @@ namespace anox { namespace buildsystem
 		// Write vert morphs
 		RKIT_CHECK(outFile->WriteAllSpan(compiledVertMorphs.ToSpan()));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxModelCompilerCommon::CompileMDASubmodels(UncompiledTriList &triList, rkit::Span<uint32_t> xyzToPointIndex)
@@ -3253,7 +3253,7 @@ namespace anox { namespace buildsystem
 			}
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxModelCompilerCommon::CompileMDASubmodel(bool &outEmittedAnything, UncompiledMDASubmodel &outSubmodel,
@@ -3331,7 +3331,7 @@ namespace anox { namespace buildsystem
 
 		outEmittedAnything = emittedAnything;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	uint16_t AnoxModelCompilerCommon::CompressUV(uint32_t floatBits)

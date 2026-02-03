@@ -48,7 +48,7 @@ namespace anox { namespace data {
 			RKIT_CHECK(visitor.VisitMember(self.m_entityData));
 			RKIT_CHECK(visitor.VisitMember(self.m_entityStringData));
 
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 	};
 } }

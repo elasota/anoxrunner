@@ -73,6 +73,6 @@ namespace anox
 
 		outFactory = std::move(resLoaderFactory);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 }

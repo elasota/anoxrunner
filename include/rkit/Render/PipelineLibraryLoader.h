@@ -35,7 +35,7 @@ namespace rkit { namespace render
 		virtual Result LoadObjectsFromPackage() = 0;
 
 		virtual void SetMergedLibraryStream(UniquePtr<ISeekableReadStream> &&cacheReadStream, ISeekableReadWriteStream *cacheWriteStream) = 0;
-		virtual Result OpenMergedLibrary() = 0;
+		virtual Result TryOpenMergedLibrary(bool &outSucceeded) = 0;
 		virtual Result LoadGraphicsPipelineFromMergedLibrary(size_t pipelineIndex, size_t permutationIndex) = 0;
 		virtual void CloseMergedLibrary(bool unloadPipelines, bool unloadMergedCache) = 0;
 

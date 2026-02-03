@@ -31,7 +31,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateSemaphore(m_device.GetDevice(), &createInfo, m_device.GetAllocCallbacks(), &m_sema));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanTimelineFence::SetValue(TimelinePoint_t value)
@@ -43,14 +43,14 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkSignalSemaphoreKHR(m_device.GetDevice(), &signalInfo));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanTimelineFence::GetCurrentValue(TimelinePoint_t &outValue) const
 	{
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkGetSemaphoreCounterValueKHR(m_device.GetDevice(), m_sema, &outValue));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VkSemaphore VulkanTimelineFence::GetSemaphore() const
@@ -79,7 +79,7 @@ namespace rkit { namespace render { namespace vulkan
 			fenceCreateInfo.flags |= VK_FENCE_CREATE_SIGNALED_BIT;
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateFence(m_device.GetDevice(), &fenceCreateInfo, m_device.GetAllocCallbacks(), &m_fence));
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanBinaryCPUWaitableFence::ResetFence()
@@ -106,6 +106,6 @@ namespace rkit { namespace render { namespace vulkan
 		semaCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateSemaphore(m_device.GetDevice(), &semaCreateInfo, m_device.GetAllocCallbacks(), &m_sema));
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } } // rkit::render::vulkan

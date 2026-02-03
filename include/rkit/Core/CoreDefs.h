@@ -56,10 +56,14 @@
 #define RKIT_DLLIMPORT_API
 #endif
 
-#if !!RKIT_IS_DEBUG
-	#define RKIT_USE_CLASS_RESULT 1
-#else
+#if RKIT_IS_DEBUG != 0
+	#define RKIT_USE_ENUM_RESULT 0
 	#define RKIT_USE_CLASS_RESULT 0
+	#define RKIT_USE_EXCEPTION_RESULT 1
+#else
+	#define RKIT_USE_ENUM_RESULT 0
+	#define RKIT_USE_CLASS_RESULT 0
+	#define RKIT_USE_EXCEPTION_RESULT 0
 #endif
 
 #define RKIT_SIMD_ALIGNMENT	16
@@ -74,18 +78,25 @@ namespace rkit { namespace mem {
 } }
 #endif
 
-#if !!RKIT_USE_CLASS_RESULT
+#if RKIT_USE_CLASS_RESULT != 0
 
 namespace rkit
 {
 	struct Result;
 }
 
-#else
+#elif RKIT_USE_ENUM_RESULT
 
 namespace rkit
 {
 	enum class Result : uint64_t;
+}
+
+#elif RKIT_USE_EXCEPTION_RESULT
+
+namespace rkit
+{
+	typedef void Result;
 }
 
 #endif

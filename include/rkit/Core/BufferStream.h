@@ -48,7 +48,7 @@ inline rkit::Result rkit::BufferStream::ReadPartial(void *data, size_t count, si
 		memcpy(data, &m_buffer[m_pos], count);
 
 	outCountRead = count;
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline rkit::Result rkit::BufferStream::WritePartial(const void *data, size_t count, size_t &outCountWritten)
@@ -56,7 +56,7 @@ inline rkit::Result rkit::BufferStream::WritePartial(const void *data, size_t co
 	if (count == 0)
 	{
 		outCountWritten = 0;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	size_t bufferAvailable = m_buffer.Count() - m_pos;
@@ -84,37 +84,37 @@ inline rkit::Result rkit::BufferStream::WritePartial(const void *data, size_t co
 		m_pos += count;
 	}
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline rkit::Result rkit::BufferStream::Flush()
 {
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline rkit::Result rkit::BufferStream::SeekStart(FilePos_t pos)
 {
 	if (pos > m_buffer.Count())
-		return ResultCode::kIOSeekOutOfRange;
+		RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 	m_pos = static_cast<size_t>(pos);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline rkit::Result rkit::BufferStream::SeekCurrent(FileOffset_t offset)
 {
 	if (offset == 0)
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 
 	if (offset < 0)
 	{
 		if (offset == std::numeric_limits<FileOffset_t>::min())
-			return ResultCode::kIOSeekOutOfRange;
+			RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 		FileOffset_t negativeOffset = -offset;
 		if (static_cast<FilePos_t>(negativeOffset) > m_pos)
-			return ResultCode::kIOSeekOutOfRange;
+			RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 		m_pos -= static_cast<size_t>(negativeOffset);
 	}
@@ -125,31 +125,31 @@ inline rkit::Result rkit::BufferStream::SeekCurrent(FileOffset_t offset)
 		FilePos_t uOffset = static_cast<FilePos_t>(offset);
 
 		if (uOffset > maxOffset)
-			return ResultCode::kIOSeekOutOfRange;
+			RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 		m_pos += static_cast<size_t>(uOffset);
 	}
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline rkit::Result rkit::BufferStream::SeekEnd(FileOffset_t offset)
 {
 	if (offset == 0)
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 
 	if (offset > 0)
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 
 	if (offset == std::numeric_limits<FileOffset_t>::min())
-		return ResultCode::kIOSeekOutOfRange;
+		RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 	FileOffset_t negativeOffset = -offset;
 	if (static_cast<FilePos_t>(negativeOffset) > m_buffer.Count())
-		return ResultCode::kIOSeekOutOfRange;
+		RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 	m_pos = m_buffer.Count() - static_cast<size_t>(negativeOffset);
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline rkit::FilePos_t rkit::BufferStream::Tell() const
@@ -165,10 +165,10 @@ inline rkit::FilePos_t rkit::BufferStream::GetSize() const
 inline rkit::Result rkit::BufferStream::Truncate(FilePos_t newSize)
 {
 	if (m_buffer.Count() == newSize)
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 
 	if (m_buffer.Count() < newSize)
-		return ResultCode::kOperationFailed;
+		RKIT_THROW(ResultCode::kOperationFailed);
 
 	size_t newSizeSz = static_cast<size_t>(newSize);
 
@@ -177,7 +177,7 @@ inline rkit::Result rkit::BufferStream::Truncate(FilePos_t newSize)
 	if (m_pos > newSizeSz)
 		m_pos = newSizeSz;
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline const rkit::Vector<uint8_t> &rkit::BufferStream::GetBuffer() const

@@ -145,7 +145,7 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanQueueProxy::Initialize()
 	{
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class T>
@@ -156,7 +156,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outCommandAllocator = std::move(cmdAllocator);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanQueueProxy::CreateCommandAllocator(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, bool isBundle)
@@ -190,6 +190,6 @@ namespace rkit { namespace render { namespace vulkan
 
 		outQueueProxy = std::move(queueProxy);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } } // rkit::render::vulkan

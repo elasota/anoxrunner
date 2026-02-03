@@ -185,7 +185,7 @@ namespace rkit { namespace utils
 			RKIT_CHECK(GetDrivers().m_systemDriver->CreateThread(td.m_thread, std::move(context), threadName));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	ThreadPoolThreadContext::ThreadPoolThreadContext(ThreadPool &pool, Vector<JobType> &&jobTypes, UniquePtr<IEvent> &&wakeEvent, UniquePtr<IEvent> &&terminateEvent)
@@ -210,7 +210,7 @@ namespace rkit { namespace utils
 				break;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result ThreadPoolBase::Create(UniquePtr<ThreadPoolBase> &outThreadPool, const IUtilitiesDriver &utils, uint32_t numThreads)
@@ -221,6 +221,6 @@ namespace rkit { namespace utils
 
 		outThreadPool = std::move(threadPool);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } // rkit::utils

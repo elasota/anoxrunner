@@ -53,14 +53,16 @@ rkit::Result rkit::DriverModuleStub<TDriver, TDriverInterface, TDriverMember>::I
 	if (initParams)
 		driverInitParams = static_cast<const DriverModuleInitParameters *>(initParams)->m_driverInitParams;
 
-	Result initResult = ms_driver->InitDriver(driverInitParams);
-	if (!utils::ResultIsOK(initResult))
-	{
-		SafeDelete(ms_driver);
-		GetMutableDrivers().*TDriverMember = ms_driver;
-	}
+	RKIT_TRY_CATCH_RETHROW(ms_driver->InitDriver(driverInitParams),
+		CatchContext(
+		[]
+		{
+			SafeDelete(ms_driver);
+			GetMutableDrivers().*TDriverMember = ms_driver;
+		})
+	);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TDriver, class TDriverInterface, ::rkit::SimpleObjectAllocation<TDriverInterface> rkit::Drivers:: *TDriverMember>

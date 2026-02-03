@@ -92,7 +92,7 @@ namespace rkit { namespace render { namespace vulkan {
 			createInfo.format = VK_FORMAT_R8_SRGB;
 			break;
 		default:
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 		}
 
 		createInfo.extent.width = imageSpec.m_width;
@@ -117,7 +117,7 @@ namespace rkit { namespace render { namespace vulkan {
 				createInfo.usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
 				break;
 			default:
-				return ResultCode::kInvalidParameter;
+				RKIT_THROW(ResultCode::kInvalidParameter);
 			}
 		}
 
@@ -162,12 +162,16 @@ namespace rkit { namespace render { namespace vulkan {
 
 		VkImageAspectFlags allAspects = VK_IMAGE_ASPECT_COLOR_BIT;
 
-		Result createResult = rkit::New<VulkanImagePrototype>(outImagePrototype, device, image, allAspects);
+		RKIT_TRY_CATCH_RETHROW(rkit::New<VulkanImagePrototype>(outImagePrototype, device, image, allAspects),
+			CatchContext(
+				[&device, image]
+				{
+					device.GetDeviceAPI().vkDestroyImage(device.GetDevice(), image, device.GetAllocCallbacks());
+				}
+			)
+		);
 
-		if (!utils::ResultIsOK(createResult))
-			device.GetDeviceAPI().vkDestroyImage(device.GetDevice(), image, device.GetAllocCallbacks());
-
-		return createResult;
+		RKIT_RETURN_OK;
 	}
 
 } } }

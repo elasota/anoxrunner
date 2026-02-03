@@ -533,7 +533,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		m_length = span.Count();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Span<Utf8Char_t> ShortTempToken::GetChars()
@@ -618,7 +618,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		// Generate graphics pipeline shader jobs
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	StringSliceView LibraryAnalyzer::ResolveGlobalString(size_t index) const
@@ -651,7 +651,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		if (m_includedFiles.Contains(fKey))
 		{
 			RemoveTopStackItem();
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		RKIT_CHECK(m_includedFiles.Add(fKey));
@@ -666,7 +666,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				if (item.m_location == BuildFileLocation::kIntermediateDir)
 				{
 					item.m_location = BuildFileLocation::kSourceDir;
-					return ResultCode::kOK;
+					RKIT_RETURN_OK;
 				}
 
 				rkit::log::ErrorFmt(u8"Could not open input file '{}'", item.m_path.ToString());
@@ -690,7 +690,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		RKIT_CHECK(utils->CreateTextParser(item.m_fileContents.ToSpan(), utils::TextParserCommentType::kC, utils::TextParserLexerType::kC, item.m_textParser));
 		item.m_isScanning = false;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseTopStackItem(AnalyzerIncludeStack &item)
@@ -710,13 +710,13 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			RKIT_CHECK(ParseDirective(item.m_path.CStr(), parser, haveMore));
 
 			if (oldStackCount != m_includeStack.Count())
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 		}
 
 		// Parsing completed
 		RemoveTopStackItem();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseDirective(const Utf8Char_t *path, TextParser_t &parser, bool &outHaveDirective)
@@ -732,7 +732,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		if (!haveToken)
 		{
 			outHaveDirective = false;
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		outHaveDirective = true;
@@ -797,7 +797,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		RKIT_CHECK(m_entities.Set(entityName, std::move(entity)));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseStaticSampler(const Utf8Char_t *blamePath, TextParser_t &parser, rpc_interchange::StaticSamplerEntity &ss)
@@ -817,7 +817,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			RKIT_CHECK(ParseDynamicStructMember(blamePath, token, rtti, ss.GetDesc(), parser));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParsePushConstants(const Utf8Char_t *blamePath, TextParser_t &parser, rpc_interchange::PushConstantsEntity &pc)
@@ -866,7 +866,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		pc.GetDesc().m_pushConstants = pc.GetPushConstantsVector().ToSpan();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseStructDef(const Utf8Char_t *blamePath, TextParser_t &parser, rpc_interchange::StructDefEntity &sd)
@@ -921,7 +921,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		sd.GetDesc().m_members = sd.GetStructMembersVector().ToSpan();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseInputLayout(const Utf8Char_t *blamePath, TextParser_t &parser, rpc_interchange::InputLayoutEntity &il)
@@ -1210,7 +1210,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		il.GetDesc().m_vertexInputs = il.GetVertexInputs().ToSpan();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseDescriptorLayout(const Utf8Char_t *filePath, TextParser_t &parser, rpc_interchange::DescriptorLayoutEntity &dl)
@@ -1425,7 +1425,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		dl.GetDesc().m_descriptors = dl.GetDescriptorDescs().ToSpan();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseGraphicsPipeline(const Utf8Char_t *filePath, TextParser_t &parser, rpc_interchange::GraphicsPipelineEntity &gp)
@@ -1724,7 +1724,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		RKIT_CHECK(m_graphicsPipelines.Append(nameLookup));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseRenderPass(const Utf8Char_t *filePath, TextParser_t &parser, rpc_interchange::RenderPassEntity &rp)
@@ -1804,7 +1804,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		RKIT_CHECK(m_renderPasses.Append(nameLookup));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseIncludeDirective(const Utf8Char_t *blamePath, TextParser_t &parser)
@@ -1839,7 +1839,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		RKIT_CHECK(m_includeStack.Append(AnalyzerIncludeStack(loc, ciPath, true)));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ResolveQuotedString(ShortTempToken &outToken, const Span<const Utf8Char_t> &inToken)
@@ -1851,7 +1851,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		outToken.Truncate(newLength);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ResolveInputLayoutVertexInputs(const Utf8Char_t *blamePath, size_t line, size_t col, render::TempStringIndex_t feedName, const Span<const Utf8Char_t> &nameBase, Vector<const render::InputLayoutVertexInputDesc *> &descsVector, uint32_t &inOutOffset, const render::VectorOrScalarNumericType &inputSourcesType, render::InputLayoutVertexFeedDesc *inputFeed)
@@ -1884,7 +1884,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		inOutOffset += sz;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ResolveInputLayoutVertexInputs(const Utf8Char_t *blamePath, size_t line, size_t col, render::TempStringIndex_t feedName, const Span<const Utf8Char_t> &nameBase, Vector<const render::InputLayoutVertexInputDesc *> &descsVector, uint32_t &inOutOffset, const render::ValueType &inputSourcesType, render::InputLayoutVertexFeedDesc *inputFeed)
@@ -1947,7 +1947,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			return ResultCode::kMalformedFile;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	uint32_t LibraryAnalyzer::ResolvePackedValueTypeSize(const render::ValueType &valueType)
@@ -2086,7 +2086,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			}
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseValue(const Utf8Char_t *blamePath, const data::RenderRTTITypeBase *rtti, void *obj, bool isConfigurable, TextParser_t &parser)
@@ -2138,7 +2138,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			if (extraChars == 0)
 			{
 				valueType = render::ValueType(ntr.m_numericType);
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else if (extraChars == 1)
 			{
@@ -2153,7 +2153,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					RKIT_CHECK(Deduplicate(m_vectorTypes, vectorType, deduplicated));
 
 					valueType = render::ValueType(deduplicated);
-					return ResultCode::kOK;
+					RKIT_RETURN_OK;
 				}
 			}
 			else if (extraChars == 3)
@@ -2172,7 +2172,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					RKIT_CHECK(Deduplicate(m_compoundTypes, compoundType, deduplicated));
 
 					valueType = render::ValueType(deduplicated);
-					return ResultCode::kOK;
+					RKIT_RETURN_OK;
 				}
 			}
 		}
@@ -2200,7 +2200,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		valueType = render::ValueType(&static_cast<const rpc_interchange::StructDefEntity *>(entity)->GetDesc());
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseConfigurable(const Utf8Char_t *blamePath, void *obj, data::RenderRTTIMainType mainType, void (*writeNameFunc)(void *, const render::ConfigStringIndex_t &), TextParser_t &parser)
@@ -2231,7 +2231,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			}
 
 			writeNameFunc(obj, keyIt.Value());
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		ConfigKey configKey;
@@ -2245,7 +2245,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		writeNameFunc(obj, configSI);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseUIntConstant(const Utf8Char_t *blamePath, size_t blameLine, size_t blameCol, const Span<const Utf8Char_t> &token, uint64_t max, uint64_t &outValue)
@@ -2255,7 +2255,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		if (token.Count() == 0)
 		{
 			outValue = 0;
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		uint8_t base = 16;
@@ -2317,7 +2317,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		outValue = result;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseStringIndex(const Utf8Char_t *blamePath, const data::RenderRTTIStringIndexType *rtti, void *obj, TextParser_t &parser)
@@ -2363,7 +2363,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		else
 			return ResultCode::kInternalError;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseEnum(const Utf8Char_t *blamePath, const data::RenderRTTIEnumType *rtti, void *obj, bool isConfigurable, TextParser_t &parser)
@@ -2396,7 +2396,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				else
 					rtti->m_writeValueFunc(obj, candidate->m_value);
 
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
@@ -2444,7 +2444,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		else
 			rtti->m_valueFunctions.m_writeValueUIntFunc(obj, number);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseUInt(const Utf8Char_t *blamePath, const data::RenderRTTINumberType *rtti, void *obj, bool isConfigurable, const Span<const Utf8Char_t> &token, size_t line, size_t col)
@@ -2487,7 +2487,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			RKIT_CHECK(ParseStructMember(blamePath, nameToken, rtti, obj, parser));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseStructMember(const Utf8Char_t *blamePath, const Span<const Utf8Char_t> &memberName, const data::RenderRTTIStructType *rtti, void *obj, TextParser_t &parser)
@@ -2548,7 +2548,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		RKIT_CHECK(ParseValue(blamePath, resolvedField->m_getTypeFunc(), fieldPtr, resolvedField->m_isConfigurable, parser));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class T>
@@ -2589,7 +2589,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		RKIT_CHECK(instVector.Append(std::move(newInst)));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	LibraryAnalyzer::DescriptorTypeClassification LibraryAnalyzer::ClassifyDescriptorType(render::DescriptorType descType)
@@ -2720,7 +2720,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		uint64_t numGraphicsPipelines = m_graphicsPipelines.Count();
 		RKIT_CHECK(indexStream->WriteAll(&numGraphicsPipelines, sizeof(numGraphicsPipelines)));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::IndexString(const Span<const Utf8Char_t> &span, render::GlobalStringIndex_t &outStringIndex)
@@ -2733,7 +2733,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		outStringIndex = render::GlobalStringIndex_t(index);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::IndexString(const Span<const Utf8Char_t> &span, render::TempStringIndex_t &outStringIndex)
@@ -2752,7 +2752,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		if (it != m_globalStringToTempString.end())
 		{
 			outStringIndex = it.Value();
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		render::TempStringIndex_t tsi(m_tempStrings.Count());
@@ -2761,7 +2761,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		outStringIndex = tsi;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } } // rkit::buildsystem::rpc_analyzer
 
@@ -2827,7 +2827,7 @@ namespace rkit { namespace buildsystem { namespace rpc_combiner
 			}
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result LibraryCombiner::WritePackage(ISeekableWriteStream &stream)
@@ -2846,7 +2846,7 @@ namespace rkit { namespace buildsystem { namespace rpc_combiner
 			RKIT_CHECK(bsDriver->CreatePackageBuilder(m_dataDriver->GetRenderDataHandler(), m_pkgObjectWriter.Get(), false, m_pkgBuilder));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	LibraryCombiner::PackageInputResolver::PackageInputResolver(data::IRenderDataPackage &pkg, const Span<const Vector<uint8_t>> &binaryContent)
@@ -2902,7 +2902,7 @@ namespace rkit { namespace buildsystem { namespace rpc_compiler
 			if (header[0] != rpc_common::kLibraryIndexID || header[1] != rpc_common::kLibraryIndexVersion)
 			{
 				rkit::log::Error(u8"Invalid library index header");
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 
 			uint64_t pipelineCounts[1];
@@ -2952,7 +2952,7 @@ namespace rkit { namespace buildsystem { namespace rpc_compiler
 
 		RKIT_CHECK(m_combiner.WritePackage(*outStream));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } } // rkit::buildsystem::rpc_compiler
 
@@ -2985,7 +2985,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(feedback->CheckFault());
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderPipelineLibraryCompiler::RunCompile(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
@@ -3007,7 +3007,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(feedback->CheckFault());
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	uint32_t RenderPipelineLibraryCompiler::GetVersion() const

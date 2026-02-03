@@ -94,7 +94,7 @@ namespace anox
 
 		m_resources->m_swapChainFrameIndex = syncPoint.GetFrameIndex();
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	RenderedWindow::PresentJobRunner::PresentJobRunner(RenderedWindow &window, const rkit::RCPtr<PerFramePerDisplayResources> &resources)
@@ -109,7 +109,7 @@ namespace anox
 
 		RKIT_CHECK(m_window.m_swapChain->Present(syncPoint));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	RenderedWindow::RenderedWindow(rkit::UniquePtr<rkit::render::IDisplay> &&display, rkit::UniquePtr<RenderedWindowResources> &&resources, rkit::render::IRenderDevice *device)
@@ -147,7 +147,7 @@ namespace anox
 			m_swapChain->GetExtents(m_width, m_height);
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::render::IDisplay &RenderedWindow::GetDisplay()
@@ -163,7 +163,7 @@ namespace anox
 	rkit::Result RenderedWindow::BeginFrame(IGraphicsSubsystem &graphicsSubsystem)
 	{
 		if (!m_device)
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		rkit::RCPtr<PerFramePerDisplayResources> displayResources;
 		RKIT_CHECK(rkit::New<PerFramePerDisplayResources>(displayResources));
@@ -178,13 +178,13 @@ namespace anox
 
 		m_currentPerDisplayResources = displayResources;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result RenderedWindow::EndFrame(IGraphicsSubsystem &graphicsSubsystem)
 	{
 		if (!m_device)
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		rkit::UniquePtr<ISubmitJobRunner> presentJobRunner;
 		RKIT_CHECK(rkit::New<PresentJobRunner>(presentJobRunner, *this, m_currentPerDisplayResources));
@@ -199,7 +199,7 @@ namespace anox
 		if (m_currentSyncPoint == m_syncPoints.Count())
 			m_currentSyncPoint = 0;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	const rkit::RCPtr<PerFramePerDisplayResources> &RenderedWindow::GetCurrentFrameResources() const
@@ -220,6 +220,6 @@ namespace anox
 
 		outWindow = std::move(window);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 }

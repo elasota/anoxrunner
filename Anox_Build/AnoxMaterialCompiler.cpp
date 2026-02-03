@@ -136,7 +136,7 @@ namespace anox { namespace buildsystem
 			RKIT_CHECK(stream.WriteAll(&m_interform.Get(), sizeof(m_interform.Get())));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result MaterialAnalysisDynamicData::Deserialize(rkit::IReadStream &stream)
@@ -188,7 +188,7 @@ namespace anox { namespace buildsystem
 			m_interform = interformData;
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	MaterialCompiler::MaterialCompiler(rkit::png::IPngDriver &pngDriver)
@@ -218,7 +218,7 @@ namespace anox { namespace buildsystem
 			return rkit::ResultCode::kInternalError;
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result MaterialCompiler::RunAnalyzeATD(const rkit::StringView &name, rkit::UniquePtr<rkit::ISeekableReadStream> &&atdStreamRef, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) const
@@ -700,7 +700,7 @@ namespace anox { namespace buildsystem
 
 		RKIT_CHECK(dynamicData.Serialize(*analysisStream));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result MaterialCompiler::ConstructAnalysisPath(rkit::CIPath &analysisPath, data::MaterialResourceType nodeType, const rkit::StringView &identifier)
@@ -710,7 +710,7 @@ namespace anox { namespace buildsystem
 
 		RKIT_CHECK(analysisPath.Set(pathStr));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result MaterialCompiler::ConstructOutputPath(rkit::CIPath &outputPath, data::MaterialResourceType nodeType, const rkit::StringView &identifier)
@@ -720,7 +720,7 @@ namespace anox { namespace buildsystem
 
 		RKIT_CHECK(outputPath.Set(pathStr));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result MaterialCompiler::RunAnalyzeImage(const rkit::StringView &longName, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) const
@@ -793,7 +793,7 @@ namespace anox { namespace buildsystem
 
 		RKIT_CHECK(dynamicData.Serialize(*analysisStream));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result MaterialCompiler::RunAnalyzeMissing(const rkit::StringView &name, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) const
@@ -824,7 +824,7 @@ namespace anox { namespace buildsystem
 
 		RKIT_CHECK(dynamicData.Serialize(*analysisStream));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result MaterialCompiler::ResolveShortName(rkit::String &shortName, const rkit::StringView &identifier) const
@@ -853,7 +853,7 @@ namespace anox { namespace buildsystem
 
 		RKIT_CHECK(shortName.Set(identifier.SubString(0, extPos.Get())));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -879,7 +879,7 @@ namespace anox { namespace buildsystem
 		if (pfFlags & rkit::data::DDSPixelFormatFlags::kFourCC)
 			return rkit::ResultCode::kNotYetImplemented;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result MaterialCompiler::ParseImageImport(const rkit::Span<const rkit::Utf8Char_t> &token, ImageImportDisposition disposition, MaterialAnalysisDynamicData &dynamicData, MaterialAnalysisBitmapDef &bitmapDef, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
@@ -911,7 +911,7 @@ namespace anox { namespace buildsystem
 					imageIndex++;
 				}
 
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			};
 
 		RKIT_CHECK(findImageIndexFunc());
@@ -984,13 +984,13 @@ namespace anox { namespace buildsystem
 		bitmapDef = {};
 		bitmapDef.m_nameIndex = imageIndex;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result MaterialCompiler::GenerateRealFrames(MaterialAnalysisHeader &header, MaterialAnalysisDynamicData &dynamicData, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) const
 	{
 		if (header.m_materialType != data::MaterialType::kAnimation)
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		MaterialAnalysisDynamicData newDynamicData = {};
 
@@ -1068,7 +1068,7 @@ namespace anox { namespace buildsystem
 		}
 
 		if (allFullFrame)
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
 
@@ -1108,7 +1108,7 @@ namespace anox { namespace buildsystem
 				if (optBitmapPtr)
 					*optBitmapPtr = bitmapPtrRef;
 
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			};
 
 
@@ -1316,7 +1316,7 @@ namespace anox { namespace buildsystem
 
 		dynamicData = std::move(newDynamicData);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result MaterialCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
@@ -1507,7 +1507,7 @@ namespace anox { namespace buildsystem
 			RKIT_CHECK(outFile->WriteAll(frameDefs.GetBuffer(), frameDefs.Count() * sizeof(frameDefs[0])));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::StringView MaterialCompiler::GetFontMaterialExtension()

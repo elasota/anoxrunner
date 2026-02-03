@@ -103,7 +103,7 @@ namespace rkit { namespace mem {
 			GetMutableDrivers().m_mallocDriver = mmapMallocDriver.Detach();
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void MemModule::Shutdown()

@@ -317,7 +317,7 @@ namespace rkit
 
 			m_storage.m_staticStorage.m_size = count;
 
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 		else
 			return m_storage.m_vector.Resize(size);
@@ -329,7 +329,7 @@ namespace rkit
 		constexpr size_t kMaxSize = std::numeric_limits<size_t>::max() / sizeof(T);
 
 		if (size > kMaxSize)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		if (!IsUsingStaticStorage())
 			return m_storage.m_vector.Reserve(size);
@@ -349,7 +349,7 @@ namespace rkit
 			m_isUsingStaticStorage = false;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class T, size_t TStaticSize>
@@ -388,7 +388,7 @@ namespace rkit
 				new (m_storage.m_staticStorage.GetStorage() + count) T(item);
 				m_storage.m_staticStorage.m_size = count + 1;
 
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else
 			{
@@ -417,7 +417,7 @@ namespace rkit
 
 				m_storage.m_staticStorage.m_size = count;
 
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else
 			{
@@ -444,7 +444,7 @@ namespace rkit
 				new (m_storage.m_staticStorage.GetStorage() + count) T(std::move(item));
 				m_storage.m_staticStorage.m_size = count + 1;
 
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else
 			{

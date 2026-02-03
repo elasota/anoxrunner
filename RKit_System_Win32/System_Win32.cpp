@@ -262,13 +262,14 @@ namespace rkit
 		~Thread_Win32();
 
 		void SetHandle(HANDLE hThread);
-		Result *GetResultPtr();
+		ResultCode *GetResultPtr();
 
-		void Finalize(Result &outResult) override;
+		void Finalize(ResultCode &outResult, uint32_t &outExtCode) override;
 
 	private:
 		HANDLE m_hThread;
-		Result m_result;
+		ResultCode m_result;
+		uint32_t m_resultExtCode;
 	};
 
 	class SystemDriver_Win32 final : public NoCopy, public ISystemDriver, public IWin32PlatformDriver
@@ -282,7 +283,7 @@ namespace rkit
 		void RemoveCommandLineArgs(size_t firstArg, size_t numArgs) override;
 		Span<const StringView> GetCommandLine() const override;
 		void AssertionFailure(const char *expr, const char *file, unsigned int line) override;
-		void FirstChanceResultFailure(const Result &result) override;
+		void FirstChanceResultFailure(ResultCode result) override;
 
 		Result AsyncOpenFileRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const FutureContainerPtr<UniquePtr<ISeekableReadStream>> &outStream, FileLocation location, const CIPathView &path) override;
 		Result AsyncOpenFileReadAbs(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const FutureContainerPtr<UniquePtr<ISeekableReadStream>> &outStream, const OSAbsPathView &path) override;
@@ -413,30 +414,30 @@ namespace rkit
 	{
 		int charsRequired = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, ReinterpretUtf8CharToAnsiChar(str8), -1, nullptr, 0);
 		if (charsRequired == 0)
-			return ResultCode::kInvalidUnicode;
+			RKIT_THROW(ResultCode::kInvalidUnicode);
 
 		RKIT_CHECK(outStr16.Resize(charsRequired));
 
 		int convResult = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, ReinterpretUtf8CharToAnsiChar(str8), -1, outStr16.GetBuffer(), static_cast<int>(outStr16.Count()));
 		if (convResult == 0)
-			return ResultCode::kInvalidUnicode;
+			RKIT_THROW(ResultCode::kInvalidUnicode);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result ConvUtil_Win32::UTF16ToUTF8(const wchar_t *str16, Vector<Utf8Char_t> &outStr8)
 	{
 		int bytesRequired = WideCharToMultiByte(CP_UTF8, 0, str16, -1, nullptr, 0, nullptr, nullptr);
 		if (bytesRequired == 0)
-			return ResultCode::kInvalidUnicode;
+			RKIT_THROW(ResultCode::kInvalidUnicode);
 
 		RKIT_CHECK(outStr8.Resize(bytesRequired));
 
 		int convResult = WideCharToMultiByte(CP_UTF8, 0, str16, -1, ReinterpretUtf8CharToAnsiChar(outStr8.GetBuffer()), static_cast<int>(outStr8.Count()), nullptr, nullptr);
 		if (convResult == 0)
-			return ResultCode::kInvalidUnicode;
+			RKIT_THROW(ResultCode::kInvalidUnicode);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -501,20 +502,20 @@ namespace rkit
 			if (!succeeded || actualAmount == 0)
 			{
 				outCountWritten = countWritten;
-				return ResultCode::kIOError;
+				RKIT_THROW(ResultCode::kIOError);
 			}
 		}
 
 		outCountWritten = countWritten;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result File_Win32::Flush()
 	{
 		if (!FlushFileBuffers(m_hfile))
-			return ResultCode::kIOError;
+			RKIT_THROW(ResultCode::kIOError);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result File_Win32::ReadPartial(void *data, size_t count, size_t &outCountRead)
@@ -545,38 +546,38 @@ namespace rkit
 			if (!succeeded || actualAmount == 0)
 			{
 				outCountRead = countRead;
-				return ResultCode::kIOError;
+				RKIT_THROW(ResultCode::kIOError);
 			}
 		}
 
 		outCountRead = countRead;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result File_Win32::SeekStart(FilePos_t pos)
 	{
 		if (pos > m_fileSize)
-			return ResultCode::kIOSeekOutOfRange;
+			RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 		if (pos == m_filePos)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		LARGE_INTEGER newPos;
 		newPos.QuadPart = static_cast<LONGLONG>(pos);
 
 		if (!SetFilePointerEx(m_hfile, newPos, nullptr, FILE_BEGIN))
-			return ResultCode::kIOError;
+			RKIT_THROW(ResultCode::kIOError);
 
 		m_filePos = pos;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result File_Win32::SeekCurrent(FileOffset_t offset)
 	{
 		if (offset < -static_cast<FileOffset_t>(m_filePos))
-			return ResultCode::kIOSeekOutOfRange;
+			RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 		if (offset > static_cast<FileOffset_t>(m_fileSize - m_filePos))
-			return ResultCode::kIOSeekOutOfRange;
+			RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 		return SeekStart(static_cast<FilePos_t>(static_cast<FileOffset_t>(m_filePos) + offset));
 	}
@@ -584,9 +585,9 @@ namespace rkit
 	Result File_Win32::SeekEnd(FileOffset_t offset)
 	{
 		if (offset < -static_cast<FileOffset_t>(m_fileSize))
-			return ResultCode::kIOSeekOutOfRange;
+			RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 		if (offset > 0)
-			return ResultCode::kIOSeekOutOfRange;
+			RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 		return SeekStart(static_cast<FilePos_t>(static_cast<FileOffset_t>(m_fileSize) + offset));
 	}
@@ -604,10 +605,10 @@ namespace rkit
 	Result File_Win32::Truncate(FilePos_t newSize)
 	{
 		if (m_fileSize == newSize)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		if (m_fileSize < newSize)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		FilePos_t oldFilePos = m_filePos;
 
@@ -617,7 +618,7 @@ namespace rkit
 			newPos.QuadPart = static_cast<LONGLONG>(newSize);
 
 			if (!::SetFilePointerEx(m_hfile, newPos, nullptr, FILE_BEGIN))
-				return ResultCode::kOperationFailed;
+				RKIT_THROW(ResultCode::kOperationFailed);
 		}
 
 		BOOL succeeded = ::SetEndOfFile(m_hfile);
@@ -634,9 +635,9 @@ namespace rkit
 		}
 
 		if (succeeded)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		else
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 	}
 
 	HANDLE File_Win32::GetHandle() const
@@ -677,8 +678,8 @@ namespace rkit
 	void AsyncReadWriteRequesterInstance_Win32::PostReadRequest(IJobQueue &jobQueue, void *readBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback)
 	{
 		OpenRequest();
-		Result postResult = CheckedPostReadRequest(jobQueue, readBuffer, pos, amount, completionUserData, completeCallback);
-		if (!utils::ResultIsOK(postResult))
+		ResultCode postResult = RKIT_EVAL_RESULT(CheckedPostReadRequest(jobQueue, readBuffer, pos, amount, completionUserData, completeCallback));
+		if (postResult != ResultCode::kOK)
 		{
 			CloseRequest();
 			completeCallback(completionUserData, postResult, 0);
@@ -688,8 +689,8 @@ namespace rkit
 	void AsyncReadWriteRequesterInstance_Win32::PostWriteRequest(IJobQueue &jobQueue, const void *writeBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback)
 	{
 		OpenRequest();
-		Result postResult = CheckedPostWriteRequest(jobQueue, writeBuffer, pos, amount, completionUserData, completeCallback);
-		if (!utils::ResultIsOK(postResult))
+		ResultCode postResult = RKIT_EVAL_RESULT(CheckedPostWriteRequest(jobQueue, writeBuffer, pos, amount, completionUserData, completeCallback));
+		if (postResult != ResultCode::kOK)
 		{
 			CloseRequest();
 			completeCallback(completionUserData, postResult, 0);
@@ -699,8 +700,8 @@ namespace rkit
 	void AsyncReadWriteRequesterInstance_Win32::PostAppendRequest(IJobQueue &jobQueue, const void *writeBuffer, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback)
 	{
 		OpenRequest();
-		Result postResult = CheckedPostAppendRequest(jobQueue, writeBuffer, amount, completionUserData, completeCallback);
-		if (!utils::ResultIsOK(postResult))
+		ResultCode postResult = RKIT_EVAL_RESULT(CheckedPostAppendRequest(jobQueue, writeBuffer, amount, completionUserData, completeCallback));
+		if (postResult != ResultCode::kOK)
 		{
 			CloseRequest();
 			completeCallback(completionUserData, postResult, 0);
@@ -734,7 +735,7 @@ namespace rkit
 	Result AsyncReadWriteRequesterInstance_Win32::CheckedPostReadRequest(IJobQueue &jobQueue, void *readBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback)
 	{
 		if (std::numeric_limits<FilePos_t>::max() - pos < amount)
-			return ResultCode::kIntegerOverflow;
+			RKIT_THROW(ResultCode::kIntegerOverflow);
 
 		m_overlappedHolder.m_overlapped = {};
 		m_overlappedHolder.m_userdata = completionUserData;
@@ -747,13 +748,13 @@ namespace rkit
 
 		PostToIOQueue();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result AsyncReadWriteRequesterInstance_Win32::CheckedPostWriteRequest(IJobQueue &jobQueue, const void *writeBuffer, FilePos_t pos, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback)
 	{
 		if (std::numeric_limits<FilePos_t>::max() - pos < amount)
-			return ResultCode::kIntegerOverflow;
+			RKIT_THROW(ResultCode::kIntegerOverflow);
 
 		m_overlappedHolder.m_overlapped = {};
 		m_overlappedHolder.m_userdata = completionUserData;
@@ -766,7 +767,7 @@ namespace rkit
 
 		PostToIOQueue();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result AsyncReadWriteRequesterInstance_Win32::CheckedPostAppendRequest(IJobQueue &jobQueue, const void *writeBuffer, size_t amount, void *completionUserData, AsyncIOCompletionCallback_t completeCallback)
@@ -782,13 +783,13 @@ namespace rkit
 
 		PostToIOQueue();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void AsyncReadWriteRequesterInstance_Win32::ContinueRequest()
 	{
-		Result continueResult = CheckedContinueRequest();
-		if (!utils::ResultIsOK(continueResult))
+		ResultCode continueResult = RKIT_EVAL_RESULT(CheckedContinueRequest());
+		if (continueResult != ResultCode::kOK)
 		{
 			const size_t bytesProcessed = m_overlappedHolder.m_bytesProcessed;
 			void *userdata = m_overlappedHolder.m_userdata;
@@ -814,28 +815,28 @@ namespace rkit
 			m_overlappedHolder.m_overlapped.OffsetHigh = static_cast<DWORD>(m_overlappedHolder.m_startPosition >> 32);
 			m_overlappedHolder.m_overlapped.OffsetHigh = static_cast<DWORD>(m_overlappedHolder.m_startPosition & 0xffffffffu);
 			if (!ReadFileEx(m_hfile, m_overlappedHolder.m_dataBuffer, operationAmount, &m_overlappedHolder.m_overlapped, StaticCompleteRequest))
-				return utils::CreateResultWithExtCode(ResultCode::kIOWriteError, GetLastError());
+				RKIT_THROW_EXT(ResultCode::kIOWriteError, GetLastError());
 			break;
 		case RequestType::kWrite:
 			m_overlappedHolder.m_overlapped.OffsetHigh = static_cast<DWORD>(m_overlappedHolder.m_startPosition >> 32);
 			m_overlappedHolder.m_overlapped.OffsetHigh = static_cast<DWORD>(m_overlappedHolder.m_startPosition & 0xffffffffu);
 			if (!WriteFileEx(m_hfile, m_overlappedHolder.m_dataBuffer, operationAmount, &m_overlappedHolder.m_overlapped, StaticCompleteRequest))
-				return utils::CreateResultWithExtCode(ResultCode::kIOWriteError, GetLastError());
+				RKIT_THROW_EXT(ResultCode::kIOWriteError, GetLastError());
 			break;
 		case RequestType::kAppend:
 			m_overlappedHolder.m_overlapped.OffsetHigh = static_cast<DWORD>(-1);
 			m_overlappedHolder.m_overlapped.OffsetHigh = static_cast<DWORD>(-1);
 			if (!WriteFileEx(m_hfile, m_overlappedHolder.m_dataBuffer, operationAmount, &m_overlappedHolder.m_overlapped, StaticCompleteRequest))
-				return utils::CreateResultWithExtCode(ResultCode::kIOWriteError, GetLastError());
+				RKIT_THROW_EXT(ResultCode::kIOWriteError, GetLastError());
 			break;
 
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		};
 
 		m_asioThread.PostInProgress(m_taskItem);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VOID WINAPI AsyncReadWriteRequesterInstance_Win32::StaticCompleteRequest(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped)
@@ -974,7 +975,7 @@ namespace rkit
 			if (m_exhausted)
 			{
 				haveItem = false;
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 
 			if (m_haveItem && !CheckItem())
@@ -987,7 +988,7 @@ namespace rkit
 				haveItem = true;
 
 				m_haveItem = false;
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 
 			RKIT_CHECK(GetAnotherItem());
@@ -1024,7 +1025,7 @@ namespace rkit
 		outItem.m_attribs.m_fileSize = (static_cast<FilePos_t>(m_findData.nFileSizeHigh) << 32) + m_findData.nFileSizeLow;
 		outItem.m_attribs.m_fileTime = ConvUtil_Win32::FileTimeToUTCMSec(m_findData.ftLastWriteTime);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DirectoryScan_Win32::GetAnotherItem()
@@ -1038,7 +1039,7 @@ namespace rkit
 			m_exhausted = true;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	SystemLibrary_Win32::SystemLibrary_Win32()
@@ -1147,9 +1148,9 @@ namespace rkit
 	{
 		m_event = ::CreateEventW(nullptr, autoReset ? FALSE : TRUE, startSignaled ? TRUE : FALSE, nullptr);
 		if (!m_event)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Thread_Win32::Thread_Win32()
@@ -1173,12 +1174,12 @@ namespace rkit
 		}
 	}
 
-	Result *Thread_Win32::GetResultPtr()
+	ResultCode *Thread_Win32::GetResultPtr()
 	{
 		return &m_result;
 	}
 
-	void Thread_Win32::Finalize(Result &outResult)
+	void Thread_Win32::Finalize(ResultCode &outResult, uint32_t &outExtCode)
 	{
 		if (m_hThread)
 		{
@@ -1188,6 +1189,7 @@ namespace rkit
 		}
 
 		outResult = m_result;
+		outExtCode = m_resultExtCode;
 	}
 
 	SystemDriver_Win32::SystemDriver_Win32(IMallocDriver *alloc, const SystemModuleInitParameters_Win32 &initParams)
@@ -1219,7 +1221,7 @@ namespace rkit
 		m_argvW = CommandLineToArgvW(cmdLine, &numArgsI);
 
 		if (!m_argvW)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		size_t numArgs = static_cast<size_t>(numArgsI);
 
@@ -1248,7 +1250,7 @@ namespace rkit
 		RKIT_CHECK(New<AsyncIOThread_Win32>(m_asioThread, *this));
 		RKIT_CHECK(m_asioThread->Initialize());
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void SystemDriver_Win32::RemoveCommandLineArgs(size_t firstArg, size_t numArgs)
@@ -1334,7 +1336,7 @@ namespace rkit
 
 		RKIT_CHECK(jobQueue.CreateJob(&outOpenJob, JobType::kIO, std::move(runner), dependencyJob));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SystemDriver_Win32::AsyncOpenFileAsyncRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const FutureContainerPtr<AsyncFileOpenReadResult> &outStream, FileLocation location, const CIPathView &path)
@@ -1355,7 +1357,7 @@ namespace rkit
 
 		RKIT_CHECK(jobQueue.CreateJob(&outOpenJob, JobType::kIO, std::move(runner), dependencyJob));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SystemDriver_Win32::OpenFileRead(UniquePtr<ISeekableReadStream> &outStream, FileLocation location, const CIPathView &path)
@@ -1372,7 +1374,7 @@ namespace rkit
 		RKIT_CHECK_SOFT(OpenFileGeneral(file, path, false, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, 0));
 
 		outStream = std::move(file);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SystemDriver_Win32::OpenFileAsyncRead(AsyncFileOpenReadResult &outStream, FileLocation location, const CIPathView &path)
@@ -1392,7 +1394,7 @@ namespace rkit
 		outStream.m_file = std::move(file);
 		outStream.m_initialSize = initialSize;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SystemDriver_Win32::OpenFileWrite(UniquePtr<ISeekableWriteStream> &outStream, FileLocation location, const CIPathView &path, bool createIfNotExists, bool createDirectories, bool truncateIfExists)
@@ -1409,7 +1411,7 @@ namespace rkit
 		RKIT_CHECK(OpenFileGeneral(file, path, createDirectories, GENERIC_WRITE, FILE_SHARE_READ, OpenFlagsToDisposition(createIfNotExists, truncateIfExists), 0));
 
 		outStream = std::move(file);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SystemDriver_Win32::OpenFileReadWrite(UniquePtr<ISeekableReadWriteStream> &outStream, FileLocation location, const CIPathView &path, bool createIfNotExists, bool createDirectories, bool truncateIfExists)
@@ -1426,7 +1428,7 @@ namespace rkit
 		RKIT_CHECK(OpenFileGeneral(file, path, createDirectories, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, OpenFlagsToDisposition(createIfNotExists, truncateIfExists), 0));
 
 		outStream = std::move(file);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SystemDriver_Win32::CreateThread(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContextRef, const StringView &threadName)
@@ -1477,7 +1479,7 @@ namespace rkit
 
 		outThread = UniqueThreadRef(UniquePtr<IThread>(std::move(thread)));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SystemDriver_Win32::CreateMutex(UniquePtr<IMutex> &outMutex)
@@ -1487,7 +1489,7 @@ namespace rkit
 
 		outMutex = std::move(mutex);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SystemDriver_Win32::CreateEvent(UniquePtr<IEvent> &outEvent, bool autoReset, bool startSignaled)
@@ -1499,7 +1501,7 @@ namespace rkit
 
 		outEvent = std::move(event);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void SystemDriver_Win32::SleepMSec(uint32_t msec) const
@@ -1529,7 +1531,7 @@ namespace rkit
 		BOOL succeeded = ::CopyFileW(reinterpret_cast<const wchar_t *>(srcPath.GetChars()), reinterpret_cast<const wchar_t *>(destPath.GetChars()), !overwrite);
 
 		if (succeeded)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		else
 			return ResultCode::kIOError;
 	}
@@ -1570,7 +1572,7 @@ namespace rkit
 		BOOL succeeded = ::MoveFileExW(reinterpret_cast<const wchar_t *>(srcPath.GetChars()), reinterpret_cast<const wchar_t *>(destPath.GetChars()), flags);
 
 		if (succeeded)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		else
 			return ResultCode::kIOError;
 	}
@@ -1626,7 +1628,7 @@ namespace rkit
 
 		outDirectoryScan = dirScan.StaticCast<IDirectoryScan>();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SystemDriver_Win32::GetFileAttributesAbs(const OSAbsPathView &path, bool &outExists, FileAttributes &outAttribs)
@@ -1637,7 +1639,7 @@ namespace rkit
 		{
 			outExists = false;
 			outAttribs = FileAttributes();
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		if ((attribs & FILE_ATTRIBUTE_DIRECTORY) != 0)
@@ -1645,7 +1647,7 @@ namespace rkit
 			outExists = true;
 			outAttribs = FileAttributes();
 			outAttribs.m_isDirectory = true;
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		} 
 
 		HANDLE hFile = CreateFileW(reinterpret_cast<const wchar_t *>(path.GetChars()), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -1667,7 +1669,7 @@ namespace rkit
 		outAttribs.m_fileTime = ConvUtil_Win32::FileTimeToUTCMSec(finfo.ftLastWriteTime);
 		outAttribs.m_isDirectory = false;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SystemDriver_Win32::SetGameDirectoryOverride(const OSAbsPathView &path)
@@ -1706,7 +1708,7 @@ namespace rkit
 
 		m_settingsDirectory = osPath;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	char SystemDriver_Win32::GetPathSeparator() const
@@ -1747,7 +1749,7 @@ namespace rkit
 		sysLibrary->SetHModule(hmodule);
 		outLibrary = std::move(sysLibrary);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	uint32_t SystemDriver_Win32::GetProcessorCount() const
@@ -1813,7 +1815,7 @@ namespace rkit
 			}
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	DWORD WINAPI SystemDriver_Win32::ThreadStartRoutine(LPVOID lpThreadParameter)
@@ -1871,7 +1873,7 @@ namespace rkit
 		RKIT_CHECK(relPath.ConvertFrom(path));
 		RKIT_CHECK(outPath.Append(relPath));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SystemDriver_Win32::OpenFileGeneral(UniquePtr<File_Win32> &outFile, const OSAbsPathView &path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition, DWORD extraFlags)
@@ -1906,7 +1908,7 @@ namespace rkit
 			return ResultCode::kFileOpenError;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SystemDriver_Win32::OpenFileAsyncGeneral(UniquePtr<AsyncFile_Win32> &outStream, FilePos_t &outInitialSize, const OSAbsPathView &path, bool createDirectories, DWORD access, DWORD shareMode, DWORD disposition, DWORD extraFlags)
@@ -1925,7 +1927,7 @@ namespace rkit
 		outStream = std::move(stream);
 		outInitialSize = initialSize;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	OpenFileReadJobRunner::OpenFileReadJobRunner(const FutureContainerPtr<UniquePtr<ISeekableReadStream>> &streamFuture, const OSAbsPath &filePath, ISystemDriver &systemDriver)
@@ -1959,7 +1961,7 @@ namespace rkit
 		m_completed = true;
 		m_streamFuture->Complete(std::move(stream));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -1996,7 +1998,7 @@ namespace rkit
 		m_completed = true;
 		m_streamFuture->Complete(std::move(result));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SystemModule_Win32::Init(const ModuleInitParameters *baseInitParams)
@@ -2011,7 +2013,7 @@ namespace rkit
 
 		RKIT_CHECK(ms_systemDriver->Initialize());
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void SystemModule_Win32::Shutdown()

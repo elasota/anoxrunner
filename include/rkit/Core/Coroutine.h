@@ -60,7 +60,7 @@ namespace rkit { namespace coro
 		void *m_userdata = nullptr;
 		PushStackCallback_t m_allocStack = nullptr;
 		FreeStackCallback_t m_freeStack = nullptr;
-		Result m_result = Result(ResultCode::kOK);
+		ResultCode m_result = ResultCode::kOK;
 	};
 
 	struct FrameMetadataBase
@@ -282,12 +282,12 @@ namespace rkit { namespace coro
 		StackFrameBase *prevFrame = context.m_frame;
 		void *newFrame = context.m_allocStack(context.m_userdata, starter.GetMetadata().m_base);
 		if (!newFrame)
-			return ResultCode::kCoroStackOverflow;
+			RKIT_THROW(ResultCode::kCoroStackOverflow);
 
 		starter.GetMetadata().m_enterFunction(context, newFrame, prevFrame, starter.GetInstance(), std::forward<TArgs>(args)...);
 		context.m_frame = static_cast<StackFrameBase *>(newFrame);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class TCoroStarter>
@@ -298,11 +298,11 @@ namespace rkit { namespace coro
 		StackFrameBase *prevFrame = context.m_frame;
 		void *newFrame = context.m_allocStack(context.m_userdata, starter.GetMetadata().m_base);
 		if (!newFrame)
-			return ResultCode::kCoroStackOverflow;
+			RKIT_THROW(ResultCode::kCoroStackOverflow);
 
 		starter.GetMetadata().m_enterFunction(context, newFrame, prevFrame, starter.GetInstance());
 		context.m_frame = static_cast<StackFrameBase *>(newFrame);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } // rkit::coro

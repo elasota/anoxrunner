@@ -10,7 +10,7 @@ namespace anox { namespace game {
 		{
 			RKIT_CHECK(serializer.SerializeField(u8"mapName", vars.m_mapName));
 
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 	};
 
@@ -30,7 +30,7 @@ namespace anox { namespace game {
 
 		state = std::move(rootState);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 } } // anox::game

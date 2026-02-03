@@ -94,7 +94,7 @@ namespace rkit
 		outCountRead = countRead;
 		m_filePos += static_cast<FilePos_t>(countRead);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result MutexProtectedStream::WritePartial(const void *data, size_t count, size_t &outCountWritten)
@@ -105,7 +105,7 @@ namespace rkit
 		outCountWritten = countWritten;
 		m_filePos += static_cast<FilePos_t>(countWritten);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result MutexProtectedStream::Flush()
@@ -118,11 +118,11 @@ namespace rkit
 		FilePos_t fileSize = m_baseStream->GetSize();
 
 		if (pos > fileSize)
-			return ResultCode::kIOSeekOutOfRange;
+			RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 		m_filePos = pos;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result MutexProtectedStream::SeekCurrent(FileOffset_t offset)
@@ -131,7 +131,7 @@ namespace rkit
 		{
 			FilePos_t backwardDist = rkit::ToUnsignedAbs<FileOffset_t, FilePos_t>(offset);
 			if (backwardDist > m_filePos)
-				return ResultCode::kIOSeekOutOfRange;
+				RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 			m_filePos -= backwardDist;
 		}
@@ -142,12 +142,12 @@ namespace rkit
 			FilePos_t distRemaining = fileSize - m_filePos;
 
 			if (static_cast<FilePos_t>(offset) > distRemaining)
-				return ResultCode::kIOSeekOutOfRange;
+				RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 			m_filePos += static_cast<FilePos_t>(offset);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result MutexProtectedStream::SeekEnd(FileOffset_t offset)
@@ -158,14 +158,14 @@ namespace rkit
 
 			FilePos_t backwardDist = rkit::ToUnsignedAbs<FileOffset_t, FilePos_t>(offset);
 			if (backwardDist > fileSize)
-				return ResultCode::kIOSeekOutOfRange;
+				RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 			m_filePos = fileSize - backwardDist;
 
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 		else
-			return ResultCode::kIOSeekOutOfRange;
+			RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 	}
 
 	FilePos_t MutexProtectedStream::Tell() const

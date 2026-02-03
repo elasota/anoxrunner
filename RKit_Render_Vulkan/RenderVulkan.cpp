@@ -31,7 +31,7 @@ namespace rkit { namespace render { namespace vulkan
 		Result FirstChanceVulkanFailure(VkResult result)
 		{
 			rkit::log::ErrorFmt(u8"Vulkan error {}", static_cast<unsigned int>(result));
-			return utils::CreateResultWithExtCode(ResultCode::kGraphicsAPIException, static_cast<uint32_t>(result));
+			RKIT_THROW((PackedResultAndExtCode{ ResultCode::kGraphicsAPIException, static_cast<uint32_t>(result) }));
 		}
 	}
 
@@ -471,7 +471,7 @@ namespace rkit { namespace render { namespace vulkan
 	Result RenderVulkanDriver::EnumerateAdapters(Vector<UniquePtr<IRenderAdapter>> &adapters) const
 	{
 		if (!m_vkInstanceIsInitialized)
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 
 		uint32_t physicalDeviceCount = 0;
 		RKIT_VK_CHECK(m_vki.vkEnumeratePhysicalDevices(m_vkInstance, &physicalDeviceCount, nullptr));
@@ -498,7 +498,7 @@ namespace rkit { namespace render { namespace vulkan
 			adapters[i] = std::move(adapter);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderVulkanDriver::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, const IRenderDeviceCaps &requiredCaps, const IRenderDeviceCaps &optionalCaps, IRenderAdapter &adapter)
@@ -538,7 +538,7 @@ namespace rkit { namespace render { namespace vulkan
 		if (!grantedCaps.MeetsOrExceeds(requiredCaps))
 		{
 			rkit::log::Error(u8"Device failed to meet capability requirements");
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 		}
 
 		RenderDeviceRequirements requirements;
@@ -558,7 +558,7 @@ namespace rkit { namespace render { namespace vulkan
 			if (queueRequest.m_numQueues == 0)
 			{
 				rkit::log::Error(u8"Command queue request didn't request any queues");
-				return ResultCode::kInvalidParameter;
+				RKIT_THROW(ResultCode::kInvalidParameter);
 			}
 
 			size_t queueTypeInt = static_cast<size_t>(queueType);
@@ -566,7 +566,7 @@ namespace rkit { namespace render { namespace vulkan
 			if (haveRequestedQueue[queueTypeInt])
 			{
 				rkit::log::Error(u8"Queue type was requested multiple times");
-				return ResultCode::kInvalidParameter;
+				RKIT_THROW(ResultCode::kInvalidParameter);
 			}
 
 			uint32_t queueFamilyIndex = 0;
@@ -576,7 +576,7 @@ namespace rkit { namespace render { namespace vulkan
 			if (queueRequest.m_numQueues > numQueuesAvailable)
 			{
 				rkit::log::Error(u8"Too many queues requested");
-				return ResultCode::kInvalidParameter;
+				RKIT_THROW(ResultCode::kInvalidParameter);
 			}
 
 			haveRequestedQueue[queueTypeInt] = true;
@@ -590,7 +590,7 @@ namespace rkit { namespace render { namespace vulkan
 			if (queueRequest.m_numQueues == 0)
 			{
 				rkit::log::Error(u8"Command queue request didn't request any queues");
-				return ResultCode::kInvalidParameter;
+				RKIT_THROW(ResultCode::kInvalidParameter);
 			}
 
 			RKIT_CHECK(queueCreateInfos.Append(queueCreateInfo));
@@ -648,7 +648,7 @@ namespace rkit { namespace render { namespace vulkan
 				if (queryItem.m_required)
 				{
 					rkit::log::ErrorFmt(u8"Missing required Vulkan device extension {}", queryItem.m_name.ToUTF8());
-					return ResultCode::kOperationFailed;
+					RKIT_THROW(ResultCode::kOperationFailed);
 				}
 			}
 		}
@@ -664,14 +664,16 @@ namespace rkit { namespace render { namespace vulkan
 		VkDevice device = VK_NULL_HANDLE;
 		RKIT_VK_CHECK(m_vki.vkCreateDevice(rPhysDevice->GetPhysDevice(), &devCreateInfo, GetAllocCallbacks(), &device));
 
-		Result wrapDeviceResult = VulkanDeviceBase::CreateDevice(outDevice, m_vkg, m_vki, m_vkg_p, m_vki_p, m_vkInstance, device, queueFamilySpecs, GetAllocCallbacks(), grantedCaps, requirements, rPhysDevice, std::move(enabledExts), memProperties);
-		if (!utils::ResultIsOK(wrapDeviceResult))
-		{
-			m_vki.vkDestroyDevice(device, GetAllocCallbacks());
-			return wrapDeviceResult;
-		}
+		RKIT_TRY_CATCH_RETHROW(VulkanDeviceBase::CreateDevice(outDevice, m_vkg, m_vki, m_vkg_p, m_vki_p, m_vkInstance, device, queueFamilySpecs, GetAllocCallbacks(), grantedCaps, requirements, rPhysDevice, std::move(enabledExts), memProperties),
+			CatchContext(
+				[this, device]
+				{
+					m_vki.vkDestroyDevice(device, this->GetAllocCallbacks());
+				}
+			)
+		);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	bool RenderVulkanDriver::IsInstanceExtensionEnabled(const AsciiStringView &extName) const
@@ -709,7 +711,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_CHECK(LoadVulkanAPI(m_vkg, resolver));
 		RKIT_CHECK(LoadVulkanAPI(m_vkg_p, resolver));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderVulkanDriver::LoadVulkanInstanceAPI()
@@ -744,7 +746,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_CHECK(LoadVulkanAPI(m_vki, resolver));
 		RKIT_CHECK(LoadVulkanAPI(m_vki_p, resolver));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderVulkanDriver::EnumerateExtensions(const char *layerName, Vector<ExtensionEnumeration> &extProperties)
@@ -767,7 +769,7 @@ namespace rkit { namespace render { namespace vulkan
 			RKIT_CHECK(extProperties.Append(std::move(extEnum)));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderVulkanDriver::EnumerateLayers(Vector<VkLayerProperties> &layerProperties)
@@ -781,7 +783,7 @@ namespace rkit { namespace render { namespace vulkan
 			RKIT_VK_CHECK(m_vkg.vkEnumerateInstanceLayerProperties(&layerCount, layerProperties.GetBuffer()));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VkBool32 RenderVulkanDriver::StaticDebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *data, void *userdata)
@@ -858,7 +860,7 @@ namespace rkit { namespace render { namespace vulkan
 				if (required && !item.m_required)
 					item.m_required = true;
 
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
@@ -874,7 +876,7 @@ namespace rkit { namespace render { namespace vulkan
 				if (required && !item.m_required)
 					item.m_required = true;
 
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
@@ -895,7 +897,7 @@ namespace rkit { namespace render { namespace vulkan
 				if (required && !item.m_required)
 					item.m_required = true;
 
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
@@ -982,7 +984,7 @@ namespace rkit { namespace render { namespace vulkan
 				if (requestedLayer.m_required)
 				{
 					rkit::log::ErrorFmt(u8"Missing required Vulkan layer {}", requestedLayer.m_name.ToUTF8());
-					return ResultCode::kOperationFailed;
+					RKIT_THROW(ResultCode::kOperationFailed);
 				}
 				else
 					continue;
@@ -1020,7 +1022,7 @@ namespace rkit { namespace render { namespace vulkan
 				if (requestedExtension.m_required)
 				{
 					rkit::log::ErrorFmt(u8"Missing required Vulkan extension {}", requestedExtension.m_name.ToUTF8());
-					return ResultCode::kOperationFailed;
+					RKIT_THROW(ResultCode::kOperationFailed);
 				}
 				else
 					continue;
@@ -1146,7 +1148,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_CHECK(LoadVulkanInstanceAPI());
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void RenderVulkanDriver::ShutdownDriver()

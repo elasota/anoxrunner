@@ -66,7 +66,7 @@ namespace anox
 		if (size == 0)
 		{
 			m_signaller->SignalDone(rkit::ResultCode::kOK);
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		rkit::UniquePtr<rkit::IAsyncReadRequester> requester;
@@ -80,7 +80,7 @@ namespace anox
 
 		requester->PostReadRequest(m_jobQueue, m_fileBlob->GetBuffer(), 0, size, completerPtr, AnoxFileResourceIOCompleter::CompleteCallback);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	AnoxFileResourceIOCompleter::AnoxFileResourceIOCompleter(const rkit::RCPtr<rkit::JobSignaler> &signaller, const rkit::RCPtr<rkit::Vector<uint8_t>> &fileBlob, size_t expectedBytes)
@@ -128,7 +128,7 @@ namespace anox
 
 		RKIT_CHECK(jobQueue.CreateJob(&outJob, rkit::JobType::kNormalPriority, rkit::UniquePtr<rkit::IJobRunner>(), ioRequestJob));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result CreateLoadEntireFileJob(rkit::RCPtr<rkit::Job> &outJob, const rkit::RCPtr<rkit::Vector<uint8_t>> &blob, AnoxGameFileSystemBase &fileSystem, const rkit::CIPathView &path)

@@ -38,7 +38,7 @@ namespace anox
 		RKIT_CHECK(m_contentsBuffer.Resize(maxCapacity));
 		RKIT_CHECK(m_lines.Resize(maxLines));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxCommandStack::Parse(const rkit::Span<const uint8_t> &streamRef)
@@ -144,7 +144,7 @@ namespace anox
 
 		RKIT_CHECK(PushMultiple(lines.ToSpan().ToValueISpan()));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxCommandStack::PushBStr(const rkit::ByteStringSliceView &strView)
@@ -207,7 +207,7 @@ namespace anox
 
 		RKIT_ASSERT(insertPos == m_contentsSize);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -233,6 +233,6 @@ namespace anox
 
 		outStack = std::move(stack);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 }

@@ -141,7 +141,7 @@ namespace anox
 		RKIT_CHECK(m_gameLogic->Start());
 
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxGame::RunFrame()
@@ -174,7 +174,7 @@ namespace anox
 			jobToRun->Run();
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	bool AnoxGame::IsExiting() const

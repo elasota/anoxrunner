@@ -32,7 +32,7 @@ namespace rkit { namespace data
 	{
 		RKIT_CHECK(New<RenderDataHandler>(m_renderDataHandler));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void DataDriver::ShutdownDriver()

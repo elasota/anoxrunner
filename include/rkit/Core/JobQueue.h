@@ -59,7 +59,7 @@ namespace rkit
 
 		virtual void WaitForJob(Job &job, const ISpan<JobType> &idleJobTypes, IEvent *wakeEvent, IEvent *terminatedEvent) = 0;
 
-		virtual void Fault(const Result &result) = 0;
+		virtual void Fault(const PackedResultAndExtCode &result) = 0;
 
 		virtual Result CheckFault() = 0;
 

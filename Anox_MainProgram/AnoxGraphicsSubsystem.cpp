@@ -549,7 +549,7 @@ namespace anox
 
 				cmdAlloc = std::move(alloc);
 
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		};
 
@@ -872,12 +872,16 @@ namespace anox
 		rkit::UniquePtr<rkit::ISeekableReadStream> cacheReadStream;
 
 		// Try opening the cache itself
-		rkit::Result openResult = sysDriver->OpenFileRead(cacheReadStream, rkit::FileLocation::kUserSettingsDirectory, m_pipelinesCacheFileName);
-		if (!rkit::utils::ResultIsOK(openResult))
-		{
-			rkit::log::Error(u8"Failed to open pipeline cache");
-			return openResult;
-		}
+		RKIT_TRY_CATCH_RETHROW(sysDriver->TryOpenFileRead(cacheReadStream, rkit::FileLocation::kUserSettingsDirectory, m_pipelinesCacheFileName),
+			rkit::CatchContext(
+				[]
+				{
+					rkit::log::Error(u8"Failed to open pipeline cache");
+				}
+			)
+		);
+
+		const bool haveCache = cacheReadStream.IsValid();
 
 		rkit::FilePos_t binaryContentStart = pipelinesFile->Tell();
 
@@ -886,18 +890,22 @@ namespace anox
 
 		RKIT_CHECK(loader->LoadObjectsFromPackage());
 
-		loader->SetMergedLibraryStream(std::move(cacheReadStream), nullptr);
+		bool cacheLoadSucceeded = false;
+		if (haveCache)
+		{
+			loader->SetMergedLibraryStream(std::move(cacheReadStream), nullptr);
 
-		rkit::Result openMergedResult = loader->OpenMergedLibrary();
+			RKIT_CHECK(loader->TryOpenMergedLibrary(cacheLoadSucceeded));
+		}
 
-		m_graphicsSubsystem.SetPipelineLibraryLoader(std::move(loader), std::move(pipelineSets), rkit::utils::ResultIsOK(openMergedResult));
+		m_graphicsSubsystem.SetPipelineLibraryLoader(std::move(loader), std::move(pipelineSets), haveCache);
 
-		if (rkit::utils::ResultIsOK(openMergedResult))
+		if (cacheLoadSucceeded)
 			m_graphicsSubsystem.MarkSetupStepCompleted();
 		else
 			m_graphicsSubsystem.MarkSetupStepFailed();
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::CheckPipelinesJob::EvaluateLivePipelineSets(const rkit::data::IRenderDataPackage &package, RenderDataConfigurator &configurator, LivePipelineSets &lpSets)
@@ -914,7 +922,7 @@ namespace anox
 			RKIT_CHECK(RecursiveEvaluatePermutationTree(package, configurator, lpSets.m_graphicsPipelines, staticResolutions, i, 0, pipeline->m_permutationTree));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::CheckPipelinesJob::RecursiveEvaluatePermutationTree(const rkit::data::IRenderDataPackage &package, RenderDataConfigurator &configurator, rkit::Vector<LivePipelineSets::LivePipeline> &pipelines,
@@ -958,7 +966,7 @@ namespace anox
 						if (foundBranch)
 						{
 							rkit::log::Error(u8"A shader permutation selector had multiple valid permutations for the same value");
-							return rkit::ResultCode::kMalformedFile;
+							RKIT_THROW(rkit::ResultCode::kMalformedFile);
 						}
 
 						foundBranch = branch;
@@ -987,16 +995,16 @@ namespace anox
 			if (keyResolution.IsSet() && !foundBranch)
 			{
 				rkit::log::Error(u8"A shader permutation selector could not match the specified value");
-				return rkit::ResultCode::kMalformedFile;
+				RKIT_THROW(rkit::ResultCode::kMalformedFile);
 			}
 
 			if (branchPermutationOffset != tree->m_width)
 			{
 				rkit::log::Error(u8"A shader permutation tree's branch set was misaligned");
-				return rkit::ResultCode::kMalformedFile;
+				RKIT_THROW(rkit::ResultCode::kMalformedFile);
 			}
 
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 		else
 		{
@@ -1027,7 +1035,7 @@ namespace anox
 
 		m_graphicsSubsystem.m_pipelineLibraryLoader->SetMergedLibraryStream(std::move(pipelinesFile), writeStream);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	GraphicsSubsystem::LoadOneGraphicsPipelineJob::LoadOneGraphicsPipelineJob(GraphicsSubsystem &graphicsSubsystem, size_t index)
@@ -1042,25 +1050,27 @@ namespace anox
 		{
 			m_graphicsSubsystem.m_pipelineLibraryLoader->CloseMergedLibrary(false, true);
 			m_graphicsSubsystem.MarkSetupStepCompleted();
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		const LivePipelineSets::LivePipeline &lp = m_graphicsSubsystem.m_livePipelineSets->m_graphicsPipelines[m_index];
 
-		rkit::Result loadPipelineResult = m_graphicsSubsystem.m_pipelineLibraryLoader->LoadGraphicsPipelineFromMergedLibrary(lp.m_pipelineIndex, lp.m_variationIndex);
+		rkit::PackedResultAndExtCode loadPipelineResult = RKIT_TRY_EVAL(m_graphicsSubsystem.m_pipelineLibraryLoader->LoadGraphicsPipelineFromMergedLibrary(lp.m_pipelineIndex, lp.m_variationIndex));
 
-		if (!rkit::utils::ResultIsOK(loadPipelineResult))
+		// FIXME: Do we really want to tolerate faults here?
+		// LoadGraphicsPipelineFromMergedLibrary doesn't actually have any soft faults.
+		if (loadPipelineResult.m_resultCode != rkit::ResultCode::kOK)
 		{
 			m_graphicsSubsystem.m_pipelineLibraryLoader->CloseMergedLibrary(true, true);
 			m_graphicsSubsystem.MarkSetupStepFailed();
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		rkit::UniquePtr<rkit::IJobRunner> jobRunner;
 		RKIT_CHECK(rkit::New<LoadOneGraphicsPipelineJob>(jobRunner, m_graphicsSubsystem, m_index + 1));
 
 		RKIT_CHECK(m_graphicsSubsystem.m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kIO, std::move(jobRunner), nullptr));
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	GraphicsSubsystem::CompileOneGraphicsPipelineJob::CompileOneGraphicsPipelineJob(GraphicsSubsystem &graphicsSubsystem, size_t index)
@@ -1089,7 +1099,7 @@ namespace anox
 	rkit::Result GraphicsSubsystem::DoneCompilingPipelinesJob::Run()
 	{
 		m_graphicsSubsystem.MarkSetupStepCompleted();
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	GraphicsSubsystem::MergePipelineLibraryJob::MergePipelineLibraryJob(GraphicsSubsystem &graphicsSubsystem)
@@ -1111,7 +1121,7 @@ namespace anox
 
 		m_graphicsSubsystem.MarkSetupStepCompleted();
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	GraphicsSubsystem::ResetCommandAllocatorJob::ResetCommandAllocatorJob(FrameSyncPointCommandListHandler &cmdListHandler)
@@ -1123,7 +1133,7 @@ namespace anox
 	{
 		RKIT_CHECK(m_cmdListHandler.m_commandAllocator->ResetCommandAllocator(false));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	GraphicsSubsystem::RunRecordJobRunner::RunRecordJobRunner(rkit::UniquePtr<IRecordJobRunner> &&recordJob, rkit::render::IBaseCommandAllocator &cmdAlloc)
@@ -1186,7 +1196,7 @@ namespace anox
 
 		rkit::Optional<rkit::render::HeapKey> heapKey = memReqs.FindSuitableHeap(heapSpec);
 		if (!heapKey.IsSet())
-			return rkit::ResultCode::kInternalError;
+			RKIT_THROW(rkit::ResultCode::kInternalError);
 		
 		rkit::UniquePtr<rkit::render::IMemoryHeap> memHeap;
 		RKIT_CHECK(m_graphicsSubsystem.m_renderDevice->CreateMemoryHeap(memHeap, heapKey.Get(), memSize));
@@ -1243,7 +1253,7 @@ namespace anox
 			RKIT_CHECK(m_graphicsSubsystem.PostAsyncUploadTask(std::move(bufferUploadTask)));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	GraphicsSubsystem::AllocateTextureStorageAndPostCopyJobRunner::AllocateTextureStorageAndPostCopyJobRunner(
@@ -1283,7 +1293,7 @@ namespace anox
 
 		if (ddsHeader.m_magic.Get() != rkit::data::DDSHeader::kExpectedMagic
 			|| ddsHeader.m_headerSizeMinus4.Get() != (sizeof(ddsHeader) - 4u))
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		const uint32_t ddsFlags = ddsHeader.m_ddsFlags.Get();
 		const uint32_t width = (ddsFlags & rkit::data::DDSFlags::kWidth) ? ddsHeader.m_width.Get() : 1;
@@ -1293,11 +1303,11 @@ namespace anox
 		const uint32_t pitchOrLinearSize = ddsHeader.m_pitchOrLinearSize.Get();
 
 		if (width == 0 || height == 0 || depth == 0)
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		const uint32_t maxLevels = static_cast<uint32_t>(rkit::Max(rkit::FindHighestSetBit(width), rkit::FindHighestSetBit(height)) + 1);
 		if (levels > maxLevels)
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		const uint32_t caps1 = ddsHeader.m_caps.Get();
 		const uint32_t caps2 = ddsHeader.m_caps2.Get();
@@ -1336,7 +1346,7 @@ namespace anox
 
 			if (pixelFormatFlags & rkit::data::DDSPixelFormatFlags::kFourCC)
 			{
-				return rkit::ResultCode::kNotYetImplemented;
+				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 			}
 			else
 			{
@@ -1390,17 +1400,17 @@ namespace anox
 				{
 					pixelBlockSizeBytes = bitCount / 8u;
 					if (pitchOrLinearSize % pixelBlockSizeBytes != 0 || pitchOrLinearSize / pixelBlockSizeBytes != width)
-						return rkit::ResultCode::kDataError;
+						RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 			}
 		}
 
 		if (textureFormat == rkit::render::TextureFormat::Count)
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		if (width > maxDimension || height > maxDimension || depth > maxDimension || arraySize > maxLayers)
 		{
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		rkit::render::ImageSpec textureSpec = {};
@@ -1438,7 +1448,7 @@ namespace anox
 				for (uint32_t multiplier : multipliers)
 				{
 					if (std::numeric_limits<size_t>::max() / levelBytesRequired < multiplier)
-						return rkit::ResultCode::kDataError;
+						RKIT_THROW(rkit::ResultCode::kDataError);
 
 					levelBytesRequired *= multiplier;
 				}
@@ -1454,7 +1464,7 @@ namespace anox
 
 		const size_t textureDataSize = m_textureData->Count() - static_cast<size_t>(headerSize);
 		if (textureDataSize < totalBytesRequired)
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		rkit::render::ImageResourceSpec resSpec = {};
 		resSpec.m_usage.Add({ rkit::render::TextureUsageFlag::kCopyDest, rkit::render::TextureUsageFlag::kSampled });
@@ -1474,7 +1484,7 @@ namespace anox
 
 		rkit::Optional<rkit::render::HeapKey> heapKey = memReqs.FindSuitableHeap(heapSpec);
 		if (!heapKey.IsSet())
-			return rkit::ResultCode::kInternalError;
+			RKIT_THROW(rkit::ResultCode::kInternalError);
 
 		// FIXME FIXME FIXME
 		rkit::UniquePtr<rkit::render::IMemoryHeap> memHeap;
@@ -1513,7 +1523,7 @@ namespace anox
 			RKIT_CHECK(m_graphicsSubsystem.PostAsyncUploadTask(std::move(textureUploadTask)));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	GraphicsSubsystem::StripedMemCopyJobRunner::StripedMemCopyJobRunner(GraphicsSubsystem &graphicsSubsystem, uint8_t syncPointIndex)
@@ -1552,7 +1562,7 @@ namespace anox
 			}
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	GraphicsSubsystem::StripedMemCopyCleanupJobRunner::StripedMemCopyCleanupJobRunner(GraphicsSubsystem &graphicsSubsystem, uint8_t syncPointIndex)
@@ -1569,7 +1579,7 @@ namespace anox
 			retiredUploadTask->OnCopyCompleted();
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	GraphicsSubsystem::AsyncDisposeResourceJobRunner::AsyncDisposeResourceJobRunner(GraphicTimelinedResourceStack &&stack)
@@ -1580,7 +1590,7 @@ namespace anox
 	rkit::Result GraphicsSubsystem::AsyncDisposeResourceJobRunner::Run()
 	{
 		m_stack = GraphicTimelinedResourceStack();
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	GraphicsSubsystem::CloseFrameRecordRunner::CloseFrameRecordRunner(rkit::render::IBaseCommandBatch *&outBatchPtr, rkit::render::IBinaryGPUWaitableFence *asyncUploadFence)
@@ -1603,7 +1613,7 @@ namespace anox
 
 		m_outBatchPtr = batch;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	GraphicsSubsystem::AsyncUploadPrepareTargetsSubmitRunner::AsyncUploadPrepareTargetsSubmitRunner()
@@ -1613,7 +1623,7 @@ namespace anox
 	rkit::Result GraphicsSubsystem::AsyncUploadPrepareTargetsSubmitRunner::RunSubmit(rkit::render::ICopyCommandQueue &commandQueue)
 	{
 		RKIT_CHECK(m_cmdBatch->Submit());
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::render::ICopyCommandBatch **GraphicsSubsystem::AsyncUploadPrepareTargetsSubmitRunner::GetCmdBatchRef()
@@ -1676,7 +1686,7 @@ namespace anox
 
 		RKIT_CHECK(cmdBatch->CloseBatch());
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	GraphicsSubsystem::CopyAsyncUploadsSubmitRunner::CopyAsyncUploadsSubmitRunner(FrameSyncPoint &syncPoint)
@@ -1688,7 +1698,7 @@ namespace anox
 	{
 		RKIT_CHECK(m_cmdBatch->Submit());
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::render::ICopyCommandBatch **GraphicsSubsystem::CopyAsyncUploadsSubmitRunner::GetCmdBatchRef()
@@ -1735,7 +1745,7 @@ namespace anox
 
 		RKIT_CHECK(cmdBatch->CloseBatch());
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	GraphicsSubsystem::CloseFrameSubmitRunner::CloseFrameSubmitRunner(rkit::render::IBaseCommandBatch *&frameEndBatchPtr)
@@ -1749,7 +1759,7 @@ namespace anox
 
 		m_frameEndBatchPtr = m_lastBatch;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::render::IBaseCommandBatch **GraphicsSubsystem::CloseFrameSubmitRunner::GetLastBatchRef()
@@ -1781,7 +1791,7 @@ namespace anox
 		}
 
 		syncPoint.m_usedGPUWaitableFences++;
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::RenderDataConfigurator::GetEnumConfigKey(size_t configKeyIndex, const rkit::StringView &keyName, rkit::data::RenderRTTIMainType expectedMainType, unsigned int &outValue)
@@ -1796,13 +1806,13 @@ namespace anox
 			if (!m_gfxSettings.ResolveConfigEnum(keyName, resolution.m_mainType, resolution.m_value))
 			{
 				rkit::log::ErrorFmt(u8"Enum config key '{}' in the pipeline cache was unresolvable", keyName.GetChars());
-				return rkit::ResultCode::kConfigInvalid;
+				RKIT_THROW(rkit::ResultCode::kConfigInvalid);
 			}
 
 			if (resolution.m_mainType != expectedMainType)
 			{
 				rkit::log::ErrorFmt(u8"Enum config key '{}' in the pipeline cache was the wrong type", keyName.GetChars());
-				return rkit::ResultCode::kConfigInvalid;
+				RKIT_THROW(rkit::ResultCode::kConfigInvalid);
 			}
 
 			RKIT_CHECK(AddConfigResolution(m_configEnums, configKeyIndex, resolution));
@@ -1810,55 +1820,55 @@ namespace anox
 
 		outValue = resolution.m_value;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::RenderDataConfigurator::GetFloatConfigKey(size_t configKeyIndex, const rkit::StringView &keyName, double &outValue)
 	{
 		if (FindExistingConfigResolution(m_configFloats, configKeyIndex, outValue))
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		if (!m_gfxSettings.ResolveConfigFloat(keyName, outValue))
 		{
 			rkit::log::ErrorFmt(u8"Float config key '{}' in the pipeline cache was unresolvable", keyName.GetChars());
-			return rkit::ResultCode::kConfigInvalid;
+			RKIT_THROW(rkit::ResultCode::kConfigInvalid);
 		}
 
 		RKIT_CHECK(AddConfigResolution(m_configFloats, configKeyIndex, outValue));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::RenderDataConfigurator::GetSIntConfigKey(size_t configKeyIndex, const rkit::StringView &keyName, int64_t &outValue)
 	{
 		if (FindExistingConfigResolution(m_configSInts, configKeyIndex, outValue))
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		if (!m_gfxSettings.ResolveConfigSInt(keyName, outValue))
 		{
 			rkit::log::ErrorFmt(u8"SInt config key '{}' in the pipeline cache was unresolvable", keyName.GetChars());
-			return rkit::ResultCode::kConfigInvalid;
+			RKIT_THROW(rkit::ResultCode::kConfigInvalid);
 		}
 
 		RKIT_CHECK(AddConfigResolution(m_configSInts, configKeyIndex, outValue));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::RenderDataConfigurator::GetUIntConfigKey(size_t configKeyIndex, const rkit::StringView &keyName, uint64_t &outValue)
 	{
 		if (FindExistingConfigResolution(m_configUInts, configKeyIndex, outValue))
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		if (!m_gfxSettings.ResolveConfigUInt(keyName, outValue))
 		{
 			rkit::log::ErrorFmt(u8"UInt config key '{}' in the pipeline cache was unresolvable", keyName.GetChars());
-			return rkit::ResultCode::kConfigInvalid;
+			RKIT_THROW(rkit::ResultCode::kConfigInvalid);
 		}
 
 		RKIT_CHECK(AddConfigResolution(m_configUInts, configKeyIndex, outValue));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::RenderDataConfigurator::GetShaderStaticPermutation(size_t stringIndex, const rkit::StringView &permutationName, bool &outIsStatic, int32_t &outStaticValue)
@@ -1866,7 +1876,7 @@ namespace anox
 		outIsStatic = false;
 		outStaticValue = 0;
 
-		return rkit::ResultCode::kNotYetImplemented;
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
 
 	rkit::Result GraphicsSubsystem::RenderDataConfigurator::CheckConfig(rkit::IReadStream &stream, bool &isConfigMatched)
@@ -1885,12 +1895,12 @@ namespace anox
 		if (amountRead != expectedBuffer.Count())
 		{
 			isConfigMatched = false;
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		isConfigMatched = rkit::CompareSpansEqual(expectedBuffer.ToSpan(), streamVersion.ToSpan());
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::RenderDataConfigurator::WriteConfig(rkit::IWriteStream &stream) const
@@ -1901,7 +1911,7 @@ namespace anox
 		RKIT_CHECK(WriteResolutionsToConfig(stream, m_configFloats));
 		RKIT_CHECK(WriteResolutionsToConfig(stream, m_permutations));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class T>
@@ -1964,7 +1974,7 @@ namespace anox
 			RKIT_CHECK(WriteValueToConfig(stream, resolution.m_resolution));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void GraphicsSubsystem::UploadActionSet::ClearActions()
@@ -2014,7 +2024,7 @@ namespace anox
 			if (lowContiguous == 0 && highContiguous == 0)
 			{
 				// Totally out of space
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 
 			const uint32_t mipLevel = m_mipLevel;
@@ -2036,7 +2046,7 @@ namespace anox
 			if (paddedLevelSize > lowContiguous)
 			{
 				if (paddedLevelSize > highContiguous)
-					return rkit::ResultCode::kOK;	// Not enough space
+					RKIT_RETURN_OK;	// Not enough space
 				else
 				{
 					subsystem.ConsumeAsyncUploadSpace(lowContiguous);
@@ -2091,12 +2101,12 @@ namespace anox
 			if (m_arrayElement == arrayCount)
 			{
 				isCompleted = true;
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
 		isCompleted = false;
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void GraphicsSubsystem::TextureUploadTask::OnCopyCompleted()
@@ -2132,7 +2142,7 @@ namespace anox
 			if (m_copyOpIndex == opCount)
 			{
 				isCompleted = true;
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 
 			const BufferInitializer::CopyOperation &copyOp = initializer.m_copyOperations[m_copyOpIndex];
@@ -2150,7 +2160,7 @@ namespace anox
 			if (lowContiguous == 0)
 			{
 				// Totally out of space
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 
 			const size_t amountToCopyRemaining = copyOp.m_data.Count() - m_srcDataOffset;
@@ -2246,7 +2256,7 @@ namespace anox
 
 		RKIT_CHECK(IFrameDrawer::Create(m_frameDrawer));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::CreateGameDisplayAndDevice(const rkit::StringView &renderModuleName, const rkit::CIPathView &pipelinesFile, const rkit::CIPathView &pipelinesCacheFile, bool canUpdatePipelineCache)
@@ -2281,14 +2291,14 @@ namespace anox
 
 		rkit::IModule *renderModule = rkit::GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, renderModuleName.GetChars(), &moduleParams);
 		if (!renderModule)
-			return rkit::ResultCode::kModuleLoadFailed;
+			RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 
 		rkit::render::IRenderDriver *renderDriver = static_cast<rkit::render::IRenderDriver *>(rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, renderModuleName));
 
 		if (!renderDriver)
 		{
 			rkit::log::Error(u8"Missing render driver");
-			return rkit::ResultCode::kModuleLoadFailed;
+			RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 		}
 
 		rkit::Vector<rkit::UniquePtr<rkit::render::IRenderAdapter>> adapters;
@@ -2297,7 +2307,7 @@ namespace anox
 		if (adapters.Count() == 0)
 		{
 			rkit::log::Error(u8"No available adapters");
-			return rkit::ResultCode::kOperationFailed;
+			RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 		}
 
 		rkit::Vector<rkit::render::CommandQueueTypeRequest> queueRequests;
@@ -2381,7 +2391,7 @@ namespace anox
 			if (!uploadHeapKey.IsSet())
 			{
 				rkit::log::Error(u8"No heap available for use as upload heap");
-				return rkit::ResultCode::kInternalError;
+				RKIT_THROW(rkit::ResultCode::kInternalError);
 			}
 
 			RKIT_CHECK(m_renderDevice->CreateMemoryHeap(m_asyncUploadHeap, uploadHeapKey.Get(), prototype->GetMemoryRequirements().Size()));
@@ -2393,7 +2403,7 @@ namespace anox
 			m_asyncUploadHeapIsFull = false;
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::WaitForRenderingTasks()
@@ -2403,7 +2413,7 @@ namespace anox
 			RKIT_CHECK(m_renderDevice->WaitForDeviceIdle());
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::PostAsyncUploadTask(rkit::RCPtr<UploadTask> &&uploadTaskRef)
@@ -2414,7 +2424,7 @@ namespace anox
 
 		RKIT_CHECK(m_asyncUploadWaitingTasks.Append(std::move(uploadTask)));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::PumpActiveAsyncUploadTask(UploadActionSet &actionSet)
@@ -2428,7 +2438,7 @@ namespace anox
 			m_asyncUploadActiveTask.Reset();
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void GraphicsSubsystem::GetAsyncUploadHeapStats(uint32_t &outContiguousLow, uint32_t &outContiguousHigh) const
@@ -2525,7 +2535,7 @@ namespace anox
 		if (outJob)
 			*outJob = newJob;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::TransitionDisplayMode()
@@ -2601,7 +2611,7 @@ namespace anox
 		if (!m_dmaQueue || !m_logicalQueues[static_cast<size_t>(LogicalQueueType::kGraphics)])
 		{
 			rkit::log::Error(u8"Missing a required graphics API queue type");
-			return rkit::ResultCode::kOperationFailed;
+			RKIT_THROW(rkit::ResultCode::kOperationFailed);
 		}
 
 		rkit::UniquePtr<rkit::render::ISwapChainPrototype> swapChainPrototype;
@@ -2615,7 +2625,7 @@ namespace anox
 		if (!isGraphicsQueueCompatible)
 		{
 			rkit::log::Error(u8"Graphics queue wasn't capable of presenting to the desired display");
-			return rkit::ResultCode::kOperationFailed;
+			RKIT_THROW(rkit::ResultCode::kOperationFailed);
 		}
 
 		LogicalQueueBase *&presentationLogicalQueueRef = m_logicalQueues[static_cast<size_t>(LogicalQueueType::kPresentation)];
@@ -2644,7 +2654,7 @@ namespace anox
 				if (!simpleColorTargetRP.IsValid())
 				{
 					rkit::log::Error(u8"RP_SimpleColorTarget render pass is missing");
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
 				rkit::render::RenderPassResources resources;
@@ -2665,7 +2675,7 @@ namespace anox
 			}
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::TransitionBackend()
@@ -2705,7 +2715,7 @@ namespace anox
 			break;
 
 		default:
-			return rkit::ResultCode::kInternalError;
+			RKIT_THROW(rkit::ResultCode::kInternalError);
 		}
 
 		return CreateGameDisplayAndDevice(backendModule, pipelinesFile, pipelinesCacheFile, canUpdatePipelineCache);
@@ -2727,7 +2737,7 @@ namespace anox
 
 		RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kIO, std::move(jobRunner), nullptr));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::KickOffNextSetupStep()
@@ -2739,7 +2749,7 @@ namespace anox
 			if (m_haveExistingMergedCache)
 			{
 				RKIT_CHECK(KickOffMergedPipelineLoad());
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else
 			{
@@ -2791,7 +2801,7 @@ namespace anox
 
 				RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(finishedJobRunner), jobs.ToSpan().ToValueISpan()));
 
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else
 			{
@@ -2822,7 +2832,7 @@ namespace anox
 
 			RKIT_CHECK(m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(jobRunner), nullptr));
 
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		if (m_setupStep == DeviceSetupStep::kMergingPipelines)
@@ -2840,14 +2850,14 @@ namespace anox
 
 			RKIT_CHECK(KickOffMergedPipelineLoad());
 
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		if (m_setupStep == DeviceSetupStep::kSecondTryLoadingPipelines)
 		{
 			if (m_stepFailed)
 			{
-				return rkit::ResultCode::kOperationFailed;
+				RKIT_THROW(rkit::ResultCode::kOperationFailed);
 			}
 			else
 			{
@@ -2859,11 +2869,11 @@ namespace anox
 
 				m_desiredDisplayMode = rkit::render::DisplayMode::kWindowed;
 
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
-		return rkit::ResultCode::kNotYetImplemented;
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
 
 	void GraphicsSubsystem::SetDesiredRenderBackend(RenderBackend renderBackend)
@@ -2886,7 +2896,7 @@ namespace anox
 				RKIT_CHECK(KickOffNextSetupStep());
 
 				if (m_setupStep == DeviceSetupStep::kFinished)
-					return rkit::ResultCode::kOK;	// Bail out since there will be no main-thread jobs to run
+					RKIT_RETURN_OK;	// Bail out since there will be no main-thread jobs to run
 			}
 
 			rkit::GetDrivers().m_systemDriver->SleepMSec(1000u / 60u);
@@ -2912,7 +2922,7 @@ namespace anox
 
 			RKIT_CHECK(m_threadPool.GetJobQueue()->CheckFault());
 
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		if (!m_backend.IsSet() || m_backend.Get() != m_desiredBackend)
@@ -2921,13 +2931,13 @@ namespace anox
 		if (!m_currentDisplayMode.IsSet() || m_currentDisplayMode.Get() != m_desiredDisplayMode)
 			return TransitionDisplayMode();
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::RetireOldestFrame()
 	{
 		if (!m_currentDisplayMode.IsSet() || m_currentDisplayMode.Get() == rkit::render::DisplayMode::kSplash)
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		FrameSyncPoint &syncPoint = m_syncPoints[m_currentSyncPoint];
 
@@ -3031,13 +3041,13 @@ namespace anox
 			cmdQueueReset.Set(static_cast<size_t>(queueType), true);
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::PumpAsyncUploads()
 	{
 		if (!m_enableAsyncUpload)
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		FrameSyncPoint &syncPoint = m_syncPoints[m_currentSyncPoint];
 
@@ -3112,7 +3122,7 @@ namespace anox
 			m_syncPoints[m_currentSyncPoint].m_asyncUploadActionSet.m_cleanupJob = cleanupJob;
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::StartRendering()
@@ -3126,23 +3136,23 @@ namespace anox
 
 		RKIT_CHECK(m_gameWindow->BeginFrame(*this));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::DrawFrame()
 	{
 		if (!m_currentDisplayMode.IsSet() || m_currentDisplayMode.Get() == rkit::render::DisplayMode::kSplash)
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		RKIT_CHECK(m_frameDrawer->DrawFrame(*this, m_currentFrameResources, *m_gameWindow));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::EndFrame()
 	{
 		if (!m_currentDisplayMode.IsSet() || m_currentDisplayMode.Get() == rkit::render::DisplayMode::kSplash)
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		RKIT_CHECK(m_gameWindow->EndFrame(*this));
 
@@ -3199,7 +3209,7 @@ namespace anox
 
 		m_currentGlobalSyncPoint++;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Optional<rkit::render::DisplayMode> GraphicsSubsystem::GetDisplayMode() const
@@ -3298,7 +3308,7 @@ namespace anox
 
 		RKIT_CHECK(jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(allocStorageJobRunner), dependencies));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::CreateAsyncCreateAndFillBufferJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<IBuffer> &outBuffer, const rkit::RCPtr<BufferInitializer> &bufferInitializer, const rkit::JobDependencyList &dependencies)
@@ -3322,7 +3332,7 @@ namespace anox
 
 		RKIT_CHECK(jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(allocStorageJobRunner), dependencies));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void GraphicsSubsystem::CondemnTimelinedResource(GraphicTimelinedResource &timelinedResource)
@@ -3354,5 +3364,5 @@ rkit::Result anox::IGraphicsSubsystem::Create(rkit::UniquePtr<IGraphicsSubsystem
 
 	outSubsystem = std::move(subsystem);
 
-	return rkit::ResultCode::kOK;
+	RKIT_RETURN_OK;
 }

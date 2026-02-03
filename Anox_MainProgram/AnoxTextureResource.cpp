@@ -40,7 +40,7 @@ namespace anox
 
 		RKIT_CHECK(systems.m_graphicsSystem->CreateAsyncCreateTextureJob(&outJob, resource.StaticCast<AnoxTextureResource>()->m_texture, state.FieldRef(&AnoxTextureResourceLoaderState::m_data), loadJob));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxTextureResourceLoader::CreateResourceObject(rkit::UniquePtr<AnoxTextureResourceBase> &outResource) const

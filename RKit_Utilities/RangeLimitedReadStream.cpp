@@ -27,7 +27,7 @@ namespace rkit
 		outCountRead = countRead;
 		m_filePos += static_cast<FilePos_t>(countRead);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RangeLimitedReadStream::SeekStart(FilePos_t pos)
@@ -39,7 +39,7 @@ namespace rkit
 
 		m_filePos = pos;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RangeLimitedReadStream::SeekCurrent(FileOffset_t offset)

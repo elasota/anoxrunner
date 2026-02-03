@@ -51,7 +51,7 @@ namespace rkit
 			outIndex = newIndex;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class TItem>

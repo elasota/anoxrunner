@@ -39,7 +39,7 @@ namespace anox
 
 rkit::Result anox::MainProgramDriver::InitDriver(const rkit::DriverInitParameters *initParams)
 {
-	return rkit::ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 void anox::MainProgramDriver::ShutdownDriver()
@@ -216,7 +216,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 		RKIT_CHECK(m_game->Start());
 	}
 
-	return rkit::ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 rkit::Result anox::MainProgramDriver::RunFrame(bool &outIsExiting)
@@ -230,7 +230,7 @@ rkit::Result anox::MainProgramDriver::RunFrame(bool &outIsExiting)
 		outIsExiting = game->IsExiting();
 	}
 
-	return rkit::ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 void anox::MainProgramDriver::ShutdownProgram()

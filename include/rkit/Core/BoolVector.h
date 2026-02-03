@@ -221,7 +221,7 @@ namespace rkit
 
 		m_size = newSize;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	inline Result BoolVector::Append(bool value)
@@ -244,7 +244,7 @@ namespace rkit
 			lastChunk |= bitMask;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	inline BoolSpanLValue BoolVector::operator[](size_t index)
@@ -291,7 +291,7 @@ namespace rkit
 			m_size = other.m_size;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	inline BoolVector &BoolVector::operator=(BoolVector &&other) noexcept

@@ -306,7 +306,7 @@ namespace rkit { namespace utils { namespace shadowfile
 			}
 
 			SetSlotOccupied(slot);
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 		else
 			return SetSlotAvailable(slot);
@@ -369,7 +369,7 @@ namespace rkit { namespace utils { namespace shadowfile
 		}
 
 		m_tables[0].Set(slot, true);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void FastIndexTable::Reset()
@@ -385,7 +385,7 @@ namespace rkit { namespace utils { namespace shadowfile
 			RKIT_CHECK(m_tables[i].Duplicate(other.m_tables[i]));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -421,7 +421,7 @@ namespace rkit { namespace utils { namespace shadowfile
 		m_convertToWrite.m_indexInParent = indexInParent;
 		m_convertToWrite.m_extra = extra;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SectorMemoryMapper::Close()
@@ -437,7 +437,7 @@ namespace rkit { namespace utils { namespace shadowfile
 			m_isWritable = false;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SectorMemoryMapper::MapRead(ConstSpan<uint8_t> &outSpan, bool isInFSLock)
@@ -449,7 +449,7 @@ namespace rkit { namespace utils { namespace shadowfile
 		}
 
 		outSpan = m_memory.ToSpan();
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SectorMemoryMapper::MapWrite(Span<uint8_t> &outSpan, bool isInFSLock)
@@ -468,7 +468,7 @@ namespace rkit { namespace utils { namespace shadowfile
 		}
 
 		outSpan = m_memory.ToSpan();
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SectorMemoryMapper::MapWriteZeroFill(Span<uint8_t> &outSpan, bool isInFSLock)
@@ -490,7 +490,7 @@ namespace rkit { namespace utils { namespace shadowfile
 		}
 
 		outSpan = m_memory.ToSpan();
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	ShadowFS::ShadowFS(ISeekableReadStream &readStream, ISeekableWriteStream *writeStream)
@@ -519,7 +519,7 @@ namespace rkit { namespace utils { namespace shadowfile
 			RKIT_CHECK(sysDriver->CreateMutex(m_sectorFlushMutex));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result ShadowFS::EntryExists(const StringSliceView &str, bool &outExists)
@@ -539,7 +539,7 @@ namespace rkit { namespace utils { namespace shadowfile
 		outStream.Reset();
 
 		if (!m_writeStream)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		MutexLock lock(*m_fsStateMutex);
 		if (m_haveFSWriteFaults)
@@ -563,7 +563,7 @@ namespace rkit { namespace utils { namespace shadowfile
 		if (!exists)
 		{
 			if (!createIfNotExists)
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 
 			RKIT_CHECK(CreateFileInDirectory(fileEntry, fileExtentsIndex, fileExtentsData, directoryEntry, directoryExtentsIndex, directoryExtentsData, nameSpan, 0));
 		}
@@ -586,7 +586,7 @@ namespace rkit { namespace utils { namespace shadowfile
 
 		outStream = std::move(file);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result ShadowFS::CopyEntry(const StringSliceView &oldName, const StringSliceView &newName)
@@ -663,7 +663,7 @@ namespace rkit { namespace utils { namespace shadowfile
 
 		m_sfHeader = newHeader;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void ShadowFS::ClearWriteState()
@@ -759,7 +759,7 @@ namespace rkit { namespace utils { namespace shadowfile
 		outDirectoryExtents = directoryExtentsIndex;
 		outDirectoryExtentsData = directoryExtentsData;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result ShadowFS::CheckCreateRootDirectory(uint32_t &outRootDirectoryEntry, uint32_t &outRootDirectoryExtentsIndex, ExtentsTableEntry &outRootDirectoryExtentsData)
@@ -850,7 +850,7 @@ namespace rkit { namespace utils { namespace shadowfile
 
 		outSector = static_cast<uint32_t>(slotIndex);
 		
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result ShadowFS::AllocateExtents(uint32_t &outExtentsIndex, ExtentsTableEntry &outExtentsData)
@@ -897,7 +897,7 @@ namespace rkit { namespace utils { namespace shadowfile
 				outExtentsData = newEntry;
 				outExtentsIndex = static_cast<uint32_t>(slotIndex);
 
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
@@ -924,7 +924,7 @@ namespace rkit { namespace utils { namespace shadowfile
 		outExtentsData = newEntry;
 		outExtentsIndex = static_cast<uint32_t>(slotIndex);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result ShadowFS::ResolveExtents(ExtentsTableEntry &outExtentsData, uint32_t extentsIndex)
@@ -938,7 +938,7 @@ namespace rkit { namespace utils { namespace shadowfile
 			return ResultCode::kOperationFailed;
 
 		if (m_isWriteAccessInitialized)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		ClearWriteState();
 
@@ -989,7 +989,7 @@ namespace rkit { namespace utils { namespace shadowfile
 
 		RKIT_CHECK(m_newUsedSectors.Duplicate(m_anyUsedSectors));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	ShadowFSFile::ShadowFSFile(ShadowFS &shadowFS, uint32_t fileTableIndex, uint32_t fileExtentsStart, const ExtentsTableEntry &initialExtentsData, bool isWritable)
@@ -1061,7 +1061,7 @@ namespace rkit { namespace utils { namespace shadowfile
 	Result ShadowFSFile::Truncate(FilePos_t size)
 	{
 		if (size == m_size)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		if (size > m_size)
 			return ResultCode::kOperationFailed;
@@ -1073,7 +1073,7 @@ namespace rkit { namespace utils { namespace shadowfile
 
 		m_size = size;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result ShadowFSFile::PrivFlush()
@@ -1121,7 +1121,7 @@ namespace rkit { namespace utils { namespace shadowfile
 		if (locator.m_extentsTableSize > m_maxExtentsTableSize)
 			return ResultCode::kOperationFailed;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result ShadowFS::InitializeShadowFile()
@@ -1134,7 +1134,7 @@ namespace rkit { namespace utils { namespace shadowfile
 
 		RKIT_CHECK(CommitChanges());
 		
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	size_t ShadowFS::GetSectorSize() const
@@ -1164,6 +1164,6 @@ namespace rkit { namespace utils
 
 		outShadowFile = std::move(shadowFile);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } // rkit::utils

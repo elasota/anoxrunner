@@ -48,7 +48,7 @@ rkit::Result anox::UtilitiesDriver::OpenAFSArchive(rkit::UniquePtr<rkit::ISeekab
 
 	outArchive = rkit::UniquePtr<anox::afs::IArchive>(std::move(archive));
 
-	return rkit::ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 
@@ -59,7 +59,7 @@ rkit::Result anox::UtilitiesDriver::RunDataBuild(const rkit::StringView &targetN
 
 	RKIT_CHECK(dataBuilder->Run(targetName, sourceDir, intermedDir, dataDir, dataSourceDir, backendType));
 
-	return rkit::ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 const anox::data::EntityDefsSchema & anox::UtilitiesDriver::GetEntityDefs() const
@@ -69,7 +69,7 @@ const anox::data::EntityDefsSchema & anox::UtilitiesDriver::GetEntityDefs() cons
 
 rkit::Result anox::UtilitiesDriver::InitDriver(const rkit::DriverInitParameters *)
 {
-	return rkit::ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 void anox::UtilitiesDriver::ShutdownDriver()

@@ -39,11 +39,11 @@ namespace rkit { namespace render { namespace vulkan {
 		if (numSemaphores == 0)
 		{
 			outTimeout = false;
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		if (numSemaphores > std::numeric_limits<uint32_t>::max())
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		HybridVector<VkSemaphore, 16> semaphores;
 		HybridVector<uint64_t, 16> values;
@@ -71,14 +71,14 @@ namespace rkit { namespace render { namespace vulkan {
 		if (result == VK_TIMEOUT)
 		{
 			outTimeout = true;
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		RKIT_VK_CHECK(result);
 
 		outTimeout = false;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCPUFenceWaiter::WaitForBinaryFencesNanoSec(bool &outTimeout, const Span<IBinaryCPUWaitableFence *> &binaryWaits, uint64_t timeoutNSec, bool waitAll) const
@@ -90,11 +90,11 @@ namespace rkit { namespace render { namespace vulkan {
 		if (numFences == 0)
 		{
 			outTimeout = false;
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		if (numFences > std::numeric_limits<uint32_t>::max())
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		HybridVector<VkFence, 16> fences;
 
@@ -110,14 +110,14 @@ namespace rkit { namespace render { namespace vulkan {
 		if (result == VK_TIMEOUT)
 		{
 			outTimeout = true;
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		RKIT_VK_CHECK(result);
 
 		outTimeout = false;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCPUFenceWaiter::WaitForFences(const Span<const Pair<ICPUVisibleTimelineFence *, TimelinePoint_t>> &timelineWaits, bool waitAll)
@@ -130,7 +130,7 @@ namespace rkit { namespace render { namespace vulkan {
 	{
 		constexpr uint64_t maxNSec = (std::numeric_limits<uint64_t>::max() - 1) / 1000000;
 		if (timeoutMSec > maxNSec)
-			return ResultCode::kIntegerOverflow;
+			RKIT_THROW(ResultCode::kIntegerOverflow);
 
 		return this->WaitForFencesNanoSec(outTimeout, timelineWaits, timeoutMSec * static_cast<uint64_t>(1000000), waitAll);
 	}
@@ -145,7 +145,7 @@ namespace rkit { namespace render { namespace vulkan {
 	{
 		constexpr uint64_t maxNSec = (std::numeric_limits<uint64_t>::max() - 1) / 1000000;
 		if (timeoutMSec > maxNSec)
-			return ResultCode::kIntegerOverflow;
+			RKIT_THROW(ResultCode::kIntegerOverflow);
 
 		return this->WaitForBinaryFencesNanoSec(outTimeout, binaryWaits, timeoutMSec * static_cast<uint64_t>(1000000), waitAll);
 	}
@@ -158,7 +158,7 @@ namespace rkit { namespace render { namespace vulkan {
 
 		outInstance = std::move(fenceWaiter);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 } } }

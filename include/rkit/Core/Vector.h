@@ -203,7 +203,7 @@ namespace rkit
 		constexpr size_t kMaxSize = std::numeric_limits<size_t>::max() / sizeof(T);
 
 		if (size > kMaxSize)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		if (m_capacity < size)
 		{
@@ -225,7 +225,7 @@ namespace rkit
 
 		m_count = count;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class T>
@@ -236,11 +236,11 @@ namespace rkit
 		constexpr size_t kMaxCount = std::numeric_limits<size_t>::max() / sizeof(T);
 
 		if (size > kMaxCount)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		void *newMem = m_alloc->Alloc(size * sizeof(T));
 		if (!newMem)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		T *newArr = static_cast<T *>(newMem);
 		size_t count = m_count;
@@ -253,7 +253,7 @@ namespace rkit
 		for (size_t i = 0; i < size; i++)
 			new (newArr + i) T();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class T>
@@ -264,7 +264,7 @@ namespace rkit
 			RKIT_CHECK(Reallocate(size));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class T>
@@ -398,7 +398,7 @@ namespace rkit
 		}
 
 		m_count = newCount;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class T>
@@ -453,11 +453,11 @@ namespace rkit
 		constexpr size_t kMaxCount = std::numeric_limits<size_t>::max() / sizeof(T);
 
 		if (newCapacity > kMaxCount)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		void *newMem = m_alloc->Alloc(newCapacity * sizeof(T));
 		if (!newMem)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		T *newArr = static_cast<T *>(newMem);
 		size_t count = m_count;
@@ -474,20 +474,20 @@ namespace rkit
 
 		m_capacity = newCapacity;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class T>
 	Result Vector<T>::EnsureCapacityForOneMore()
 	{
 		if (m_count < m_capacity)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		constexpr size_t kMaxCount = std::numeric_limits<size_t>::max() / sizeof(T);
 		const size_t kInitialAllocSize = 8;
 
 		if (m_capacity == kMaxCount)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		const size_t maxCountToAdd = kMaxCount - m_capacity;
 
@@ -499,7 +499,7 @@ namespace rkit
 			countToAdd = maxCountToAdd;
 
 		if (countToAdd < kInitialAllocSize)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		return Reallocate(m_capacity + countToAdd);
 	}
@@ -508,7 +508,7 @@ namespace rkit
 	Result Vector<T>::EnsureCapacityForMore(size_t extra)
 	{
 		if (m_capacity - m_count >= extra)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		if (extra == 1)
 			return EnsureCapacityForOneMore();
@@ -519,7 +519,7 @@ namespace rkit
 		const size_t maxCountToAdd = kMaxCount - m_capacity;
 
 		if (maxCountToAdd < extra)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		size_t countToAdd = m_capacity / 2u;
 

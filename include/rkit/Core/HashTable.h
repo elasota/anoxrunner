@@ -637,17 +637,17 @@ rkit::Result rkit::HashTableBase<TKey, TValue, TSize>::Resize(TSize newCapacity)
 	if (newCapacity == 0)
 	{
 		Clear();
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	if (newCapacity > std::numeric_limits<TSize>::max() / 2)
-		return ResultCode::kOutOfMemory;
+		RKIT_THROW(ResultCode::kOutOfMemory);
 
 	if (newCapacity < m_count)
-		return ResultCode::kInvalidParameter;
+		RKIT_THROW(ResultCode::kInvalidParameter);
 
 	if ((newCapacity & (newCapacity - 1)) != 0)
-		return ResultCode::kInvalidParameter;
+		RKIT_THROW(ResultCode::kInvalidParameter);
 
 	// Keys, Next/Occupancy, Values, HashValues
 	ResizePlanChunk sizeAlignChunks[] =
@@ -667,24 +667,24 @@ rkit::Result rkit::HashTableBase<TKey, TValue, TSize>::Resize(TSize newCapacity)
 			padding = (chunk.m_alignment - trailingAlignment);
 
 		if (maxBlobSize - totalSize < padding)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		totalSize += padding;
 		chunk.m_blobOffset = totalSize;
 
 		if (chunk.m_size > 0 && maxBlobSize / chunk.m_size < chunk.m_count)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		size_t chunkSize = chunk.m_count * chunk.m_size;
 		if (maxBlobSize - totalSize < chunkSize)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		totalSize += chunkSize;
 	}
 
 	void *newBlob = m_alloc->Alloc(totalSize);
 	if (!newBlob)
-		return ResultCode::kOutOfMemory;
+		RKIT_THROW(ResultCode::kOutOfMemory);
 
 	TKey *oldKeys = m_keys;
 	const HashValue_t *oldHashValues = m_hashValues;
@@ -731,7 +731,7 @@ rkit::Result rkit::HashTableBase<TKey, TValue, TSize>::Resize(TSize newCapacity)
 		m_alloc->Free(oldMemory);
 	}
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TKey, class TValue, class TSize>
@@ -745,14 +745,14 @@ rkit::Result rkit::HashTableBase<TKey, TValue, TSize>::Rehash(TSize minimumCapac
 			return Resize(newSize);
 	}
 
-	return ResultCode::kOutOfMemory;
+	RKIT_THROW(ResultCode::kOutOfMemory);
 }
 
 template<class TKey, class TValue, class TSize>
 rkit::Result rkit::HashTableBase<TKey, TValue, TSize>::CreatePositionForNewEntry(HashValue_t newKeyHash, TSize &outPosition)
 {
 	if (m_count == std::numeric_limits<TSize>::max())
-		return ResultCode::kOutOfMemory;
+		RKIT_THROW(ResultCode::kOutOfMemory);
 
 	if (m_capacity > 0)
 	{
@@ -762,7 +762,7 @@ rkit::Result rkit::HashTableBase<TKey, TValue, TSize>::CreatePositionForNewEntry
 		{
 			ReserveMainPosition(newKeyHash, mainPosition);
 			outPosition = mainPosition;
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 	}
 
@@ -779,14 +779,14 @@ rkit::Result rkit::HashTableBase<TKey, TValue, TSize>::CreatePositionForNewEntry
 	{
 		RKIT_CHECK(Rehash(m_count + 1));
 		this->CreatePositionForNewEntryNoResize(newKeyHash, outPosition);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	m_freePosScan = insertPosition + 1;
 
 	ReserveNonMainPosition(newKeyHash, insertPosition, outPosition);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TKey, class TValue, class TSize>
@@ -945,19 +945,21 @@ rkit::Result rkit::HashSet<TKey, TSize>::Add(TCandidateKey &&key)
 
 	TSize position = 0;
 	if (this->FindKeyPosition<TCandidateKey>(hash, key, position))
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 
 	RKIT_CHECK(this->CreatePositionForNewEntry(hash, position));
 
-	Result constructResult = TKeyConstructor::Construct(this->m_keys + position, std::forward<TKey>(key));
-	if (!utils::ResultIsOK(constructResult))
-	{
-		this->m_keys[position].~TKey();
-		this->RemoveEntryNoDestruct(position);
-		return constructResult;
-	}
+	RKIT_TRY(TKeyConstructor::Construct(this->m_keys + position, std::forward<TKey>(key)),
+		CatchRethrow(
+			[]
+			{
+				this->m_keys[position].~TKey();
+				this->RemoveEntryNoDestruct(position);
+			}
+		)
+	);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TKey, class TSize>
@@ -1000,26 +1002,30 @@ rkit::Result rkit::HashMap<TKey, TValue, TSize>::SetPrehashed(HashValue_t hash, 
 	RKIT_CHECK(this->CreatePositionForNewEntry(hash, position));
 
 	{
-		Result keyConstructResult = TKeyConstructor::Construct(this->m_keys + position, std::forward<TCandidateKey>(key));
-		if (!utils::ResultIsOK(keyConstructResult))
-		{
-			this->RemoveEntryNoDestruct(position);
-			return keyConstructResult;
-		}
+		RKIT_TRY_CATCH_RETHROW(TKeyConstructor::Construct(this->m_keys + position, std::forward<TCandidateKey>(key)),
+			CatchContext(
+				[this, position]
+				{
+					this->RemoveEntryNoDestruct(position);
+				}
+			)
+		);
 	}
 
 	{
-		Result valueConstructResult = TValueConstructor::Construct(this->m_values.GetValuePtrAt(position), std::forward<TCandidateValue>(value));
-		if (!utils::ResultIsOK(valueConstructResult))
-		{
-			this->m_keys[position].~TKey();
+		RKIT_TRY_CATCH_RETHROW(TValueConstructor::Construct(this->m_values.GetValuePtrAt(position), std::forward<TCandidateValue>(value)),
+			CatchContext(
+				[this, position]
+				{
+					this->m_keys[position].~TKey();
 
-			this->RemoveEntryNoDestruct(position);
-			return valueConstructResult;
-		}
+					this->RemoveEntryNoDestruct(position);
+				}
+			)
+		);
 	}
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 
@@ -1125,14 +1131,14 @@ template<class TTarget, class TOriginal>
 rkit::Result rkit::DefaultElementConstructor<TTarget, TOriginal>::Construct(void *memory, TOriginal &&original)
 {
 	new (memory) TTarget(std::forward<TOriginal>(original));
-	return rkit::ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TTarget, class TOriginal>
 rkit::Result rkit::DefaultElementConstructor<TTarget, TOriginal>::Assign(TTarget &target, TOriginal &&original)
 {
 	target = std::forward<TOriginal>(original);
-	return rkit::ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TKey, class TValue>

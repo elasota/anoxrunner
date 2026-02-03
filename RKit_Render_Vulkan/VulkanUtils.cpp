@@ -17,10 +17,10 @@ namespace rkit { namespace render { namespace vulkan
 			outVkFormat = VK_FORMAT_R8G8B8A8_SRGB;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanUtils::ResolveRenderTargetFormatAspectFlags(VkImageAspectFlags &outFlags, RenderTargetFormat rtFormat)
@@ -32,10 +32,10 @@ namespace rkit { namespace render { namespace vulkan
 			outFlags = VK_IMAGE_ASPECT_COLOR_BIT;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanUtils::ConvertBidirectionalPipelineStageBits(VkPipelineStageFlags &outSrcFlags, VkPipelineStageFlags &outDstFlags, const EnumMask<PipelineStage> &srcStages, const EnumMask<PipelineStage> &dstStages)
@@ -59,7 +59,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_CHECK(ConvertPipelineStageBits(outSrcFlags, srcStagesCopy));
 		RKIT_CHECK(ConvertPipelineStageBits(outDstFlags, dstStagesCopy));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanUtils::ConvertResourceAccessBits(VkAccessFlags &outFlags, const EnumMask<ResourceAccess> &accesses)
@@ -82,13 +82,13 @@ namespace rkit { namespace render { namespace vulkan
 			case ResourceAccess::kPresentSource:
 				break;
 			default:
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 			}
 		}
 
 		outFlags = flags;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanUtils::ConvertImagePlaneBits(VkImageAspectFlags &outFlags, const EnumMask<ImagePlane> &planes)
@@ -110,13 +110,13 @@ namespace rkit { namespace render { namespace vulkan
 				break;
 
 			default:
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 			}
 		}
 
 		outFlags = flags;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanUtils::ConvertImageLayout(VkImageLayout &outLayout, ImageLayout imageLayout)
@@ -151,10 +151,10 @@ namespace rkit { namespace render { namespace vulkan
 			outLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VkRect2D VulkanUtils::ConvertImageRect(const ImageRect2D &rect)
@@ -191,10 +191,10 @@ namespace rkit { namespace render { namespace vulkan
 			outBlockSizeBytes = 1;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanUtils::ConvertPipelineStageBits(VkPipelineStageFlags &outFlags, const EnumMask<PipelineStage> &stages)
@@ -218,12 +218,12 @@ namespace rkit { namespace render { namespace vulkan
 				flags |= VK_PIPELINE_STAGE_TRANSFER_BIT;
 				break;
 			default:
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 			}
 		}
 
 		outFlags = flags;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } } // rkit::render::vulkan

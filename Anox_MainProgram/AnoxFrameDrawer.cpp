@@ -132,14 +132,14 @@ namespace anox
 
 		RKIT_CHECK(cmdBatch.CloseBatch());
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result FrameDrawer::SubmitTestCommandsJobRunner::RunSubmit(rkit::render::IGraphicsCommandQueue &commandQueue)
 	{
 		RKIT_CHECK(m_cmdBatch->Submit());
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -164,12 +164,12 @@ namespace anox
 
 		RKIT_CHECK(graphicsSubsystem.CreateAndQueueSubmitJob(&submitJob, LogicalQueueType::kGraphics, std::move(submitJobRunner), recordJob));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result FrameDrawer::Initialize()
 	{
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result IFrameDrawer::Create(rkit::UniquePtr<IFrameDrawer> &outFrameDrawer)
@@ -181,6 +181,6 @@ namespace anox
 
 		outFrameDrawer = std::move(frameDrawer);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 }

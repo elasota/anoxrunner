@@ -266,7 +266,7 @@ inline rkit::Result rkit::buildsystem::FileStatus::Set(const FileStatusView &vie
 	m_fileTime = view.m_fileTime;
 	m_isDirectory = view.m_isDirectory;
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline rkit::buildsystem::FileDependencyInfoView rkit::buildsystem::FileDependencyInfo::ToView() const
@@ -285,7 +285,7 @@ inline rkit::Result rkit::buildsystem::FileDependencyInfo::Set(const FileDepende
 	m_mustBeUpToDate = view.m_mustBeUpToDate;
 	RKIT_CHECK(m_status.Set(view.m_status));
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline bool rkit::buildsystem::DirectoryScanView::operator==(const DirectoryScanView &other) const
@@ -358,7 +358,7 @@ inline rkit::Result rkit::buildsystem::DirectoryScan::Set(const DirectoryScanVie
 	RKIT_CHECK(m_directoryPath.Set(view.m_directoryPath));
 	m_directoryLocation = view.m_directoryLocation;
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline rkit::buildsystem::DirectoryScanDependencyInfoView rkit::buildsystem::DirectoryScanDependencyInfo::ToView() const
@@ -377,5 +377,5 @@ inline rkit::Result rkit::buildsystem::DirectoryScanDependencyInfo::Set(const Di
 	m_dirExists = view.m_dirExists;
 	m_mustBeUpToDate = view.m_mustBeUpToDate;
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }

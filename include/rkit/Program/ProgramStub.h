@@ -26,7 +26,7 @@ rkit::Result rkit::ProgramStub<T>::Init(const ModuleInitParameters *)
 	RKIT_CHECK(New<T>(driver));
 	GetMutableDrivers().m_programDriver = driver.Detach();
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class T>

@@ -396,7 +396,7 @@ rkit::Result rkit::ResizableRingBuffer<TTraits>::Allocate(AddrOffset_t size, Add
 
 	outHandle = ResizableRingBufferHandle<TTraits>(m_lastInfoBlockChunk, infoBlockLoc);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TTraits>
@@ -509,7 +509,7 @@ inline rkit::Result rkit::ResizableRingBufferCPUMemChunk::Initialize(size_t size
 	m_baseAddr = m_alloc->Alloc(size + alignment - 1);
 
 	if (!m_baseAddr)
-		return ResultCode::kOutOfMemory;
+		RKIT_THROW(ResultCode::kOutOfMemory);
 
 	uintptr_t addrPtr = reinterpret_cast<uintptr_t>(m_baseAddr);
 	addrPtr += alignment - 1;
@@ -517,7 +517,7 @@ inline rkit::Result rkit::ResizableRingBufferCPUMemChunk::Initialize(size_t size
 
 	m_alignedMemory = reinterpret_cast<void *>(addrPtr);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline void *rkit::ResizableRingBufferCPUMemChunk::GetDataAtPosition(size_t offset) const

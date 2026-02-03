@@ -84,7 +84,7 @@ namespace anox { namespace priv {
 			return rkit::ResultCode::kDataError;
 
 		outValue = static_cast<TEnum>(num);
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class TEnum, class TIntegral>
@@ -108,7 +108,7 @@ namespace anox { namespace priv {
 			return rkit::ResultCode::kDataError;
 
 		outValue = result;
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class TEnum, class TIntegral>
@@ -148,7 +148,7 @@ namespace anox
 
 		outVec = rkit::math::Vec<float, TSize>::FromArray(floats);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class TEnum, class TIntegral>
@@ -168,6 +168,6 @@ namespace anox
 		uint8_t b = 0;
 		RKIT_CHECK(ReadCheckUInt(b, inBool, 1));
 		outBool = (b != 0);
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 }

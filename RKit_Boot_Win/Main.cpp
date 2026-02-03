@@ -379,7 +379,7 @@ namespace rkit
 			RKIT_CHECK(m_moduleAPI.m_initFunction(initParams));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void Module_Win32::Unload()

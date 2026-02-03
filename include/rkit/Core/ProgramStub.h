@@ -44,7 +44,7 @@ rkit::Result rkit::ProgramStubDriver<TProgram>::InitDriver(const DriverInitParam
 
 	ms_program = program.Detach();
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TProgram>
@@ -63,7 +63,7 @@ template<class TProgram>
 rkit::Result rkit::ProgramStubDriver<TProgram>::RunFrame(bool &outIsExiting)
 {
 	outIsExiting = true;
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TProgram>

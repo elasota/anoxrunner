@@ -48,7 +48,7 @@ namespace rkit { namespace buildsystem
 			amountRemaining -= static_cast<FilePos_t>(amountToCopy);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	uint32_t CopyFileCompiler::GetVersion() const

@@ -110,7 +110,7 @@ inline rkit::Result rkit::Drivers::RegisterDriver(UniquePtr<ICustomDriver> &&dri
 
 	m_lastCustomDriverLink = driverLink;
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline void rkit::Drivers::UnregisterDriver(ICustomDriver *driver)

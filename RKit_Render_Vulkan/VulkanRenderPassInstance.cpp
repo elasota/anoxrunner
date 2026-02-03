@@ -60,10 +60,10 @@ namespace rkit { namespace render { namespace vulkan
 	Result VulkanRenderPassInstance::Initialize(const RenderPassRef_t &renderPassRef, const RenderPassResources &resources)
 	{
 		if (!renderPassRef.IsValid())
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		if (resources.m_width == 0 || resources.m_height == 0)
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		m_renderPass = static_cast<const VulkanRenderPassBase *>(renderPassRef.ResolveCompiled())->GetRenderPass();
 
@@ -97,10 +97,10 @@ namespace rkit { namespace render { namespace vulkan
 		}
 
 		if (desc->m_renderTargets.Count() != resources.m_renderTargetViews.Count())
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		if ((desc->m_depthStencilTarget == nullptr) != (resources.m_depthStencilView == nullptr))
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		RKIT_CHECK(m_rtvAspectFlags.Resize(resources.m_renderTargetViews.Count()));
 
@@ -124,7 +124,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateFramebuffer(m_device.GetDevice(), &createInfo, m_device.GetAllocCallbacks(), &m_framebuffer));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VkImageAspectFlags VulkanRenderPassInstance::GetImageAspectFlagsForRTV(size_t index) const
@@ -166,6 +166,6 @@ namespace rkit { namespace render { namespace vulkan
 
 		renderPassInstance = std::move(instance);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } } // rkit::render::vulkan

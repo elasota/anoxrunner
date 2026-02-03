@@ -85,7 +85,7 @@ namespace rkit { namespace render { namespace vulkan {
 		}
 
 		if (bufferSpec.m_size > std::numeric_limits<VkDeviceSize>::max())
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		createInfo.size = static_cast<VkDeviceSize>(bufferSpec.m_size);
 
@@ -126,11 +126,15 @@ namespace rkit { namespace render { namespace vulkan {
 		VkBuffer buffer = VK_NULL_HANDLE;
 		RKIT_VK_CHECK(device.GetDeviceAPI().vkCreateBuffer(device.GetDevice(), &createInfo, device.GetAllocCallbacks(), &buffer));
 
-		Result createResult = New<VulkanBufferPrototype>(outBufferPrototype, device, buffer);
+		RKIT_TRY_CATCH_RETHROW(New<VulkanBufferPrototype>(outBufferPrototype, device, buffer),
+			CatchContext(
+				[&device, buffer]
+				{
+					device.GetDeviceAPI().vkDestroyBuffer(device.GetDevice(), buffer, device.GetAllocCallbacks());
+				}
+			)
+		);
 
-		if (!utils::ResultIsOK(createResult))
-			device.GetDeviceAPI().vkDestroyBuffer(device.GetDevice(), buffer, device.GetAllocCallbacks());
-
-		return createResult;
+		RKIT_RETURN_OK;
 	}
 } } }

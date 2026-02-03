@@ -153,7 +153,7 @@ namespace anox
 			{
 			case rkit::Ordering::kEqual:
 				m_keyValueTable.Modify()[testPos].m_value = std::move(valueAsCBV);
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			case rkit::Ordering::kLess:
 				insertPosMaxExclusive = testPos;
 				break;
@@ -176,7 +176,7 @@ namespace anox
 
 		RKIT_CHECK(m_keyValueTable.Modify().InsertAt(insertPosMinInclusive, std::move(newPair)));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 }
 
@@ -254,7 +254,7 @@ namespace anox { namespace priv {
 			return rkit::ResultCode::kInternalError;
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	IConfigurationValueView ConfigBuilderValueFuncs::CreateViewOfStringSliceView(const rkit::StringSliceView &value)
@@ -280,7 +280,7 @@ namespace anox { namespace priv {
 			RKIT_CHECK(SetValue(vector[i], values[i]));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result ConfigBuilderValueFuncs::SetKeyValueTable(ConfigBuilderKeyValueTable &list, const rkit::ISpan<IConfigurationKeyValuePair> &values)
@@ -298,7 +298,7 @@ namespace anox { namespace priv {
 			RKIT_CHECK(SetValue(vector[i].m_value, kvp.m_value));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	ConfigurationValueType ConfigBuilderValueFuncs::GetTypeCB(const IConfigurationValueView &view)

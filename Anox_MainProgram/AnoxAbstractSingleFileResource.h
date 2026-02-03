@@ -159,7 +159,7 @@ namespace anox
 
 		outJob = std::move(prevPhaseEndJob);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class TLoaderInfo>

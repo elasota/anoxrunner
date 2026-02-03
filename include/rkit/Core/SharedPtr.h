@@ -193,7 +193,7 @@ rkit::Result rkit::SharedPtr<T>::Create(SharedPtr<T> &outRCPtr, IMallocDriver *a
 
 	outRCPtr = SharedPtr<T>(rcContainer);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class T>

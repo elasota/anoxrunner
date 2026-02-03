@@ -73,7 +73,7 @@ namespace rkit { namespace render { namespace vulkan
 	template<class T>
 	Result ResourcePool<T>::Initialize()
 	{
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class T>
@@ -93,7 +93,7 @@ namespace rkit { namespace render { namespace vulkan
 			outResource = resRef;
 			outResourceIndex = freeResIndex;
 
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 		else
 		{
@@ -115,7 +115,7 @@ namespace rkit { namespace render { namespace vulkan
 			outResource = newResource;
 			outResourceIndex = resIndex;
 
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 	}
 
@@ -143,7 +143,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_CHECK(GetDrivers().m_systemDriver->CreateMutex(m_mutex));
 		RKIT_CHECK(m_pool.Initialize());
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class T>
@@ -178,7 +178,7 @@ namespace rkit { namespace render { namespace vulkan
 			outPool = std::move(pool);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template Result CreateResourcePool<VkSemaphore>(UniquePtr<IResourcePool<VkSemaphore>> &outPool, const IPooledResourceFactory<VkSemaphore> &factory, bool mutexProtected);

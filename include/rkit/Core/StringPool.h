@@ -55,8 +55,8 @@ inline rkit::Result rkit::BaseStringPoolBuilder<TChar, TEncoding>::IndexString(c
 		size_t index = m_strings.Count();
 		RKIT_CHECK(m_strings.Append(std::move(strPtr)));
 
-		Result hashMapInsertResult = m_stringToIndex.Set(GetStringByIndex(index), index);
-		if (!utils::ResultIsOK(hashMapInsertResult))
+		PackedResultAndExtCode hashMapInsertResult = RKIT_EVAL_RESULT(m_stringToIndex.Set(GetStringByIndex(index), index));
+		if (hashMapInsertResult.m_resultCode != ResultCode::kOK)
 		{
 			m_strings.RemoveRange(index, 1);
 			return hashMapInsertResult;
@@ -67,7 +67,7 @@ inline rkit::Result rkit::BaseStringPoolBuilder<TChar, TEncoding>::IndexString(c
 	else
 		outIndex = it.Value();
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding>

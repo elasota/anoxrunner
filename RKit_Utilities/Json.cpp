@@ -60,7 +60,7 @@ namespace rkit { namespace utils
 			size_t m_preloadedEnd;
 			size_t m_preloadPosInFile;
 			bool m_isEOF;
-			Result m_errorResult;
+			PackedResultAndExtCode m_errorResult;
 		};
 
 		typedef rapidjson::UTF8<Utf8Char_t> Utf8Encoding_t;
@@ -126,7 +126,6 @@ namespace rkit { namespace utils
 		, m_preloadedEnd(0)
 		, m_preloadPosInFile(0)
 		, m_isEOF(false)
-		, m_errorResult(ResultCode::kOK)
 	{
 		Preload();
 	}
@@ -187,13 +186,15 @@ namespace rkit { namespace utils
 		size_t preloadCapacity = kPreloadBufferSize - m_preloadedEnd;
 		size_t amountPreloaded = 0;
 
-		Result result = m_readStream->ReadPartial(m_preloadBuffer + m_preloadedStart, preloadCapacity, amountPreloaded);
-		if (!utils::ResultIsOK(result))
+		PackedResultAndExtCode result = RKIT_TRY_EVAL(m_readStream->ReadPartial(m_preloadBuffer + m_preloadedStart, preloadCapacity, amountPreloaded));
+		if (result.m_resultCode != ResultCode::kOK)
 		{
 			m_isEOF = true;
-			if (utils::GetResultCode(result) == ResultCode::kEndOfStream)
-				m_errorResult = result;
+			m_errorResult = result;
 		}
+
+		if (amountPreloaded < preloadCapacity)
+			m_isEOF = true;
 
 		m_preloadedEnd += amountPreloaded;
 	}
@@ -215,7 +216,7 @@ namespace rkit { namespace utils
 		GenericValue_t &docValue = m_document;
 		GenericValueToJsonValue(docValue, outValue);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result JsonDocument::CheckInit()
@@ -225,10 +226,10 @@ namespace rkit { namespace utils
 			m_haveStarted = true;
 			m_document.ParseStream<rapidjson::kParseValidateEncodingFlag, Utf8Encoding_t, EncodedInputStream_t>(m_encodedInputStream);
 			if (m_document.HasParseError())
-				return ResultCode::kInvalidJson;
+				RKIT_THROW(ResultCode::kInvalidJson);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void JsonDocument::GenericValueToJsonValue(const GenericValue_t &genericValue, JsonValue &outJsonValue)
@@ -274,10 +275,10 @@ namespace rkit { namespace utils
 		else
 		{
 			outBool = false;
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result JsonDocument::VFToString(const void *jsonValue, const Utf8Char_t *&outCharPtr, size_t &outLength)
@@ -285,12 +286,12 @@ namespace rkit { namespace utils
 		const GenericValue_t *gValue = static_cast<const GenericValue_t *>(jsonValue);
 
 		if (gValue->GetType() != rapidjson::kStringType)
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		outCharPtr = gValue->GetString();
 		outLength = gValue->GetStringLength();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result JsonDocument::VFToNumber(const void *jsonValue, double &outNumber)
@@ -298,11 +299,11 @@ namespace rkit { namespace utils
 		const GenericValue_t *gValue = static_cast<const GenericValue_t *>(jsonValue);
 
 		if (gValue->GetType() != rapidjson::kNumberType)
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		outNumber = gValue->GetDouble();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result JsonDocument::VFGetArraySize(const void *jsonValue, size_t &outSize)
@@ -310,11 +311,11 @@ namespace rkit { namespace utils
 		const GenericValue_t *gValue = static_cast<const GenericValue_t *>(jsonValue);
 
 		if (gValue->GetType() != rapidjson::kArrayType)
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		outSize = gValue->Size();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result JsonDocument::VFGetArrayElement(const void *jsonValue, size_t index, JsonValue &outJsonValue)
@@ -322,14 +323,14 @@ namespace rkit { namespace utils
 		const GenericValue_t *gValue = static_cast<const GenericValue_t *>(jsonValue);
 
 		if (gValue->GetType() != rapidjson::kArrayType)
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		RKIT_ASSERT(index < gValue->Size());
 		const GenericValue_t &arrayElement = (*gValue)[static_cast<rapidjson::SizeType>(index)];
 
 		GenericValueToJsonValue(arrayElement, outJsonValue);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result JsonDocument::VFIterateObject(const void *jsonValue, void *userdata, JsonObjectIteratorCallback_t callback)
@@ -338,7 +339,7 @@ namespace rkit { namespace utils
 		const GenericValue_t *gValue = static_cast<const GenericValue_t *>(jsonValue);
 
 		if (gValue->GetType() != rapidjson::kObjectType)
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		for (ConstMemberIterator_t it = gValue->MemberBegin(), itEnd = gValue->MemberEnd(); it != itEnd; ++it)
 		{
@@ -351,7 +352,7 @@ namespace rkit { namespace utils
 				break;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result JsonDocument::VFObjectHasElement(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, bool &outHasElement)
@@ -359,11 +360,11 @@ namespace rkit { namespace utils
 		const GenericValue_t *gValue = static_cast<const GenericValue_t *>(jsonValue);
 
 		if (gValue->GetType() != rapidjson::kObjectType)
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		outHasElement = gValue->HasMember(GenericValue_t(keyChars, static_cast<rapidjson::SizeType>(keyLength)));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result JsonDocument::VFGetObjectElement(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, JsonValue &outJsonValue)
@@ -372,15 +373,15 @@ namespace rkit { namespace utils
 		const GenericValue_t *gValue = static_cast<const GenericValue_t *>(jsonValue);
 
 		if (gValue->GetType() != rapidjson::kObjectType)
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		Document_t::ConstMemberIterator it = gValue->FindMember(GenericValue_t(keyChars, static_cast<rapidjson::SizeType>(keyLength)));
 		if (it == gValue->MemberEnd())
-			return ResultCode::kKeyNotFound;
+			RKIT_THROW(ResultCode::kKeyNotFound);
 
 		GenericValueToJsonValue(it->value, outJsonValue);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	const JsonValueVFTable JsonDocument::kJsonValueVFTable =

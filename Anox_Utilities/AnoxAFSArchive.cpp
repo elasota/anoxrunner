@@ -65,7 +65,7 @@ namespace anox
 			numDirectories = 1;
 			RecursiveUnrollDirectory(files, numFiles, directories, numDirectories, rootDirectory, 0);
 
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		void Archive::DirectoryTreeBuilder::RecursiveSortAndCountDirectories(Directory &dir, size_t &outNumFiles, size_t &outNumDirectories)
@@ -143,7 +143,7 @@ namespace anox
 				RKIT_CHECK(InsertFile(dir, filledFile, fullName.SubString(sliceStart)));
 			}
 
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		rkit::Result Archive::DirectoryTreeBuilder::InsertFile(Directory &dir, const FileInfo &file, const rkit::AsciiStringSliceView &nameSlice)
@@ -168,7 +168,7 @@ namespace anox
 
 			RKIT_CHECK(dir.m_filesByName.SetPrehashed(nameHash, nameSlice.RemoveEncoding(), fileIndex));
 
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		rkit::Result Archive::DirectoryTreeBuilder::InsertDirectory(Directory &dir, Directory *&outDirectory, const rkit::AsciiStringSliceView &fullDirPath, const rkit::AsciiStringSliceView &nameSlice)
@@ -186,7 +186,7 @@ namespace anox
 			if (it != dir.m_subDirectoriesByName.end())
 			{
 				outDirectory = &dir.m_subDirectories[it.Value()];
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 
 			// New directory
@@ -200,7 +200,7 @@ namespace anox
 			RKIT_CHECK(dir.m_subDirectoriesByName.SetPrehashed(nameHash, nameSlice.RemoveEncoding(), dirIndex));
 
 			outDirectory = newDir;
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		Archive::Archive(rkit::IMallocDriver *alloc)
@@ -305,7 +305,7 @@ namespace anox
 			// Finally wrap stream
 			RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->CreateMutexProtectedReadStream(m_stream, std::move(stream)));
 
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		FileHandle Archive::FindFile(const rkit::ByteStringSliceView &fileName, bool allowDirectories) const
@@ -344,7 +344,7 @@ namespace anox
 				RKIT_CHECK(utils->CreateRangeLimitedReadStream(outStream, std::move(mutualAccessorStream), fileInfo.m_filePosition, fileInfo.m_uncompressedSize));
 			}
 
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		uint32_t Archive::GetFileSizeByIndex(uint32_t fileIndex) const
@@ -445,7 +445,7 @@ namespace anox
 
 			RKIT_CHECK(CheckSlice(name.SubSpan(sliceStart, name.Count() - sliceStart)));
 
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		rkit::Result Archive::CheckSlice(const rkit::Span<const char> &sliceName)
@@ -518,7 +518,7 @@ namespace anox
 					return rkit::ResultCode::kMalformedFile;
 			}
 
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 	}
 }

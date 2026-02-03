@@ -47,7 +47,7 @@ namespace rkit { namespace render
 
 		DisplayMode GetDisplayMode() const override { return DisplayMode::kSplash; }
 		bool CanChangeToDisplayMode(DisplayMode mode) const override { return mode == GetDisplayMode(); }
-		Result ChangeToDisplayMode(DisplayMode mode) override { return ResultCode::kInternalError; }
+		Result ChangeToDisplayMode(DisplayMode mode) override { RKIT_THROW(ResultCode::kInternalError); }
 
 		uint32_t GetSimultaneousImageCount() const override { return 0; }
 
@@ -236,7 +236,7 @@ namespace rkit { namespace render
 
 		// This is only changed on the task thread
 		bool m_actionLoopWasKicked = false;
-		Result m_msgProcResult;
+		PackedResultAndExtCode m_msgProcResult;
 
 		RECT m_windowedModeRect = {};
 		uint32_t m_defaultWidth = 0;
@@ -323,10 +323,10 @@ namespace rkit { namespace render
 			PrimaryMonitorSearchData searchData = {};
 
 			if (!EnumDisplayMonitors(nullptr, nullptr, FindPrimaryMonitor, reinterpret_cast<LPARAM>(&searchData)))
-				return ResultCode::kOperationFailed;
+				RKIT_THROW(ResultCode::kOperationFailed);
 
 			if (!searchData.m_haveAnyRect)
-				return ResultCode::kOperationFailed;
+				RKIT_THROW(ResultCode::kOperationFailed);
 
 			LONG doubleMidpointX = searchData.m_monitorRect.left + searchData.m_monitorRect.right;
 			LONG doubleMidpointY = searchData.m_monitorRect.top + searchData.m_monitorRect.bottom;
@@ -339,12 +339,12 @@ namespace rkit { namespace render
 			IDisplay *lparam = this;
 
 			if (!::AdjustWindowRectEx(&wr, style, haveMenu, exStyle))
-				return ResultCode::kOperationFailed;
+				RKIT_THROW(ResultCode::kOperationFailed);
 
 			// FIXME: Configurable title
 			HWND hwnd = CreateWindowExW(exStyle, DisplayManager_Win32::AtomToClassName(splashWCAtom), L"RKit Launch Window", style, wr.left, wr.top, wr.right - wr.left, wr.bottom - wr.top, HWND_TOP, nullptr, m_hInst, lparam);
 			if (!hwnd)
-				return ResultCode::kOperationFailed;
+				RKIT_THROW(ResultCode::kOperationFailed);
 
 			m_hWnd = hwnd;
 		}
@@ -358,7 +358,7 @@ namespace rkit { namespace render
 			HWND label = ::CreateWindowExW(exStyle, L"Static", L"Starting up...", style, 10, 10, width - 20, 16, m_hWnd, nullptr, nullptr, nullptr);
 
 			if (!label)
-				return ResultCode::kOperationFailed;
+				RKIT_THROW(ResultCode::kOperationFailed);
 
 			m_label = label;
 		}
@@ -366,7 +366,7 @@ namespace rkit { namespace render
 		NONCLIENTMETRICSW nonClientMetrics = {};
 		nonClientMetrics.cbSize = sizeof(nonClientMetrics);
 		if (!::SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, 0, &nonClientMetrics, 0))
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		// Label font
 		m_labelFont = ::CreateFontIndirectW(&nonClientMetrics.lfCaptionFont);
@@ -383,7 +383,7 @@ namespace rkit { namespace render
 			HWND pbar = ::CreateWindowExW(exStyle, PROGRESS_CLASS, nullptr, style, 10, 30, width - 20, 20, m_hWnd, nullptr, nullptr, nullptr);
 
 			if (!pbar)
-				return ResultCode::kOperationFailed;
+				RKIT_THROW(ResultCode::kOperationFailed);
 
 			m_progressBar = pbar;
 
@@ -391,7 +391,7 @@ namespace rkit { namespace render
 			::SendMessageW(m_progressBar, PBM_SETSTEP, 1, 0);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -404,7 +404,7 @@ namespace rkit { namespace render
 
 		FlushWinMessageQueue();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SplashWindow_Win32::SetRange(uint64_t minimum, uint64_t maximum)
@@ -441,7 +441,7 @@ namespace rkit { namespace render
 
 		FlushWinMessageQueue();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result SplashWindow_Win32::SetValue(uint64_t value)
@@ -463,7 +463,7 @@ namespace rkit { namespace render
 
 		FlushWinMessageQueue();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void SplashWindow_Win32::FlushEvents()
@@ -473,7 +473,7 @@ namespace rkit { namespace render
 
 	Result SplashWindow_Win32::PostWindowThreadTask(void *userdata, void (*callback)(void *userdata))
 	{
-		return ResultCode::kInternalError;
+		RKIT_THROW(ResultCode::kInternalError);
 	}
 
 	HWND SplashWindow_Win32::GetHWND()
@@ -497,11 +497,11 @@ namespace rkit { namespace render
 
 		ATOM atom = RegisterClassW(&wc);
 		if (!atom)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		outAtom = atom;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	LRESULT SplashWindow_Win32::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -584,7 +584,6 @@ namespace rkit { namespace render
 		: m_alloc(alloc)
 		, m_hInst(hInst)
 		, m_actions(alloc, alloc)
-		, m_msgProcResult(ResultCode::kOK)
 	{
 	}
 
@@ -640,9 +639,9 @@ namespace rkit { namespace render
 		m_startEvent.Reset();
 
 		if (!m_hWnd)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	bool RenderWindow_Win32::CanChangeToDisplayMode(DisplayMode mode) const
@@ -653,7 +652,7 @@ namespace rkit { namespace render
 	Result RenderWindow_Win32::ChangeToDisplayMode(DisplayMode mode)
 	{
 		if (mode == m_displayMode)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		switch (mode)
 		{
@@ -662,7 +661,7 @@ namespace rkit { namespace render
 		case DisplayMode::kWindowed:
 			return BecomeWindowed();
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 	}
 
@@ -687,11 +686,11 @@ namespace rkit { namespace render
 
 		ATOM atom = RegisterClassExW(&wc);
 		if (!atom)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		outAtom = atom;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderWindow_Win32::PostWindowThreadTask(void *userdata, void (*callback)(void *userdata))
@@ -815,7 +814,7 @@ namespace rkit { namespace render
 
 		PostAQIToActionQueue(aqi);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -851,9 +850,9 @@ namespace rkit { namespace render
 
 	Result RenderWindow_Win32::ThreadFunc()
 	{
-		Result result = Result(ResultCode::kOK);
+		PackedResultAndExtCode result;
 
-		while (utils::ResultIsOK(result))
+		while (result.m_resultCode == ResultCode::kOK)
 		{
 			ActionQueueItem *aqi = nullptr;
 			{
@@ -880,18 +879,15 @@ namespace rkit { namespace render
 			if (aqi)
 			{
 				// Handle action
-				result = aqi->m_runCallback(*this, aqi->m_userdata);
+				result = RKIT_TRY_EVAL(aqi->m_runCallback(*this, aqi->m_userdata));
 
 				aqi->m_disposeCallback(aqi->m_userdata);
 				m_actions.Dispose(aqi->m_thisAlloc);
 			}
 			else
 			{
-				result = ThreadProcessWinMessages();
+				result = RKIT_TRY_EVAL(ThreadProcessWinMessages());
 			}
-
-			if (!utils::ResultIsOK(result))
-				break;
 		}
 
 		{
@@ -899,23 +895,23 @@ namespace rkit { namespace render
 			m_threadHasExited = true;
 		}
 
-		return result;
+		return ThrowIfError(result);
 	}
 
 	Result RenderWindow_Win32::ThreadProcessWinMessages()
 	{
-		while (!m_actionLoopWasKicked && utils::ResultIsOK(m_msgProcResult))
+		while (!m_actionLoopWasKicked && m_msgProcResult.m_resultCode == ResultCode::kOK)
 		{
 			MSG msg;
 			BOOL msgGetResult = GetMessageW(&msg, m_hWnd, 0, 0);
 
 			if (msgGetResult == -1)
-				return ResultCode::kOperationFailed;
+				RKIT_THROW(ResultCode::kOperationFailed);
 
 			if (msgGetResult == 0)
 			{
 				// WM_QUIT
-				return ResultCode::kNotYetImplemented;
+				RKIT_THROW(ResultCode::kNotYetImplemented);
 			}
 			else
 			{
@@ -926,7 +922,7 @@ namespace rkit { namespace render
 
 		m_actionLoopWasKicked = false;
 
-		return m_msgProcResult;
+		return ThrowIfError(m_msgProcResult);
 	}
 
 	Result RenderWindow_Win32::SetupWindow()
@@ -936,10 +932,10 @@ namespace rkit { namespace render
 		PrimaryMonitorSearchData searchData = {};
 
 		if (!EnumDisplayMonitors(nullptr, nullptr, FindPrimaryMonitor, reinterpret_cast<LPARAM>(&searchData)))
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		if (!searchData.m_haveAnyRect)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		RECT monitorRect = searchData.m_monitorRect;
 
@@ -963,7 +959,7 @@ namespace rkit { namespace render
 		HMENU menus = nullptr;
 
 		if (!::AdjustWindowRect(&wr, m_windowStyle, (menus != nullptr)))
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		DWORD exStyle = 0;
 		DWORD style = m_windowStyle;
@@ -974,11 +970,11 @@ namespace rkit { namespace render
 		m_hWnd = CreateWindowExW(exStyle, DisplayManager_Win32::AtomToClassName(m_wcAtom), L"RKit Rendering Window", m_windowStyle, wr.left, wr.top, wr.right - wr.left, wr.bottom - wr.top, nullptr, menus, m_hInst, &wcParams);
 
 		if (!m_hWnd)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		ShowWindow(m_hWnd, SW_SHOWDEFAULT);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderWindow_Win32::BecomeBorderlessFullScreen()
@@ -999,16 +995,16 @@ namespace rkit { namespace render
 		m_changeDisplayModeEvent->Wait();
 
 		if (!completed)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderWindow_Win32::ThreadBecomeBorderlessFullScreen()
 	{
 		RECT windowRect;
 		if (!GetWindowRect(m_hWnd, &windowRect))
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		HMONITOR monitor = MonitorFromRect(&windowRect, MONITOR_DEFAULTTONULL);
 		if (!monitor)
@@ -1023,12 +1019,12 @@ namespace rkit { namespace render
 		}
 
 		if (!monitor)
-			return ResultCode::kOperationFailed;	// No monitor?
+			RKIT_THROW(ResultCode::kOperationFailed);	// No monitor?
 
 		MONITORINFO monitorInfo;
 		monitorInfo.cbSize = sizeof(monitorInfo);
 		if (!GetMonitorInfoW(monitor, &monitorInfo))
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		m_windowStyle = WS_POPUP;
 
@@ -1040,17 +1036,18 @@ namespace rkit { namespace render
 			rkit::log::Warning(u8"BecomeBorderlessFullScreen: SetWindowPos failed");
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderWindow_Win32::Action_ChangeDisplayMode(ChangeDisplayModeParams &displayModeParams)
 	{
 		*displayModeParams.m_completedFlag = false;
-		Result result = (this->*(displayModeParams.m_callback))();
+		PackedResultAndExtCode result = RKIT_TRY_EVAL( (this->*(displayModeParams.m_callback))() );
 
-		*displayModeParams.m_completedFlag = utils::ResultIsOK(result);
+		const bool completedOK = (result.m_resultCode == ResultCode::kOK);
+		*displayModeParams.m_completedFlag = completedOK;
 
-		if (utils::ResultIsOK(result))
+		if (completedOK)
 		{
 			RECT clRect = {};
 			::GetClientRect(m_hWnd, &clRect);
@@ -1063,18 +1060,18 @@ namespace rkit { namespace render
 		displayModeParams.m_signalEvent = nullptr;
 		displayModeParams.m_completedFlag = nullptr;
 
-		return result;
+		return ThrowIfError(result);
 	}
 
 	Result RenderWindow_Win32::Action_RunCustomTask(RunCustomTaskParams &customTaskParams)
 	{
 		customTaskParams.m_task(customTaskParams.m_userdata);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderWindow_Win32::BecomeWindowed()
 	{
-		return ResultCode::kNotYetImplemented;
+		RKIT_THROW(ResultCode::kNotYetImplemented);
 	}
 
 	LRESULT RenderWindow_Win32::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -1119,13 +1116,13 @@ namespace rkit { namespace render
 
 	Result RenderWindow_Win32::ThreadContext::Run()
 	{
-		Result result = m_window.SetupWindow();
+		PackedResultAndExtCode result = RKIT_TRY_EVAL(m_window.SetupWindow());
 
 		m_window.m_startEvent->Signal();
 
-		if (utils::ResultIsOK(result))
+		if (result.m_resultCode == ResultCode::kOK)
 		{
-			result = m_window.ThreadFunc();
+			result = RKIT_TRY_EVAL(m_window.ThreadFunc());
 		}
 		else
 		{
@@ -1145,7 +1142,7 @@ namespace rkit { namespace render
 
 		m_window.m_exitEvent->Signal();
 
-		return result;
+		return ThrowIfError(result);
 	}
 
 	DisplayManager_Win32::DisplayManager_Win32(IMallocDriver *alloc, HINSTANCE hInst)
@@ -1168,7 +1165,7 @@ namespace rkit { namespace render
 		RKIT_CHECK(SplashWindow_Win32::RegisterWndClass(m_splashWCAtom, m_hInst));
 		RKIT_CHECK(RenderWindow_Win32::RegisterWndClass(m_renderWCAtom, m_hInst));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DisplayManager_Win32::CreateDisplay(UniquePtr<IDisplay> &display, DisplayMode displayMode)
@@ -1208,7 +1205,7 @@ namespace rkit { namespace render
 
 		display = std::move(splashWindow);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DisplayManager_Win32::CreateRenderWindow(UniquePtr<IDisplay> &display, DisplayMode displayMode, uint32_t width, uint32_t height)
@@ -1226,13 +1223,13 @@ namespace rkit { namespace render
 			}
 			else
 			{
-				return ResultCode::kOperationFailed;
+				RKIT_THROW(ResultCode::kOperationFailed);
 			}
 		}
 
 		display = std::move(renderWindow);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	LPCWSTR DisplayManager_Win32::AtomToClassName(ATOM atom)
@@ -1249,6 +1246,6 @@ namespace rkit { namespace render
 
 		outDisplayManager = std::move(displayManager);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } // rkit::render

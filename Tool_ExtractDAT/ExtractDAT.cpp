@@ -35,28 +35,28 @@ rkit::Result anox::ExtractDATProgram::Run()
 {
 	rkit::IModule *anoxUtilsModule = rkit::GetDrivers().m_moduleDriver->LoadModule(anox::kAnoxNamespaceID, u8"Utilities");
 	if (!anoxUtilsModule)
-		return rkit::ResultCode::kModuleLoadFailed;
+		RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 
 	rkit::Span<const rkit::StringView> args = rkit::GetDrivers().m_systemDriver->GetCommandLine();
 
 	if (args.Count() != 2)
 	{
 		::rkit::log::Error(u8"Usage: ExtractDAT <input> <output>");
-		return rkit::ResultCode::kInvalidParameter;
+		RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 	}
 
 	rkit::OSAbsPath inPath;
 	RKIT_CHECK(inPath.SetFromEncodedString(args[0]));
 
 	rkit::UniquePtr<rkit::ISeekableReadStream> datFileStream;
-	rkit::Result openResult = rkit::GetDrivers().m_systemDriver->OpenFileReadAbs(datFileStream, inPath);
-	if (rkit::utils::GetResultCode(openResult) == rkit::ResultCode::kFileOpenError)
-	{
-		::rkit::log::Error(u8"Failed to open input file");
-		return rkit::ResultCode::kFileOpenError;
-	}
-
-	RKIT_CHECK(openResult);
+	RKIT_TRY_CATCH_RETHROW(rkit::GetDrivers().m_systemDriver->TryOpenFileReadAbs(datFileStream, inPath),
+		rkit::CatchContext(
+			[]
+			{
+				::rkit::log::Error(u8"Failed to open input file");
+			}
+		)
+	);
 
 	anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver*>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, u8"Utilities"));
 
@@ -78,7 +78,7 @@ rkit::Result anox::ExtractDATProgram::Run()
 		RKIT_CHECK(outPath.SetFromEncodedString(args[1]));
 
 		if (true)
-			return rkit::ResultCode::kNotYetImplemented;	// fix path handling here
+			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);	// fix path handling here
 
 		rkit::OSRelPath fpath;
 		RKIT_CHECK(fpath.SetFromEncodedString(filePath.ToUTF8()));
@@ -86,11 +86,9 @@ rkit::Result anox::ExtractDATProgram::Run()
 		RKIT_CHECK(outPath.Append(fpath));
 
 		rkit::UniquePtr<rkit::ISeekableWriteStream> writeStream;
-		openResult = rkit::GetDrivers().m_systemDriver->OpenFileWriteAbs(writeStream, outPath, true, true, true);
-		if (rkit::utils::GetResultCode(openResult) == rkit::ResultCode::kFileOpenError)
-			return rkit::ResultCode::kFileOpenError;
-
-		RKIT_CHECK(openResult);
+		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->TryOpenFileWriteAbs(writeStream, outPath, true, true, true));
+		if (!writeStream.IsValid())
+			RKIT_THROW(rkit::ResultCode::kFileOpenError);
 
 		uint8_t buffer[1024];
 
@@ -109,7 +107,7 @@ rkit::Result anox::ExtractDATProgram::Run()
 		}
 	}
 
-	return rkit::ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 RKIT_IMPLEMENT_MODULE("Tool", "ExtractDAT", ::anox::ExtractDATModule)

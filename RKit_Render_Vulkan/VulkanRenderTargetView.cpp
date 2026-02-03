@@ -67,7 +67,7 @@ namespace rkit { namespace render { namespace vulkan
 			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
 		createInfo.subresourceRange.baseMipLevel = mipSlice;
@@ -77,7 +77,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateImageView(m_device.GetDevice(), &createInfo, m_device.GetAllocCallbacks(), &m_imageView));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanRenderTargetViewBase::Create(UniquePtr<VulkanRenderTargetViewBase> &outRTV, VulkanDeviceBase &device, VkImage image, VkFormat format, VkImageAspectFlags imageAspectFlags, VkImageViewType imageViewType, uint32_t mipSlice, ImagePlane plane, uint32_t firstArrayElement, uint32_t arraySize)
@@ -89,6 +89,6 @@ namespace rkit { namespace render { namespace vulkan
 
 		outRTV = std::move(rtv);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } } // rkit::render::vulkan

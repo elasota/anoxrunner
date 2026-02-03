@@ -65,7 +65,7 @@ namespace rkit
 
 		m_startAndTerminateEvent.Signal();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void AsyncIOThreadContext_Win32::PostTask(AsyncIOTaskItem_Win32 &task)
@@ -196,7 +196,7 @@ namespace rkit
 	{
 		m_kickEvent = ::CreateEventA(nullptr, FALSE, FALSE, "AsyncIOThreadKick");
 		if (!m_kickEvent)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		RKIT_CHECK(m_sysDriver.CreateMutex(m_pendingQueueMutex));
 		RKIT_CHECK(m_sysDriver.CreateMutex(m_inProgressQueueMutex));
@@ -212,7 +212,7 @@ namespace rkit
 
 		m_startAndTerminateEvent->Wait();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void AsyncIOThread_Win32::PostTask(AsyncIOTaskItem_Win32 &task)

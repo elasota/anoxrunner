@@ -32,7 +32,7 @@ namespace rkit { namespace render { namespace vulkan { namespace platform
 		struct WindowThreadInitTaskData
 		{
 			VulkanSurface_Win32 *m_surf = nullptr;
-			Result m_result = Result(ResultCode::kOK);
+			PackedResultAndExtCode m_result;
 			UniquePtr<IEvent> m_doneEvent;
 		};
 
@@ -68,13 +68,13 @@ namespace rkit { namespace render { namespace vulkan { namespace platform
 
 		taskData.m_doneEvent->Wait();
 
-		return taskData.m_result;
+		return ThrowIfError(taskData.m_result);
 	}
 
 	void VulkanSurface_Win32::InitTaskCallback(void *userdata)
 	{
 		WindowThreadInitTaskData *taskData = static_cast<WindowThreadInitTaskData *>(userdata);
-		taskData->m_result = taskData->m_surf->WindowThreadInitialize();
+		taskData->m_result = RKIT_TRY_EVAL(taskData->m_surf->WindowThreadInitialize());
 		taskData->m_doneEvent->Signal();
 	}
 
@@ -87,7 +87,7 @@ namespace rkit { namespace render { namespace vulkan { namespace platform
 
 		RKIT_VK_CHECK(m_device.GetInstancePlatformAPI().vkCreateWin32SurfaceKHR(m_device.GetInstance(), &surfaceCreateInfo, m_device.GetAllocCallbacks(), &m_surface));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VkSurfaceKHR VulkanSurface_Win32::GetSurface() const
@@ -104,19 +104,19 @@ namespace rkit { namespace render { namespace vulkan { namespace platform
 
 		outSurface = std::move(surf);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result AddInstanceExtensions(IInstanceExtensionEnumerator &enumerator)
 	{
 		RKIT_CHECK(enumerator.AddExtension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME, true));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result AddDeviceExtensions(IDeviceExtensionEnumerator &enumerator)
 	{
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } } } // rkit::render::vulkan::platform
 

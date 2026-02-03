@@ -89,7 +89,7 @@ namespace rkit { namespace utils
 			while (m_context.m_disposition == coro::Disposition::kResume)
 			{
 				if (m_context.m_frame == nullptr)
-					return ResultCode::kOK;
+					RKIT_RETURN_OK;
 
 				coro::StackFrameBase *frame = m_context.m_frame;
 				coro::Code_t ip = frame->m_ip;
@@ -103,17 +103,17 @@ namespace rkit { namespace utils
 			switch (m_context.m_disposition)
 			{
 			case coro::Disposition::kFailResult:
-				return m_context.m_result;
+				RKIT_THROW(m_context.m_result);
 			case coro::Disposition::kAwait:
 				if (!TryUnblock())
-					return ResultCode::kOK;
+					RKIT_RETURN_OK;
 				break;
 			default:
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 			}
 		}
 
-		return ResultCode::kInternalError;
+		RKIT_THROW(ResultCode::kInternalError);
 	}
 
 	bool CoroThreadImpl::TryUnblock()
@@ -147,11 +147,11 @@ namespace rkit { namespace utils
 	{
 		m_topStackBlob.m_memoryBase = static_cast<uint8_t *>(m_alloc->Alloc(stackSize));
 		if (!m_topStackBlob.m_memoryBase)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		m_topStackBlob.m_memorySize = stackSize;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	coro::Context &CoroThreadImpl::GetContext()
@@ -213,6 +213,6 @@ namespace rkit { namespace utils
 
 		thread = std::move(threadImpl);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } // rkit::utils

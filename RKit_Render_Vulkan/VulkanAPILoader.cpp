@@ -25,10 +25,10 @@ namespace rkit { namespace render { namespace vulkan
 			if (!foundFunction && !loaderInfo.m_isOptional)
 			{
 				rkit::log::ErrorFmt(u8"Failed to find required Vulkan function {}", loaderInfo.m_fnName.ToUTF8());
-				return ResultCode::kModuleLoadFailed;
+				RKIT_THROW(ResultCode::kModuleLoadFailed);
 			}
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } } // rkit::render::vulkan

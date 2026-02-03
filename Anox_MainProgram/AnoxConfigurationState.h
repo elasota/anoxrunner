@@ -158,7 +158,7 @@ namespace anox
 		if (!this->GetAs(outValue))
 			return rkit::ResultCode::kInvalidParameter;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	inline IConfigurationArrayView::IConfigurationArrayView()
@@ -231,7 +231,7 @@ namespace anox
 			return rkit::ResultCode::kKeyNotFound;
 
 		outValue = result.Get();
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<ConfigurationValueType TType>

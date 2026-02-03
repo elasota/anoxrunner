@@ -81,17 +81,15 @@ inline rkit::Result rkit::FixedSizeMemoryStream::ReadPartial(void *data, size_t 
 		memcpy(data, m_bytes + m_pos, amountAvailable);
 		outCountRead = amountAvailable;
 		m_pos = m_size;
-
-		return ResultCode::kEndOfStream;
 	}
 	else
 	{
 		memcpy(data, m_bytes + m_pos, count);
 		m_pos += count;
 		outCountRead = count;
-
-		return ResultCode::kOK;
 	}
+
+	RKIT_RETURN_OK;
 }
 
 inline rkit::Result rkit::FixedSizeMemoryStream::WritePartial(const void *data, size_t count, size_t &outCountWritten)
@@ -103,32 +101,30 @@ inline rkit::Result rkit::FixedSizeMemoryStream::WritePartial(const void *data, 
 		memcpy(m_bytes + m_pos, data, amountAvailable);
 		outCountWritten = amountAvailable;
 		m_pos = m_size;
-
-		return ResultCode::kIOWriteError;
 	}
 	else
 	{
 		memcpy(m_bytes + m_pos, data, count);
 		m_pos += count;
 		outCountWritten = count;
-
-		return ResultCode::kOK;
 	}
+
+	RKIT_RETURN_OK;
 }
 
 inline rkit::Result rkit::FixedSizeMemoryStream::Flush()
 {
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline rkit::Result rkit::FixedSizeMemoryStream::SeekStart(FilePos_t pos)
 {
 	if (pos > m_size)
-		return ResultCode::kIOSeekOutOfRange;
+		RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 	m_pos = static_cast<size_t>(pos);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline rkit::Result rkit::FixedSizeMemoryStream::SeekCurrent(FileOffset_t pos)
@@ -137,11 +133,11 @@ inline rkit::Result rkit::FixedSizeMemoryStream::SeekCurrent(FileOffset_t pos)
 	const FileOffset_t maxOffset = static_cast<FileOffset_t>(m_size - m_pos);
 
 	if (pos < minOffset || pos > maxOffset)
-		return ResultCode::kIOSeekOutOfRange;
+		RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 	m_pos = static_cast<size_t>(static_cast<FileOffset_t>(m_pos) + pos);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline rkit::Result rkit::FixedSizeMemoryStream::SeekEnd(FileOffset_t pos)
@@ -149,19 +145,19 @@ inline rkit::Result rkit::FixedSizeMemoryStream::SeekEnd(FileOffset_t pos)
 	const FileOffset_t minOffset = -static_cast<FileOffset_t>(m_size);
 
 	if (pos < minOffset || pos > 0)
-		return ResultCode::kIOSeekOutOfRange;
+		RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
 	m_pos = static_cast<size_t>(static_cast<FileOffset_t>(m_size) + pos);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline rkit::Result rkit::FixedSizeMemoryStream::Truncate(FilePos_t newSize)
 {
 	if (newSize == m_size)
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	else
-		return ResultCode::kOperationFailed;
+		RKIT_THROW(ResultCode::kOperationFailed);
 }
 
 inline rkit::FilePos_t rkit::FixedSizeMemoryStream::Tell() const
@@ -241,5 +237,5 @@ inline rkit::Result rkit::ReadOnlyMemoryStream::ExtractSpan(Span<const T> &outSp
 	RKIT_CHECK(m_stream.ExtractSpan(mutableSpan, count));
 	outSpan = mutableSpan;
 
-	return rkit::ResultCode::kOK;
+	RKIT_RETURN_OK;
 }

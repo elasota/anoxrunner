@@ -231,7 +231,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			if (list->GetCount() != 1)
 			{
 				rkit::log::Error(u8"Pipeline package doesn't contain exactly one graphics pipeline");
-				return ResultCode::kMalformedFile;
+				RKIT_THROW(ResultCode::kMalformedFile);
 			}
 
 			const render::GraphicsPipelineDesc *pipelineDesc = static_cast<const render::GraphicsPipelineDesc *>(list->GetElementPtr(0));
@@ -252,9 +252,9 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			}
 		}
 		else
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderPipelineCompiler::RunCompile(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
@@ -273,7 +273,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			if (nameLookupList->GetCount() != 1)
 			{
 				rkit::log::Error(u8"Pipeline package doesn't contain exactly one graphics pipeline name lookup");
-				return ResultCode::kMalformedFile;
+				RKIT_THROW(ResultCode::kMalformedFile);
 			}
 
 			const render::GraphicsPipelineNameLookup *nameLookupDesc = static_cast<const render::GraphicsPipelineNameLookup *>(nameLookupList->GetElementPtr(0));
@@ -281,13 +281,13 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			RKIT_CHECK(CompileGraphicsPipeline(depsNode, feedback, package.Get(), binaryContent.ToSpan(), nameLookupDesc));
 		}
 		else
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 
 		RKIT_CHECK(ClearUnusedValues(*package.Get()));
 
 		RKIT_CHECK(feedback->CheckFault());
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	uint32_t RenderPipelineCompiler::GetVersion() const
@@ -341,12 +341,12 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				if (!stream.IsValid())
 				{
 					rkit::log::ErrorFmt(u8"Failed to open SPV input {}", spvPath.CStr());
-					return ResultCode::kOperationFailed;
+					RKIT_THROW(ResultCode::kOperationFailed);
 				}
 
 				FilePos_t size = stream->GetSize();
 				if (size > std::numeric_limits<size_t>::max())
-					return ResultCode::kOutOfMemory;
+					RKIT_THROW(ResultCode::kOutOfMemory);
 
 				RKIT_CHECK(stageBinaryData.Resize(static_cast<size_t>(size)));
 				if (size > 0)
@@ -395,7 +395,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 		RKIT_CHECK(packageBuilder->WritePackage(*stream));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderPipelineCompiler::ClearUnusedValues(data::IRenderDataPackage &package)
@@ -414,7 +414,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			descriptorDesc->m_globallyCoherent = false;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderPipelineCompiler::AddGraphicsAnalysisStage(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback, render::vulkan::GraphicPipelineStage stage)
@@ -479,7 +479,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			m_glslangStage = GLSLANG_STAGE_FRAGMENT;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
 		GraphicsPipelineShaderField_t field;
@@ -507,7 +507,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 		if (pipeline->m_pipelineLayout->m_pushConstantList)
 		{
-			return ResultCode::kNotYetImplemented;
+			RKIT_THROW(ResultCode::kNotYetImplemented);
 		}
 
 		if (stage == render::vulkan::GraphicPipelineStage::Vertex && pipeline->m_inputLayout != nullptr)
@@ -541,7 +541,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 		if ((stage == render::vulkan::GraphicPipelineStage::Vertex || stage == render::vulkan::GraphicPipelineStage::Pixel) && pipeline->m_vertexShaderOutput != nullptr)
 		{
-			return ResultCode::kNotYetImplemented;
+			RKIT_THROW(ResultCode::kNotYetImplemented);
 		}
 
 		if (stage == render::vulkan::GraphicPipelineStage::Pixel)
@@ -705,7 +705,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		RKIT_CHECK(WriteString(m_suffixStream, u8"}\n"));
 
 		if (rpDesc->m_renderTargets.Count() > static_cast<size_t>(std::numeric_limits<int>::max()))
-			return ResultCode::kIntegerOverflow;
+			RKIT_THROW(ResultCode::kIntegerOverflow);
 
 		m_glslangResource.max_draw_buffers = static_cast<int>(rpDesc->m_renderTargets.Count());
 
@@ -741,7 +741,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 		glslang_shader_t *shader = m_glslc->glslang_shader_create(&input);
 		if (!shader)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		if (!m_glslc->glslang_shader_preprocess(shader, &input) || !m_glslc->glslang_shader_parse(shader, &input))
 		{
@@ -755,14 +755,14 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				rkit::log::Error(StringView::FromCString(ReinterpretAnsiCharToUtf8Char(infoDebugLog)));
 
 			m_glslc->glslang_shader_delete(shader);
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 		}
 
 		glslang_program_t *program = m_glslc->glslang_program_create();
 		if (!program)
 		{
 			m_glslc->glslang_shader_delete(shader);
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 		}
 
 		m_glslc->glslang_program_add_shader(program, shader);
@@ -780,7 +780,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 			m_glslc->glslang_program_delete(program);
 			m_glslc->glslang_shader_delete(shader);
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 		}
 
 		m_glslc->glslang_program_SPIRV_generate(program, m_glslangStage);
@@ -798,7 +798,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		m_glslc->glslang_program_delete(program);
 		m_glslc->glslang_shader_delete(shader);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderPipelineStageBuildJob::WriteToFile(IWriteStream &stream)
@@ -825,7 +825,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 	{
 		Span<const Utf8Char_t> span = str.ToSpan();
 		if (span.Count() == 0)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		return stream.WriteAll(span.Ptr(), span.Count());
 	}
@@ -850,7 +850,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 	Result RenderPipelineStageBuildJob::WriteRTFormat(IWriteStream &stream, const render::RenderTargetFormat &format)
 	{
-		return ResultCode::kNotYetImplemented;
+		RKIT_THROW(ResultCode::kNotYetImplemented);
 	}
 
 	Result RenderPipelineStageBuildJob::WriteVectorOrScalarNumericType(IWriteStream &stream, const render::VectorOrScalarNumericType &format)
@@ -858,7 +858,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		RKIT_CHECK(WriteNumericType(stream, format.m_numericType));
 		RKIT_CHECK(WriteVectorOrScalarDimension(stream, format.m_cols));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderPipelineStageBuildJob::WriteVectorNumericType(IWriteStream &stream, const render::VectorNumericType &format)
@@ -866,7 +866,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		RKIT_CHECK(WriteNumericType(stream, format.m_numericType));
 		RKIT_CHECK(WriteVectorDimension(stream, format.m_cols));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderPipelineStageBuildJob::WriteNumericType(IWriteStream &stream, const render::NumericType numericType)
@@ -899,7 +899,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			return WriteString(stream, u8"ulong");
 		default:
 			rkit::log::Error(u8"A numeric type could not be written in the desired context");
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 		}
 	}
 
@@ -908,7 +908,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		switch (vectorOrScalarDimension)
 		{
 		case render::VectorOrScalarDimension::Scalar:
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		case render::VectorOrScalarDimension::Dimension2:
 			return WriteString(stream, u8"2");
 		case render::VectorOrScalarDimension::Dimension3:
@@ -916,7 +916,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		case render::VectorOrScalarDimension::Dimension4:
 			return WriteString(stream, u8"4");
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 	}
 
@@ -931,7 +931,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		case render::VectorDimension::Dimension4:
 			return WriteString(stream, u8"4");
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 	}
 
@@ -951,7 +951,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		if (valueType.m_type != render::ValueTypeType::Numeric)
 		{
 			rkit::log::Error(u8"Texture descriptor type was non-numeric");
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 		}
 
 		const render::NumericType numericType = valueType.m_value.m_numericType;
@@ -1007,7 +1007,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			break;
 
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
 		switch (descriptorType)
@@ -1038,10 +1038,10 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			break;
 
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -1058,7 +1058,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			{
 				c = path[i];
 				if (c != '/' && c != '.' && c != '_' && !(c >= 'a' && c <= 'z') && !(c >= '0' && c <= '9'))
-					return ResultCode::kOperationFailed;
+					RKIT_THROW(ResultCode::kOperationFailed);
 			}
 
 			if (i == path.Length() || c == '/')
@@ -1067,7 +1067,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				sliceStart = i + 1;
 
 				if (slice.Length() == 0 || slice == u8".")
-					return ResultCode::kOperationFailed;
+					RKIT_THROW(ResultCode::kOperationFailed);
 
 				if (slice == u8"..")
 				{
@@ -1079,7 +1079,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 					}
 
 					if (lastSlashPos == 0)
-						return ResultCode::kOperationFailed;
+						RKIT_THROW(ResultCode::kOperationFailed);
 
 					RKIT_CHECK(fullPath.Set(fullPath.SubString(0, lastSlashPos + 1)));
 				}
@@ -1095,10 +1095,10 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		}
 
 		if (fullPath.Length() == 0 || !GetDrivers().m_utilitiesDriver->ValidateFilePath(fullPath.ToSpan(), false))
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		path = std::move(fullPath);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderPipelineStageBuildJob::TryInclude(CIPath &&path, bool &outSucceeded, UniquePtr<IncludeResultBase> &outIncludeResult) const
@@ -1114,11 +1114,11 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		RKIT_CHECK(m_feedback->TryOpenInput(BuildFileLocation::kSourceDir, fullPath, stream));
 
 		if (!stream.IsValid())
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		FilePos_t size = static_cast<size_t>(stream->GetSize());
 		if (stream->GetSize() > std::numeric_limits<size_t>::max())
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		Vector<uint8_t> contents;
 		RKIT_CHECK(contents.Resize(static_cast<size_t>(size)));
@@ -1133,7 +1133,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		RKIT_CHECK(New<DynamicIncludeResult>(outIncludeResult, std::move(path), std::move(contents)));
 
 		outSucceeded = true;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result RenderPipelineStageBuildJob::ProcessInclude(const StringView &headerName, const StringView &includerName, size_t includeDepth, bool isSystem, UniquePtr<IncludeResultBase> &outIncludeResult)
@@ -1159,7 +1159,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				return New<StaticIncludeResult>(outIncludeResult, std::move(headerNameStr), prefixVector.GetBuffer(), prefixVector.Count());
 			}
 
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 		}
 
 		bool isAbsolutePath = false;
@@ -1181,7 +1181,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				if (slice == u8".")
 				{
 					if (numSlices != 0)
-						return ResultCode::kOperationFailed;
+						RKIT_THROW(ResultCode::kOperationFailed);
 
 					isAbsolutePath = true;
 				}
@@ -1208,7 +1208,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			RKIT_CHECK(TryInclude(std::move(normalizedPath), succeeded, outIncludeResult));
 
 			if (succeeded)
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 		}
 		else
 		{
@@ -1233,7 +1233,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				RKIT_CHECK(TryInclude(std::move(path), succeeded, outIncludeResult));
 
 				if (succeeded)
-					return ResultCode::kOK;
+					RKIT_RETURN_OK;
 			}
 
 			if (shouldTryIncludePaths)
@@ -1254,12 +1254,12 @@ namespace rkit { namespace buildsystem { namespace vulkan
 					RKIT_CHECK(TryInclude(std::move(fullPath), succeeded, outIncludeResult));
 
 					if (succeeded)
-						return ResultCode::kOK;
+						RKIT_RETURN_OK;
 				}
 			}
 		}
 
-		return ResultCode::kOperationFailed;
+		RKIT_THROW(ResultCode::kOperationFailed);
 	}
 
 	void RenderPipelineStageBuildJob::FreeIncludeResult(glsl_include_result_t *result)
@@ -1278,9 +1278,9 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		RenderPipelineStageBuildJob *job = static_cast<RenderPipelineStageBuildJob *>(ctx);
 
 		UniquePtr<IncludeResultBase> includeResult;
-		Result result = job->ProcessInclude(StringView::FromCString(ReinterpretAnsiCharToUtf8Char(header_name)), StringView::FromCString(ReinterpretAnsiCharToUtf8Char(includer_name)), include_depth, is_system, includeResult);
+		PackedResultAndExtCode result = RKIT_TRY_EVAL(job->ProcessInclude(StringView::FromCString(ReinterpretAnsiCharToUtf8Char(header_name)), StringView::FromCString(ReinterpretAnsiCharToUtf8Char(includer_name)), include_depth, is_system, includeResult));
 
-		if (!utils::ResultIsOK(result))
+		if (result.m_resultCode != ResultCode::kOK)
 			return nullptr;
 
 		SimpleObjectAllocation<IncludeResultBase> allocation = includeResult.Detach();
@@ -1368,7 +1368,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 	Result RenderPipelineStageCompiler::RunAnalysis(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
 	{
-		return ResultCode::kInternalError;
+		RKIT_THROW(ResultCode::kInternalError);
 	}
 
 	Result RenderPipelineStageCompiler::RunCompile(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
@@ -1385,7 +1385,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			if (list->GetCount() != 1)
 			{
 				rkit::log::Error(u8"Pipeline package doesn't contain exactly one graphics pipeline");
-				return ResultCode::kMalformedFile;
+				RKIT_THROW(ResultCode::kMalformedFile);
 			}
 
 			const render::GraphicsPipelineDesc *pipelineDesc = static_cast<const render::GraphicsPipelineDesc *>(list->GetElementPtr(0));
@@ -1403,10 +1403,10 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 			RKIT_CHECK(buildJob.WriteToFile(*outStream));
 
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
-		return ResultCode::kInternalError;
+		RKIT_THROW(ResultCode::kInternalError);
 	}
 
 	uint32_t RenderPipelineStageCompiler::GetVersion() const
@@ -1422,7 +1422,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		if (!packageStream.IsValid())
 		{
 			rkit::log::Error(u8"Failed to open pipeline input");
-			return rkit::ResultCode::kFileOpenError;
+			RKIT_THROW(ResultCode::kFileOpenError);
 		}
 
 		data::IDataDriver *dataDriver = nullptr;
@@ -1432,7 +1432,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 		RKIT_CHECK(dataHandler->LoadPackage(*packageStream, allowTempStrings, nullptr, outPackage, binaryContent));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result PipelineCompilerBase::GetGraphicsShaderPipelineShaderFieldForStage(render::vulkan::GraphicPipelineStage stage, GraphicsPipelineShaderField_t &outField)
@@ -1447,10 +1447,10 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			break;
 
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result PipelineCompilerBase::FormatGraphicsPipelineStageFilePath(CIPath &path, const CIPathView &inPath, render::vulkan::GraphicPipelineStage stage)
@@ -1460,7 +1460,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 		RKIT_CHECK(path.Set(str));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result PipelineCompilerBase::LoadDataDriver(data::IDataDriver **outDriver)
@@ -1470,12 +1470,12 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		if (!dataModule)
 		{
 			rkit::log::Error(u8"Couldn't load data module");
-			return rkit::ResultCode::kModuleLoadFailed;
+			RKIT_THROW(ResultCode::kModuleLoadFailed);
 		}
 
 		*outDriver = static_cast<data::IDataDriver *>(rkit::GetDrivers().FindDriver(IModuleDriver::kDefaultNamespace, u8"Data"));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 

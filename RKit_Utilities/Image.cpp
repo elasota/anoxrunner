@@ -38,7 +38,7 @@ namespace rkit { namespace utils {
 	Result Image<TElement>::Initialize()
 	{
 		if (m_spec.m_numChannels == 0)
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		size_t pitchInBytes = sizeof(TElement) * m_spec.m_numChannels;
 		RKIT_CHECK(SafeMul<size_t>(pitchInBytes, pitchInBytes, m_spec.m_width));
@@ -55,7 +55,7 @@ namespace rkit { namespace utils {
 
 		memset(m_image.GetBuffer(), 0, sizeof(TElement) * bufferSize);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class TElement>
@@ -94,13 +94,13 @@ namespace rkit { namespace utils {
 			break;
 
 		default:
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 		}
 		RKIT_CHECK(image->Initialize());
 
 		outImage = std::move(image);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } // rkit::utils
 

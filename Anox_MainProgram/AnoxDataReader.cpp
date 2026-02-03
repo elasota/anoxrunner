@@ -32,7 +32,7 @@ namespace anox
 		for (size_t i = 0; i < numFloats; i++)
 			outFloatsPtr[i] = inFloatsPtr[i].Get();
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result DataReader::ReadCheckUInt(uint64_t &outUInt, const rkit::endian::LittleUInt64_t &inUInt, uint64_t expectedMax)
@@ -58,7 +58,7 @@ namespace anox
 	rkit::Result DataReader::ReadCheckLabel(Label &outLabel, const rkit::endian::LittleUInt32_t &inLabel)
 	{
 		outLabel = Label::FromRawValue(inLabel.Get());
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result DataReader::ReadCheckUTF8String(rkit::String &outString, const rkit::Span<const rkit::Utf8Char_t> &chars)
@@ -67,7 +67,7 @@ namespace anox
 		if (!view.Validate())
 			return rkit::ResultCode::kDataError;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class TIntegral>
@@ -77,6 +77,6 @@ namespace anox
 			return rkit::ResultCode::kDataError;
 
 		outUInt = value;
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 }

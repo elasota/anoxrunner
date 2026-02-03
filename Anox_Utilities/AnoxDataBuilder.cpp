@@ -106,7 +106,7 @@ namespace anox { namespace utils
 		}
 
 		if (!rebuiltAnyPipelines)
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		rkit::log::LogInfo(u8"Combining pipeline libraries...");
 
@@ -135,7 +135,7 @@ namespace anox { namespace utils
 
 		RKIT_CHECK(combiner->WritePackage(*outStream));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxDataBuilder::Run(const rkit::StringView &targetName, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataDir, const rkit::OSAbsPathView &dataSourceDir, rkit::render::BackendType backendType)
@@ -244,7 +244,7 @@ namespace anox { namespace utils
 
 		RKIT_CHECK(instance->Build(&fs));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	AnoxDataBuilder::ExportPipelinesCheckRunner::ExportPipelinesCheckRunner(AnoxDataBuilder &dataBuilder, rkit::buildsystem::IBuildSystemInstance &bsi)
@@ -337,7 +337,7 @@ namespace anox { namespace utils
 		if (exists)
 		{
 			if (attribs.m_isDirectory && !allowDirectories)
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 
 			rkit::buildsystem::FileStatusView fsView;
 			fsView.m_filePath = path;
@@ -349,7 +349,7 @@ namespace anox { namespace utils
 			return applyStatus(userdata, fsView);
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxFileSystem::TryOpenFileRead(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::CIPathView &path, rkit::UniquePtr<rkit::ISeekableReadStream> &outStream)
@@ -380,7 +380,7 @@ namespace anox { namespace utils
 				openResult = sysDriver->OpenFileReadAbs(outStream, osPath);
 
 				if (rkit::utils::GetResultCode(openResult) == rkit::ResultCode::kFileOpenError)
-					return rkit::ResultCode::kOK;
+					RKIT_RETURN_OK;
 			}
 
 			return openResult;
@@ -410,17 +410,17 @@ namespace anox { namespace utils
 
 			rkit::Result openResult = sysDriver->OpenFileReadAbs(outStream, osPath);
 			if (rkit::utils::GetResultCode(openResult) == rkit::ResultCode::kFileOpenError)
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 		}
 
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxFileSystem::EnumerateDirectory(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::CIPathView &path, bool listFiles, bool listDirectories, void *userdata, ApplyFileStatusCallback_t callback)
 	{
 		if (!listFiles && !listDirectories)
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		rkit::OSRelPath osRelPath;
 		RKIT_CHECK(osRelPath.ConvertFrom(path));
@@ -586,7 +586,7 @@ namespace anox { namespace utils
 			}
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	bool AnoxFileSystem::FindFileInArchive(const rkit::CIPathView &path, bool allowDirectories, const MountedArchive *&outArchive, afs::FileHandle &outFileHandle)
@@ -663,7 +663,7 @@ namespace anox { namespace utils
 			RKIT_CHECK(str.Set(str.SubString(0, str.Length() - numTrailingSeparators)));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxFileSystem::Load(anox::IUtilitiesDriver *utils, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataFilesDir, const rkit::OSAbsPathView &dataContentDir, const rkit::OSAbsPathView &dataSourceDir)
@@ -727,7 +727,7 @@ namespace anox { namespace utils
 			}
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result IDataBuilder::Create(anox::IUtilitiesDriver *utils, rkit::UniquePtr<IDataBuilder> &outDataBuilder)

@@ -49,7 +49,7 @@ namespace rkit
 			if (!utilitiesModule)
 				return ResultCode::kModuleLoadFailed;
 
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		Result TryGetJsonObjectValue(const utils::JsonValue &objValue, const StringView &key, bool &outExists, utils::JsonValue &outValue)
@@ -61,13 +61,13 @@ namespace rkit
 			if (utils::GetResultCode(getResult) == ResultCode::kKeyNotFound)
 			{
 				outExists = false;
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else if (!utils::ResultIsOK(getResult))
 				return getResult;
 
 			outExists = true;
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		Result TryGetJsonObjectValueOfType(const utils::JsonValue &objValue, const StringView &key, utils::JsonElementType desiredElementType, bool &outExists, utils::JsonValue &outValue)
@@ -77,7 +77,7 @@ namespace rkit
 			if (outValue.GetType() != desiredElementType)
 				return ResultCode::kConfigInvalid;
 
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		Result StringToNamespaceID(const StringView &namespaceStr, uint32_t &outNamespaceID)
@@ -92,7 +92,7 @@ namespace rkit
 
 			outNamespaceID = utils::ComputeFourCC(namespaceChars[0], namespaceChars[1], namespaceChars[2], namespaceChars[3]);
 
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		Result TryGetJsonObjectValueString(const utils::JsonValue &objValue, const StringView &key, bool &outExists, StringView &outStr)
@@ -101,13 +101,13 @@ namespace rkit
 			RKIT_CHECK(TryGetJsonObjectValueOfType(objValue, key, utils::JsonElementType::kString, outExists, strValue));
 
 			if (!outExists)
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 
 			RKIT_CHECK(strValue.ToString(outStr));
 
 			outExists = true;
 
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		Result LoadModuleConfig(ModuleConfig &outConfig)
@@ -204,7 +204,7 @@ namespace rkit
 					RKIT_CHECK(outConfig.m_moduleDefs.Append(std::move(moduleDef)));
 				}
 
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			};
 
 			RKIT_CHECK(modulesJV.IterateObjectWithCallable(iterateModules));
@@ -254,12 +254,12 @@ namespace rkit
 					RKIT_CHECK(outConfig.m_moduleDefs.Append(std::move(moduleDef)));
 				}
 
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			};
 
 			RKIT_CHECK(programsJV.IterateObjectWithCallable(iteratePrograms));
 
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 	
 		Result LoadProgramModule(const ModuleConfig &moduleConfig)
@@ -303,7 +303,7 @@ namespace rkit
 			if (!programModule)
 				return ResultCode::kModuleLoadFailed;
 
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 	}
 
@@ -437,13 +437,13 @@ namespace rkit
 	Result TrackedModule::Init(const ModuleInitParameters *initParams)
 	{
 		if (m_initialized)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		RKIT_CHECK(m_module->Init(initParams));
 
 		m_initialized = true;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void TrackedModule::Unload()

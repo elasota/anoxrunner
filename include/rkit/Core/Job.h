@@ -28,6 +28,29 @@ namespace rkit
 	class JobSignaler : public RefCounted
 	{
 	public:
-		virtual void SignalDone(const Result &result) = 0;
+		void SignalDone(ResultCode resultCode);
+		void SignalDone(ResultCode resultCode, uint32_t extCode);
+		void SignalDone(const PackedResultAndExtCode &result);
+
+	protected:
+		virtual void SignalDoneImpl(const PackedResultAndExtCode &result) = 0;
 	};
+}
+
+namespace rkit
+{
+	inline void JobSignaler::SignalDone(ResultCode resultCode)
+	{
+		this->SignalDoneImpl(PackedResultAndExtCode{ resultCode, 0 });
+	}
+
+	inline void JobSignaler::SignalDone(ResultCode resultCode, uint32_t extCode)
+	{
+		this->SignalDoneImpl(PackedResultAndExtCode{ resultCode, extCode });
+	}
+
+	inline void JobSignaler::SignalDone(const PackedResultAndExtCode &result)
+	{
+		this->SignalDoneImpl(result);
+	}
 }

@@ -31,7 +31,7 @@ namespace rkit { namespace buildsystem
 
 	rkit::Result BuildSystemDriver::InitDriver(const DriverInitParameters *)
 	{
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void BuildSystemDriver::ShutdownDriver()

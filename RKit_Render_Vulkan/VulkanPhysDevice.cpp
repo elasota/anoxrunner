@@ -53,7 +53,7 @@ namespace rkit { namespace render { namespace vulkan
 			}
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VkPhysicalDevice RenderVulkanPhysicalDevice::GetPhysDevice() const

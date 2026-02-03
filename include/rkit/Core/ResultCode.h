@@ -6,7 +6,7 @@
 
 namespace rkit
 {
-#if RKIT_USE_CLASS_RESULT
+#if !RKIT_USE_ENUM_RESULT
 	enum class ResultCode : uint32_t
 #else
 	enum class Result : uint64_t
@@ -18,6 +18,7 @@ namespace rkit
 		kInvalidParameter,
 		kNotYetImplemented,
 		kInternalError,
+		kCppException,
 
 		kDataError,
 
@@ -38,7 +39,6 @@ namespace rkit
 		kInvalidCString,
 		kInvalidPath,
 
-		kEndOfStream,
 		kIOReadError,
 		kIOWriteError,
 		kIOSeekOutOfRange,
@@ -60,7 +60,7 @@ namespace rkit
 		kJobAborted,
 	};
 
-#if !RKIT_USE_CLASS_RESULT
+#if RKIT_USE_ENUM_RESULT != 0
 	typedef Result ResultCode;
 #endif
 }

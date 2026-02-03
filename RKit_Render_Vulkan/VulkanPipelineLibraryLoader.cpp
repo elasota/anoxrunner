@@ -204,7 +204,7 @@ namespace rkit { namespace render { namespace vulkan
 		Result LoadObjectsFromPackage() override;
 
 		void SetMergedLibraryStream(UniquePtr<ISeekableReadStream> &&cacheReadStream, ISeekableReadWriteStream *cacheWriteStream) override;
-		Result OpenMergedLibrary() override;
+		Result TryOpenMergedLibrary(bool &outSucceeded) override;
 		Result LoadGraphicsPipelineFromMergedLibrary(size_t pipelineIndex, size_t permutationIndex) override;
 		void CloseMergedLibrary(bool unloadPipelines, bool unloadMergedCache) override;
 
@@ -349,12 +349,12 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		m_calculator->AppendStreamingState(m_streamingState, data, count);
 		outCountWritten = count;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ConfigHashComputer::Flush()
 	{
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	utils::Sha256DigestBytes VulkanPipelineLibraryLoader::ConfigHashComputer::FinishSHA()
@@ -436,7 +436,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		m_configHashBytes = hashComputer.FinishSHA();
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::LoadObjectsFromPackage()
@@ -494,7 +494,7 @@ namespace rkit { namespace render { namespace vulkan
 			const size_t binaryContentSize = m_data.m_package->GetBinaryContentSize(i);
 
 			if (binaryContentSize > std::numeric_limits<FilePos_t>::max())
-				return ResultCode::kIntegerOverflow;
+				RKIT_THROW(ResultCode::kIntegerOverflow);
 
 			m_binaryContents[i].m_filePos = binaryContentStart;
 
@@ -583,7 +583,7 @@ namespace rkit { namespace render { namespace vulkan
 					if (descriptorDesc->m_arraySize == 0)
 					{
 						rkit::log::Error(u8"Pipeline contains unbounded descriptors, but device doesn't support unbounded descriptors");
-						return ResultCode::kOperationFailed;
+						RKIT_THROW(ResultCode::kOperationFailed);
 					}
 
 					if (descriptorDesc->m_staticSamplerDesc)
@@ -595,7 +595,7 @@ namespace rkit { namespace render { namespace vulkan
 							if (vkBinding.descriptorType != VK_DESCRIPTOR_TYPE_SAMPLER)
 							{
 								rkit::log::Error(u8"Pipeline contains a static sampler assigned to a descriptor that isn't a sampler or sampled texture");
-								return ResultCode::kOperationFailed;
+								RKIT_THROW(ResultCode::kOperationFailed);
 							}
 						}
 
@@ -724,7 +724,7 @@ namespace rkit { namespace render { namespace vulkan
 			}
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void VulkanPipelineLibraryLoader::SetMergedLibraryStream(UniquePtr<ISeekableReadStream> &&cacheReadStream, ISeekableReadWriteStream *cacheWriteStream)
@@ -733,12 +733,12 @@ namespace rkit { namespace render { namespace vulkan
 		m_cacheWriteStream = cacheWriteStream;
 	}
 
-	Result VulkanPipelineLibraryLoader::OpenMergedLibrary()
+	Result VulkanPipelineLibraryLoader::TryOpenMergedLibrary(bool &outSucceeded)
 	{
+		outSucceeded = false;
+
 		if (!m_cacheReadStream.IsValid())
-		{
-			return utils::SoftFaultResult(ResultCode::kOperationFailed);
-		}
+			RKIT_RETURN_OK;
 
 		PipelineCacheHeader header = {};
 
@@ -752,16 +752,19 @@ namespace rkit { namespace render { namespace vulkan
 			|| memcmp(&header.m_configHashBytes, &m_configHashBytes, sizeof(header.m_configHashBytes))
 			)
 		{
-			return utils::SoftFaultResult(ResultCode::kOperationFailed);
+			RKIT_RETURN_OK;
 		}
 
 		FilePos_t cacheSize = m_cacheReadStream->GetSize() - sizeof(header);
 
 		if (cacheSize < sizeof(VkPipelineCacheHeaderVersionOne))
-			return utils::SoftFaultResult(ResultCode::kOperationFailed);
+			RKIT_RETURN_OK;
 
 		if (cacheSize > std::numeric_limits<size_t>::max())
-			return ResultCode::kOperationFailed;
+		{
+			rkit::log::Error(u8"Pipeline library cache size was invalid");
+			RKIT_RETURN_OK;
+		}
 
 		Vector<uint8_t> mergedData;
 		RKIT_CHECK(mergedData.Resize(static_cast<size_t>(cacheSize)));
@@ -789,7 +792,7 @@ namespace rkit { namespace render { namespace vulkan
 			|| memcmp(vkCacheHeader.pipelineCacheUUID, deviceProps.pipelineCacheUUID, VK_UUID_SIZE))
 		{
 			// Pipeline cache mismatch
-			return utils::SoftFaultResult(ResultCode::kOperationFailed);
+			RKIT_RETURN_OK;
 		}
 
 		VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
@@ -799,24 +802,25 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreatePipelineCache(m_device.GetDevice(), &pipelineCacheCreateInfo, m_device.GetAllocCallbacks(), &m_data.m_mergedCache));
 
-		return ResultCode::kOK;
+		outSucceeded = true;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::LoadGraphicsPipelineFromMergedLibrary(size_t pipelineIndex, size_t permutationIndex)
 	{
 		if (m_data.m_mergedCache == VK_NULL_HANDLE)
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 
 		VkPipeline &outPipelineRef = m_data.m_allPipelines[m_data.m_graphicPipelinePermutationStarts[pipelineIndex] + permutationIndex];
 		if (outPipelineRef != VK_NULL_HANDLE)
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 
 		CompiledPipeline compiledPipeline;
 		RKIT_CHECK(CheckedCreateGraphicsPipeline(m_data.m_mergedCache, compiledPipeline, pipelineIndex, permutationIndex));
 
 		outPipelineRef = compiledPipeline.m_pipeline;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void VulkanPipelineLibraryLoader::CloseMergedLibrary(bool unloadPipelines, bool unloadMergedCache)
@@ -851,7 +855,7 @@ namespace rkit { namespace render { namespace vulkan
 		VkPipelineCache pipelineCache = VK_NULL_HANDLE;
 		CompiledPipeline pipeline;
 
-		Result result = CheckedCompileUnmergedGraphicsPipeline(pipelineCache, pipeline, pipelineIndex, permutationIndex);
+		PackedResultAndExtCode result = RKIT_TRY_EVAL(CheckedCompileUnmergedGraphicsPipeline(pipelineCache, pipeline, pipelineIndex, permutationIndex));
 
 		const VulkanDeviceAPI &vkd = m_device.GetDeviceAPI();
 
@@ -861,7 +865,7 @@ namespace rkit { namespace render { namespace vulkan
 		if (pipelineCache != VK_NULL_HANDLE)
 			vkd.vkDestroyPipelineCache(m_device.GetDevice(), pipelineCache, m_device.GetAllocCallbacks());
 
-		return result;
+		return ThrowIfError(result);
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveVertexInputAttributeFormat(VkFormat &outVkFormat, const VectorOrScalarNumericType &vectorType)
@@ -877,7 +881,7 @@ namespace rkit { namespace render { namespace vulkan
 		case VectorOrScalarDimension::Dimension4:
 			return ResolveVertexInputAttributeFormat_V4(outVkFormat, vectorType.m_numericType);
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 	}
 
@@ -898,10 +902,10 @@ namespace rkit { namespace render { namespace vulkan
 			outVkFormat = VK_FORMAT_D16_UNORM;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveDepthStencilFormatHasStencil(bool &outHaveStencil, DepthStencilFormat dsFormat)
@@ -917,10 +921,10 @@ namespace rkit { namespace render { namespace vulkan
 			outHaveStencil = false;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -971,10 +975,10 @@ namespace rkit { namespace render { namespace vulkan
 			outBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveAlphaBlendFactor(VkBlendFactor &outBlendFactor, AlphaBlendFactor abf)
@@ -1006,10 +1010,10 @@ namespace rkit { namespace render { namespace vulkan
 			outBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveBlendOp(VkBlendOp &outBlendOp, BlendOp bo)
@@ -1032,10 +1036,10 @@ namespace rkit { namespace render { namespace vulkan
 			outBlendOp = VK_BLEND_OP_MAX;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveVertexInputAttributeFormat_Scalar(VkFormat &outVkFormat, NumericType numericType)
@@ -1093,10 +1097,10 @@ namespace rkit { namespace render { namespace vulkan
 			break;
 
 		default:
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveVertexInputAttributeFormat_V2(VkFormat &outVkFormat, NumericType numericType)
@@ -1154,10 +1158,10 @@ namespace rkit { namespace render { namespace vulkan
 			break;
 
 		default:
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveVertexInputAttributeFormat_V3(VkFormat &outVkFormat, NumericType numericType)
@@ -1215,10 +1219,10 @@ namespace rkit { namespace render { namespace vulkan
 			break;
 
 		default:
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveVertexInputAttributeFormat_V4(VkFormat &outVkFormat, NumericType numericType)
@@ -1277,10 +1281,10 @@ namespace rkit { namespace render { namespace vulkan
 			break;
 
 		default:
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveStencilOps(VkStencilOpState &outOpState, const StencilOpDesc &stencilOpDesc, const DepthStencilOperationDesc &depthStencilDesc)
@@ -1297,7 +1301,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outOpState.reference = ResolveConfigurable(depthStencilDesc.m_stencilReference);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveStencilOp(VkStencilOp &outOp, StencilOp stencilOp)
@@ -1329,10 +1333,10 @@ namespace rkit { namespace render { namespace vulkan
 			outOp = VK_STENCIL_OP_DECREMENT_AND_WRAP;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveCompareOp(VkCompareOp &outOp, ComparisonFunction compareFunc)
@@ -1364,10 +1368,10 @@ namespace rkit { namespace render { namespace vulkan
 			outOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveAnyStageFlags(VkPipelineStageFlags &outStageFlags, StageVisibility visibility)
@@ -1384,10 +1388,10 @@ namespace rkit { namespace render { namespace vulkan
 			outStageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveGraphicsStageFlags(VkPipelineStageFlags &outStageFlags, StageVisibility visibility)
@@ -1404,10 +1408,10 @@ namespace rkit { namespace render { namespace vulkan
 			outStageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveDescriptorType(VkDescriptorType &outDescType, DescriptorType descType)
@@ -1451,10 +1455,10 @@ namespace rkit { namespace render { namespace vulkan
 			break;
 
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveFilter(VkFilter &outFilter, Filter filter)
@@ -1469,10 +1473,10 @@ namespace rkit { namespace render { namespace vulkan
 			break;
 
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveSamplerMipMapMode(VkSamplerMipmapMode &outMipmapMode, MipMapMode mipmapMode)
@@ -1487,10 +1491,10 @@ namespace rkit { namespace render { namespace vulkan
 			break;
 
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveSamplerAddressMode(VkSamplerAddressMode &outAddressMode, AddressMode addressMode)
@@ -1511,10 +1515,10 @@ namespace rkit { namespace render { namespace vulkan
 			break;
 
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveAnisotropy(float &outMaxAnisotropy, AnisotropicFiltering anisoFiltering)
@@ -1538,10 +1542,10 @@ namespace rkit { namespace render { namespace vulkan
 			break;
 
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolvePushConstantSize(uint32_t &size, const ValueType &valueType)
@@ -1557,7 +1561,7 @@ namespace rkit { namespace render { namespace vulkan
 		case ValueTypeType::Structure:
 			return ResolvePushConstantSize(size, valueType.m_value.m_structureType);
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 	}
 
@@ -1572,7 +1576,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_CHECK(SafeMul(size, numberSize, numElements));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolvePushConstantSize(uint32_t &size, const VectorNumericType &valueType)
@@ -1584,7 +1588,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_CHECK(SafeMul(size, numberSize, colsInt));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolvePushConstantSize(uint32_t &size, NumericType numericType)
@@ -1598,10 +1602,10 @@ namespace rkit { namespace render { namespace vulkan
 			break;
 		default:
 			rkit::log::Error(u8"Push constants element was not DWORD-sized");
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveStoreOp(VkAttachmentStoreOp &outStoreOp, RenderPassStoreOp storeOp)
@@ -1615,10 +1619,10 @@ namespace rkit { namespace render { namespace vulkan
 			outStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::ResolveLoadOp(VkAttachmentLoadOp &outLoadOp, RenderPassLoadOp loadOp)
@@ -1635,10 +1639,10 @@ namespace rkit { namespace render { namespace vulkan
 			outLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 #define RKIT_VK_FIND_FROM_LIST(type, object)\
@@ -1646,7 +1650,7 @@ namespace rkit { namespace render { namespace vulkan
 	do {\
 		const data::IRenderRTTIListBase *list = m_data.m_package->GetIndexable(data::RenderRTTIIndexableStructType::type);\
 		if (list->GetCount() == 0)\
-			return ResultCode::kOperationFailed;\
+			RKIT_THROW(ResultCode::kOperationFailed);\
 		const type *firstElement = static_cast<const type *>(list->GetElementPtr(0));\
 		index = static_cast<size_t>(object - firstElement);\
 	} while (false)
@@ -1656,10 +1660,10 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_FIND_FROM_LIST(SamplerDesc, sampler);
 
 		if (m_data.m_samplers[index] == VK_NULL_HANDLE)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		outSampler = m_data.m_samplers[index];
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::FindDescriptorSetLayout(VkDescriptorSetLayout &outDSL, const DescriptorLayoutDesc *descLayout) const
@@ -1667,10 +1671,10 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_FIND_FROM_LIST(DescriptorLayoutDesc, descLayout);
 
 		if (m_data.m_descriptorSetLayouts[index] == VK_NULL_HANDLE)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		outDSL = m_data.m_descriptorSetLayouts[index];
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::FindPipelineLayout(VkPipelineLayout &outPipelineLayout, const PipelineLayoutDesc *pipelineLayout) const
@@ -1678,10 +1682,10 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_FIND_FROM_LIST(PipelineLayoutDesc, pipelineLayout);
 
 		if (m_data.m_pipelineLayouts[index] == VK_NULL_HANDLE)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		outPipelineLayout = m_data.m_pipelineLayouts[index];
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::FindRenderPass(VkRenderPass &outRenderPass, const RenderPassDesc *renderPass) const
@@ -1690,10 +1694,10 @@ namespace rkit { namespace render { namespace vulkan
 
 		VkRenderPass vkRenderPass = m_data.m_renderPasses[index].GetRenderPass();
 		if (vkRenderPass == VK_NULL_HANDLE)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		outRenderPass = vkRenderPass;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::CreateRenderPass(VkRenderPass &outRenderPass, const RenderPassDesc &renderPassDesc)
@@ -1799,7 +1803,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateRenderPass(m_device.GetDevice(), &renderPassCreateInfo, m_device.GetAllocCallbacks(), &outRenderPass));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::CheckedCreateGraphicsPipeline(VkPipelineCache &pipelineCache, CompiledPipeline &pipeline, size_t pipelineIndex, size_t permutationIndex)
@@ -1816,10 +1820,10 @@ namespace rkit { namespace render { namespace vulkan
 		const ConstSpan<const render::ContentKey *> contentKeys = pipelineDesc->m_compiledContentKeys;
 
 		if (contentKeys.Count() % kMaxGraphicsStages != 0)
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 
 		if (permutationIndex > contentKeys.Count() / kMaxGraphicsStages)
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 
 		Vector<VkDynamicState> dynamicStates;
 		RKIT_CHECK(dynamicStates.Append(VK_DYNAMIC_STATE_VIEWPORT));
@@ -1872,7 +1876,7 @@ namespace rkit { namespace render { namespace vulkan
 					bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
 					break;
 				default:
-					return ResultCode::kInternalError;
+					RKIT_THROW(ResultCode::kInternalError);
 				}
 
 				bindingDesc.stride = ResolveConfigurable(feed->m_byteStride);
@@ -1909,7 +1913,7 @@ namespace rkit { namespace render { namespace vulkan
 			inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
 		inputAssemblyStateCreateInfo.primitiveRestartEnable = (pipelineDesc->m_primitiveRestart) ? VK_TRUE : VK_FALSE;
@@ -1932,7 +1936,7 @@ namespace rkit { namespace render { namespace vulkan
 			rasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
 		switch (pipelineDesc->m_cullMode)
@@ -1947,7 +1951,7 @@ namespace rkit { namespace render { namespace vulkan
 			rasterizationStateCreateInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 
 		const render::DepthStencilOperationDesc defaultDepthStencilDesc;
@@ -1993,7 +1997,7 @@ namespace rkit { namespace render { namespace vulkan
 		if (renderPassDesc->m_renderTargets.Count() != pipelineDesc->m_renderTargets.Count())
 		{
 			rkit::log::Error(u8"Pipeline render target count didn't match render pass count");
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 
 		Vector<VkPipelineColorBlendAttachmentState> blendAttachments;
@@ -2090,7 +2094,7 @@ namespace rkit { namespace render { namespace vulkan
 					break;
 
 				default:
-					return ResultCode::kInternalError;
+					RKIT_THROW(ResultCode::kInternalError);
 				}
 
 				const size_t bcIndex = contentKey->m_content.m_contentIndex;
@@ -2108,7 +2112,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(vkd.vkCreateGraphicsPipelines(m_device.GetDevice(), pipelineCache, 1, &pipelineCreateInfo, m_device.GetAllocCallbacks(), &pipeline.m_pipeline));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::CheckedCompileUnmergedGraphicsPipeline(VkPipelineCache &pipelineCache, CompiledPipeline &pipeline, size_t pipelineIndex, size_t permutationIndex)
@@ -2178,7 +2182,7 @@ namespace rkit { namespace render { namespace vulkan
 			RKIT_CHECK(m_cacheWriteStream->WriteAll(pipelineCacheDataBuffer.GetBuffer(), dataSize));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::LoadShaderModule(size_t binaryContentIndex)
@@ -2188,14 +2192,14 @@ namespace rkit { namespace render { namespace vulkan
 		{
 			MutexLock lock(*m_shaderModuleMutex);
 			if (bcd.m_shaderModule != VK_NULL_HANDLE)
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 		}
 
 		const size_t binaryContentSize = m_data.m_package->GetBinaryContentSize(binaryContentIndex);
 		const size_t sizeDWords = binaryContentSize / 4;
 
 		if (binaryContentSize % 4 != 0)
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 
 		Vector<uint8_t> content;
 		RKIT_CHECK(content.Resize(binaryContentSize));
@@ -2231,7 +2235,7 @@ namespace rkit { namespace render { namespace vulkan
 		{
 			MutexLock lock(*m_shaderModuleMutex);
 			if (bcd.m_shaderModule != VK_NULL_HANDLE)
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 
 			VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
 			shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -2241,7 +2245,7 @@ namespace rkit { namespace render { namespace vulkan
 			RKIT_VK_CHECK(vkd.vkCreateShaderModule(m_device.GetDevice(), &shaderModuleCreateInfo, m_device.GetAllocCallbacks(), &bcd.m_shaderModule));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::GetUnmergedCachePath(String &path, const utils::Sha256DigestBytes &configHash, size_t pipelineIndex, size_t permutationIndex)
@@ -2308,7 +2312,7 @@ namespace rkit { namespace render { namespace vulkan
 		HashMap<CompiledPipelineKey, CompiledPipelineFileLocator>::ConstIterator_t it = m_individualPipelineLocators.Find<CompiledPipelineKey, CompiledPipelineKeyHasher>(key);
 
 		if (it == m_individualPipelineLocators.end())
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 
 		Vector<uint8_t> pipelineCacheData;
 		RKIT_CHECK(pipelineCacheData.Resize(it.Value().m_size));
@@ -2331,7 +2335,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(vkd.vkCreatePipelineCache(m_device.GetDevice(), &pipelineCacheCreateInfo, m_device.GetAllocCallbacks(), &m_individualCaches[m_individualCaches.Count() - 1]));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::SaveMergedPipeline()
@@ -2384,13 +2388,13 @@ namespace rkit { namespace render { namespace vulkan
 			RKIT_CHECK(m_cacheWriteStream->Flush());
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::GetFinishedPipeline(UniquePtr<IPipelineLibrary> &outPipelineLibrary)
 	{
 		if (m_isFinished)
-			return ResultCode::kOperationFailed;
+			RKIT_THROW(ResultCode::kOperationFailed);
 
 		m_isFinished = true;
 
@@ -2399,7 +2403,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outPipelineLibrary = std::move(pipelineLibrary);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result PipelineLibraryLoaderBase::Create(VulkanDeviceBase &device, UniquePtr<PipelineLibraryLoaderBase> &outLoader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
@@ -2413,6 +2417,6 @@ namespace rkit { namespace render { namespace vulkan
 
 		outLoader = std::move(loader);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } } // rkit::render::vulkan

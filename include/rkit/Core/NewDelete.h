@@ -130,12 +130,12 @@ inline rkit::Result rkit::NewWithAlloc(UniquePtr<TPtrType> &objPtr, IMallocDrive
 {
 	void *mem = alloc->Alloc(priv::NewSizeAlignResolver<TType>::GetSize());
 	if (!mem)
-		return ResultCode::kOutOfMemory;
+		RKIT_THROW(ResultCode::kOutOfMemory);
 
 	TType *obj = new (mem) TType(std::forward<TArgs>(args)...);
 	objPtr = UniquePtr<TPtrType>(obj, mem, alloc);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TType, class TPtrType, class... TArgs>
@@ -149,12 +149,12 @@ rkit::Result rkit::NewWithAlloc(UniquePtr<TPtrType> &objPtr, IMallocDriver *allo
 {
 	void *mem = alloc->Alloc(priv::NewSizeAlignResolver<TType>::GetSize());
 	if (!mem)
-		return ResultCode::kOutOfMemory;
+		RKIT_THROW(ResultCode::kOutOfMemory);
 
 	TType *obj = new (mem) TType();
 	objPtr = UniquePtr<TPtrType>(obj, mem, alloc);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TType, class TPtrType>

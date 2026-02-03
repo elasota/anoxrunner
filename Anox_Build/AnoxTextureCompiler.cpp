@@ -409,7 +409,7 @@ namespace anox { namespace buildsystem { namespace priv
 
 		m_pitchInElements = pitch;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class TPixelElement, size_t TElementsPerPixel>
@@ -605,7 +605,7 @@ namespace anox { namespace buildsystem
 		imageSpec.m_numChannels = tgaHeader.m_pixelSizeBits / 8;
 		imageSpec.m_pixelPacking = rkit::utils::PixelPacking::kUInt8;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result TextureCompiler::GetPCXMetadata(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName)
@@ -640,7 +640,7 @@ namespace anox { namespace buildsystem
 		imageSpec.m_numChannels = 3;
 		imageSpec.m_pixelPacking = rkit::utils::PixelPacking::kUInt8;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result TextureCompiler::GetPNGMetadata(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, const rkit::CIPathView &shortName)
@@ -798,7 +798,7 @@ namespace anox { namespace buildsystem
 		}
 
 		outImage = std::move(image);
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result TextureCompiler::GetPCX(rkit::UniquePtr<rkit::utils::IImage> &outImage, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
@@ -957,7 +957,7 @@ namespace anox { namespace buildsystem
 		}
 
 		outImage = std::move(image);
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result TextureCompiler::GetPNG(rkit::UniquePtr<rkit::utils::IImage> &image, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
@@ -1086,14 +1086,14 @@ namespace anox { namespace buildsystem
 		}
 
 		outNumLevels = numLevels;
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class TElementType, size_t TNumElements>
 	rkit::Result TextureCompiler::Generate2DMipMapChain(const rkit::Span<priv::TextureCompilerImage<TElementType, TNumElements>> &images, ImageImportDisposition disposition)
 	{
 		if (images.Count() == 1)
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		return rkit::ResultCode::kNotYetImplemented;
 	}
@@ -1331,7 +1331,7 @@ namespace anox { namespace buildsystem
 			}
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	bool TextureCompiler::DispositionHasAlpha(ImageImportDisposition disposition)

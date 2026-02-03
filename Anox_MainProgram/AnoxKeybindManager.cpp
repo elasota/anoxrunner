@@ -274,14 +274,14 @@ namespace anox
 		if (args.Count() < 1)
 		{
 			rkit::log::Error(u8"Usage: bind <key> <parameters>");
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		KeyCode_t keyCode = 0;
 		if (!ResolveKeyCode(args[0], keyCode))
 		{
 			rkit::log::ErrorFmt(u8"Unknown key {}", args[0]);
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		AnoxKeybind *keyBind = this->FindKeybind(keyCode);
@@ -302,7 +302,7 @@ namespace anox
 			RKIT_CHECK(keyBind->m_cmd.Set(concatenated));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxKeybindManager::Cmd_Unbind(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args)
@@ -310,14 +310,14 @@ namespace anox
 		if (args.Count() < 1)
 		{
 			rkit::log::Error(u8"Usage: unbind <key>");
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		KeyCode_t keyCode = 0;
 		if (!ResolveKeyCode(args[0], keyCode))
 		{
 			rkit::log::ErrorFmt(u8"Unknown key {}", args[0]);
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		AnoxKeybind *keyBind = this->FindKeybind(keyCode);
@@ -326,7 +326,7 @@ namespace anox
 
 		keyBind->m_cmd.Clear();
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxKeybindManager::Cmd_Set(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args)
@@ -334,7 +334,7 @@ namespace anox
 		if (args.Count() < 2)
 		{
 			rkit::log::Error(u8"Usage: set <variable> <value> [u | s]");
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		AnoxCommandRegistryBase *cmdRegistry = m_game.GetCommandRegistry();
@@ -356,10 +356,10 @@ namespace anox
 			if (!setOK)
 				rkit::log::ErrorFmt(u8"Failed to set '{0}' to '{1}'", args[0], args[1]);
 
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxKeybindManager::Cmd_Alias(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args)
@@ -367,7 +367,7 @@ namespace anox
 		if (args.Count() < 2)
 		{
 			rkit::log::Error(u8"Usage: alias <name> <commands>");
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		rkit::ByteString storageStr;
@@ -377,7 +377,7 @@ namespace anox
 
 		RKIT_CHECK(m_game.GetCommandRegistry()->RegisterAlias(args[0], aliasCommand));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxKeybindManager::ConcatenateArgs(const rkit::ISpan<rkit::ByteStringView> &args, size_t firstArg, rkit::ByteString &storageStr, rkit::ByteStringView &outStrView)
@@ -416,7 +416,7 @@ namespace anox
 			outStrView = storageStr;
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxKeybindManager::Register(AnoxCommandRegistryBase &commandRegistry)
@@ -428,7 +428,7 @@ namespace anox
 		RKIT_CHECK(commandRegistry.RegisterCommand(u8"alias", wrapper.Create<&AnoxKeybindManager::Cmd_Alias>()));
 		RKIT_CHECK(commandRegistry.RegisterCommand(u8"set", wrapper.Create<&AnoxKeybindManager::Cmd_Set>()));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	AnoxKeybind *AnoxKeybindManager::FindKeybind(KeyCode_t keyCode)
@@ -489,6 +489,6 @@ namespace anox
 
 		outManager = std::move(manager);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 }

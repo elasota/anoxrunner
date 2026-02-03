@@ -271,7 +271,7 @@ namespace rkit { namespace render { namespace vulkan
 			static_cast<uint32_t>(bufferMemoryBarriers.Count()), bufferMemoryBarriers.GetBuffer(),
 			static_cast<uint32_t>(imageMemoryBarriers.Count()), imageMemoryBarriers.GetBuffer());
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VulkanQueueProxyBase *VulkanCommandEncoder::DefaultQueue(IBaseCommandQueue *specifiedQueue) const
@@ -334,7 +334,7 @@ namespace rkit { namespace render { namespace vulkan
 			static_cast<VulkanImageContainer &>(imageResource).GetVkImage(),
 			vkImageLayout, 1, &bufferImageCopy);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCopyCommandEncoder::CopyBufferToBuffer(IBufferResource &destResource, GPUMemoryOffset_t destOffset,
@@ -356,12 +356,12 @@ namespace rkit { namespace render { namespace vulkan
 		VulkanDeviceBase &device = m_batch.GetDevice();
 		device.GetDeviceAPI().vkCmdCopyBuffer(cmdBuffer, srcBuffer, destBuffer, 1, &bufferCopy);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCopyCommandEncoder::CloseEncoder()
 	{
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VulkanGraphicsCommandEncoder::VulkanGraphicsCommandEncoder(VulkanCommandBatch &batch)
@@ -372,9 +372,9 @@ namespace rkit { namespace render { namespace vulkan
 	Result VulkanGraphicsCommandEncoder::CloseEncoder()
 	{
 		if (m_isRendering)
-			return ResultCode::kNotYetImplemented;
+			RKIT_THROW(ResultCode::kNotYetImplemented);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanGraphicsCommandEncoder::WaitForSwapChainAcquire(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &subsequentStages)
@@ -383,7 +383,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_CHECK(m_batch.AddWaitForVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetAcquireSema(), subsequentStages));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanGraphicsCommandEncoder::SignalSwapChainPresentReady(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &priorStages)
@@ -392,7 +392,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_CHECK(m_batch.AddSignalVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetPresentSema()));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanGraphicsCommandEncoder::PipelineBarrier(const BarrierGroup &barrierGroup)
@@ -470,7 +470,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		device.GetDeviceAPI().vkCmdClearAttachments(cmdBuffer, static_cast<uint32_t>(clearAttachments.Count()), clearAttachments.GetBuffer(), static_cast<uint32_t>(clearRects.Count()), clearRects.GetBuffer());
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanGraphicsCommandEncoder::OpenEncoder(IRenderPassInstance &rpi)
@@ -478,7 +478,7 @@ namespace rkit { namespace render { namespace vulkan
 		m_rpi = static_cast<VulkanRenderPassInstanceBase *>(&rpi);
 		m_isRendering = false;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VulkanCommandBatch::VulkanCommandBatch(VulkanDeviceBase &device, VulkanQueueProxyBase &queue, VulkanCommandAllocatorBase &cmdAlloc)
@@ -515,7 +515,7 @@ namespace rkit { namespace render { namespace vulkan
 			m_isCPUWaitable = false;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandBatch::OpenCommandBatch(bool cpuWaitable)
@@ -537,7 +537,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		m_isCPUWaitable = cpuWaitable;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandBatch::Submit()
@@ -545,7 +545,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_CHECK(CloseBatch());
 
 		if (m_submits.Count() == 0 && m_completionFence == VK_NULL_HANDLE)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		const VkCommandBuffer *cmdBuffers = m_cmdBuffers.GetBuffer();
 		const VkSemaphore *semas = m_semas.GetBuffer();
@@ -578,20 +578,20 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkQueueSubmit(m_queue.GetVkQueue(), static_cast<uint32_t>(m_submits.Count()), m_submits.GetBuffer(), m_completionFence));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandBatch::WaitForCompletion(ICPUFenceWaiter& fenceWaiter)
 	{
 		if (!m_isCPUWaitable)
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 
 		if (m_completionFence == VK_NULL_HANDLE)
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkWaitForFences(m_device.GetDevice(), 1, &m_completionFence, VK_TRUE, UINT64_MAX));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandBatch::CloseBatch()
@@ -599,7 +599,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_CHECK(StartNewEncoder(EncoderType::kNone));
 		RKIT_CHECK(CheckCloseCommandList());
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandBatch::OpenCopyCommandEncoder(ICopyCommandEncoder *&outCopyCommandEncoder)
@@ -608,12 +608,12 @@ namespace rkit { namespace render { namespace vulkan
 
 		outCopyCommandEncoder = &m_copyCommandEncoder;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandBatch::OpenComputeCommandEncoder(IComputeCommandEncoder *&outComputeCommandEncoder)
 	{
-		return ResultCode::kNotYetImplemented;
+		RKIT_THROW(ResultCode::kNotYetImplemented);
 	}
 
 	Result VulkanCommandBatch::OpenGraphicsCommandEncoder(IGraphicsCommandEncoder *&outGraphicsCommandEncoder, IRenderPassInstance &rpi)
@@ -624,7 +624,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outGraphicsCommandEncoder = &m_graphicsCommandEncoder;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandBatch::AddWaitForFence(IBinaryGPUWaitableFence &fence, const PipelineStageMask_t &subsequentStageMask)
@@ -659,18 +659,18 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_CHECK(m_semas.Append(sema));
 
-		{
-			Result dstMaskAppendResult = m_waitDstStageMasks.Append(stageFlagBits);
-			if (!utils::ResultIsOK(dstMaskAppendResult))
-			{
-				m_semas.ShrinkToSize(m_semas.Count() - 1);
-				return dstMaskAppendResult;
-			}
-		}
+		RKIT_TRY_CATCH_RETHROW(m_waitDstStageMasks.Append(stageFlagBits),
+			CatchContext(
+				[this]
+				{
+					m_semas.ShrinkToSize(m_semas.Count() - 1);
+				}
+			)
+		);
 
 		submitItem->waitSemaphoreCount++;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandBatch::AddSignalVkSema(VkSemaphore sema)
@@ -692,7 +692,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		submitItem->signalSemaphoreCount++;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -701,7 +701,7 @@ namespace rkit { namespace render { namespace vulkan
 		if (m_isCommandListOpen)
 		{
 			outCmdBuffer = m_cmdBuffers[m_cmdBuffers.Count() - 1];
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		VkSubmitInfo *submitItem = nullptr;
@@ -733,7 +733,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		submitItem->commandBufferCount++;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandBatch::OpenRenderPass(VkCommandBuffer &outCmdBuffer, const VulkanRenderPassInstanceBase &rpi)
@@ -757,7 +757,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outCmdBuffer = cmdBuffer;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VulkanDeviceBase &VulkanCommandBatch::GetDevice() const
@@ -779,7 +779,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outSubmitInfo = &m_submits[m_submits.Count() - 1];
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandBatch::CloseRenderPass()
@@ -792,7 +792,7 @@ namespace rkit { namespace render { namespace vulkan
 			m_isRenderPassOpen = false;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandBatch::CheckCloseCommandList()
@@ -806,12 +806,12 @@ namespace rkit { namespace render { namespace vulkan
 			m_isCommandListOpen = false;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandBatch::Initialize()
 	{
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandBatch::StartNewEncoder(EncoderType encoderType)
@@ -823,7 +823,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		m_currentEncoderType = encoderType;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandBatchBase::Create(UniquePtr<VulkanCommandBatchBase> &outCmdBatch, VulkanDeviceBase &device, VulkanQueueProxyBase &queue, VulkanCommandAllocatorBase &cmdAlloc)
@@ -835,6 +835,6 @@ namespace rkit { namespace render { namespace vulkan
 
 		outCmdBatch = std::move(cmdBatch);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } } // rkit::render::vulkan

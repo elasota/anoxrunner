@@ -181,7 +181,7 @@ namespace rkit
 
 	Result UtilitiesDriver::InitDriver(const DriverInitParameters *)
 	{
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void UtilitiesDriver::ShutdownDriver()
@@ -218,7 +218,7 @@ namespace rkit
 
 		outStream = SharedPtr<IMutexProtectedReadWriteStream>(std::move(sharedWrapper));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result UtilitiesDriver::CreateMutexProtectedReadStream(SharedPtr<IMutexProtectedReadStream> &outStream, UniquePtr<ISeekableReadStream> &&stream) const
@@ -241,7 +241,7 @@ namespace rkit
 
 		outStream = SharedPtr<IMutexProtectedReadStream>(std::move(sharedWrapper));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result UtilitiesDriver::CreateMutexProtectedWriteStream(SharedPtr<IMutexProtectedWriteStream> &outStream, UniquePtr<ISeekableWriteStream> &&stream) const
@@ -264,7 +264,7 @@ namespace rkit
 
 		outStream = SharedPtr<IMutexProtectedWriteStream>(std::move(sharedWrapper));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result UtilitiesDriver::OpenShadowFileRead(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadStream &stream) const
@@ -276,7 +276,7 @@ namespace rkit
 
 		outShadowFile = std::move(shadowFile);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result UtilitiesDriver::OpenShadowFileReadWrite(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadWriteStream &stream) const
@@ -288,7 +288,7 @@ namespace rkit
 
 		outShadowFile = std::move(shadowFile);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result UtilitiesDriver::InitializeShadowFile(UniquePtr<utils::IShadowFile> &outShadowFile, ISeekableReadWriteStream &stream) const
@@ -300,7 +300,7 @@ namespace rkit
 
 		outShadowFile = std::move(shadowFile);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result UtilitiesDriver::CreateRestartableDeflateDecompressStream(UniquePtr<ISeekableReadStream> &outStream, UniquePtr<ISeekableReadStream> &&compressedStream, FilePos_t decompressedSize) const
@@ -315,7 +315,7 @@ namespace rkit
 
 		outStream = std::move(createdStream);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result UtilitiesDriver::CreateDeflateDecompressStream(UniquePtr<IReadStream> &outStream, UniquePtr<IReadStream> &&compressedStream) const
@@ -329,7 +329,7 @@ namespace rkit
 
 		outStream = UniquePtr<IReadStream>(std::move(createdStream));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result UtilitiesDriver::CreateRangeLimitedReadStream(UniquePtr<ISeekableReadStream> &outStream, UniquePtr<ISeekableReadStream> &&streamSrc, FilePos_t startPos, FilePos_t size) const
@@ -348,7 +348,7 @@ namespace rkit
 
 		outThreadPool = std::move(threadPool);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	HashValue_t UtilitiesDriver::ComputeHash(HashValue_t baseHash, const void *value, size_t size) const
@@ -370,7 +370,7 @@ namespace rkit
 
 		outParser = std::move(parser);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result UtilitiesDriver::ReadEntireFile(ISeekableReadStream &stream, Vector<uint8_t> &outBytes) const
@@ -389,7 +389,7 @@ namespace rkit
 			RKIT_CHECK(stream.ReadAll(outBytes.GetBuffer(), static_cast<size_t>(fileSizeRemaining)));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	bool UtilitiesDriver::ValidateFilePathSlice(const rkit::Span<const Utf8Char_t> &sliceName, bool permitWildcards)
@@ -557,7 +557,7 @@ namespace rkit
 
 		outNewLength = outPos;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	const utils::ISha256Calculator *UtilitiesDriver::GetSha256Calculator() const
@@ -2142,7 +2142,7 @@ namespace rkit
 
 		outSize = resultSize;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class TWChar>
@@ -2184,7 +2184,7 @@ namespace rkit
 
 		outSize = resultSize;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	bool UtilitiesDriver::TryParseDigit(uint8_t c, uint8_t &outDigit)
@@ -2310,7 +2310,7 @@ namespace rkit
 
 		thread = std::move(threadBase);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result UtilitiesDriver::CreateBlockingReader(UniquePtr<ISeekableReadStream> &outReadStream, UniquePtr<IAsyncReadFile> &&asyncFile, FilePos_t fileSize) const
@@ -2361,7 +2361,7 @@ namespace rkit
 		UniquePtr<utils::ImageBase> imageBase;
 		RKIT_CHECK(utils::ImageBase::Create(imageBase, spec));
 		image = std::move(imageBase);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result UtilitiesDriver::CloneImage(UniquePtr<utils::IImage> &outImage, const utils::IImage &image) const
@@ -2372,7 +2372,7 @@ namespace rkit
 		RKIT_CHECK(BlitImage(*imageBase, image, 0, 0, 0, 0, image.GetWidth(), image.GetHeight()));
 
 		outImage = std::move(imageBase);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result UtilitiesDriver::BlitImageSigned(utils::IImage &destImage, const utils::IImage &srcImage, ptrdiff_t srcX, ptrdiff_t srcY, ptrdiff_t destX, ptrdiff_t destY, size_t width, size_t height) const
@@ -2436,7 +2436,7 @@ namespace rkit
 		if (!adjustCoords(srcDestXOut, srcDestXIn, width)
 			|| !adjustCoords(srcDestYOut, srcDestYIn, height))
 		{
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		return BlitImage(destImage, srcImage, srcDestXOut[0], srcDestYOut[0], srcDestXOut[1], srcDestYOut[1], width, height);
@@ -2448,7 +2448,7 @@ namespace rkit
 		const utils::ImageSpec &srcSpec = srcImage.GetImageSpec();
 
 		if (srcX >= srcSpec.m_width || srcY >= srcSpec.m_height || destX >= destSpec.m_width || destY >= destSpec.m_height)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		bool requiresConversion = (destSpec.m_pixelPacking != srcSpec.m_pixelPacking || destSpec.m_numChannels != srcSpec.m_numChannels);
 
@@ -2476,7 +2476,7 @@ namespace rkit
 			utils::img::BlitScanline(destImage, srcImage, srcRow, srcByteOffset, destRow, destByteOffset, spanSize);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void UtilitiesDriver::FormatSignedInt(IFormatStringWriter<Utf8Char_t> &writer, intmax_t value) const

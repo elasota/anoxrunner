@@ -93,7 +93,7 @@ namespace anox
 			RKIT_CHECK(outDeps.AppendRValue(std::move(job)));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxEntityDefLoaderInfo::LoadContents(State_t &state, Resource_t &resource)
@@ -124,7 +124,7 @@ namespace anox
 
 		RKIT_CHECK(DataReader::ReadCheckUTF8String(resource.m_values.m_description, descChars.ToSpan()));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	const AnoxEntityDefResource::Values &AnoxEntityDefResource::GetValues() const
@@ -141,6 +141,6 @@ namespace anox
 
 		outLoader = std::move(loader);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 }

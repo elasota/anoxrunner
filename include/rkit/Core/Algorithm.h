@@ -470,7 +470,7 @@ rkit::Result rkit::SafeAlignUp(T &result, const T &a, const T &b)
 	if (remainder == 0)
 	{
 		result = a;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	return SafeAdd<T>(result, a, static_cast<T>(b - remainder));
@@ -699,14 +699,14 @@ rkit::Result rkit::priv::SafeMathHelper<T, true, true>::Add(T &result, T a, T b)
 	if (a == 0 || b == 0)
 	{
 		result = a + b;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	// Mixed-sign adds are always okay
 	if ((a < 0) != (b < 0))
 	{
 		result = a + b;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	// Make both values negative
@@ -720,10 +720,10 @@ rkit::Result rkit::priv::SafeMathHelper<T, true, true>::Add(T &result, T a, T b)
 	}
 
 	if (aTemp < std::numeric_limits<T>::min() - bTemp)
-		return ResultCode::kIntegerOverflow;
+		RKIT_THROW(ResultCode::kIntegerOverflow);
 
 	result = a + b;
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class T>
@@ -732,23 +732,23 @@ rkit::Result rkit::priv::SafeMathHelper<T, true, true>::Sub(T &result, T a, T b)
 	if (b == 0)
 	{
 		result = a;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	if (a == 0)
 	{
 		if (b == std::numeric_limits<T>::min())
-			return ResultCode::kIntegerOverflow;
+			RKIT_THROW(ResultCode::kIntegerOverflow);
 
 		result = -b;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	// Same-sign subtracts are always okay
 	if ((a < 0) == (b < 0))
 	{
 		result = a - b;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	// Mixed-sign subtract
@@ -756,17 +756,17 @@ rkit::Result rkit::priv::SafeMathHelper<T, true, true>::Sub(T &result, T a, T b)
 	{
 		// a is positive, b is negative
 		if (b < -(a - std::numeric_limits<T>::max() - a))
-			return ResultCode::kIntegerOverflow;
+			RKIT_THROW(ResultCode::kIntegerOverflow);
 	}
 	else
 	{
 		// a is negative, b is positive
 		if (b > (a - std::numeric_limits<T>::min()))
-			return ResultCode::kIntegerOverflow;
+			RKIT_THROW(ResultCode::kIntegerOverflow);
 	}
 
 	result = a - b;
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class T>
@@ -777,7 +777,7 @@ rkit::Result rkit::priv::SafeMathHelper<T, true, true>::Mul(T &result, T a, T b)
 	if (a == 0 || b == 0)
 	{
 		result = 0;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	bool resultIsNegative = ((a < 0) != (b < 0));
@@ -790,24 +790,24 @@ rkit::Result rkit::priv::SafeMathHelper<T, true, true>::Mul(T &result, T a, T b)
 	UnsignedT_t bAbs = ToUnsignedAbs(b);
 
 	if (bAbs > maxResult / aAbs)
-		return ResultCode::kIntegerOverflow;
+		RKIT_THROW(ResultCode::kIntegerOverflow);
 
 	result = a * b;
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class T>
 rkit::Result rkit::priv::SafeMathHelper<T, true, true>::DivMod(T &divResult, T &modResult, T a, T b)
 {
 	if (b == 0)
-		return ResultCode::kDivisionByZero;
+		RKIT_THROW(ResultCode::kDivisionByZero);
 
 	if (a == std::numeric_limits<T>::min() && b == -1)
-		return ResultCode::kIntegerOverflow;
+		RKIT_THROW(ResultCode::kIntegerOverflow);
 
 	divResult = a / b;
 	modResult = a % b;
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 // Unsigned integers
@@ -815,20 +815,20 @@ template<class T>
 rkit::Result rkit::priv::SafeMathHelper<T, true, false>::Add(T &result, T a, T b)
 {
 	if (b > std::numeric_limits<T>::max() - a)
-		return ResultCode::kIntegerOverflow;
+		RKIT_THROW(ResultCode::kIntegerOverflow);
 
 	result = a + b;
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class T>
 rkit::Result rkit::priv::SafeMathHelper<T, true, false>::Sub(T &result, T a, T b)
 {
 	if (b > a)
-		return ResultCode::kIntegerOverflow;
+		RKIT_THROW(ResultCode::kIntegerOverflow);
 
 	result = a + b;
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class T>
@@ -837,22 +837,22 @@ rkit::Result rkit::priv::SafeMathHelper<T, true, false>::Mul(T &result, T a, T b
 	if (a != 0 && b != 0)
 	{
 		if (b > std::numeric_limits<T>::max() / a)
-			return ResultCode::kIntegerOverflow;
+			RKIT_THROW(ResultCode::kIntegerOverflow);
 	}
 
 	result = a * b;
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class T>
 rkit::Result rkit::priv::SafeMathHelper<T, true, false>::DivMod(T &divResult, T &modResult, T a, T b)
 {
 	if (b == 0)
-		return ResultCode::kDivisionByZero;
+		RKIT_THROW(ResultCode::kDivisionByZero);
 
 	divResult = a / b;
 	modResult = a % b;
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 
@@ -1242,5 +1242,5 @@ rkit::Result rkit::CheckedProcessParallelSpans(const Span<TDest> &dest, const Sp
 		RKIT_CHECK(processor(destPtr[i], srcPtr[i]));
 	}
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }

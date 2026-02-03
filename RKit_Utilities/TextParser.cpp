@@ -248,7 +248,7 @@ namespace rkit { namespace utils
 		uint8_t c;
 
 		if (m_isInQuotedString)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		for (;;)
 		{
@@ -257,7 +257,7 @@ namespace rkit { namespace utils
 				if (m_isInQuotedString)
 					return ResultCode::kTextParsingFailed;
 
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 
 			if (m_isInLineComment)
@@ -325,7 +325,7 @@ namespace rkit { namespace utils
 			break;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result TextParser::ReadSimpleToken(Span<const uint8_t> &outSpan)
@@ -375,7 +375,7 @@ namespace rkit { namespace utils
 
 		outSpan = m_charReader.GetSpan(startLoc, endLoc - startLoc);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result TextParser::ReadCToken(Span<const uint8_t> &outSpan)
@@ -470,7 +470,7 @@ namespace rkit { namespace utils
 
 		outSpan = m_charReader.GetSpan(startLoc, endLoc - startLoc);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -480,7 +480,7 @@ namespace rkit { namespace utils
 		RKIT_CHECK(m_simpleDelimiters.Reserve(delimiters.Count()));
 		RKIT_CHECK(m_simpleDelimiters.Append(delimiters));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result TextParser::SkipWhitespace()
@@ -496,7 +496,7 @@ namespace rkit { namespace utils
 		if (!m_charReader.PeekOne(c))
 		{
 			haveToken = false;
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		if (m_lexType == TextParserLexerType::kSimple)
@@ -529,7 +529,7 @@ namespace rkit { namespace utils
 		size_t endPos = m_charReader.GetLocation().m_pos;
 
 		outSpan = m_charReader.GetSpan(startPos, endPos - startPos);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void TextParser::GetLocation(size_t &outLine, size_t &outCol) const
@@ -550,7 +550,7 @@ namespace rkit { namespace utils
 			return ResultCode::kTextParsingFailed;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result TextParser::ExpectToken(const Span<const uint8_t> &str)
@@ -569,7 +569,7 @@ namespace rkit { namespace utils
 			return ResultCode::kTextParsingFailed;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	bool TextParser::IsAlphaChar(uint8_t c)
@@ -593,7 +593,7 @@ namespace rkit { namespace utils
 		{
 			uint8_t c = '\0';
 			if (!m_charReader.PeekOne(c))
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 
 			if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_')
 			{
@@ -604,7 +604,7 @@ namespace rkit { namespace utils
 				break;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result TextParser::ReadCOctalNumber()
@@ -613,7 +613,7 @@ namespace rkit { namespace utils
 		{
 			uint8_t c = '\0';
 			if (!m_charReader.PeekOne(c))
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 
 			if (c >= '0' && c <= '7')
 			{
@@ -626,7 +626,7 @@ namespace rkit { namespace utils
 				break;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result TextParser::ReadCDecimalNumber()
@@ -635,7 +635,7 @@ namespace rkit { namespace utils
 		{
 			uint8_t c = '\0';
 			if (!m_charReader.PeekOne(c))
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 
 			if (c >= '0' && c <= '9')
 			{
@@ -648,14 +648,14 @@ namespace rkit { namespace utils
 				break;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result TextParser::ReadCHexOrOctalNumber()
 	{
 		uint8_t secondChar = '\0';
 		if (!m_charReader.PeekOne(secondChar))
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		if (secondChar == 'x')
 		{
@@ -692,7 +692,7 @@ namespace rkit { namespace utils
 			}
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result TextParser::ReadCHexNumber()
@@ -712,12 +712,12 @@ namespace rkit { namespace utils
 				break;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } // rkit::utils
 
 rkit::Result rkit::utils::TextParserBase::Create(const Span<const uint8_t> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<TextParserBase> &outParser)
 {
 	RKIT_CHECK(New<TextParser>(outParser, contents, commentType, lexType));
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }

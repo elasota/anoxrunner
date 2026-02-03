@@ -719,7 +719,7 @@ namespace rkit { namespace buildsystem
 	{
 		RKIT_CHECK(m_identifier.Set(identifier));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	IDependencyNodeCompiler *DependencyNode::GetCompiler() const
@@ -837,7 +837,7 @@ namespace rkit { namespace buildsystem
 		m_lastCompilerVersion = m_compiler->GetVersion();
 		RKIT_CHECK(m_compiler->RunAnalysis(this, &feedback));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DependencyNode::RunCompile(IBuildSystemInstance *instance)
@@ -848,7 +848,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(m_compiler->RunCompile(this, &feedback));
 
 		m_wasCompiled = true;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	CallbackSpan<FileStatusView, const IDependencyNode *> DependencyNode::GetAnalysisProducts() const
@@ -899,7 +899,7 @@ namespace rkit { namespace buildsystem
 			if (fileStatus.m_location == location && fileStatus.m_filePath == path)
 			{
 				outIndex = i;
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
@@ -910,7 +910,7 @@ namespace rkit { namespace buildsystem
 		outIndex = products.Count();
 		RKIT_CHECK(products.Append(std::move(newStatus)));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DependencyNode::FindOrAddAnalysisProduct(BuildFileLocation location, const CIPathView &path, size_t &outIndex)
@@ -930,7 +930,7 @@ namespace rkit { namespace buildsystem
 		for (const data::ContentID &casContentID : m_casProducts)
 		{
 			if (casContentID == contentID)
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 		}
 
 		return m_casProducts.Append(contentID);
@@ -963,7 +963,7 @@ namespace rkit { namespace buildsystem
 			if (existingFDI.m_status.m_location == fileInfo.m_status.m_location && existingFDI.m_status.m_filePath == fileInfo.m_status.m_filePath)
 			{
 				RKIT_CHECK(existingFDI.Set(fileInfo));
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
@@ -972,7 +972,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(fileDependencies.Append(std::move(fdi)));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DependencyNode::AddDirectoryScanDependency(Vector<DirectoryScanDependencyInfo> &dirScanDependencies, const DirectoryScanDependencyInfoView &dirScanInfo)
@@ -986,7 +986,7 @@ namespace rkit { namespace buildsystem
 				&& existingDSDI.m_dirScan.m_directoryMode == dirScanInfo.m_dirScan.m_directoryMode)
 			{
 				RKIT_CHECK(existingDSDI.Set(dirScanInfo));
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
@@ -995,7 +995,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(dirScanDependencies.Append(std::move(dsdi)));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class T>
@@ -1010,7 +1010,7 @@ namespace rkit { namespace buildsystem
 			RKIT_CHECK(Serialize(stream, stringPool, item));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class T>
@@ -1049,7 +1049,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(stream.WriteAll(&fs.m_fileSize, sizeof(fs.m_fileSize)));
 		RKIT_CHECK(stream.WriteAll(&fs.m_fileTime, sizeof(fs.m_fileTime)));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result serializer::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const DirectoryScan &ds)
@@ -1059,7 +1059,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(SerializeEnum(stream, ds.m_directoryLocation));
 		RKIT_CHECK(Serialize(stream, stringPool, ds.m_directoryMode));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result serializer::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const FileDependencyInfo &fdi)
@@ -1068,7 +1068,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(Serialize(stream, stringPool, fdi.m_fileExists));
 		RKIT_CHECK(Serialize(stream, stringPool, fdi.m_mustBeUpToDate));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result serializer::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const DirectoryScanDependencyInfo &dsdi)
@@ -1077,7 +1077,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(Serialize(stream, stringPool, dsdi.m_dirExists));
 		RKIT_CHECK(Serialize(stream, stringPool, dsdi.m_mustBeUpToDate));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result serializer::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, const NodeDependencyInfo &ndi)
@@ -1085,7 +1085,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(SerializeCompactSize(stream, static_cast<DependencyNode *>(ndi.m_node)->GetSerializedIndex()));
 		RKIT_CHECK(Serialize(stream, stringPool, ndi.m_mustBeUpToDate));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result serializer::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool, bool value)
@@ -1138,7 +1138,7 @@ namespace rkit { namespace buildsystem
 			return ResultCode::kInvalidParameter;
 
 		outString = m_strings[index];
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result serializer::DeserializeResolver::GetDependencyNode(size_t index, IDependencyNode *&outNode) const
@@ -1147,7 +1147,7 @@ namespace rkit { namespace buildsystem
 			return ResultCode::kInvalidParameter;
 
 		outNode = m_nodes[index].Get();
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -1163,7 +1163,7 @@ namespace rkit { namespace buildsystem
 			RKIT_CHECK(Deserialize(stream, resolver, item));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class T>
@@ -1173,7 +1173,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(DeserializeCompactSize(stream, szValue));
 
 		value = static_cast<T>(szValue);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result serializer::DeserializeString(IReadStream &stream, const IDeserializeResolver &resolver, String &str)
@@ -1186,7 +1186,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(str.Set(strView));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result serializer::DeserializeCIPath(IReadStream &stream, const IDeserializeResolver &resolver, CIPath &path)
@@ -1196,7 +1196,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(path.Set(str));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, data::ContentID &contentID)
@@ -1216,7 +1216,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(stream.ReadAll(&fs.m_fileSize, sizeof(fs.m_fileSize)));
 		RKIT_CHECK(stream.ReadAll(&fs.m_fileTime, sizeof(fs.m_fileTime)));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, DirectoryScan &ds)
@@ -1226,7 +1226,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(DeserializeEnum(stream, ds.m_directoryLocation));
 		RKIT_CHECK(Deserialize(stream, resolver, ds.m_directoryMode));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, FileDependencyInfo &fdi)
@@ -1235,7 +1235,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(Deserialize(stream, resolver, fdi.m_fileExists));
 		RKIT_CHECK(Deserialize(stream, resolver, fdi.m_mustBeUpToDate));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, DirectoryScanDependencyInfo &dsdi)
@@ -1244,7 +1244,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(Deserialize(stream, resolver, dsdi.m_dirExists));
 		RKIT_CHECK(Deserialize(stream, resolver, dsdi.m_mustBeUpToDate));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, NodeDependencyInfo &ndi)
@@ -1257,7 +1257,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(Deserialize(stream, resolver, ndi.m_mustBeUpToDate));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result serializer::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver, bool &value)
@@ -1266,7 +1266,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(stream.ReadAll(&valueByte, 1));
 
 		value = (valueByte != 0);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result serializer::DeserializeCompactSize(IReadStream &stream, size_t &sz)
@@ -1300,7 +1300,7 @@ namespace rkit { namespace buildsystem
 			return ResultCode::kIntegerOverflow;
 
 		sz = static_cast<size_t>(u64);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DependencyNode::AddNodeDependency(const NodeDependencyInfo &nodeInfo)
@@ -1308,12 +1308,12 @@ namespace rkit { namespace buildsystem
 		for (const NodeDependencyInfo &existingInfo : m_nodeDependencies)
 		{
 			if (nodeInfo.m_node == existingInfo.m_node)
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 		}
 
 		RKIT_CHECK(m_nodeDependencies.Append(nodeInfo));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DependencyNode::SerializeInitialState(IWriteStream &stream) const
@@ -1331,7 +1331,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(serializer::SerializeEnum(stream, m_inputLocation));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DependencyNode::DeserializeInitialState(IReadStream &stream, uint32_t &outNodeNamespace, uint32_t &outNodeType, Vector<uint8_t> &outContent, BuildFileLocation &outInputLocation)
@@ -1355,7 +1355,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(serializer::DeserializeEnum(stream, outInputLocation));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DependencyNode::Serialize(IWriteStream &stream, StringPoolBuilder &stringPool) const
@@ -1377,7 +1377,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(stream.WriteAll(&m_lastCompilerVersion, sizeof(m_lastCompilerVersion)));
 
 		// Intentionally not serialized: compiler, m_isMarkedAsRoot, m_checkNodeIndex, m_depCheckPhase, m_serializedIndex
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DependencyNode::Deserialize(IReadStream &stream, const IDeserializeResolver &resolver)
@@ -1399,7 +1399,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(stream.ReadAll(&m_lastCompilerVersion, sizeof(m_lastCompilerVersion)));
 
 		// Intentionally not serialized: compiler, m_isMarkedAsRoot, m_checkNodeIndex, m_depCheckPhase, m_serializedIndex
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DependencyNode::MarkProductFinished(bool isCompilePhase, size_t productIndex, const FileStatusView &fstatus)
@@ -1436,7 +1436,7 @@ namespace rkit { namespace buildsystem
 			if (fStatus.m_status.m_location == location && fStatus.m_status.m_filePath == path)
 			{
 				outExists = fStatus.m_fileExists;
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
@@ -1467,7 +1467,7 @@ namespace rkit { namespace buildsystem
 
 		outExists = exists;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DependencyNode::DependencyNodeCompilerFeedback::OpenInput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadStream> &inputFile)
@@ -1476,7 +1476,7 @@ namespace rkit { namespace buildsystem
 		if (!inputFile.IsValid())
 			return ResultCode::kFileOpenError;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DependencyNode::DependencyNodeCompilerFeedback::TryOpenInput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadStream> &inputFile)
@@ -1490,7 +1490,7 @@ namespace rkit { namespace buildsystem
 			if (fStatus.m_status.m_location == location && fStatus.m_status.m_filePath == path)
 			{
 				if (!fStatus.m_fileExists)
-					return ResultCode::kOK;
+					RKIT_RETURN_OK;
 			}
 		}
 
@@ -1514,7 +1514,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(m_buildInstance->TryOpenFileRead(location, path, inputFile));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DependencyNode::DependencyNodeCompilerFeedback::OpenOutput(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadWriteStream> &outputFile)
@@ -1537,7 +1537,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(New<FeedbackWrapperStream>(outputFile, *this, productIndex, location, std::move(pathCopy), std::move(realFile)));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DependencyNode::DependencyNodeCompilerFeedback::AddAnonymousDeployableContent(BuildFileLocation location, const CIPathView &path)
@@ -1558,7 +1558,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(casIDFile->WriteAll(contentID.m_data, data::ContentID::kSize));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DependencyNode::DependencyNodeCompilerFeedback::IndexCAS(BuildFileLocation location, const CIPathView &path, data::ContentID &outContentID)
@@ -1596,7 +1596,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(m_dependencyNode->AddCASProduct(outContentID));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DependencyNode::DependencyNodeCompilerFeedback::AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier)
@@ -1609,7 +1609,7 @@ namespace rkit { namespace buildsystem
 		depInfo.m_node = node;
 		RKIT_CHECK(m_dependencyNode->AddNodeDependency(depInfo));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	bool DependencyNode::DependencyNodeCompilerFeedback::FindNodeTypeByFileExtension(const StringSliceView &ext, uint32_t &outNamespace, uint32_t &outType) const
@@ -1640,7 +1640,7 @@ namespace rkit { namespace buildsystem
 			}
 		}		
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result DependencyNode::DependencyNodeCompilerFeedback::EnumerateFiles(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback)
@@ -1685,7 +1685,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(m_dependencyNode->MarkProductFinished(m_isCompilePhase, productIndex, fileStatusView));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	DependencyNode::FeedbackWrapperStream::FeedbackWrapperStream(DependencyNodeCompilerFeedback &feedback, size_t productIndex, BuildFileLocation location, CIPath &&path, UniquePtr<ISeekableReadWriteStream> &&stream)
@@ -1835,7 +1835,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(RegisterNodeTypeByExtension(u8"deps", kDefaultNamespace, kDepsNodeID));
 		RKIT_CHECK(RegisterNodeTypeByExtension(u8"rkp", kDefaultNamespace, kRenderPipelineLibraryNodeID));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::CheckedLoadCache(ISeekableReadStream &seekableStream, FilePos_t pos)
@@ -1912,7 +1912,7 @@ namespace rkit { namespace buildsystem
 		m_nodes = std::move(nodesVector);
 		m_nodeLookup = std::move(nodeLookup);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::LoadCache()
@@ -1929,17 +1929,17 @@ namespace rkit { namespace buildsystem
 		Result openResult = sysDriver->OpenFileReadAbs(graphStream, cacheFullPath);
 
 		if (utils::GetResultCode(openResult) == ResultCode::kFileOpenError)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		RKIT_CHECK(openResult);
 
 		BuildCacheFileHeader header;
 		size_t countRead = 0;
 		if (!utils::ResultIsOK(graphStream->ReadPartial(&header, sizeof(header), countRead)) || countRead != sizeof(header))
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		if (header.m_identifier != BuildCacheFileHeader::kCacheIdentifier || header.m_version != BuildCacheFileHeader::kCacheVersion || header.m_activeInstance >= 2)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		const BuildCacheInstanceInfo &cacheInstance = header.m_instances[header.m_activeInstance];
 
@@ -1949,7 +1949,7 @@ namespace rkit { namespace buildsystem
 			m_nodes.Reset();
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	IDependencyNode *BuildSystemInstance::FindNamedNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) const
@@ -1985,7 +1985,7 @@ namespace rkit { namespace buildsystem
 			if (node)
 			{
 				outNode = node;
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
@@ -2000,7 +2000,7 @@ namespace rkit { namespace buildsystem
 			outNode = nodePtr;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::FindOrCreateNamedNode(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier, IDependencyNode *&outNode)
@@ -2013,7 +2013,7 @@ namespace rkit { namespace buildsystem
 			if (node)
 			{
 				outNode = node;
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
@@ -2028,7 +2028,7 @@ namespace rkit { namespace buildsystem
 			outNode = nodePtr;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::AddRootNode(IDependencyNode *node)
@@ -2041,7 +2041,7 @@ namespace rkit { namespace buildsystem
 			dnode->MarkAsRoot();
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::AddPostBuildAction(IBuildSystemAction *action)
@@ -2118,7 +2118,7 @@ namespace rkit { namespace buildsystem
 		// Step 6: Write updated state
 		RKIT_CHECK(SaveCache());
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::SaveCache()
@@ -2219,7 +2219,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(graphStream->SeekStart(0));
 		RKIT_CHECK(graphStream->WriteAll(&header, sizeof(header)));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	IDependencyGraphFactory *BuildSystemInstance::GetDependencyGraphFactory() const
@@ -2274,7 +2274,7 @@ namespace rkit { namespace buildsystem
 
 		outNode = std::move(depNode);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::CreateNamedNode(uint32_t nodeNamespace, uint32_t nodeType, BuildFileLocation buildFileLocation, const StringView &identifier, UniquePtr<IDependencyNode> &outNode) const
@@ -2298,7 +2298,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(m_nodeCompilers.Set(NodeTypeKey(nodeNamespace, nodeType), std::move(compilerMoved)));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::AddNode(UniquePtr<DependencyNode> &&node)
@@ -2325,7 +2325,7 @@ namespace rkit { namespace buildsystem
 			node->SetDependencyCheckPhase(DependencyCheckPhase::CheckFiles);
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::ProcessTopDepCheck()
@@ -2335,7 +2335,7 @@ namespace rkit { namespace buildsystem
 		if (node->GetDependencyCheckPhase() == DependencyCheckPhase::Completed)
 		{
 			m_depCheckStack.RemoveRange(m_depCheckStack.Count() - 1, 1);
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		if (node->GetDependencyCheckPhase() == DependencyCheckPhase::CheckFiles)
@@ -2365,14 +2365,14 @@ namespace rkit { namespace buildsystem
 
 			node->SetDependencyCheckPhase(DependencyCheckPhase::CheckNodes);
 
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		RKIT_ASSERT(node->GetDependencyCheckPhase() == DependencyCheckPhase::CheckNodes);
 
 		RKIT_CHECK(CheckNodeNodeDependencies(node));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::CheckNodeFilesAndVersion(DependencyNode *node)
@@ -2380,7 +2380,7 @@ namespace rkit { namespace buildsystem
 		if (node->GetLastCompilerVersion() != node->GetCompiler()->GetVersion())
 		{
 			node->SetState(DependencyState::NotAnalyzedOrCompiled);
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		const int kCompilePhase = 0;
@@ -2512,7 +2512,7 @@ namespace rkit { namespace buildsystem
 		if (node->GetDependencyState() != resultState)
 			node->SetState(resultState);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::CheckNodeNodeDependencies(DependencyNode *node)
@@ -2535,15 +2535,15 @@ namespace rkit { namespace buildsystem
 				}
 			}
 
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		if (!nodeDep.m_mustBeUpToDate)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		DependencyNode *nodeDepNode = static_cast<DependencyNode *>(nodeDep.m_node);
 		if (nodeDepNode->GetDependencyCheckPhase() == DependencyCheckPhase::Completed)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		if (nodeDepNode->GetDependencyCheckPhase() != DependencyCheckPhase::None)
 		{
@@ -2554,7 +2554,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(AddRelevantNode(nodeDepNode));
 		RKIT_CHECK(m_depCheckStack.Append(nodeDepNode));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -2605,7 +2605,7 @@ namespace rkit { namespace buildsystem
 			RKIT_CHECK(m_relevantNodes.Append(bucket.ToSpan()));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::ResolveDirectoryScan(BuildFileLocation location, const CIPathView &path, bool directoryMode, DirectoryScanView &outStatusView, bool cached, bool &outExists)
@@ -2626,7 +2626,7 @@ namespace rkit { namespace buildsystem
 				else
 					outStatusView = DirectoryScanView();
 
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
@@ -2657,7 +2657,7 @@ namespace rkit { namespace buildsystem
 					RKIT_CHECK(path.Set(fileStatus.m_filePath));
 					RKIT_CHECK(m_dirScan.m_paths.Append(path));
 
-					return ResultCode::kOK;
+					RKIT_RETURN_OK;
 				}
 
 				static Result StaticApplyFileStatus(void *userdata, const FileStatusView &fileStatus)
@@ -2689,7 +2689,7 @@ namespace rkit { namespace buildsystem
 		DirectoryScanKey cacheKey(location, dirScan->m_scan.m_directoryPath, directoryMode);
 		RKIT_CHECK(m_cachedDirScan.Set(std::move(cacheKey), std::move(dirScan)));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::ResolveFileStatus(BuildFileLocation location, const CIPathView &path, bool allowDirectories, FileStatusView &outStatusView, bool cached, bool &outExists)
@@ -2711,7 +2711,7 @@ namespace rkit { namespace buildsystem
 				else
 					outStatusView = FileStatusView();
 
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
@@ -2738,7 +2738,7 @@ namespace rkit { namespace buildsystem
 
 		outExists = cfs->m_exists;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::TryOpenFileRead(BuildFileLocation location, const CIPathView &path, UniquePtr<ISeekableReadStream> &outFile)
@@ -2776,7 +2776,7 @@ namespace rkit { namespace buildsystem
 			return ResultCode::kFileOpenError;
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::EnumerateFiles(BuildFileLocation location, const CIPathView &path, void *userdata, EnumerateFilesResultCallback_t resultCallback)
@@ -2796,14 +2796,14 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(ResolveDirectoryScan(location, path, directoryMode, directoryScanView, true, exists));
 
 		if (!exists)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		for (const CIPathView path : directoryScanView.m_paths)
 		{
 			RKIT_CHECK(resultCallback(userdata, path));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::UpdateCAS(const data::ContentID &contentID)
@@ -2885,7 +2885,7 @@ namespace rkit { namespace buildsystem
 			RKIT_CHECK(sysDriver->MoveFileFromAbsToAbs(tempPath, contentPath, true));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::RegisterNodeTypeByExtension(const StringSliceView &ext, uint32_t nodeNamespace, uint32_t nodeType)
@@ -2896,14 +2896,14 @@ namespace rkit { namespace buildsystem
 		if (it != m_nodeTypesByExtension.end())
 		{
 			it.Value() = nodeTypeKey;
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		String str;
 		RKIT_CHECK(str.Set(ext));
 		RKIT_CHECK(m_nodeTypesByExtension.Set(std::move(str), nodeTypeKey));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	bool BuildSystemInstance::FindNodeTypeByFileExtension(const StringSliceView &ext, uint32_t &outNamespace, uint32_t &outType) const
@@ -2934,7 +2934,7 @@ namespace rkit { namespace buildsystem
 			RKIT_CHECK(m_casSources.Set(contentID, std::move(casSource)));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::ResolveCachedFileStatusCallback(void *userdata, const FileStatusView &status)
@@ -2952,7 +2952,7 @@ namespace rkit { namespace buildsystem
 
 		cfs->m_exists = true;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void BuildSystemInstance::ErrorBlameNode(DependencyNode *node, const StringView &msg)
@@ -2969,7 +2969,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(outStr.Append(relPath));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::ConstructOutputFilePath(OSAbsPath &outStr, const CIPathView &path) const
@@ -2981,7 +2981,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(outStr.Append(relPath));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BuildSystemInstance::ConstructOutputContentPath(OSAbsPath &outStr, const CIPathView &path) const
@@ -2993,7 +2993,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(outStr.Append(relPath));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	BuildSystemInstance::PrintableFourCC BuildSystemInstance::FourCCToPrintable(uint32_t fourCC)

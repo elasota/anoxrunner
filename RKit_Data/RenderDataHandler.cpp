@@ -1376,13 +1376,13 @@ namespace rkit { namespace data
 		if (identifier != handler->GetPackageIdentifier())
 		{
 			rkit::log::Error(u8"Package identifier doesn't match");
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 
 		if (packageVersion != handler->GetPackageVersion())
 		{
 			rkit::log::Error(u8"Package version doesn't match");
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 
 		size_t numStrings = 0;
@@ -1425,7 +1425,7 @@ namespace rkit { namespace data
 				if (stringChars[str.m_offset + str.m_size] != '\0')
 				{
 					rkit::log::Error(u8"Malformed string data");
-					return ResultCode::kMalformedFile;
+					RKIT_THROW(ResultCode::kMalformedFile);
 				}
 			}
 		}
@@ -1439,13 +1439,13 @@ namespace rkit { namespace data
 			if (configKey.m_stringIndex >= m_strings.Count())
 			{
 				rkit::log::Error(u8"Config key string index was invalid");
-				return ResultCode::kMalformedFile;
+				RKIT_THROW(ResultCode::kMalformedFile);
 			}
 
 			if (mainType >= static_cast<uint64_t>(data::RenderRTTIMainType::Count))
 			{
 				rkit::log::Error(u8"Config key main type was invalid");
-				return ResultCode::kMalformedFile;
+				RKIT_THROW(ResultCode::kMalformedFile);
 			}
 		}
 
@@ -1494,7 +1494,7 @@ namespace rkit { namespace data
 						if (objectIndex >= objectList.GetCount())
 						{
 							rkit::log::Error(u8"Invalid object index");
-							return ResultCode::kMalformedFile;
+							RKIT_THROW(ResultCode::kMalformedFile);
 						}
 
 						RKIT_CHECK(objectPtrList.Append(objectList.GetElementPtr(objectIndex)));
@@ -1527,7 +1527,7 @@ namespace rkit { namespace data
 			RKIT_CHECK(ValidateStructureType(static_cast<const render::StructureType *>(structList->GetElementPtr(i)), nullptr, 0, complexity));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result Package::ReadUInt8(IReadStream &stream, uint8_t &outValue)
@@ -1541,7 +1541,7 @@ namespace rkit { namespace data
 		RKIT_CHECK(ReadVariableSizeUInt(stream, 2, value));
 		outValue = static_cast<uint16_t>(value);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result Package::ReadUInt32(IReadStream &stream, uint32_t &outValue)
@@ -1550,7 +1550,7 @@ namespace rkit { namespace data
 		RKIT_CHECK(ReadVariableSizeUInt(stream, 4, value));
 		outValue = static_cast<uint32_t>(value);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result Package::ReadUInt64(IReadStream &stream, uint64_t &outValue)
@@ -1569,7 +1569,7 @@ namespace rkit { namespace data
 		RKIT_CHECK(ReadUInt16(stream, value));
 		memcpy(&outValue, &value, sizeof(value));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result Package::ReadSInt32(IReadStream &stream, int32_t &outValue)
@@ -1578,7 +1578,7 @@ namespace rkit { namespace data
 		RKIT_CHECK(ReadUInt32(stream, value));
 		memcpy(&outValue, &value, sizeof(value));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result Package::ReadSInt64(IReadStream &stream, int64_t &outValue)
@@ -1587,7 +1587,7 @@ namespace rkit { namespace data
 		RKIT_CHECK(ReadUInt64(stream, value));
 		memcpy(&outValue, &value, sizeof(value));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result Package::ReadFloat32(IReadStream &stream, float &outValue)
@@ -1596,7 +1596,7 @@ namespace rkit { namespace data
 		RKIT_CHECK(ReadUInt32(stream, value));
 		memcpy(&outValue, &value, sizeof(value));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result Package::ReadFloat64(IReadStream &stream, double &outValue)
@@ -1605,7 +1605,7 @@ namespace rkit { namespace data
 		RKIT_CHECK(ReadUInt64(stream, value));
 		memcpy(&outValue, &value, sizeof(value));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 
@@ -1615,7 +1615,7 @@ namespace rkit { namespace data
 		RKIT_CHECK(stream.ReadAll(bytes, size));
 		outValue = DecodeUInt64(bytes);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result Package::ReadUIntForSize(IReadStream &stream, size_t maxValue, uint64_t &outValue)
@@ -1649,12 +1649,12 @@ namespace rkit { namespace data
 			RKIT_CHECK(stream.ReadAll(bytes + 1, 7));
 			break;
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		};
 
 		outValue = (DecodeUInt64(bytes) >> 2) & 0x3fffffffffffffffull;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	uint64_t Package::DecodeUInt64(uint8_t(&bytes)[8])
@@ -1679,7 +1679,7 @@ namespace rkit { namespace data
 			RKIT_CHECK(ReadObject(memberPtr, fieldRTTI, field->m_isConfigurable, field->m_isNullable, stream, configurator));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result Package::ReadObject(void *obj, const data::RenderRTTITypeBase *rtti, bool isConfigurable, bool isNullable, IReadStream &stream, IRenderDataConfigurator *configurator) const
@@ -1709,7 +1709,7 @@ namespace rkit { namespace data
 			RKIT_ASSERT(!isConfigurable);
 			return ReadBinaryContent(obj, stream);
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 	}
 
@@ -1725,7 +1725,7 @@ namespace rkit { namespace data
 			{
 			case static_cast<uint8_t>(render::ConfigurableValueState::Default):
 				rtti->m_writeConfigurableDefaultFunc(obj);
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			case static_cast<uint8_t>(render::ConfigurableValueState::Configured):
 				{
 					render::ConfigStringIndex_t cfgKey;
@@ -1741,7 +1741,7 @@ namespace rkit { namespace data
 					else
 						rtti->m_writeConfigurableNameFunc(obj, cfgKey);
 				}
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			case static_cast<uint8_t>(render::ConfigurableValueState::Explicit):
 				{
 					uint64_t enumValue = 0;
@@ -1749,15 +1749,15 @@ namespace rkit { namespace data
 					if (enumValue >= rtti->m_maxValueExclusive)
 					{
 						rkit::log::Error(u8"Configurable enum value was out of range");
-						return ResultCode::kMalformedFile;
+						RKIT_THROW(ResultCode::kInternalError);
 					}
 
 					rtti->m_writeConfigurableValueFunc(obj, static_cast<unsigned int>(enumValue));
 				}
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			default:
 				rkit::log::Error(u8"Configurable enum state was invalid");
-				return ResultCode::kMalformedFile;
+				RKIT_THROW(ResultCode::kInternalError);
 			}
 		}
 		else
@@ -1767,11 +1767,11 @@ namespace rkit { namespace data
 			if (enumValue >= rtti->m_maxValueExclusive)
 			{
 				rkit::log::Error(u8"Enum value was out of range");
-				return ResultCode::kMalformedFile;
+				RKIT_THROW(ResultCode::kInternalError);
 			}
 
 			rtti->m_writeValueFunc(obj, static_cast<unsigned int>(enumValue));
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 	}
 
@@ -1788,7 +1788,7 @@ namespace rkit { namespace data
 			{
 			case static_cast<uint8_t>(render::ConfigurableValueState::Default):
 				rtti->m_writeConfigurableDefaultFunc(obj);
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			case static_cast<uint8_t>(render::ConfigurableValueState::Configured):
 				{
 					render::ConfigStringIndex_t cfgKey;
@@ -1826,13 +1826,13 @@ namespace rkit { namespace data
 					else
 						rtti->m_writeConfigurableNameFunc(obj, cfgKey);
 				}
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			case static_cast<uint8_t>(render::ConfigurableValueState::Explicit):
 				ioFuncs = &rtti->m_configurableFunctions;
 				break;
 			default:
 				rkit::log::Error(u8"Invalid configurable number state");
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 			}
 		}
 		else
@@ -1847,17 +1847,17 @@ namespace rkit { namespace data
 				float f = 0.f;
 				RKIT_CHECK(ReadFloat32(stream, f));
 				ioFuncs->m_writeValueFloatFunc(obj, f);
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize64)
 			{
 				double f = 0.0;
 				RKIT_CHECK(ReadFloat64(stream, f));
 				ioFuncs->m_writeValueFloatFunc(obj, f);
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 		}
 		break;
 		case data::RenderRTTINumberRepresentation::SignedInt:
@@ -1868,31 +1868,31 @@ namespace rkit { namespace data
 				int8_t v = 0;
 				RKIT_CHECK(ReadSInt8(stream, v));
 				ioFuncs->m_writeValueUIntFunc(obj, v);
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize16)
 			{
 				int16_t v = 0;
 				RKIT_CHECK(ReadSInt16(stream, v));
 				ioFuncs->m_writeValueUIntFunc(obj, v);
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize32)
 			{
 				int32_t v = 0;
 				RKIT_CHECK(ReadSInt32(stream, v));
 				ioFuncs->m_writeValueUIntFunc(obj, v);
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize64)
 			{
 				int64_t v = 0;
 				RKIT_CHECK(ReadSInt64(stream, v));
 				ioFuncs->m_writeValueUIntFunc(obj, v);
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 		}
 		case data::RenderRTTINumberRepresentation::UnsignedInt:
 		{
@@ -1905,45 +1905,45 @@ namespace rkit { namespace data
 				if (v >= 2)
 				{
 					rkit::log::Error(u8"Invalid 1-bit value");
-					return ResultCode::kMalformedFile;
+					RKIT_THROW(ResultCode::kMalformedFile);
 				}
 
 				ioFuncs->m_writeValueUIntFunc(obj, v);
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize8)
 			{
 				uint8_t v = 0;
 				RKIT_CHECK(ReadUInt8(stream, v));
 				ioFuncs->m_writeValueUIntFunc(obj, v);
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize16)
 			{
 				uint16_t v = 0;
 				RKIT_CHECK(ReadUInt16(stream, v));
 				ioFuncs->m_writeValueUIntFunc(obj, v);
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize32)
 			{
 				uint32_t v = 0;
 				RKIT_CHECK(ReadUInt32(stream, v));
 				ioFuncs->m_writeValueUIntFunc(obj, v);
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize64)
 			{
 				uint64_t v = 0;
 				RKIT_CHECK(ReadUInt64(stream, v));
 				ioFuncs->m_writeValueUIntFunc(obj, v);
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else
-				return ResultCode::kInternalError;
+				RKIT_THROW(ResultCode::kInternalError);
 		}
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 	}
 
@@ -1962,7 +1962,7 @@ namespace rkit { namespace data
 				RKIT_CHECK(ReadEnum(&nt, reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::NumericType>::GetRTTIType()), false, stream, configurator));
 				*vt = render::ValueType(nt);
 			}
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		case static_cast<uint8_t>(render::ValueTypeType::VectorNumeric):
 			{
 				const void *ptr = nullptr;
@@ -1970,7 +1970,7 @@ namespace rkit { namespace data
 
 				*vt = render::ValueType(static_cast<const render::VectorNumericType *>(ptr));
 			}
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		case static_cast<uint8_t>(render::ValueTypeType::CompoundNumeric):
 			{
 				const void *ptr = nullptr;
@@ -1978,7 +1978,7 @@ namespace rkit { namespace data
 
 				*vt = render::ValueType(static_cast<const render::CompoundNumericType *>(ptr));
 			}
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		case static_cast<uint8_t>(render::ValueTypeType::Structure):
 			{
 				const void *ptr = nullptr;
@@ -1986,10 +1986,10 @@ namespace rkit { namespace data
 
 				*vt = render::ValueType(static_cast<const render::StructureType *>(ptr));
 			}
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		default:
 			rkit::log::Error(u8"Invalid valuetype");
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 	}
 
@@ -1998,7 +1998,7 @@ namespace rkit { namespace data
 		int purpose = rtti->m_getPurposeFunc();
 
 		if (purpose == render::TempStringIndex_t::kPurpose && !m_hasTempStrings)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		size_t stringIndex = 0;
 		RKIT_CHECK(ReadCompactIndex(stream, stringIndex));
@@ -2006,9 +2006,9 @@ namespace rkit { namespace data
 		if (purpose == render::TempStringIndex_t::kPurpose || purpose == render::GlobalStringIndex_t::kPurpose)
 			rtti->m_writeStringIndexFunc(obj, stringIndex);
 		else
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result Package::ReadBinaryContent(void *obj, IReadStream &stream) const
@@ -2018,7 +2018,7 @@ namespace rkit { namespace data
 
 		static_cast<render::BinaryContent *>(obj)->m_contentIndex = binaryContentIndex;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result Package::ReadObjectPtr(void *obj, const data::RenderRTTIObjectPtrType *rtti, bool isNullable, IReadStream &stream) const
@@ -2032,7 +2032,7 @@ namespace rkit { namespace data
 			if (objectIndex == 0)
 			{
 				rtti->m_writeFunc(obj, nullptr);
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 			else
 				objectIndex--;
@@ -2041,18 +2041,18 @@ namespace rkit { namespace data
 		const RenderRTTIStructType *structType = rtti->m_getTypeFunc();
 
 		if (static_cast<size_t>(structType->m_indexableType) >= kNumIndexables)
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 
 		const IRenderRTTIListBase *list = m_indexables[static_cast<size_t>(structType->m_indexableType)].Get();
 		if (objectIndex >= list->GetCount())
 		{
 			rkit::log::Error(u8"Object index was out of range");
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 
 		rtti->m_writeFunc(obj, list->GetElementPtr(objectIndex));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result Package::ReadObjectPtrSpan(void *obj, const data::RenderRTTIObjectPtrSpanType *rtti, bool isNullable, IReadStream &stream) const
@@ -2062,7 +2062,7 @@ namespace rkit { namespace data
 
 		size_t indexableInt = static_cast<size_t>(structType->m_indexableType);
 		if (indexableInt >= kNumIndexables)
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 
 		size_t spanIndex = 0;
 		RKIT_CHECK(ReadCompactIndex(stream, spanIndex));
@@ -2073,7 +2073,7 @@ namespace rkit { namespace data
 		if (spanIndex >= spanInfos.Count())
 		{
 			rkit::log::Error(u8"Invalid object span index");
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 
 		const ObjectSpanInfo &spanInfo = spanInfos[spanIndex];
@@ -2092,14 +2092,14 @@ namespace rkit { namespace data
 				if (!ptrList.GetElement(start + i))
 				{
 					rkit::log::Error(u8"Object ptr was invalid");
-					return ResultCode::kMalformedFile;
+					RKIT_THROW(ResultCode::kMalformedFile);
 				}
 			}
 		}
 
 		rtti->m_setFunc(obj, ptrsDataStart, count);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result Package::ReadConfigurationKey(render::ConfigStringIndex_t &outCfgKey, IReadStream &stream) const
@@ -2110,11 +2110,11 @@ namespace rkit { namespace data
 		if (index >= m_configKeys.Count())
 		{
 			rkit::log::Error(u8"Configuration key index was out of range");
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 
 		outCfgKey = render::ConfigStringIndex_t(index);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result Package::ValidateStructureType(const render::StructureType *structType, const render::StructureType *upperLimit, size_t depth, size_t &complexity)
@@ -2122,7 +2122,7 @@ namespace rkit { namespace data
 		if (upperLimit != nullptr && structType >= upperLimit)
 		{
 			rkit::log::Error(u8"Structure type was recursive");
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 
 		const size_t complexityLimit = 4096;
@@ -2130,7 +2130,7 @@ namespace rkit { namespace data
 		if (structType->m_members.Count() >= complexityLimit || complexity + structType->m_members.Count() >= complexityLimit)
 		{
 			rkit::log::Error(u8"Structure type has too many fields");
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 
 		complexity += structType->m_members.Count();
@@ -2138,7 +2138,7 @@ namespace rkit { namespace data
 		if (depth > 16)
 		{
 			rkit::log::Error(u8"Structure type tree is too deep");
-			return ResultCode::kMalformedFile;
+			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 
 		for (const render::StructureMemberDesc *member : structType->m_members)
@@ -2146,7 +2146,7 @@ namespace rkit { namespace data
 			RKIT_CHECK(ValidateValueType(member->m_type, structType, depth + 1, complexity));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result Package::ValidateValueType(const render::ValueType &valueType, const render::StructureType *upperLimit, size_t depth, size_t &complexity)
@@ -2154,7 +2154,7 @@ namespace rkit { namespace data
 		if (valueType.m_type == render::ValueTypeType::Structure)
 			return ValidateStructureType(valueType.m_value.m_structureType, upperLimit, depth, complexity);
 		else
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 	}
 
 	const RenderRTTIStructType *RenderDataHandler::GetSamplerDescRTTI() const
@@ -2285,7 +2285,7 @@ namespace rkit { namespace data
 		}
 
 		outPackage = std::move(package);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 #define LINK_INDEXABLE_LIST_TYPE(type)	\
@@ -2300,7 +2300,7 @@ namespace rkit { namespace data
 		}\
 		if (outRTTI)\
 			*outRTTI = reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::type>::GetRTTIType());\
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 
 	Result RenderDataHandler::ProcessIndexable(RenderRTTIIndexableStructType indexableStructType, UniquePtr<IRenderRTTIListBase> *outList, UniquePtr<IRenderRTTIObjectPtrList> *outPtrList, const RenderRTTIStructType **outRTTI) const
 	{
@@ -2334,7 +2334,7 @@ namespace rkit { namespace data
 		LINK_INDEXABLE_LIST_TYPE(RenderPassNameLookup)
 
 		default:
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 		}
 	}
 #undef LINK_INDEXABLE_LIST_TYPE

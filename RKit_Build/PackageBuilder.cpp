@@ -227,7 +227,7 @@ namespace rkit { namespace buildsystem
 			if (checkIt != m_cachedObjectToBlob.end())
 			{
 				outIndex = checkIt.Value();
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			}
 		}
 
@@ -251,7 +251,7 @@ namespace rkit { namespace buildsystem
 			}
 
 			outIndex = index;
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		size_t newIndex = m_blobs.Count();
@@ -266,7 +266,7 @@ namespace rkit { namespace buildsystem
 		}
 
 		outIndex = newIndex;
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void IndexableObjectBlobCollection::ClearObjectAddressCache()
@@ -300,7 +300,7 @@ namespace rkit { namespace buildsystem
 		if (it != m_stringToIndex.end())
 		{
 			outIndex = it.Value();
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		String newStr;
@@ -313,7 +313,7 @@ namespace rkit { namespace buildsystem
 
 		outIndex = newIndex;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result PackageBuilder::IndexConfigKey(size_t globalStringIndex, data::RenderRTTIMainType mainType, size_t &outIndex)
@@ -336,7 +336,7 @@ namespace rkit { namespace buildsystem
 			}
 
 			outIndex = it.Value();
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		size_t newIndex = m_configKeys.Count();
@@ -351,7 +351,7 @@ namespace rkit { namespace buildsystem
 
 		outIndex = newIndex;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result PackageBuilder::IndexBinaryContent(BinaryBlobRef &&blob, size_t &outIndex)
@@ -405,7 +405,7 @@ namespace rkit { namespace buildsystem
 			}
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result PackageBuilder::WritePackage(ISeekableWriteStream &streamBase) const
@@ -493,7 +493,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(stream.Flush());
 		RKIT_CHECK(PackageObjectWriter::WriteUInt32(m_dataHandler->GetPackageIdentifier(), stream));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result PackageObjectWriter::WriteObject(IPackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTITypeBase *rtti, IWriteStream &stream) const
@@ -543,7 +543,7 @@ namespace rkit { namespace buildsystem
 			switch (state)
 			{
 			case static_cast<uint8_t>(render::ConfigurableValueState::Default):
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			case static_cast<uint8_t>(render::ConfigurableValueState::Configured):
 				return WriteConfigurationKey(pkgBuilder, rtti->m_readConfigurableNameFunc(obj), rtti->m_base.m_mainType, stream);
 			case static_cast<uint8_t>(render::ConfigurableValueState::Explicit):
@@ -568,7 +568,7 @@ namespace rkit { namespace buildsystem
 			RKIT_CHECK(StaticWriteObject(pkgBuilder, memberPtr, fieldRTTI, field->m_isConfigurable, field->m_isNullable, stream));
 		}
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result PackageObjectWriter::WriteNumber(IPackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTINumberType *rtti, bool isConfigurable, IWriteStream &stream)
@@ -584,7 +584,7 @@ namespace rkit { namespace buildsystem
 			switch (state)
 			{
 			case static_cast<uint8_t>(render::ConfigurableValueState::Default):
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 			case static_cast<uint8_t>(render::ConfigurableValueState::Configured):
 				return WriteConfigurationKey(pkgBuilder, rtti->m_readConfigurableNameFunc(obj), rtti->m_base.m_mainType, stream);
 			case static_cast<uint8_t>(render::ConfigurableValueState::Explicit):
@@ -682,7 +682,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(pkgBuilder.IndexBinaryContent(BinaryBlobRef(std::move(blob)), index));
 		RKIT_CHECK(WriteCompactIndex(index, stream));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result PackageObjectWriter::WriteStringIndex(IPackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTIStringIndexType *rtti, IWriteStream &stream)
@@ -694,7 +694,7 @@ namespace rkit { namespace buildsystem
 		if (purpose == render::TempStringIndex_t::kPurpose)
 		{
 			if (!pkgBuilder.IsWritingTempStrings())
-				return ResultCode::kOK;
+				RKIT_RETURN_OK;
 
 			str = pkgBuilder.GetStringResolver()->ResolveTempString(rtti->m_readStringIndexFunc(obj));
 		}
@@ -706,7 +706,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(pkgBuilder.IndexString(str, index));
 		RKIT_CHECK(WriteCompactIndex(index, stream));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result PackageObjectWriter::WriteObjectPtr(IPackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTIObjectPtrType *rtti, bool isNullable, IWriteStream &stream)
@@ -753,7 +753,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(WriteCompactIndex(objectListIndex, stream));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result PackageObjectWriter::WriteConfigurationKey(IPackageBuilder &pkgBuilder, const render::ConfigStringIndex_t &str, data::RenderRTTIMainType mainType, IWriteStream &stream)
@@ -768,7 +768,7 @@ namespace rkit { namespace buildsystem
 
 		RKIT_CHECK(WriteCompactIndex(configKeyIndex, stream));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result PackageObjectWriter::WriteUIntForSize(uint64_t ui, uint64_t max, IWriteStream &stream)
@@ -923,7 +923,7 @@ namespace rkit { namespace buildsystem
 	Result Sha256Wrapper::Truncate(FilePos_t newSize)
 	{
 		if (newSize == m_stream.GetSize())
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		return ResultCode::kOperationFailed;
 	}
@@ -958,12 +958,12 @@ namespace rkit { namespace buildsystem
 
 		outCountWritten = count;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result BinaryBlobBuilder::Flush()
 	{
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	BinaryBlobRef BinaryBlobBuilder::Finish()

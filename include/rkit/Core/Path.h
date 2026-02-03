@@ -695,7 +695,7 @@ namespace rkit
 			return m_path.Set(str);
 
 		if (str.Length() == 0)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		PathValidationResult validationResult = TPathTraits::ValidateComponent(str, TIsAbsolute, false);
 
@@ -723,7 +723,7 @@ namespace rkit
 		m_path.Clear();
 		m_path = BaseString<Char_t, kEncoding>(std::move(scBuf));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -732,13 +732,13 @@ namespace rkit
 		if (m_path.Length() == 0)
 		{
 			if (TIsAbsolute)
-				return ResultCode::kInvalidPath;
+				RKIT_THROW(ResultCode::kInvalidPath);
 			else
 				return m_path.Set(str.ToStringView());
 		}
 
 		if (str.Length() == 0)
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 
 		size_t totalChars = str.Length() + 1;
 		RKIT_CHECK(SafeAdd<size_t>(totalChars, m_path.Length(), totalChars));
@@ -754,7 +754,7 @@ namespace rkit
 		m_path.Clear();
 		m_path = BaseString<Char_t, kEncoding>(std::move(scBuf));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -799,7 +799,7 @@ namespace rkit
 		case PathValidationResult::kConvertible:
 			return SetConvert(str);
 		default:
-			return ResultCode::kInvalidParameter;
+			RKIT_THROW(ResultCode::kInvalidParameter);
 		}
 	}
 
@@ -816,7 +816,7 @@ namespace rkit
 		if (str.Length() == 0)
 		{
 			m_path.Clear();
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		BaseString<Char_t, TPathTraits::kEncoding> newStr;
@@ -845,7 +845,7 @@ namespace rkit
 		if (path.Length() == 0)
 		{
 			m_path.Clear();
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		const CharacterEncoding kOtherEncoding = TOtherPathTraits::kEncoding;
@@ -875,7 +875,7 @@ namespace rkit
 							chunk.Ptr(), kOtherEncoding, chunk.Count(), text::UnknownCharBehavior::kFail, 0);
 
 						if (!amountConsumed)
-							return ResultCode::kInvalidUnicode;
+							RKIT_THROW(ResultCode::kInvalidUnicode);
 					}
 
 					newSize = newSize + convertedChunkSize + 1;
@@ -918,7 +918,7 @@ namespace rkit
 							chunk.Ptr(), kOtherEncoding, chunk.Count(), text::UnknownCharBehavior::kFail, 0);
 
 						if (!amountConsumed)
-							return ResultCode::kInvalidUnicode;
+							RKIT_THROW(ResultCode::kInvalidUnicode);
 					}
 
 					const bool isFirst = (emitPos == 0);
@@ -934,9 +934,9 @@ namespace rkit
 						TPathTraits::MakeComponentValid(outChunkSpan, TIsAbsolute, isFirst);
 						break;
 					case PathValidationResult::kInvalid:
-						return ResultCode::kInvalidPath;
+						RKIT_THROW(ResultCode::kInvalidPath);
 					default:
-						return ResultCode::kInternalError;
+						RKIT_THROW(ResultCode::kInternalError);
 					}
 
 					emitPos += convertedChunkSize;
@@ -948,7 +948,7 @@ namespace rkit
 
 		m_path = BaseString<Char_t, kEncoding>(std::move(scBuf));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -1078,7 +1078,7 @@ namespace rkit
 		if (str.Length() == 0)
 		{
 			m_path.Clear();
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		size_t numComponents = 0;
@@ -1131,7 +1131,7 @@ namespace rkit
 
 		m_path = BaseString<Char_t, kEncoding>(std::move(stringBuffer));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>

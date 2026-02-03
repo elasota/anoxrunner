@@ -515,7 +515,7 @@ namespace rkit
 	{
 		void *mem = alloc->Alloc(sizeof(TType));
 		if (!mem)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		TType *obj = new (mem) TType(std::forward<TArgs>(args)...);
 
@@ -531,7 +531,7 @@ namespace rkit
 
 		objPtr = RCPtr<TPtrType>(obj, tracker);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class TType, class TPtrType, class... TArgs>
@@ -545,7 +545,7 @@ namespace rkit
 	{
 		void *mem = alloc->Alloc(sizeof(TType));
 		if (!mem)
-			return ResultCode::kOutOfMemory;
+			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		TType *obj = new (mem) TType();
 
@@ -561,7 +561,7 @@ namespace rkit
 
 		objPtr = RCPtr<TPtrType>(obj, tracker);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	template<class TType, class TPtrType>
@@ -578,7 +578,7 @@ namespace rkit
 		if (object == nullptr)
 		{
 			rcPtr.Reset();
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		UniquePtr<priv::UniquePtrTracker<UPtrType>> tracker;
@@ -588,7 +588,7 @@ namespace rkit
 		trackerAllocation.m_obj->SetSelf(trackerAllocation);
 
 		rcPtr = RCPtr<RCType>(object, trackerAllocation.m_obj);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	namespace priv

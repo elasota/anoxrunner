@@ -428,7 +428,7 @@ namespace anox
 
 					leafBrushIndex += leafBrushCount;
 
-					return rkit::ResultCode::kOK;
+					RKIT_RETURN_OK;
 				});
 			RKIT_CHECK(checkResult);
 
@@ -460,7 +460,7 @@ namespace anox
 					outBrush.m_sides = brushSidesSpan.SubSpan(brushSideIndex, brushSideCount);
 					brushSideIndex += brushSideCount;
 
-					return rkit::ResultCode::kOK;
+					RKIT_RETURN_OK;
 				})));;
 
 			if (brushSideIndex != numBrushSides)
@@ -526,7 +526,7 @@ namespace anox
 
 					locatorStartIndex += count;
 
-					return rkit::ResultCode::kOK;
+					RKIT_RETURN_OK;
 				});
 
 			RKIT_CHECK(checkResult);
@@ -612,7 +612,7 @@ namespace anox
 
 					firstTriIndex += numTrisForSurf;
 
-					return rkit::ResultCode::kOK;
+					RKIT_RETURN_OK;
 				});
 
 			RKIT_CHECK(checkResult);
@@ -656,7 +656,7 @@ namespace anox
 
 				firstDrawSurfaceIndex += numDrawSurfacesForLMG;
 
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			});
 
 			RKIT_CHECK(checkResult);
@@ -697,7 +697,7 @@ namespace anox
 
 					firstLightmapGroupIndex += numLightmapGroupsForMG;
 
-					return rkit::ResultCode::kOK;
+					RKIT_RETURN_OK;
 				});
 
 			RKIT_CHECK(checkResult);
@@ -736,7 +736,7 @@ namespace anox
 
 					firstMaterialGroupIndex += numMaterialGroupsForModelGroup;
 
-					return rkit::ResultCode::kOK;
+					RKIT_RETURN_OK;
 				});
 
 			RKIT_CHECK(checkResult);
@@ -776,7 +776,7 @@ namespace anox
 
 					firstModelGroupIndex += numModelGroupsForCluster;
 
-					return rkit::ResultCode::kOK;
+					RKIT_RETURN_OK;
 				});
 
 			RKIT_CHECK(checkResult);
@@ -948,12 +948,12 @@ namespace anox
 			RKIT_CHECK(outDeps.Append(uploadJob));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxBSPModelLoaderInfo::LoadContents(State_t &state, Resource_t &resource)
 	{
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	bool AnoxBSPModelLoaderInfo::PhaseHasDependencies(size_t phase)
@@ -1002,7 +1002,7 @@ namespace anox
 			RKIT_CHECK(m_readStream.ExtractSpan(span, count));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxBSPModelResourceLoaderBase::Create(rkit::RCPtr<AnoxBSPModelResourceLoaderBase> &outLoader)
@@ -1014,6 +1014,6 @@ namespace anox
 
 		outLoader = std::move(loader);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 }

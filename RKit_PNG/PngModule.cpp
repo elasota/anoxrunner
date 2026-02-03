@@ -129,12 +129,12 @@ namespace rkit { namespace png {
 	{
 		if (setjmp(png_jmpbuf(png)))
 		{
-			return ResultCode::kDataError;
+			RKIT_THROW(ResultCode::kDataError);
 		}
 		else
 		{
 			m_func(png, args...);
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 	}
 
@@ -155,7 +155,7 @@ namespace rkit { namespace png {
 		{
 			TReturn callReturnValue = m_func(png, args...);
 			returnedValue = callReturnValue;
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 	}
 
@@ -204,7 +204,7 @@ namespace rkit { namespace png {
 
 	rkit::Result PngDriver::InitDriver(const rkit::DriverInitParameters *)
 	{
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	PngLoader::PngLoader(ISeekableReadStream &stream)
@@ -224,7 +224,7 @@ namespace rkit { namespace png {
 		if (!m_png)
 		{
 			rkit::log::Error(u8"Creating PNG failed");
-			return ResultCode::kDataError;
+			RKIT_THROW(ResultCode::kDataError);
 		}
 
 		m_info = png_create_info_struct(m_png);
@@ -232,7 +232,7 @@ namespace rkit { namespace png {
 		if (!m_png)
 		{
 			rkit::log::Error(u8"Creating PNG info failed");
-			return ResultCode::kDataError;
+			RKIT_THROW(ResultCode::kDataError);
 		}
 
 		png_set_user_limits(m_png, 4096, 4096);
@@ -248,7 +248,7 @@ namespace rkit { namespace png {
 		if (bitDepth != 8)
 		{
 			rkit::log::Error(u8"Unsupported bit depth");
-			return ResultCode::kDataError;
+			RKIT_THROW(ResultCode::kDataError);
 		}
 
 		imageSpec.m_width = png_get_image_width(m_png, m_info);
@@ -256,7 +256,7 @@ namespace rkit { namespace png {
 		imageSpec.m_pixelPacking = utils::PixelPacking::kUInt8;
 		imageSpec.m_numChannels = channels;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result PngLoader::Run(UniquePtr<utils::IImage> &outImage)
@@ -266,7 +266,7 @@ namespace rkit { namespace png {
 		if (!m_png)
 		{
 			rkit::log::Error(u8"Creating PNG failed");
-			return ResultCode::kDataError;
+			RKIT_THROW(ResultCode::kDataError);
 		}
 
 		m_info = png_create_info_struct(m_png);
@@ -274,7 +274,7 @@ namespace rkit { namespace png {
 		if (!m_png)
 		{
 			rkit::log::Error(u8"Creating PNG info failed");
-			return ResultCode::kDataError;
+			RKIT_THROW(ResultCode::kDataError);
 		}
 
 		png_set_user_limits(m_png, 4096, 4096);
@@ -291,13 +291,13 @@ namespace rkit { namespace png {
 		if (bitDepth != 8)
 		{
 			rkit::log::Error(u8"Unsupported bit depth");
-			return ResultCode::kDataError;
+			RKIT_THROW(ResultCode::kDataError);
 		}
 
 		if (channels != 3 && channels != 4 && channels != 1)
 		{
 			rkit::log::Error(u8"Unsupported bit depth");
-			return ResultCode::kDataError;
+			RKIT_THROW(ResultCode::kDataError);
 		}
 
 		const size_t pngRowSize = png_get_rowbytes(m_png, m_info);
@@ -314,7 +314,7 @@ namespace rkit { namespace png {
 		const size_t copySize = static_cast<size_t>(image->GetPixelSizeBytes()) * imageSpec.m_width;
 
 		if (copySize < pngRowSize)
-			return ResultCode::kInternalError;
+			RKIT_THROW(ResultCode::kInternalError);
 
 
 		for (uint32_t y = 0; y < imageSpec.m_height; y++)
@@ -327,15 +327,15 @@ namespace rkit { namespace png {
 
 		outImage = std::move(image);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void PNGCBAPI PngLoader::StaticReadCB(png_structp png, png_bytep buffer, size_t sz)
 	{
 		png_voidp ioPtr = png_get_io_ptr(png);
-		Result result = static_cast<PngLoader *>(ioPtr)->m_stream.ReadAll(buffer, sz);
+		PackedResultAndExtCode result = RKIT_TRY_EVAL(static_cast<PngLoader *>(ioPtr)->m_stream.ReadAll(buffer, sz));
 
-		if (!rkit::utils::ResultIsOK(result))
+		if (result.m_resultCode != ResultCode::kOK)
 			png_error(png, "Read error");
 	}
 
@@ -363,7 +363,7 @@ namespace rkit { namespace png {
 		if (!m_png)
 		{
 			rkit::log::Error(u8"Creating PNG failed");
-			return ResultCode::kDataError;
+			RKIT_THROW(ResultCode::kDataError);
 		}
 
 		m_info = png_create_info_struct(m_png);
@@ -371,7 +371,7 @@ namespace rkit { namespace png {
 		if (!m_png)
 		{
 			rkit::log::Error(u8"Creating PNG info failed");
-			return ResultCode::kDataError;
+			RKIT_THROW(ResultCode::kDataError);
 		}
 
 		int bitDepth = 0;
@@ -382,7 +382,7 @@ namespace rkit { namespace png {
 			break;
 		default:
 			rkit::log::Error(u8"Unknown pixel packing");
-			return ResultCode::kDataError;
+			RKIT_THROW(ResultCode::kDataError);
 		}
 
 		int colorType = 0;
@@ -402,7 +402,7 @@ namespace rkit { namespace png {
 			break;
 		default:
 			rkit::log::Error(u8"Unsupported channel count");
-			return ResultCode::kDataError;
+			RKIT_THROW(ResultCode::kDataError);
 		}
 
 		RKIT_CHECK(TrapPNGCall(png_set_IHDR)(m_png, m_info, image.GetWidth(), image.GetHeight(), bitDepth, colorType, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT));
@@ -418,15 +418,15 @@ namespace rkit { namespace png {
 
 		RKIT_CHECK(TrapPNGCall(png_write_end)(m_png, m_info));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	void PNGCBAPI PngSaver::StaticWriteCB(png_structp png, png_bytep buffer, size_t sz)
 	{
 		png_voidp ioPtr = png_get_io_ptr(png);
-		Result result = static_cast<PngSaver *>(ioPtr)->m_stream.WriteAll(buffer, sz);
+		PackedResultAndExtCode result = RKIT_TRY_EVAL(static_cast<PngSaver *>(ioPtr)->m_stream.WriteAll(buffer, sz));
 
-		if (!rkit::utils::ResultIsOK(result))
+		if (result.m_resultCode != ResultCode::kOK)
 			png_error(png, "Write error");
 
 	}
@@ -434,9 +434,9 @@ namespace rkit { namespace png {
 	void PNGCBAPI PngSaver::StaticFlushCB(png_structp png)
 	{
 		png_voidp ioPtr = png_get_io_ptr(png);
-		Result result = static_cast<PngSaver *>(ioPtr)->m_stream.Flush();
+		PackedResultAndExtCode result = RKIT_TRY_EVAL(static_cast<PngSaver *>(ioPtr)->m_stream.Flush());
 
-		if (!rkit::utils::ResultIsOK(result))
+		if (result.m_resultCode != ResultCode::kOK)
 			png_error(png, "Flush error");
 	}
 

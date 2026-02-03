@@ -5,7 +5,37 @@
 
 #include <cstdint>
 
-#if RKIT_USE_CLASS_RESULT
+namespace rkit
+{
+	struct PackedResultAndExtCode
+	{
+		ResultCode m_resultCode = ResultCode::kOK;
+		uint32_t m_extCode = 0;
+	};
+
+	class RKIT_NODISCARD CatchContext
+	{
+	public:
+		CatchContext() = delete;
+		CatchContext(const CatchContext &) = default;
+
+		template<class TCatchBody>
+		explicit CatchContext(const TCatchBody &catchBody);
+
+		void Invoke() const;
+
+	private:
+		CatchContext &operator=(const CatchContext &) = delete;
+
+		template<class TCatchBody>
+		static void CallInvoke(const void *catchBodyPtr);
+
+		const void *m_catchBody;
+		void (*m_invokeThunk)(const void *);
+	};
+}
+
+#if RKIT_USE_CLASS_RESULT != 0
 
 namespace rkit
 {
@@ -148,7 +178,7 @@ namespace rkit
 		return RKIT_PP_CONCAT(exprResult_, __LINE__);\
 } while (false)
 
-#else
+#elif RKIT_USE_ENUM_RESULT != 0
 
 namespace rkit
 {
@@ -191,4 +221,115 @@ namespace rkit
 
 #define RKIT_CHECK_SOFT(expr) RKIT_CHECK(expr)
 
+#elif RKIT_USE_EXCEPTION_RESULT != 0
+
+namespace rkit { namespace priv
+{
+	template<class TTryBody>
+	void TryCatchRethrow(const TTryBody &tryBody, const ::rkit::CatchContext &catchContext)
+	{
+		try
+		{
+			tryBody();
+		}
+		catch (...)
+		{
+			catchContext.Invoke();
+			throw;
+		}
+	}
+} }
+
+namespace rkit
+{
+	class ResultException
+	{
+	public:
+		ResultException() = delete;
+		explicit ResultException(ResultCode resultCode);
+		explicit ResultException(const PackedResultAndExtCode &packedResult);
+		ResultException(const ResultException &) = default;
+
+		ResultException &operator=(const ResultException &) = default;
+
+		const PackedResultAndExtCode &GetPackedResult() const;
+
+	private:
+		PackedResultAndExtCode m_packedResult;
+	};
+
+	inline ResultException::ResultException(ResultCode resultCode)
+		: m_packedResult{ resultCode, 0 }
+	{
+	}
+
+	inline ResultException::ResultException(const PackedResultAndExtCode &packedResult)
+		: m_packedResult(packedResult)
+	{
+	}
+
+	inline const PackedResultAndExtCode &ResultException::GetPackedResult() const
+	{
+		return m_packedResult;
+	}
+}
+
+namespace rkit { namespace priv {
+
+	template<class TTryBody>
+	PackedResultAndExtCode TryCatch(const TTryBody &tryBody)
+	{
+		try
+		{
+			tryBody();
+			return PackedResultAndExtCode{ ResultCode::kOK, 0 };
+		}
+		catch (ResultException rex)
+		{
+			return rex.GetPackedResult();
+		}
+		catch (...)
+		{
+			return PackedResultAndExtCode{ ResultCode::kCppException, 0 };
+		}
+	}
+} }
+
+#define RKIT_CHECK(expr) expr
+#define RKIT_RETURN_OK return
+#define RKIT_THROW(expr) throw (::rkit::ResultException(expr))
+#define RKIT_TRY_CATCH_RETHROW(expr, eh) (::rkit::priv::TryCatchRethrow([&] { static_cast<void>(expr); }, (eh)))
+#define RKIT_TRY_EVAL(expr) (::rkit::priv::TryCatch([&] { static_cast<void>(expr); }))
+
 #endif
+
+
+namespace rkit
+{
+	template<class TCatchBody>
+	CatchContext::CatchContext(const TCatchBody &catchBody)
+		: m_catchBody(&catchBody)
+		, m_invokeThunk(CatchContext::CallInvoke<TCatchBody>)
+	{
+	}
+
+	inline void CatchContext::Invoke() const
+	{
+		m_invokeThunk(m_catchBody);
+	}
+
+	template<class TCatchBody>
+	void CatchContext::CallInvoke(const void *catchBodyPtr)
+	{
+		const TCatchBody &catchBody = *static_cast<const TCatchBody *>(catchBodyPtr);
+		catchBody();
+	}
+
+	inline Result ThrowIfError(const PackedResultAndExtCode &result)
+	{
+		if (result.m_resultCode == ResultCode::kOK)
+			RKIT_RETURN_OK;
+
+		RKIT_THROW(result);
+	}
+}

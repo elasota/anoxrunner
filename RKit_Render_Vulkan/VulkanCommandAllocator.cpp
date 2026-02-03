@@ -77,7 +77,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateCommandPool(m_device.GetDevice(), &poolCreateInfo, m_device.GetAllocCallbacks(), &m_pool));
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	IInternalCommandAllocator *VulkanCommandAllocator::ToInternalCommandAllocator()
@@ -127,7 +127,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		m_activeCmdBuffers = 0;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	CommandQueueType VulkanCommandAllocator::GetQueueType() const
@@ -152,7 +152,7 @@ namespace rkit { namespace render { namespace vulkan
 			outCmdBuffer = m_cmdBuffers[m_activeCmdBuffers];
 			m_activeCmdBuffers++;
 
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		VkCommandBufferAllocateInfo allocInfo = {};
@@ -165,18 +165,20 @@ namespace rkit { namespace render { namespace vulkan
 		VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkAllocateCommandBuffers(m_device.GetDevice(), &allocInfo, &cmdBuffer));
 
-		Result appendResult = m_cmdBuffers.Append(cmdBuffer);
-		if (!utils::ResultIsOK(appendResult))
-		{
-			m_device.GetDeviceAPI().vkFreeCommandBuffers(m_device.GetDevice(), m_pool, 1, &cmdBuffer);
-			return appendResult;
-		}
+		RKIT_TRY_CATCH_RETHROW(m_cmdBuffers.Append(cmdBuffer),
+			CatchContext(
+				[this, cmdBuffer]
+				{
+					m_device.GetDeviceAPI().vkFreeCommandBuffers(m_device.GetDevice(), m_pool, 1, &cmdBuffer);
+				}
+			)
+		);
 
 		outCmdBuffer = cmdBuffer;
 
 		m_activeCmdBuffers++;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	VulkanCommandAllocator::DynamicCastRef_t VulkanCommandAllocator::InternalDynamicCast()
@@ -205,7 +207,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outCommandBatch = cmdBatch;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandAllocator::OpenCommandBatch(VulkanCommandBatchBase *&outCommandBatch, bool cpuWaitable)
@@ -238,7 +240,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		outCommandBatch = cmdBatchPtr;
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandAllocatorBase::Create(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, VulkanDeviceBase &device, VulkanQueueProxyBase &queue, CommandQueueType queueType, bool isBundle, uint32_t queueFamily)
@@ -251,6 +253,6 @@ namespace rkit { namespace render { namespace vulkan
 
 		outCommandAllocator = std::move(cmdAllocator);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 } } } // rkit::render::vulkan

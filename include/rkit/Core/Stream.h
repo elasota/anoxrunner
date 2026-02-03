@@ -113,9 +113,9 @@ inline rkit::Result rkit::IReadStream::ReadAll(void *data, size_t count)
 	RKIT_CHECK(this->ReadPartial(data, count, countRead));
 
 	if (countRead != count)
-		return ResultCode::kIOReadError;
+		RKIT_THROW(ResultCode::kIOReadError);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 inline rkit::Result rkit::IWriteStream::WriteAll(const void *data, size_t count)
@@ -124,9 +124,9 @@ inline rkit::Result rkit::IWriteStream::WriteAll(const void *data, size_t count)
 	RKIT_CHECK(this->WritePartial(data, count, countWritten));
 
 	if (countWritten != count)
-		return ResultCode::kIOReadError;
+		RKIT_THROW(ResultCode::kIOReadError);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 
@@ -140,7 +140,7 @@ template<class T>
 rkit::Result rkit::IWriteStream::WriteAllSpan(const rkit::Span<T> &span)
 {
 	if (span.Count() == 0)
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 
 	return WriteAll(span.Ptr(), span.Count() * sizeof(T));
 }
@@ -156,7 +156,7 @@ template<class T>
 inline rkit::Result rkit::IReadStream::ReadAllSpan(const rkit::Span<T> &span)
 {
 	if (span.Count() == 0)
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 
 	return this->ReadAll(span.Ptr(), span.Count() * sizeof(T));
 }

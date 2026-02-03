@@ -252,7 +252,7 @@ rkit::Result rkit::StringStorage<TChar>::ComputeSize(size_t sizeInChars, size_t 
 	RKIT_CHECK(rkit::SafeAdd(sz, sz, ComputePaddedBaseSize()));
 
 	outSizeInBytes = sz;
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 
@@ -296,14 +296,14 @@ template<class TChar>
 rkit::Result rkit::BaseStringConstructionBuffer<TChar>::Allocate(size_t numChars, IMallocDriver *alloc)
 {
 	if (numChars == std::numeric_limits<size_t>::max())
-		return ResultCode::kOutOfMemory;
+		RKIT_THROW(ResultCode::kOutOfMemory);
 
 	size_t stringStorageObjSize = 0;
 	RKIT_CHECK(StringStorage<TChar>::ComputeSize(numChars + 1, stringStorageObjSize));
 
 	void *stringStorageMem = alloc->Alloc(stringStorageObjSize);
 	if (!stringStorageMem)
-		return ResultCode::kOutOfMemory;
+		RKIT_THROW(ResultCode::kOutOfMemory);
 
 	StringStorage<TChar> *stringStorage = new (stringStorageMem) StringStorage<TChar>(alloc);
 
@@ -313,7 +313,7 @@ rkit::Result rkit::BaseStringConstructionBuffer<TChar>::Allocate(size_t numChars
 	m_stringStorage = stringStorage;
 	m_numChars = numChars;
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TChar>
@@ -541,7 +541,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::VFormat(const Base
 
 		GetDrivers().m_utilitiesDriver->FormatString(formatHelper, fmt, args);
 		if (formatHelper.m_overflowed)
-			return rkit::ResultCode::kOutOfMemory;
+			RKIT_THROW(rkit::ResultCode::kOutOfMemory);
 
 		if (formatHelper.m_charsRequired <= formatHelper.m_charsBuffer.Count())
 		{
@@ -550,7 +550,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::VFormat(const Base
 			m_staticString[formatHelper.m_charsRequired] = static_cast<TChar>(0);
 			m_chars = m_staticString;
 			m_length = formatHelper.m_charsRequired;
-			return rkit::ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		charsRequired = formatHelper.m_charsRequired;
@@ -571,7 +571,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::VFormat(const Base
 
 	(*this) = std::move(constructionBuffer);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
@@ -646,7 +646,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::Set(const Span<con
 	if (strSpan.Count() == 0)
 	{
 		Clear();
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	if (!IsStaticString())
@@ -672,7 +672,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::Set(const Span<con
 
 	(*this) = std::move(newString);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
@@ -689,7 +689,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::ConvertFromSpan(co
 	if (charsRef.Count() == 0)
 	{
 		Clear();
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	Span<const TOtherChar> inChars = charsRef;
@@ -707,7 +707,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::ConvertFromSpan(co
 			inChars.Ptr(), encoding, inChars.Count(), text::UnknownCharBehavior::kFail, 0);
 
 		if (charsDigested == 0)
-			return ResultCode::kInvalidUnicode;
+			RKIT_THROW(ResultCode::kInvalidUnicode);
 
 		if (charsDigested == inChars.Count())
 		{
@@ -716,7 +716,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::ConvertFromSpan(co
 			CopySpanNonOverlapping(Span<TChar>(m_staticString, staticCharsEmitted), staticBuffer.ToSpan().SubSpan(0, staticCharsEmitted));
 			m_staticString[staticCharsEmitted] = static_cast<TChar>(0);
 			m_length = staticCharsEmitted;
-			return ResultCode::kOK;
+			RKIT_RETURN_OK;
 		}
 
 		inChars = inChars.SubSpan(charsDigested);
@@ -732,7 +732,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::ConvertFromSpan(co
 		inChars.Ptr(), encoding, inChars.Count(), text::UnknownCharBehavior::kFail, 0);
 
 	if (charsDigested != inChars.Count())
-		return ResultCode::kOutOfMemory;
+		RKIT_THROW(ResultCode::kOutOfMemory);
 
 	RKIT_CHECK(cbuf.Allocate(staticCharsEmitted + remainingCharsEmitted));
 	Span<TChar> outChars = cbuf.GetSpan();
@@ -750,17 +750,17 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::ConvertFromSpan(co
 	RKIT_ASSERT(remainingCharsEmitted2 == remainingCharsEmitted);
 
 	(*this) = std::move(cbuf);
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
 rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::Append(const Span<const TChar> &span)
 {
 	if (span.Count() == 0)
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 
 	if (std::numeric_limits<size_t>::max() - m_length < span.Count())
-		return ResultCode::kOutOfMemory;
+		RKIT_THROW(ResultCode::kOutOfMemory);
 
 	const size_t combinedLength = m_length + span.Count();
 
@@ -786,7 +786,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::Append(const Span<
 		(*this) = std::move(newString);
 	}
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
@@ -814,7 +814,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::ChangeCase(const T
 		for (size_t i = 0; i < length; i++)
 			chars[i] = adjuster(chars[i]);
 
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	BaseString<TChar, TEncoding, TStaticSize> newString;
@@ -830,7 +830,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::ChangeCase(const T
 
 	(*this) = std::move(newString);
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
@@ -925,7 +925,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::CreateAndReturnUni
 		outStr.m_staticString[numChars] = static_cast<TChar>(0);
 
 		outSpan = Span<TChar>(outStr.m_staticString, numChars);
-		return ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	BaseStringConstructionBuffer<TChar> constructionBuffer;
@@ -939,7 +939,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::CreateAndReturnUni
 
 	outSpan = constructedSpan;
 
-	return ResultCode::kOK;
+	RKIT_RETURN_OK;
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>

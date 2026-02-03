@@ -61,7 +61,7 @@ namespace anox
 
 		RKIT_CHECK(m_commands.SetPrehashed(name.GetHash(), std::move(key), std::move(cmd)));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxCommandRegistry::RegisterAlias(const AnoxPrehashedRegistryKeyView &name, const rkit::ByteStringSliceView &commandText)
@@ -75,7 +75,7 @@ namespace anox
 
 		RKIT_CHECK(m_aliases.SetPrehashed(name.GetHash(), std::move(key), std::move(alias)));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxCommandRegistry::RegisterConsoleVar(const AnoxPrehashedRegistryKeyView &name, AnoxConsoleVarType varType, void *varValue)
@@ -90,7 +90,7 @@ namespace anox
 
 		RKIT_CHECK(m_consoleVars.SetPrehashed(name.GetHash(), std::move(key), std::move(consoleVar)));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	const AnoxRegisteredCommand *AnoxCommandRegistry::FindCommand(const AnoxPrehashedRegistryKeyView &name) const
@@ -196,7 +196,7 @@ namespace anox
 
 		outKey.m_str = rkit::ByteString(std::move(cbuf));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	bool AnoxCommandRegistryBase::RequiresEscape(const rkit::ByteStringSliceView &token)
@@ -223,7 +223,7 @@ namespace anox
 
 		outString = rkit::ByteString(std::move(cbuf));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxCommandRegistryBase::Create(rkit::UniquePtr<AnoxCommandRegistryBase> &outRegistry)
@@ -233,6 +233,6 @@ namespace anox
 
 		outRegistry = std::move(registry);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 }

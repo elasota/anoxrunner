@@ -111,7 +111,7 @@ namespace anox
 			RKIT_CHECK(m_stream.ReadAllSpan(array.ToSpan()));
 		}
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxSpawnDefsLoaderInfo::LoadHeaderAndQueueDependencies(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
@@ -143,10 +143,10 @@ namespace anox
 				RKIT_CHECK(resManager->GetContentIDKeyedResource(&depsJob, outResourceFuture, resloaders::kEntityDefTypeCode, inContentID));
 				RKIT_CHECK(outDeps.AppendRValue(std::move(depsJob)));
 
-				return rkit::ResultCode::kOK;
+				RKIT_RETURN_OK;
 			})));
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxSpawnDefsLoaderInfo::LoadContents(State_t &state, Resource_t &resource)
@@ -229,7 +229,7 @@ namespace anox
 		if (resource.m_chunks.m_entityStringLengths.Count())
 			return rkit::ResultCode::kNotYetImplemented;
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxSpawnDefsLoaderInfo::ParseEntity(void *data, const AnoxSpawnDefsResource &resource, rkit::Span<const uint8_t> entityData, const data::EntityClassDef *eclass)
@@ -309,7 +309,7 @@ namespace anox
 			};
 		}
 
-		return rkit::ResultCode::kOK;		
+		RKIT_RETURN_OK;		
 	}
 
 	template<size_t TComponents>
@@ -334,6 +334,6 @@ namespace anox
 
 		outLoader = std::move(loader);
 
-		return rkit::ResultCode::kOK;
+		RKIT_RETURN_OK;
 	}
 }
