@@ -27,7 +27,7 @@ namespace anox
 		}
 
 		if (!isOK)
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		for (size_t i = 0; i < numFloats; i++)
 			outFloatsPtr[i] = inFloatsPtr[i].Get();
@@ -65,7 +65,7 @@ namespace anox
 	{
 		rkit::StringSliceView view(chars);
 		if (!view.Validate())
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		RKIT_RETURN_OK;
 	}
@@ -74,7 +74,7 @@ namespace anox
 	rkit::Result DataReader::ReadCheckUIntImpl(TIntegral &outUInt, TIntegral value, TIntegral expectedMax)
 	{
 		if (value > expectedMax)
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		outUInt = value;
 		RKIT_RETURN_OK;

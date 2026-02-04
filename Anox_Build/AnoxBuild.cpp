@@ -47,7 +47,7 @@ rkit::Result anox::BuildDriver::InitDriver(const rkit::DriverInitParameters *)
 	if (!rkit::GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, u8"PNG"))
 	{
 		rkit::log::Error(u8"PNG module missing");
-		return rkit::ResultCode::kModuleLoadFailed;
+		RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 	}
 
 	rkit::ICustomDriver *pngDriver = rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, u8"PNG");
@@ -55,7 +55,7 @@ rkit::Result anox::BuildDriver::InitDriver(const rkit::DriverInitParameters *)
 	if (!pngDriver)
 	{
 		rkit::log::Error(u8"PNG driver failed to load");
-		return rkit::ResultCode::kModuleLoadFailed;
+		RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 	}
 
 	m_pngDriver = static_cast<rkit::png::IPngDriver *>(pngDriver);

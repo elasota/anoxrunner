@@ -872,16 +872,12 @@ namespace anox
 		rkit::UniquePtr<rkit::ISeekableReadStream> cacheReadStream;
 
 		// Try opening the cache itself
-		RKIT_TRY_CATCH_RETHROW(sysDriver->TryOpenFileRead(cacheReadStream, rkit::FileLocation::kUserSettingsDirectory, m_pipelinesCacheFileName),
-			rkit::CatchContext(
-				[]
-				{
-					rkit::log::Error(u8"Failed to open pipeline cache");
-				}
-			)
-		);
+		// FIXME: Is this supposed to be a soft failure?
+		RKIT_CHECK(sysDriver->OpenFileRead(cacheReadStream, rkit::FileLocation::kUserSettingsDirectory, m_pipelinesCacheFileName, true));
 
 		const bool haveCache = cacheReadStream.IsValid();
+		if (!haveCache)
+			rkit::log::Error(u8"Failed to open pipeline cache");
 
 		rkit::FilePos_t binaryContentStart = pipelinesFile->Tell();
 
@@ -1029,7 +1025,7 @@ namespace anox
 		m_graphicsSubsystem.m_pipelineLibraryLoader->CloseMergedLibrary(true, true);
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> pipelinesFile;
-		RKIT_CHECK(sysDriver->OpenFileReadWrite(pipelinesFile, rkit::FileLocation::kUserSettingsDirectory, m_graphicsSubsystem.m_pipelinesCacheFileName, true, true, true));
+		RKIT_CHECK(sysDriver->OpenFileReadWrite(pipelinesFile, rkit::FileLocation::kUserSettingsDirectory, m_graphicsSubsystem.m_pipelinesCacheFileName, true, true, true, false));
 
 		rkit::ISeekableReadWriteStream *writeStream = pipelinesFile.Get();
 
@@ -1059,7 +1055,7 @@ namespace anox
 
 		// FIXME: Do we really want to tolerate faults here?
 		// LoadGraphicsPipelineFromMergedLibrary doesn't actually have any soft faults.
-		if (loadPipelineResult.m_resultCode != rkit::ResultCode::kOK)
+		if (!rkit::utils::ResultIsOK(loadPipelineResult))
 		{
 			m_graphicsSubsystem.m_pipelineLibraryLoader->CloseMergedLibrary(true, true);
 			m_graphicsSubsystem.MarkSetupStepFailed();

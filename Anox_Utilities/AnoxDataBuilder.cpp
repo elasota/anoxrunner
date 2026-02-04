@@ -123,7 +123,7 @@ namespace anox { namespace utils
 				if (!stream.IsValid())
 				{
 					rkit::log::ErrorFmt(u8"Failed to open pipeline '{}' for merge", product.m_filePath.GetChars());
-					return rkit::ResultCode::kOperationFailed;
+					RKIT_THROW(rkit::ResultCode::kOperationFailed);
 				}
 
 				RKIT_CHECK(combiner->AddInput(*stream));
@@ -144,14 +144,14 @@ namespace anox { namespace utils
 		if (!buildModule)
 		{
 			rkit::log::Error(u8"Couldn't load build module");
-			return rkit::ResultCode::kModuleLoadFailed;
+			RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 		}
 
 		m_bsDriver = static_cast<rkit::buildsystem::IBuildSystemDriver *>(rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, u8"BuildSystem"));
 		if (!m_bsDriver)
 		{
 			rkit::log::Error(u8"Couldn't find build system driver");
-			return rkit::ResultCode::kModuleLoadFailed;
+			RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 		}
 
 		rkit::OSAbsPath dataFilesDir;
@@ -189,7 +189,7 @@ namespace anox { namespace utils
 			renderAddOnDriverName = u8"Build_Vulkan";
 			break;
 		default:
-			return rkit::ResultCode::kInternalError;
+			RKIT_THROW(rkit::ResultCode::kInternalError);
 		}
 
 		// Add render add-on
@@ -198,14 +198,14 @@ namespace anox { namespace utils
 			if (!renderBuildModule)
 			{
 				rkit::log::Error(u8"Couldn't load render build add-on module");
-				return rkit::ResultCode::kModuleLoadFailed;
+				RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 			}
 
 			rkit::buildsystem::IBuildSystemAddOnDriver *addOnDriver = static_cast<rkit::buildsystem::IBuildSystemAddOnDriver *>(rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, renderAddOnDriverName));
 			if (!addOnDriver)
 			{
 				rkit::log::Error(u8"Couldn't load render build add-on driver");
-				return rkit::ResultCode::kModuleLoadFailed;
+				RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 			}
 
 			RKIT_CHECK(addOnDriver->RegisterBuildSystemAddOn(instance.Get()));
@@ -217,14 +217,14 @@ namespace anox { namespace utils
 			if (!renderBuildModule)
 			{
 				rkit::log::Error(u8"Couldn't load game build add-on module");
-				return rkit::ResultCode::kModuleLoadFailed;
+				RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 			}
 
 			rkit::buildsystem::IBuildSystemAddOnDriver *addOnDriver = static_cast<rkit::buildsystem::IBuildSystemAddOnDriver *>(rkit::GetDrivers().FindDriver(anox::kAnoxNamespaceID, u8"Build"));
 			if (!addOnDriver)
 			{
 				rkit::log::Error(u8"Couldn't load game build add-on driver");
-				return rkit::ResultCode::kModuleLoadFailed;
+				RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 			}
 
 			RKIT_CHECK(addOnDriver->RegisterBuildSystemAddOn(instance.Get()));
@@ -290,14 +290,15 @@ namespace anox { namespace utils
 				rkit::OSAbsPath osPath = m_dataSourceDir;
 				RKIT_CHECK(osPath.Append(relPath));
 
-				RKIT_CHECK(sysDriver->GetFileAttributesAbs(osPath, exists, attribs));
+				bool succeeded_IGNORE = false;
+				RKIT_CHECK(sysDriver->GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, osPath, false));
 
 				if (!exists)
 				{
 					osPath = m_sourceDir;
 					RKIT_CHECK(osPath.Append(relPath));
 
-					RKIT_CHECK(sysDriver->GetFileAttributesAbs(osPath, exists, attribs));
+					RKIT_CHECK(sysDriver->GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, osPath, false));
 				}
 			}
 		}
@@ -320,7 +321,7 @@ namespace anox { namespace utils
 				osPath = m_exeDir;
 				break;
 			default:
-				return rkit::ResultCode::kNotYetImplemented;
+				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 			}
 
 			{
@@ -330,7 +331,8 @@ namespace anox { namespace utils
 				RKIT_CHECK(osPath.Append(relPath));
 			}
 
-			RKIT_CHECK(sysDriver->GetFileAttributesAbs(osPath, exists, attribs));
+			bool succeeded_IGNORE = false;
+			RKIT_CHECK(sysDriver->GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, osPath, false));
 		}
 
 		// Try to import file from the root directory
@@ -371,19 +373,16 @@ namespace anox { namespace utils
 			rkit::OSAbsPath osPath = m_dataSourceDir;
 			RKIT_CHECK(osPath.Append(relPath));
 
-			rkit::Result openResult = sysDriver->OpenFileReadAbs(outStream, osPath);
-			if (rkit::utils::GetResultCode(openResult) == rkit::ResultCode::kFileOpenError)
+			RKIT_CHECK(sysDriver->OpenFileReadAbs(outStream, osPath, true));
+			if (!outStream.IsValid())
 			{
 				osPath = m_sourceDir;
 				RKIT_CHECK(osPath.Append(relPath));
 
-				openResult = sysDriver->OpenFileReadAbs(outStream, osPath);
-
-				if (rkit::utils::GetResultCode(openResult) == rkit::ResultCode::kFileOpenError)
-					RKIT_RETURN_OK;
+				RKIT_CHECK(sysDriver->OpenFileReadAbs(outStream, osPath, true));
 			}
 
-			return openResult;
+			RKIT_RETURN_OK;
 		}
 		else
 		{
@@ -398,7 +397,7 @@ namespace anox { namespace utils
 				osPath = m_exeDir;
 				break;
 			default:
-				return rkit::ResultCode::kNotYetImplemented;
+				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 			}
 
 			{
@@ -408,11 +407,8 @@ namespace anox { namespace utils
 				RKIT_CHECK(osPath.Append(relPath));
 			}
 
-			rkit::Result openResult = sysDriver->OpenFileReadAbs(outStream, osPath);
-			if (rkit::utils::GetResultCode(openResult) == rkit::ResultCode::kFileOpenError)
-				RKIT_RETURN_OK;
+			RKIT_CHECK(sysDriver->OpenFileReadAbs(outStream, osPath, true));
 		}
-
 
 		RKIT_RETURN_OK;
 	}
@@ -446,7 +442,8 @@ namespace anox { namespace utils
 
 				bool directoryExists = false;
 				rkit::FileAttributes dirAttribs;
-				RKIT_CHECK(sysDriver->GetFileAttributesAbs(dirPath, directoryExists, dirAttribs));
+				bool succeeded_IGNORE = false;
+				RKIT_CHECK(sysDriver->GetFileAttributesAbs(succeeded_IGNORE, directoryExists, dirAttribs, dirPath, false));
 
 				// See if this actually exists, otherwise blank it out so future scans ignore it
 				if (!directoryExists || !dirAttribs.m_isDirectory)
@@ -456,7 +453,7 @@ namespace anox { namespace utils
 				}
 
 				rkit::UniquePtr<rkit::IDirectoryScan> dirScan;
-				RKIT_CHECK(sysDriver->OpenDirectoryScanAbs(directories[srcIndex], dirScan));
+				RKIT_CHECK(sysDriver->OpenDirectoryScanAbs(dirScan, directories[srcIndex], false));
 
 				for (;;)
 				{
@@ -487,7 +484,7 @@ namespace anox { namespace utils
 
 						bool altExists = false;
 						rkit::FileAttributes altAttribs;
-						RKIT_CHECK(sysDriver->GetFileAttributesAbs(altPath, altExists, altAttribs));
+						RKIT_CHECK(sysDriver->GetFileAttributesAbs(succeeded_IGNORE, altExists, altAttribs, altPath, false));
 
 						if (altExists && altAttribs.m_isDirectory == isDirectory)
 						{
@@ -685,7 +682,7 @@ namespace anox { namespace utils
 		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
 
 		rkit::UniquePtr<rkit::IDirectoryScan> dirScan;
-		RKIT_CHECK(sysDriver->OpenDirectoryScanAbs(m_sourceDir, dirScan));
+		RKIT_CHECK(sysDriver->OpenDirectoryScanAbs(dirScan, m_sourceDir, false));
 
 		if (dirScan.Get())
 		{
@@ -704,13 +701,15 @@ namespace anox { namespace utils
 					RKIT_CHECK(archivePath.Append(scanItem.m_fileName));
 
 					rkit::UniquePtr<rkit::ISeekableReadStream> archiveStream;
-					rkit::Result openResult = sysDriver->OpenFileReadAbs(archiveStream, archivePath);
 
-					if (!rkit::utils::ResultIsOK(openResult))
-					{
-						rkit::log::ErrorFmt(u8"Failed to open archive");
-						return openResult;
-					}
+					RKIT_TRY_CATCH_RETHROW(sysDriver->OpenFileReadAbs(archiveStream, archivePath, false),
+						rkit::CatchContext(
+							[]
+							{
+								rkit::log::ErrorFmt(u8"Failed to open archive");
+							}
+						)
+					);
 
 					rkit::CIPath fileNameCIPath;
 					RKIT_CHECK(fileNameCIPath.ConvertFrom(scanItem.m_fileName));

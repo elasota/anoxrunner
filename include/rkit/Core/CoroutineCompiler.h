@@ -164,13 +164,14 @@ namespace rkit { namespace coro { namespace compiler
 		return { nullptr };
 	}
 
+#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_ENUM || RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_CLASS
 	inline CodePtr FaultWithResult(Context *coroContext, const Result &result)
 	{
 		coroContext->m_disposition = Disposition::kFailResult;
 		coroContext->m_result = result;
-
 		return { nullptr };
 	}
+#endif
 
 #define CORO_CONCAT_2(a, b) a ## b
 #define CORO_CONCAT_1(a, b) CORO_CONCAT_2(a, b)
@@ -930,12 +931,20 @@ namespace rkit { namespace coro
 		typedef CoroTerminator Resolution_t;\
 	};
 
+#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_ENUM || RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_CLASS
+
 #define CORO_CHECK(expr)	\
 			do {\
 				::rkit::Result RKIT_PP_CONCAT(exprResult_, __LINE__) = (expr);\
 				if (!::rkit::utils::ResultIsOK(RKIT_PP_CONCAT(exprResult_, __LINE__)))\
 					return ::rkit::coro::compiler::FaultWithResult(CORO_INTERNAL_coroContext, RKIT_PP_CONCAT(exprResult_, __LINE__));\
 			} while (false)
+
+#elif RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
+
+#define CORO_CHECK(expr) (static_cast<void>(expr))
+
+#endif
 
 #define CORO_AWAIT(expr)	\
 			::rkit::RCPtr<::rkit::FutureContainerBase> CORO_CONCAT_LINE(futureContainer) = (expr).GetFutureContainer(); \
@@ -1122,7 +1131,7 @@ namespace rkit { namespace coro
 				if (!CORO_CONCAT_LINE(CORO_INTERNAL_newStackFrame))\
 				{\
 					CORO_INTERNAL_coroContext->m_disposition = ::rkit::coro::Disposition::kFailResult;\
-					CORO_INTERNAL_coroContext->m_result = ::rkit::ResultCode::kCoroStackOverflow;\
+					CORO_INTERNAL_coroContext->m_result = ::rkit::utils::PackResult(::rkit::ResultCode::kCoroStackOverflow);\
 				}\
 				else\
 				{\

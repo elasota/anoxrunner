@@ -82,7 +82,7 @@ namespace rkit { namespace utils
 		static Result VFGetArrayElement(const void *jsonValue, size_t index, JsonValue &outJsonValue);
 		static Result VFIterateObject(const void *jsonValue, void *userdata, JsonObjectIteratorCallback_t callback);
 		static Result VFObjectHasElement(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, bool &outHasElement);
-		static Result VFGetObjectElement(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, JsonValue &outJsonValue);
+		static Result VFTryGetObjectElement(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, bool &outExists, JsonValue &outJsonValue);
 
 		PrivAllocator m_allocator;
 		rapidjson::MemoryPoolAllocator<PrivAllocator> m_poolAllocator;
@@ -368,7 +368,7 @@ namespace rkit { namespace utils
 		RKIT_RETURN_OK;
 	}
 
-	Result JsonDocument::VFGetObjectElement(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, JsonValue &outJsonValue)
+	Result JsonDocument::VFTryGetObjectElement(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, bool &outExists, JsonValue &outJsonValue)
 	{
 		typedef Document_t::ConstMemberIterator ConstMemberIterator_t;
 		const GenericValue_t *gValue = static_cast<const GenericValue_t *>(jsonValue);
@@ -378,8 +378,12 @@ namespace rkit { namespace utils
 
 		Document_t::ConstMemberIterator it = gValue->FindMember(GenericValue_t(keyChars, static_cast<rapidjson::SizeType>(keyLength)));
 		if (it == gValue->MemberEnd())
-			RKIT_THROW(ResultCode::kKeyNotFound);
+		{
+			outExists = false;
+			RKIT_RETURN_OK;
+		}
 
+		outExists = true;
 		GenericValueToJsonValue(it->value, outJsonValue);
 
 		RKIT_RETURN_OK;
@@ -394,7 +398,7 @@ namespace rkit { namespace utils
 		JsonDocument::VFGetArrayElement,
 		JsonDocument::VFIterateObject,
 		JsonDocument::VFObjectHasElement,
-		JsonDocument::VFGetObjectElement,
+		JsonDocument::VFTryGetObjectElement,
 	};
 } } // rkit::utils
 

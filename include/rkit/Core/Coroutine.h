@@ -60,7 +60,7 @@ namespace rkit { namespace coro
 		void *m_userdata = nullptr;
 		PushStackCallback_t m_allocStack = nullptr;
 		FreeStackCallback_t m_freeStack = nullptr;
-		ResultCode m_result = ResultCode::kOK;
+		PackedResultAndExtCode m_result = utils::PackResult(ResultCode::kOK);
 	};
 
 	struct FrameMetadataBase

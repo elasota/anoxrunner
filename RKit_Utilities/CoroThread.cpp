@@ -86,19 +86,39 @@ namespace rkit { namespace utils
 	{
 		for (;;)
 		{
-			while (m_context.m_disposition == coro::Disposition::kResume)
+#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
+			try
+#endif
 			{
-				if (m_context.m_frame == nullptr)
-					RKIT_RETURN_OK;
-
-				coro::StackFrameBase *frame = m_context.m_frame;
-				coro::Code_t ip = frame->m_ip;
-
-				while (ip != nullptr)
+				while (m_context.m_disposition == coro::Disposition::kResume)
 				{
-					ip = ip(&m_context, frame).m_code;
+					if (m_context.m_frame == nullptr)
+						RKIT_RETURN_OK;
+
+					coro::StackFrameBase *frame = m_context.m_frame;
+					coro::Code_t ip = frame->m_ip;
+
+					while (ip != nullptr)
+					{
+						ip = ip(&m_context, frame).m_code;
+					}
 				}
 			}
+
+#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
+			catch (ResultException rex)
+			{
+				m_context.m_disposition = coro::Disposition::kFailResult;
+				m_context.m_result = rex.GetPackedResult();
+				throw;
+			}
+			catch (...)
+			{
+				m_context.m_disposition = coro::Disposition::kFailResult;
+				m_context.m_result = utils::PackResult(ResultCode::kCppException);
+				throw;
+			}
+#endif
 
 			switch (m_context.m_disposition)
 			{
@@ -130,14 +150,14 @@ namespace rkit { namespace utils
 		case FutureState::kFailed:
 		case FutureState::kAborted:
 			m_context.m_disposition = coro::Disposition::kFailResult;
-			m_context.m_result = ResultCode::kOperationFailed;
+			m_context.m_result = utils::PackResult(ResultCode::kOperationFailed);
 			m_context.m_awaitFuture.Reset();
 			return true;
 		case FutureState::kWaiting:
 			return false;
 		default:
 			m_context.m_disposition = coro::Disposition::kFailResult;
-			m_context.m_result = ResultCode::kInternalError;
+			m_context.m_result = utils::PackResult(ResultCode::kInternalError);
 			m_context.m_awaitFuture.Reset();
 			return true;
 		};

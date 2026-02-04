@@ -59,7 +59,7 @@ namespace anox
 			case 1:
 				return LoadContents(state, resource);
 			default:
-				return rkit::ResultCode::kInternalError;
+				RKIT_THROW(rkit::ResultCode::kInternalError);
 			}
 		}
 	};

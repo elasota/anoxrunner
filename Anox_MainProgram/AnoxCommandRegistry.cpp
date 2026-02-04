@@ -130,7 +130,7 @@ namespace anox
 		switch (cvar.m_varType)
 		{
 		default:
-			return rkit::ResultCode::kInternalError;
+			RKIT_THROW(rkit::ResultCode::kInternalError);
 		}
 	}
 

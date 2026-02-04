@@ -81,14 +81,17 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 			if (i == args.Count())
 			{
 				rkit::log::Error(u8"Expected path after -idir");
-				return rkit::ResultCode::kInvalidParameter;
+				RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 			}
 
-			if (!rkit::utils::ResultIsOK(buildIntermediateDirectory.SetFromUTF8(args[i])))
-			{
-				rkit::log::Error(u8"-idir path was invalid");
-				return rkit::ResultCode::kInvalidParameter;
-			}
+			RKIT_TRY_CATCH_RETHROW(buildIntermediateDirectory.SetFromUTF8(args[i]),
+				rkit::CatchContext(
+					[]
+					{
+						rkit::log::Error(u8"-idir path was invalid");
+					}
+				)
+			);
 		}
 		else if (arg == u8"-ddir")
 		{
@@ -97,14 +100,17 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 			if (i == args.Count())
 			{
 				rkit::log::Error(u8"Expected path after -ddir");
-				return rkit::ResultCode::kInvalidParameter;
+				RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 			}
 
-			if (!rkit::utils::ResultIsOK(dataDirectory.SetFromUTF8(args[i])))
-			{
-				rkit::log::Error(u8"-ddir path was invalid");
-				return rkit::ResultCode::kInvalidParameter;
-			}
+			RKIT_TRY_CATCH_RETHROW(dataDirectory.SetFromUTF8(args[i]),
+				rkit::CatchContext(
+					[]
+					{
+						rkit::log::Error(u8"-ddir path was invalid");
+					}
+				)
+			);
 		}
 		else if (arg == u8"-dsrcdir")
 		{
@@ -113,14 +119,17 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 			if (i == args.Count())
 			{
 				rkit::log::Error(u8"Expected path after -ddir");
-				return rkit::ResultCode::kInvalidParameter;
+				RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 			}
 
-			if (!rkit::utils::ResultIsOK(dataSourceDirectory.SetFromUTF8(args[i])))
-			{
-				rkit::log::Error(u8"-ddir path was invalid");
-				return rkit::ResultCode::kInvalidParameter;
-			}
+			RKIT_TRY_CATCH_RETHROW(dataSourceDirectory.SetFromUTF8(args[i]),
+				rkit::CatchContext(
+					[]
+					{
+						rkit::log::Error(u8"-dsrcdir path was invalid");
+					}
+				)
+			);
 		}
 		else if (arg == u8"-sdir")
 		{
@@ -129,14 +138,17 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 			if (i == args.Count())
 			{
 				rkit::log::Error(u8"Expected path after -sdir");
-				return rkit::ResultCode::kInvalidParameter;
+				RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 			}
 
-			if (!rkit::utils::ResultIsOK(buildSourceDirectory.SetFromUTF8(args[i])))
-			{
-				rkit::log::Error(u8"-sdir path was invalid");
-				return rkit::ResultCode::kInvalidParameter;
-			}
+			RKIT_TRY_CATCH_RETHROW(buildSourceDirectory.SetFromUTF8(args[i]),
+				rkit::CatchContext(
+					[]
+					{
+						rkit::log::Error(u8"-sdir path was invalid");
+					}
+				)
+			);
 		}
 		else if (arg == u8"-build")
 		{
@@ -145,7 +157,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 			if (i == args.Count())
 			{
 				rkit::log::Error(u8"Expected build target after -build");
-				return rkit::ResultCode::kInvalidParameter;
+				RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 			}
 
 			buildTarget = args[i];
@@ -161,7 +173,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 			if (i == args.Count())
 			{
 				rkit::log::Error(u8"Expected build target after -build");
-				return rkit::ResultCode::kInvalidParameter;
+				RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 			}
 
 			// FIXME: Use CoreLib or something instead
@@ -169,7 +181,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 			if (numThreadsArg < 1 || numThreadsArg > 512)
 			{
 				rkit::log::Error(u8"Invalid thread count for -threads");
-				return rkit::ResultCode::kInvalidParameter;
+				RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 			}
 
 			numThreads = static_cast<uint16_t>(numThreadsArg);
@@ -177,7 +189,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 		else
 		{
 			rkit::log::ErrorFmt(u8"Unknown argument {}", arg.GetChars());
-			return rkit::ResultCode::kInvalidParameter;
+			RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 		}
 #endif
 	}
@@ -196,7 +208,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 		if (!utilsModule)
 		{
 			rkit::log::Error(u8"Couldn't load utilities module");
-			return rkit::ResultCode::kModuleLoadFailed;
+			RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 		}
 
 		IUtilitiesDriver *utilsDriver = static_cast<IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, u8"Utilities"));

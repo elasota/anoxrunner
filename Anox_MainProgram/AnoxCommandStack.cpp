@@ -162,7 +162,7 @@ namespace anox
 		if (linesAvailable < numSlices)
 		{
 			rkit::log::Error(u8"Not enough command stack space available");
-			return rkit::ResultCode::kOperationFailed;
+			RKIT_THROW(rkit::ResultCode::kOperationFailed);
 		}
 
 		size_t sizeRequired = 0;
@@ -173,7 +173,7 @@ namespace anox
 			if (sizeAvailable < 1)
 			{
 				rkit::log::Error(u8"Not enough command stack space available");
-				return rkit::ResultCode::kOperationFailed;
+				RKIT_THROW(rkit::ResultCode::kOperationFailed);
 			}
 
 			sizeAvailable -= 1;
@@ -181,7 +181,7 @@ namespace anox
 			if (sizeAvailable < slice.Length())
 			{
 				rkit::log::Error(u8"Not enough command stack space available");
-				return rkit::ResultCode::kOperationFailed;
+				RKIT_THROW(rkit::ResultCode::kOperationFailed);
 			}
 
 			sizeRequired += 1 + slice.Length();

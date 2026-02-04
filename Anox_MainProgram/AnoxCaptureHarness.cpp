@@ -57,7 +57,7 @@ namespace anox
 
 	rkit::Result AnoxRealTimeCaptureHarness::GetSessionState(const IConfigurationState *&outConfigStatePtr)
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
 
 	rkit::Result AnoxRealTimeCaptureHarness::GetContentIDKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::data::ContentID &cid)

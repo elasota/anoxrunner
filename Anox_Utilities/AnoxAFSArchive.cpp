@@ -149,17 +149,17 @@ namespace anox
 		rkit::Result Archive::DirectoryTreeBuilder::InsertFile(Directory &dir, const FileInfo &file, const rkit::AsciiStringSliceView &nameSlice)
 		{
 			if (nameSlice.Length() == 0)
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 
 			rkit::HashValue_t nameHash = rkit::Hasher<rkit::ByteStringSliceView>::ComputeHash(0, nameSlice.RemoveEncoding());
 
 			if (dir.m_subDirectoriesByName.FindPrehashed(nameHash, nameSlice.RemoveEncoding()) != dir.m_subDirectoriesByName.end())
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 
 			rkit::HashMap<rkit::ByteStringSliceView, size_t>::ConstIterator_t it = dir.m_filesByName.FindPrehashed(nameHash, nameSlice.RemoveEncoding());
 
 			if (it != dir.m_filesByName.end())
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 
 			// New file
 			size_t fileIndex = dir.m_files.Count();
@@ -174,12 +174,12 @@ namespace anox
 		rkit::Result Archive::DirectoryTreeBuilder::InsertDirectory(Directory &dir, Directory *&outDirectory, const rkit::AsciiStringSliceView &fullDirPath, const rkit::AsciiStringSliceView &nameSlice)
 		{
 			if (nameSlice.Length() == 0)
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 
 			rkit::HashValue_t nameHash = rkit::Hasher<rkit::ByteStringSliceView>::ComputeHash(0, nameSlice.RemoveEncoding());
 
 			if (dir.m_filesByName.FindPrehashed(nameHash, nameSlice.RemoveEncoding()) != dir.m_filesByName.end())
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 
 			rkit::HashMap<rkit::ByteStringSliceView, size_t>::ConstIterator_t it = dir.m_subDirectoriesByName.FindPrehashed(nameHash, nameSlice.RemoveEncoding());
 
@@ -223,7 +223,7 @@ namespace anox
 			if (header.m_magic.Get() != anox::afs::HeaderData::kAFSMagic || header.m_version.Get() != anox::afs::HeaderData::kAFSVersion)
 			{
 				rkit::log::Error(u8"AFS file header was invalid");
-				return rkit::ResultCode::kInvalidParameter;
+				RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 			}
 
 			uint32_t catalogSize = header.m_catalogSize.Get();
@@ -231,7 +231,7 @@ namespace anox
 			if (catalogSize % sizeof(afs::FileData) != 0)
 			{
 				rkit::log::Error(u8"AFS catalog size was invalid");
-				return rkit::ResultCode::kInvalidParameter;
+				RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 			}
 
 			uint32_t numFiles = catalogSize / sizeof(afs::FileData);
@@ -270,7 +270,7 @@ namespace anox
 				if (!rkit::CharacterEncodingValidator<rkit::CharacterEncoding::kASCII>::ValidateSpan(rkit::Span<const char>(charsWriteLoc, filePathLen)))
 				{
 					rkit::log::Error(u8"Archive file name had invalid ASCII characters");
-					return rkit::ResultCode::kInvalidUnicode;
+					RKIT_THROW(rkit::ResultCode::kInvalidUnicode);
 				}
 
 				fileInfo.m_fullPath = rkit::AsciiStringView(charsWriteLoc, filePathLen);
@@ -285,10 +285,10 @@ namespace anox
 				fileInfo.m_uncompressedSize = fileData.m_uncompressedSize.Get();
 
 				if (fileInfo.m_filePosition > archiveSize)
-					return rkit::ResultCode::kMalformedFile;
+					RKIT_THROW(rkit::ResultCode::kMalformedFile);
 
 				if (archiveSize - fileInfo.m_filePosition < fileInfo.m_compressedSize)
-					return rkit::ResultCode::kMalformedFile;
+					RKIT_THROW(rkit::ResultCode::kMalformedFile);
 
 				filePathWritePos += filePathLen + 1;
 			}
@@ -451,13 +451,13 @@ namespace anox
 		rkit::Result Archive::CheckSlice(const rkit::Span<const char> &sliceName)
 		{
 			if (sliceName.Count() == 0)
-				return rkit::ResultCode::kMalformedFile;
+				RKIT_THROW(rkit::ResultCode::kMalformedFile);
 
 			char firstChar = sliceName[0];
 			char lastChar = sliceName[sliceName.Count() - 1];
 
 			if (firstChar == ' ' || lastChar == ' ' || lastChar == '.')
-				return rkit::ResultCode::kMalformedFile;
+				RKIT_THROW(rkit::ResultCode::kMalformedFile);
 
 			const char *bannedNames[] =
 			{
@@ -489,14 +489,14 @@ namespace anox
 			{
 				size_t bannedNameLength = strlen(bannedName);
 				if (sliceName.Count() == bannedNameLength && !memcmp(bannedName, sliceName.Ptr(), bannedNameLength))
-					return rkit::ResultCode::kMalformedFile;
+					RKIT_THROW(rkit::ResultCode::kMalformedFile);
 			}
 
 			for (size_t i = 0; i < sliceName.Count(); i++)
 			{
 				char c = sliceName[i];
 				if (c == '.' && i > 0 && sliceName[i - 1] == '.')
-					return rkit::ResultCode::kMalformedFile;
+					RKIT_THROW(rkit::ResultCode::kMalformedFile);
 
 				bool isValidChar = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
 
@@ -515,7 +515,7 @@ namespace anox
 				}
 
 				if (!isValidChar)
-					return rkit::ResultCode::kMalformedFile;
+					RKIT_THROW(rkit::ResultCode::kMalformedFile);
 			}
 
 			RKIT_RETURN_OK;

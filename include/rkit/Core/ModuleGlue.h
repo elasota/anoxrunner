@@ -32,7 +32,7 @@
 #endif
 
 
-#if RKIT_IS_DEBUG && RKIT_USE_CLASS_RESULT
+#if RKIT_IS_DEBUG != 0 && (RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_CLASS)
 
 #define RKIT_IMPLEMENT_RESULT_FIRST_CHANCE_RESULT_FAILURE	\
 	void rkit::Result::FirstChanceResultFailure() const\

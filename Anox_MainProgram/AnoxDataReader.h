@@ -81,7 +81,7 @@ namespace anox { namespace priv {
 	rkit::Result ReadCheckEnumHelper<TEnum, TIntegral, true>::ReadCheckEnum(TEnum &outValue, TIntegral num)
 	{
 		if (num >= static_cast<uintmax_t>(TEnum::kCount))
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		outValue = static_cast<TEnum>(num);
 		RKIT_RETURN_OK;
@@ -105,7 +105,7 @@ namespace anox { namespace priv {
 		// Ensure no extraneous flags
 		if (sizeof(TIntegral) * 8 < static_cast<size_t>(TEnum::kCount)
 			&& (num >> static_cast<int>(TEnum::kCount)) != 0)
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		outValue = result;
 		RKIT_RETURN_OK;

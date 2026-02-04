@@ -135,7 +135,7 @@ namespace anox
 
 		if (materialHeader.m_magic.Get() != data::MaterialHeader::kExpectedMagic
 			|| materialHeader.m_version.Get() != data::MaterialHeader::kExpectedVersion)
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		rkit::Vector<data::MaterialBitmapDef> bitmapDefs;
 		rkit::Vector<data::MaterialFrameDef> frameDefs;
@@ -175,7 +175,7 @@ namespace anox
 
 	rkit::Result AnoxMaterialProcessJobRunner::Run()
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
 
 	rkit::Result AnoxMaterialResourceLoaderBase::Create(rkit::RCPtr<AnoxMaterialResourceLoaderBase> &outLoader, data::MaterialResourceType resType)

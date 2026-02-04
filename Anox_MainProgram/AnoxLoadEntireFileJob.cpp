@@ -33,10 +33,10 @@ namespace anox
 
 		void SetSelf(rkit::UniquePtr<AnoxFileResourceIOCompleter> &&self);
 
-		static void CompleteCallback(void *userdata, const rkit::Result &result, size_t bytesRead);
+		static void CompleteCallback(void *userdata, rkit::PackedResultAndExtCode result, size_t bytesRead);
 
 	private:
-		void Complete(const rkit::Result &result, size_t bytesRead);
+		void Complete(rkit::PackedResultAndExtCode result, size_t bytesRead);
 
 		rkit::RCPtr<rkit::JobSignaler> m_signaller;
 		rkit::UniquePtr<AnoxFileResourceIOCompleter> m_self;
@@ -57,7 +57,7 @@ namespace anox
 		const rkit::FilePos_t fileSize = m_openFileFuture.GetResult().m_initialSize;
 
 		if (fileSize > std::numeric_limits<size_t>::max())
-			return rkit::ResultCode::kOutOfMemory;
+			RKIT_THROW(rkit::ResultCode::kOutOfMemory);
 
 		const size_t size = static_cast<size_t>(fileSize);
 
@@ -95,12 +95,12 @@ namespace anox
 		m_self = std::move(self);
 	}
 
-	void AnoxFileResourceIOCompleter::CompleteCallback(void *userdata, const rkit::Result &result, size_t bytesRead)
+	void AnoxFileResourceIOCompleter::CompleteCallback(void *userdata, rkit::PackedResultAndExtCode result, size_t bytesRead)
 	{
 		static_cast<AnoxFileResourceIOCompleter *>(userdata)->Complete(result, bytesRead);
 	}
 
-	void AnoxFileResourceIOCompleter::Complete(const rkit::Result &result, size_t bytesRead)
+	void AnoxFileResourceIOCompleter::Complete(rkit::PackedResultAndExtCode result, size_t bytesRead)
 	{
 		if (rkit::utils::ResultIsOK(result) && bytesRead != m_expectedBytes)
 			m_signaller->SignalDone(rkit::ResultCode::kIOReadError);

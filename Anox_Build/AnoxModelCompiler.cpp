@@ -558,7 +558,7 @@ namespace anox { namespace buildsystem
 				RKIT_RETURN_OK;
 			}
 
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		RKIT_RETURN_OK;
@@ -588,7 +588,7 @@ namespace anox { namespace buildsystem
 
 		rkit::ConstSpan<char> line;
 		if (!ParseOneLine(line, fileSpan) || !rkit::CompareSpansEqual(line, rkit::AsciiStringView("MDA1").ToSpan()))
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		rkit::Optional<rkit::ConstSpan<char>> baseModel;
 
@@ -672,7 +672,7 @@ namespace anox { namespace buildsystem
 		if (!ParseOneLine(line, fileSpan) || TokenIs(line, "MDA1"))
 		{
 			rkit::log::Error(u8"Missing MDA header");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		rkit::Vector<MDABase64Chunk> base64Chunks;
@@ -685,7 +685,7 @@ namespace anox { namespace buildsystem
 				if (line.Count() != 32)
 				{
 					rkit::log::Error(u8"Malformed MDA chunk");
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
 				uint32_t dwords[3] = { 0, 0, 0 };
@@ -700,7 +700,7 @@ namespace anox { namespace buildsystem
 					if (line[startPos] != ':')
 					{
 						rkit::log::Error(u8"Malformed MDA chunk");
-						return rkit::ResultCode::kDataError;
+						RKIT_THROW(rkit::ResultCode::kDataError);
 					}
 
 					for (size_t nibbleIndex = 0; nibbleIndex < 8; nibbleIndex++)
@@ -717,7 +717,7 @@ namespace anox { namespace buildsystem
 						else
 						{
 							rkit::log::Error(u8"Malformed MDA chunk");
-							return rkit::ResultCode::kDataError;
+							RKIT_THROW(rkit::ResultCode::kDataError);
 						}
 
 						dwords[dwordIndex] = dwords[dwordIndex] * 0x10u + nibble;
@@ -737,7 +737,7 @@ namespace anox { namespace buildsystem
 				if (base64Chunks.Count() == 0)
 				{
 					rkit::log::Error(u8"MDA base64 data appeared after header");
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
 				RKIT_CHECK(base64Chunks[base64Chunks.Count() - 1].m_base64Chars.Append(line.SubSpan(1)));
@@ -775,7 +775,7 @@ namespace anox { namespace buildsystem
 						)
 					{
 						rkit::log::Error(u8"Malformed headtri directive");
-						return rkit::ResultCode::kDataError;
+						RKIT_THROW(rkit::ResultCode::kDataError);
 					}
 
 					mdaData.m_headTri = triVerts;
@@ -791,7 +791,7 @@ namespace anox { namespace buildsystem
 						if (token.Count() != 4)
 						{
 							rkit::log::Error(u8"Malformed profile directive");
-							return rkit::ResultCode::kDataError;
+							RKIT_THROW(rkit::ResultCode::kDataError);
 						}
 
 						profileFourCC = rkit::utils::ComputeFourCC(token[0], token[1], token[2], token[3]);
@@ -865,7 +865,7 @@ namespace anox { namespace buildsystem
 											else
 											{
 												rkit::log::Error(u8"Unknown alphafunc");
-												return rkit::ResultCode::kDataError;
+												RKIT_THROW(rkit::ResultCode::kDataError);
 											}
 										}
 										else if (TokenIs(token, "depthwrite"))
@@ -876,7 +876,7 @@ namespace anox { namespace buildsystem
 											if (!utils->ParseUInt32(rkit::AsciiStringSliceView(token).RemoveEncoding(), 10, depthWriteFlag))
 											{
 												rkit::log::Error(u8"Invalid depthwrite value");
-												return rkit::ResultCode::kDataError;
+												RKIT_THROW(rkit::ResultCode::kDataError);
 											}
 
 											pass.m_depthWrite = (depthWriteFlag != 0);
@@ -890,7 +890,7 @@ namespace anox { namespace buildsystem
 											else
 											{
 												rkit::log::Error(u8"Unknown uvgen type");
-												return rkit::ResultCode::kDataError;
+												RKIT_THROW(rkit::ResultCode::kDataError);
 											}
 										}
 										else if (TokenIs(token, "uvmod"))
@@ -911,7 +911,7 @@ namespace anox { namespace buildsystem
 													if (!utils->ParseDouble(tokenStr.ToByteView(), uvScroll[axis]))
 													{
 														rkit::log::Error(u8"Invalid scroll");
-														return rkit::ResultCode::kDataError;
+														RKIT_THROW(rkit::ResultCode::kDataError);
 													}
 												}
 
@@ -921,7 +921,7 @@ namespace anox { namespace buildsystem
 											else
 											{
 												rkit::log::Error(u8"Unknown uvmode type");
-												return rkit::ResultCode::kDataError;
+												RKIT_THROW(rkit::ResultCode::kDataError);
 											}
 										}
 										else if (TokenIs(token, "blendmode"))
@@ -937,7 +937,7 @@ namespace anox { namespace buildsystem
 											else
 											{
 												rkit::log::Error(u8"Unknown blendmode");
-												return rkit::ResultCode::kDataError;
+												RKIT_THROW(rkit::ResultCode::kDataError);
 											}
 										}
 										else if (TokenIs(token, "depthfunc"))
@@ -951,7 +951,7 @@ namespace anox { namespace buildsystem
 											else
 											{
 												rkit::log::Error(u8"Unknown depthfunc");
-												return rkit::ResultCode::kDataError;
+												RKIT_THROW(rkit::ResultCode::kDataError);
 											}
 										}
 										else if (TokenIs(token, "cull"))
@@ -967,7 +967,7 @@ namespace anox { namespace buildsystem
 											else
 											{
 												rkit::log::Error(u8"Unknown cull type");
-												return rkit::ResultCode::kDataError;
+												RKIT_THROW(rkit::ResultCode::kDataError);
 											}
 										}
 										else if (TokenIs(token, "rgbgen"))
@@ -981,20 +981,20 @@ namespace anox { namespace buildsystem
 											else
 											{
 												rkit::log::Error(u8"Unknown rgbgen type");
-												return rkit::ResultCode::kDataError;
+												RKIT_THROW(rkit::ResultCode::kDataError);
 											}
 										}
 										else
 										{
 											rkit::log::Error(u8"Unknown directive in pass");
-											return rkit::ResultCode::kDataError;
+											RKIT_THROW(rkit::ResultCode::kDataError);
 										}
 									}
 
 									if (!haveMap)
 									{
 										rkit::log::Error(u8"Pass missing map");
-										return rkit::ResultCode::kDataError;
+										RKIT_THROW(rkit::ResultCode::kDataError);
 									}
 
 									RKIT_CHECK(skin.m_passes.Append(std::move(pass)));
@@ -1010,13 +1010,13 @@ namespace anox { namespace buildsystem
 									else
 									{
 										rkit::log::Error(u8"Unknown sort type");
-										return rkit::ResultCode::kDataError;
+										RKIT_THROW(rkit::ResultCode::kDataError);
 									}
 								}
 								else
 								{
 									rkit::log::Error(u8"Unknown directive in skin");
-									return rkit::ResultCode::kDataError;
+									RKIT_THROW(rkit::ResultCode::kDataError);
 								}
 							}
 
@@ -1029,7 +1029,7 @@ namespace anox { namespace buildsystem
 							if (token.Count() < 2 || token[0] != '\"' || token[token.Count() - 1] != '\"')
 							{
 								rkit::log::Error(u8"Invalid condition");
-								return rkit::ResultCode::kDataError;
+								RKIT_THROW(rkit::ResultCode::kDataError);
 							}
 
 							RKIT_CHECK(profile.m_evaluate.Set(token.SubSpan(1, token.Count() - 2)));
@@ -1037,7 +1037,7 @@ namespace anox { namespace buildsystem
 						else
 						{
 							rkit::log::Error(u8"Unknown directive in profile");
-							return rkit::ResultCode::kDataError;
+							RKIT_THROW(rkit::ResultCode::kDataError);
 						}
 					}
 
@@ -1047,7 +1047,7 @@ namespace anox { namespace buildsystem
 				else
 				{
 					rkit::log::Error(u8"Unknown directive");
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 			}
 		}
@@ -1059,7 +1059,7 @@ namespace anox { namespace buildsystem
 				|| base64Chunk.m_size > base64Chunk.m_paddedSize)
 			{
 				rkit::log::Error(u8"Malformed base64 chunk");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
 			rkit::Vector<uint8_t> decoded;
@@ -1092,7 +1092,7 @@ namespace anox { namespace buildsystem
 					else
 					{
 						rkit::log::Error(u8"Malformed base64 chunk");
-						return rkit::ResultCode::kDataError;
+						RKIT_THROW(rkit::ResultCode::kDataError);
 					}
 				}
 
@@ -1116,7 +1116,7 @@ namespace anox { namespace buildsystem
 			else
 			{
 				rkit::log::Error(u8"Unknown MDA chunk type");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 		}
 
@@ -1136,7 +1136,7 @@ namespace anox { namespace buildsystem
 		if (!ParseOneLine(outLine, fileSpan))
 		{
 			rkit::log::Error(u8"Unexpected end of file");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		RKIT_RETURN_OK;
@@ -1147,7 +1147,7 @@ namespace anox { namespace buildsystem
 		if (!TokenIs(token, candidate))
 		{
 			rkit::log::ErrorFmt(u8"Expected token '{}'", candidate.ToUTF8());
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		RKIT_RETURN_OK;
@@ -1216,7 +1216,7 @@ namespace anox { namespace buildsystem
 		if (!ParseToken(outToken, line))
 		{
 			rkit::log::ErrorFmt(u8"Expected token");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		RKIT_RETURN_OK;
@@ -1291,7 +1291,7 @@ namespace anox { namespace buildsystem
 		}
 
 		if (token.Count() == 0)
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		rkit::StringConstructionBuffer strBuf;
 		RKIT_CHECK(strBuf.Allocate(token.Count()));
@@ -1310,7 +1310,7 @@ namespace anox { namespace buildsystem
 		rkit::String str(std::move(strBuf));
 
 		if (rkit::CIPath::Validate(str) == rkit::PathValidationResult::kInvalid)
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		return path.Set(str);
 	}
@@ -1356,12 +1356,12 @@ namespace anox { namespace buildsystem
 		RKIT_CHECK(inputFile->ReadOneBinary(header));
 
 		if (header.m_version.Get() != CTCHeader::kExpectedVersion || header.m_magic.Get() != CTCHeader::kExpectedMagic)
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		const uint32_t numTextures = header.m_numTextures.Get();
 
 		if (numTextures == 0)
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		RKIT_CHECK(inputFile->SeekStart(header.m_texturesPos.Get()));
 
@@ -1431,7 +1431,7 @@ namespace anox { namespace buildsystem
 			{
 				RKIT_CHECK(inputFile->ReadOneBinary(vertMorph.m_pointIndex));
 
-				return rkit::ResultCode::kNotYetImplemented;
+				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 			}
 			for (VertMorph &vertMorph : morphs[mi].m_vertMorphs)
 			{
@@ -1484,7 +1484,7 @@ namespace anox { namespace buildsystem
 				if (pointIndex >= numPoints)
 				{
 					rkit::log::Error(u8"Vert morph vert index was out of range");
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
 				pointHasMorph.Set(pointIndex, true);
@@ -1517,7 +1517,7 @@ namespace anox { namespace buildsystem
 			{
 				const uint32_t numTrisForTexture = textureTriListSizes[textureIndex].Get();
 				if (numTrisForTexture > numTotalTris || (numTotalTris - firstTri) < numTrisForTexture)
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 
 				const rkit::ConstSpan<CTCTriVerts> textureTriVerts = triVerts.ToSpan().SubSpan(firstTri, numTrisForTexture);
 				const rkit::ConstSpan<CTCTriTexCoords> textureTriTexCoords = triTexCoords.ToSpan().SubSpan(firstTri, numTrisForTexture);
@@ -1557,7 +1557,7 @@ namespace anox { namespace buildsystem
 				if (availableFrames < numFramesForAnim)
 				{
 					rkit::log::Error(u8"Too many frames in animations");
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
 				data::MDAAnimation outAnim = {};
@@ -1598,7 +1598,7 @@ namespace anox { namespace buildsystem
 			if (parentIndexPlusOne > boneIndex)
 			{
 				rkit::log::Error(u8"Invalid bone parent index");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
 			outBone.m_parentIndexPlusOne = static_cast<uint16_t>(inBone.m_parentIndexPlusOne.Get());
@@ -1641,7 +1641,7 @@ namespace anox { namespace buildsystem
 
 			typedef uint16_t StoredMaterialIndex_t;
 			if (materialIndex > std::numeric_limits<StoredMaterialIndex_t>::max())
-				return rkit::ResultCode::kIntegerOverflow;
+				RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
 
 			skinPass.m_materialIndex = static_cast<StoredMaterialIndex_t>(materialIndex);
 
@@ -1651,7 +1651,7 @@ namespace anox { namespace buildsystem
 
 		if (numMorphedPoints > 0)
 		{
-			return rkit::ResultCode::kNotYetImplemented;
+			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 		}
 
 		RKIT_CHECK(outPoints.Resize(numPoints));
@@ -1696,7 +1696,7 @@ namespace anox { namespace buildsystem
 			if (skeletalDataFourCC.Get() != RKIT_FOURCC('S', 'T', 'G', 'W'))
 			{
 				rkit::log::Error(u8"Skeletal data fourcc mismatch");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
 			for (uint32_t inPointIndex = 0; inPointIndex < numPoints; inPointIndex++)
@@ -1709,7 +1709,7 @@ namespace anox { namespace buildsystem
 				if (numBonesForPoint == 0)
 				{
 					rkit::log::Error(u8"Skeletal data vert had no bones?");
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
 				for (uint32_t bpi = 0; bpi < numBonesForPoint; bpi++)
@@ -1723,7 +1723,7 @@ namespace anox { namespace buildsystem
 					if (boneIndex >= bones.Count())
 					{
 						rkit::log::Error(u8"Bone index was out of range");
-						return rkit::ResultCode::kDataError;
+						RKIT_THROW(rkit::ResultCode::kDataError);
 					}
 
 					// Anachronox never uses multi-weight skinning even though the format
@@ -1808,7 +1808,7 @@ namespace anox { namespace buildsystem
 		if (outSubModels.Count() > 255)
 		{
 			rkit::log::Error(u8"Too many submodels");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		outHeader.m_numSubModels = static_cast<uint8_t>(outSubModels.Count());
@@ -1818,7 +1818,7 @@ namespace anox { namespace buildsystem
 		if (outMaterials.Count() > std::numeric_limits<uint16_t>::max())
 		{
 			rkit::log::Error(u8"Too many materials");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		outHeader.m_numMaterials = static_cast<uint16_t>(outMaterials.Count());
@@ -1826,7 +1826,7 @@ namespace anox { namespace buildsystem
 		if (outAnimations.Count() > 127)
 		{
 			rkit::log::Error(u8"Too many animations");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		outHeader.m_numAnimations7_AnimationType1 = static_cast<uint8_t>(0x80 | outAnimations.Count());
@@ -1834,7 +1834,7 @@ namespace anox { namespace buildsystem
 		if (outSkins.Count() > 255)
 		{
 			rkit::log::Error(u8"Too many skins");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		outHeader.m_numSkins = static_cast<uint8_t>(outSkins.Count());
@@ -1842,7 +1842,7 @@ namespace anox { namespace buildsystem
 		if (outMorphKeys.Count() > std::numeric_limits<uint16_t>::max())
 		{
 			rkit::log::Error(u8"Too many morph keys");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		outHeader.m_numMorphKeys = static_cast<uint16_t>(outMorphKeys.Count());
@@ -1850,7 +1850,7 @@ namespace anox { namespace buildsystem
 		if (outBones.Count() > std::numeric_limits<uint16_t>::max())
 		{
 			rkit::log::Error(u8"Too many morph keys");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		outHeader.m_numBones = static_cast<uint16_t>(outBones.Count());
@@ -1858,7 +1858,7 @@ namespace anox { namespace buildsystem
 		if (outFrames.Count() > std::numeric_limits<uint16_t>::max())
 		{
 			rkit::log::Error(u8"Too many frames");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		outHeader.m_numFrames = static_cast<uint16_t>(outFrames.Count());
@@ -1866,7 +1866,7 @@ namespace anox { namespace buildsystem
 		if (outPoints.Count() > std::numeric_limits<uint32_t>::max())
 		{
 			rkit::log::Error(u8"Too many points");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		outHeader.m_numPoints = static_cast<uint32_t>(outPoints.Count());
@@ -2015,7 +2015,7 @@ namespace anox { namespace buildsystem
 						if (inPointIndex >= inPointToOutPoint.Count())
 						{
 							rkit::log::Error(u8"Vert was out of range");
-							return rkit::ResultCode::kDataError;
+							RKIT_THROW(rkit::ResultCode::kDataError);
 						}
 
 						data::MDAModelVert outVert = {};
@@ -2316,7 +2316,7 @@ namespace anox { namespace buildsystem
 			if (anoxGfxDll->GetSize() > std::numeric_limits<size_t>::max())
 			{
 				rkit::log::Error(u8"anoxgfx.dll is too big");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
 			RKIT_CHECK(anoxGfxContents.Resize(static_cast<size_t>(fileSize)));
@@ -2327,7 +2327,7 @@ namespace anox { namespace buildsystem
 			if (anoxGfxContents.Count() < kNormalBlobSize)
 			{
 				rkit::log::Error(u8"anoxgfx.dll size was smaller than expected");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
 			const uint8_t kSignature[] = { 0x45, 0x7d, 0x74, 0xbf, 0x11, 0x04 };
@@ -2347,7 +2347,7 @@ namespace anox { namespace buildsystem
 			if (startPos == maxPos)
 			{
 				rkit::log::Error(u8"Couldn't find normal blob in anoxgfx.dll");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
 			rkit::CopySpanNonOverlapping(normalFloats.ToSpan().ReinterpretCast<uint8_t>(), fileSpan.SubSpan(startPos, kNormalBlobSize));
@@ -2359,7 +2359,7 @@ namespace anox { namespace buildsystem
 		if (header.m_numTextureBlocks.Get() != header.m_numTextures.Get())
 		{
 			rkit::log::Error(u8"Texture block count doesn't match texture count");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		const uint32_t numTextures = header.m_numTextures.Get();
@@ -2371,7 +2371,7 @@ namespace anox { namespace buildsystem
 				if (profile.m_skins.Count() != numTextures)
 				{
 					rkit::log::Error(u8"Skin count didn't match MD2 texture count");
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 			}
 		}
@@ -2382,7 +2382,7 @@ namespace anox { namespace buildsystem
 			|| header.m_minorVersion.Get() > MD2Header::kMaxMinorVersion)
 		{
 			rkit::log::Error(u8"MD2 file appears to be invalid");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		const uint32_t numFrames = header.m_numFrames.Get();
@@ -2391,7 +2391,7 @@ namespace anox { namespace buildsystem
 		if (numFrames == 0 || numXYZ == 0)
 		{
 			rkit::log::Error(u8"MD2 file has no frames or verts");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		const uint32_t frameSizeBytes = header.m_frameSizeBytes.Get();
@@ -2399,7 +2399,7 @@ namespace anox { namespace buildsystem
 		if (frameSizeBytes < sizeof(MD2FrameHeader))
 		{
 			rkit::log::Error(u8"MD2 frame size is invalid");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		uint32_t vertSize = (frameSizeBytes - sizeof(MD2FrameHeader));
@@ -2407,7 +2407,7 @@ namespace anox { namespace buildsystem
 		if (vertSize % numXYZ != 0)
 		{
 			rkit::log::Error(u8"Couldn't determine vert size");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		vertSize /= numXYZ;
@@ -2415,7 +2415,7 @@ namespace anox { namespace buildsystem
 		if (vertSize != 8 && vertSize != 6 && vertSize != 5)
 		{
 			rkit::log::Error(u8"Unknown vert size");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		rkit::Vector<rkit::endian::LittleUInt32_t> glCommandsArray;
@@ -2454,7 +2454,7 @@ namespace anox { namespace buildsystem
 			if (currentTextureBlock == textureBlockSizes.Count())
 			{
 				rkit::log::Error(u8"Texture blocks desynced");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
 			textureBlockSizes[currentTextureBlock] = textureBlockSizes[currentTextureBlock].Get() - 1;
@@ -2467,7 +2467,7 @@ namespace anox { namespace buildsystem
 			if (realCount < 3 || realCount > (glCommands.Count() / 3u))
 			{
 				rkit::log::Error(u8"Invalid GL command");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
 			const rkit::ConstSpan<rkit::endian::LittleUInt32_t> commandArgs = glCommands.SubSpan(0, realCount * 3);
@@ -2491,7 +2491,7 @@ namespace anox { namespace buildsystem
 				if (vert.m_xyzIndex >= numXYZ)
 				{
 					rkit::log::Error(u8"Invalid GL command vert");
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
 				if (i >= 3)
@@ -2538,7 +2538,7 @@ namespace anox { namespace buildsystem
 			if (animDataBytes.Count() < sizeof(animData))
 			{
 				rkit::log::Error(u8"Anim data too small");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
 			rkit::CopySpanNonOverlapping(rkit::Span<MDAAnimationChunkData>(&animData, 1).ReinterpretCast<uint8_t>(), animDataBytes.SubSpan(0, sizeof(animData)));
@@ -2550,7 +2550,7 @@ namespace anox { namespace buildsystem
 			if (animDataBytes.Count() / sizeof(MDAAnimInfoData) < numAnimations)
 			{
 				rkit::log::Error(u8"Anim data was truncated");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
 			for (uint32_t animIndex = 0; animIndex < numAnimations; animIndex++)
@@ -2566,7 +2566,7 @@ namespace anox { namespace buildsystem
 				if (numFrames == 0 || animFirstFrame > numFrames || (numFrames - animFirstFrame) < animNumFrames)
 				{
 					rkit::log::Error(u8"Anim frame range was invalid");
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
 				uint8_t nameLength = sizeof(inAnim.m_animCategory);
@@ -2599,7 +2599,7 @@ namespace anox { namespace buildsystem
 			if (morphDataBytes.Count() < sizeof(morphData))
 			{
 				rkit::log::Error(u8"Morph data too small");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
 			rkit::CopySpanNonOverlapping(rkit::Span<MDAMorphChunkData>(&morphData, 1).ReinterpretCast<uint8_t>(), morphDataBytes.SubSpan(0, sizeof(morphData)));
@@ -2612,7 +2612,7 @@ namespace anox { namespace buildsystem
 			if (morphKeyBytes.Count() / sizeof(MDAMorphKey) < numKeys)
 			{
 				rkit::log::Error(u8"Morph key data too small");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
 			RKIT_CHECK(morphKeys.Resize(numKeys));
@@ -2634,7 +2634,7 @@ namespace anox { namespace buildsystem
 				if (vertMorphDataPos > morphDataBytes.Count() || (morphDataBytes.Count() - vertMorphDataPos) / sizeof(MDAVertMorph) < numVertMorphs)
 				{
 					rkit::log::Error(u8"Morph data too small");
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
 				RKIT_CHECK(vertMorphs.Resize(numVertMorphs));
@@ -2651,7 +2651,7 @@ namespace anox { namespace buildsystem
 					if (vertIndex >= numXYZ)
 					{
 						rkit::log::Error(u8"Vert morph vertex was invalid");
-						return rkit::ResultCode::kDataError;
+						RKIT_THROW(rkit::ResultCode::kDataError);
 					}
 
 					outVertMorph.m_vertIndex = vertIndex;
@@ -2706,7 +2706,7 @@ namespace anox { namespace buildsystem
 			if (boneDataBytes.Count() < sizeof(boneData))
 			{
 				rkit::log::Error(u8"Bone data too small");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
 			rkit::CopySpanNonOverlapping(rkit::Span<MDABoneChunkData>(&boneData, 1).ReinterpretCast<uint8_t>(), boneDataBytes.SubSpan(0, sizeof(boneData)));
@@ -2716,7 +2716,7 @@ namespace anox { namespace buildsystem
 			if (boneFrameBytes.Count() / sizeof(MDABoneFrame) < numFrames)
 			{
 				rkit::log::Error(u8"Bone frame data was too small");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
 			RKIT_CHECK(vertexBones.Resize(1));
@@ -2794,7 +2794,7 @@ namespace anox { namespace buildsystem
 				if (normalIndex >= 2048)
 				{
 					rkit::log::Error(u8"Normal index was out of range");
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
 				uint16_t vertUIntCoords[3];
@@ -2822,7 +2822,7 @@ namespace anox { namespace buildsystem
 						vertUIntCoords[axis] = vertData[axis * 2] + static_cast<uint16_t>(vertData[axis * 2 + 1] << 8);
 					break;
 				default:
-					return rkit::ResultCode::kInternalError;
+					RKIT_THROW(rkit::ResultCode::kInternalError);
 				}
 
 				for (size_t axis = 0; axis < 3; axis++)
@@ -2925,7 +2925,7 @@ namespace anox { namespace buildsystem
 				if (inProfile.m_evaluate.Length() > std::numeric_limits<uint32_t>::max())
 				{
 					rkit::log::Error(u8"Skin condition length too long");
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
 				outProfile.m_fourCC = inProfile.m_fourCC;
@@ -2950,7 +2950,7 @@ namespace anox { namespace buildsystem
 					if (numPasses > 0xffu)
 					{
 						rkit::log::Error(u8"Too many passes on one skin");
-						return rkit::ResultCode::kDataError;
+						RKIT_THROW(rkit::ResultCode::kDataError);
 					}
 
 					RKIT_CHECK(outPasses.Resize(numPasses));
@@ -2980,7 +2980,7 @@ namespace anox { namespace buildsystem
 						RKIT_CHECK(materialContentIDs.AddAndGetIndex(materialIndex, materialContentID));
 
 						if (materialIndex > std::numeric_limits<uint16_t>::max())
-							return rkit::ResultCode::kIntegerOverflow;
+							RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
 
 						outPass.m_materialIndex = static_cast<StoredMaterialIndex_t>(materialIndex);
 
@@ -3040,7 +3040,7 @@ namespace anox { namespace buildsystem
 								break;
 							default:
 								rkit::log::Error(u8"Unknown material color type");
-								return rkit::ResultCode::kDataError;
+								RKIT_THROW(rkit::ResultCode::kDataError);
 							}
 
 							if (haveAlpha)
@@ -3066,49 +3066,49 @@ namespace anox { namespace buildsystem
 		if (numTextures > 0xff)
 		{
 			rkit::log::Error(u8"Too many materials");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		if (numFrames > 0xffff)
 		{
 			rkit::log::Error(u8"Too many frames");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		if (numXYZ > 0xffff)
 		{
 			rkit::log::Error(u8"Too many verts");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		if (animations.Count() > 0x7fu)
 		{
 			rkit::log::Error(u8"Too many animations");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		if (morphKeys.Count() > 0xffffu)
 		{
 			rkit::log::Error(u8"Too many morph keys");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		if (vertexBones.Count() > 0xffffu)
 		{
 			rkit::log::Error(u8"Too many bones");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		if (profiles.Count() > 0xffu)
 		{
 			rkit::log::Error(u8"Too many profiles");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		if (materials.Count() > 0xffffu)
 		{
 			rkit::log::Error(u8"Too many materials");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		data::MDAModelHeader outHeader = {};
@@ -3119,7 +3119,7 @@ namespace anox { namespace buildsystem
 			if (triList.m_submodels.Count() > maxSubModels || (maxSubModels - outHeader.m_numSubModels) < triList.m_submodels.Count())
 			{
 				rkit::log::Error(u8"Too many submodels");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
 			outHeader.m_numSubModels += static_cast<uint8_t>(triList.m_submodels.Count());
@@ -3193,7 +3193,7 @@ namespace anox { namespace buildsystem
 				if (subModel.m_verts.Count() == 0)
 				{
 					rkit::log::Error(u8"Submodel has no verts");
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
 				data::MDAModelSubModel outSubModel = {};

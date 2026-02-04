@@ -156,7 +156,7 @@ namespace anox
 	rkit::Result IConfigurationValueView::Get(T &outValue) const
 	{
 		if (!this->GetAs(outValue))
-			return rkit::ResultCode::kInvalidParameter;
+			RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 
 		RKIT_RETURN_OK;
 	}
@@ -228,7 +228,7 @@ namespace anox
 	{
 		rkit::Optional<IConfigurationValueView> result = this->GetValueFromKey(key);
 		if (!result.IsSet())
-			return rkit::ResultCode::kKeyNotFound;
+			RKIT_THROW(rkit::ResultCode::kKeyNotFound);
 
 		outValue = result.Get();
 		RKIT_RETURN_OK;

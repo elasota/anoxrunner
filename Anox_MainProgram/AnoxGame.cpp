@@ -102,7 +102,7 @@ namespace anox
 		if (!dataModule)
 		{
 			rkit::log::Error(u8"Couldn't load data module");
-			return rkit::ResultCode::kModuleLoadFailed;
+			RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 		}
 
 		m_dataDriver = static_cast<rkit::data::IDataDriver *>(rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, u8"Data"));
@@ -110,7 +110,7 @@ namespace anox
 		if (!m_dataDriver)
 		{
 			rkit::log::Error(u8"Data driver wasn't available");
-			return rkit::ResultCode::kModuleLoadFailed;
+			RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 		}
 
 		uint32_t numWorkThreads = rkit::GetDrivers().m_systemDriver->GetProcessorCount() - 1;

@@ -121,7 +121,7 @@ namespace anox
 	rkit::Result ConfigValueReadWrite<rkit::String>::Write(rkit::String &value, const IConfigurationValueView &src)
 	{
 		if (src.m_getType(src) != ConfigurationValueType::kString)
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		return value.Set(src.m_getValueFuncs.m_getString(src));
 	}
@@ -161,7 +161,7 @@ namespace anox
 				insertPosMinInclusive = testPos + 1u;
 				break;
 			default:
-				return rkit::ResultCode::kInternalError;
+				RKIT_THROW(rkit::ResultCode::kInternalError);
 			}
 		}
 
@@ -251,7 +251,7 @@ namespace anox { namespace priv {
 			}
 			break;
 		default:
-			return rkit::ResultCode::kInternalError;
+			RKIT_THROW(rkit::ResultCode::kInternalError);
 		}
 
 		RKIT_RETURN_OK;

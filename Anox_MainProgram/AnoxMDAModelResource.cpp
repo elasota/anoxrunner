@@ -186,7 +186,7 @@ namespace anox
 			case 1:
 				return LoadContents(state, resource, outDeps);
 			default:
-				return rkit::ResultCode::kInternalError;
+				RKIT_THROW(rkit::ResultCode::kInternalError);
 			}
 		}
 	};
@@ -256,12 +256,12 @@ namespace anox
 		rkit::Vector<char> &outCategoryChars = resource.m_categoryChars;
 
 		if (numPoints == 0 || numMorphedPoints > numPoints)
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		resource.m_animType = animType;
 
 		if (numFrames == 0)
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		{
 			rkit::Vector<data::MDAProfile> profiles;
@@ -286,7 +286,7 @@ namespace anox
 
 			{
 				size_t startPos = 0;
-				const rkit::Result processResult = rkit::CheckedProcessParallelSpans(resource.m_profiles.ToSpan(), profiles.ToSpan(),
+				RKIT_CHECK((rkit::CheckedProcessParallelSpans(resource.m_profiles.ToSpan(), profiles.ToSpan(),
 					[&startPos, &profileConditionsChars, &stream]
 					(AnoxMDAModelResource::Profile &destProfile, const data::MDAProfile &srcProfile) -> rkit::Result
 					{
@@ -298,15 +298,15 @@ namespace anox
 
 						rkit::AsciiStringView conditionStr(chars.Ptr(), conditionLength);
 						if (!conditionStr.Validate())
-							return rkit::ResultCode::kDataError;
+							RKIT_THROW(rkit::ResultCode::kDataError);
 
 						destProfile.m_condition = conditionStr;
 						destProfile.m_fourCC = srcProfile.m_fourCC.Get();
 
 						startPos += conditionLength + 1;
 						RKIT_RETURN_OK;
-					});
-				RKIT_CHECK(processResult);
+					}
+				)));
 			}
 		}
 
@@ -326,7 +326,7 @@ namespace anox
 			for (size_t i = 0; i < numProfiles; i++)
 				outProfiles[i].m_skins = resource.m_profileSkins.ToSpan().SubSpan(i * numSkins, numSkins);
 
-			const rkit::Result checkResult = rkit::CheckedProcessParallelSpans(outProfileSkins.ToSpan(), profileSkins.ToSpan(),
+			RKIT_CHECK((rkit::CheckedProcessParallelSpans(outProfileSkins.ToSpan(), profileSkins.ToSpan(),
 				[&numSkinPasses]
 				(AnoxMDAModelResource::Skin &outSkin, const data::MDASkin &inSkin)
 				-> rkit::Result
@@ -335,14 +335,13 @@ namespace anox
 					RKIT_CHECK(rkit::SafeAdd(numSkinPasses, numSkinPasses, numPasses));
 
 					if (inSkin.m_sortMode >= static_cast<size_t>(data::MDASortMode::kCount))
-						return rkit::ResultCode::kDataError;
+						RKIT_THROW(rkit::ResultCode::kDataError);
 
 					outSkin.m_sortMode = static_cast<data::MDASortMode>(inSkin.m_sortMode);
 
 					RKIT_RETURN_OK;
-				});
-
-			RKIT_CHECK(checkResult);
+				}
+			)));
 
 			RKIT_CHECK(outSkinPasses.Resize(numSkinPasses));
 
@@ -365,7 +364,7 @@ namespace anox
 
 			RKIT_CHECK(stream.ReadAllSpan(skinPasses.ToSpan()));
 
-			const rkit::Result checkResult = rkit::CheckedProcessParallelSpans(outSkinPasses.ToSpan(), skinPasses.ToSpan(),
+			RKIT_CHECK((rkit::CheckedProcessParallelSpans(outSkinPasses.ToSpan(), skinPasses.ToSpan(),
 				[numMaterials]
 				(AnoxMDAModelResource::Pass &outPass, const data::MDASkinPass &inPass)
 				-> rkit::Result
@@ -382,9 +381,8 @@ namespace anox
 					RKIT_CHECK(DataReader::ReadCheckFloat(outPass.m_scrollU, inPass.m_scrollU, 10));
 					RKIT_CHECK(DataReader::ReadCheckFloat(outPass.m_scrollV, inPass.m_scrollV, 10));
 					RKIT_RETURN_OK;
-				});
-
-			RKIT_CHECK(checkResult);
+				}
+			)));
 		}
 
 		{
@@ -405,7 +403,7 @@ namespace anox
 
 			{
 				size_t charStartPos = 0;
-				const rkit::Result checkResult = rkit::CheckedProcessParallelSpans(outAnimations.ToSpan(), animations.ToSpan(),
+				RKIT_CHECK((rkit::CheckedProcessParallelSpans(outAnimations.ToSpan(), animations.ToSpan(),
 					[&charStartPos, &outCategoryChars, &stream, numFrames]
 					(AnoxMDAModelResource::Animation &outAnimation, const data::MDAAnimation &inAnimation)
 					->rkit::Result
@@ -423,7 +421,7 @@ namespace anox
 
 						rkit::AsciiStringView category(chars.Ptr(), chars.Count());
 						if (!category.Validate())
-							return rkit::ResultCode::kDataError;
+							RKIT_THROW(rkit::ResultCode::kDataError);
 
 						// Process everything else
 						outAnimation.m_animNumber = inAnimation.m_animNumber.Get();
@@ -435,8 +433,8 @@ namespace anox
 						RKIT_CHECK(DataReader::ReadCheckUInt(outAnimation.m_firstFrame, inAnimation.m_numFrames, maxNumFrames));
 
 						RKIT_RETURN_OK;
-					});
-				RKIT_CHECK(checkResult);
+					}
+				)));
 			}
 		}
 
@@ -465,7 +463,7 @@ namespace anox
 			RKIT_CHECK(stream.ReadAllSpan(bones.ToSpan()));
 
 			uint16_t boneIndex = 0;
-			const rkit::Result checkResult = rkit::CheckedProcessParallelSpans(outBones.ToSpan(), bones.ToSpan(),
+			RKIT_CHECK((rkit::CheckedProcessParallelSpans(outBones.ToSpan(), bones.ToSpan(),
 				[&boneIndex]
 				(AnoxMDAModelResource::SkeletalModelBone &outBone, const data::MDASkeletalModelBone &inBone)
 				-> rkit::Result
@@ -476,11 +474,10 @@ namespace anox
 					boneIndex++;
 
 					RKIT_RETURN_OK;
-				});
+				}
+			)));
 
-			RKIT_CHECK(checkResult);
-
-			return rkit::ResultCode::kNotYetImplemented;
+			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 		}
 
 		if (animType == data::MDAAnimationType::kVertexAnimated)
@@ -493,7 +490,7 @@ namespace anox
 
 			RKIT_CHECK(stream.ReadAllSpan(bones.ToSpan()));
 
-			const rkit::Result checkResult = rkit::CheckedProcessParallelSpans(outBones.ToSpan(), bones.ToSpan(),
+			RKIT_CHECK((rkit::CheckedProcessParallelSpans(outBones.ToSpan(), bones.ToSpan(),
 				[]
 				(AnoxMDAModelResource::VertexModelBone &outBone, const data::MDAVertexModelBone &inBone)
 				-> rkit::Result
@@ -501,15 +498,14 @@ namespace anox
 					outBone.m_fourCC = inBone.m_boneIDFourCC.Get();
 
 					RKIT_RETURN_OK;
-				});
-
-			RKIT_CHECK(checkResult);
+				}
+			)));
 		}
 
 		if (animType == data::MDAAnimationType::kSkeletalAnimated)
 		{
 			// MDAModelSkeletalBoneFrame m_boneFrames[m_numFrames][m_numBones]
-			return rkit::ResultCode::kNotYetImplemented;
+			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 		}
 
 		if (animType == data::MDAAnimationType::kVertexAnimated)
@@ -533,7 +529,7 @@ namespace anox
 				outVertexFrames[i].m_bones = resource.m_vertexFrameBones.ToSpan().SubSpan(0, numBones);
 			}
 
-			const rkit::Result checkResult = rkit::CheckedProcessParallelSpans(outVertexFrameBones.ToSpan(), boneFrames.ToSpan(),
+			RKIT_CHECK((rkit::CheckedProcessParallelSpans(outVertexFrameBones.ToSpan(), boneFrames.ToSpan(),
 				[]
 				(AnoxMDAModelResource::VertexFrameBone &outFrameBone, const data::MDAModelTagBoneFrame &inBoneFrame)
 				-> rkit::Result
@@ -544,9 +540,8 @@ namespace anox
 					}
 
 					RKIT_RETURN_OK;
-				});
-
-			RKIT_CHECK(checkResult);
+				}
+			)));
 		}
 
 		size_t numTrisTotal = 0;
@@ -560,7 +555,7 @@ namespace anox
 
 			RKIT_CHECK(stream.ReadAllSpan(subModels.ToSpan()));
 
-			const rkit::Result checkResult = rkit::CheckedProcessParallelSpans(outSubModels.ToSpan(), subModels.ToSpan(),
+			RKIT_CHECK((rkit::CheckedProcessParallelSpans(outSubModels.ToSpan(), subModels.ToSpan(),
 				[numMaterials, &numTrisTotal]
 				(AnoxMDAModelResource::SubModel &outSubModel, const data::MDAModelSubModel &inSubModel)
 				-> rkit::Result
@@ -572,9 +567,8 @@ namespace anox
 					RKIT_CHECK(rkit::SafeAdd<size_t>(numTrisTotal, numTrisTotal, outSubModel.m_numTris));
 
 					RKIT_RETURN_OK;
-				});
-
-			RKIT_CHECK(checkResult);
+				}
+			)));
 		}
 
 		const rkit::render::IRenderDeviceRequirements &deviceReqs = state.m_systems.m_graphicsSystem->GetDeviceRequirements();
@@ -587,13 +581,13 @@ namespace anox
 			RKIT_CHECK(state.m_indexCopyOperations.Resize(resource.m_subModels.Count()));
 
 			size_t indexBufferSize = 0;
-			rkit::Result checkResult = rkit::CheckedProcessParallelSpans(state.m_indexCopyOperations.ToSpan(), resource.m_subModels.ToSpan(),
+			RKIT_CHECK((rkit::CheckedProcessParallelSpans(state.m_indexCopyOperations.ToSpan(), resource.m_subModels.ToSpan(),
 				[&indexBufferSize, &stream, bufferOffsetAlignment]
 				(BufferInitializer::CopyOperation &copyOp, AnoxMDAModelResource::SubModel &subModel)
 				-> rkit::Result
 				{
 					if (subModel.m_numTris == 0 || subModel.m_numVerts == 0)
-						return rkit::ResultCode::kDataError;
+						RKIT_THROW(rkit::ResultCode::kDataError);
 
 					RKIT_CHECK(rkit::SafeAlignUp<size_t>(indexBufferSize, indexBufferSize, bufferOffsetAlignment));
 
@@ -612,8 +606,8 @@ namespace anox
 					copyOp.m_offset = bufferOffset;
 
 					RKIT_RETURN_OK;
-				});
-			RKIT_CHECK(checkResult);
+				}
+			)));
 
 			BufferInitializer &bufInitializer = state.m_triBufferInitializer;
 			bufInitializer.m_copyOperations = state.m_indexCopyOperations.ToSpan();
@@ -626,13 +620,13 @@ namespace anox
 			RKIT_CHECK(state.m_vertCopyOperations.Resize(resource.m_subModels.Count()));
 
 			size_t vertBufferSize = 0;
-			rkit::Result checkResult = rkit::CheckedProcessParallelSpans(state.m_vertCopyOperations.ToSpan(), resource.m_subModels.ToSpan(),
+			RKIT_CHECK((rkit::CheckedProcessParallelSpans(state.m_vertCopyOperations.ToSpan(), resource.m_subModels.ToSpan(),
 				[&vertBufferSize, &stream, bufferOffsetAlignment, numPoints]
 				(BufferInitializer::CopyOperation &copyOp, AnoxMDAModelResource::SubModel &subModel)
 				-> rkit::Result
 				{
 					if (subModel.m_numVerts == 0)
-						return rkit::ResultCode::kDataError;
+						RKIT_THROW(rkit::ResultCode::kDataError);
 
 					RKIT_CHECK(rkit::SafeAlignUp<size_t>(vertBufferSize, vertBufferSize, bufferOffsetAlignment));
 
@@ -651,8 +645,8 @@ namespace anox
 					copyOp.m_offset = bufferOffset;
 
 					RKIT_RETURN_OK;
-				});
-			RKIT_CHECK(checkResult);
+				}
+			)));
 
 			BufferInitializer &bufInitializer = state.m_vertBufferInitializer;
 			bufInitializer.m_copyOperations = state.m_vertCopyOperations.ToSpan();
@@ -669,7 +663,7 @@ namespace anox
 			}
 
 			if (numPoints == 0)
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 
 			size_t pointBufferSize = 0;
 			RKIT_CHECK(rkit::SafeMul<size_t>(pointBufferSize, sizeof(data::MDAModelPoint), numPointsTotal));
@@ -724,7 +718,7 @@ namespace anox
 		}
 
 		if (stream.Tell() != stream.GetSize())
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		typedef BufferInitializer (AnoxMDAModelResourceLoaderState:: *BufferInitializerField_t);
 		typedef rkit::RCPtr<IBuffer> (AnoxMDAModelResource:: *BufferField_t);

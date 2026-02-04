@@ -5,30 +5,43 @@
 
 #include <cstdint>
 
-namespace rkit
+namespace rkit { namespace priv
 {
-	enum class PackedResultAndExtCode : uint64_t;
+	enum class EHBodyType
+	{
+		kCatch,
+		kFinally,
+	};
 
-	class RKIT_NODISCARD CatchContext
+	template<EHBodyType TBodyType>
+	class RKIT_NODISCARD EHBodyContext
 	{
 	public:
-		CatchContext() = delete;
-		CatchContext(const CatchContext &) = default;
+		EHBodyContext() = delete;
+		EHBodyContext(const EHBodyContext &) = default;
 
-		template<class TCatchBody>
-		explicit CatchContext(const TCatchBody &catchBody);
+		template<class TEHHandlerBody>
+		explicit EHBodyContext(const TEHHandlerBody &handlerBody);
 
 		void Invoke() const;
 
 	private:
-		CatchContext &operator=(const CatchContext &) = delete;
+		EHBodyContext &operator=(const EHBodyContext &) = delete;
 
-		template<class TCatchBody>
-		static void CallInvoke(const void *catchBodyPtr);
+		template<class TEHHandlerBody>
+		static void CallInvoke(const void *handlerBodyPtr);
 
-		const void *m_catchBody;
+		const void *m_handlerBody;
 		void (*m_invokeThunk)(const void *);
 	};
+} }
+
+namespace rkit
+{
+	enum class PackedResultAndExtCode : uint64_t;
+
+	typedef priv::EHBodyContext<priv::EHBodyType::kCatch> CatchContext;
+	typedef priv::EHBodyContext<priv::EHBodyType::kFinally> FinallyContext;
 }
 
 
@@ -42,7 +55,7 @@ namespace rkit { namespace utils
 	inline bool ResultIsOK(ResultCode resultCode);
 } } // rkit::utils
 
-#if RKIT_USE_CLASS_RESULT != 0
+#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_CLASS
 
 namespace rkit
 {
@@ -185,7 +198,7 @@ namespace rkit
 		return RKIT_PP_CONCAT(exprResult_, __LINE__);\
 } while (false)
 
-#elif RKIT_USE_ENUM_RESULT != 0
+#elif RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_ENUM
 
 namespace rkit
 {
@@ -228,7 +241,7 @@ namespace rkit
 
 #define RKIT_CHECK_SOFT(expr) RKIT_CHECK(expr)
 
-#elif RKIT_USE_EXCEPTION_RESULT != 0
+#elif RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
 
 namespace rkit { namespace priv
 {
@@ -244,6 +257,39 @@ namespace rkit { namespace priv
 			catchContext.Invoke();
 			throw;
 		}
+	}
+
+	template<class TTryBody>
+	void TryFinallyRethrow(const TTryBody &tryBody, const ::rkit::FinallyContext &finallyContext)
+	{
+		try
+		{
+			tryBody();
+		}
+		catch (...)
+		{
+			finallyContext.Invoke();
+			throw;
+		}
+
+		finallyContext.Invoke();
+	}
+
+	template<class TTryBody>
+	void TryCatchFinallyRethrow(const TTryBody &tryBody, const ::rkit::CatchContext &catchContext, const ::rkit::FinallyContext &finallyContext)
+	{
+		try
+		{
+			tryBody();
+		}
+		catch (...)
+		{
+			catchContext.Invoke();
+			finallyContext.Invoke();
+			throw;
+		}
+
+		finallyContext.Invoke();
 	}
 } }
 
@@ -306,9 +352,14 @@ namespace rkit { namespace priv {
 #define RKIT_RETURN_OK return
 #define RKIT_THROW(expr) throw (::rkit::ResultException(expr))
 #define RKIT_TRY_CATCH_RETHROW(expr, eh) (::rkit::priv::TryCatchRethrow([&] { static_cast<void>(expr); }, (eh)))
+#define RKIT_TRY_FINALLY_RETHROW(expr, eh) (::rkit::priv::TryFinallyRethrow([&] { static_cast<void>(expr); }, (eh)))
+#define RKIT_TRY_CATCH_FINALLY_RETHROW(expr, catchContext, finallyContext) (::rkit::priv::TryCatchFinallyRethrow([&] { static_cast<void>(expr); }, (eh), (eh)))
 #define RKIT_TRY_EVAL(expr) (::rkit::priv::TryCatch([&] { static_cast<void>(expr); }))
 
 #endif
+
+#include <limits>
+
 
 namespace rkit { namespace utils
 {
@@ -343,30 +394,40 @@ namespace rkit { namespace utils
 	{
 		return resultCode == ResultCode::kOK;
 	}
+
+	inline int ResultToExitCode(PackedResultAndExtCode result)
+	{
+		return -static_cast<int>(static_cast<uint64_t>(result) & static_cast<uint64_t>(std::numeric_limits<int>::max()));
+	}
 } } // rkit::utils
 
-namespace rkit
+namespace rkit { namespace priv
 {
-
+	template<EHBodyType TBodyType>
 	template<class TCatchBody>
-	CatchContext::CatchContext(const TCatchBody &catchBody)
-		: m_catchBody(&catchBody)
+	EHBodyContext<TBodyType>::EHBodyContext(const TCatchBody &catchBody)
+		: m_handlerBody(&catchBody)
 		, m_invokeThunk(CatchContext::CallInvoke<TCatchBody>)
 	{
 	}
 
-	inline void CatchContext::Invoke() const
+	template<EHBodyType TBodyType>
+	inline void EHBodyContext<TBodyType>::Invoke() const
 	{
-		m_invokeThunk(m_catchBody);
+		m_invokeThunk(m_handlerBody);
 	}
 
-	template<class TCatchBody>
-	void CatchContext::CallInvoke(const void *catchBodyPtr)
+	template<EHBodyType TBodyType>
+	template<class TEHHandlerBody>
+	void EHBodyContext<TBodyType>::CallInvoke(const void *bodyPtr)
 	{
-		const TCatchBody &catchBody = *static_cast<const TCatchBody *>(catchBodyPtr);
-		catchBody();
+		const TEHHandlerBody &handlerBody = *static_cast<const TEHHandlerBody *>(bodyPtr);
+		handlerBody();
 	}
+} }
 
+namespace rkit
+{
 	inline Result ThrowIfError(PackedResultAndExtCode result)
 	{
 		if (utils::ResultIsOK(result))

@@ -84,7 +84,7 @@ namespace rkit { namespace coro { namespace priv {
 	template<class TCaller, class TClass, class... TParams>
 	void MethodWrapperThunk<TCaller, TClass, TParams...>::EnterFunction(Context &context, void *stackFrameRoot, StackFrameBase *prevFrame, void *classInstance, TParams... params)
 	{
-		rkit::Result result = TCaller::Call(*static_cast<TClass *>(classInstance), std::forward<TParams>(params)...);
+		rkit::PackedResultAndExtCode result = RKIT_TRY_EVAL(TCaller::Call(*static_cast<TClass *>(classInstance), std::forward<TParams>(params)...));
 
 		if (!rkit::utils::ResultIsOK(result))
 		{

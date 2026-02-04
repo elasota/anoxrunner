@@ -286,7 +286,7 @@ namespace anox
 
 		AnoxKeybind *keyBind = this->FindKeybind(keyCode);
 		if (!keyBind)
-			return rkit::ResultCode::kInternalError;
+			RKIT_THROW(rkit::ResultCode::kInternalError);
 
 		if (args.Count() == 1)
 		{
@@ -322,7 +322,7 @@ namespace anox
 
 		AnoxKeybind *keyBind = this->FindKeybind(keyCode);
 		if (!keyBind)
-			return rkit::ResultCode::kInternalError;
+			RKIT_THROW(rkit::ResultCode::kInternalError);
 
 		keyBind->m_cmd.Clear();
 
@@ -341,7 +341,7 @@ namespace anox
 
 		if (args.Count() == 3)
 		{
-			return rkit::ResultCode::kNotYetImplemented;
+			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 		}
 		else if (args.Count() == 2)
 		{

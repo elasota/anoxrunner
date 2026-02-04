@@ -173,21 +173,23 @@ inline rkit::FilePos_t rkit::FixedSizeMemoryStream::GetSize() const
 template<class T>
 rkit::Result rkit::FixedSizeMemoryStream::ExtractSpan(Span<T> &outSpan, size_t count)
 {
-	ResultCode result = ResultCode::kOK;
-
 	const size_t maxCount = (m_size - m_pos) / sizeof(T);
 
+	bool eos = false;
 	if (maxCount < count)
 	{
 		count = maxCount;
-		result = ResultCode::kEndOfStream;
+		eos = true;
 	}
 
 	outSpan = Span<T>(reinterpret_cast<T *>(m_bytes + m_pos), count);
 
 	m_pos += count * sizeof(T);
 
-	return result;
+	if (eos)
+		RKIT_THROW(ResultCode::kIOReadError);
+
+	RKIT_RETURN_OK;
 }
 
 inline rkit::ReadOnlyMemoryStream::ReadOnlyMemoryStream(const Span<const uint8_t> &data)

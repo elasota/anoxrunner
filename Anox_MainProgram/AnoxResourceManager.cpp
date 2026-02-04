@@ -599,7 +599,7 @@ namespace anox
 			rkit::MutexLock factoryLock(*m_loaderMutex);
 			rkit::HashMap<uint32_t, TypeKeyedFactory>::ConstIterator_t factoryIt = m_loaders.Find(key.GetResourceType());
 			if (factoryIt == m_loaders.end() || factoryIt.Value().m_keyType != TKeyType)
-				return rkit::ResultCode::kInvalidParameter;
+				RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 
 			loader = factoryIt.Value().m_loader;
 		}
@@ -705,7 +705,7 @@ namespace anox
 
 	rkit::Result AnoxResourceManager::EnumerateCIPathKeyedResources(const rkit::CIPathView &basePath, rkit::Vector<rkit::CIPath> &outFiles, rkit::Vector<rkit::CIPath> &outDirectories) const
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
 
 	void AnoxResourceManager::SetGraphicsSubsystem(IGraphicsSubsystem *graphicsSubsystem)

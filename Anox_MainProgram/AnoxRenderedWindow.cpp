@@ -132,7 +132,7 @@ namespace anox
 		if (m_device != nullptr)
 		{
 			if (numSwapChainFrames < 2 || numSyncPoints < 1)
-				return rkit::ResultCode::kInternalError;
+				RKIT_THROW(rkit::ResultCode::kInternalError);
 
 			RKIT_CHECK(m_syncPoints.Resize(numSyncPoints));
 			for (size_t i = 0; i < numSyncPoints; i++)

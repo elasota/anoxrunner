@@ -26,14 +26,14 @@ namespace rkit
 
 		struct JsonValueVFTable
 		{
-			Result(*m_toBool)(const void *jsonValue, bool &outBool);
-			Result(*m_toString)(const void *jsonValue, const Utf8Char_t *&outCharPtr, size_t &outLength);
-			Result(*m_toNumber)(const void *jsonValue, double &outNumber);
-			Result(*m_getArraySize)(const void *jsonValue, size_t &outSize);
-			Result(*m_getArrayElement)(const void *jsonValue, size_t index, JsonValue &outJsonValue);
-			Result(*m_iterateObject)(const void *jsonValue, void *userdata, JsonObjectIteratorCallback_t callback);
-			Result(*m_objectHasElement)(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, bool &outHasElement);
-			Result(*m_getObjectElement)(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, JsonValue &outJsonValue);
+			Result (*m_toBool)(const void *jsonValue, bool &outBool);
+			Result (*m_toString)(const void *jsonValue, const Utf8Char_t *&outCharPtr, size_t &outLength);
+			Result (*m_toNumber)(const void *jsonValue, double &outNumber);
+			Result (*m_getArraySize)(const void *jsonValue, size_t &outSize);
+			Result (*m_getArrayElement)(const void *jsonValue, size_t index, JsonValue &outJsonValue);
+			Result (*m_iterateObject)(const void *jsonValue, void *userdata, JsonObjectIteratorCallback_t callback);
+			Result (*m_objectHasElement)(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, bool &outHasElement);
+			Result (*m_tryGetObjectElement)(const void *jsonValue, const Utf8Char_t *keyChars, size_t keyLength, bool &outExists, JsonValue &outJsonValue);
 		};
 
 		struct JsonValue
@@ -80,6 +80,7 @@ namespace rkit
 			Result ObjectHasElement(const StringView &key, bool &outHasElement) const;
 
 			Result GetObjectElement(const StringView &key, JsonValue &outJsonValue) const;
+			Result TryGetObjectElement(const StringView &key, bool &outExists, JsonValue &outJsonValue) const;
 
 		private:
 			template<class TCallable>
@@ -179,7 +180,16 @@ inline rkit::Result rkit::utils::JsonValue::ObjectHasElement(const StringView &k
 
 inline rkit::Result rkit::utils::JsonValue::GetObjectElement(const StringView &key, JsonValue &outJsonValue) const
 {
-	return m_vptr->m_getObjectElement(m_jsonValuePtr, key.GetChars(), key.Length(), outJsonValue);
+	bool exists = false;
+	RKIT_CHECK(m_vptr->m_tryGetObjectElement(m_jsonValuePtr, key.GetChars(), key.Length(), exists, outJsonValue));
+	if (!exists)
+		RKIT_THROW(ResultCode::kInvalidParameter);
+	RKIT_RETURN_OK;
+}
+
+inline rkit::Result rkit::utils::JsonValue::TryGetObjectElement(const StringView &key, bool &outExists, JsonValue &outJsonValue) const
+{
+	return m_vptr->m_tryGetObjectElement(m_jsonValuePtr, key.GetChars(), key.Length(), outExists, outJsonValue);
 }
 
 

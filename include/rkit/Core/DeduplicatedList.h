@@ -41,12 +41,14 @@ namespace rkit
 		{
 			const size_t newIndex = m_items.Count();
 			RKIT_CHECK(m_items.Append(item));
-			const Result insertResult = m_lookup.SetPrehashed(hashValue, item, newIndex);
-			if (!utils::ResultIsOK(insertResult))
-			{
-				m_items.ShrinkToSize(newIndex);
-				return insertResult;
-			}
+			RKIT_TRY_CATCH_RETHROW(m_lookup.SetPrehashed(hashValue, item, newIndex),
+				CatchContext(
+					[this, newIndex]
+					{
+						m_items.ShrinkToSize(newIndex);
+					}
+				)
+			);
 
 			outIndex = newIndex;
 		}

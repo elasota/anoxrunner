@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreDefs.h"
+#include "Result.h"
 #include "StreamProtos.h"
 
 #include <cstddef>
@@ -12,7 +13,7 @@ namespace rkit
 
 	struct IJobQueue;
 
-	typedef void (*AsyncIOCompletionCallback_t)(void *userdata, const PackedResultAndExtCode &result, size_t bytesProcessed);
+	typedef void (*AsyncIOCompletionCallback_t)(void *userdata, PackedResultAndExtCode result, size_t bytesProcessed);
 
 
 	// NOTE: Async requests may return immediately

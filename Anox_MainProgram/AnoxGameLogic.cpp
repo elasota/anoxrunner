@@ -130,7 +130,7 @@ namespace anox
 					haveMainThreadWork = true;
 				break;
 			default:
-				return rkit::ResultCode::kInternalError;
+				RKIT_THROW(rkit::ResultCode::kInternalError);
 			};
 		}
 
@@ -154,7 +154,7 @@ namespace anox
 
 	rkit::Result AnoxGameLogic::SaveGame(rkit::UniquePtr<IConfigurationState> &outConfig)
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
 
 	AnoxGameLogic::DestructiveSpanArgParser::DestructiveSpanArgParser()
@@ -302,7 +302,7 @@ namespace anox
 
 	rkit::Result AnoxGameLogic::ApplyConsoleVar(const AnoxRegisteredConsoleVar &consoleVar, const rkit::ISpan<rkit::ByteStringView> &args)
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
 
 	CORO_DEF_METHOD(AnoxGameLogic, StartUp)

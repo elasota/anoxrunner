@@ -67,7 +67,7 @@ namespace anox
 			case 1:
 				return LoadContents(state, resource);
 			default:
-				return rkit::ResultCode::kInternalError;
+				RKIT_THROW(rkit::ResultCode::kInternalError);
 			}
 		}
 
@@ -123,7 +123,7 @@ namespace anox
 			RKIT_CHECK(stream.ReadOneBinary(spawnDataFile));
 
 			if (spawnDataFile.m_fourCC.Get() != data::EntitySpawnDataFile::kFourCC || spawnDataFile.m_version.Get() != data::EntitySpawnDataFile::kVersion)
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 
 			RKIT_CHECK(resource.m_chunks.VisitAllChunks(SpawnDataChunkVisitor(stream, state)));
 		}
@@ -178,7 +178,7 @@ namespace anox
 				const uint32_t etype = entityType.Get();
 
 				if (etype >= schema.m_numClassDefs)
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 
 				const data::EntityClassDef *eclass = schema.m_classDefs[etype];
 
@@ -202,7 +202,7 @@ namespace anox
 
 		rkit::ReadOnlyMemoryStream stream(resource.m_chunks.m_entityData.ToSpan());
 
-		rkit::Result checkResult = rkit::CheckedProcessParallelSpans(outSpawnDefs.ToSpan(), resource.m_chunks.m_entityTypes.ToSpan(),
+		RKIT_CHECK((rkit::CheckedProcessParallelSpans(outSpawnDefs.ToSpan(), resource.m_chunks.m_entityTypes.ToSpan(),
 			[&schema, &stream, &resource]
 			(AnoxSpawnDefsResource::SpawnDef &outSpawnDef, const rkit::endian::LittleUInt32_t &inEntityType)
 			-> rkit::Result
@@ -210,7 +210,7 @@ namespace anox
 				const uint32_t etype = inEntityType.Get();
 
 				if (etype >= schema.m_numClassDefs)
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 
 				const data::EntityClassDef *eclass = schema.m_classDefs[etype];
 				outSpawnDef.m_eclass = eclass;
@@ -219,15 +219,14 @@ namespace anox
 				RKIT_CHECK(stream.ExtractSpan(dataSpan, eclass->m_dataSize));
 
 				return ParseEntity(outSpawnDef.m_data, resource, dataSpan, eclass);
-			});
-
-		RKIT_CHECK(checkResult);
+			}
+		)));
 
 		if (stream.Tell() != stream.GetSize())
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		if (resource.m_chunks.m_entityStringLengths.Count())
-			return rkit::ResultCode::kNotYetImplemented;
+			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 
 		RKIT_RETURN_OK;
 	}
@@ -277,7 +276,7 @@ namespace anox
 					uint32_t stringIndex = static_cast<const rkit::endian::LittleUInt32_t *>(inDataPos)->Get();
 
 					if (stringIndex > resource.m_chunks.m_entityStringLengths.Count())
-						return rkit::ResultCode::kDataError;
+						RKIT_THROW(rkit::ResultCode::kDataError);
 
 					if (stringIndex == 0)
 						new (fieldDataPos) rkit::Optional<uint32_t>();
@@ -289,14 +288,14 @@ namespace anox
 				{
 					uint32_t edefIndex = static_cast<const rkit::endian::LittleUInt32_t *>(inDataPos)->Get();
 					if (edefIndex >= resource.m_userEntityDefs.Count())
-						return rkit::ResultCode::kDataError;
+						RKIT_THROW(rkit::ResultCode::kDataError);
 
 					*static_cast<uint32_t *>(fieldDataPos) = edefIndex;
 				}
 				break;
 			case data::EntityFieldType::kBSPModel:
 				// uint32
-				return rkit::ResultCode::kNotYetImplemented;
+				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 			case data::EntityFieldType::kComponent:
 				{
 					const data::EntityClassDef *componentClass = fieldDef.m_classDef;
@@ -305,7 +304,7 @@ namespace anox
 				}
 				break;
 			default:
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			};
 		}
 

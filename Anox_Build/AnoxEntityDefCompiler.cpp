@@ -117,7 +117,7 @@ namespace anox { namespace buildsystem {
 
 	rkit::Result UserEntityDictionary::WriteEDef(rkit::IWriteStream &stream, uint32_t edefID) const
 	{
-		return rkit::ResultCode::kNotYetImplemented;
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
 
 	const UserEntityDef2 &UserEntityDictionary::GetEDef(uint32_t edefID) const
@@ -135,11 +135,11 @@ namespace anox { namespace buildsystem {
 		const rkit::StringView identifier = depsNode->GetIdentifier();
 		const rkit::StringView prefix = u8"edefs/edef";
 		if (!identifier.StartsWith(prefix))
-			return rkit::ResultCode::kInternalError;
+			RKIT_THROW(rkit::ResultCode::kInternalError);
 
 		uint32_t edefID = 0;
 		if (!rkit::GetDrivers().m_utilitiesDriver->ParseUInt32(identifier.SubString(prefix.Length()).RemoveEncoding(), 10, edefID))
-			return rkit::ResultCode::kInternalError;
+			RKIT_THROW(rkit::ResultCode::kInternalError);
 
 		rkit::UniquePtr<UserEntityDictionaryBase> dictionary;
 		RKIT_CHECK(EntityDefCompilerBase::LoadUserEntityDictionary(dictionary, feedback));
@@ -147,7 +147,7 @@ namespace anox { namespace buildsystem {
 		const uint32_t numEDefs = dictionary->GetEDefCount();
 
 		if (edefID >= numEDefs)
-			return rkit::ResultCode::kInternalError;
+			RKIT_THROW(rkit::ResultCode::kInternalError);
 
 		const UserEntityDef2 &edef = static_cast<UserEntityDictionary &>(*dictionary).GetEDef(edefID);
 		const rkit::AsciiStringView modelPath = edef.m_modelPath;
@@ -169,7 +169,7 @@ namespace anox { namespace buildsystem {
 			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kCTCModelNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, modelPathStr));
 		}
 		else
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		RKIT_RETURN_OK;
 	}
@@ -181,11 +181,11 @@ namespace anox { namespace buildsystem {
 		const rkit::StringView identifier = depsNode->GetIdentifier();
 		const rkit::StringView prefix = u8"edefs/edef";
 		if (!identifier.StartsWith(prefix))
-			return rkit::ResultCode::kInternalError;
+			RKIT_THROW(rkit::ResultCode::kInternalError);
 
 		uint32_t edefID = 0;
 		if (!rkit::GetDrivers().m_utilitiesDriver->ParseUInt32(identifier.SubString(prefix.Length()).RemoveEncoding(), 10, edefID))
-			return rkit::ResultCode::kInternalError;
+			RKIT_THROW(rkit::ResultCode::kInternalError);
 
 		rkit::UniquePtr<UserEntityDictionaryBase> dictionary;
 		RKIT_CHECK(EntityDefCompilerBase::LoadUserEntityDictionary(dictionary, feedback));
@@ -193,7 +193,7 @@ namespace anox { namespace buildsystem {
 		const uint32_t numEDefs = dictionary->GetEDefCount();
 
 		if (edefID >= numEDefs)
-			return rkit::ResultCode::kInternalError;
+			RKIT_THROW(rkit::ResultCode::kInternalError);
 
 		const UserEntityDef2 &edef = static_cast<UserEntityDictionary &>(*dictionary).GetEDef(edefID);
 		const rkit::AsciiStringView modelPathStrView = edef.m_modelPath;
@@ -201,7 +201,7 @@ namespace anox { namespace buildsystem {
 		if (edef.m_description.Length() > 255)
 		{
 			rkit::log::Error(u8"Description too long");
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		rkit::Optional<size_t> classDefIndex;
@@ -229,7 +229,7 @@ namespace anox { namespace buildsystem {
 			if (!classDefIndex.IsSet())
 			{
 				rkit::log::Error(u8"Invalid userentity type");
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 		}
 
@@ -265,7 +265,7 @@ namespace anox { namespace buildsystem {
 				RKIT_CHECK(AnoxCTCCompilerBase::ConstructOutputPath(outputModelPath, modelPathStr));
 			}
 			else
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 
 			RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outputModelPath, outDef.m_modelContentID));
 		}
@@ -296,7 +296,7 @@ namespace anox { namespace buildsystem {
 	rkit::Result EntityDefCompiler::IndexString(rkit::Vector<rkit::AsciiString> &strings, rkit::HashMap<rkit::AsciiString, uint16_t> &stringToIndex, const rkit::AsciiString &str, uint16_t &outIndex)
 	{
 		if (str.Length() > 256)
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		rkit::HashValue_t hash = rkit::Hasher<rkit::AsciiString>::ComputeHash(0, str);
 		rkit::HashMap<rkit::AsciiString, uint16_t>::ConstIterator_t it = stringToIndex.FindPrehashed(hash, str);
@@ -305,7 +305,7 @@ namespace anox { namespace buildsystem {
 			const uint16_t stringIndex = static_cast<uint16_t>(strings.Count());
 
 			if (stringIndex == std::numeric_limits<uint16_t>::max())
-				return rkit::ResultCode::kDataError;
+				RKIT_THROW(rkit::ResultCode::kDataError);
 
 			RKIT_CHECK(strings.Append(str));
 			RKIT_CHECK(stringToIndex.SetPrehashed(hash, str, stringIndex));
@@ -335,7 +335,7 @@ namespace anox { namespace buildsystem {
 			if (span[i] == ':')
 			{
 				if (foundDivider)
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 				else
 				{
 					dividerPos = i;
@@ -345,7 +345,7 @@ namespace anox { namespace buildsystem {
 			else
 			{
 				if (span[i] < '0' || span[i] > '9')
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 		}
 
@@ -358,7 +358,7 @@ namespace anox { namespace buildsystem {
 				RKIT_RETURN_OK;
 			}
 
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		uint32_t highPart = 0;
@@ -366,7 +366,7 @@ namespace anox { namespace buildsystem {
 		if (!utils->ParseUInt32(rkit::ByteStringSliceView(span.SubSpan(0, dividerPos)), 10, highPart)
 			|| !utils->ParseUInt32(rkit::ByteStringSliceView(span.SubSpan(dividerPos + 1)), 10, lowPart)
 			|| !Label::IsValid(highPart, lowPart))
-			return rkit::ResultCode::kDataError;
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		outLabel = Label(highPart, lowPart);
 
@@ -384,7 +384,7 @@ namespace anox { namespace buildsystem {
 		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, u8"models/entity.dat", inFile));
 
 		if (inFile->GetSize() >= std::numeric_limits<size_t>::max())
-			return rkit::ResultCode::kOutOfMemory;
+			RKIT_THROW(rkit::ResultCode::kOutOfMemory);
 
 		const size_t fileSize = static_cast<size_t>(inFile->GetSize());
 
@@ -439,7 +439,7 @@ namespace anox { namespace buildsystem {
 					continue;
 
 				if (numFragments == fragments.Count())
-					return rkit::ResultCode::kDataError;
+					RKIT_THROW(rkit::ResultCode::kDataError);
 
 				fragments[numFragments++] = lineChars.SubSpan(fragmentStart, fragmentEnd - fragmentStart);
 
@@ -491,7 +491,7 @@ namespace anox { namespace buildsystem {
 						else if (fragmentIndex == 1)
 						{
 							if (!rkit::CharacterEncodingValidator<rkit::CharacterEncoding::kASCII>::ValidateSpan(fragment))
-								return rkit::ResultCode::kDataError;
+								RKIT_THROW(rkit::ResultCode::kDataError);
 
 							RKIT_CHECK(edef.m_modelPath.Set(rkit::AsciiStringSliceView(fragment.ReinterpretCast<const char>())));
 						}
@@ -525,7 +525,7 @@ namespace anox { namespace buildsystem {
 						else
 						{
 							if (!utils->ParseDouble(str, d))
-								return rkit::ResultCode::kDataError;
+								RKIT_THROW(rkit::ResultCode::kDataError);
 						}
 
 						const float f = static_cast<float>(d);
@@ -559,7 +559,7 @@ namespace anox { namespace buildsystem {
 						else if (slice == rkit::StringView(u8"lightning").RemoveEncoding())
 							shadowType = data::UserEntityShadowType::kLightning;
 						else
-							return rkit::ResultCode::kDataError;
+							RKIT_THROW(rkit::ResultCode::kDataError);
 
 						edef.m_shadowType = shadowType;
 					}
@@ -581,7 +581,7 @@ namespace anox { namespace buildsystem {
 							else if (fragmentIndex == 21)
 								edef.m_flags |= static_cast<uint8_t>(1 << static_cast<int>(data::UserEntityFlags::kNoMip));
 							else
-								return rkit::ResultCode::kInternalError;
+								RKIT_THROW(rkit::ResultCode::kInternalError);
 						}
 						else if (slice == rkit::AsciiStringView("0").RemoveEncoding()
 							|| slice.Length() == 0
@@ -589,7 +589,7 @@ namespace anox { namespace buildsystem {
 						{
 						}
 						else
-							return rkit::ResultCode::kDataError;
+							RKIT_THROW(rkit::ResultCode::kDataError);
 					}
 					break;
 				case 19:
@@ -602,7 +602,7 @@ namespace anox { namespace buildsystem {
 					{
 						rkit::ByteStringSliceView slice(fragment);
 						if (slice != rkit::AsciiStringView("0").RemoveEncoding())
-							return rkit::ResultCode::kDataError;
+							RKIT_THROW(rkit::ResultCode::kDataError);
 					}
 					break;
 				case 22:
@@ -616,7 +616,7 @@ namespace anox { namespace buildsystem {
 					}
 					break;
 				default:
-					return rkit::ResultCode::kInternalError;
+					RKIT_THROW(rkit::ResultCode::kInternalError);
 				}
 			}
 
