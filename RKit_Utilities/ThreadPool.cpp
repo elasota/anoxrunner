@@ -206,7 +206,7 @@ namespace rkit { namespace utils
 
 			job->Run();
 
-			if (!utils::ResultIsOK(m_pool.GetJobQueue()->CheckFault()))
+			if (!utils::ResultIsOK(m_pool.GetJobQueue()->SoftCheckFault()))
 				break;
 		}
 

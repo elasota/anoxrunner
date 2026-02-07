@@ -675,7 +675,7 @@ namespace anox
 					continue;
 
 				rkit::log::Error(u8"Invalid map name");
-				CORO_CHECK(rkit::ResultCode::kDataError);
+				CORO_THROW(rkit::ResultCode::kDataError);
 			}
 
 			CORO_CALL(self->AsyncLoadMap, locals.mapName);

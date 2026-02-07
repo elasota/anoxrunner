@@ -32,13 +32,13 @@
 #endif
 
 
-#if RKIT_IS_DEBUG != 0 && (RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_CLASS)
+#if RKIT_IS_DEBUG != 0 && (RKIT_RESULT_BEHAVIOR != RKIT_RESULT_BEHAVIOR_EXCEPTION)
 
 #define RKIT_IMPLEMENT_RESULT_FIRST_CHANCE_RESULT_FAILURE	\
-	void rkit::Result::FirstChanceResultFailure() const\
+	void rkit::utils::FirstChanceResultFailure(PackedResultAndExtCode packedResult)\
 	{\
 		::rkit::ISystemDriver *sysDriver = ::rkit::GetDrivers().m_systemDriver; \
-		if (sysDriver) sysDriver->FirstChanceResultFailure(*this); \
+		if (sysDriver) sysDriver->FirstChanceResultFailure(packedResult); \
 	}
 
 #else

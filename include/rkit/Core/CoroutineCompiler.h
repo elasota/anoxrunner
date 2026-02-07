@@ -165,11 +165,21 @@ namespace rkit { namespace coro { namespace compiler
 	}
 
 #if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_ENUM || RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_CLASS
-	inline CodePtr FaultWithResult(Context *coroContext, const Result &result)
+	inline CodePtr FaultWithResultCode(Context *coroContext, PackedResultAndExtCode result)
 	{
 		coroContext->m_disposition = Disposition::kFailResult;
 		coroContext->m_result = result;
 		return { nullptr };
+	}
+
+	inline CodePtr FaultWithResultCode(Context *coroContext, ResultCode resultCode)
+	{
+		return FaultWithResultCode(coroContext, utils::PackResult(resultCode));
+	}
+
+	inline CodePtr FaultWithResult(Context *coroContext, Result result)
+	{
+		return FaultWithResultCode(coroContext, static_cast<PackedResultAndExtCode>(result));
 	}
 #endif
 
@@ -933,6 +943,9 @@ namespace rkit { namespace coro
 
 #if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_ENUM || RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_CLASS
 
+#define CORO_THROW(expr)	\
+		return (::rkit::coro::compiler::FaultWithResultCode(CORO_INTERNAL_coroContext, (expr)))\
+
 #define CORO_CHECK(expr)	\
 			do {\
 				::rkit::Result RKIT_PP_CONCAT(exprResult_, __LINE__) = (expr);\
@@ -941,6 +954,8 @@ namespace rkit { namespace coro
 			} while (false)
 
 #elif RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
+
+#define CORO_THROW(expr)	RKIT_THROW(expr)
 
 #define CORO_CHECK(expr) (static_cast<void>(expr))
 

@@ -6,11 +6,7 @@
 
 namespace rkit
 {
-#if !RKIT_USE_ENUM_RESULT
 	enum class ResultCode : uint32_t
-#else
-	enum class Result : uint64_t
-#endif
 	{
 		kOK,
 

@@ -166,7 +166,9 @@ namespace rkit { namespace utils
 
 		void Fault(const PackedResultAndExtCode &result) override;
 
-		PackedResultAndExtCode CheckFault() override;
+		PackedResultAndExtCode SoftCheckFault() override;
+		Result CheckFault() override;
+
 		PackedResultAndExtCode Close() override;
 
 		Result Init();
@@ -985,7 +987,7 @@ namespace rkit { namespace utils
 			case JobQueueWakeDisposition::kJobStartedByThisThread:
 				return Pair<RCPtr<Job>, JobQueue::WaitResultType>(wti.m_job, WaitResultType::kSpecifiedJobReturned);
 			case JobQueueWakeDisposition::kJobCompletedByAnotherThread:
-				RKIT_ASSERT(jobToWaitFor->m_dgJobCompleted);
+				RKIT_ASSERT(jobToWaitFor != nullptr && jobToWaitFor->m_dgJobCompleted);
 				if (jobToWaitFor->m_dgJobFailed)
 					return Pair<RCPtr<Job>, JobQueue::WaitResultType>(RCPtr<Job>(), WaitResultType::kSpecifiedJobFailed);
 				else
@@ -1008,7 +1010,17 @@ namespace rkit { namespace utils
 			m_result = result;
 	}
 
-	PackedResultAndExtCode JobQueue::CheckFault()
+	Result JobQueue::CheckFault()
+	{
+		PackedResultAndExtCode result = SoftCheckFault();
+
+		if (!utils::ResultIsOK(result))
+			RKIT_THROW(result);
+
+		RKIT_RETURN_OK;
+	}
+
+	PackedResultAndExtCode JobQueue::SoftCheckFault()
 	{
 		PackedResultAndExtCode result;
 
@@ -1023,7 +1035,7 @@ namespace rkit { namespace utils
 	PackedResultAndExtCode JobQueue::Close()
 	{
 		PrivClose();
-		return CheckFault();
+		return SoftCheckFault();
 	}
 
 	Result JobQueue::Init()

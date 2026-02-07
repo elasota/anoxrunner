@@ -61,7 +61,8 @@ namespace rkit
 
 		virtual void Fault(const PackedResultAndExtCode &result) = 0;
 
-		virtual PackedResultAndExtCode CheckFault() = 0;
+		virtual Result CheckFault() = 0;
+		virtual PackedResultAndExtCode SoftCheckFault() = 0;
 
 		// Closes the job queue.  The shutdown procedure for the job queue should be:
 		// - Close the job queue
