@@ -5,8 +5,8 @@ namespace anox
 	AnoxAbstractSingleFileLoaderPhaseJob::AnoxAbstractSingleFileLoaderPhaseJob(const rkit::RCPtr<AnoxAbstractSingleFileResourceLoaderState> &state,
 		size_t phase, const rkit::RCPtr<rkit::JobSignaler> &waitForDependenciesSignaler)
 		: m_state(state)
-		, m_phase(phase)
 		, m_waitForDependenciesSignaler(waitForDependenciesSignaler)
+		, m_phase(phase)
 	{
 	}
 

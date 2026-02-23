@@ -149,6 +149,7 @@ namespace anox
 }
 
 #include "rkit/Core/RKitAssert.h"
+#include "rkit/Core/Optional.h"
 
 namespace anox
 {

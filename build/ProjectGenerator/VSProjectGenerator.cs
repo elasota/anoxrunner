@@ -378,7 +378,7 @@ namespace ProjectGenerator
 
                 string fullFilterPath = Path.Combine(bin, file.FilterPath);
 
-                string fullBin = Path.GetDirectoryName(fullFilterPath).Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+                string fullBin = Path.GetDirectoryName(fullFilterPath)!.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
 
                 AddBin(fullBin, uniqueFileBins, uniqueFileBinsSet, reservedBinsSet);
 

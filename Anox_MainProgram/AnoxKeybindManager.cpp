@@ -421,12 +421,10 @@ namespace anox
 
 	rkit::Result AnoxKeybindManager::Register(AnoxCommandRegistryBase &commandRegistry)
 	{
-		rkit::coro::MethodWrapper<AnoxKeybindManager, AnoxRegisteredCommand::MethodStarter_t::Signature_t> wrapper(this);
-
-		RKIT_CHECK(commandRegistry.RegisterCommand(u8"bind", wrapper.Create<&AnoxKeybindManager::Cmd_Bind>()));
-		RKIT_CHECK(commandRegistry.RegisterCommand(u8"unbind", wrapper.Create<&AnoxKeybindManager::Cmd_Unbind>()));
-		RKIT_CHECK(commandRegistry.RegisterCommand(u8"alias", wrapper.Create<&AnoxKeybindManager::Cmd_Alias>()));
-		RKIT_CHECK(commandRegistry.RegisterCommand(u8"set", wrapper.Create<&AnoxKeybindManager::Cmd_Set>()));
+		RKIT_CHECK(commandRegistry.RegisterMemberFuncCommand<&AnoxKeybindManager::Cmd_Bind>(u8"bind", this));
+		RKIT_CHECK(commandRegistry.RegisterMemberFuncCommand<&AnoxKeybindManager::Cmd_Unbind>(u8"unbind", this));
+		RKIT_CHECK(commandRegistry.RegisterMemberFuncCommand<&AnoxKeybindManager::Cmd_Alias>(u8"alias", this));
+		RKIT_CHECK(commandRegistry.RegisterMemberFuncCommand<&AnoxKeybindManager::Cmd_Set>(u8"set", this));
 
 		RKIT_RETURN_OK;
 	}

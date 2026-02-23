@@ -141,7 +141,7 @@ namespace rkit
 			return nullptr;
 		}
 
-		IModule* module = new (moduleMemory) Module_Win32(hmodule, initFunc, &mallocDriver);
+		IModule *module = new (moduleMemory) Module_Win32(hmodule, initFunc, &mallocDriver);
 
 		PackedResultAndExtCode initResult = RKIT_TRY_EVAL(module->Init(initParams));
 		if (!utils::ResultIsOK(initResult))
@@ -397,144 +397,133 @@ namespace rkit
 	}
 }
 
-static int WinMainCommon(HINSTANCE hInstance)
+namespace rkit { namespace boot { namespace win32
 {
-	setlocale(LC_ALL, "C");
-	::SetConsoleOutputCP(CP_UTF8);
-
-	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-
-	memset(rkit::g_winGlobalsBuffer.m_bytes, 0, sizeof(rkit::g_winGlobalsBuffer.m_bytes));
-	new (rkit::g_winGlobalsBuffer.m_bytes) rkit::Win32Globals();
-
-	rkit::Drivers *drivers = &rkit::g_winGlobals.m_drivers;
-
-	rkit::mem::SimpleMemMapMallocDriver bootMallocDriver(rkit::g_winGlobals.m_memMapDriver);
-
-	drivers->m_mallocDriver.m_obj = &bootMallocDriver;
-	drivers->m_moduleDriver.m_obj = &rkit::g_winGlobals.m_moduleDriver;
-
-	rkit::mem::MemModuleInitParameters memModuleParams = {};
-	memModuleParams.m_mmapDriver = &rkit::g_winGlobals.m_memMapDriver;
-
-	rkit::IModule *memModule = drivers->m_moduleDriver->LoadModule(::rkit::IModuleDriver::kDefaultNamespace, u8"Mem", &memModuleParams);
-	if (!memModule)
+	int __declspec(dllexport) MainCommon(HINSTANCE hInstance)
 	{
-		return rkit::utils::ResultToExitCode(rkit::utils::PackResult(rkit::ResultCode::kModuleLoadFailed));
-	}
+		setlocale(LC_ALL, "C");
+		::SetConsoleOutputCP(CP_UTF8);
+
+		_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+
+		memset(rkit::g_winGlobalsBuffer.m_bytes, 0, sizeof(rkit::g_winGlobalsBuffer.m_bytes));
+		new (rkit::g_winGlobalsBuffer.m_bytes) rkit::Win32Globals();
+
+		rkit::Drivers *drivers = &rkit::g_winGlobals.m_drivers;
+
+		rkit::mem::SimpleMemMapMallocDriver bootMallocDriver(rkit::g_winGlobals.m_memMapDriver);
+
+		drivers->m_mallocDriver.m_obj = &bootMallocDriver;
+		drivers->m_moduleDriver.m_obj = &rkit::g_winGlobals.m_moduleDriver;
+
+		rkit::mem::MemModuleInitParameters memModuleParams = {};
+		memModuleParams.m_mmapDriver = &rkit::g_winGlobals.m_memMapDriver;
+
+		rkit::IModule *memModule = drivers->m_moduleDriver->LoadModule(::rkit::IModuleDriver::kDefaultNamespace, u8"Mem", &memModuleParams);
+		if (!memModule)
+		{
+			return rkit::utils::ResultToExitCode(rkit::utils::PackResult(rkit::ResultCode::kModuleLoadFailed));
+		}
 
 #if RKIT_IS_DEBUG
-	drivers->m_logDriver.m_obj = &rkit::g_winGlobals.m_consoleLogDriver;
+		drivers->m_logDriver.m_obj = &rkit::g_winGlobals.m_consoleLogDriver;
 #endif
 
-	rkit::Utf16String modulePathStr;
-	rkit::Utf16String moduleDirStr;
+		rkit::Utf16String modulePathStr;
+		rkit::Utf16String moduleDirStr;
 
-	{
-		DWORD requiredSize = 16;
-
-		for (;;)
 		{
-			rkit::Vector<rkit::Utf16Char_t> moduleFileNameChars;
+			DWORD requiredSize = 16;
 
+			for (;;)
 			{
-				rkit::PackedResultAndExtCode resizeResult = RKIT_TRY_EVAL(moduleFileNameChars.Resize(requiredSize));
-				if (!rkit::utils::ResultIsOK(resizeResult))
-					return rkit::utils::ResultToExitCode(resizeResult);
-			}
+				rkit::Vector<rkit::Utf16Char_t> moduleFileNameChars;
 
-			rkit::Utf16StringConstructionBuffer cbuf;
+				{
+					rkit::PackedResultAndExtCode resizeResult = RKIT_TRY_EVAL(moduleFileNameChars.Resize(requiredSize));
+					if (!rkit::utils::ResultIsOK(resizeResult))
+						return rkit::utils::ResultToExitCode(resizeResult);
+				}
 
-			DWORD moduleStrSize = GetModuleFileNameW(nullptr, reinterpret_cast<wchar_t *>(moduleFileNameChars.GetBuffer()), requiredSize);
+				rkit::Utf16StringConstructionBuffer cbuf;
 
-			if (moduleStrSize == requiredSize)
-			{
-				if (requiredSize >= 0x1000000)
-					return rkit::utils::ResultToExitCode(rkit::utils::PackResult(rkit::ResultCode::kOutOfMemory));
+				DWORD moduleStrSize = GetModuleFileNameW(nullptr, reinterpret_cast<wchar_t *>(moduleFileNameChars.GetBuffer()), requiredSize);
 
-				requiredSize *= 2;
-				continue;
-			}
+				if (moduleStrSize == requiredSize)
+				{
+					if (requiredSize >= 0x1000000)
+						return rkit::utils::ResultToExitCode(rkit::utils::PackResult(rkit::ResultCode::kOutOfMemory));
 
-			rkit::PackedResultAndExtCode setResult = RKIT_TRY_EVAL(modulePathStr.Set(moduleFileNameChars.ToSpan().SubSpan(0, moduleStrSize)));
-			if (!rkit::utils::ResultIsOK(setResult))
-				return rkit::utils::ResultToExitCode(setResult);
+					requiredSize *= 2;
+					continue;
+				}
 
-			DWORD dirEnd = moduleStrSize;
-			DWORD dirEndScan = dirEnd;
-			while (dirEndScan > 0 && moduleFileNameChars[dirEndScan] != '\\')
-				dirEndScan--;
+				rkit::PackedResultAndExtCode setResult = RKIT_TRY_EVAL(modulePathStr.Set(moduleFileNameChars.ToSpan().SubSpan(0, moduleStrSize)));
+				if (!rkit::utils::ResultIsOK(setResult))
+					return rkit::utils::ResultToExitCode(setResult);
+
+				DWORD dirEnd = moduleStrSize;
+				DWORD dirEndScan = dirEnd;
+				while (dirEndScan > 0 && moduleFileNameChars[dirEndScan] != '\\')
+					dirEndScan--;
 
 
-			setResult = RKIT_TRY_EVAL(moduleDirStr.Set(moduleFileNameChars.ToSpan().SubSpan(0, dirEndScan)));
-			if (!rkit::utils::ResultIsOK(setResult))
-				return rkit::utils::ResultToExitCode(setResult);
+				setResult = RKIT_TRY_EVAL(moduleDirStr.Set(moduleFileNameChars.ToSpan().SubSpan(0, dirEndScan)));
+				if (!rkit::utils::ResultIsOK(setResult))
+					return rkit::utils::ResultToExitCode(setResult);
 
-			break;
-		}
-	}
-
-	rkit::IModule *systemModule = nullptr;
-
-	{
-		rkit::SystemModuleInitParameters_Win32 systemParams(hInstance, std::move(modulePathStr), std::move(moduleDirStr));
-
-		modulePathStr.Clear();
-		moduleDirStr.Clear();
-
-		systemModule = ::rkit::g_winGlobals.m_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, u8"System_Win32", &systemParams);
-		if (!systemModule)
-			return rkit::utils::ResultToExitCode(rkit::utils::PackResult(rkit::ResultCode::kModuleLoadFailed));
-	}
-
-	rkit::IModule *programLauncherModule = ::rkit::g_winGlobals.m_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, u8"ProgramLauncher");
-	if (!programLauncherModule)
-	{
-		systemModule->Unload();
-		return rkit::utils::ResultToExitCode(rkit::utils::PackResult(rkit::ResultCode::kModuleLoadFailed));
-	}
-
-	rkit::PackedResultAndExtCode result = RKIT_TRY_EVAL(drivers->m_programDriver->InitProgram());
-	if (rkit::utils::ResultIsOK(result))
-	{
-		for (;;)
-		{
-			bool isExiting = false;
-			result = RKIT_TRY_EVAL(drivers->m_programDriver->RunFrame(isExiting));
-
-			if (!rkit::utils::ResultIsOK(result) || isExiting)
 				break;
+			}
 		}
+
+		rkit::IModule *systemModule = nullptr;
+
+		{
+			rkit::SystemModuleInitParameters_Win32 systemParams(hInstance, std::move(modulePathStr), std::move(moduleDirStr));
+
+			modulePathStr.Clear();
+			moduleDirStr.Clear();
+
+			systemModule = ::rkit::g_winGlobals.m_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, u8"System_Win32", &systemParams);
+			if (!systemModule)
+				return rkit::utils::ResultToExitCode(rkit::utils::PackResult(rkit::ResultCode::kModuleLoadFailed));
+		}
+
+		rkit::IModule *programLauncherModule = ::rkit::g_winGlobals.m_moduleDriver.LoadModule(::rkit::IModuleDriver::kDefaultNamespace, u8"ProgramLauncher");
+		if (!programLauncherModule)
+		{
+			systemModule->Unload();
+			return rkit::utils::ResultToExitCode(rkit::utils::PackResult(rkit::ResultCode::kModuleLoadFailed));
+		}
+
+		rkit::PackedResultAndExtCode result = RKIT_TRY_EVAL(drivers->m_programDriver->InitProgram());
+		if (rkit::utils::ResultIsOK(result))
+		{
+			for (;;)
+			{
+				bool isExiting = false;
+				result = RKIT_TRY_EVAL(drivers->m_programDriver->RunFrame(isExiting));
+
+				if (!rkit::utils::ResultIsOK(result) || isExiting)
+					break;
+			}
+		}
+
+		drivers->m_programDriver->ShutdownProgram();
+
+		programLauncherModule->Unload();
+		systemModule->Unload();
+
+		_CrtCheckMemory();
+		_CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_DEBUG);
+		_CrtDumpMemoryLeaks();
+
+		memModule->Unload();
+
+		rkit::g_winGlobals.~Win32Globals();
+
+		return 0;
 	}
-
-	drivers->m_programDriver->ShutdownProgram();
-
-	programLauncherModule->Unload();
-	systemModule->Unload();
-
-	_CrtCheckMemory();
-	_CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_DEBUG);
-	_CrtDumpMemoryLeaks();
-
-	memModule->Unload();
-
-	rkit::g_winGlobals.~Win32Globals();
-
-	return 0;
-}
-
-
-
-#ifdef _CONSOLE
-int main(int argc, const char **argv)
-{
-	return WinMainCommon(GetModuleHandleW(nullptr));
-}
-#else
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
-{
-	return WinMainCommon(hInstance);
-}
-#endif
+} } }
 
 RKIT_IMPLEMENT_PER_MODULE_FUNCTIONS

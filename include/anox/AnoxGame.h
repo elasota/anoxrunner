@@ -1,7 +1,7 @@
 #pragma once
 
 #include "rkit/Core/CoreDefs.h"
-#include "rkit/Core/CoroutineProtos.h"
+#include "rkit/Core/Coroutine2Protos.h"
 #include "rkit/Core/StringProto.h"
 
 #include <cstdint>
@@ -40,7 +40,7 @@ namespace anox
 		virtual AnoxCommandRegistryBase *GetCommandRegistry() const = 0;
 		virtual AnoxKeybindManagerBase *GetKeybindManager() const = 0;
 
-		CORO_DECL_METHOD_ABSTRACT(RestartGame, const rkit::StringView &initialMapName);
+		virtual rkit::ResultCoroutine RestartGame(rkit::ICoroThread &thread, rkit::StringView initialMapName) = 0;
 
 		static rkit::Result Create(rkit::UniquePtr<IAnoxGame> &outGame, const rkit::Optional<uint16_t> &numThreads);
 	};

@@ -215,7 +215,7 @@ namespace ProjectGenerator
                                     if (prop.Value.ValueKind != JsonValueKind.String)
                                         throw new JsonException("Invalid value type for 'extra_dirs.target'");
 
-                                    target = prop.Value.GetString();
+                                    target = prop.Value.GetString()!;
                                 }
                                 else if (prop.Name == "target")
                                 {

@@ -44,7 +44,7 @@ namespace rkit
 		std::atomic<RefCount_t> m_refCount;
 	};
 
-	class RefCounted : private RefCountedTracker
+	class RefCounted : protected RefCountedTracker
 	{
 	public:
 		friend struct rkit::priv::RefCountedInstantiator;
@@ -62,6 +62,10 @@ namespace rkit
 		SimpleObjectAllocation<RefCounted> m_allocation;
 	};
 
+	enum class RCPtrMoveTag
+	{
+	};
+
 	template<class T>
 	class RCPtr
 	{
@@ -73,6 +77,7 @@ namespace rkit
 		explicit RCPtr(std::nullptr_t);
 		explicit RCPtr(T *ptr);
 		explicit RCPtr(T *ptr, RefCountedTracker *tracker);
+		explicit RCPtr(RCPtrMoveTag, T *ptr, RefCountedTracker *tracker);
 		RCPtr(const RCPtr<T> &other) noexcept;
 		RCPtr(RCPtr<T> &&other) noexcept;
 
@@ -102,6 +107,7 @@ namespace rkit
 		RCPtr &operator=(std::nullptr_t);
 
 		T *Get() const;
+		RefCountedTracker *GetTracker() const;
 		operator T *() const;
 		T *operator->() const;
 
@@ -113,6 +119,15 @@ namespace rkit
 
 		template<class TOther>
 		RCPtr<TOther> ConstCast() const;
+
+		template<class TOther>
+		RCPtr<TOther> StaticCastMove();
+
+		template<class TOther>
+		RCPtr<TOther> ReinterpretCastMove();
+
+		template<class TOther>
+		RCPtr<TOther> ConstCastMove();
 
 		template<class TField, class TObject>
 		RCPtr<TField> FieldRef(TField TObject::* fieldRef) const;
@@ -265,6 +280,14 @@ namespace rkit
 	{
 		if (tracker != nullptr)
 			tracker->RCTrackerAddRef();
+	}
+
+
+	template<class T>
+	RCPtr<T>::RCPtr(RCPtrMoveTag, T *ptr, RefCountedTracker *tracker)
+		: m_object(ptr)
+		, m_tracker(tracker)
+	{
 	}
 
 	template<class T>
@@ -465,6 +488,13 @@ namespace rkit
 		return m_object;
 	}
 
+
+	template<class T>
+	RefCountedTracker *RCPtr<T>::GetTracker() const
+	{
+		return m_tracker;
+	}
+
 	template<class T>
 	template<class TOther>
 	RCPtr<TOther> RCPtr<T>::StaticCast() const
@@ -485,6 +515,46 @@ namespace rkit
 	{
 		return RCPtr<TOther>(const_cast<TOther *>(m_object), m_tracker);
 	}
+
+	template<class T>
+	template<class TOther>
+	RCPtr<TOther> RCPtr<T>::StaticCastMove()
+	{
+		TOther *object = static_cast<TOther *>(m_object);
+		RefCountedTracker *tracker = m_tracker;
+
+		m_object = nullptr;
+		m_tracker = nullptr;
+
+		return RCPtr<TOther>(RCPtrMoveTag(), object, tracker);
+	}
+
+	template<class T>
+	template<class TOther>
+	RCPtr<TOther> RCPtr<T>::ReinterpretCastMove()
+	{
+		TOther *object = reinterpret_cast<TOther *>(m_object);
+		RefCountedTracker *tracker = m_tracker;
+
+		m_object = nullptr;
+		m_tracker = nullptr;
+
+		return RCPtr<TOther>(RCPtrMoveTag(), object, tracker);
+	}
+
+	template<class T>
+	template<class TOther>
+	RCPtr<TOther> RCPtr<T>::ConstCastMove()
+	{
+		TOther *object = const_cast<TOther *>(m_object);
+		RefCountedTracker *tracker = m_tracker;
+
+		m_object = nullptr;
+		m_tracker = nullptr;
+
+		return RCPtr<TOther>(RCPtrMoveTag(), object, tracker);
+	}
+
 
 	template<class T>
 	template<class TField, class TObject>

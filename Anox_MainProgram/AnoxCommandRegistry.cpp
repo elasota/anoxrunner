@@ -9,7 +9,7 @@ namespace anox
 	public:
 		AnoxCommandRegistry();
 
-		rkit::Result RegisterCommand(const AnoxPrehashedRegistryKeyView &name, const AnoxRegisteredCommand::MethodStarter_t &methodStarter) override;
+		rkit::Result RegisterCommand(const AnoxPrehashedRegistryKeyView &name, void *obj, const AnoxRegisteredCommand::MethodStarter_t &methodStarter) override;
 		rkit::Result RegisterAlias(const AnoxPrehashedRegistryKeyView &name, const rkit::ByteStringSliceView &commandText) override;
 		rkit::Result RegisterConsoleVar(const AnoxPrehashedRegistryKeyView &name, AnoxConsoleVarType varType, void *varValue) override;
 
@@ -52,9 +52,9 @@ namespace anox
 	{
 	}
 
-	rkit::Result AnoxCommandRegistry::RegisterCommand(const AnoxPrehashedRegistryKeyView &name, const AnoxRegisteredCommand::MethodStarter_t &methodStarter)
+	rkit::Result AnoxCommandRegistry::RegisterCommand(const AnoxPrehashedRegistryKeyView &name, void *obj, const AnoxRegisteredCommand::MethodStarter_t &methodStarter)
 	{
-		AnoxRegisteredCommand cmd{ methodStarter };
+		AnoxRegisteredCommand cmd{ obj, methodStarter };
 
 		RegistryKey key;
 		RKIT_CHECK(CreateNormalizedKey(key, name));

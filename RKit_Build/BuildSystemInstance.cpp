@@ -1944,7 +1944,7 @@ namespace rkit { namespace buildsystem
 
 		if (!utils::ResultIsOK(result))
 		{
-			rkit::log::Error("A problem occurred while loading the build system cache");
+			rkit::log::Error(u8"A problem occurred while loading the build system cache");
 			m_nodeLookup.Clear();
 			m_nodes.Reset();
 		}

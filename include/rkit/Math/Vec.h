@@ -177,7 +177,7 @@ namespace rkit { namespace math { namespace priv {
 		template<bool... TParam>
 		VecStorage InternalNegateElements() const
 		{
-			static_assert(IntListSize<bool, TParam...>::kValue == TSize, "Wrong number of bool parameters");
+			static_assert(IntListSize<IntList<bool, TParam...>>::kValue == TSize, "Wrong number of bool parameters");
 			return this->InternalNegateElementsImpl<TParam...>();
 		}
 

@@ -670,10 +670,6 @@ namespace rkit { namespace traits {
 		template<class TDerived, class... TParams>\
 		struct InlineMethods\
 		{\
-			inline ::rkit::traits::priv::TraitMethodCaller<signature> GetInvokerFor_ ## methodID() const\
-			{\
-				return ::rkit::traits::priv::TraitMethodCallerFactory::template Create<TDerived, TypeTag_t, kMethodID>(*static_cast<const TDerived *>(this));\
-			}\
 			inline typename AutoMetadata_t::ReturnType_t methodID(TParams... params) const\
 			{\
 				typedef ::rkit::traits::Trait<IDType_t, TypeTag_t> Trait_t;\

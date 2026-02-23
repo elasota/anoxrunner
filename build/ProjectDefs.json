@@ -40,21 +40,13 @@
 	},
 	"RKit_Boot_Win" :
 	{
-		"type": "exe",
-		"extra_files":
-		[
-			{
-				"path": "deploy/RKitModuleConfig.json",
-				"type": "content"
-			}
-		],
+		"type": "linked_module",
 		"refs":
 		[
 			"RKit_CoreLib",
 			"RKit_Mem",
 			"RKit_System_Win32",
 			"RKit_ProgramLauncher",
-			"Anox_MainProgram"
 		]
 	},
 	"RKit_Build" :
@@ -254,6 +246,22 @@
 			"thirdparty/zlib/inftrees.c",
 			"thirdparty/zlib/trees.c",
 			"thirdparty/zlib/zutil.c"
+		]
+	},
+	"Game_Win32" :
+	{
+		"type": "exe",
+		"extra_files":
+		[
+			{
+				"path": "deploy/RKitModuleConfig.json",
+				"type": "content"
+			}
+		],
+		"refs":
+		[
+			"RKit_Boot_Win",
+			"Anox_MainProgram"
 		]
 	}
 }

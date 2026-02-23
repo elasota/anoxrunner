@@ -29,6 +29,9 @@ namespace rkit
 
 		FutureState GetState() const;
 
+		void RCIncRef();
+		void RCDecRef();
+
 	protected:
 		typedef uint8_t StatePrimitive_t;
 
@@ -42,30 +45,41 @@ namespace rkit
 		void Complete(T &&value);
 
 		T &GetResult();
+		const T &GetResult() const;
 
 	private:
 		Optional<T> m_result;
 	};
 
+	class FutureBase
+	{
+	public:
+		FutureBase();
+		explicit FutureBase(RCPtr<FutureContainerBase> &&futureContainer);
+
+		FutureState GetState() const;
+
+		void Reset();
+
+		const RCPtr<FutureContainerBase> &GetFutureContainerRCPtr() const;
+
+	protected:
+		RCPtr<FutureContainerBase> m_container;
+	};
+
 	template<class T>
-	class Future
+	class Future : public FutureBase
 	{
 	public:
 		Future();
 		explicit Future(const RCPtr<FutureContainer<T>> &futureContainer);
 		explicit Future(RCPtr<FutureContainer<T>> &&futureContainer);
 
-		FutureState GetState() const;
-
 		T *TryGetResult() const;
 		T &GetResult() const;
 
-		void Reset();
-
-		const RCPtr<FutureContainer<T>> &GetFutureContainer() const;
-
-	private:
-		RCPtr<FutureContainer<T>> m_container;
+		RCPtr<FutureContainer<T>> GetFutureContainerRCPtr() const;
+		FutureContainer<T> *GetFutureContainer() const;
 	};
 }
 
@@ -97,6 +111,16 @@ namespace rkit
 		return static_cast<FutureState>(m_state.load(std::memory_order_acquire));
 	}
 
+	inline void FutureContainerBase::RCIncRef()
+	{
+		this->RCTrackerAddRef();
+	}
+
+	inline void FutureContainerBase::RCDecRef()
+	{
+		this->RCTrackerDecRef();
+	}
+
 	template<class T>
 	void FutureContainer<T>::Complete(const T &value)
 	{
@@ -123,29 +147,54 @@ namespace rkit
 	}
 
 	template<class T>
+	const T &FutureContainer<T>::GetResult() const
+	{
+		RKIT_ASSERT(GetState() == FutureState::kCompleted);
+		return m_result.Get();
+	}
+
+	inline FutureBase::FutureBase()
+	{
+	}
+
+	inline FutureBase::FutureBase(RCPtr<FutureContainerBase> &&futureContainer)
+		: m_container(std::move(futureContainer))
+	{
+	}
+
+	inline FutureState FutureBase::GetState() const
+	{
+		if (!m_container.IsValid())
+			return FutureState::kEmpty;
+
+		return m_container->GetState();
+	}
+
+	inline void FutureBase::Reset()
+	{
+		m_container.Reset();
+	}
+
+	inline const RCPtr<FutureContainerBase> &FutureBase::GetFutureContainerRCPtr() const
+	{
+		return m_container;
+	}
+
+	template<class T>
 	Future<T>::Future()
 	{
 	}
 
 	template<class T>
 	Future<T>::Future(const RCPtr<FutureContainer<T>> &futureContainer)
-		: m_container(futureContainer)
+		: FutureBase(futureContainer.template StaticCast<FutureContainerBase>())
 	{
 	}
 
 	template<class T>
 	Future<T>::Future(RCPtr<FutureContainer<T>> &&futureContainer)
-		: m_container(std::move(futureContainer))
+		: FutureBase(futureContainer.template StaticCastMove<FutureContainerBase>())
 	{
-	}
-
-	template<class T>
-	FutureState Future<T>::GetState() const
-	{
-		if (!m_container.IsValid())
-			return FutureState::kEmpty;
-
-		return m_container->GetState();
 	}
 
 	template<class T>
@@ -155,7 +204,7 @@ namespace rkit
 			return nullptr;
 
 		if (m_container->GetState() == FutureState::kCompleted)
-			return &m_container->GetResult();
+			return &static_cast<FutureContainer<T> *>(m_container.Get())->GetResult();
 
 		return nullptr;
 	}
@@ -169,14 +218,14 @@ namespace rkit
 	}
 
 	template<class T>
-	void Future<T>::Reset()
+	RCPtr<FutureContainer<T>> Future<T>::GetFutureContainerRCPtr() const
 	{
-		m_container.Reset();
+		return m_container.template StaticCast<FutureContainer<T>>();
 	}
 
 	template<class T>
-	const RCPtr<FutureContainer<T>> &Future<T>::GetFutureContainer() const
+	FutureContainer<T> *Future<T>::GetFutureContainer() const
 	{
-		return m_container;
+		return static_cast<FutureContainer<T> *>(m_container.Get());
 	}
 }

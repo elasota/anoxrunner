@@ -12,6 +12,7 @@
 
 #include "rkit/Data/DataDriver.h"
 
+#include "rkit/Core/Coroutine2.h"
 #include "rkit/Core/Coroutine.h"
 #include "rkit/Core/CoroutineCompiler.h"
 #include "rkit/Core/Drivers.h"
@@ -50,7 +51,7 @@ namespace anox
 		AnoxCommandRegistryBase *GetCommandRegistry() const override;
 		AnoxKeybindManagerBase *GetKeybindManager() const override;
 
-		CORO_DECL_METHOD_OVERRIDE(RestartGame);
+		rkit::ResultCoroutine RestartGame(rkit::ICoroThread &thread, rkit::StringView mapName) override;
 
 	private:
 		bool m_isExiting = false;
@@ -202,29 +203,20 @@ namespace anox
 		return m_keybindManager.Get();
 	}
 
-	CORO_DEF_METHOD(AnoxGame, RestartGame)
+	rkit::ResultCoroutine AnoxGame::RestartGame(rkit::ICoroThread &thread, rkit::StringView mapName)
 	{
-		struct Params
-		{
-			const rkit::StringView mapName;
-		};
+		m_captureHarness->TerminateSession();
 
-		struct Locals
-		{
-		};
+		m_captureHarness.Reset();
 
-		CORO_BEGIN
-			CORO_CHECK(self->m_captureHarness->TerminateSession());
+		rkit::UniquePtr<IConfigurationState> newGameConfig;
+		CORO2_CHECK(m_gameLogic->CreateNewGame(newGameConfig, mapName));
+		CORO2_CHECK(ICaptureHarness::CreateRealTime(m_captureHarness, *this, *m_resourceManager, std::move(newGameConfig)));
 
-			self->m_captureHarness.Reset();
+		CORO2_CHECK(co_await m_gameLogic->StartSession(thread));
 
-			rkit::UniquePtr<IConfigurationState> newGameConfig;
-			CORO_CHECK(self->m_gameLogic->CreateNewGame(newGameConfig, params.mapName));
-			CORO_CHECK(ICaptureHarness::CreateRealTime(self->m_captureHarness, *self, *self->m_resourceManager, std::move(newGameConfig)));
-
-			CORO_CALL(self->m_gameLogic->AsyncStartSession);
-		CORO_END
-	};
+		CORO2_RETURN_OK;
+	}
 
 	rkit::Result anox::IAnoxGame::Create(rkit::UniquePtr<IAnoxGame> &outGame, const rkit::Optional<uint16_t> &numThreads)
 	{

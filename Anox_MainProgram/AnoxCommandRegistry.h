@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rkit/Core/Coroutine.h"
+#include "rkit/Core/Coroutine2Protos.h"
 #include "rkit/Core/Optional.h"
 #include "rkit/Core/String.h"
 #include "rkit/Core/HashValue.h"
@@ -15,15 +16,12 @@ namespace anox
 {
 	class AnoxCommandStackBase;
 
+
 	struct AnoxRegisteredCommand
 	{
-		typedef rkit::coro::MethodStarter<void(AnoxCommandStackBase &, const rkit::ISpan<rkit::ByteStringView> &args)> MethodStarter_t;
+		typedef rkit::ResultCoroutine(*MethodStarter_t)(void *obj, rkit::ICoroThread &thread, AnoxCommandStackBase &, const rkit::ISpan<rkit::ByteStringView> &args);
 
-		inline const MethodStarter_t &AsyncCall() const
-		{
-			return m_methodStarter;
-		}
-
+		void *m_obj;
 		MethodStarter_t m_methodStarter;
 	};
 
@@ -81,7 +79,7 @@ namespace anox
 	public:
 		virtual ~AnoxCommandRegistryBase() {}
 
-		virtual rkit::Result RegisterCommand(const AnoxPrehashedRegistryKeyView &name, const AnoxRegisteredCommand::MethodStarter_t &methodStarter) = 0;
+		virtual rkit::Result RegisterCommand(const AnoxPrehashedRegistryKeyView &name, void *obj, const AnoxRegisteredCommand::MethodStarter_t &methodStarter) = 0;
 		virtual rkit::Result RegisterAlias(const AnoxPrehashedRegistryKeyView &name, const rkit::ByteStringSliceView &commandText) = 0;
 		virtual rkit::Result RegisterConsoleVar(const AnoxPrehashedRegistryKeyView &name, AnoxConsoleVarType varType, void *varValue) = 0;
 
@@ -95,10 +93,34 @@ namespace anox
 		static rkit::Result EscapeToken(rkit::ByteString &outString, const rkit::ByteStringSliceView &token);
 
 		static rkit::Result Create(rkit::UniquePtr<AnoxCommandRegistryBase> &outRegistry);
+
+		template<auto TMemberFunction, class TObj>
+		rkit::Result RegisterMemberFuncCommand(const AnoxPrehashedRegistryKeyView &name, TObj *obj);
+
+	private:
+		template<auto TMemberFunction, class TObj>
+		static rkit::ResultCoroutine MemberFuncCommandThunk(void *obj, rkit::ICoroThread &thread, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &span);
+
+		template<class TObj>
+		static rkit::ResultCoroutine MemberFuncCommandThunk2(rkit::ICoroThread &thread, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &span, TObj *obj,
+			rkit::ResultCoroutine(TObj:: *memberFunc)(rkit::ICoroThread &thread, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &span));
+
+		template<class TObj>
+		static rkit::ResultCoroutine MemberFuncCommandThunk2(rkit::ICoroThread &thread, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &span, const TObj *obj,
+			rkit::ResultCoroutine(TObj:: *memberFunc)(rkit::ICoroThread &thread, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &span) const);
+
+		template<class TObj>
+		static rkit::ResultCoroutine MemberFuncCommandThunk2(rkit::ICoroThread &thread, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &span, TObj *obj,
+			rkit::Result (TObj:: *memberFunc)(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &span));
+
+		template<class TObj>
+		static rkit::ResultCoroutine MemberFuncCommandThunk2(rkit::ICoroThread &thread, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &span, TObj *obj,
+			rkit::Result (TObj:: *memberFunc)(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &span) const);
 	};
 }
 
 #include "rkit/Core/StringView.h"
+#include "rkit/Core/Coroutine2.h"
 
 namespace anox
 {
@@ -131,5 +153,45 @@ namespace anox
 			return ch - 'A' + 'a';
 		else
 			return ch;
+	}
+
+	template<auto TMemberFunction, class TObj>
+	rkit::Result AnoxCommandRegistryBase::RegisterMemberFuncCommand(const AnoxPrehashedRegistryKeyView &name, TObj *obj)
+	{
+		this->RegisterCommand(name, obj, MemberFuncCommandThunk<TMemberFunction, TObj>);
+	}
+
+	template<auto TMemberFunction, class TObj>
+	rkit::ResultCoroutine AnoxCommandRegistryBase::MemberFuncCommandThunk(void *obj, rkit::ICoroThread &thread, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args)
+	{
+		return MemberFuncCommandThunk2<TObj>(thread, commandStack, args, static_cast<TObj *>(obj), TMemberFunction);
+	}
+
+	template<class TObj>
+	rkit::ResultCoroutine AnoxCommandRegistryBase::MemberFuncCommandThunk2(rkit::ICoroThread &thread, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args, TObj *obj,
+		rkit::ResultCoroutine(TObj:: *memberFunc)(rkit::ICoroThread &thread, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args))
+	{
+		return (obj->*memberFunc)(thread, commandStack, args);
+	}
+
+	template<class TObj>
+	rkit::ResultCoroutine AnoxCommandRegistryBase::MemberFuncCommandThunk2(rkit::ICoroThread &thread, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args, const TObj *obj,
+		rkit::ResultCoroutine(TObj:: *memberFunc)(rkit::ICoroThread &thread, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args) const)
+	{
+		return (obj->*memberFunc)(thread, commandStack, args);
+	}
+
+	template<class TObj>
+	rkit::ResultCoroutine AnoxCommandRegistryBase::MemberFuncCommandThunk2(rkit::ICoroThread &thread, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args, TObj *obj,
+		rkit::Result(TObj:: *memberFunc)(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args))
+	{
+		co_return (obj->*memberFunc)(commandStack, args);
+	}
+
+	template<class TObj>
+	rkit::ResultCoroutine AnoxCommandRegistryBase::MemberFuncCommandThunk2(rkit::ICoroThread &thread, AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args, TObj *obj,
+		rkit::Result(TObj:: *memberFunc)(AnoxCommandStackBase &commandStack, const rkit::ISpan<rkit::ByteStringView> &args) const)
+	{
+		co_return (obj->*memberFunc)(commandStack, args);
 	}
 }
