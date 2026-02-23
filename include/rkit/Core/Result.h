@@ -246,7 +246,7 @@ namespace rkit { namespace priv {
 	}
 } }
 
-#define RKIT_CHECK(expr) expr
+#define RKIT_CHECK(expr) (static_cast<void>(expr))
 #define RKIT_RETURN_OK return
 #define RKIT_THROW(expr) throw (::rkit::ResultException(expr))
 #define RKIT_TRY_CATCH_RETHROW(expr, eh) (::rkit::priv::TryCatchRethrow([&] { static_cast<void>(expr); }, (eh)))

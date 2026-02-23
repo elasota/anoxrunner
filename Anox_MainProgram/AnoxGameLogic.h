@@ -1,7 +1,7 @@
 #pragma once
 
 #include "rkit/Core/CoreDefs.h"
-#include "rkit/Core/Coroutine2.h"
+#include "rkit/Core/Coroutine.h"
 #include "rkit/Core/StringProto.h"
 
 namespace rkit

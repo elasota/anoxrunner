@@ -2,7 +2,11 @@
 
 namespace rkit { namespace boot { namespace win32
 {
+#if !RKIT_IS_DEBUG
+	int MainCommon(HINSTANCE hInstance);
+#else
 	int __declspec(dllimport) MainCommon(HINSTANCE hInstance);
+#endif
 } } }
 
 #ifdef _CONSOLE

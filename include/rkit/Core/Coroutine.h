@@ -1,17 +1,15 @@
 #pragma once
 
-#include "Coroutine2Protos.h"
+#include "CoroutineProtos.h"
 #include "Result.h"
 #include "StringProto.h"
 
 #include <coroutine>
 #include <cstddef>
 
-#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
 #include <exception>
-#endif
 
-namespace rkit::coro2::priv
+namespace rkit::coro::priv
 {
 	template<class TReturnType>
 	class CoroutineAwaiterBase
@@ -152,6 +150,11 @@ namespace rkit::coro2::priv
 		friend class CoroutineAwaiterBase;
 
 	public:
+#ifdef __INTELLISENSE__
+		// Hack for broken IntelliSense
+		Promise();
+#endif
+
 		template<class... TArgs>
 		Promise(ICoroThread &thread, TArgs&&...);
 
@@ -168,9 +171,17 @@ namespace rkit::coro2::priv
 
 		void operator delete(void *ptr);
 
+#ifndef __INTELLISENSE__
+		// Hack for IntelliSense not recognizing this entire thing
 		static Coroutine<TReturnType> get_return_object_on_allocation_failure();
+#endif
 
 		Returner<TReturnType> &GetReturnValueStorage();
+
+#ifdef __INTELLISENSE__
+		// Hack for IntelliSense not recognizing overloaded allocators
+		void *operator new(std::size_t n);
+#endif
 
 		template<class... TArgs>
 		void *operator new(std::size_t n, ICoroThread &allocator, TArgs&&... args) noexcept;
@@ -181,13 +192,11 @@ namespace rkit::coro2::priv
 	private:
 		std::coroutine_handle<> m_continuation;
 
-#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
 		std::exception_ptr m_exception;
-#endif
 	};
 }
 
-namespace rkit::coro2
+namespace rkit::coro
 {
 	template<class TReturnType = rkit::Result>
 	class Coroutine
@@ -216,11 +225,15 @@ namespace rkit::coro2
 
 #include "CoroThread.h"
 
+#if RKIT_RESULT_BEHAVIOR != RKIT_RESULT_BEHAVIOR_EXCEPTION
+#include "RKitAssert.h"
+#endif
+
 #include <new>
 #include <limits>
 
 // Implementations
-namespace rkit::coro2::priv
+namespace rkit::coro::priv
 {
 	template<class TReturnType>
 	inline CoroutineAwaiterBase<TReturnType>::CoroutineAwaiterBase(std::coroutine_handle<Promise<TReturnType>> coroHandle)
@@ -259,14 +272,12 @@ namespace rkit::coro2::priv
 		{
 			Promise<TReturnType> &promise = this->m_coroHandle.promise();
 
-#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
 			if (promise.m_exception)
 			{
 				std::exception_ptr exPtr = promise.m_exception;
 				this->m_coroHandle.destroy();
 				std::rethrow_exception(exPtr);
 			}
-#endif
 
 			Returner<TReturnType> &returner = this->m_coroHandle.promise();
 			TReturnType *storedRV = returner.GetRVStorage();
@@ -295,18 +306,17 @@ namespace rkit::coro2::priv
 			RKIT_THROW(rkit::ResultCode::kCoroStackOverflow);
 #else
 			RKIT_ASSERT(false);
+			std::terminate();
 #endif
 		}
 		Promise<TReturnType> &promise = this->m_coroHandle.promise();
 
-#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
 		if (promise.m_exception)
 		{
 			std::exception_ptr exPtr = promise.m_exception;
 			this->m_coroHandle.destroy();
 			std::rethrow_exception(exPtr);
 		}
-#endif
 
 		Returner<TReturnType &> &returner = promise.GetReturnValueStorage();
 		TReturnType *temp = returner.GetRV();
@@ -331,18 +341,17 @@ namespace rkit::coro2::priv
 			RKIT_THROW(rkit::ResultCode::kCoroStackOverflow);
 #else
 			RKIT_ASSERT(false);
+			std::terminate();
 #endif
 		}
 		Promise<TReturnType> &promise = this->m_coroHandle.promise();
 
-#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
 		if (promise.m_exception)
 		{
 			std::exception_ptr exPtr = promise.m_exception;
 			this->m_coroHandle.destroy();
 			std::rethrow_exception(exPtr);
 		}
-#endif
 
 		Returner<TReturnType &> &returner = promise.GetReturnValueStorage();
 		TReturnType *temp = returner.GetRV();
@@ -365,10 +374,10 @@ namespace rkit::coro2::priv
 			RKIT_THROW(rkit::ResultCode::kCoroStackOverflow);
 #else
 			RKIT_ASSERT(false);
+			std::terminate();
 #endif
 		}
 
-#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
 		Promise<void> &promise = this->m_coroHandle.promise();
 
 		if (promise.m_exception)
@@ -377,7 +386,6 @@ namespace rkit::coro2::priv
 			this->m_coroHandle.destroy();
 			std::rethrow_exception(exPtr);
 		}
-#endif
 
 		this->m_coroHandle.destroy();
 	}
@@ -517,11 +525,13 @@ namespace rkit::coro2::priv
 		header->m_deleter(header->m_context, header);
 	}
 
+#ifndef __INTELLISENSE__
 	template<class TReturnType>
 	Coroutine<TReturnType> Promise<TReturnType>::get_return_object_on_allocation_failure()
 	{
 		return Coroutine<TReturnType>(std::coroutine_handle<Promise>());
 	}
+#endif
 
 	template<class TReturnType>
 	Returner<TReturnType> &Promise<TReturnType>::GetReturnValueStorage()
@@ -546,7 +556,7 @@ namespace rkit::coro2::priv
 
 
 
-namespace rkit::coro2
+namespace rkit::coro
 {
 	template<class TReturnType>
 	Coroutine<TReturnType>::Coroutine(std::coroutine_handle<promise_type> handle)
@@ -575,16 +585,23 @@ namespace rkit::coro2
 
 #if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_ENUM || RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_CLASS
 
-#define CORO2_THROW(expr)	co_return (expr);
+#define CORO_THROW(expr)	co_return (::rkit::priv::ThrowResult(expr));
 
-#define CORO2_CHECK(expr)	RKIT_CHECK(co_await (expr))
+#define CORO_RETURN_OK co_return (static_cast<::rkit::Result>(::rkit::ResultCode::kOK))
+
+#define CORO_CHECK(expr) do {\
+	::rkit::Result RKIT_PP_CONCAT(exprResult_, __LINE__) = (expr);\
+	if (static_cast<uint64_t>(RKIT_PP_CONCAT(exprResult_, __LINE__)) != 0)\
+		co_return RKIT_PP_CONCAT(exprResult_, __LINE__);\
+} while (false)
+
 
 #elif RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
 
-#define CORO2_THROW(expr)	RKIT_THROW(expr)
+#define CORO_THROW(expr)	RKIT_THROW(expr)
 
-#define CORO2_CHECK(expr) (static_cast<void>(expr))
+#define CORO_CHECK(expr) RKIT_CHECK(expr)
 
-#define CORO2_RETURN_OK co_return
+#define CORO_RETURN_OK co_return
 
 #endif

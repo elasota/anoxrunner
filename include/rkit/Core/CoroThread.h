@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Coroutine2Protos.h"
+#include "CoroutineProtos.h"
 #include "Result.h"
 
 #include <coroutine>
@@ -68,7 +68,7 @@ namespace rkit
 		virtual void DeallocFrame(void *mem) = 0;
 
 		template<class TReturnType>
-		rkit::Result EnterFunction(const coro2::Coroutine<TReturnType> &coro);
+		rkit::Result EnterFunction(const coro::Coroutine<TReturnType> &coro);
 
 	protected:
 		virtual rkit::Result EnterCoroutine(std::coroutine_handle<> coroHandle) = 0;
@@ -109,7 +109,7 @@ namespace rkit
 	}
 
 	template<class TReturnType>
-	rkit::Result ICoroThread::EnterFunction(const coro2::Coroutine<TReturnType> &coro)
+	rkit::Result ICoroThread::EnterFunction(const coro::Coroutine<TReturnType> &coro)
 	{
 		return this->EnterCoroutine(coro.GetCoroutineHandle());
 	}

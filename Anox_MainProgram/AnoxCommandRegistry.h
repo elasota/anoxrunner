@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rkit/Core/Coroutine2Protos.h"
+#include "rkit/Core/CoroutineProtos.h"
 #include "rkit/Core/Optional.h"
 #include "rkit/Core/String.h"
 #include "rkit/Core/HashValue.h"
@@ -119,7 +119,7 @@ namespace anox
 }
 
 #include "rkit/Core/StringView.h"
-#include "rkit/Core/Coroutine2.h"
+#include "rkit/Core/Coroutine.h"
 
 namespace anox
 {
@@ -157,7 +157,7 @@ namespace anox
 	template<auto TMemberFunction, class TObj>
 	rkit::Result AnoxCommandRegistryBase::RegisterMemberFuncCommand(const AnoxPrehashedRegistryKeyView &name, TObj *obj)
 	{
-		this->RegisterCommand(name, obj, MemberFuncCommandThunk<TMemberFunction, TObj>);
+		return this->RegisterCommand(name, obj, MemberFuncCommandThunk<TMemberFunction, TObj>);
 	}
 
 	template<auto TMemberFunction, class TObj>

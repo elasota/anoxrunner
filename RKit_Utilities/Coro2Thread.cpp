@@ -259,6 +259,8 @@ namespace rkit::utils
 		m_resumer.m_continuation = coroHandle;
 
 		m_blocker = NotActuallyBlockedBlocker::Create();
+
+		RKIT_RETURN_OK;
 	}
 
 

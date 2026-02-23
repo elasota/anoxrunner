@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rkit/Core/Coroutine2.h"
+#include "rkit/Core/Coroutine.h"
 
 namespace rkit
 {

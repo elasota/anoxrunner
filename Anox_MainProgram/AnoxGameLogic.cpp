@@ -4,7 +4,7 @@
 
 #include "rkit/Data/ContentID.h"
 
-#include "rkit/Core/Coroutine2.h"
+#include "rkit/Core/Coroutine.h"
 #include "rkit/Core/CoroThread.h"
 #include "rkit/Core/Future.h"
 #include "rkit/Core/LogDriver.h"
@@ -307,23 +307,23 @@ namespace anox
 
 	rkit::ResultCoroutine AnoxGameLogic::StartUp(rkit::ICoroThread &thread)
 	{
-		CORO2_CHECK(co_await ExecCommandFile(thread, *m_commandStack, rkit::CIPathView(u8"configs/default.cfg")));
-		CORO2_CHECK(m_commandStack->Push(u8"d1"));
-		CORO2_CHECK(co_await RunCommands(thread, *m_commandStack));
+		CORO_CHECK(co_await ExecCommandFile(thread, *m_commandStack, rkit::CIPathView(u8"configs/default.cfg")));
+		CORO_CHECK(m_commandStack->Push(u8"d1"));
+		CORO_CHECK(co_await RunCommands(thread, *m_commandStack));
 
-		CORO2_RETURN_OK;
+		CORO_RETURN_OK;
 	}
 
 	rkit::ResultCoroutine AnoxGameLogic::ExecCommandFile(rkit::ICoroThread &thread, AnoxCommandStackBase &commandStack, rkit::CIPathView path)
 	{
 		AnoxResourceRetrieveResult resLoadResult;
 
-		CORO2_CHECK(co_await LoadCIPathKeyedResource(thread, resLoadResult, anox::resloaders::kRawFileResourceTypeCode, path));
+		CORO_CHECK(co_await LoadCIPathKeyedResource(thread, resLoadResult, anox::resloaders::kRawFileResourceTypeCode, path));
 
-		CORO2_CHECK(commandStack.Parse(resLoadResult.m_resourceHandle.StaticCast<AnoxFileResourceBase>()->GetContents()));
-		CORO2_CHECK(co_await RunCommands(thread, commandStack));
+		CORO_CHECK(commandStack.Parse(resLoadResult.m_resourceHandle.StaticCast<AnoxFileResourceBase>()->GetContents()));
+		CORO_CHECK(co_await RunCommands(thread, commandStack));
 
-		CORO2_RETURN_OK;
+		CORO_RETURN_OK;
 	}
 
 
@@ -333,10 +333,10 @@ namespace anox
 
 		while (commandStack.Pop(line))
 		{
-			CORO2_CHECK(co_await RunCommand(thread, commandStack, line));
+			CORO_CHECK(co_await RunCommand(thread, commandStack, line));
 		}
 
-		CORO2_RETURN_OK;
+		CORO_RETURN_OK;
 	}
 
 
@@ -356,29 +356,29 @@ namespace anox
 
 		if (cmd != nullptr)
 		{
-			CORO2_CHECK(co_await cmd->m_methodStarter(cmd->m_obj, thread, commandStack, parser));
-			CORO2_RETURN_OK;
+			CORO_CHECK(co_await cmd->m_methodStarter(cmd->m_obj, thread, commandStack, parser));
+			CORO_RETURN_OK;
 		}
 
 		const AnoxRegisteredAlias *alias = cmdRegistry->FindAlias(cmdView);
 
 		if (alias != nullptr)
 		{
-			CORO2_CHECK(InsertAlias(commandStack, *alias));
-			CORO2_RETURN_OK;
+			CORO_CHECK(InsertAlias(commandStack, *alias));
+			CORO_RETURN_OK;
 		}
 
 		const AnoxRegisteredConsoleVar *consoleVar = cmdRegistry->FindConsoleVar(cmdView);
 
 		if (consoleVar != nullptr)
 		{
-			CORO2_CHECK(ApplyConsoleVar(*consoleVar, parser));
-			CORO2_RETURN_OK;
+			CORO_CHECK(ApplyConsoleVar(*consoleVar, parser));
+			CORO_RETURN_OK;
 		}
 
 		rkit::log::ErrorFmt(u8"Unknown console command {}", parser.GetCommand());
 
-		CORO2_RETURN_OK;
+		CORO_RETURN_OK;
 	};
 
 	rkit::ResultCoroutine AnoxGameLogic::Cmd_Exec(rkit::ICoroThread &thread, AnoxCommandStackBase &cmdStack, const rkit::ISpan<rkit::ByteStringView> &args)
@@ -386,18 +386,18 @@ namespace anox
 		if (args.Count() < 1)
 		{
 			rkit::log::Error(u8"Usage: exec <file>");
-			CORO2_RETURN_OK;
+			CORO_RETURN_OK;
 		}
 
 		rkit::CIPath path;
-		CORO2_CHECK(path.Set(rkit::CIPathView(u8"configs")));
+		CORO_CHECK(path.Set(rkit::CIPathView(u8"configs")));
 
 		rkit::ByteStringView configPathBStr = args[0];
 
 		if (!rkit::CharacterEncodingValidator<rkit::CharacterEncoding::kASCII>::ValidateSpan(configPathBStr.ToSpan()))
 		{
 			rkit::log::Error(u8"exec file was invalid");
-			CORO2_RETURN_OK;
+			CORO_RETURN_OK;
 		}
 
 		rkit::StringView configPathStr = configPathBStr.ToUTF8Unsafe();
@@ -410,20 +410,20 @@ namespace anox
 			configRelPath = rkit::CIPathView(configPathStr);
 		else if (validationResult == rkit::PathValidationResult::kConvertible)
 		{
-			CORO2_CHECK(relPath.Set(configPathStr));
+			CORO_CHECK(relPath.Set(configPathStr));
 			configRelPath = relPath;
 		}
 		else
 		{
 			rkit::log::Error(u8"Malformed exec file path");
-			CORO2_RETURN_OK;
+			CORO_RETURN_OK;
 		}
 
-		CORO2_CHECK(path.Append(configRelPath));
+		CORO_CHECK(path.Append(configRelPath));
 
-		CORO2_CHECK(co_await ExecCommandFile(thread, cmdStack, path));
+		CORO_CHECK(co_await ExecCommandFile(thread, cmdStack, path));
 
-		CORO2_RETURN_OK;
+		CORO_RETURN_OK;
 	}
 
 	rkit::ResultCoroutine AnoxGameLogic::Cmd_Map(rkit::ICoroThread &thread, AnoxCommandStackBase &cmdStack, const rkit::ISpan<rkit::ByteStringView> &args)
@@ -431,7 +431,7 @@ namespace anox
 		if (args.Count() < 1)
 		{
 			rkit::log::Error(u8"Usage: map <map name>");
-			CORO2_RETURN_OK;
+			CORO_RETURN_OK;
 		}
 
 		rkit::ByteStringView mapNameStr = args[0];
@@ -448,14 +448,14 @@ namespace anox
 				continue;
 
 			rkit::log::Error(u8"Malformed map file path");
-			CORO2_RETURN_OK;
+			CORO_RETURN_OK;
 		}
 
 		rkit::StringView unicodeStrView(reinterpret_cast<const rkit::Utf8Char_t *>(mapNameStr.GetChars()), mapNameStr.Length());
 
-		CORO2_CHECK(co_await m_game->RestartGame(thread,  unicodeStrView));
+		CORO_CHECK(co_await m_game->RestartGame(thread,  unicodeStrView));
 
-		CORO2_RETURN_OK;
+		CORO_RETURN_OK;
 	}
 
 	rkit::ResultCoroutine AnoxGameLogic::LoadCIPathKeyedResource(rkit::ICoroThread &thread, AnoxResourceRetrieveResult &loadResult,
@@ -463,23 +463,23 @@ namespace anox
 	{
 		rkit::Future<AnoxResourceRetrieveResult> resLoadResult;
 
-		CORO2_CHECK(m_game->GetCaptureHarness()->GetCIPathKeyedResource(resLoadResult, resourceType, path));
-		CORO2_CHECK(co_await thread.AwaitFuture(resLoadResult));
+		CORO_CHECK(m_game->GetCaptureHarness()->GetCIPathKeyedResource(resLoadResult, resourceType, path));
+		CORO_CHECK(co_await thread.AwaitFuture(resLoadResult));
 
 		loadResult = resLoadResult.GetResult();
 
-		CORO2_RETURN_OK;
+		CORO_RETURN_OK;
 	}
 
 	rkit::ResultCoroutine AnoxGameLogic::LoadStringKeyedResource(rkit::ICoroThread &thread, AnoxResourceRetrieveResult &loadResult,
 		uint32_t resourceType, const rkit::StringView &str)
 	{
 		rkit::Future<AnoxResourceRetrieveResult> resLoadResult;
-		CORO2_CHECK(m_game->GetCaptureHarness()->GetStringKeyedResource(resLoadResult, resourceType, str));
-		CORO2_CHECK(co_await thread.AwaitFuture(resLoadResult));
+		CORO_CHECK(m_game->GetCaptureHarness()->GetStringKeyedResource(resLoadResult, resourceType, str));
+		CORO_CHECK(co_await thread.AwaitFuture(resLoadResult));
 
 		loadResult = resLoadResult.GetResult();
-		CORO2_RETURN_OK;
+		CORO_RETURN_OK;
 	}
 
 	rkit::ResultCoroutine AnoxGameLogic::LoadContentIDKeyedResource(rkit::ICoroThread &thread, AnoxResourceRetrieveResult &loadResult,
@@ -487,11 +487,11 @@ namespace anox
 	{
 		rkit::Future<AnoxResourceRetrieveResult> resLoadResult;
 
-		CORO2_CHECK(m_game->GetCaptureHarness()->GetContentIDKeyedResource(resLoadResult, resourceType, cid));
-		CORO2_CHECK(co_await thread.AwaitFuture(resLoadResult));
+		CORO_CHECK(m_game->GetCaptureHarness()->GetContentIDKeyedResource(resLoadResult, resourceType, cid));
+		CORO_CHECK(co_await thread.AwaitFuture(resLoadResult));
 
 		loadResult = resLoadResult.GetResult();
-		CORO2_RETURN_OK;
+		CORO_RETURN_OK;
 	}
 
 	rkit::ResultCoroutine AnoxGameLogic::LoadMap(rkit::ICoroThread &thread, const rkit::StringSliceView &mapName)
@@ -503,20 +503,20 @@ namespace anox
 
 		{
 			rkit::String fullPathStr;
-			CORO2_CHECK(fullPathStr.Format(u8"ax_bsp/maps/{}.bsp.bspmodel", mapName));
+			CORO_CHECK(fullPathStr.Format(u8"ax_bsp/maps/{}.bsp.bspmodel", mapName));
 
-			CORO2_CHECK(path.Set(fullPathStr));
+			CORO_CHECK(path.Set(fullPathStr));
 		}
 
 		rkit::log::LogInfo(u8"GameLogic: Loading map");
 
-		CORO2_CHECK(co_await LoadCIPathKeyedResource(thread, modelLoadResult, anox::resloaders::kBSPModelResourceTypeCode, path));
+		CORO_CHECK(co_await LoadCIPathKeyedResource(thread, modelLoadResult, anox::resloaders::kBSPModelResourceTypeCode, path));
 
 		m_bspModel = modelLoadResult.m_resourceHandle.StaticCast<AnoxBSPModelResourceBase>();
 
 		rkit::log::LogInfo(u8"GameLogic: Map loaded successfully");
 
-		CORO2_RETURN_OK;
+		CORO_RETURN_OK;
 	}
 
 	rkit::ResultCoroutine AnoxGameLogic::SpawnMapInitialObjects(rkit::ICoroThread &thread, const rkit::StringSliceView &mapName)
@@ -525,18 +525,18 @@ namespace anox
 		rkit::CIPath path;
 
 		rkit::String fullPathStr;
-		CORO2_CHECK(fullPathStr.Format(u8"ax_bsp/maps/{}.bsp.objects", mapName));
+		CORO_CHECK(fullPathStr.Format(u8"ax_bsp/maps/{}.bsp.objects", mapName));
 
-		CORO2_CHECK(path.Set(fullPathStr));
+		CORO_CHECK(path.Set(fullPathStr));
 
 		rkit::log::LogInfo(u8"GameLogic: Loading spawn objects");
 
-		CORO2_CHECK(co_await LoadCIPathKeyedResource(thread, objectsLoadResult, anox::resloaders::kSpawnDefsResourceTypeCode, path));
+		CORO_CHECK(co_await LoadCIPathKeyedResource(thread, objectsLoadResult, anox::resloaders::kSpawnDefsResourceTypeCode, path));
 
 		rkit::log::LogInfo(u8"GameLogic: Spawning objects");
 
 		int n = 0;
-		CORO2_RETURN_OK;
+		CORO_RETURN_OK;
 	}
 
 	rkit::ResultCoroutine AnoxGameLogic::StartSession(rkit::ICoroThread &thread)
@@ -545,18 +545,18 @@ namespace anox
 
 		rkit::log::LogInfo(u8"GameLogic: Starting session");
 
-		CORO2_CHECK(m_game->GetCaptureHarness()->GetConfigurationState(configState));
+		CORO_CHECK(m_game->GetCaptureHarness()->GetConfigurationState(configState));
 
 		IConfigurationValueView root = configState->GetRoot();
 
 		IConfigurationKeyValueTableView kvt;
-		CORO2_CHECK(root.Get(kvt));
+		CORO_CHECK(root.Get(kvt));
 
 		IConfigurationValueView mapNameValue;
-		CORO2_CHECK(kvt.GetValueFromKey(u8"mapName", mapNameValue));
+		CORO_CHECK(kvt.GetValueFromKey(u8"mapName", mapNameValue));
 
 		rkit::StringSliceView mapName;
-		CORO2_CHECK(mapNameValue.Get(mapName));
+		CORO_CHECK(mapNameValue.Get(mapName));
 
 		for (char c : mapName)
 		{
@@ -566,18 +566,18 @@ namespace anox
 				continue;
 
 			rkit::log::Error(u8"Invalid map name");
-			CORO2_THROW(rkit::ResultCode::kDataError);
+			CORO_THROW(rkit::ResultCode::kDataError);
 		}
 
-		CORO2_CHECK(co_await LoadMap(thread, mapName));
-		CORO2_CHECK(co_await SpawnMapInitialObjects(thread, mapName));
+		CORO_CHECK(co_await LoadMap(thread, mapName));
+		CORO_CHECK(co_await SpawnMapInitialObjects(thread, mapName));
 
-		CORO2_RETURN_OK;
+		CORO_RETURN_OK;
 	}
 
 	rkit::ResultCoroutine AnoxGameLogic::AsyncRunFrame(rkit::ICoroThread &thread)
 	{
-		CORO2_RETURN_OK;
+		CORO_RETURN_OK;
 	}
 
 	rkit::Result IGameLogic::Create(rkit::UniquePtr<IGameLogic> &outGameLoop, IAnoxGame *game)

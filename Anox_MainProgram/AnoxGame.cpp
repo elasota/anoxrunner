@@ -12,7 +12,7 @@
 
 #include "rkit/Data/DataDriver.h"
 
-#include "rkit/Core/Coroutine2.h"
+#include "rkit/Core/Coroutine.h"
 #include "rkit/Core/Drivers.h"
 #include "rkit/Core/DriverModuleInitParams.h"
 #include "rkit/Core/Event.h"
@@ -203,17 +203,17 @@ namespace anox
 
 	rkit::ResultCoroutine AnoxGame::RestartGame(rkit::ICoroThread &thread, rkit::StringView mapName)
 	{
-		m_captureHarness->TerminateSession();
+		CORO_CHECK(m_captureHarness->TerminateSession());
 
 		m_captureHarness.Reset();
 
 		rkit::UniquePtr<IConfigurationState> newGameConfig;
-		CORO2_CHECK(m_gameLogic->CreateNewGame(newGameConfig, mapName));
-		CORO2_CHECK(ICaptureHarness::CreateRealTime(m_captureHarness, *this, *m_resourceManager, std::move(newGameConfig)));
+		CORO_CHECK(m_gameLogic->CreateNewGame(newGameConfig, mapName));
+		CORO_CHECK(ICaptureHarness::CreateRealTime(m_captureHarness, *this, *m_resourceManager, std::move(newGameConfig)));
 
-		CORO2_CHECK(co_await m_gameLogic->StartSession(thread));
+		CORO_CHECK(co_await m_gameLogic->StartSession(thread));
 
-		CORO2_RETURN_OK;
+		CORO_RETURN_OK;
 	}
 
 	rkit::Result anox::IAnoxGame::Create(rkit::UniquePtr<IAnoxGame> &outGame, const rkit::Optional<uint16_t> &numThreads)

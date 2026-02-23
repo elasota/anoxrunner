@@ -1,7 +1,7 @@
 #pragma once
 
 #include "rkit/Core/CoreDefs.h"
-#include "rkit/Core/Coroutine2Protos.h"
+#include "rkit/Core/CoroutineProtos.h"
 #include "rkit/Core/StringProto.h"
 
 #include <cstdint>

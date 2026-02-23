@@ -2,13 +2,13 @@
 
 #include "Result.h"
 
-namespace rkit::coro2
+namespace rkit::coro
 {
 	template<class TReturnType>
 	class Coroutine;
 }
 
-namespace rkit::coro2::priv
+namespace rkit::coro::priv
 {
 	template<class TReturnType>
 	class Promise;
@@ -18,7 +18,7 @@ namespace rkit
 {
 	struct ICoroThread;
 
-	using ResultCoroutine = rkit::coro2::Coroutine<rkit::Result>;
+	using ResultCoroutine = rkit::coro::Coroutine<rkit::Result>;
 
 	struct CoroThreadResumer;
 	struct CoroThreadBlocker;

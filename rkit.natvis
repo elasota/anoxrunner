@@ -33,14 +33,6 @@
 	<Type Name="rkit::BaseStringSliceView&lt;wchar_t&gt;">
 		<DisplayString>{m_span.m_arr,su}</DisplayString>
 	</Type>
-	<Type Name="rkit::coro::InspectableStackFrameBase">
-		<DisplayString>{m_stackInspector}</DisplayString>
-		<Expand>
-			<Item Name="[frame]">m_stackInspector</Item>
-			<Item Name="[ip]">m_ip</Item>
-			<Item Name="[prevFrame]">m_prevFrame ? (m_prevFrame->m_stackInspector) : nullptr</Item>
-		</Expand>
-	</Type>
 	<Type Name="rkit::BasePathSliceView&lt;*,*&gt;">
 		<DisplayString>{m_view.m_span.m_arr}</DisplayString>
 	</Type>

@@ -397,9 +397,13 @@ namespace rkit
 	}
 }
 
-namespace rkit { namespace boot { namespace win32
+namespace rkit::boot::win32
 {
+#if RKIT_IS_DEBUG
 	int __declspec(dllexport) MainCommon(HINSTANCE hInstance)
+#else
+	int MainCommon(HINSTANCE hInstance)
+#endif
 	{
 		setlocale(LC_ALL, "C");
 		::SetConsoleOutputCP(CP_UTF8);
@@ -524,6 +528,6 @@ namespace rkit { namespace boot { namespace win32
 
 		return 0;
 	}
-} } }
+}
 
 RKIT_IMPLEMENT_PER_MODULE_FUNCTIONS
