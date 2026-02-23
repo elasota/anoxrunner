@@ -14,7 +14,6 @@
 
 #include "rkit/Utilities/ThreadPool.h"
 
-#include "CoroThread.h"
 #include "Coro2Thread.h"
 #include "DeflateDecompressStream.h"
 #include "JobQueue.h"
@@ -103,7 +102,6 @@ namespace rkit
 
 		bool IsPathComponentValidOnWindows(const BaseStringSliceView<OSPathChar_t, CharacterEncoding::kOSPath> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const override;
 
-		Result CreateCoroThread(UniquePtr<coro::Thread> &thread, size_t stackSize) const override;
 		Result CreateCoro2Thread(UniquePtr<ICoroThread> &thread, size_t stackSize) const override;
 
 		bool ParseDouble(const ByteStringSliceView &str, double &d) const override;
@@ -2260,16 +2258,6 @@ namespace rkit
 			return ParsePositiveInt(str, 1, radix, i);
 
 		return ParsePositiveInt(str, 0, radix, i);
-	}
-
-	Result UtilitiesDriver::CreateCoroThread(UniquePtr<coro::Thread> &thread, size_t stackSize) const
-	{
-		UniquePtr<utils::CoroThreadBase> threadBase;
-		RKIT_CHECK(utils::CoroThreadBase::Create(threadBase, stackSize));
-
-		thread = std::move(threadBase);
-
-		RKIT_RETURN_OK;
 	}
 
 	Result UtilitiesDriver::CreateCoro2Thread(UniquePtr<ICoroThread> &thread, size_t stackSize) const

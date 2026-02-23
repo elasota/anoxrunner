@@ -5,7 +5,6 @@
 #include "rkit/Data/ContentID.h"
 
 #include "rkit/Core/Coroutine2.h"
-#include "rkit/Core/CoroutineCompiler.h"
 #include "rkit/Core/CoroThread.h"
 #include "rkit/Core/Future.h"
 #include "rkit/Core/LogDriver.h"
@@ -567,7 +566,7 @@ namespace anox
 				continue;
 
 			rkit::log::Error(u8"Invalid map name");
-			CORO_THROW(rkit::ResultCode::kDataError);
+			CORO2_THROW(rkit::ResultCode::kDataError);
 		}
 
 		CORO2_CHECK(co_await LoadMap(thread, mapName));

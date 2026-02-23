@@ -4,7 +4,6 @@
 
 #include "anox/AnoxGame.h"
 
-#include "rkit/Core/CoroutineWrapper.h"
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/Result.h"
@@ -12,8 +11,6 @@
 #include "rkit/Core/String.h"
 #include "rkit/Core/UniquePtr.h"
 #include "rkit/Core/Vector.h"
-
-#include "rkit/Core/CoroutineCompiler.h"
 
 namespace anox
 {

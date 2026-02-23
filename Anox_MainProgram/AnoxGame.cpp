@@ -13,8 +13,6 @@
 #include "rkit/Data/DataDriver.h"
 
 #include "rkit/Core/Coroutine2.h"
-#include "rkit/Core/Coroutine.h"
-#include "rkit/Core/CoroutineCompiler.h"
 #include "rkit/Core/Drivers.h"
 #include "rkit/Core/DriverModuleInitParams.h"
 #include "rkit/Core/Event.h"

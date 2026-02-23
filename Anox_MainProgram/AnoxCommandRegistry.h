@@ -1,6 +1,5 @@
 #pragma once
 
-#include "rkit/Core/Coroutine.h"
 #include "rkit/Core/Coroutine2Protos.h"
 #include "rkit/Core/Optional.h"
 #include "rkit/Core/String.h"
