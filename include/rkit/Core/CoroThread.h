@@ -111,6 +111,9 @@ namespace rkit
 	template<class TReturnType>
 	rkit::Result ICoroThread::EnterFunction(const coro::Coroutine<TReturnType> &coro)
 	{
+		if (!coro.GetCoroutineHandle())
+			RKIT_THROW(ResultCode::kCoroStackOverflow);
+
 		return this->EnterCoroutine(coro.GetCoroutineHandle());
 	}
 
