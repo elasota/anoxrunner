@@ -167,4 +167,4 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 }
 
 
-RKIT_IMPLEMENT_MODULE("Anox", "Build", ::anox::BuildModule)
+RKIT_IMPLEMENT_MODULE(Anox, Build, ::anox::BuildModule)

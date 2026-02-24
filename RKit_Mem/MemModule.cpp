@@ -121,4 +121,4 @@ namespace rkit { namespace mem {
 } } // rkit::mem
 
 
-RKIT_IMPLEMENT_MODULE("RKit", "Mem", ::rkit::mem::MemModule)
+RKIT_IMPLEMENT_MODULE(RKit, Mem, ::rkit::mem::MemModule)

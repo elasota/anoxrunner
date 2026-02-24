@@ -12,9 +12,11 @@ namespace rkit
 
 	struct IModule
 	{
-		virtual ~IModule() {};
-
+	public:
 		virtual Result Init(const ModuleInitParameters *initParams) = 0;
 		virtual void Unload() = 0;
+
+	protected:
+		virtual ~IModule() {};
 	};
 }

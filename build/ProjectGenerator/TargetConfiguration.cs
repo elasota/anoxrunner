@@ -10,6 +10,7 @@ namespace ProjectGenerator
         public ProjectDef.Type? LinkedModuleProjectType { get; set; }
         public string? PlatformToolset { get; set; }
         public bool? UseDebugLibraries { get; set; }
+        public bool IsDevConfig { get; set; }
 
         public TargetConfiguration(string name)
         {

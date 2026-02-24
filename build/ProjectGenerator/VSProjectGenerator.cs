@@ -261,6 +261,8 @@ namespace ProjectGenerator
                 projElement.AppendChild(propsImportElement);
             }
 
+            AddSystemRefs(projElement, projectDir, projDef, targetDefs, state.ProjectDefs);
+
             AddPropertySheetImports(projElement, projectDir, projDef, targetDefs);
 
             AddFiles(projElement, gconfig.RootPath!, projectDir, resolver);
@@ -280,6 +282,107 @@ namespace ProjectGenerator
             {
                 writer.Formatting = Formatting.Indented;
                 xmlDocument.WriteTo(writer);
+            }
+        }
+
+        private void RecursiveResolveSystemRefs(HashSet<string> systemRefs, HashSet<ProjectDef> allDefs, ProjectDef def, ProjectDefs projDefs, TargetConfiguration config)
+        {
+            if (allDefs.Contains(def))
+                return;
+
+            allDefs.Add(def);
+
+            if (def.DevOnly && !config.IsDevConfig)
+                return;
+
+            ProjectDef.Type defType = ResolveProjectType(config, def.ProjectType);
+
+            if (defType == ProjectDef.Type.Lib)
+            {
+                foreach (string systemRef in def.SystemRefs)
+                    systemRefs.Add(systemRef);
+
+                foreach (string dependency in def.Refs)
+                   RecursiveResolveSystemRefs(systemRefs, allDefs, projDefs.Defs[dependency], projDefs, config);
+            }
+        }
+
+        private void AddSystemRefs(XmlElement projElement, string projectDir, ProjectDef projDef, TargetDefs targetDefs, ProjectDefs projDefs)
+        {
+            foreach (TargetConfiguration config in targetDefs.Configurations)
+            {
+                ProjectDef.Type thisType = ResolveProjectType(config, projDef.ProjectType);
+
+                bool needsSystemRefs = false;
+                switch (thisType)
+                {
+                    case ProjectDef.Type.Lib:
+                        needsSystemRefs = false;
+                        break;
+                    case ProjectDef.Type.Executable:
+                    case ProjectDef.Type.LooseDll:
+                    case ProjectDef.Type.LinkedDll:
+                    case ProjectDef.Type.AlwaysLinkedDll:
+                    case ProjectDef.Type.NeverLinkedDll:
+                        needsSystemRefs = true;
+                        break;
+                    default:
+                        throw new NotImplementedException();
+                }
+
+                if (needsSystemRefs)
+                {
+                    HashSet<string> systemRefsSet = new HashSet<string>();
+                    HashSet<ProjectDef> allDefs = new HashSet<ProjectDef>();
+
+                    foreach (string sysRef in projDef.SystemRefs)
+                        systemRefsSet.Add(sysRef);
+
+                    foreach (string depName in projDef.Refs)
+                    {
+                        ProjectDef dep = projDefs.Defs[depName];
+                        RecursiveResolveSystemRefs(systemRefsSet, allDefs, dep, projDefs, config);
+                    }
+
+                    List<string> sortedSystemRefs = new List<string>();
+                    sortedSystemRefs.AddRange(systemRefsSet);
+
+                    sortedSystemRefs.Sort(int (string a, string b) => string.Compare(a, b, StringComparison.OrdinalIgnoreCase));
+
+                    if (sortedSystemRefs.Count > 0)
+                    {
+                        AddSystemRefsXML(projElement, config, targetDefs.Platforms, sortedSystemRefs);
+                    }
+                }
+
+            }
+        }
+
+        private void AddSystemRefsXML(XmlElement projElement, TargetConfiguration config, IEnumerable<TargetPlatform> platforms, IEnumerable<string> systemRefs)
+        {
+            XmlDocument document = projElement.OwnerDocument;
+
+            foreach (TargetPlatform platform in platforms)
+            {
+                XmlElement itemDefGroupElement = document.CreateElement("ItemDefinitionGroup", _xmlNS);
+                itemDefGroupElement.SetAttribute("Condition", $"'$(Configuration)|$(Platform)'=='{config.Name}|{platform.ArchName}'");
+
+                XmlElement linkElement = document.CreateElement("Link", _xmlNS);
+
+                XmlElement addlDepsElement = document.CreateElement("AdditionalDependencies", _xmlNS);
+
+                StringBuilder sb = new StringBuilder();
+                foreach (string systemRef in systemRefs)
+                {
+                    sb.Append(systemRef);
+                    sb.Append(".lib;");
+                }
+                sb.Append("%(AdditionalDependencies)");
+
+                addlDepsElement.AppendChild(document.CreateTextNode(sb.ToString()));
+                linkElement.AppendChild(addlDepsElement);
+                itemDefGroupElement.AppendChild(linkElement);
+                projElement.AppendChild(itemDefGroupElement);
             }
         }
 

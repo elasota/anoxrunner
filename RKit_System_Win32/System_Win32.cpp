@@ -2256,4 +2256,4 @@ namespace rkit
 	SimpleObjectAllocation<SystemDriver_Win32> SystemModule_Win32::ms_systemDriver;
 }
 
-RKIT_IMPLEMENT_MODULE("RKit", "System_Win32", ::rkit::SystemModule_Win32)
+RKIT_IMPLEMENT_MODULE(RKit, System_Win32, ::rkit::SystemModule_Win32)

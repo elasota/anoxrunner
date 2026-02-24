@@ -77,4 +77,4 @@ namespace rkit { namespace buildsystem { namespace vulkan {
 } } }
 
 
-RKIT_IMPLEMENT_MODULE("RKit", "ShaderC_DLL", ::rkit::buildsystem::vulkan::ShaderCModule)
+RKIT_IMPLEMENT_MODULE(RKit, ShaderC_DLL, ::rkit::buildsystem::vulkan::ShaderCModule)

@@ -57,6 +57,7 @@
                 debugConfig.ModuleProjectType = ProjectDef.Type.LooseDll;
                 debugConfig.LinkedModuleProjectType = ProjectDef.Type.LinkedDll;
                 debugConfig.UseDebugLibraries = true;
+                debugConfig.IsDevConfig = true;
                 targetDefs.Configurations.Add(debugConfig);
             }
 
@@ -73,13 +74,16 @@
 
             foreach (KeyValuePair<string, ProjectDef> projectDef in projDefs.Defs)
             {
-                resolvers[projectDef.Value] = new ProjectResolver(projectDef.Value, projectDef.Key, config);
+                resolvers[projectDef.Value] = new ProjectResolver(projectDef.Key, projectDef.Value, projectDef.Key, config);
             }
 
             OutputFileCollection outputFiles = new OutputFileCollection();
 
             VSProjectGenerator projectGenerator = new VSProjectGenerator();
             projectGenerator.Generate(config, projDefs, resolvers, targetDefs, outputFiles);
+
+            ModuleListGenerator moduleListgenerator = new ModuleListGenerator();
+            moduleListgenerator.Generate(config, projDefs, resolvers, targetDefs, outputFiles);
         }
     }
 }

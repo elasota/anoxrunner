@@ -47,4 +47,4 @@ namespace rkit { namespace data
 	}
 } } // rkit::data
 
-RKIT_IMPLEMENT_MODULE("RKit", "Data", ::rkit::data::DataModule)
+RKIT_IMPLEMENT_MODULE(RKit, Data, ::rkit::data::DataModule)

@@ -77,4 +77,4 @@ void anox::UtilitiesDriver::ShutdownDriver()
 }
 
 
-RKIT_IMPLEMENT_MODULE("Anox", "Utilities", ::anox::UtilitiesModule)
+RKIT_IMPLEMENT_MODULE(Anox, Utilities, ::anox::UtilitiesModule)

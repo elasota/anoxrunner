@@ -470,4 +470,4 @@ namespace rkit { namespace png {
 } } // rkit::png
 
 
-RKIT_IMPLEMENT_MODULE("RKit", "PNG", ::rkit::png::PngModule)
+RKIT_IMPLEMENT_MODULE(RKit, PNG, ::rkit::png::PngModule)

@@ -19,7 +19,7 @@ namespace rkit
 namespace rkit { namespace utils
 {
 	template<class TChar>
-	inline uint32_t ComputeFourCC(TChar c0, TChar c1, TChar c2, TChar c3)
+	inline constexpr uint32_t ComputeFourCC(TChar c0, TChar c1, TChar c2, TChar c3)
 	{
 		return static_cast<uint32_t>(
 			(static_cast<uint32_t>(static_cast<uint8_t>(c0)) << 24) |
@@ -30,7 +30,7 @@ namespace rkit { namespace utils
 	}
 
 	template<class TChar>
-	inline void ExtractFourCC(uint32_t fourCC, TChar &outC0, TChar &outC1, TChar &outC2, TChar &outC3)
+	inline constexpr void ExtractFourCC(uint32_t fourCC, TChar &outC0, TChar &outC1, TChar &outC2, TChar &outC3)
 	{
 		outC0 = static_cast<char>(static_cast<uint8_t>((fourCC >> 24) & 0xff));
 		outC1 = static_cast<char>(static_cast<uint8_t>((fourCC >> 16) & 0xff));

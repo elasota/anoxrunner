@@ -510,4 +510,4 @@ namespace rkit
 	SimpleObjectAllocation<ProgramLauncherPrivate::ModuleConfig> ProgramModule::ms_moduleConfig = {};
 }
 
-RKIT_IMPLEMENT_MODULE("RKit", "ProgramLauncher", ::rkit::ProgramModule)
+RKIT_IMPLEMENT_MODULE(RKit, ProgramLauncher, ::rkit::ProgramModule)

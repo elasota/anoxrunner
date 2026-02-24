@@ -2723,4 +2723,4 @@ namespace rkit
 }
 
 
-RKIT_IMPLEMENT_MODULE("RKit", "Utilities", ::rkit::UtilitiesModule)
+RKIT_IMPLEMENT_MODULE(RKit, Utilities, ::rkit::UtilitiesModule)

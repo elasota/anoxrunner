@@ -16,16 +16,20 @@
 #include "rkit/Win32/ModuleAPI_Win32.h"
 #include "rkit/Win32/IncludeWindows.h"
 
+#include "rkit/Core/StaticModuleLoader.inl"
+
 #include <cstdlib>
 #include <clocale>
 #include <new>
 
 namespace rkit
 {
-	struct ModuleDriver_Win32 final : public IModuleDriver
+#if RKIT_MODULE_LINKER_TYPE == RKIT_MODULE_LINKER_TYPE_DLL
+	struct DLLModuleDriver_Win32 final : public IModuleDriver
 	{
 		IModule *LoadModuleInternal(uint32_t moduleNamespace, const Utf8Char_t *moduleName, const ModuleInitParameters *initParams, IMallocDriver &mallocDriver) override;
 	};
+#endif
 
 	struct ConsoleLogDriver_Win32 final : public ILogDriver
 	{
@@ -67,11 +71,12 @@ namespace rkit
 		bool InternalCreateMappingAt(mem::MemMapPageRange &outPageRange, void *baseAddress, size_t size, size_t pageTypeIndex, mem::MemMapState initialState) const;
 	};
 
-	class Module_Win32 final : public IModule
+#if RKIT_MODULE_LINKER_TYPE == RKIT_MODULE_LINKER_TYPE_DLL
+	class DLLModule_Win32 final : public IModule
 	{
 	public:
-		Module_Win32(HMODULE hmodule, FARPROC initFunc, IMallocDriver *mallocDriver);
-		~Module_Win32();
+		DLLModule_Win32(HMODULE hmodule, FARPROC initFunc, IMallocDriver *mallocDriver);
+		~DLLModule_Win32();
 
 		Result Init(const ModuleInitParameters *initParams) override;
 		void Unload() override;
@@ -84,11 +89,18 @@ namespace rkit
 
 		ModuleAPI_Win32 m_moduleAPI;
 	};
+#endif
 
 	struct Win32Globals
 	{
 		rkit::Drivers m_drivers;
-		rkit::ModuleDriver_Win32 m_moduleDriver;
+#if RKIT_MODULE_LINKER_TYPE == RKIT_MODULE_LINKER_TYPE_STATIC
+		rkit::moduleloader::StaticModuleDriver m_moduleDriver;
+#elif RKIT_MODULE_LINKER_TYPE == RKIT_MODULE_LINKER_TYPE_DLL
+		rkit::DLLModuleDriver_Win32 m_moduleDriver;
+#else
+#error "No module loader was implemented"
+#endif
 		rkit::ConsoleLogDriver_Win32 m_consoleLogDriver;
 		rkit::MemMapDriver_Win32 m_memMapDriver;
 	};
@@ -101,7 +113,8 @@ namespace rkit
 	static Win32GlobalsBuffer g_winGlobalsBuffer;
 	static Win32Globals &g_winGlobals = *reinterpret_cast<Win32Globals *>(g_winGlobalsBuffer.m_bytes);
 
-	IModule *ModuleDriver_Win32::LoadModuleInternal(uint32_t moduleNamespace, const Utf8Char_t *moduleName, const ModuleInitParameters *initParams, IMallocDriver &mallocDriver)
+#if RKIT_MODULE_LINKER_TYPE == RKIT_MODULE_LINKER_TYPE_DLL
+	IModule *DLLModuleDriver_Win32::LoadModuleInternal(uint32_t moduleNamespace, const Utf8Char_t *moduleName, const ModuleInitParameters *initParams, IMallocDriver &mallocDriver)
 	{
 		// FIXME
 		const char *moduleNameAscii = reinterpret_cast<const char *>(moduleName);
@@ -117,7 +130,7 @@ namespace rkit
 
 		rkit::utils::ExtractFourCC(moduleNamespace, nameBuf[0], nameBuf[1], nameBuf[2], nameBuf[3]);
 
-		void *moduleMemory = mallocDriver.Alloc(sizeof(Module_Win32));
+		void *moduleMemory = mallocDriver.Alloc(sizeof(DLLModule_Win32));
 		if (!moduleMemory)
 		{
 			mallocDriver.Free(nameBuf);
@@ -141,7 +154,7 @@ namespace rkit
 			return nullptr;
 		}
 
-		IModule *module = new (moduleMemory) Module_Win32(hmodule, initFunc, &mallocDriver);
+		IModule *module = new (moduleMemory) DLLModule_Win32(hmodule, initFunc, &mallocDriver);
 
 		PackedResultAndExtCode initResult = RKIT_TRY_EVAL(module->Init(initParams));
 		if (!utils::ResultIsOK(initResult))
@@ -152,6 +165,7 @@ namespace rkit
 
 		return module;
 	}
+#endif
 
 	void ConsoleLogDriver_Win32::LogMessage(LogSeverity severity, const StringSliceView &msg)
 	{
@@ -343,7 +357,8 @@ namespace rkit
 		(void)succeeded;
 	}
 
-	Module_Win32::Module_Win32(HMODULE hmodule, FARPROC initFunc, IMallocDriver *mallocDriver)
+#if RKIT_MODULE_LINKER_TYPE == RKIT_MODULE_LINKER_TYPE_DLL
+	DLLModule_Win32::DLLModule_Win32(HMODULE hmodule, FARPROC initFunc, IMallocDriver *mallocDriver)
 		: m_hmodule(hmodule)
 		, m_initFunc(initFunc)
 		, m_mallocDriver(mallocDriver)
@@ -352,7 +367,7 @@ namespace rkit
 	{
 	}
 
-	Module_Win32::~Module_Win32()
+	DLLModule_Win32::~DLLModule_Win32()
 	{
 		if (m_isInitialized)
 			m_moduleAPI.m_shutdownFunction();
@@ -360,7 +375,7 @@ namespace rkit
 		::FreeLibrary(m_hmodule);
 	}
 
-	Result Module_Win32::Init(const ModuleInitParameters *initParams)
+	Result DLLModule_Win32::Init(const ModuleInitParameters *initParams)
 	{
 		typedef void (*initProc_t)(void *);
 
@@ -382,16 +397,22 @@ namespace rkit
 		RKIT_RETURN_OK;
 	}
 
-	void Module_Win32::Unload()
+	void DLLModule_Win32::Unload()
 	{
 		IMallocDriver *mallocDriver = m_mallocDriver;
 		void *thisMem = this;
 
-		this->~Module_Win32();
+		this->~DLLModule_Win32();
 		mallocDriver->Free(thisMem);
 	}
+#endif
 
 	const Drivers &rkit::GetDrivers()
+	{
+		return g_winGlobals.m_drivers;
+	}
+
+	Drivers &rkit::GetMutableDrivers()
 	{
 		return g_winGlobals.m_drivers;
 	}

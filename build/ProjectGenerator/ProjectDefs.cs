@@ -83,11 +83,11 @@ namespace ProjectGenerator
         {
             Unknown,
 
-            Module,
-            LinkedModule,
+            Module,         // Dynamically-loaded module
+            LinkedModule,   // Hard-linked module
 
-            Lib,
-            Executable,
+            Lib,            // Static library
+            Executable,     // Executable
             LooseDll,
             LinkedDll,
             AlwaysLinkedDll,
@@ -99,6 +99,7 @@ namespace ProjectGenerator
         public IReadOnlyList<DirectoryMapping> DirectoryMappings { get => _dirMappings; }
         public IReadOnlyList<ExtraFile> ExtraFiles { get => _extraFiles; }
         public IReadOnlyList<string> Refs { get => _refs; }
+        public IReadOnlyList<string> SystemRefs { get => _systemRefs; }
 
         public bool DevOnly { get; private set; }
 
@@ -106,6 +107,7 @@ namespace ProjectGenerator
         private List<DirectoryMapping> _dirMappings = new List<DirectoryMapping>();
         private List<ExtraFile> _extraFiles = new List<ExtraFile>();
         private List<string> _refs = new List<string>();
+        private List<string> _systemRefs = new List<string>();
 
         public ProjectDef(JsonElement json)
         {
@@ -178,6 +180,19 @@ namespace ProjectGenerator
                             throw new JsonException("Invalid project def 'refs' type");
 
                         _refs.Add(refElement.GetString()!);
+                    }
+                }
+                else if (propertyName == "system_refs")
+                {
+                    if (property.Value.ValueKind != JsonValueKind.Array)
+                        throw new JsonException("Invalid project def 'extra_files' type");
+
+                    foreach (JsonElement refElement in property.Value.EnumerateArray())
+                    {
+                        if (refElement.ValueKind != JsonValueKind.String)
+                            throw new JsonException("Invalid project def 'refs' type");
+
+                        _systemRefs.Add(refElement.GetString()!);
                     }
                 }
                 else if (propertyName == "extra_dirs")

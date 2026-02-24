@@ -140,6 +140,10 @@
 		"refs":
 		[
 			"RKit_CoreLib"
+		],
+		"system_refs":
+		[
+			"Shlwapi"
 		]
 	},
 	"RKit_Utilities" :

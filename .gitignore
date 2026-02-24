@@ -19,6 +19,8 @@
 *.nativecodeanalysis.xml
 *.vcxproj
 *.vcxproj.filters
+*.generated.cpp
+*.generated.h
 launchSettings.json
 vc.nativecodeanalysis.all.xml
 CodeAnalysisResultManifest.txt

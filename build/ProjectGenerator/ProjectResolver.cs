@@ -10,6 +10,7 @@ namespace ProjectGenerator
     {
         private static readonly string[] _headerExts = { ".h", ".hxx", ".inl" };
         private static readonly string[] _sourceExts = { ".c", ".cxx", ".cpp" };
+        private static readonly string[] _ignoreExts = { ".generated.cpp" };
 
         public IReadOnlyList<ResolvedFile> ResolvedFiles { get; private set; }
         public ProjectDef ProjectDef { get; private set; }
@@ -119,6 +120,12 @@ namespace ProjectGenerator
         {
             string ext = Path.GetExtension(fileName);
 
+            foreach (string ignoreExt in _ignoreExts)
+            {
+                if (fileName.EndsWith(ignoreExt, StringComparison.OrdinalIgnoreCase))
+            return ProjectDef.FileType.Misc;
+            }
+
             foreach (string sourceExt in _sourceExts)
             {
                 if (string.Compare(ext, sourceExt, StringComparison.OrdinalIgnoreCase) == 0)
@@ -134,7 +141,7 @@ namespace ProjectGenerator
             return ProjectDef.FileType.Misc;
         }
 
-        public ProjectResolver(ProjectDef projDef, string projectDir, GlobalConfiguration gconfig)
+        public ProjectResolver(string projName, ProjectDef projDef, string projectDir, GlobalConfiguration gconfig)
         {
             List<ProjectDef.DirectoryMapping> mappings = new List<ProjectDef.DirectoryMapping>();
             mappings.Add(new ProjectDef.DirectoryMapping()
@@ -149,6 +156,13 @@ namespace ProjectGenerator
             foreach (ProjectDef.ExtraFile file in projDef.ExtraFiles)
             {
                 ExpandExtraFile(resolvedFiles, file, projectDir, gconfig.RootPath!);
+            }
+
+            if (projDef.ProjectType == ProjectDef.Type.Executable)
+            {
+                string fileName = projName + ".generated.cpp";
+                string generatedPath = Path.Combine(projectDir, fileName);
+                resolvedFiles.Add(new ResolvedFile { FilePath = generatedPath, FileType = ProjectDef.FileType.Source, FilterPath = fileName });
             }
 
             {
@@ -227,6 +241,15 @@ namespace ProjectGenerator
                             fileType = ProjectDef.FileType.Source;
                             break;
                         }
+                    }
+                }
+
+                foreach (string ignoreExt in _ignoreExts)
+                {
+                    if (fileName.EndsWith(ignoreExt, StringComparison.OrdinalIgnoreCase))
+                    {
+                        fileType = null;
+                        break;
                     }
                 }
             }

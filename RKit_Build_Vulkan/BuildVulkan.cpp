@@ -98,4 +98,4 @@ namespace rkit { namespace buildsystem
 	}
 } } // rkit::buildsystem
 
-RKIT_IMPLEMENT_MODULE("RKit", "Build_Vulkan", ::rkit::buildsystem::BuildVulkanModule)
+RKIT_IMPLEMENT_MODULE(RKit, Build_Vulkan, ::rkit::buildsystem::BuildVulkanModule)

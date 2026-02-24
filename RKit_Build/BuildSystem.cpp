@@ -59,4 +59,4 @@ namespace rkit { namespace buildsystem
 	}
 } } // rkit::buildsystem
 
-RKIT_IMPLEMENT_MODULE("RKit", "Build", ::rkit::buildsystem::BuildSystemModule)
+RKIT_IMPLEMENT_MODULE(RKit, Build, ::rkit::buildsystem::BuildSystemModule)

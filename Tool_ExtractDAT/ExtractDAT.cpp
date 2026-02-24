@@ -108,4 +108,4 @@ rkit::Result anox::ExtractDATProgram::Run()
 	RKIT_RETURN_OK;
 }
 
-RKIT_IMPLEMENT_MODULE("Tool", "ExtractDAT", ::anox::ExtractDATModule)
+RKIT_IMPLEMENT_MODULE(Tool, ExtractDAT, ::anox::ExtractDATModule)

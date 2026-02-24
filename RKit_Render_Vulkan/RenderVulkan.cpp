@@ -1166,4 +1166,4 @@ namespace rkit { namespace render { namespace vulkan
 	}
 } } } // rkit::render::vulkan
 
-RKIT_IMPLEMENT_MODULE("RKit", "Render_Vulkan", ::rkit::render::vulkan::RenderVulkanModule)
+RKIT_IMPLEMENT_MODULE(RKit, Render_Vulkan, ::rkit::render::vulkan::RenderVulkanModule)

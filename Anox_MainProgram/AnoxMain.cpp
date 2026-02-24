@@ -250,4 +250,4 @@ void anox::MainProgramDriver::ShutdownProgram()
 	m_game.Reset();
 }
 
-RKIT_IMPLEMENT_MODULE("Anox", "MainProgram", ::anox::MainProgramModule)
+RKIT_IMPLEMENT_MODULE(Anox, MainProgram, ::anox::MainProgramModule)

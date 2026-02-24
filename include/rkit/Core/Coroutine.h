@@ -398,15 +398,33 @@ namespace rkit::coro::priv
 	}
 
 	template<class TReturnType>
+	TReturnType *Returner<TReturnType>::GetRVStorage()
+	{
+		return reinterpret_cast<TReturnType *>(m_storage);
+	}
+
+	template<class TReturnType>
 	void Returner<TReturnType &>::return_value(TReturnType &returnArg)
 	{
 		m_returnValue = std::addressof(returnArg);
 	}
 
 	template<class TReturnType>
+	TReturnType *Returner<TReturnType &>::GetRV()
+	{
+		return m_returnValue;
+	}
+
+	template<class TReturnType>
 	void Returner<TReturnType &&>::return_value(TReturnType &&returnArg)
 	{
 		m_returnValue = std::addressof(returnArg);
+	}
+
+	template<class TReturnType>
+	TReturnType *Returner<TReturnType &&>::GetRV()
+	{
+		return m_returnValue;
 	}
 
 	inline void Returner<void>::return_void()
