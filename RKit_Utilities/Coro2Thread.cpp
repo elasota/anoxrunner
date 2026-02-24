@@ -59,6 +59,7 @@ namespace rkit::utils
 	private:
 		CoroThreadBlocker m_blocker;
 		CoroThreadResumer m_resumer;
+		std::coroutine_handle<> m_rootFunction;
 
 		uint8_t *GetStackStart();
 
@@ -138,6 +139,8 @@ namespace rkit::utils
 
 		if (m_resumer.m_continuation)
 			m_resumer.m_continuation.destroy();
+
+		// The root function should be automatically destroyed by destroying the continuation
 	}
 
 	CoroThreadState Coro2Thread::GetState() const
@@ -173,6 +176,14 @@ namespace rkit::utils
 		m_resumer.m_continuation = std::coroutine_handle<>();
 
 		continuation.resume();
+
+		if (m_rootFunction.done())
+		{
+			RKIT_ASSERT(!m_resumer.m_continuation);
+			m_rootFunction.destroy();
+			m_rootFunction = std::coroutine_handle<>();
+		}
+
 		RKIT_RETURN_OK;
 	}
 
@@ -259,6 +270,7 @@ namespace rkit::utils
 		m_resumer.m_continuation = coroHandle;
 
 		m_blocker = NotActuallyBlockedBlocker::Create();
+		m_rootFunction = coroHandle;
 
 		RKIT_RETURN_OK;
 	}
