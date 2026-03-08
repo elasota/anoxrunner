@@ -8,10 +8,12 @@
 #include "rkit/Core/CoroThread.h"
 #include "rkit/Core/Future.h"
 #include "rkit/Core/LogDriver.h"
+#include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/Path.h"
 #include "rkit/Core/String.h"
 #include "rkit/Core/UtilitiesDriver.h"
+#include "rkit/Sandbox/Sandbox.h"
 
 #include "AnoxBSPModelResource.h"
 #include "AnoxCaptureHarness.h"
@@ -19,13 +21,23 @@
 #include "AnoxCommandStack.h"
 #include "AnoxConfigurationSaver.h"
 #include "AnoxFileResource.h"
+#include "AnoxGameSandboxEnv.h"
+#include "AnoxGameSandboxInterface.h"
 #include "AnoxResourceManager.h"
+#include "AnoxSpawnDefsResource.h"
 #include "AnoxGlobalVars.h"
+#include "AnoxGameWorld.h"
+#include "anox/AnoxModule.h"
+
+#include "anox/Sandbox/AnoxGame.host.generated.h"
 
 namespace anox
 {
+	class AnoxGameSandboxInterface;
 	class AnoxCommandStackBase;
 	class AnoxBSPModelResourceBase;
+	class World;
+	class AnoxGameLogic;
 
 	class AnoxGameLogic final : public IGameLogic
 	{
@@ -80,6 +92,10 @@ namespace anox
 		rkit::UniquePtr<AnoxCommandStackBase> m_commandStack;
 
 		rkit::UniquePtr<game::GlobalVars> m_globalVars;
+		rkit::UniquePtr<game::World> m_world;
+		rkit::UniquePtr<AnoxGameSandboxInterface> m_sandbox;
+		anox::game::sandbox::HostImports m_sandboxImports;
+		game::AnoxGameSandboxEnvironment m_sandboxEnv;
 
 		rkit::RCPtr<AnoxBSPModelResourceBase> m_bspModel;
 	};
@@ -535,6 +551,8 @@ namespace anox
 
 		rkit::log::LogInfo(u8"GameLogic: Spawning objects");
 
+		CORO_CHECK(co_await m_world->SpawnObjects(thread, static_cast<AnoxSpawnDefsResourceBase *>(objectsLoadResult.m_resourceHandle.Get())));
+
 		int n = 0;
 		CORO_RETURN_OK;
 	}
@@ -542,6 +560,32 @@ namespace anox
 	rkit::ResultCoroutine AnoxGameLogic::StartSession(rkit::ICoroThread &thread)
 	{
 		const IConfigurationState *configState = nullptr;
+
+		RKIT_ASSERT(!m_sandbox.IsValid());
+		RKIT_ASSERT(!m_world.IsValid());
+
+		{
+			rkit::UniquePtr<rkit::ISandbox> sandbox;
+			rkit::UniquePtr<game::World> world;
+
+			rkit::log::LogInfo(u8"Loading game module");
+
+			CORO_CHECK(rkit::GetDrivers().m_utilitiesDriver->CreateModuleSandbox(sandbox, kAnoxNamespaceID, u8"Game", m_sandboxImports.GetHostAPIDescriptor().m_sysCallCatalog, m_sandboxEnv));
+
+			m_sandboxEnv.m_sandbox = sandbox.Get();
+
+			CORO_CHECK(sandbox->RunInitializer());
+
+			CORO_CHECK(game::World::Create(world));
+
+			rkit::UniquePtr<AnoxGameSandboxInterface> sandboxInterface;
+			CORO_CHECK(AnoxGameSandboxInterface::Create(sandboxInterface, std::move(sandbox)));
+
+			CORO_CHECK(sandboxInterface->LinkToSandbox());
+
+			m_sandbox = std::move(sandboxInterface);
+			m_world = std::move(world);
+		}
 
 		rkit::log::LogInfo(u8"GameLogic: Starting session");
 

@@ -8,6 +8,7 @@ namespace rkit
 {
 	struct IModule;
 	struct ModuleInitParameters;
+	struct IMallocDriver;
 
 	struct IModuleDriver
 	{

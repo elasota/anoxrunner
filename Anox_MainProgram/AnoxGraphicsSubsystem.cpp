@@ -532,10 +532,12 @@ namespace anox
 				return m_commandQueue;
 			}
 
+			/*
 			inline TCommandAllocatorType *GetCommandAllocator() const
 			{
 				return static_cast<TCommandAllocatorType *>(this->m_commandAllocator.Get());
 			}
+			*/
 
 			rkit::render::IBaseCommandQueue *GetBaseCommandQueue() const override
 			{
@@ -894,7 +896,7 @@ namespace anox
 			RKIT_CHECK(loader->TryOpenMergedLibrary(cacheLoadSucceeded));
 		}
 
-		m_graphicsSubsystem.SetPipelineLibraryLoader(std::move(loader), std::move(pipelineSets), haveCache);
+		m_graphicsSubsystem.SetPipelineLibraryLoader(std::move(loader), std::move(pipelineSets), cacheLoadSucceeded);
 
 		if (cacheLoadSucceeded)
 			m_graphicsSubsystem.MarkSetupStepCompleted();

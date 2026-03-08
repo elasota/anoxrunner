@@ -25,6 +25,7 @@
 		"type": "module",
 		"refs":
 		[
+			"Anox_Game",
 			"Anox_Utilities",
 			"RKit_CoreLib",
 			"RKit_Data",
@@ -36,6 +37,14 @@
 				"path": "include/anox",
 				"target": "anox"
 			}
+		]
+	},
+	"Anox_Game" :
+	{
+		"type": "module",
+		"refs":
+		[
+			"RKit_CoreLib"
 		]
 	},
 	"RKit_Boot_Win" :

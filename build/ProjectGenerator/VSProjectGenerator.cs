@@ -265,6 +265,8 @@ namespace ProjectGenerator
 
             AddPropertySheetImports(projElement, projectDir, projDef, targetDefs);
 
+            AddSelfIncludeDir(projElement);
+
             AddFiles(projElement, gconfig.RootPath!, projectDir, resolver);
 
             AddProjectRefs(projElement, projectDir, projDef, resolver, state);
@@ -283,6 +285,18 @@ namespace ProjectGenerator
                 writer.Formatting = Formatting.Indented;
                 xmlDocument.WriteTo(writer);
             }
+        }
+
+        private void AddSelfIncludeDir(XmlElement projElement)
+        {
+            XmlDocument document = projElement.OwnerDocument;
+
+            XmlElement propertyGroupElement = document.CreateElement("PropertyGroup", _xmlNS);
+            XmlElement includePathElement = document.CreateElement("IncludePath", _xmlNS);
+
+            includePathElement.AppendChild(document.CreateTextNode("$(ProjectDir);$(IncludePath)"));
+            propertyGroupElement.AppendChild(includePathElement);
+            projElement.AppendChild(propertyGroupElement);
         }
 
         private void RecursiveResolveSystemRefs(HashSet<string> systemRefs, HashSet<ProjectDef> allDefs, ProjectDef def, ProjectDefs projDefs, TargetConfiguration config)

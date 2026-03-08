@@ -1,13 +1,19 @@
 #pragma once
 
+namespace rkit
+{
+	template<class TImpl>
+	class Opaque;
+}
+
 namespace rkit { namespace priv {
+	template<class TImpl>
 	struct OpaqueDestructor
 	{
-		template<class T>
-		static void Destruct(T *obj);
+		static void DestructImpl(Opaque<TImpl> *obj);
 
-		template<class T>
-		static void DestructImpl(T *obj);
+	private:
+		static void DestructImplAuto(Opaque<TImpl> *obj);
 	};
 } }
 
@@ -48,6 +54,8 @@ namespace rkit
 	class Opaque
 	{
 	public:
+		friend class priv::OpaqueDestructor<TImpl>;
+
 		template<class... TArgs>
 		explicit Opaque(TArgs... args);
 		~Opaque();
@@ -79,10 +87,10 @@ namespace rkit
 #include <utility>
 
 namespace rkit { namespace priv {
-	template<class T>
-	inline void OpaqueDestructor::DestructImpl<T>(T *obj)
+	template<class TImpl>
+	void OpaqueDestructor<TImpl>::DestructImplAuto(Opaque<TImpl> *obj)
 	{
-		obj->~T();
+		obj->Impl().~TImpl();
 	}
 } }
 
@@ -95,15 +103,16 @@ namespace rkit
 #endif
 	{
 		static_assert(std::is_final<TBase>::value, "Opaque base must be final");
+		CheckBase(static_cast<TBase *>(nullptr));
 	}
-
 
 	template<class TBase>
 	template<class TImpl>
 	void OpaqueImplementation<TBase>::CheckBase(Opaque<TImpl> *)
 	{
-		TImpl *impl = this;
-		(void)impl;
+		TImpl *impl = nullptr;
+		OpaqueImplementation<TBase> *base = impl;
+		(void)base;
 	}
 
 	template<class TBase>
@@ -120,7 +129,7 @@ namespace rkit
 	template<class TBase>
 	TBase &OpaqueImplementation<TBase>::Base()
 	{
-		return ResolveBase(static_cast<TBase *>(nullptr));
+		return *ResolveBase(static_cast<TBase *>(nullptr));
 	}
 
 	template<class TBase>
@@ -129,13 +138,11 @@ namespace rkit
 		return const_cast<OpaqueImplementation<TBase> *>(this)->Base();
 	}
 
-
 	template<class TImpl>
 	template<class... TArgs>
 	Opaque<TImpl>::Opaque(TArgs... args)
-		: m_implDtor(nullptr)
 #if RKIT_IS_DEBUG
-		, m_impl(Impl())
+		: m_impl(Impl())
 #endif
 	{
 		new (&Impl()) TImpl(std::forward<TArgs>(args)...);
@@ -144,14 +151,13 @@ namespace rkit
 	template<class TImpl>
 	Opaque<TImpl>::~Opaque()
 	{
-		if (m_implDtor != nullptr)
-			m_implDtor(&this->Impl());
+		priv::OpaqueDestructor<TImpl>::DestructImpl(this);
 	}
 
 	template<class TImpl>
 	TImpl &Opaque<TImpl>::Impl()
 	{
-		return *ResolveImpl(static_cast<TImpl>(nullptr));
+		return *ResolveImpl(static_cast<TImpl *>(nullptr));
 	}
 
 	template<class TImpl>
@@ -171,3 +177,13 @@ namespace rkit
 		return reinterpret_cast<TImpl *>(reinterpret_cast<uint8_t *>(base) - offsetof(Pairing_t, m_base) + offsetof(Pairing_t, m_impl));
 	}
 }
+
+#define RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR_TEMPLATED(type)	\
+void ::rkit::priv::OpaqueDestructor<type>::DestructImpl(Opaque<type> *obj)\
+{\
+	DestructImplAuto(obj);\
+}
+
+#define RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR(type)	\
+template<>\
+RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR_TEMPLATED(type)

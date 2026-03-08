@@ -11,7 +11,11 @@ namespace rkit
 	template<class T>
 	class UniquePtr;
 
+	template<class T>
+	class WeakPtr;
+
 	class RefCounted;
+	class WeakRefTracker;
 	struct RefCountedTracker;
 
 	namespace priv
@@ -32,9 +36,11 @@ namespace rkit
 
 		void RCTrackerAddRef();
 		void RCTrackerDecRef();
+		bool RCTrackerAddRefIfNotZero();
 
 	protected:
 		virtual void RCTrackerZero() = 0;
+		virtual WeakRefTracker *CastToWeakRefTracker();
 
 		RefCount_t RCTrackerRefCount() const;
 
@@ -137,7 +143,6 @@ namespace rkit
 		RefCountedTracker *m_tracker;
 	};
 
-
 	template<class TType, class TPtrType, class... TArgs>
 	Result New(RCPtr<TPtrType> &objPtr, TArgs&& ...args);
 
@@ -208,12 +213,30 @@ namespace rkit
 
 	inline void RefCountedTracker::RCTrackerAddRef()
 	{
-		(void)m_refCount.fetch_add(1, std::memory_order_seq_cst);
+		(void)m_refCount.fetch_add(1, std::memory_order_relaxed);
+	}
+
+	inline bool RefCountedTracker::RCTrackerAddRefIfNotZero()
+	{
+		RefCount_t refCount = m_refCount.load(std::memory_order_relaxed);
+		while (refCount != 0)
+		{
+			const RefCount_t desiredCount = refCount + 1;
+			if (m_refCount.compare_exchange_weak(refCount, desiredCount, std::memory_order_relaxed))
+				return true;
+		}
+
+		return false;
+	}
+
+	inline WeakRefTracker *RefCountedTracker::CastToWeakRefTracker()
+	{
+		return nullptr;
 	}
 
 	inline void RefCountedTracker::RCTrackerDecRef()
 	{
-		if (m_refCount.fetch_sub(1, std::memory_order_seq_cst) == 1)
+		if (m_refCount.fetch_sub(1, std::memory_order_release) == 1)
 			RCTrackerZero();
 	}
 

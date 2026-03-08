@@ -78,6 +78,7 @@ namespace rkit
 		DLLModule_Win32(HMODULE hmodule, FARPROC initFunc, IMallocDriver *mallocDriver);
 		~DLLModule_Win32();
 
+		Result InitWithCustomDrivers(const ModuleInitParameters *initParams, Drivers *drivers) override;
 		Result Init(const ModuleInitParameters *initParams) override;
 		void Unload() override;
 
@@ -375,11 +376,11 @@ namespace rkit
 		::FreeLibrary(m_hmodule);
 	}
 
-	Result DLLModule_Win32::Init(const ModuleInitParameters *initParams)
+	Result DLLModule_Win32::InitWithCustomDrivers(const ModuleInitParameters *initParams, Drivers *drivers)
 	{
 		typedef void (*initProc_t)(void *);
 
-		m_moduleAPI.m_drivers = &g_winGlobals.m_drivers;
+		m_moduleAPI.m_drivers = drivers;
 		m_moduleAPI.m_initFunction = nullptr;
 		m_moduleAPI.m_shutdownFunction = nullptr;
 
@@ -395,6 +396,11 @@ namespace rkit
 		}
 
 		RKIT_RETURN_OK;
+	}
+
+	Result DLLModule_Win32::Init(const ModuleInitParameters *initParams)
+	{
+		return InitWithCustomDrivers(initParams, &g_winGlobals.m_drivers);
 	}
 
 	void DLLModule_Win32::Unload()

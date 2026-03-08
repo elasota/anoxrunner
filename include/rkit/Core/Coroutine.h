@@ -199,7 +199,7 @@ namespace rkit::coro::priv
 namespace rkit::coro
 {
 	template<class TReturnType = rkit::Result>
-	class Coroutine
+	class RKIT_NODISCARD Coroutine
 	{
 	public:
 		using promise_type = priv::Promise<TReturnType>;

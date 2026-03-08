@@ -20,6 +20,7 @@
 *.vcxproj
 *.vcxproj.filters
 *.generated.cpp
+*.generated.inl
 *.generated.h
 launchSettings.json
 vc.nativecodeanalysis.all.xml
@@ -31,3 +32,5 @@ x64/Release/*
 
 build/ProjectGenerator/obj/*
 build/ProjectGenerator/bin/*
+build/SandboxAPIGenerator/obj/*
+build/SandboxAPIGenerator/bin/*

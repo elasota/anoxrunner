@@ -82,6 +82,10 @@ namespace anox
 	public:
 		friend struct AnoxSpawnDefsLoaderInfo;
 
+		rkit::Span<const SpawnDef> GetSpawnDefs() const override;
+		const data::EntitySpawnDataChunks &GetChunks() const override;
+		rkit::Span<const uint8_t> GetDataBuffer() const override;
+
 	private:
 		rkit::Vector<rkit::RCPtr<AnoxEntityDefResourceBase>> m_userEntityDefs;
 		rkit::Vector<SpawnDef> m_spawnDefs;
@@ -90,6 +94,23 @@ namespace anox
 
 		rkit::Vector<uint8_t> m_objectDataBuffer;
 	};
+
+
+
+	rkit::Span<const AnoxSpawnDefsResourceBase::SpawnDef> AnoxSpawnDefsResource::GetSpawnDefs() const
+	{
+		return m_spawnDefs.ToSpan();
+	}
+
+	const data::EntitySpawnDataChunks &AnoxSpawnDefsResource::GetChunks() const
+	{
+		return m_chunks;
+	}
+
+	rkit::Span<const uint8_t> AnoxSpawnDefsResource::GetDataBuffer() const
+	{
+		return this->m_objectDataBuffer.ToSpan();
+	}
 
 	AnoxSpawnDefsLoaderInfo::SpawnDataChunkVisitor::SpawnDataChunkVisitor(rkit::IReadStream &stream, AnoxSpawnDefsResourceLoaderState &state)
 		: m_stream(stream)

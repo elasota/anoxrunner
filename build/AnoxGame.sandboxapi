@@ -1,0 +1,7 @@
+target include/anox/Sandbox/AnoxGame
+class anox.game.sandbox
+
+import MemAlloc(uintptr size) -> (address ptr)
+import MemFree(address ptr)
+
+export Whatever(int32 a, int32 b) -> (int32 c, int32 d)

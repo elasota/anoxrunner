@@ -13,6 +13,8 @@ namespace rkit
 	struct IModule
 	{
 	public:
+		// Custom drivers are not guaranteed to be supported!
+		virtual Result InitWithCustomDrivers(const ModuleInitParameters *initParams, Drivers *drivers) = 0;
 		virtual Result Init(const ModuleInitParameters *initParams) = 0;
 		virtual void Unload() = 0;
 

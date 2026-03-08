@@ -318,6 +318,7 @@ namespace rkit
 	public:
 		TrackedModule(IModule *module, TrackedModule *prevModule, IMallocDriver *mallocDriver, uint32_t namespaceID, String &&name, TrackedModuleDriver *trackedModuleDriver);
 
+		Result InitWithCustomDrivers(const ModuleInitParameters *initParams, Drivers *drivers) override;
 		Result Init(const ModuleInitParameters *initParams) override;
 		void Unload() override;
 
@@ -417,6 +418,18 @@ namespace rkit
 	{
 		if (prevModule)
 			prevModule->m_nextModule = this;
+	}
+
+	Result TrackedModule::InitWithCustomDrivers(const ModuleInitParameters *initParams, Drivers *drivers)
+	{
+		if (m_initialized)
+			RKIT_RETURN_OK;
+
+		RKIT_CHECK(m_module->InitWithCustomDrivers(initParams, drivers));
+
+		m_initialized = true;
+
+		RKIT_RETURN_OK;
 	}
 
 	Result TrackedModule::Init(const ModuleInitParameters *initParams)

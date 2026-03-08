@@ -245,10 +245,11 @@ namespace rkit::utils
 				// Is this a hole?
 				if ((nextOffset & 1) == 0)
 				{
-					// No
+					// No (it's in use)
 					break;
 				}
 
+				// Yes, pop it off
 				nextOffset -= (nextOffset & 1);
 				headerPos += nextOffset;
 			}

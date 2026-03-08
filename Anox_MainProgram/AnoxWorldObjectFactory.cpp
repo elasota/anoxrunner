@@ -1,0 +1,68 @@
+#include "AnoxWorldObjectFactory.h"
+
+#include "rkit/Core/Coroutine.h"
+
+#include "anox/Data/EntityDef.h"
+#include "anox/Data/EntityStructs.h"
+
+namespace anox::game
+{
+#define CLASS_BASE(name) \
+		EType_ ## name,
+
+#define CLASS_BASE_INVISIBLE(name)
+#define FIELD_VEC2(name)
+#define FIELD_VEC3(name)
+#define FIELD_VEC4(name)
+#define FIELD_BOOL(name)
+#define FIELD_BOOL_ON_OFF(name)
+#define FIELD_STRING(name)
+#define FIELD_FLOAT(name)
+#define FIELD_UINT(name)
+#define FIELD_LABEL(name)
+#define FIELD_COMPONENT(name)
+#define FIELD_EDEF(name)
+#define FIELD_BSPMODEL(name)
+#define END_CLASS
+
+		enum class WorldObjectEntityClass
+		{
+#include "anox/Data/EntityDefs.inl"
+		};
+
+#undef CLASS_BASE
+
+	rkit::ResultCoroutine WorldObjectFactory::SpawnWorldObject(rkit::ICoroThread &thread, rkit::RCPtr<WorldObject> &outObject, const WorldObjectSpawnParams &spawnParams,
+		const data::EntityClassDef &eclass, const void *data)
+	{
+		switch (eclass.m_entityClassIndex)
+		{
+#define CLASS_BASE(name) \
+		case static_cast<uint32_t>(WorldObjectEntityClass::EType_ ## name):\
+			return WorldObjectInstantiator<data::EClass_ ## name>::SpawnObject(thread, outObject, spawnParams, *static_cast<const data::EClass_ ## name *>(data));
+
+#include "anox/Data/EntityDefs.inl"
+
+#undef CLASS_BASE
+#undef CLASS_BASE_INVISIBLE
+
+		default:
+			RKIT_THROW(rkit::ResultCode::kInternalError);
+		};
+	}
+}
+
+
+#undef FIELD_VEC2
+#undef FIELD_VEC3
+#undef FIELD_VEC4
+#undef FIELD_BOOL
+#undef FIELD_BOOL_ON_OFF
+#undef FIELD_STRING
+#undef FIELD_FLOAT
+#undef FIELD_UINT
+#undef FIELD_LABEL
+#undef FIELD_COMPONENT
+#undef FIELD_EDEF
+#undef FIELD_BSPMODEL
+#undef END_CLASS

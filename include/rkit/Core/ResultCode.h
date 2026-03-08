@@ -52,6 +52,8 @@ namespace rkit
 		kFormatError,
 
 		kCoroStackOverflow,
+		kSandboxMemoryError,
+		kSandboxAPIError,
 
 		kJobAborted,
 	};
