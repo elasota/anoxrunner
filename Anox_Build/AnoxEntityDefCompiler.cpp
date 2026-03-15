@@ -6,12 +6,15 @@
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/Stream.h"
 
+#include "anox/Data/EntityDef.h"
+#include "anox/CoreUtils/CoreUtils.h"
+
 #include "anox/AnoxModule.h"
 #include "anox/Label.h"
-#include "anox/Data/EntityDef.h"
+#include "anox/AnoxUtilitiesDriver.h"
 
 #include "AnoxModelCompiler.h"
-#include "anox/AnoxUtilitiesDriver.h"
+
 
 namespace anox { namespace buildsystem {
 	struct UserEntityDef2
@@ -207,7 +210,7 @@ namespace anox { namespace buildsystem {
 		rkit::Optional<size_t> classDefIndex;
 
 		{
-			const data::EntityDefsSchema &schema = anoxUtils->GetEntityDefs();
+			const data::EntityDefsSchema &schema = anox::utils::GetEntityDefs();
 
 			rkit::ByteString fullType;
 			RKIT_CHECK(fullType.Set(rkit::StringView(u8"userentity_").RemoveEncoding()));

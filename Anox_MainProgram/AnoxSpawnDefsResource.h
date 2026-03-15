@@ -19,8 +19,8 @@ namespace anox
 	public:
 		struct SpawnDef
 		{
-			const data::EntityClassDef *m_eclass = nullptr;
-			void *m_data = nullptr;
+			uint32_t m_eclassIndex = 0;
+			uint32_t m_dataOffset = 0;
 		};
 
 		virtual rkit::Span<const SpawnDef> GetSpawnDefs() const = 0;

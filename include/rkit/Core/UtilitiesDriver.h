@@ -151,6 +151,6 @@ namespace rkit
 		virtual void SanitizeClampUInt16s(const Span<uint16_t> &outFloats, const Span<const endian::LittleUInt16_t> &inFloats, uint16_t maxValue) const = 0;
 
 		virtual Result CreateModuleSandbox(UniquePtr<ISandbox> &outSandbox, uint32_t moduleNamespace, const Utf8Char_t *moduleName, const sandbox::SysCallCatalog &sysCalls, sandbox::Environment &env) const = 0;
-		virtual Result LinkSandbox(ISandbox &sandbox, const sandbox::HostAPIDescriptor &hostAPIDescriptor) const = 0;
+		virtual Result LinkSandbox(ISandbox &sandbox, sandbox::HostAPIDescriptor &hostAPIDescriptor) const = 0;
 	};
 }

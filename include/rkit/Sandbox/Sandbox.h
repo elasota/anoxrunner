@@ -10,6 +10,9 @@
 namespace rkit
 {
 	template<class T>
+	class Span;
+
+	template<class T>
 	class UniquePtr;
 }
 
@@ -41,12 +44,12 @@ namespace rkit
 
 		virtual bool TryAccessMemoryRange(void *&outPtr, sandbox::Address_t address, sandbox::Address_t size) = 0;
 		virtual Result CallFunction(sandbox::Address_t address, sandbox::io::Value_t *ioValues, size_t numReturnValues, size_t numParameters) = 0;
-		virtual Result CreateThreadConext(UniquePtr<sandbox::IThreadContext> &outThreadContext, const sandbox::ThreadCreationParameters &threadParams) = 0;
+		virtual Result CreateThreadContext(UniquePtr<sandbox::IThreadContext> &outThreadContext, const sandbox::ThreadCreationParameters &threadParams) = 0;
 
-		virtual Result AllocDynamicMemory(sandbox::Address_t &outAddress, size_t size) = 0;
-		virtual Result ReleaseDynamicMemory(sandbox::Address_t address) = 0;
+		virtual Result AllocDynamicMemory(sandbox::Address_t &outAddress, uint32_t &outMMID, size_t size) = 0;
+		virtual Result ReleaseDynamicMemory(uint32_t mmid) = 0;
 
-		virtual Result RunInitializer() = 0;
+		virtual Result RunInitializer(sandbox::IThreadContext &threadContext) = 0;
 
 		virtual sandbox::Address_t GetEntryDescriptor() const = 0;
 
@@ -57,12 +60,18 @@ namespace rkit
 		Result AccessMemoryValue(TType *&outPtr, sandbox::Address_t address);
 
 		template<class TType>
+		Result AccessMemorySpan(Span<TType> &outSpan, sandbox::Address_t address, size_t count);
+
+		template<class TType>
 		Result AccessMemoryArray(TType *&outPtr, sandbox::Address_t address, size_t count);
 
 		bool TryAccessMemoryRangeWithAlignment(void *&outPtr, sandbox::Address_t address, sandbox::Address_t size, sandbox::Address_t alignment);
 
 		template<class TType>
 		bool TryAccessMemoryValue(TType *&outPtr, sandbox::Address_t address);
+
+		template<class TType>
+		bool TryAccessMemorySpan(Span<TType> &outSpan, sandbox::Address_t address, size_t count);
 
 		template<class TType>
 		bool TryAccessMemoryArray(TType *&outPtr, sandbox::Address_t address, size_t count);
@@ -98,16 +107,19 @@ namespace rkit
 	}
 
 	template<class TType>
-	inline Result ISandbox::AccessMemoryArray(TType *&outPtr, sandbox::Address_t address, size_t size)
+	inline Result ISandbox::AccessMemoryArray(TType *&outPtr, sandbox::Address_t address, size_t count)
 	{
-		const sandbox::Address_t maxSize = std::numeric_limits<sandbox::Address_t>::max() / sizeof(TType);
-		if (size > maxSize)
+		if (!TryAccessMemoryArray(outPtr, address, count))
 			RKIT_THROW(rkit::ResultCode::kSandboxMemoryError);
 
-		void *ptr = nullptr;
-		RKIT_CHECK(this->AccessMemoryRangeWithAlignment(ptr, address, size * sizeof(TType), alignof(TType)));
+		RKIT_RETURN_OK;
+	}
 
-		outPtr = static_cast<TType *>(ptr);
+	template<class TType>
+	inline Result ISandbox::AccessMemorySpan(Span<TType> &outSpan, sandbox::Address_t address, size_t count)
+	{
+		if (!TryAccessMemorySpan(outSpan, address, count))
+			RKIT_THROW(rkit::ResultCode::kSandboxMemoryError);
 
 		RKIT_RETURN_OK;
 	}
@@ -127,17 +139,29 @@ namespace rkit
 	}
 
 	template<class TType>
-	inline bool ISandbox::TryAccessMemoryArray(TType *&outPtr, sandbox::Address_t address, size_t size)
+	inline bool ISandbox::TryAccessMemoryArray(TType *&outPtr, sandbox::Address_t address, size_t count)
 	{
-		const sandbox::Address_t maxSize = std::numeric_limits<sandbox::Address_t>::max() / sizeof(TType);
-		if (size > maxSize)
+		const sandbox::Address_t maxCount = std::numeric_limits<sandbox::Address_t>::max() / sizeof(TType);
+		if (count > maxCount)
 			return false;
 
 		void *ptr = nullptr;
-		if (!this->TryAccessMemoryRangeWithAlignment(ptr, address, size * sizeof(TType), alignof(TType)))
+		if (!this->TryAccessMemoryRangeWithAlignment(ptr, address, count * sizeof(TType), alignof(TType)))
 			return false;
 
 		outPtr = static_cast<TType *>(ptr);
+
+		return true;
+	}
+
+	template<class TType>
+	inline bool ISandbox::TryAccessMemorySpan(Span<TType> &outSpan, sandbox::Address_t address, size_t count)
+	{
+		TType *ptr = nullptr;
+		if (!TryAccessMemoryArray(ptr, address, count))
+			return false;
+
+		outSpan = Span<TType>(ptr, count);
 
 		return true;
 	}

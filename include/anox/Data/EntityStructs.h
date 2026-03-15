@@ -2,9 +2,9 @@
 
 #include "rkit/Core/Endian.h"
 #include "rkit/Core/Optional.h"
+#include "rkit/Core/StaticArray.h"
 #include "rkit/Data/ContentID.h"
 
-#include "rkit/Math/Vec.h"
 
 #include "anox/Label.h"
 
@@ -16,9 +16,9 @@ namespace anox { namespace data {
 
 #define CLASS_BASE_INVISIBLE(name) CLASS_BASE(name)
 
-#define FIELD_VEC2(name) rkit::math::Vec2 m_ ## name;
-#define FIELD_VEC3(name) rkit::math::Vec3 m_ ## name;
-#define FIELD_VEC4(name) rkit::math::Vec4 m_ ## name;
+#define FIELD_VEC2(name) rkit::StaticArray<float, 2> m_ ## name;
+#define FIELD_VEC3(name) rkit::StaticArray<float, 3> m_ ## name;
+#define FIELD_VEC4(name) rkit::StaticArray<float, 4> m_ ## name;
 #define FIELD_BOOL(name) bool m_ ## name;
 #define FIELD_BOOL_ON_OFF(name) bool m_ ## name;
 #define FIELD_STRING(name) ::rkit::Optional<uint32_t> m_ ## name;

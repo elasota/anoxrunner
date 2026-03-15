@@ -6,6 +6,8 @@ namespace rkit::coro
 {
 	template<class TReturnType>
 	class Coroutine;
+
+	struct CoroFinalizer;
 }
 
 namespace rkit::coro::priv

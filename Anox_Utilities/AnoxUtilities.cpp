@@ -1,6 +1,7 @@
 #include "AnoxAFSArchive.h"
 #include "AnoxDataBuilder.h"
-#include "AnoxEntityDefs.h"
+
+#include "anox/CoreUtils/CoreUtils.h"
 
 #include "anox/AnoxModule.h"
 #include "anox/AFSFormat.h"
@@ -30,8 +31,6 @@ namespace anox
 
 		rkit::Result OpenAFSArchive(rkit::UniquePtr<rkit::ISeekableReadStream> &&stream, rkit::UniquePtr<anox::afs::IArchive> &outArchive) override;
 		rkit::Result RunDataBuild(const rkit::StringView &targetName, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataDir, const rkit::OSAbsPathView &dataSourceDir, rkit::render::BackendType backendType) override;
-
-		const data::EntityDefsSchema &GetEntityDefs() const override;
 	};
 
 	typedef rkit::CustomDriverModuleStub<UtilitiesDriver> UtilitiesModule;
@@ -60,11 +59,6 @@ rkit::Result anox::UtilitiesDriver::RunDataBuild(const rkit::StringView &targetN
 	RKIT_CHECK(dataBuilder->Run(targetName, sourceDir, intermedDir, dataDir, dataSourceDir, backendType));
 
 	RKIT_RETURN_OK;
-}
-
-const anox::data::EntityDefsSchema & anox::UtilitiesDriver::GetEntityDefs() const
-{
-	return anox::utils::GetEntityDefs();
 }
 
 rkit::Result anox::UtilitiesDriver::InitDriver(const rkit::DriverInitParameters *)

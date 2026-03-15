@@ -1,5 +1,6 @@
 #include "Coro2Thread.h"
 
+#include "rkit/Core/CoroFinalizer.h"
 #include "rkit/Core/Future.h"
 #include "rkit/Core/NewDelete.h"
 
@@ -54,12 +55,13 @@ namespace rkit::utils
 		static size_t ComputeBaseSize();
 
 	protected:
-		rkit::Result EnterCoroutine(std::coroutine_handle<> coroHandle) override;
+		rkit::Result EnterCoroutine(std::coroutine_handle<> coroHandle, const coro::CoroFinalizer &finalizer) override;
 
 	private:
 		CoroThreadBlocker m_blocker;
 		CoroThreadResumer m_resumer;
 		std::coroutine_handle<> m_rootFunction;
+		coro::CoroFinalizer m_finalizer = {};
 
 		uint8_t *GetStackStart();
 
@@ -180,8 +182,10 @@ namespace rkit::utils
 		if (m_rootFunction.done())
 		{
 			RKIT_ASSERT(!m_resumer.m_continuation);
-			m_rootFunction.destroy();
+			std::coroutine_handle<> coroHandle = m_rootFunction;
 			m_rootFunction = std::coroutine_handle<>();
+
+			RKIT_CHECK(m_finalizer.m_destroyAndRethrow(coroHandle, m_finalizer.m_context));
 		}
 
 		RKIT_RETURN_OK;
@@ -263,7 +267,7 @@ namespace rkit::utils
 		return rkit::AlignUp<size_t>(sizeof(Coro2Thread), Coro2StackFrame::kAlignment);
 	}
 
-	rkit::Result Coro2Thread::EnterCoroutine(std::coroutine_handle<> coroHandle)
+	rkit::Result Coro2Thread::EnterCoroutine(std::coroutine_handle<> coroHandle, const coro::CoroFinalizer &finalizer)
 	{
 		RKIT_ASSERT(!m_resumer.m_continuation);
 		RKIT_ASSERT(m_blocker.m_checkFunc == nullptr);
@@ -272,6 +276,7 @@ namespace rkit::utils
 
 		m_blocker = NotActuallyBlockedBlocker::Create();
 		m_rootFunction = coroHandle;
+		m_finalizer = finalizer;
 
 		RKIT_RETURN_OK;
 	}

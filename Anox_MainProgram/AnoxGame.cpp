@@ -81,6 +81,8 @@ namespace anox
 
 	AnoxGame::~AnoxGame()
 	{
+		m_gameLogic.Reset();
+
 		if (m_threadPool.IsValid())
 		{
 			// Flush all thread pool tasks before tearing down subsystems in case there are any leftover jobs

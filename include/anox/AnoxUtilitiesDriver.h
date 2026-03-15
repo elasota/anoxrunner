@@ -34,7 +34,5 @@ namespace anox
 	{
 		virtual rkit::Result OpenAFSArchive(rkit::UniquePtr<rkit::ISeekableReadStream> &&stream, rkit::UniquePtr<afs::IArchive> &outArchive) = 0;
 		virtual rkit::Result RunDataBuild(const rkit::StringView &targetName, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataDir, const rkit::OSAbsPathView &dataSourceDir, rkit::render::BackendType backendType) = 0;
-
-		virtual const data::EntityDefsSchema &GetEntityDefs() const = 0;
 	};
 }

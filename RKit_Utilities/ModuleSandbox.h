@@ -17,6 +17,7 @@ namespace rkit
 	struct IMallocDriver;
 	struct IModuleDriver;
 	struct IModule;
+	struct IMutex;
 }
 
 namespace rkit::utils
@@ -26,15 +27,15 @@ namespace rkit::utils
 	class ModuleSandbox final : public Opaque<ModuleSandboxImpl>, public ISandbox
 	{
 	public:
-		ModuleSandbox(sandbox::Address_t entryDescriptor, IModule *module, IMallocDriver *alloc);
+		ModuleSandbox(sandbox::Address_t entryDescriptor, IModule *module, IMallocDriver *alloc, UniquePtr<IMutex> &&memMutex);
 		~ModuleSandbox();
 
 		bool TryAccessMemoryRange(void *&outPtr, uint64_t address, uint64_t size) override;
 		Result CallFunction(sandbox::Address_t address, sandbox::io::Value_t *ioValues, size_t numReturnValues, size_t numParameters) override;
-		Result CreateThreadConext(UniquePtr<sandbox::IThreadContext> &outThreadContext, const sandbox::ThreadCreationParameters &threadParams) override;
-		Result RunInitializer() override;
-		Result AllocDynamicMemory(sandbox::Address_t &outAddress, size_t size) override;
-		Result ReleaseDynamicMemory(sandbox::Address_t address) override;
+		Result CreateThreadContext(UniquePtr<sandbox::IThreadContext> &outThreadContext, const sandbox::ThreadCreationParameters &threadParams) override;
+		Result RunInitializer(sandbox::IThreadContext &threadContext) override;
+		Result AllocDynamicMemory(sandbox::Address_t &outAddress, uint32_t &outMMID, size_t size) override;
+		Result ReleaseDynamicMemory(uint32_t mmid) override;
 		uint64_t GetEntryDescriptor() const override;
 
 		static Result Create(UniquePtr<ModuleSandbox> &outSandbox, IModuleDriver *moduleDriver, uint32_t moduleNamespace, const Utf8Char_t *moduleName, const sandbox::SysCallCatalog &sysCalls, sandbox::Environment &sandboxEnv);

@@ -6,6 +6,7 @@
 #include "rkit/Data/ContentID.h"
 #include "rkit/Core/Sanitizers.h"
 
+#include "anox/CoreUtils/CoreUtils.h"
 #include "anox/Data/EntitySpawnData.h"
 #include "anox/Data/EntityStructs.h"
 
@@ -74,7 +75,7 @@ namespace anox
 		static rkit::Result ParseEntity(void *data, const AnoxSpawnDefsResource &resource, rkit::Span<const uint8_t> entityData, const data::EntityClassDef *eclass);
 
 		template<size_t TComponents>
-		static void ParseFloatVector(void *outData, const void *inData);
+		static void ParseFloatArray(void *outData, const void *inData);
 	};
 
 	class AnoxSpawnDefsResource final : public AnoxSpawnDefsResourceBase
@@ -181,7 +182,7 @@ namespace anox
 			});
 
 		anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, u8"Utilities"));
-		const data::EntityDefsSchema &schema = anoxUtils->GetEntityDefs();
+		const data::EntityDefsSchema &schema = utils::GetEntityDefs();
 
 		const size_t numSpawnDefs = resource.m_chunks.m_entityTypes.Count();
 
@@ -210,21 +211,24 @@ namespace anox
 			}
 		}
 
+		if (entityDataSize > std::numeric_limits<uint32_t>::max())
+			RKIT_THROW(rkit::ResultCode::kDataError);
+
 		RKIT_CHECK(resource.m_objectDataBuffer.Resize(entityDataSize));
 
 		uint8_t *structDataStart = resource.m_objectDataBuffer.GetBuffer();
 
 		rkit::ProcessParallelSpans(outSpawnDefs.ToSpan(), spawnDefStartOffsets.ToSpan(),
-			[structDataStart]
+			[]
 			(AnoxSpawnDefsResource::SpawnDef &outSpawnDef, size_t inOffset)
 			{
-				outSpawnDef.m_data = static_cast<void *>(structDataStart + inOffset);
+				outSpawnDef.m_dataOffset = static_cast<uint32_t>(inOffset);
 			});
 
 		rkit::ReadOnlyMemoryStream stream(resource.m_chunks.m_entityData.ToSpan());
 
 		RKIT_CHECK((rkit::CheckedProcessParallelSpans(outSpawnDefs.ToSpan(), resource.m_chunks.m_entityTypes.ToSpan(),
-			[&schema, &stream, &resource]
+			[&schema, &stream, &resource, structDataStart]
 			(AnoxSpawnDefsResource::SpawnDef &outSpawnDef, const rkit::endian::LittleUInt32_t &inEntityType)
 			-> rkit::Result
 			{
@@ -234,12 +238,12 @@ namespace anox
 					RKIT_THROW(rkit::ResultCode::kDataError);
 
 				const data::EntityClassDef *eclass = schema.m_classDefs[etype];
-				outSpawnDef.m_eclass = eclass;
+				outSpawnDef.m_eclassIndex = etype;
 
 				rkit::ConstSpan<uint8_t> dataSpan;
 				RKIT_CHECK(stream.ExtractSpan(dataSpan, eclass->m_dataSize));
 
-				return ParseEntity(outSpawnDef.m_data, resource, dataSpan, eclass);
+				return ParseEntity(structDataStart + outSpawnDef.m_dataOffset, resource, dataSpan, eclass);
 			}
 		)));
 
@@ -284,13 +288,13 @@ namespace anox
 				*static_cast<float *>(fieldDataPos) = rkit::sanitizers::SanitizeClampFloat(*static_cast<const rkit::endian::LittleFloat32_t *>(inDataPos), 40);
 				break;
 			case data::EntityFieldType::kVec2:
-				ParseFloatVector<2>(fieldDataPos, inDataPos);
+				ParseFloatArray<2>(fieldDataPos, inDataPos);
 				break;
 			case data::EntityFieldType::kVec3:
-				ParseFloatVector<3>(fieldDataPos, inDataPos);
+				ParseFloatArray<3>(fieldDataPos, inDataPos);
 				break;
 			case data::EntityFieldType::kVec4:
-				ParseFloatVector<4>(fieldDataPos, inDataPos);
+				ParseFloatArray<4>(fieldDataPos, inDataPos);
 				break;
 			case data::EntityFieldType::kString:
 				{
@@ -333,16 +337,14 @@ namespace anox
 	}
 
 	template<size_t TComponents>
-	void AnoxSpawnDefsLoaderInfo::ParseFloatVector(void *outData, const void *inData)
+	void AnoxSpawnDefsLoaderInfo::ParseFloatArray(void *outData, const void *inData)
 	{
 		const rkit::endian::LittleFloat32_t *inFloats = static_cast<const rkit::endian::LittleFloat32_t *>(inData);
 
-		float floats[TComponents] = {};
+		rkit::StaticArray<float, TComponents> &outFloats = *static_cast<rkit::StaticArray<float, TComponents> *>(outData);
 
 		for (size_t i = 0; i < TComponents; i++)
-			floats[i] = rkit::sanitizers::SanitizeClampFloat(inFloats[i], 40);
-
-		*static_cast<rkit::math::Vec<float, TComponents> *>(outData) = rkit::math::Vec<float, TComponents>::FromArray(floats);
+			outFloats[i] = rkit::sanitizers::SanitizeClampFloat(inFloats[i], 40);
 	}
 
 	rkit::Result AnoxSpawnDefsResourceLoaderBase::Create(rkit::RCPtr<AnoxSpawnDefsResourceLoaderBase> &outLoader)

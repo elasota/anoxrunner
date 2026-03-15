@@ -189,7 +189,11 @@ namespace rkit::coro::priv
 		template<class TObject, class... TArgs>
 		void *operator new(std::size_t n, TObject &obj, ICoroThread &allocator, TArgs&&... args) noexcept;
 
+		CoroFinalizer GetFinalizer();
+
 	private:
+		static rkit::Result FinalizerDestroyAndRethrow(std::coroutine_handle<> coroHandle, void *context);
+
 		std::coroutine_handle<> m_continuation;
 
 		std::exception_ptr m_exception;
@@ -555,6 +559,25 @@ namespace rkit::coro::priv
 	Returner<TReturnType> &Promise<TReturnType>::GetReturnValueStorage()
 	{
 		return *this;
+	}
+
+	template<class TReturnType>
+	CoroFinalizer Promise<TReturnType>::GetFinalizer()
+	{
+		return { Promise<TReturnType>::FinalizerDestroyAndRethrow, this };
+	}
+
+	template<class TReturnType>
+	rkit::Result Promise<TReturnType>::FinalizerDestroyAndRethrow(std::coroutine_handle<> coroHandle, void *context)
+	{
+		Promise<TReturnType> *self = static_cast<Promise<TReturnType> *>(context);
+		std::exception_ptr ex = self->m_exception;
+		coroHandle.destroy();
+
+		if (ex)
+			std::rethrow_exception(ex);
+
+		RKIT_RETURN_OK;
 	}
 
 	template<class TReturnType>

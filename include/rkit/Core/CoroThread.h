@@ -71,9 +71,11 @@ namespace rkit
 		rkit::Result EnterFunction(const coro::Coroutine<TReturnType> &coro);
 
 	protected:
-		virtual rkit::Result EnterCoroutine(std::coroutine_handle<> coroHandle) = 0;
+		virtual rkit::Result EnterCoroutine(std::coroutine_handle<> coroHandle, const coro::CoroFinalizer &finalizer) = 0;
 	};
 }
+
+#include "CoroFinalizer.h"
 
 namespace rkit
 {
@@ -111,10 +113,11 @@ namespace rkit
 	template<class TReturnType>
 	rkit::Result ICoroThread::EnterFunction(const coro::Coroutine<TReturnType> &coro)
 	{
-		if (!coro.GetCoroutineHandle())
+		const std::coroutine_handle<typename coro::Coroutine<TReturnType>::promise_type> coroHandle = coro.GetCoroutineHandle();
+
+		if (!coroHandle)
 			RKIT_THROW(ResultCode::kCoroStackOverflow);
 
-		return this->EnterCoroutine(coro.GetCoroutineHandle());
+		return this->EnterCoroutine(coroHandle, coroHandle.promise().GetFinalizer());
 	}
-
 }

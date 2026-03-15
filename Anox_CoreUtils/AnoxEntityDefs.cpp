@@ -2,12 +2,13 @@
 #include "rkit/Core/Endian.h"
 #include "rkit/Data/ContentID.h"
 
-#include "AnoxEntityDefs.h"
-
 #include "anox/Data/EntityDef.h"
 #include "anox/Data/EntityStructs.h"
 
-namespace anox { namespace utils { namespace priv {
+#include "anox/CoreUtils/CoreUtils.h"
+
+namespace anox::utils::priv
+{
 
 // Packed field calculations and class prototypes
 #define FIELD_METADATA(name, eft, size, classDef)	\
@@ -187,12 +188,13 @@ namespace anox { namespace utils { namespace priv {
 		sizeof(g_badClasses) / sizeof(g_badClasses[0])
 	};
 
-} } }
+}
 
 
-namespace anox { namespace utils {
-	const data::EntityDefsSchema &GetEntityDefs()
+namespace anox::utils
+{
+	const data::EntityDefsSchema ANOX_COREUTILS_API &GetEntityDefs()
 	{
 		return priv::g_schema;
 	}
-} }
+}

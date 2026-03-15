@@ -57,6 +57,7 @@ namespace anox
 		static rkit::Result ReadCheckBool(bool &outBool, uint8_t inBool);
 		static rkit::Result ReadCheckLabel(Label &outLabel, const rkit::endian::LittleUInt32_t &inLabel);
 		static rkit::Result ReadCheckUTF8String(rkit::String &outString, const rkit::Span<const rkit::Utf8Char_t> &chars);
+		static rkit::Result ReadCheckByteString(rkit::ByteString &outString, const rkit::Span<const uint8_t> &chars);
 
 		template<class TEnum, class TIntegral>
 		static rkit::Result ReadCheckEnum(TEnum &outValue, const TIntegral &inUInt);
@@ -66,6 +67,9 @@ namespace anox
 
 		template<size_t TSize>
 		static rkit::Result ReadCheckVec(rkit::math::Vec<float, TSize> &outVec, const rkit::endian::LittleFloat32_t (&inVec)[TSize], int highestExpectedExponent);
+
+		template<size_t TSize>
+		static rkit::Result ReadCheckFloatArray(rkit::StaticArray<float, TSize> &outVec, const rkit::endian::LittleFloat32_t(&inVec)[TSize], int highestExpectedExponent);
 
 	private:
 		template<class TIntegral>
@@ -135,6 +139,21 @@ namespace anox
 	inline rkit::Result DataReader::ReadCheckFloat(float &outFloat, const rkit::endian::LittleFloat32_t &inFloat, int highestExpectedExponent)
 	{
 		return ReadCheckFloats(rkit::Span<float>(&outFloat, 1), rkit::Span<const rkit::endian::LittleFloat32_t>(&inFloat, 1), highestExpectedExponent);
+	}
+
+	template<size_t TSize>
+	rkit::Result DataReader::ReadCheckFloatArray(rkit::StaticArray<float, TSize> &outVec, const rkit::endian::LittleFloat32_t(&inVec)[TSize], int highestExpectedExponent)
+	{
+		float floats[TSize] = {};
+		for (size_t i = 0; i < TSize; i++)
+		{
+			RKIT_CHECK(ReadCheckFloat(floats[i], inVec[i], highestExpectedExponent));
+		}
+
+		for (size_t i = 0; i < TSize; i++)
+			outVec[i] = floats[i];
+
+		RKIT_RETURN_OK;
 	}
 
 	template<size_t TSize>

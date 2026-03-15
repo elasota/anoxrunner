@@ -70,9 +70,11 @@ namespace anox
 		friend struct AnoxEntityDefLoaderInfo;
 
 		const Values &GetValues() const override;
+		const rkit::ByteString &GetDescription() const override;
 
 	private:
 		Values m_values;
+		rkit::ByteString m_description;
 	};
 
 	rkit::Result AnoxEntityDefLoaderInfo::LoadHeaderAndQueueDependencies(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
@@ -102,10 +104,10 @@ namespace anox
 
 		resource.m_values.m_modelCodeFourCC = state.m_edef.m_modelCode.Get();
 
-		RKIT_CHECK(DataReader::ReadCheckVec(resource.m_values.m_scale, state.m_edef.m_scale, 16));
+		RKIT_CHECK(DataReader::ReadCheckFloatArray(resource.m_values.m_scale, state.m_edef.m_scale, 16));
 		RKIT_CHECK(DataReader::ReadCheckEnum(resource.m_values.m_shadowType, state.m_edef.m_shadowType));
-		RKIT_CHECK(DataReader::ReadCheckVec(resource.m_values.m_bboxMin, state.m_edef.m_bboxMin, 16));
-		RKIT_CHECK(DataReader::ReadCheckVec(resource.m_values.m_bboxMax, state.m_edef.m_bboxMax, 16));
+		RKIT_CHECK(DataReader::ReadCheckFloatArray(resource.m_values.m_bboxMin, state.m_edef.m_bboxMin, 16));
+		RKIT_CHECK(DataReader::ReadCheckFloatArray(resource.m_values.m_bboxMax, state.m_edef.m_bboxMax, 16));
 		RKIT_CHECK(DataReader::ReadCheckEnumMask(resource.m_values.m_userEntityFlags, state.m_edef.m_flags));
 		RKIT_CHECK(DataReader::ReadCheckFloat(resource.m_values.m_walkSpeed, state.m_edef.m_walkSpeed, 16));
 		RKIT_CHECK(DataReader::ReadCheckFloat(resource.m_values.m_runSpeed, state.m_edef.m_runSpeed, 16));
@@ -114,7 +116,7 @@ namespace anox
 		RKIT_CHECK(DataReader::ReadCheckLabel(resource.m_values.m_startSequence, state.m_edef.m_startSequenceID));
 		resource.m_values.m_miscValue = state.m_edef.m_miscValue.Get();
 
-		rkit::Vector<rkit::Utf8Char_t> descChars;
+		rkit::Vector<uint8_t> descChars;
 		RKIT_CHECK(descChars.Resize(state.m_edef.m_descriptionStringLength));
 
 		rkit::ReadOnlyMemoryStream stream(state.m_fileContents.ToSpan());
@@ -122,7 +124,7 @@ namespace anox
 
 		RKIT_CHECK(stream.ReadAllSpan(descChars.ToSpan()));
 
-		RKIT_CHECK(DataReader::ReadCheckUTF8String(resource.m_values.m_description, descChars.ToSpan()));
+		RKIT_CHECK(DataReader::ReadCheckByteString(resource.m_description, descChars.ToSpan()));
 
 		RKIT_RETURN_OK;
 	}
@@ -130,6 +132,11 @@ namespace anox
 	const AnoxEntityDefResource::Values &AnoxEntityDefResource::GetValues() const
 	{
 		return m_values;
+	}
+
+	const rkit::ByteString &AnoxEntityDefResource::GetDescription() const
+	{
+		return m_description;
 	}
 
 	rkit::Result AnoxEntityDefResourceLoaderBase::Create(rkit::RCPtr<AnoxEntityDefResourceLoaderBase> &outLoader)

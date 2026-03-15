@@ -19,6 +19,7 @@ namespace rkit::sandbox
 namespace rkit::sandbox::io
 {
 	typedef uint64_t Value_t;
+	typedef void (*CriticalErrorFunc_t)(ISandbox *sandbox, Environment *env, IThreadContext *thread) noexcept;
 	typedef PackedResultAndExtCode (*SysCallDispatchFunc_t)(ISandbox *sandbox, Environment *env, IThreadContext *thread, sandbox::Address_t ioValuesAddr) noexcept;
 }
 

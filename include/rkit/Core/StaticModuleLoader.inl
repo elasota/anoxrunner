@@ -14,6 +14,7 @@ namespace rkit::moduleloader
 	public:
 		explicit StaticModule(const ModuleInfo &mdl, IMallocDriver *alloc);
 
+		Result InitWithCustomDrivers(const ModuleInitParameters *initParams, Drivers *drivers) override;
 		Result Init(const ModuleInitParameters *initParams) override;
 		void Unload() override;
 

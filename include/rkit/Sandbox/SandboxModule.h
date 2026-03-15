@@ -22,5 +22,6 @@ namespace rkit::sandbox
 		ISandbox ***m_outSandboxPtr = nullptr;
 		Environment *m_envPtr = nullptr;
 		const io::SysCallDispatchFunc_t *m_sysCalls = nullptr;
+		io::CriticalErrorFunc_t m_criticalError = nullptr;
 	};
 }

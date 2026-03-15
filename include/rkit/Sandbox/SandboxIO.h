@@ -70,7 +70,8 @@ namespace rkit::sandbox::io
 		return priv::SandboxIOHelper<T>::LoadValue(inValue);
 	}
 
-	void SysCall(ISandbox *sandbox, Environment *env, const SysCallDispatchFunc_t *sysCalls, uint32_t sysCallID, Value_t *values) noexcept;
+	void CriticalError(ISandbox *sandbox, Environment *env, CriticalErrorFunc_t criticalError) noexcept;
+	void SysCall(ISandbox *sandbox, Environment *env, const SysCallDispatchFunc_t *sysCalls, uint32_t sysCallID, PackedResultAndExtCode &outResult, Value_t *values) noexcept;
 	Value_t LoadParam(void *ioContext, uint32_t paramIndex) noexcept;
 	void StoreResult(void *ioContext, PackedResultAndExtCode result) noexcept;
 	void StoreReturnValue(void *ioContext, uint32_t index, Value_t value) noexcept;

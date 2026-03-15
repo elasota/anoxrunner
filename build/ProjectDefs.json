@@ -5,6 +5,7 @@
 		"dev_only": true,
 		"refs":
 		[
+			"Anox_CoreUtils",
 			"RKit_Build",
 			"RKit_Build_Vulkan",
 			"RKit_CoreLib",
@@ -25,6 +26,7 @@
 		"type": "module",
 		"refs":
 		[
+			"Anox_CoreUtils",
 			"Anox_Game",
 			"Anox_Utilities",
 			"RKit_CoreLib",
@@ -39,12 +41,21 @@
 			}
 		]
 	},
+	"Anox_CoreUtils" :
+	{
+		"type": "linked_module",
+		"configs":
+		[
+			"Anox_CoreUtils_Internal"
+		]
+	},
 	"Anox_Game" :
 	{
 		"type": "module",
 		"refs":
 		[
-			"RKit_CoreLib"
+			"RKit_CoreLib",
+			"Anox_CoreUtils"
 		]
 	},
 	"RKit_Boot_Win" :

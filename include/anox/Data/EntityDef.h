@@ -63,7 +63,7 @@ namespace anox { namespace data {
 		size_t m_numBadClassDefs;
 	};
 
-	enum class UserEntityFlags
+	enum class UserEntityFlags : uint32_t
 	{
 		kSolid,
 		kLighting,
@@ -73,7 +73,7 @@ namespace anox { namespace data {
 		kCount,
 	};
 
-	enum class UserEntityShadowType
+	enum class UserEntityShadowType : uint32_t
 	{
 		kNoShadow,
 		kShadow,

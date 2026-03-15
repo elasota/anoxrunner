@@ -24,8 +24,6 @@ namespace anox::game
 	public:
 		World();
 
-		rkit::ResultCoroutine SpawnObjects(rkit::ICoroThread &thread, const AnoxSpawnDefsResourceBase *spawnDefs);
-
 		static rkit::Result Create(rkit::UniquePtr<World> &outWorld);
 	};
 }

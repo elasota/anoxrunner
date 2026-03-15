@@ -13,7 +13,9 @@
 #include "rkit/Core/Path.h"
 #include "rkit/Core/String.h"
 #include "rkit/Core/UtilitiesDriver.h"
+
 #include "rkit/Sandbox/Sandbox.h"
+#include "rkit/Sandbox/ThreadCreationParameters.h"
 
 #include "AnoxBSPModelResource.h"
 #include "AnoxCaptureHarness.h"
@@ -22,7 +24,6 @@
 #include "AnoxConfigurationSaver.h"
 #include "AnoxFileResource.h"
 #include "AnoxGameSandboxEnv.h"
-#include "AnoxGameSandboxInterface.h"
 #include "AnoxResourceManager.h"
 #include "AnoxSpawnDefsResource.h"
 #include "AnoxGlobalVars.h"
@@ -93,7 +94,8 @@ namespace anox
 
 		rkit::UniquePtr<game::GlobalVars> m_globalVars;
 		rkit::UniquePtr<game::World> m_world;
-		rkit::UniquePtr<AnoxGameSandboxInterface> m_sandbox;
+		rkit::UniquePtr<rkit::ISandbox> m_sandbox;
+		rkit::UniquePtr<rkit::sandbox::IThreadContext> m_sandboxMainThreadContext;
 		anox::game::sandbox::HostImports m_sandboxImports;
 		game::AnoxGameSandboxEnvironment m_sandboxEnv;
 
@@ -551,7 +553,42 @@ namespace anox
 
 		rkit::log::LogInfo(u8"GameLogic: Spawning objects");
 
-		CORO_CHECK(co_await m_world->SpawnObjects(thread, static_cast<AnoxSpawnDefsResourceBase *>(objectsLoadResult.m_resourceHandle.Get())));
+		m_sandboxEnv.m_spawnDefs = objectsLoadResult.m_resourceHandle.StaticCastMove<AnoxSpawnDefsResourceBase>();
+
+		const AnoxSpawnDefsResourceBase *spawnDefs = m_sandboxEnv.m_spawnDefs.Get();
+
+		uint32_t spawnDefsMMID = 0;
+		{
+			rkit::ConstSpan<AnoxSpawnDefsResourceBase::SpawnDef> inSpawnDefs = spawnDefs->GetSpawnDefs();
+
+			rkit::sandbox::Address_t spawnDefsAddress = 0;
+			CORO_CHECK(m_sandbox->AllocDynamicMemory(spawnDefsAddress, spawnDefsMMID, inSpawnDefs.SizeInBytes()));
+
+			rkit::Span<AnoxSpawnDefsResourceBase::SpawnDef> outSpawnDefs;
+			CORO_CHECK(m_sandbox->AccessMemorySpan(outSpawnDefs, spawnDefsAddress, inSpawnDefs.Count()));
+
+			rkit::CopySpanNonOverlapping(outSpawnDefs, inSpawnDefs);
+		}
+
+		uint32_t spawnDataMMID = 0;
+		{
+			rkit::ConstSpan<uint8_t> inSpawnData = spawnDefs->GetDataBuffer();
+
+			rkit::sandbox::Address_t spawnDataAddress = 0;
+			CORO_CHECK(m_sandbox->AllocDynamicMemory(spawnDataAddress, spawnDataMMID, inSpawnData.SizeInBytes()));
+
+			rkit::Span<uint8_t> outSpawnData;
+			CORO_CHECK(m_sandbox->AccessMemorySpan(outSpawnData, spawnDataAddress, inSpawnData.Count()));
+
+			rkit::CopySpanNonOverlapping(outSpawnData, inSpawnData);
+		}
+
+		CORO_THROW(rkit::ResultCode::kNotYetImplemented);
+
+		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(spawnDefsMMID));
+		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(spawnDataMMID));
+
+		//CORO_CHECK(co_await m_world->SpawnObjects(thread, static_cast<AnoxSpawnDefsResourceBase *>(objectsLoadResult.m_resourceHandle.Get())));
 
 		int n = 0;
 		CORO_RETURN_OK;
@@ -566,6 +603,7 @@ namespace anox
 
 		{
 			rkit::UniquePtr<rkit::ISandbox> sandbox;
+			rkit::UniquePtr<rkit::sandbox::IThreadContext> mainThreadContext;
 			rkit::UniquePtr<game::World> world;
 
 			rkit::log::LogInfo(u8"Loading game module");
@@ -574,16 +612,19 @@ namespace anox
 
 			m_sandboxEnv.m_sandbox = sandbox.Get();
 
-			CORO_CHECK(sandbox->RunInitializer());
+			CORO_CHECK(rkit::GetDrivers().m_utilitiesDriver->LinkSandbox(*sandbox, m_sandboxImports.GetHostAPIDescriptor()));
+
+			rkit::sandbox::ThreadCreationParameters threadParams = {};
+			CORO_CHECK(sandbox->CreateThreadContext(mainThreadContext, threadParams));
+
+			CORO_CHECK(sandbox->RunInitializer(*mainThreadContext));
+
+			CORO_CHECK(m_sandboxImports.Initialize(mainThreadContext.Get(), m_sandboxEnv.m_gameSessionAddr));
 
 			CORO_CHECK(game::World::Create(world));
 
-			rkit::UniquePtr<AnoxGameSandboxInterface> sandboxInterface;
-			CORO_CHECK(AnoxGameSandboxInterface::Create(sandboxInterface, std::move(sandbox)));
-
-			CORO_CHECK(sandboxInterface->LinkToSandbox());
-
-			m_sandbox = std::move(sandboxInterface);
+			m_sandbox = std::move(sandbox);
+			m_sandboxMainThreadContext = std::move(mainThreadContext);
 			m_world = std::move(world);
 		}
 

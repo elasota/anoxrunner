@@ -24,10 +24,10 @@ namespace anox
 		struct Values
 		{
 			uint32_t m_modelCodeFourCC = 0;
-			rkit::math::Vec3 m_scale;
+			rkit::StaticArray<float, 3> m_scale;
 			data::UserEntityShadowType m_shadowType = data::UserEntityShadowType::kCount;
-			rkit::math::Vec3 m_bboxMin;
-			rkit::math::Vec3 m_bboxMax;
+			rkit::StaticArray<float, 3> m_bboxMin;
+			rkit::StaticArray<float, 3> m_bboxMax;
 			rkit::EnumMask<data::UserEntityFlags> m_userEntityFlags;
 			float m_walkSpeed = 0.f;
 			float m_runSpeed = 0.f;
@@ -35,11 +35,10 @@ namespace anox
 			Label m_targetSequence;
 			Label m_startSequence;
 			uint32_t m_miscValue = 0;
-
-			rkit::String m_description;
 		};
 
 		virtual const Values &GetValues() const = 0;
+		virtual const rkit::ByteString &GetDescription() const = 0;
 	};
 
 	class AnoxEntityDefResourceLoaderBase : public AnoxContentIDKeyedResourceLoader<AnoxEntityDefResourceBase>

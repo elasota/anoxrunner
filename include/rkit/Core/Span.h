@@ -82,6 +82,7 @@ namespace rkit
 
 		T *Ptr() const;
 		size_t Count() const;
+		size_t SizeInBytes() const;
 
 		Span<T> SubSpan(size_t start) const;
 		Span<T> SubSpan(size_t start, size_t size) const;
@@ -408,6 +409,12 @@ template<class T>
 size_t rkit::Span<T>::Count() const
 {
 	return m_count;
+}
+
+template<class T>
+size_t rkit::Span<T>::SizeInBytes() const
+{
+	return m_count * sizeof(T);
 }
 
 template<class T>

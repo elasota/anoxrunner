@@ -19,6 +19,8 @@
 
 #include "rkit/Math/SoftFloat.h"
 
+#include "anox/CoreUtils/CoreUtils.h"
+
 #include "anox/Data/CompressedNormal.h"
 #include "anox/Data/EntityDef.h"
 #include "anox/Data/EntitySpawnData.h"
@@ -1250,7 +1252,7 @@ namespace anox { namespace buildsystem
 	{
 		anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, u8"Utilities"));
 
-		const data::EntityDefsSchema &schema = anoxUtils->GetEntityDefs();
+		const data::EntityDefsSchema &schema = anox::utils::GetEntityDefs();
 
 		const rkit::ConstSpan<const anox::data::EntityClassDef *> classDefs(schema.m_classDefs, schema.m_numClassDefs);
 

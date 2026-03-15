@@ -39,12 +39,14 @@ namespace SandboxAPIGenerator
         public ParameterDef[] Parameters { get; private set; }
         public ParameterDef[] ReturnValues { get; private set; }
         public string Name { get; private set; }
+        public bool NoExcept { get; private set; }
 
-        public FunctionDef(string name, ParameterDef[] parameters, ParameterDef[] returnValues)
+        public FunctionDef(string name, ParameterDef[] parameters, ParameterDef[] returnValues, bool noExcept)
         {
             Parameters = parameters;
             ReturnValues = returnValues;
             Name = name;
+            NoExcept = noExcept;
         }
     }
 
@@ -264,7 +266,7 @@ namespace SandboxAPIGenerator
             sw.Write("(");
             sw.Write(prefix);
 
-            bool anyParams = false;
+            bool anyParams = !string.IsNullOrEmpty(prefix);
             foreach (ParameterDef rv in returnValues)
             {
                 if (!anyParams)
@@ -344,7 +346,8 @@ namespace SandboxAPIGenerator
                 }
                 else if (directive == "export" || directive == "import")
                 {
-                    ParseFunctionDef(lineNum, tokens, (directive == "export") ? exports : imports);
+                    bool isExport = (directive == "export");
+                    ParseFunctionDef(lineNum, tokens, isExport ? exports : imports, !isExport);
                 }
                 else
                     ThrowOnLine(lineNum, "Unknown directive");
@@ -383,9 +386,17 @@ namespace SandboxAPIGenerator
 
                     foreach (FunctionDef fdef in imports)
                     {
-                        sw.Write(indent + "\tstatic ::rkit::Result " + fdef.Name);
+                        sw.Write(indent + "\tstatic ");
+                        if (fdef.NoExcept)
+                            sw.Write("void");
+                        else
+                            sw.Write("::rkit::Result");
+
+                        sw.Write(" " + fdef.Name);
 
                         WriteCanonicalParamList(sw, "", fdef, false);
+                        if (fdef.NoExcept)
+                            sw.Write(" noexcept");
                         sw.WriteLine(";");
                     }
 
@@ -430,6 +441,7 @@ namespace SandboxAPIGenerator
                     sw.WriteLine(indent + "\tstatic ::rkit::ISandbox *ms_sandboxPtr;");
                     sw.WriteLine(indent + "\tstatic ::rkit::sandbox::Environment *ms_sandboxEnvPtr;");
                     sw.WriteLine(indent + "\tstatic const ::rkit::sandbox::io::SysCallDispatchFunc_t *ms_sysCalls;");
+                    sw.WriteLine(indent + "\tstatic ::rkit::sandbox::io::CriticalErrorFunc_t ms_criticalError;");
                     sw.WriteLine(indent + "};");
 
                     sw.WriteLine();
@@ -438,31 +450,49 @@ namespace SandboxAPIGenerator
                     {
                         FunctionDef fdef = imports[sysCallID];
 
-                        sw.Write(indent + "::rkit::Result SandboxImports::" + fdef.Name);
+                        sw.Write(indent);
+                        if (fdef.NoExcept)
+                            sw.Write("void");
+                        else
+                            sw.Write("::rkit::Result");
+
+                        sw.Write(" SandboxImports::" + fdef.Name);
 
                         WriteCanonicalParamList(sw, "", fdef, false);
+                        if (fdef.NoExcept)
+                            sw.Write(" noexcept");
                         sw.WriteLine();
+
                         sw.WriteLine(indent + "{");
 
                         ParameterDef[] returnValues = fdef.ReturnValues;
                         ParameterDef[] parameters = fdef.Parameters;
-                        sw.WriteLine(indent + "\t::rkit::sandbox::io::Value_t loc_ioContext[" + (1 + returnValues.Length + parameters.Length) + "];");
+                        sw.WriteLine(indent + "\t::rkit::sandbox::io::Value_t loc_ioContext[" + (returnValues.Length + parameters.Length) + "];");
+                        sw.WriteLine(indent + "\t::rkit::PackedResultAndExtCode loc_resultCode;");
 
                         for (int i = 0; i < parameters.Length; i++)
                         {
-                            sw.WriteLine(indent + "\tloc_ioContext[" + (returnValues.Length + 1 + i).ToString() + "] = ::rkit::sandbox::io::LoadValue(" + parameters[i].Name + ");");
+                            sw.WriteLine(indent + "\tloc_ioContext[" + (returnValues.Length + i).ToString() + "] = ::rkit::sandbox::io::LoadValue(" + parameters[i].Name + ");");
                         }
 
-                        sw.WriteLine(indent + "\t::rkit::sandbox::io::SysCall(SandboxAPI::ms_sandboxPtr, SandboxAPI::ms_sandboxEnvPtr, SandboxAPI::ms_sysCalls, SandboxAPI::ms_sysCallStubs[" + sysCallID.ToString() + "].m_sysCallID, loc_ioContext);");
+                        sw.WriteLine(indent + "\t::rkit::sandbox::io::SysCall(SandboxAPI::ms_sandboxPtr, SandboxAPI::ms_sandboxEnvPtr, SandboxAPI::ms_sysCalls, SandboxAPI::ms_sysCallStubs[" + sysCallID.ToString() + "].m_sysCallID, loc_resultCode, loc_ioContext);");
 
-                        sw.WriteLine(indent + "\tRKIT_CHECK(::rkit::ThrowIfError(static_cast<::rkit::PackedResultAndExtCode>(loc_ioContext[" + returnValues.Length.ToString() + "])));");
+                        if (fdef.NoExcept)
+                        {
+                            sw.WriteLine(indent + "\tif (!::rkit::utils::ResultIsOK(loc_resultCode))");
+                            sw.WriteLine(indent + "\t\t::rkit::sandbox::io::CriticalError(SandboxAPI::ms_sandboxPtr, SandboxAPI::ms_sandboxEnvPtr, SandboxAPI::ms_criticalError);");
+                        }
+                        else
+                            sw.WriteLine(indent + "\tRKIT_CHECK(::rkit::ThrowIfError(loc_resultCode));");
 
                         for (int i = 0; i < returnValues.Length; i++)
                         {
-                            sw.WriteLine(indent + "\t::rkit::sandbox::io::StoreValue(" + returnValues[i].Name + ", loc_ioContext[" + (returnValues.Length - 1 + i).ToString() + "]);");
+                            sw.WriteLine(indent + "\t::rkit::sandbox::io::StoreValue(" + returnValues[i].Name + ", loc_ioContext[" + i.ToString() + "]);");
                         }
 
-                        sw.WriteLine(indent + "\tRKIT_RETURN_OK;");
+                        if (!fdef.NoExcept)
+                            sw.WriteLine(indent + "\tRKIT_RETURN_OK;");
+
                         sw.WriteLine(indent + "}");
                         sw.WriteLine();
                     }
@@ -570,7 +600,7 @@ namespace SandboxAPIGenerator
                     sw.WriteLine(indent + "\t{");
                     sw.WriteLine(indent + "\t\tsizeof(void *),");
                     sw.WriteLine(indent + "\t\tsizeof(::rkit::sandbox::ExportDescriptor::ExportFunctionPtr_t),");
-                    sw.WriteLine(indent + "\t\tsizeof(::rkit::sandbox::EntryDescriptor),");
+                    sw.WriteLine(indent + "\t\tsizeof(::rkit::sandbox::ExportDescriptor),");
                     sw.WriteLine(indent + "\t\t0,");
                     sw.WriteLine(indent + "\t\t" + imports.Count.ToString() + ",");
                     sw.WriteLine(indent + "\t\t" + exports.Count.ToString() + ",");
@@ -585,6 +615,7 @@ namespace SandboxAPIGenerator
                     sw.WriteLine(indent + "::rkit::ISandbox *SandboxAPI::ms_sandboxPtr = nullptr;");
                     sw.WriteLine(indent + "::rkit::sandbox::Environment *SandboxAPI::ms_sandboxEnvPtr = nullptr;");
                     sw.WriteLine(indent + "const ::rkit::sandbox::io::SysCallDispatchFunc_t *SandboxAPI::ms_sysCalls = nullptr;");
+                    sw.WriteLine(indent + "::rkit::sandbox::io::CriticalErrorFunc_t SandboxAPI::ms_criticalError = nullptr;");
 
                     sw.WriteLine("}");
                 }
@@ -613,10 +644,10 @@ namespace SandboxAPIGenerator
 
                     foreach (FunctionDef fdef in exports)
                     {
-                        sw.Write(indent + "\tstatic ::rkit::Result " + fdef.Name);
+                        sw.Write(indent + "\t::rkit::Result " + fdef.Name);
 
-                        WriteCanonicalParamList(sw, "::rkit::sandbox::IThreadContext *thread, ", fdef, true);
-                        sw.WriteLine(";");
+                        WriteCanonicalParamList(sw, "::rkit::sandbox::IThreadContext *thread", fdef, true);
+                        sw.WriteLine(" const;");
                     }
 
                     sw.WriteLine();
@@ -641,7 +672,7 @@ namespace SandboxAPIGenerator
                     {
                         sw.Write(indent + "\tstatic ::rkit::Result " + fdef.Name);
 
-                        WriteCanonicalParamList(sw, "::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, ", fdef, true);
+                        WriteCanonicalParamList(sw, "::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread", fdef, true);
                         sw.WriteLine(";");
                     }
                     sw.WriteLine(indent + "};");
@@ -783,6 +814,41 @@ namespace SandboxAPIGenerator
                         sw.WriteLine();
                     }
 
+                    for (int exportIndex = 0; exportIndex < exports.Count; exportIndex++)
+                    {
+                        FunctionDef fdef = exports[exportIndex];
+
+                        ParameterDef[] parameters = fdef.Parameters;
+                        ParameterDef[] returnValues = fdef.ReturnValues;
+
+                        sw.Write(indent + "::rkit::Result HostImports::" + fdef.Name + "(::rkit::sandbox::IThreadContext *thread");
+
+                        foreach (ParameterDef rv in returnValues)
+                            sw.Write(", " + CppTypeForParamType(rv.ParamType, true) + "& " + rv.Name);
+
+                        foreach (ParameterDef parameter in parameters)
+                            sw.Write(", " + CppTypeForParamType(parameter.ParamType, true) + " " + parameter.Name);
+
+                        sw.WriteLine(") const");
+
+                        sw.WriteLine(indent + "{");
+                        sw.WriteLine(indent + "\t::rkit::sandbox::io::Value_t loc_ioValues[" + (parameters.Length + returnValues.Length + 1).ToString() + "] = {};");
+
+                        for (int parameterIndex = 0;  parameterIndex < parameters.Length; parameterIndex++)
+                            sw.WriteLine(indent + "\tloc_ioValues[" + (returnValues.Length + 1 + parameterIndex) + "] = ::rkit::sandbox::io::LoadValue(" + parameters[parameterIndex].Name + ");");
+
+                        sw.Write(indent + "\tRKIT_CHECK(this->m_hostAPI.m_sandbox->CallFunction(this->m_importAddresses[0], loc_ioValues, ");
+                        sw.WriteLine(returnValues.Length.ToString() + ", " + parameters.Length.ToString() + "));");
+
+                        for (int rvIndex = 0; rvIndex < returnValues.Length; rvIndex++)
+                            sw.WriteLine(indent + "\t::rkit::sandbox::io::StoreValue(" + returnValues[rvIndex].Name + ", loc_ioValues[" + (returnValues.Length - 1 - rvIndex) + "]);");
+
+
+                        sw.WriteLine(indent + "\tRKIT_RETURN_OK;");
+                        sw.WriteLine(indent + "}");
+                        sw.WriteLine();
+                    }
+
                     sw.WriteLine(indent + "HostImports::HostImports()");
                     sw.WriteLine(indent + "\t: m_importAddresses {}");
                     sw.WriteLine(indent + "\t, m_hostAPI{ nullptr, { HostAPI::ms_sysCalls, " + imports.Count.ToString() + " }, HostAPI::ms_sysCallNames, m_importAddresses, HostAPI::ms_importNames, " + exports.Count.ToString() + " }");
@@ -863,7 +929,7 @@ namespace SandboxAPIGenerator
             }
         }
 
-        private static void ParseFunctionDef(int lineNum, string[] tokens, IList<FunctionDef> functionDefs)
+        private static void ParseFunctionDef(int lineNum, string[] tokens, IList<FunctionDef> functionDefs, bool noExceptAllowed)
         {
             if (tokens.Length < 2)
                 ThrowOnLine(lineNum, "Invalid function def");
@@ -878,17 +944,24 @@ namespace SandboxAPIGenerator
 
             if (tokenNum < tokens.Length)
             {
-                if (tokens[tokenNum] != "->")
-                    ThrowOnLine(lineNum, "Expected '->'");
-
-                tokenNum++;
-                ParseParameterList(lineNum, tokens, ref tokenNum, returnValues);
+                if (tokens[tokenNum] == "->")
+                {
+                    tokenNum++;
+                    ParseParameterList(lineNum, tokens, ref tokenNum, returnValues);
+                }
             }
 
-            if (tokenNum != tokens.Length)
+            bool isNoExcept = false;
+            if (tokenNum < tokens.Length && noExceptAllowed && tokens[tokenNum] == "noexcept")
+            {
+                isNoExcept = true;
+                tokenNum++;
+            }
+
+            if (tokenNum < tokens.Length)
                 ThrowOnLine(lineNum, "Unexpected tokens after return value list");
 
-            functionDefs.Add(new FunctionDef(functionName, parameters.ToArray(), returnValues.ToArray()));
+            functionDefs.Add(new FunctionDef(functionName, parameters.ToArray(), returnValues.ToArray(), isNoExcept));
         }
     }
 }

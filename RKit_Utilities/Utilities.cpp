@@ -136,7 +136,7 @@ namespace rkit
 		void SanitizeClampUInt16s(const Span<uint16_t> &outFloats, const Span<const endian::LittleUInt16_t> &inFloats, uint16_t maxValue) const override;
 
 		Result CreateModuleSandbox(UniquePtr<ISandbox> &outSandbox, uint32_t moduleNamespace, const Utf8Char_t *moduleName, const sandbox::SysCallCatalog &sysCalls, sandbox::Environment &env) const override;
-		Result LinkSandbox(ISandbox &sandbox, const sandbox::HostAPIDescriptor &hostAPIDescriptor) const override;
+		Result LinkSandbox(ISandbox &sandbox, sandbox::HostAPIDescriptor &hostAPIDescriptor) const override;
 
 	private:
 		static bool ValidateFilePathSlice(const Span<const Utf8Char_t> &name, bool permitWildcards);
@@ -2739,7 +2739,7 @@ namespace rkit
 		RKIT_RETURN_OK;
 	}
 
-	Result UtilitiesDriver::LinkSandbox(ISandbox &sandbox, const sandbox::HostAPIDescriptor &hostAPIDescriptor) const
+	Result UtilitiesDriver::LinkSandbox(ISandbox &sandbox, sandbox::HostAPIDescriptor &hostAPIDescriptor) const
 	{
 		sandbox::Address_t entryDescAddr = sandbox.GetEntryDescriptor();
 
@@ -2751,6 +2751,9 @@ namespace rkit
 		const uint16_t exportDescSize = entryDesc->m_exportDescriptorSize;
 		const size_t numSysCalls = entryDesc->m_numSysCalls;
 		const size_t numExports = entryDesc->m_numExports;
+
+		for (sandbox::Address_t &addr : Span<sandbox::Address_t>(hostAPIDescriptor.m_imports, hostAPIDescriptor.m_numImports))
+			addr = 0;
 
 		if (dataAddrSize != 4 && dataAddrSize != 8)
 			RKIT_THROW(ResultCode::kSandboxMemoryError);
@@ -2828,8 +2831,10 @@ namespace rkit
 					currentDescAddress += 16u;
 				}
 
-				void *importNameCharsPtr = nullptr;
-				RKIT_CHECK(sandbox.AccessMemoryRange(importNameCharsPtr, charsAddr, charsLength));
+				void *importNameVoidPtr = nullptr;
+				RKIT_CHECK(sandbox.AccessMemoryRange(importNameVoidPtr, charsAddr, charsLength));
+
+				const Utf8Char_t *importNameCharsPtr = static_cast<const Utf8Char_t *>(importNameVoidPtr);
 
 				Optional<uint32_t> sysCallID = 0;
 				for (size_t candidateIndex = 0; candidateIndex < hostNames.Count(); candidateIndex++)
@@ -2889,12 +2894,12 @@ namespace rkit
 					charsLength = exportDataAddrs[1];
 				}
 
-				currentTableAddress += exportDescSize;
+				void *importNameVoidPtr = nullptr;
+				RKIT_CHECK(sandbox.AccessMemoryRange(importNameVoidPtr, charsAddr, charsLength));
 
-				void *importNameCharsPtr = nullptr;
-				RKIT_CHECK(sandbox.AccessMemoryRange(importNameCharsPtr, charsAddr, charsLength));
+				const Utf8Char_t *importNameCharsPtr = static_cast<const Utf8Char_t *>(importNameVoidPtr);
 
-				Optional<size_t> importIndex = 0;
+				Optional<size_t> importIndex;
 				for (size_t candidateIndex = 0; candidateIndex < hostNames.Count(); candidateIndex++)
 				{
 					const sandbox::HostAPIName &hostAPIName = hostNames[candidateIndex];
@@ -2928,6 +2933,7 @@ namespace rkit
 					imports[importIndex.Get()] = *funcAddressPtr;
 				}
 
+				currentTableAddress += exportDescSize;
 				currentFPtrAddress += exportDescSize;
 			}
 
@@ -2936,6 +2942,8 @@ namespace rkit
 				if (addr == 0)
 					RKIT_THROW(ResultCode::kSandboxAPIError);
 			}
+
+			hostAPIDescriptor.m_sandbox = &sandbox;
 
 			RKIT_RETURN_OK;
 		}

@@ -70,6 +70,15 @@ namespace anox
 		RKIT_RETURN_OK;
 	}
 
+	rkit::Result DataReader::ReadCheckByteString(rkit::ByteString &outString, const rkit::Span<const uint8_t> &chars)
+	{
+		rkit::ByteStringSliceView view(chars);
+		if (!view.Validate())
+			RKIT_THROW(rkit::ResultCode::kDataError);
+
+		RKIT_RETURN_OK;
+	}
+
 	template<class TIntegral>
 	rkit::Result DataReader::ReadCheckUIntImpl(TIntegral &outUInt, TIntegral value, TIntegral expectedMax)
 	{
