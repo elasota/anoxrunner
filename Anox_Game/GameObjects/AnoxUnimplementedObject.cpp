@@ -15,7 +15,6 @@ rkit::ResultCoroutine WorldObjectInstantiator<data::eclass>::SpawnObject(rkit::I
 
 namespace anox::game
 {
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_info_player_start)
 	ANOX_UNIMPLEMENTED_ECLASS(EClass_info_party_start)
 	ANOX_UNIMPLEMENTED_ECLASS(EClass_func_areaportal)
 	ANOX_UNIMPLEMENTED_ECLASS(EClass_func_button)
@@ -42,12 +41,10 @@ namespace anox::game
 	ANOX_UNIMPLEMENTED_ECLASS(EClass_trigger_multiple)
 	ANOX_UNIMPLEMENTED_ECLASS(EClass_trigger_push)
 	ANOX_UNIMPLEMENTED_ECLASS(EClass_trigger_relay)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_worldspawn)
 	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_playerchar)
 	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_char)
 	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_charfly)
 	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_noclip)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_general)
 	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_trashspawn)
 	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_bugspawn)
 	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_lottobot)

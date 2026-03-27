@@ -61,6 +61,7 @@ namespace rkit
 
 		virtual CoroThreadState GetState() const = 0;
 		virtual CoroThreadBlockerAwaiter AwaitFuture(const FutureBase &future) = 0;
+		virtual CoroThreadBlockerAwaiter AwaitBlocker(const CoroThreadBlocker &blocker) = 0;
 
 		virtual rkit::Result Resume() = 0;
 		virtual bool TryUnblock() = 0;

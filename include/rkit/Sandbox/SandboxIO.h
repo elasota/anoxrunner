@@ -52,6 +52,13 @@ namespace rkit::sandbox::io::priv
 		static void StoreValue(float &outValue, Value_t inValue);
 		static Value_t LoadValue(float inValue);
 	};
+
+	template<>
+	struct SandboxIOHelper<bool>
+	{
+		static void StoreValue(bool &outValue, Value_t inValue);
+		static Value_t LoadValue(bool inValue);
+	};
 }
 
 namespace rkit::sandbox::io
@@ -155,5 +162,15 @@ namespace rkit::sandbox::io::priv
 		uint32_t temp = 0;
 		memcpy(&temp, &inValue, 4);
 		return temp;
+	}
+
+	inline void SandboxIOHelper<bool>::StoreValue(bool &outValue, Value_t inValue)
+	{
+		outValue = (inValue != 0);
+	}
+
+	inline Value_t SandboxIOHelper<bool>::LoadValue(bool inValue)
+	{
+		return inValue ? 1 : 0;
 	}
 }

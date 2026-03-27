@@ -69,11 +69,11 @@ namespace anox
 	public:
 		friend struct AnoxEntityDefLoaderInfo;
 
-		const Values &GetValues() const override;
+		const game::UserEntityDefValues &GetValues() const override;
 		const rkit::ByteString &GetDescription() const override;
 
 	private:
-		Values m_values;
+		game::UserEntityDefValues m_values;
 		rkit::ByteString m_description;
 	};
 
@@ -100,7 +100,7 @@ namespace anox
 
 	rkit::Result AnoxEntityDefLoaderInfo::LoadContents(State_t &state, Resource_t &resource)
 	{
-		AnoxEntityDefResource::Values &resValues = resource.m_values;
+		game::UserEntityDefValues &resValues = resource.m_values;
 
 		resource.m_values.m_modelCodeFourCC = state.m_edef.m_modelCode.Get();
 
@@ -115,6 +115,7 @@ namespace anox
 		RKIT_CHECK(DataReader::ReadCheckLabel(resource.m_values.m_targetSequence, state.m_edef.m_targetSequenceID));
 		RKIT_CHECK(DataReader::ReadCheckLabel(resource.m_values.m_startSequence, state.m_edef.m_startSequenceID));
 		resource.m_values.m_miscValue = state.m_edef.m_miscValue.Get();
+		resource.m_values.m_descLength = state.m_edef.m_descriptionStringLength;
 
 		rkit::Vector<uint8_t> descChars;
 		RKIT_CHECK(descChars.Resize(state.m_edef.m_descriptionStringLength));
@@ -129,7 +130,7 @@ namespace anox
 		RKIT_RETURN_OK;
 	}
 
-	const AnoxEntityDefResource::Values &AnoxEntityDefResource::GetValues() const
+	const game::UserEntityDefValues &AnoxEntityDefResource::GetValues() const
 	{
 		return m_values;
 	}

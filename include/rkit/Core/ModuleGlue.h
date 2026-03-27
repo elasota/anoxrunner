@@ -14,20 +14,19 @@
 #else
 
 #include "rkit/Core/SystemDriver.h"
-#include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/Drivers.h"
 
 #include <cstdlib>
 #include <cassert>
 
 #define RKIT_IMPLEMENT_ASSERTION_CHECK_FUNC	\
-	void rkit::priv::AssertionCheckFunc(bool expr, const char *exprStr, const char *file, unsigned int line)\
+	void ::rkit::priv::AssertionCheckFunc(bool expr, const char *exprStr, const char *file, unsigned int line)\
 	{\
 		if (!expr)\
 		{\
-			ISystemDriver *systemDriver = GetDrivers().m_systemDriver;\
-			if (systemDriver)\
-				systemDriver->AssertionFailure(exprStr, file, line);\
+			IAssertDriver *assertDriver = GetDrivers().GetAssertDriver();\
+			if (assertDriver)\
+				assertDriver->AssertionFailure(exprStr, file, line);\
 			else\
 				abort();\
 		}\

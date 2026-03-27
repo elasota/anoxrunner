@@ -19,7 +19,6 @@
 
 #include "rkit/Utilities/ThreadPool.h"
 
-#include "Coro2Thread.h"
 #include "DeflateDecompressStream.h"
 #include "JobQueue.h"
 #include "Json.h"
@@ -107,8 +106,6 @@ namespace rkit
 		Result ConvertUTF8ToUTF16WChar(size_t &outSize, const Span<wchar_t> &dest, const Span<const uint8_t> &src) const override;
 
 		bool IsPathComponentValidOnWindows(const BaseStringSliceView<OSPathChar_t, CharacterEncoding::kOSPath> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const override;
-
-		Result CreateCoro2Thread(UniquePtr<ICoroThread> &thread, size_t stackSize) const override;
 
 		bool ParseDouble(const ByteStringSliceView &str, double &d) const override;
 		bool ParseFloat(const ByteStringSliceView &str, float &f) const override;
@@ -2267,16 +2264,6 @@ namespace rkit
 			return ParsePositiveInt(str, 1, radix, i);
 
 		return ParsePositiveInt(str, 0, radix, i);
-	}
-
-	Result UtilitiesDriver::CreateCoro2Thread(UniquePtr<ICoroThread> &thread, size_t stackSize) const
-	{
-		UniquePtr<utils::Coro2ThreadBase> threadBase;
-		RKIT_CHECK(utils::Coro2ThreadBase::Create(threadBase, stackSize));
-
-		thread = std::move(threadBase);
-
-		RKIT_RETURN_OK;
 	}
 
 	bool UtilitiesDriver::ParseDouble(const ByteStringSliceView &str, double &d) const

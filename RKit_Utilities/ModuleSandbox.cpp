@@ -68,6 +68,13 @@ namespace rkit::utils
 
 	Result ModuleSandboxImpl::AllocDynamicMemory(sandbox::Address_t &outAddress, uint32_t &outMMID, size_t size)
 	{
+		if (size == 0)
+		{
+			outAddress = 0;
+			outMMID = 0;
+			RKIT_RETURN_OK;
+		}
+
 		void *mem = m_alloc->Alloc(size);
 		if (!mem)
 		{
@@ -84,15 +91,15 @@ namespace rkit::utils
 			size_t newSize = m_mmidFreeList.Count() - 1;
 			uint32_t mmid = m_mmidFreeList[newSize];
 			m_mmidFreeList.ShrinkToSize(newSize);
-			m_memAllocations[mmid] = mem;
+			m_memAllocations[mmid - 1] = mem;
 			outMMID = mmid;
 		}
 		else
 		{
-			if (m_memAllocations.Count() == std::numeric_limits<uint32_t>::max())
+			if (m_memAllocations.Count() == (std::numeric_limits<uint32_t>::max() - 1u))
 				RKIT_THROW(ResultCode::kOutOfMemory);
 
-			const uint32_t newMMID = m_memAllocations.Count();
+			const uint32_t newMMID = m_memAllocations.Count() + 1;
 
 			RKIT_TRY_CATCH_RETHROW(m_memAllocations.Append(mem),
 				rkit::CatchContext(
@@ -113,22 +120,25 @@ namespace rkit::utils
 
 	Result ModuleSandboxImpl::ReleaseDynamicMemory(uint32_t mmid)
 	{
+		if (mmid == 0)
+			RKIT_RETURN_OK;
+
 		void *mem = nullptr;
 
 		{
 			rkit::MutexLock lock(*m_memMutex);
 
-			if (mmid >= m_memAllocations.Count())
+			if (mmid > m_memAllocations.Count())
 				RKIT_THROW(ResultCode::kOperationFailed);
 
-			void *mem = m_memAllocations[mmid];
+			mem = m_memAllocations[mmid - 1];
 
 			if (!mem)
 				RKIT_THROW(ResultCode::kOperationFailed);
 
 			RKIT_CHECK(m_mmidFreeList.Append(mmid));
 
-			m_memAllocations[mmid] = nullptr;
+			m_memAllocations[mmid - 1] = nullptr;
 		}
 
 		m_alloc->Free(mem);

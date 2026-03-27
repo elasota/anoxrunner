@@ -74,7 +74,6 @@ namespace rkit
 
 		virtual void RemoveCommandLineArgs(size_t firstArg, size_t numArgs) = 0;
 		virtual Span<const StringView> GetCommandLine() const = 0;
-		virtual void AssertionFailure(const char *expr, const char *file, unsigned int line) = 0;
 		virtual void FirstChanceResultFailure(PackedResultAndExtCode result) = 0;
 
 		virtual Result AsyncOpenFileRead(IJobQueue &jobQueue, RCPtr<Job> &outOpenJob, Job *dependencyJob, const FutureContainerPtr<UniquePtr<ISeekableReadStream>> &outStream, FileLocation location, const CIPathView &path, bool allowFailure) = 0;

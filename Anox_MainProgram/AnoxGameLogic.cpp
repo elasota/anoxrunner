@@ -10,6 +10,7 @@
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/NewDelete.h"
+#include "rkit/Core/Pair.h"
 #include "rkit/Core/Path.h"
 #include "rkit/Core/String.h"
 #include "rkit/Core/UtilitiesDriver.h"
@@ -22,14 +23,16 @@
 #include "AnoxCommandRegistry.h"
 #include "AnoxCommandStack.h"
 #include "AnoxConfigurationSaver.h"
+#include "AnoxEntityDefResource.h"
 #include "AnoxFileResource.h"
 #include "AnoxGameSandboxEnv.h"
 #include "AnoxResourceManager.h"
 #include "AnoxSpawnDefsResource.h"
 #include "AnoxGlobalVars.h"
-#include "AnoxGameWorld.h"
 #include "anox/AnoxModule.h"
 
+#include "anox/Game/UserEntityDefValues.h"
+#include "anox/Data/EntitySpawnData.h"
 #include "anox/Sandbox/AnoxGame.host.generated.h"
 
 namespace anox
@@ -37,7 +40,6 @@ namespace anox
 	class AnoxGameSandboxInterface;
 	class AnoxCommandStackBase;
 	class AnoxBSPModelResourceBase;
-	class World;
 	class AnoxGameLogic;
 
 	class AnoxGameLogic final : public IGameLogic
@@ -52,6 +54,13 @@ namespace anox
 		rkit::Result SaveGame(rkit::UniquePtr<IConfigurationState> &outConfig) override;
 
 	private:
+		struct SandboxMemObject
+		{
+			rkit::sandbox::Address_t m_addr = 0;
+			uint32_t m_mmid = 0;
+			size_t m_size = 0;
+		};
+
 		class DestructiveSpanArgParser final : public rkit::ISpan<rkit::ByteStringView>
 		{
 		public:
@@ -68,6 +77,26 @@ namespace anox
 			rkit::ByteStringView m_cmd;
 			rkit::ConstSpan<uint8_t> m_line;
 			size_t m_count;
+		};
+
+		class SandboxMainThreadBlocker
+		{
+		public:
+			explicit SandboxMainThreadBlocker(AnoxGameLogic *gameLogic);
+
+			SandboxMainThreadBlocker() = delete;
+			SandboxMainThreadBlocker(const SandboxMainThreadBlocker &) = delete;
+			SandboxMainThreadBlocker &operator=(const SandboxMainThreadBlocker &) = delete;
+
+			rkit::CoroThreadBlocker CreateBlocker();
+
+		private:
+			rkit::Optional<rkit::PackedResultAndExtCode> m_result;
+			AnoxGameLogic *m_gameLogic = nullptr;
+
+			static bool StaticCheckUnblock(void *selfPtr);
+			static rkit::Result StaticConsume(void *selfPtr);
+			static void StaticRelease(void *selfPtr);
 		};
 
 		static rkit::Result InsertAlias(AnoxCommandStackBase &commandStack, const AnoxRegisteredAlias &alias);
@@ -93,14 +122,55 @@ namespace anox
 		rkit::UniquePtr<AnoxCommandStackBase> m_commandStack;
 
 		rkit::UniquePtr<game::GlobalVars> m_globalVars;
-		rkit::UniquePtr<game::World> m_world;
 		rkit::UniquePtr<rkit::ISandbox> m_sandbox;
 		rkit::UniquePtr<rkit::sandbox::IThreadContext> m_sandboxMainThreadContext;
 		anox::game::sandbox::HostImports m_sandboxImports;
 		game::AnoxGameSandboxEnvironment m_sandboxEnv;
 
 		rkit::RCPtr<AnoxBSPModelResourceBase> m_bspModel;
+
+		template<class T>
+		rkit::Result CopySpanToSandbox(SandboxMemObject &outMemObject, const rkit::Span<T> &span);
+
+		rkit::Result CopyDataToSandbox(SandboxMemObject &outMemObject, const void *ptr, size_t size);
 	};
+
+	AnoxGameLogic::SandboxMainThreadBlocker::SandboxMainThreadBlocker(AnoxGameLogic *gameLogic)
+		: m_gameLogic(gameLogic)
+	{
+	}
+
+	rkit::CoroThreadBlocker AnoxGameLogic::SandboxMainThreadBlocker::CreateBlocker()
+	{
+		return rkit::CoroThreadBlocker::Create(this, StaticCheckUnblock, StaticConsume, StaticRelease, true);
+	}
+
+	bool AnoxGameLogic::SandboxMainThreadBlocker::StaticCheckUnblock(void *selfPtr)
+	{
+		SandboxMainThreadBlocker *self = static_cast<SandboxMainThreadBlocker *>(selfPtr);
+		AnoxGameLogic *gameLogic = self->m_gameLogic;
+
+		bool isFinished = false;
+		rkit::PackedResultAndExtCode result = RKIT_TRY_EVAL(gameLogic->m_sandboxImports.WaitForMainThread(gameLogic->m_sandboxMainThreadContext.Get(), isFinished, gameLogic->m_sandboxEnv.m_gameSessionObjAddr));
+		if (isFinished || !rkit::utils::ResultIsOK(result))
+		{
+			self->m_result = result;
+			return true;
+		}
+		else
+			return false;
+	}
+
+	rkit::Result AnoxGameLogic::SandboxMainThreadBlocker::StaticConsume(void *selfPtr)
+	{
+		SandboxMainThreadBlocker *self = static_cast<SandboxMainThreadBlocker *>(selfPtr);
+		RKIT_CHECK(rkit::ThrowIfError(self->m_result.Get()));
+		RKIT_RETURN_OK;
+	}
+
+	void AnoxGameLogic::SandboxMainThreadBlocker::StaticRelease(void *selfPtr)
+	{
+	}
 
 	AnoxGameLogic::AnoxGameLogic(IAnoxGame *game)
 		: m_game(game)
@@ -114,7 +184,7 @@ namespace anox
 
 		RKIT_CHECK(AnoxCommandStackBase::Create(m_commandStack, 64 * 1024, 1024));
 
-		RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->CreateCoro2Thread(m_mainCoroThread, 1 * 1024 * 1024));
+		RKIT_CHECK(rkit::utils::CreateCoroThread(m_mainCoroThread, rkit::GetDrivers().m_mallocDriver, 1 * 1024 * 1024, rkit::GetDrivers().GetAssertDriver()));
 		RKIT_CHECK(m_mainCoroThread->EnterFunction(StartUp(*m_mainCoroThread)));
 
 		RKIT_RETURN_OK;
@@ -557,40 +627,74 @@ namespace anox
 
 		const AnoxSpawnDefsResourceBase *spawnDefs = m_sandboxEnv.m_spawnDefs.Get();
 
-		uint32_t spawnDefsMMID = 0;
+		SandboxMemObject spawnDefsMO = {};
+		SandboxMemObject spawnDataMO = {};
+		SandboxMemObject stringLengthsMO = {};
+		SandboxMemObject stringDataMO = {};
+		SandboxMemObject entityDefValuesMO = {};
+		SandboxMemObject udefDescLengthsMO = {};
+		SandboxMemObject udefDescBytesMO = {};
+
+		rkit::Vector<game::UserEntityDefValues> udefValues;
+		rkit::Vector<uint8_t> udefDescBytes;
+
 		{
-			rkit::ConstSpan<AnoxSpawnDefsResourceBase::SpawnDef> inSpawnDefs = spawnDefs->GetSpawnDefs();
+			const rkit::CallbackSpan<AnoxEntityDefResourceBase *, const AnoxSpawnDefsResourceBase *> inUserEntityDefsSpan = spawnDefs->GetUserEntityDefs();
 
-			rkit::sandbox::Address_t spawnDefsAddress = 0;
-			CORO_CHECK(m_sandbox->AllocDynamicMemory(spawnDefsAddress, spawnDefsMMID, inSpawnDefs.SizeInBytes()));
+			CORO_CHECK(udefValues.Reserve(inUserEntityDefsSpan.Count()));
 
-			rkit::Span<AnoxSpawnDefsResourceBase::SpawnDef> outSpawnDefs;
-			CORO_CHECK(m_sandbox->AccessMemorySpan(outSpawnDefs, spawnDefsAddress, inSpawnDefs.Count()));
+			for (AnoxEntityDefResourceBase *edef : inUserEntityDefsSpan)
+			{
+				CORO_CHECK(udefValues.Append(edef->GetValues()));
 
-			rkit::CopySpanNonOverlapping(outSpawnDefs, inSpawnDefs);
+				const rkit::ByteString &desc = edef->GetDescription();
+				const size_t descLength = desc.Length();
+				if (descLength > std::numeric_limits<uint32_t>::max())
+					CORO_THROW(rkit::ResultCode::kIntegerOverflow);
+
+				CORO_CHECK(udefDescBytes.Append(desc.ToSpan()));
+			}
 		}
 
-		uint32_t spawnDataMMID = 0;
+		CORO_CHECK(CopySpanToSandbox(spawnDefsMO, spawnDefs->GetSpawnDefs()));
+		CORO_CHECK(CopySpanToSandbox(spawnDataMO, spawnDefs->GetDataBuffer()));
+
+		const data::EntitySpawnDataChunks &chunks = spawnDefs->GetChunks();
+		CORO_CHECK(CopySpanToSandbox(stringLengthsMO, chunks.m_entityStringLengths.ToSpan()));
+		CORO_CHECK(CopySpanToSandbox(stringDataMO, chunks.m_entityStringData.ToSpan()));
+
+		CORO_CHECK(CopySpanToSandbox(entityDefValuesMO, udefValues.ToSpan()));
+		CORO_CHECK(CopySpanToSandbox(udefDescBytesMO, udefDescBytes.ToSpan()));
+
+		CORO_CHECK(m_sandboxImports.MTAsync_SpawnInitialEntities(
+			m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr,
+			spawnDefsMO.m_addr, spawnDefsMO.m_size / sizeof(game::SpawnDef),
+			spawnDataMO.m_addr, spawnDataMO.m_size / sizeof(uint8_t),
+			stringLengthsMO.m_addr, stringLengthsMO.m_size / sizeof(uint32_t),
+			stringDataMO.m_addr, stringDataMO.m_size / sizeof(uint8_t),
+			entityDefValuesMO.m_addr, entityDefValuesMO.m_size / sizeof(game::UserEntityDefValues),
+			udefDescBytesMO.m_addr, udefDescBytesMO.m_size / sizeof(uint8_t)));
+
 		{
-			rkit::ConstSpan<uint8_t> inSpawnData = spawnDefs->GetDataBuffer();
-
-			rkit::sandbox::Address_t spawnDataAddress = 0;
-			CORO_CHECK(m_sandbox->AllocDynamicMemory(spawnDataAddress, spawnDataMMID, inSpawnData.SizeInBytes()));
-
-			rkit::Span<uint8_t> outSpawnData;
-			CORO_CHECK(m_sandbox->AccessMemorySpan(outSpawnData, spawnDataAddress, inSpawnData.Count()));
-
-			rkit::CopySpanNonOverlapping(outSpawnData, inSpawnData);
+			SandboxMainThreadBlocker mtBlocker(this);
+			CORO_CHECK(co_await thread.AwaitBlocker(mtBlocker.CreateBlocker()));
 		}
 
-		CORO_THROW(rkit::ResultCode::kNotYetImplemented);
+		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(spawnDefsMO.m_mmid));
+		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(spawnDataMO.m_mmid));
+		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(stringLengthsMO.m_mmid));
+		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(stringDataMO.m_mmid));
+		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(entityDefValuesMO.m_mmid));
+		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(udefDescLengthsMO.m_mmid));
+		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(udefDescBytesMO.m_mmid));
 
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(spawnDefsMMID));
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(spawnDataMMID));
+		CORO_CHECK(m_sandboxImports.MTAsync_PostSpawnInitialEntities(m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr));
 
-		//CORO_CHECK(co_await m_world->SpawnObjects(thread, static_cast<AnoxSpawnDefsResourceBase *>(objectsLoadResult.m_resourceHandle.Get())));
+		{
+			SandboxMainThreadBlocker mtBlocker(this);
+			CORO_CHECK(co_await thread.AwaitBlocker(mtBlocker.CreateBlocker()));
+		}
 
-		int n = 0;
 		CORO_RETURN_OK;
 	}
 
@@ -599,12 +703,10 @@ namespace anox
 		const IConfigurationState *configState = nullptr;
 
 		RKIT_ASSERT(!m_sandbox.IsValid());
-		RKIT_ASSERT(!m_world.IsValid());
 
 		{
 			rkit::UniquePtr<rkit::ISandbox> sandbox;
 			rkit::UniquePtr<rkit::sandbox::IThreadContext> mainThreadContext;
-			rkit::UniquePtr<game::World> world;
 
 			rkit::log::LogInfo(u8"Loading game module");
 
@@ -619,13 +721,10 @@ namespace anox
 
 			CORO_CHECK(sandbox->RunInitializer(*mainThreadContext));
 
-			CORO_CHECK(m_sandboxImports.Initialize(mainThreadContext.Get(), m_sandboxEnv.m_gameSessionAddr));
-
-			CORO_CHECK(game::World::Create(world));
+			CORO_CHECK(m_sandboxImports.Initialize(mainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr, m_sandboxEnv.m_gameSessionMemAddr));
 
 			m_sandbox = std::move(sandbox);
 			m_sandboxMainThreadContext = std::move(mainThreadContext);
-			m_world = std::move(world);
 		}
 
 		rkit::log::LogInfo(u8"GameLogic: Starting session");
@@ -657,11 +756,52 @@ namespace anox
 		CORO_CHECK(co_await LoadMap(thread, mapName));
 		CORO_CHECK(co_await SpawnMapInitialObjects(thread, mapName));
 
+		CORO_CHECK(m_sandboxImports.MTAsync_EnterGameSession(m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr));
+
+		{
+			SandboxMainThreadBlocker mtBlocker(this);
+			CORO_CHECK(co_await thread.AwaitBlocker(mtBlocker.CreateBlocker()));
+		}
+
 		CORO_RETURN_OK;
+	}
+
+
+	template<class T>
+	rkit::Result AnoxGameLogic::CopySpanToSandbox(SandboxMemObject &outMemObject, const rkit::Span<T> &span)
+	{
+		return CopyDataToSandbox(outMemObject, span.Ptr(), span.SizeInBytes());
+	}
+
+	rkit::Result AnoxGameLogic::CopyDataToSandbox(SandboxMemObject &outMemObject, const void *data, size_t size)
+	{
+		rkit::sandbox::Address_t addr = 0;
+		uint32_t mmid = 0;
+		RKIT_CHECK(m_sandbox->AllocDynamicMemory(addr, mmid, size));
+
+		void *ptr = nullptr;
+		RKIT_CHECK(m_sandbox->AccessMemoryRange(ptr, addr, size));
+
+		memcpy(ptr, data, size);
+
+		outMemObject.m_mmid = mmid;
+		outMemObject.m_addr = addr;
+		outMemObject.m_size = size;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::ResultCoroutine AnoxGameLogic::AsyncRunFrame(rkit::ICoroThread &thread)
 	{
+		if (m_sandbox.IsValid())
+		{
+			RKIT_CHECK(m_sandboxImports.MTAsync_RunFrame(m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr));
+
+			{
+				SandboxMainThreadBlocker mtBlocker(this);
+				CORO_CHECK(co_await thread.AwaitBlocker(mtBlocker.CreateBlocker()));
+			}
+		}
+
 		CORO_RETURN_OK;
 	}
 

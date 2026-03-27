@@ -4,6 +4,8 @@
 #include "rkit/Core/String.h"
 #include "rkit/Math/Vec.h"
 
+#include "anox/Game/SpawnDef.h"
+#include "anox/Game/UserEntityDefValues.h"
 #include "anox/Data/EntityDef.h"
 #include "anox/Label.h"
 
@@ -21,23 +23,7 @@ namespace anox
 	class AnoxEntityDefResourceBase : public AnoxResourceBase
 	{
 	public:
-		struct Values
-		{
-			uint32_t m_modelCodeFourCC = 0;
-			rkit::StaticArray<float, 3> m_scale;
-			data::UserEntityShadowType m_shadowType = data::UserEntityShadowType::kCount;
-			rkit::StaticArray<float, 3> m_bboxMin;
-			rkit::StaticArray<float, 3> m_bboxMax;
-			rkit::EnumMask<data::UserEntityFlags> m_userEntityFlags;
-			float m_walkSpeed = 0.f;
-			float m_runSpeed = 0.f;
-			float m_speed = 0.f;
-			Label m_targetSequence;
-			Label m_startSequence;
-			uint32_t m_miscValue = 0;
-		};
-
-		virtual const Values &GetValues() const = 0;
+		virtual const game::UserEntityDefValues &GetValues() const = 0;
 		virtual const rkit::ByteString &GetDescription() const = 0;
 	};
 

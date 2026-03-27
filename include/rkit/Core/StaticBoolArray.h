@@ -5,6 +5,12 @@
 
 namespace rkit
 {
+	template<class T>
+	class Span;
+}
+
+namespace rkit
+{
 	class StaticBoolArrayIterator
 	{
 	public:
@@ -45,6 +51,9 @@ namespace rkit
 	class StaticBoolArray
 	{
 	public:
+		typedef const uint8_t *ChunkConstIterator_t;
+		typedef uint8_t *ChunkIterator_t;
+
 		static const size_t kSize = TSize;
 
 		StaticBoolArray();
@@ -55,6 +64,9 @@ namespace rkit
 
 		StaticBoolArrayIterator begin() const;
 		StaticBoolArrayIterator end() const;
+
+		Span<uint8_t> Chunks();
+		Span<const uint8_t> Chunks() const;
 
 		StaticBoolArray<TSize> operator|(const StaticBoolArray<TSize> &other) const;
 		StaticBoolArray<TSize> &operator|=(const StaticBoolArray<TSize> &other);
@@ -85,6 +97,7 @@ namespace rkit
 }
 
 #include "RKitAssert.h"
+#include "Span.h"
 
 #include <limits>
 #include <type_traits>
@@ -233,6 +246,17 @@ namespace rkit
 		return (m_bytes[index / 8u] & (1 << (index % 8u))) != 0;
 	}
 
+	template<size_t TSize>
+	Span<uint8_t> StaticBoolArray<TSize>::Chunks()
+	{
+		return Span<uint8_t>(m_bytes);
+	}
+
+	template<size_t TSize>
+	Span<const uint8_t> StaticBoolArray<TSize>::Chunks() const
+	{
+		return Span<const uint8_t>(m_bytes);
+	}
 
 	template<size_t TSize>
 	StaticBoolArrayIterator StaticBoolArray<TSize>::begin() const

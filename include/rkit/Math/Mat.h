@@ -145,7 +145,7 @@ namespace rkit { namespace math {
 	Matrix<TComponent, TRows, TCols>::Matrix(const TParam&... params)
 		: m_rows{ params... }
 	{
-		static_assert(TypeListSize<TypeList<TParam...>>::kSize == TRows);
+		static_assert(TypeListSize<TypeList<TParam...>>::kValue == TRows);
 	}
 
 	template<class TComponent, size_t TRows, size_t TCols>

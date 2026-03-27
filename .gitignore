@@ -34,3 +34,5 @@ build/ProjectGenerator/obj/*
 build/ProjectGenerator/bin/*
 build/SandboxAPIGenerator/obj/*
 build/SandboxAPIGenerator/bin/*
+build/GameObjectReflector/obj/*
+build/GameObjectReflector/bin/*

@@ -13,13 +13,27 @@
 #	define RKIT_CORELIB_API
 #endif
 
+namespace rkit
+{
+	template<class T>
+	class UniquePtr;
 
-namespace rkit { namespace math {
+	struct ICoroThread;
+	struct IMallocDriver;
+
+#ifndef NDEBUG
+	struct IAssertDriver;
+#endif
+}
+
+namespace rkit::math
+{
 	float RKIT_CORELIB_API SoftwareSqrtf(float f);
 	double RKIT_CORELIB_API SoftwareSqrt(double f);
-} }
+}
 
-namespace rkit { namespace text {
+namespace rkit::text
+{
 	enum class UnknownCharBehavior
 	{
 		kSkipInvalid,
@@ -39,10 +53,11 @@ namespace rkit { namespace text {
 	// The output and input buffers must not overlap.
 	size_t RKIT_CORELIB_API ConvertText(void *outputChars, CharacterEncoding outEncoding, size_t outMaxChars, size_t &outCharsEmitted,
 		const void *inputChars, CharacterEncoding inEncoding, size_t inCharCount, UnknownCharBehavior unknownCharBehavior, uint32_t unknownReplacementChar);
-} }
+}
 
 
-namespace rkit { namespace utils {
+namespace rkit::utils
+{
 	bool RKIT_CORELIB_API CharsToFloat(float &f, const uint8_t *chars, size_t &inOutLen);
 	bool RKIT_CORELIB_API CharsToDouble(double &f, const uint8_t *chars, size_t &inOutLen);
 	bool RKIT_CORELIB_API WCharsToFloat(float &f, const wchar_t *chars, size_t &inOutLen);
@@ -50,4 +65,12 @@ namespace rkit { namespace utils {
 
 	bool RKIT_CORELIB_API CharsToFloatDynamic(float &f, void *state, bool (*getOneCharCb)(void *state, int32_t &outChar), void (*unGetCharCb)(void *state));
 	bool RKIT_CORELIB_API CharsToDoubleDynamic(double &f, void *state, bool (*getOneCharCb)(void *state, int32_t &outChar), void (*unGetCharCb)(void *state));
-} }
+
+	Result RKIT_CORELIB_API CreateCoroThread(UniquePtr<ICoroThread> &outThread, IMallocDriver *alloc, size_t stackSize
+#ifdef NDEBUG
+		, nullptr_t assertDriver
+#else
+		, IAssertDriver *assertDriver
+#endif
+	);
+}

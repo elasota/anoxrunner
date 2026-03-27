@@ -123,8 +123,6 @@ namespace rkit
 
 		virtual bool IsPathComponentValidOnWindows(const BaseStringSliceView<OSPathChar_t, CharacterEncoding::kOSPath> &span, bool isAbsolute, bool isFirst, bool allowWildcards) const = 0;
 
-		virtual Result CreateCoro2Thread(UniquePtr<ICoroThread> &thread, size_t stackSize) const = 0;
-
 		virtual bool ParseFloat(const ByteStringSliceView &str, float &f) const = 0;
 		virtual bool ParseDouble(const ByteStringSliceView &str, double &d) const = 0;
 

@@ -18,7 +18,7 @@ namespace rkit::priv
 	class WeakRefWeakTracker : public RefCountedTracker
 	{
 	protected:
-		WeakRefWeakTracker();
+		explicit WeakRefWeakTracker(RefCountedTracker::RefCount_t initialCount);
 
 		void RCTrackerZero() override final;
 		virtual void WeakTrackerZero() = 0;
@@ -43,9 +43,9 @@ namespace rkit
 	public:
 		friend class priv::WeakRefStrongTracker;
 
-		WeakRefTracker();
+		typedef void (*DeleterFunc_t)(void *context) noexcept;
 
-		void SetSelf(UniquePtr<WeakRefTracker> &&self);
+		WeakRefTracker(DeleterFunc_t strongDeleter, DeleterFunc_t finalDeleter, void *context);
 
 		RefCountedTracker &GetWeakTracker();
 		RefCountedTracker &GetStrongTracker();
@@ -56,7 +56,9 @@ namespace rkit
 
 		WeakRefTracker() = delete;
 
-		UniquePtr<WeakRefTracker> m_self;
+		DeleterFunc_t m_strongDeleter = nullptr;
+		DeleterFunc_t m_finalDeleter = nullptr;
+		void *m_deleterContext = nullptr;
 	};
 
 	template<class T>
@@ -127,8 +129,72 @@ namespace rkit
 
 #include "RKitAssert.h"
 
+
+namespace rkit::priv
+{
+	inline WeakRefWeakTracker::WeakRefWeakTracker(RefCountedTracker::RefCount_t initialCount)
+		: RefCountedTracker(initialCount)
+	{
+	}
+
+	inline void WeakRefWeakTracker::RCTrackerZero()
+	{
+		this->WeakTrackerZero();
+	}
+
+	inline WeakRefStrongTracker::WeakRefStrongTracker(RefCountedTracker::RefCount_t initialCount)
+		: RefCountedTracker(initialCount)
+	{
+	}
+
+	inline void WeakRefStrongTracker::RCTrackerZero()
+	{
+		this->StrongTrackerZero();
+	}
+
+	inline WeakRefTracker *WeakRefStrongTracker::CastToWeakRefTracker()
+	{
+		return static_cast<WeakRefTracker *>(this);
+	}
+}
+
 namespace rkit
 {
+	inline WeakRefTracker::WeakRefTracker(DeleterFunc_t strongDeleter, DeleterFunc_t finalDeleter, void *context)
+		: priv::WeakRefWeakTracker(1)
+		, priv::WeakRefStrongTracker(0)
+		, m_strongDeleter(strongDeleter)
+		, m_finalDeleter(finalDeleter)
+		, m_deleterContext(context)
+	{
+	}
+
+	inline RefCountedTracker &WeakRefTracker::GetWeakTracker()
+	{
+		priv::WeakRefWeakTracker *self = this;
+		return *self;
+	}
+
+	inline RefCountedTracker &WeakRefTracker::GetStrongTracker()
+	{
+		priv::WeakRefStrongTracker *self = this;
+		return *self;
+	}
+
+	inline void WeakRefTracker::StrongTrackerZero()
+	{
+		m_strongDeleter(m_deleterContext);
+
+		priv::WeakRefWeakTracker *weakSelf = this;
+		weakSelf->RCTrackerDecRef();
+	}
+
+	inline void WeakRefTracker::WeakTrackerZero()
+	{
+		void *context = m_deleterContext;
+		m_finalDeleter(m_deleterContext);
+	}
+
 	template<class T>
 	WeakPtr<T>::WeakPtr()
 		: m_object(nullptr)
@@ -210,7 +276,7 @@ namespace rkit
 	}
 
 	template<class T>
-	WeakPtr<T> &WeakPtr<T>::operator=(const WeakPtr<T> &other)
+	WeakPtr<T> &WeakPtr<T>::operator=(const WeakPtr<T> &other) noexcept
 	{
 		WeakRefTracker *oldTracker = m_tracker;
 		WeakRefTracker *newTracker = other.m_tracker;

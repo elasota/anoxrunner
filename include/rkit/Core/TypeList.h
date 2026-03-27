@@ -17,19 +17,19 @@ namespace rkit
 	template<>
 	struct TypeListSize<TypeList<>>
 	{
-		static const size_t kSize = 0;
+		static const size_t kValue = 0;
 	};
 
 	template<class TType>
 	struct TypeListSize<TypeList<TType>>
 	{
-		static const size_t kSize = 1;
+		static const size_t kValue = 1;
 	};
 
 	template<class TFirstType, class... TMoreTypes>
 	struct TypeListSize<TypeList<TFirstType, TMoreTypes...>>
 	{
-		static const size_t kSize = TypeListSize<TypeList<TMoreTypes...>>::kSize + 1;
+		static const size_t kValue = TypeListSize<TypeList<TMoreTypes...>>::kValue + 1;
 	};
 
 	template<size_t TIndex, class TTypeList>

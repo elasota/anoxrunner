@@ -1,8 +1,0 @@
-target include/anox/Sandbox/AnoxGame
-class anox.game.sandbox
-
-import MemAlloc(uintptr size) -> (address ptr, uint32 mmid) noexcept
-import MemFree(uint32 mmid) noexcept
-
-export Initialize() -> (address outGameSession)
-export Shutdown(address gameSession)

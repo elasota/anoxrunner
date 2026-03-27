@@ -32,14 +32,13 @@ namespace anox::game
 
 #undef CLASS_BASE
 
-	rkit::ResultCoroutine WorldObjectFactory::SpawnWorldObject(rkit::ICoroThread &thread, rkit::RCPtr<WorldObject> &outObject, const WorldObjectSpawnParams &spawnParams,
-		const data::EntityClassDef &eclass, const void *data)
+	rkit::ResultCoroutine WorldObjectFactory::SpawnWorldObject(rkit::ICoroThread &thread, rkit::RCPtr<WorldObject> &outObject, const WorldObjectSpawnParams &spawnParams)
 	{
-		switch (eclass.m_entityClassIndex)
+		switch (spawnParams.m_eclass.m_entityClassIndex)
 		{
 #define CLASS_BASE(name) \
 		case static_cast<uint32_t>(WorldObjectEntityClass::EType_ ## name):\
-			return WorldObjectInstantiator<data::EClass_ ## name>::SpawnObject(thread, outObject, spawnParams, *static_cast<const data::EClass_ ## name *>(data));
+			return WorldObjectInstantiator<data::EClass_ ## name>::SpawnObject(thread, outObject, spawnParams, spawnParams.m_data.ReinterpretCast<const data::EClass_ ## name>()[0]);
 
 #include "anox/Data/EntityDefs.inl"
 

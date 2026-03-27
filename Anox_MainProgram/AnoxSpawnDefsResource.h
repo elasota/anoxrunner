@@ -2,6 +2,8 @@
 
 #include "AnoxResourceManager.h"
 
+#include "anox/Game/SpawnDef.h"
+
 #include "rkit/Core/Span.h"
 
 namespace anox { namespace data {
@@ -12,20 +14,16 @@ namespace anox { namespace data {
 
 namespace anox
 {
+	class AnoxEntityDefResourceBase;
 	class AnoxSpawnDefsResourceLoaderImpl;
 
 	class AnoxSpawnDefsResourceBase : public AnoxResourceBase
 	{
 	public:
-		struct SpawnDef
-		{
-			uint32_t m_eclassIndex = 0;
-			uint32_t m_dataOffset = 0;
-		};
-
-		virtual rkit::Span<const SpawnDef> GetSpawnDefs() const = 0;
+		virtual rkit::Span<const game::SpawnDef> GetSpawnDefs() const = 0;
 		virtual const data::EntitySpawnDataChunks &GetChunks() const = 0;
 		virtual rkit::Span<const uint8_t> GetDataBuffer() const = 0;
+		virtual rkit::CallbackSpan<AnoxEntityDefResourceBase *, const AnoxSpawnDefsResourceBase *> GetUserEntityDefs() const = 0;
 	};
 
 	class AnoxSpawnDefsResourceLoaderBase : public AnoxCIPathKeyedResourceLoader<AnoxSpawnDefsResourceBase>

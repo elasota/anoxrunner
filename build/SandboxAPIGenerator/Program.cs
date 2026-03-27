@@ -20,6 +20,8 @@ namespace SandboxAPIGenerator
         kUIntPtr,
         kFloat32,
         kFloat64,
+        kSize,
+        kPtrDiff,
     }
 
     internal struct ParameterDef
@@ -256,6 +258,10 @@ namespace SandboxAPIGenerator
                     return "float";
                 case ParamType.kFloat64:
                     return "double";
+                case ParamType.kSize:
+                    return "size_t";
+                case ParamType.kPtrDiff:
+                    return "ptrdiff_t";
                 default:
                     throw new Exception("Internal error: Unknown type");
             }
@@ -837,7 +843,7 @@ namespace SandboxAPIGenerator
                         for (int parameterIndex = 0;  parameterIndex < parameters.Length; parameterIndex++)
                             sw.WriteLine(indent + "\tloc_ioValues[" + (returnValues.Length + 1 + parameterIndex) + "] = ::rkit::sandbox::io::LoadValue(" + parameters[parameterIndex].Name + ");");
 
-                        sw.Write(indent + "\tRKIT_CHECK(this->m_hostAPI.m_sandbox->CallFunction(this->m_importAddresses[0], loc_ioValues, ");
+                        sw.Write(indent + "\tRKIT_CHECK(this->m_hostAPI.m_sandbox->CallFunction(this->m_importAddresses[" + exportIndex.ToString() + "], loc_ioValues, ");
                         sw.WriteLine(returnValues.Length.ToString() + ", " + parameters.Length.ToString() + "));");
 
                         for (int rvIndex = 0; rvIndex < returnValues.Length; rvIndex++)
@@ -914,6 +920,10 @@ namespace SandboxAPIGenerator
                         paramType = ParamType.kFloat32;
                     else if (paramTypeStr == "float64")
                         paramType = ParamType.kFloat64;
+                    else if (paramTypeStr == "size")
+                        paramType = ParamType.kSize;
+                    else if (paramTypeStr == "ptrdiff")
+                        paramType = ParamType.kPtrDiff;
                     else
                         ThrowOnLine(lineNum, $"Unknown type: {paramTypeStr}");
 

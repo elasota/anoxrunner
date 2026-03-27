@@ -1,8 +1,15 @@
 #include "anox/Sandbox/AnoxGame.sb.generated.inl"
 
+#include "anox/Game/UserEntityDefValues.h"
+#include "anox/Game/SpawnDef.h"
+
 #include "anox/AnoxModule.h"
 
+#include "AnoxGameSession.h"
+
 #include "rkit/Sandbox/SandboxModuleImpl.h"
+#include "rkit/Core/String.h"
+#include "rkit/Core/Vector.h"
 
 namespace anox::game
 {
@@ -107,7 +114,7 @@ namespace anox::game::sandbox
 
 namespace anox::game::sandbox
 {
-	::rkit::Result SandboxExports::Initialize(void *&outGameSession)
+	::rkit::Result SandboxExports::Initialize(void *&outGameSessionObject, void *&outGameSessionMem)
 	{
 #if !!RKIT_SANDBOX_USE_PRIVATE_DRIVERS
 		{
@@ -120,17 +127,108 @@ namespace anox::game::sandbox
 			rkit::SimpleObjectAllocation<rkit::IMallocDriver> mallocDriverPtr;
 			mallocDriverPtr.m_alloc = mallocDriver;
 			mallocDriverPtr.m_mem = memAllocDriverPtr;
-			mallocDriverPtr.m_alloc = mallocDriver;
+			mallocDriverPtr.m_obj = mallocDriver;
 
 			rkit::GetMutableDrivers().m_mallocDriver = mallocDriverPtr;
 		}
 #endif
 
+		rkit::UniquePtr<Session> session;
+		RKIT_CHECK(Session::Create(session, rkit::GetDrivers().m_mallocDriver));
+
+		rkit::SimpleObjectAllocation<Session> sessionAllocation = session.Detach();
+
+		outGameSessionObject = sessionAllocation.m_obj;
+		outGameSessionMem = sessionAllocation.m_mem;
+
 		RKIT_RETURN_OK;
 	}
 
-	::rkit::Result SandboxExports::Shutdown(void *gameSession)
+	rkit::Result SandboxExports::Shutdown(void *gameSessionObject, void *gameSessionMem)
 	{
+		if (gameSessionObject)
+		{
+			rkit::SimpleObjectAllocation<Session> sessionAllocation;
+			sessionAllocation.m_obj = static_cast<Session *>(gameSessionObject);
+			sessionAllocation.m_mem = gameSessionMem;
+			sessionAllocation.m_alloc = rkit::GetDrivers().m_mallocDriver;
 
+			rkit::Delete(sessionAllocation);
+		}
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SandboxExports::MTAsync_SpawnInitialEntities(void *gameSession,
+		void *spawnDefs, size_t numSpawnDefs,
+		void *spawnData, size_t numSpawnData,
+		void *stringLengths, size_t numStrings,
+		void *stringData, size_t numStringData,
+		void *udefValues, size_t numUDefs,
+		void *udefStringData, size_t udefStringDataSize)
+	{
+		Session *session = static_cast<Session *>(gameSession);
+
+		const rkit::ConstSpan<game::SpawnDef> spawnDefsSpan(static_cast<const game::SpawnDef *>(spawnDefs), numSpawnDefs);
+		const rkit::ConstSpan<uint8_t> spawnDataSpan(static_cast<const uint8_t *>(spawnData), numSpawnData);
+		const rkit::ConstSpan<uint32_t> stringLengthsSpan(static_cast<const uint32_t *>(stringLengths), numStrings);
+		const rkit::ConstSpan<uint8_t> stringDataSpan(static_cast<const uint8_t *>(stringData), numStringData);
+		const rkit::ConstSpan<game::UserEntityDefValues> udefValuesSpan(static_cast<const game::UserEntityDefValues *>(udefValues), numUDefs);
+		const rkit::ConstSpan<uint8_t> udefDescsDataSpan(static_cast<const uint8_t *>(udefStringData), udefStringDataSize);
+
+		rkit::Vector<rkit::ByteStringView> spawnDataStrings;
+		{
+			uint32_t stringDataPos = 0;
+			for (uint32_t stringLength : stringLengthsSpan)
+			{
+				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+			}
+		}
+
+		rkit::Vector<rkit::ByteString> udefDescs;
+		{
+			uint32_t udefDescPos = 0;
+			for (const game::UserEntityDefValues &udef : udefValuesSpan)
+			{
+				if (udef.m_descLength > 0)
+				{
+					rkit::ByteStringConstructionBuffer cbuf;
+					RKIT_CHECK(cbuf.Allocate(udef.m_descLength));
+
+					rkit::CopySpanNonOverlapping(cbuf.GetSpan(), udefDescsDataSpan.SubSpan(udefDescPos, udef.m_descLength));
+
+					RKIT_CHECK(udefDescs.Append(rkit::ByteString(std::move(cbuf))));
+
+					udefDescPos += udef.m_descLength;
+				}
+			}
+		}
+
+		RKIT_CHECK(session->AsyncSpawnInitialEntities(spawnDefsSpan, session->GetWorld(), spawnDataSpan, spawnDataStrings.ToSpan(), udefValuesSpan, udefDescs.ToSpan()));
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SandboxExports::MTAsync_RunFrame(void *gameSession)
+	{
+		Session *session = static_cast<Session *>(gameSession);
+		return session->AsyncRunFrame(session->GetWorld());
+	}
+
+	rkit::Result SandboxExports::MTAsync_PostSpawnInitialEntities(void *gameSession)
+	{
+		Session *session = static_cast<Session *>(gameSession);
+		return session->AsyncPostSpawnInitialEntities(session->GetWorld());
+	}
+
+	::rkit::Result SandboxExports::MTAsync_EnterGameSession(void *gameSession)
+	{
+		Session *session = static_cast<Session *>(gameSession);
+		return session->AsyncEnterGameSession(session->GetWorld());
+	}
+
+	rkit::Result SandboxExports::WaitForMainThread(bool &isFinished, void *sessionPtr)
+	{
+		isFinished = false;
+		return static_cast<Session *>(sessionPtr)->WaitForMainThreadCoro(isFinished);
 	}
 }

@@ -1,8 +1,11 @@
 #include "Coro2Thread.h"
 
+#include "rkit/Core/RKitAssert.h"
 #include "rkit/Core/CoroFinalizer.h"
 #include "rkit/Core/Future.h"
 #include "rkit/Core/NewDelete.h"
+
+#include "rkit/Core/CoreLib.h"
 
 namespace rkit::utils
 {
@@ -41,11 +44,16 @@ namespace rkit::utils
 	class Coro2Thread final: public Coro2ThreadBase
 	{
 	public:
-		explicit Coro2Thread(size_t stackSize);
+		explicit Coro2Thread(size_t stackSize
+#ifndef NDEBUG
+			, IAssertDriver *assertDriver
+#endif
+		);
 		~Coro2Thread();
 
 		CoroThreadState GetState() const override;
 		CoroThreadBlockerAwaiter AwaitFuture(const FutureBase &future) override;
+		CoroThreadBlockerAwaiter AwaitBlocker(const CoroThreadBlocker &blocker) override;
 
 		rkit::Result Resume() override;
 		bool TryUnblock() override;
@@ -67,6 +75,8 @@ namespace rkit::utils
 
 		uint8_t *m_stackEnd;
 		uint8_t *m_stackTopFrame;
+
+		RKIT_ASSERTS_ONLY(IAssertDriver *m_assertDriver;)
 	};
 
 	CoroThreadBlocker FutureBlocker::Create(const FutureBase &future)
@@ -128,9 +138,16 @@ namespace rkit::utils
 		return rkit::AlignUp<size_t>(sizeof(Coro2StackFrame), kAlignment);
 	}
 
-	Coro2Thread::Coro2Thread(size_t stackSize)
+	Coro2Thread::Coro2Thread(size_t stackSize
+#ifndef NDEBUG
+		, IAssertDriver *assertDriver
+#endif
+	)
 		: m_stackEnd(GetStackStart() + stackSize)
 		, m_stackTopFrame(m_stackEnd)
+#ifndef NDEBUG
+		, m_assertDriver(assertDriver)
+#endif
 	{
 	}
 
@@ -158,15 +175,20 @@ namespace rkit::utils
 
 	CoroThreadBlockerAwaiter Coro2Thread::AwaitFuture(const FutureBase &future)
 	{
-		RKIT_ASSERT(m_blocker.m_context == nullptr);
-		m_blocker = FutureBlocker::Create(future);
+		return AwaitBlocker(FutureBlocker::Create(future));
+	}
+
+	CoroThreadBlockerAwaiter Coro2Thread::AwaitBlocker(const CoroThreadBlocker &blocker)
+	{
+		RKIT_ASSERT_WITH_DRIVER(m_blocker.m_context == nullptr, m_assertDriver);
+		m_blocker = blocker;
 		return CoroThreadBlockerAwaiter(&m_blocker, &m_resumer);
 	}
 
 	rkit::Result Coro2Thread::Resume()
 	{
-		RKIT_ASSERT(!!m_resumer.m_continuation);
-		RKIT_ASSERT(GetState() == CoroThreadState::kSuspended);
+		RKIT_ASSERT_WITH_DRIVER(!!m_resumer.m_continuation, m_assertDriver);
+		RKIT_ASSERT_WITH_DRIVER(GetState() == CoroThreadState::kSuspended, m_assertDriver);
 
 		if (m_blocker.m_autoReleaseOnResume)
 		{
@@ -181,7 +203,7 @@ namespace rkit::utils
 
 		if (m_rootFunction.done())
 		{
-			RKIT_ASSERT(!m_resumer.m_continuation);
+			RKIT_ASSERT_WITH_DRIVER(!m_resumer.m_continuation, m_assertDriver);
 			std::coroutine_handle<> coroHandle = m_rootFunction;
 			m_rootFunction = std::coroutine_handle<>();
 
@@ -269,8 +291,8 @@ namespace rkit::utils
 
 	rkit::Result Coro2Thread::EnterCoroutine(std::coroutine_handle<> coroHandle, const coro::CoroFinalizer &finalizer)
 	{
-		RKIT_ASSERT(!m_resumer.m_continuation);
-		RKIT_ASSERT(m_blocker.m_checkFunc == nullptr);
+		RKIT_ASSERT_WITH_DRIVER(!m_resumer.m_continuation, m_assertDriver);
+		RKIT_ASSERT_WITH_DRIVER(m_blocker.m_checkFunc == nullptr, m_assertDriver);
 
 		m_resumer.m_continuation = coroHandle;
 
@@ -287,11 +309,15 @@ namespace rkit::utils
 		return reinterpret_cast<uint8_t *>(this) + ComputeBaseSize();
 	}
 
-	Result Coro2ThreadBase::Create(UniquePtr<Coro2ThreadBase> &outThread, size_t stackSize)
+	Result Coro2ThreadBase::Create(UniquePtr<Coro2ThreadBase> &outThread, rkit::IMallocDriver *alloc, size_t stackSize
+#ifdef NDEBUG
+		, nullptr_t assertDriver
+#else
+		, IAssertDriver *assertDriver
+#endif
+		)
 	{
 		const size_t alignment = __STDCPP_DEFAULT_NEW_ALIGNMENT__;
-
-		IMallocDriver *alloc = rkit::GetDrivers().m_mallocDriver;
 
 		const size_t threadObjectSize = Coro2Thread::ComputeBaseSize();
 
@@ -307,9 +333,29 @@ namespace rkit::utils
 		if (!mem)
 			RKIT_THROW(ResultCode::kOutOfMemory);
 
-		Coro2Thread *thread = new (mem) Coro2Thread(stackSize);
+		Coro2Thread *thread = new (mem) Coro2Thread(stackSize
+#ifndef NDEBUG
+			, assertDriver
+#endif
+		);
 
 		outThread = UniquePtr<Coro2ThreadBase>(thread, mem, alloc);
+
+		RKIT_RETURN_OK;
+	}
+
+
+	Result RKIT_CORELIB_API CreateCoroThread(UniquePtr<ICoroThread> &outThread, IMallocDriver *alloc, size_t stackSize
+#ifdef NDEBUG
+		, nullptr_t assertDriver
+#else
+		, IAssertDriver *assertDriver
+#endif
+	)
+	{
+		rkit::UniquePtr<Coro2ThreadBase> thread;
+		RKIT_CHECK(Coro2ThreadBase::Create(thread, alloc, stackSize, assertDriver));
+		outThread = std::move(thread);
 
 		RKIT_RETURN_OK;
 	}

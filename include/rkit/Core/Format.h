@@ -168,9 +168,9 @@ namespace rkit { namespace priv {
 namespace rkit
 {
 	template<class TChar, class... TParameter>
-	typename SizedFormatParameterList<TChar, TypeListSize<typename TypeList<TParameter...> >::kSize> CreateFormatParameterList(const TParameter &... params)
+	typename SizedFormatParameterList<TChar, TypeListSize<typename TypeList<TParameter...> >::kValue> CreateFormatParameterList(const TParameter &... params)
 	{
-		return SizedFormatParameterList<TChar, TypeListSize<TypeList<TParameter...> >::kSize>(params...);
+		return SizedFormatParameterList<TChar, TypeListSize<TypeList<TParameter...> >::kValue>(params...);
 	}
 
 	template<class TChar, size_t TSize>

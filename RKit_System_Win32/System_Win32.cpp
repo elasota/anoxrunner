@@ -271,6 +271,19 @@ namespace rkit
 		PackedResultAndExtCode m_result;
 	};
 
+#ifndef NDEBUG
+	class AssertDriver_Win32 final : public IAssertDriver
+	{
+	public:
+		explicit AssertDriver_Win32(IMallocDriver *alloc);
+
+		void AssertionFailure(const char *expr, const char *file, unsigned int line) override;
+
+	private:
+		IMallocDriver *m_alloc;
+	};
+#endif
+
 	class SystemDriver_Win32 final : public NoCopy, public ISystemDriver, public IWin32PlatformDriver
 	{
 	public:
@@ -281,7 +294,6 @@ namespace rkit
 
 		void RemoveCommandLineArgs(size_t firstArg, size_t numArgs) override;
 		Span<const StringView> GetCommandLine() const override;
-		void AssertionFailure(const char *expr, const char *file, unsigned int line) override;
 		void FirstChanceResultFailure(PackedResultAndExtCode result) override;
 
 		Result CreateThread(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContext, const StringView &threadName) override;
@@ -1192,6 +1204,31 @@ namespace rkit
 		outPackedResult = m_result;
 	}
 
+#ifndef NDEBUG
+	AssertDriver_Win32::AssertDriver_Win32(IMallocDriver *alloc)
+		: m_alloc(alloc)
+	{
+	}
+
+	void AssertDriver_Win32::AssertionFailure(const char *expr, const char *file, unsigned int line)
+	{
+		Vector<wchar_t> exprWChar(m_alloc);
+		Vector<wchar_t> fileWChar(m_alloc);
+
+		PackedResultAndExtCode exprConvResult = RKIT_TRY_EVAL(ConvUtil_Win32::UTF8ToUTF16(ReinterpretAnsiCharToUtf8Char(expr), exprWChar));
+		PackedResultAndExtCode fileConvResult = RKIT_TRY_EVAL(ConvUtil_Win32::UTF8ToUTF16(ReinterpretAnsiCharToUtf8Char(file), fileWChar));
+
+		if (!utils::ResultIsOK(exprConvResult) || !utils::ResultIsOK(fileConvResult))
+		{
+			_wassert(L"Failed to convert assertion message", RKIT_PP_CONCAT(L, __FILE__), line);
+		}
+		else
+		{
+			_wassert(exprWChar.GetBuffer(), fileWChar.GetBuffer(), line);
+		}
+	}
+#endif
+
 	SystemDriver_Win32::SystemDriver_Win32(IMallocDriver *alloc, const SystemModuleInitParameters_Win32 &initParams)
 		: m_commandLine(alloc)
 		, m_argvW(nullptr)
@@ -1268,28 +1305,6 @@ namespace rkit
 	Span<const StringView> SystemDriver_Win32::GetCommandLine() const
 	{
 		return m_commandLine.ToSpan();
-	}
-
-	void SystemDriver_Win32::AssertionFailure(const char *expr, const char *file, unsigned int line)
-	{
-#ifndef NDEBUG
-		Vector<wchar_t> exprWChar(m_alloc);
-		Vector<wchar_t> fileWChar(m_alloc);
-
-		PackedResultAndExtCode exprConvResult = RKIT_TRY_EVAL(ConvUtil_Win32::UTF8ToUTF16(ReinterpretAnsiCharToUtf8Char(expr), exprWChar));
-		PackedResultAndExtCode fileConvResult = RKIT_TRY_EVAL(ConvUtil_Win32::UTF8ToUTF16(ReinterpretAnsiCharToUtf8Char(file), fileWChar));
-
-		if (!utils::ResultIsOK(exprConvResult) || !utils::ResultIsOK(fileConvResult))
-		{
-			_wassert(L"Failed to convert assertion message", RKIT_PP_CONCAT(L, __FILE__), line);
-		}
-		else
-		{
-			_wassert(exprWChar.GetBuffer(), fileWChar.GetBuffer(), line);
-		}
-#else
-		abort();
-#endif
 	}
 
 	void SystemDriver_Win32::FirstChanceResultFailure(PackedResultAndExtCode result)

@@ -8,6 +8,9 @@
 
 namespace rkit
 {
+#ifndef NDEBUG
+	struct IAssertDriver;
+#endif
 	struct IShellDriver;
 	struct IModuleDriver;
 	struct IMallocDriver;
@@ -52,6 +55,13 @@ namespace rkit
 		Result RegisterDriver(UniquePtr<ICustomDriver> &&driver);
 		void UnregisterDriver(ICustomDriver *driver);
 
+#ifdef NDEBUG
+		inline nullptr_t GetAssertDriver() const;
+#else
+		inline IAssertDriver *GetAssertDriver() const;
+		inline void RegisterAssertDriver(const SimpleObjectAllocation<IAssertDriver> &assertDriver);
+#endif
+
 	private:
 		struct CustomDriverLink
 		{
@@ -60,6 +70,10 @@ namespace rkit
 			CustomDriverLink *m_prev;
 			CustomDriverLink *m_next;
 		};
+
+#ifndef NDEBUG
+		SimpleObjectAllocation<IAssertDriver> m_assertDriver;
+#endif
 
 		CustomDriverLink *m_firstCustomDriverLink;
 		CustomDriverLink *m_lastCustomDriverLink;
@@ -76,6 +90,24 @@ namespace rkit
 #include "UniquePtr.h"
 
 #include <utility>
+
+
+#ifdef NDEBUG
+inline nullptr_t rkit::Drivers::GetAssertDriver() const
+{
+	return nullptr;
+}
+#else
+inline rkit::IAssertDriver *rkit::Drivers::GetAssertDriver() const
+{
+	return this->m_assertDriver.m_obj;
+}
+
+inline void rkit::Drivers::RegisterAssertDriver(const SimpleObjectAllocation<IAssertDriver> &assertDriver)
+{
+	m_assertDriver = assertDriver;
+}
+#endif
 
 inline rkit::ICustomDriver *rkit::Drivers::FindDriver(uint32_t namespaceID, const rkit::StringView &driverName) const
 {

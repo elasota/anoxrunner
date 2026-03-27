@@ -1,0 +1,14 @@
+target include/anox/Sandbox/AnoxGame
+class anox.game.sandbox
+
+import MemAlloc(size size) -> (address ptr, uint32 mmid) noexcept
+import MemFree(uint32 mmid) noexcept
+
+export Initialize() -> (address outGameSessionObject, address outGameSessionMem)
+export Shutdown(address gameSessionObject, address gameSessionMem)
+
+export MTAsync_SpawnInitialEntities(address gameSession, address spawnDefs, size numSpawnDefs, address spawnData, size numSpawnData, address stringLengths, size numStrings, address stringData, size numStringData, address udefValues, size numUDefs, address udefStringData, size udefStringDataSize)
+export MTAsync_PostSpawnInitialEntities(address gameSession)
+export MTAsync_EnterGameSession(address gameSession)
+export MTAsync_RunFrame(address gameSession)
+export WaitForMainThread(address gameSession) -> (bool isFinished)

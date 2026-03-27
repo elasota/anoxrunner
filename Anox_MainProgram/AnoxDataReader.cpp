@@ -76,6 +76,13 @@ namespace anox
 		if (!view.Validate())
 			RKIT_THROW(rkit::ResultCode::kDataError);
 
+		rkit::ByteStringConstructionBuffer cbuf;
+		RKIT_CHECK(cbuf.Allocate(chars.Count()));
+
+		rkit::CopySpanNonOverlapping(cbuf.GetSpan(), chars);
+
+		outString = rkit::ByteString(std::move(cbuf));
+
 		RKIT_RETURN_OK;
 	}
 

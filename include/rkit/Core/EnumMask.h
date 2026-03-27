@@ -38,8 +38,13 @@ namespace rkit
 	template<class T>
 	class EnumMask
 	{
+	private:
+		static const size_t kMax = static_cast<size_t>(T::kCount);
+
 	public:
 		friend class EnumMaskIterator<T>;
+
+		typedef StaticBoolArray<kMax> BoolVectorType_t;
 
 		EnumMask();
 
@@ -72,12 +77,13 @@ namespace rkit
 		EnumMaskIterator<T> begin() const;
 		EnumMaskIterator<T> end() const;
 
-	private:
-		static const size_t kMax = static_cast<size_t>(T::kCount);
+		BoolVectorType_t &AsBoolVector();
+		const BoolVectorType_t &AsBoolVector() const;
 
+	private:
 		explicit EnumMask(const StaticBoolArray<kMax> &boolVector);
 
-		StaticBoolArray<kMax> m_boolVector;
+		BoolVectorType_t m_boolVector;
 	};
 }
 
@@ -274,6 +280,18 @@ namespace rkit
 			return EnumMaskIterator<T>(*this, lastSet + 1);
 		else
 			return EnumMaskIterator<T>();
+	}
+
+	template<class T>
+	typename EnumMask<T>::BoolVectorType_t &EnumMask<T>::AsBoolVector()
+	{
+		return m_boolVector;
+	}
+
+	template<class T>
+	const typename EnumMask<T>::BoolVectorType_t &EnumMask<T>::AsBoolVector() const
+	{
+		return m_boolVector;
 	}
 
 	template<class T>
