@@ -2,6 +2,7 @@
 
 #include "AnoxEntityDefCompiler.h"
 #include "AnoxMaterialCompiler.h"
+#include "AnoxLevelEntitiesSchema.h"
 
 #include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/BoolVector.h"
@@ -459,8 +460,8 @@ namespace anox { namespace buildsystem
 			typedef rkit::Pair<rkit::AsciiString, rkit::ByteString> Property_t;
 			typedef rkit::ConstSpan<Property_t> PropertySpan_t;
 
-			virtual rkit::Result ParseBuiltinEntity(const data::EntityClassDef &classDef, const PropertySpan_t &properties) = 0;
-			virtual rkit::Result ParseUserEntity(uint32_t edefID, const data::EntityClassDef &classDef, const PropertySpan_t &properties) = 0;
+			virtual rkit::Result ParseBuiltinEntity(const data::EntityClassDef2 &classDef, const PropertySpan_t &properties) = 0;
+			virtual rkit::Result ParseUserEntity(uint32_t edefID, const data::EntityClassDef2 &classDef, const PropertySpan_t &properties) = 0;
 		};
 
 		class EntityAnalysisHandler final : public IEntityDataHandler
@@ -468,8 +469,8 @@ namespace anox { namespace buildsystem
 		public:
 			explicit EntityAnalysisHandler(rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 
-			rkit::Result ParseBuiltinEntity(const data::EntityClassDef &classDef, const PropertySpan_t &properties) override;
-			rkit::Result ParseUserEntity(uint32_t edefID, const data::EntityClassDef &classDef, const PropertySpan_t &properties) override;
+			rkit::Result ParseBuiltinEntity(const data::EntityClassDef2 &classDef, const PropertySpan_t &properties) override;
+			rkit::Result ParseUserEntity(uint32_t edefID, const data::EntityClassDef2 &classDef, const PropertySpan_t &properties) override;
 
 		private:
 			rkit::buildsystem::IDependencyNodeCompilerFeedback *m_feedback;
@@ -480,8 +481,8 @@ namespace anox { namespace buildsystem
 		public:
 			explicit EntityCompileHandler(rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 
-			rkit::Result ParseBuiltinEntity(const data::EntityClassDef &classDef, const PropertySpan_t &properties) override;
-			rkit::Result ParseUserEntity(uint32_t edefID, const data::EntityClassDef &classDef, const PropertySpan_t &properties) override;
+			rkit::Result ParseBuiltinEntity(const data::EntityClassDef2 &classDef, const PropertySpan_t &properties) override;
+			rkit::Result ParseUserEntity(uint32_t edefID, const data::EntityClassDef2 &classDef, const PropertySpan_t &properties) override;
 
 			rkit::Result WriteEntityData(rkit::IWriteStream &stream) const;
 
@@ -494,9 +495,9 @@ namespace anox { namespace buildsystem
 				kAngleRecast,
 			};
 
-			rkit::Result ParseEntityCommon(const rkit::data::ContentID *contentID, const data::EntityClassDef &classDef, const PropertySpan_t &properties);
-			static PropertyDisposition FindFieldDef(const data::EntityClassDef &classDef, const rkit::AsciiStringSliceView &str, uint32_t baseOffset, const data::EntityFieldDef *&outFieldDef, uint32_t &outOffset);
-			static rkit::Result ParseField(const rkit::Span<uint8_t> &span, const data::EntityFieldDef &fieldDef, const rkit::ByteStringSliceView &propertyValue);
+			rkit::Result ParseEntityCommon(const rkit::data::ContentID *contentID, const data::EntityClassDef2 &classDef, const PropertySpan_t &properties);
+			static PropertyDisposition FindFieldDef(const data::EntityClassDef2 &classDef, const rkit::AsciiStringSliceView &str, const data::EntityFieldDef2 *&outFieldDef, uint32_t &outOffset);
+			static rkit::Result ParseField(const rkit::Span<uint8_t> &span, const data::EntityFieldDef2 &fieldDef, const rkit::ByteStringSliceView &propertyValue);
 			static rkit::Result ParseFloatSequence(const rkit::Span<uint8_t> &span, size_t numFloats, const rkit::ByteStringSliceView &propertyValue);
 
 			rkit::buildsystem::IDependencyNodeCompilerFeedback *m_feedback;
@@ -838,13 +839,13 @@ namespace anox { namespace buildsystem
 	{
 	}
 
-	rkit::Result BSPEntityCompiler::EntityAnalysisHandler::ParseBuiltinEntity(const data::EntityClassDef &classDef, const PropertySpan_t &properties)
+	rkit::Result BSPEntityCompiler::EntityAnalysisHandler::ParseBuiltinEntity(const data::EntityClassDef2 &classDef, const PropertySpan_t &properties)
 	{
 		// Ignore in analysis phase
 		RKIT_RETURN_OK;
 	}
 
-	rkit::Result BSPEntityCompiler::EntityAnalysisHandler::ParseUserEntity(uint32_t edefID, const data::EntityClassDef &classDef, const PropertySpan_t &properties)
+	rkit::Result BSPEntityCompiler::EntityAnalysisHandler::ParseUserEntity(uint32_t edefID, const data::EntityClassDef2 &classDef, const PropertySpan_t &properties)
 	{
 		rkit::String edefIdentifier;
 		RKIT_CHECK(EntityDefCompilerBase::FormatEDef(edefIdentifier, edefID));
@@ -859,7 +860,7 @@ namespace anox { namespace buildsystem
 	{
 	}
 
-	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseEntityCommon(const rkit::data::ContentID *contentID, const data::EntityClassDef &classDef, const PropertySpan_t &properties)
+	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseEntityCommon(const rkit::data::ContentID *contentID, const data::EntityClassDef2 &classDef, const PropertySpan_t &properties)
 	{
 		CompiledEntity compiledEntity;
 
@@ -899,7 +900,13 @@ namespace anox { namespace buildsystem
 			rkit::endian::LittleUInt32_t edefIDData;
 			edefIDData = edefID;
 
-			rkit::CopySpanNonOverlapping(blobBytes.SubSpan(0, 4), edefIDData.GetBytes().ToSpan());
+			for (const data::EntityFieldDef2 &fieldDef : rkit::ConstSpan<data::EntityFieldDef2>(classDef.m_fields, classDef.m_numFields))
+			{
+				if (fieldDef.m_fieldType == data::EntityFieldType::kEntityDef)
+				{
+					rkit::CopySpanNonOverlapping(blobBytes.SubSpan(fieldDef.m_dataOffset, 4), edefIDData.GetBytes().ToSpan());
+				}
+			}
 		}
 
 		for (const Property_t &property : properties)
@@ -908,8 +915,8 @@ namespace anox { namespace buildsystem
 				continue;
 
 			uint32_t offset = 0;
-			const data::EntityFieldDef *fieldDef = nullptr;
-			PropertyDisposition dispo = FindFieldDef(classDef, property.GetAt<0>(), 0, fieldDef, offset);
+			const data::EntityFieldDef2 *fieldDef = nullptr;
+			PropertyDisposition dispo = FindFieldDef(classDef, property.GetAt<0>(), fieldDef, offset);
 
 			if (dispo == PropertyDisposition::kMissing)
 			{
@@ -949,12 +956,12 @@ namespace anox { namespace buildsystem
 		RKIT_RETURN_OK;
 	}
 
-	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseBuiltinEntity(const data::EntityClassDef &classDef, const PropertySpan_t &properties)
+	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseBuiltinEntity(const data::EntityClassDef2 &classDef, const PropertySpan_t &properties)
 	{
 		return ParseEntityCommon(nullptr, classDef, properties);
 	}
 
-	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseUserEntity(uint32_t edefID, const data::EntityClassDef &classDef, const PropertySpan_t &properties)
+	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseUserEntity(uint32_t edefID, const data::EntityClassDef2 &classDef, const PropertySpan_t &properties)
 	{
 		rkit::String edefIdentifier;
 		RKIT_CHECK(EntityDefCompilerBase::FormatEDef(edefIdentifier, edefID));
@@ -968,44 +975,32 @@ namespace anox { namespace buildsystem
 		return ParseEntityCommon(&contentID, classDef, properties);
 	}
 
-	BSPEntityCompiler::EntityCompileHandler::PropertyDisposition BSPEntityCompiler::EntityCompileHandler::FindFieldDef(const data::EntityClassDef &classDef, const rkit::AsciiStringSliceView &fieldName, uint32_t baseOffset, const data::EntityFieldDef *&outFieldDef, uint32_t &outOffset)
+	BSPEntityCompiler::EntityCompileHandler::PropertyDisposition BSPEntityCompiler::EntityCompileHandler::FindFieldDef(const data::EntityClassDef2 &classDef, const rkit::AsciiStringSliceView &fieldName, const data::EntityFieldDef2 *&outFieldDef, uint32_t &outOffset)
 	{
 		PropertyDisposition dispo = PropertyDisposition::kMissing;
 
-		const rkit::ConstSpan<anox::data::EntityFieldDef> fieldDefs(classDef.m_fields, classDef.m_numFields);
+		const rkit::ConstSpan<anox::data::EntityFieldDef2> fieldDefs(classDef.m_fields, classDef.m_numFields);
 
-		for (const data::EntityFieldDef &fieldDef : fieldDefs)
+		for (const data::EntityFieldDef2 &fieldDef : fieldDefs)
 		{
-			if (fieldDef.m_fieldType == data::EntityFieldType::kComponent)
-			{
-				PropertyDisposition componentDispo = FindFieldDef(*fieldDef.m_classDef, fieldName, baseOffset + fieldDef.m_dataOffset, outFieldDef, outOffset);
-				if (componentDispo != PropertyDisposition::kMissing)
-				{
-					RKIT_ASSERT(dispo == PropertyDisposition::kMissing);
-					dispo = componentDispo;
-				}
-
-				continue;
-			}
-
 			if (rkit::StringView(fieldDef.m_name, fieldDef.m_nameLength).RemoveEncoding().EqualsNoCase(fieldName.RemoveEncoding()))
 			{
 				RKIT_ASSERT(dispo == PropertyDisposition::kMissing);
 				dispo = PropertyDisposition::kPresent;
-				outOffset = baseOffset + fieldDef.m_dataOffset;
+				outOffset = fieldDef.m_dataOffset;
 				outFieldDef = &fieldDef;
 			}
 		}
 
 		if (fieldName == "angle")
 		{
-			for (const anox::data::EntityFieldDef &fieldDef : fieldDefs)
+			for (const anox::data::EntityFieldDef2 &fieldDef : fieldDefs)
 			{
 				if (rkit::StringView(fieldDef.m_name, fieldDef.m_nameLength).EqualsNoCase(u8"angles"))
 				{
 					RKIT_ASSERT(dispo == PropertyDisposition::kMissing);
 					dispo = PropertyDisposition::kAngleRecast;
-					outOffset = baseOffset + fieldDef.m_dataOffset;
+					outOffset = fieldDef.m_dataOffset;
 					outFieldDef = &fieldDef;
 				}
 			}
@@ -1014,7 +1009,7 @@ namespace anox { namespace buildsystem
 		return dispo;
 	}
 
-	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseField(const rkit::Span<uint8_t> &span, const data::EntityFieldDef &fieldDef, const rkit::ByteStringSliceView &propertyValue)
+	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseField(const rkit::Span<uint8_t> &span, const data::EntityFieldDef2 &fieldDef, const rkit::ByteStringSliceView &propertyValue)
 	{
 		switch (fieldDef.m_fieldType)
 		{
@@ -1250,11 +1245,9 @@ namespace anox { namespace buildsystem
 
 	rkit::Result BSPEntityCompiler::ParseEntityData(const UserEntityDictionaryBase &dict, const rkit::ConstSpan<char> &entityDataRef, IEntityDataHandler &handler)
 	{
-		anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, u8"Utilities"));
+		const data::EntityDefsSchema2 &schema = GetLevelEntitiesSchema();
 
-		const data::EntityDefsSchema &schema = anox::utils::GetEntityDefs();
-
-		const rkit::ConstSpan<const anox::data::EntityClassDef *> classDefs(schema.m_classDefs, schema.m_numClassDefs);
+		const rkit::ConstSpan<const anox::data::EntityClassDef2> classDefs(schema.m_classDefs, schema.m_numClassDefs);
 
 		rkit::ConstSpan<char> entityData = entityDataRef;
 
@@ -1315,11 +1308,11 @@ namespace anox { namespace buildsystem
 			rkit::AsciiStringView userEntityType;
 
 			bool isUserClass = true;
-			for (const anox::data::EntityClassDef *classDef : classDefs)
+			for (const anox::data::EntityClassDef2 &classDef : classDefs)
 			{
-				if (classname.EqualsNoCase(rkit::StringView(classDef->m_name, classDef->m_nameLength).RemoveEncoding()))
+				if (classname.EqualsNoCase(rkit::StringView(classDef.m_name, classDef.m_nameLength).RemoveEncoding()))
 				{
-					RKIT_CHECK(handler.ParseBuiltinEntity(*classDef, keyValuePairs.ToSpan()));
+					RKIT_CHECK(handler.ParseBuiltinEntity(classDef, keyValuePairs.ToSpan()));
 
 					isUserClass = false;
 					break;
@@ -1351,12 +1344,12 @@ namespace anox { namespace buildsystem
 				RKIT_CHECK(fullType.Set(rkit::StringView(u8"userentity_").RemoveEncoding()));
 				RKIT_CHECK(fullType.Append(type));
 
-				const data::EntityClassDef *userEntityClassDef = nullptr;
-				for (const anox::data::EntityClassDef *classDef : classDefs)
+				const data::EntityClassDef2 *userEntityClassDef = nullptr;
+				for (const anox::data::EntityClassDef2 &classDef : classDefs)
 				{
-					if (rkit::StringSliceView(classDef->m_name, classDef->m_nameLength).RemoveEncoding().EqualsNoCase(fullType))
+					if (rkit::StringSliceView(classDef.m_name, classDef.m_nameLength).RemoveEncoding().EqualsNoCase(fullType))
 					{
-						userEntityClassDef = classDef;
+						userEntityClassDef = &classDef;
 						break;
 					}
 				}

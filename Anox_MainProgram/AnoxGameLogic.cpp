@@ -627,7 +627,7 @@ namespace anox
 
 		const AnoxSpawnDefsResourceBase *spawnDefs = m_sandboxEnv.m_spawnDefs.Get();
 
-		SandboxMemObject spawnDefsMO = {};
+		SandboxMemObject entityTypesMO = {};
 		SandboxMemObject spawnDataMO = {};
 		SandboxMemObject stringLengthsMO = {};
 		SandboxMemObject stringDataMO = {};
@@ -656,10 +656,9 @@ namespace anox
 			}
 		}
 
-		CORO_CHECK(CopySpanToSandbox(spawnDefsMO, spawnDefs->GetSpawnDefs()));
-		CORO_CHECK(CopySpanToSandbox(spawnDataMO, spawnDefs->GetDataBuffer()));
-
 		const data::EntitySpawnDataChunks &chunks = spawnDefs->GetChunks();
+		CORO_CHECK(CopySpanToSandbox(entityTypesMO, chunks.m_entityTypes.ToSpan()));
+		CORO_CHECK(CopySpanToSandbox(spawnDataMO, chunks.m_entityData.ToSpan()));
 		CORO_CHECK(CopySpanToSandbox(stringLengthsMO, chunks.m_entityStringLengths.ToSpan()));
 		CORO_CHECK(CopySpanToSandbox(stringDataMO, chunks.m_entityStringData.ToSpan()));
 
@@ -668,7 +667,7 @@ namespace anox
 
 		CORO_CHECK(m_sandboxImports.MTAsync_SpawnInitialEntities(
 			m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr,
-			spawnDefsMO.m_addr, spawnDefsMO.m_size / sizeof(game::SpawnDef),
+			entityTypesMO.m_addr, entityTypesMO.m_size / sizeof(uint32_t),
 			spawnDataMO.m_addr, spawnDataMO.m_size / sizeof(uint8_t),
 			stringLengthsMO.m_addr, stringLengthsMO.m_size / sizeof(uint32_t),
 			stringDataMO.m_addr, stringDataMO.m_size / sizeof(uint8_t),
@@ -680,7 +679,7 @@ namespace anox
 			CORO_CHECK(co_await thread.AwaitBlocker(mtBlocker.CreateBlocker()));
 		}
 
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(spawnDefsMO.m_mmid));
+		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(entityTypesMO.m_mmid));
 		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(spawnDataMO.m_mmid));
 		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(stringLengthsMO.m_mmid));
 		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(stringDataMO.m_mmid));

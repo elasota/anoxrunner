@@ -26,7 +26,8 @@ namespace anox::game
 	public:
 		World &GetWorld() const;
 
-		rkit::Result AsyncSpawnInitialEntities(rkit::Span<const SpawnDef> spawnDefs, World &world,
+		rkit::Result AsyncSpawnInitialEntities(World &world,
+			rkit::Span<const rkit::endian::LittleUInt32_t> entityTypes,
 			rkit::Span<const uint8_t> spawnData,
 			rkit::Span<const rkit::ByteStringView> spawnDefStrings, rkit::Span<const game::UserEntityDefValues> udefs,
 			rkit::Span<const rkit::ByteString> udefDescriptions);

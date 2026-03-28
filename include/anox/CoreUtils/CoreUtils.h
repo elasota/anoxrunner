@@ -22,6 +22,7 @@ namespace rkit
 namespace anox::data
 {
 	struct EntityDefsSchema;
+	struct EntityDefsSchema2;
 }
 
 namespace anox::utils

@@ -2,9 +2,9 @@
 #include "rkit/Core/Coroutine.h"
 #include "rkit/Core/CoroThread.h"
 #include "rkit/Core/RefCounted.h"
+#include "rkit/Core/LogDriver.h"
 
 #include "anox/Data/EntityDef.h"
-#include "anox/Game/SpawnDef.h"
 #include "anox/CoreUtils/CoreUtils.h"
 
 #include "AnoxGameSession.h"
@@ -25,7 +25,7 @@ namespace anox::game
 
 		rkit::Result Initialize();
 
-		rkit::ResultCoroutine SpawnInitialEntities(rkit::ICoroThread &thread, World &world, rkit::Span<const SpawnDef> spawnDefs,
+		rkit::ResultCoroutine SpawnInitialEntities(rkit::ICoroThread &thread, World &world, rkit::Span<const rkit::endian::LittleUInt32_t> spawnDefs,
 			rkit::Span<const uint8_t> spawnData, rkit::Span<const rkit::ByteStringView> spawnDefStrings,
 			rkit::Span<const game::UserEntityDefValues> udefs, rkit::Span<const rkit::ByteString> udefDescriptions);
 
@@ -57,35 +57,54 @@ namespace anox::game
 	}
 
 	rkit::ResultCoroutine SessionImpl::SpawnInitialEntities(rkit::ICoroThread &thread, World &world,
-		rkit::Span<const SpawnDef> spawnDefs,
+		rkit::Span<const rkit::endian::LittleUInt32_t> entityTypes,
 		rkit::Span<const uint8_t> spawnData, rkit::Span<const rkit::ByteStringView> spawnDefStrings,
 		rkit::Span<const game::UserEntityDefValues> udefs, rkit::Span<const rkit::ByteString> udefDescriptions)
 	{
-		const data::EntityDefsSchema &schema = anox::utils::GetEntityDefs();
-
-		for (const SpawnDef &spawnDef : spawnDefs)
+		for (const rkit::endian::LittleUInt32_t &entityTypeLEU32 : entityTypes)
 		{
-			const data::EntityClassDef *eclass = schema.m_classDefs[spawnDef.m_eclassIndex];
-			const rkit::Span<const uint8_t> itemSpawnData = spawnData.SubSpan(spawnDef.m_dataOffset, eclass->m_structSize);
+			const uint32_t entityTypeID = entityTypeLEU32.Get();
+			size_t spawnDataSize = 0;
+
+			rkit::RCPtr<WorldObject> obj;
+			void *fieldsRef = nullptr;
+			SerializeFromLevelFunction_t deserializeFunc = nullptr;
+
+			CORO_CHECK(WorldObjectFactory::CreateLevelObject(entityTypeID, spawnDataSize, obj, fieldsRef, deserializeFunc));
+
+			if (!obj)
+			{
+				rkit::log::Error(u8"Entity type was invalid");
+				CORO_THROW(rkit::ResultCode::kDataError);
+			}
+
+			if (spawnDataSize > spawnData.Count())
+			{
+				rkit::log::Error(u8"Spawn data was too small");
+				CORO_THROW(rkit::ResultCode::kDataError);
+			}
 
 			WorldObjectSpawnParams spawnParams =
 			{
-				world,
 				spawnDefStrings,
 				udefs,
 				udefDescriptions,
-				*eclass,
-				itemSpawnData
+				spawnData.SubSpan(0, spawnDataSize)
 			};
 
-			rkit::RCPtr<WorldObject> obj;
-			CORO_CHECK(co_await WorldObjectFactory::SpawnWorldObject(thread, obj, spawnParams));
+			CORO_CHECK(deserializeFunc(fieldsRef, spawnParams));
+			spawnData = spawnData.SubSpan(spawnDataSize);
 
-			if (obj.IsValid())
-			{
-				CORO_CHECK(world.AddObject(std::move(obj)));
-			}
+			CORO_CHECK(world.AddObject(std::move(obj)));
 		}
+
+		if (spawnData.Count() > 0)
+		{
+			rkit::log::Error(u8"Extra spawn data was detected");
+			CORO_THROW(rkit::ResultCode::kDataError);
+		}
+
+		CORO_THROW(rkit::ResultCode::kNotYetImplemented);
 
 		CORO_RETURN_OK;
 	}
@@ -105,13 +124,14 @@ namespace anox::game
 		CORO_RETURN_OK;
 	}
 
-	rkit::Result Session::AsyncSpawnInitialEntities(rkit::Span<const SpawnDef> spawnDefs, World &world,
+	rkit::Result Session::AsyncSpawnInitialEntities(World &world,
+		rkit::Span<const rkit::endian::LittleUInt32_t> entityTypes,
 		rkit::Span<const uint8_t> spawnData,
 		rkit::Span<const rkit::ByteStringView> spawnDefStrings, rkit::Span<const game::UserEntityDefValues> udefs,
 		rkit::Span<const rkit::ByteString> udefDescriptions)
 	{
 		rkit::ICoroThread &thread = *Impl().m_mainCoroThread;
-		return thread.EnterFunction(Impl().SpawnInitialEntities(thread, world, spawnDefs, spawnData, spawnDefStrings, udefs, udefDescriptions));
+		return thread.EnterFunction(Impl().SpawnInitialEntities(thread, world, entityTypes, spawnData, spawnDefStrings, udefs, udefDescriptions));
 	}
 
 	rkit::Result Session::AsyncPostSpawnInitialEntities(World &world)

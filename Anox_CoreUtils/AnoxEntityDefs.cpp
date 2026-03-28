@@ -187,9 +187,7 @@ namespace anox::utils::priv
 		g_badClasses,
 		sizeof(g_badClasses) / sizeof(g_badClasses[0])
 	};
-
 }
-
 
 namespace anox::utils
 {

@@ -192,7 +192,6 @@ class LightObject : PlacedComponent, ColorableComponent
 	[level] bytestring np_1
 	[level] bytestring np_2
 	[level] bytestring np_3
-	[level] uint particleflags
 	[level name(sun_ambient)] vec3 sunAmbient
 	[level] bytestring model
 }
@@ -301,7 +300,7 @@ class PushTriggerObject : GeometricComponent
 	[level] float angle
 }
 
-[level(trigger_push)]
+[level(trigger_relay)]
 class RelayTriggerObject : GeometricComponent
 {
 	[level] vec3 origin
@@ -352,7 +351,7 @@ class WorldSpawnObject
 
 component AbstractUserEntityComponent
 {
-	edef edef
+	[level] edef edef
 }
 
 component UserEntityComponent : AbstractUserEntityComponent, PlacedComponent
@@ -400,7 +399,7 @@ class NoClipUserEntityObject : UserEntityComponent, ColorableComponent
 	[level] bytestring default_anim
 }
 
-[userentity(noclip)]
+[userentity(general)]
 class GeneralUserEntityObject : UserEntityComponent, ColorableComponent, ClickableComponent
 {
 	[level] uint count
@@ -453,7 +452,7 @@ class ScavengerUserEntityObject : UserEntityComponent
 {
 }
 
-[userentity(scavenger)]
+[userentity(effect)]
 class EffectUserEntityObject : UserEntityComponent
 {
 }
@@ -464,12 +463,12 @@ class ContainerUserEntityObject : UserEntityComponent, ClickableComponent
 	[level] bytestring message
 }
 
-[userentity(container)]
+[userentity(lightsource)]
 class LightSourceUserEntity : AbstractUserEntityComponent
 {
 }
 
-[userentity(container)]
+[userentity(sunpoint)]
 class SunPointUserEntity : AbstractUserEntityComponent
 {
 }

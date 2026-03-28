@@ -7,6 +7,7 @@
 
 #define ANOX_RTTI_CLASS_MULTI_BASE(cls, ...)	\
 public:\
+	friend class ::anox::game::priv::PrivateAccessor;\
 	typedef ::rkit::TypeList<__VA_ARGS__> BaseClasses_t;\
 	typedef cls ThisClass_t;\
 	typedef ::anox::game::priv::AutoRTTI<ThisClass_t, BaseClasses_t> RTTIType_t;\
@@ -27,6 +28,15 @@ namespace anox::game
 
 namespace anox::game::priv
 {
+	struct PrivateAccessor
+	{
+		template<class TBase, class TInitial>
+		static TBase *ImplicitCast(TInitial *ptr);
+
+		template<class TCastTo, class TInitial>
+		static TCastTo *StaticCast(TInitial *ptr);
+	};
+
 	template<class TDerivedClass, class TBaseClassList>
 	struct AutoRTTIBaseClassList
 	{
@@ -94,6 +104,19 @@ namespace anox::game
 
 namespace anox::game::priv
 {
+	template<class TBase, class TInitial>
+	TBase *PrivateAccessor::ImplicitCast(TInitial *ptr)
+	{
+		TBase *basePtr = ptr;
+		return basePtr;
+	}
+
+	template<class TCastTo, class TInitial>
+	TCastTo *PrivateAccessor::StaticCast(TInitial *ptr)
+	{
+		TCastTo *recastPtr = static_cast<TCastTo *>(ptr);;
+		return recastPtr;
+	}
 
 	template<class TDerived, class TBase>
 	void *RTTIPtrAdjust<TDerived, TBase>::DerivedToBase(void *ptr)

@@ -23,6 +23,8 @@ namespace anox { namespace data {
 		kEntityDef,
 		kBSPModel,
 		kComponent,
+		kIgnore,
+		kByteString,
 	};
 
 	struct EntityFieldDef
@@ -35,6 +37,15 @@ namespace anox { namespace data {
 		size_t m_nameLength;
 
 		const EntityClassDef *m_classDef;
+	};
+
+	struct EntityFieldDef2
+	{
+		uint32_t m_dataOffset;
+		EntityFieldType m_fieldType;
+
+		const rkit::Utf8Char_t *m_name;
+		size_t m_nameLength;
 	};
 
 	struct EntityClassDef
@@ -54,9 +65,31 @@ namespace anox { namespace data {
 		size_t m_numFields;
 	};
 
+	struct EntityClassDef2
+	{
+		uint32_t m_entityClassIndex;
+
+		const rkit::Utf8Char_t *m_name;
+		size_t m_nameLength;
+
+		size_t m_dataSize;
+
+		const EntityFieldDef2 *m_fields;
+		size_t m_numFields;
+	};
+
 	struct EntityDefsSchema
 	{
 		const EntityClassDef *const *m_classDefs;
+		size_t m_numClassDefs;
+
+		const rkit::Utf8Char_t *const *m_badClassDefs;
+		size_t m_numBadClassDefs;
+	};
+
+	struct EntityDefsSchema2
+	{
+		const EntityClassDef2 *m_classDefs;
 		size_t m_numClassDefs;
 
 		const rkit::Utf8Char_t *const *m_badClassDefs;

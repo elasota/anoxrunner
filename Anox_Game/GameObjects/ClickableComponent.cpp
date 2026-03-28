@@ -3,7 +3,6 @@
 #include "rkit/Core/Coroutine.h"
 
 #include "anox/Data/EntityStructs.h"
-#include "anox/Game/SpawnDef.h"
 
 namespace anox::game
 {

@@ -3,17 +3,14 @@ namespace GameObjectReflector
 {
     internal class EntityClassCollection
     {
-        private List<ClassDef2> _classes = new List<ClassDef2>();
-        private List<ClassDef2> _components = new List<ClassDef2>();
+        private Dictionary<string, ClassDef2> _classesByName = new Dictionary<string, ClassDef2>();
+
+        public IReadOnlyDictionary<string, ClassDef2> Classes { get =>_classesByName; }
 
         internal void AddClass(ClassDef2 value)
         {
-            _classes.Add(value);
-        }
-
-        internal void AddComponent(ClassDef2 value)
-        {
-            _components.Add(value);
+            if (!_classesByName.TryAdd(value.Name, value))
+                throw new ReflectorException("Class " + value.Name + " is already defined");
         }
     }
 }

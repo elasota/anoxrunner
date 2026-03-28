@@ -14,11 +14,14 @@ namespace rkit
 
 	template<class T>
 	class Span;
+
+	template<class T>
+	class UniquePtr;
 }
 
 namespace anox::data
 {
-	struct EntityClassDef;
+	struct EntityClassDef2;
 	struct EntitySpawnDataChunks;
 }
 
@@ -28,54 +31,76 @@ namespace anox::game
 	class World;
 	struct UserEntityDefValues;
 
+	template<class T>
+	struct ObjectFieldsBase;
+
 	struct WorldObjectSpawnParams
 	{
-		World &m_world;
 		rkit::Span<const rkit::ByteStringView> m_spawnDefStrings;
 		rkit::Span<const UserEntityDefValues> m_udefs;
 		rkit::Span<const rkit::ByteString> m_udefDescriptions;
-		const data::EntityClassDef &m_eclass;
 		rkit::Span<const uint8_t> m_data;
 	};
 
-	template<class TEntityDefType>
+	typedef rkit::Result (*SerializeFromLevelFunction_t)(void *fieldsRef, const WorldObjectSpawnParams &spawnParams);
+
+	template<class TObjectType>
 	class WorldObjectInstantiator
 	{
 	public:
-		static rkit::ResultCoroutine SpawnObject(rkit::ICoroThread &thread, rkit::RCPtr<WorldObject> &outObject, const WorldObjectSpawnParams &spawnParams, const TEntityDefType &spawnDef);
+		static rkit::Result CreateObject(rkit::UniquePtr<WorldObject> &outObject, ObjectFieldsBase<TObjectType> *&outFieldsRef);
+		static rkit::Result LoadObjectFromLevel(ObjectFieldsBase<TObjectType> &object, const WorldObjectSpawnParams &spawnParams);
 	};
 
 	class WorldObjectFactory
 	{
 	public:
-		static rkit::ResultCoroutine SpawnWorldObject(rkit::ICoroThread &thread, rkit::RCPtr<WorldObject> &outObject, const WorldObjectSpawnParams &spawnParams);
 
-		template<class TObjClass, class TEClass>
-		static rkit::ResultCoroutine SpawnObjectTemplate(rkit::ICoroThread &thread, rkit::RCPtr<anox::game::WorldObject> &outObject, const anox::game::WorldObjectSpawnParams &spawnParams, const TEClass &spawnDef);
+		static rkit::Result CreateLevelObject(uint32_t levelObjectID, size_t &outSize, rkit::RCPtr<WorldObject> &outObject, void *&outFieldsRef, SerializeFromLevelFunction_t &outDeserializeFunction);
+
+		template<class TObjClass>
+		static rkit::Result CreateLevelObjectTemplate(rkit::RCPtr<anox::game::WorldObject> &outObject, void *&outFieldsRef, SerializeFromLevelFunction_t &outDeserializeFunction);
+
+	private:
+		template<class TObjClass>
+		static rkit::Result SerializeFromLevelCB(void *fieldsRef, const WorldObjectSpawnParams &spawnParams);
 	};
 }
 
-#include "GameObjects/AnoxWorldObject.h"
+#include "GameObjects/WorldObject.h"
 #include "rkit/Core/Coroutine.h"
 
 namespace anox::game
 {
-	template<class TObjClass, class TEClass>
-	rkit::ResultCoroutine WorldObjectFactory::SpawnObjectTemplate(rkit::ICoroThread &thread, rkit::RCPtr<anox::game::WorldObject> &outObject, const anox::game::WorldObjectSpawnParams &spawnParams, const TEClass &spawnDef)
+	template<class TObjClass>
+	rkit::Result WorldObjectFactory::CreateLevelObjectTemplate(rkit::RCPtr<anox::game::WorldObject> &outObject, void *&outFieldsRef, SerializeFromLevelFunction_t &outDeserializeFunction)
 	{
 		rkit::UniquePtr<WorldObjectContainer> container;
-		CORO_CHECK(rkit::New<WorldObjectContainer>(container));
-		rkit::UniquePtr<TObjClass> obj;
-		CORO_CHECK(rkit::New<TObjClass>(obj));
-		CORO_CHECK(co_await obj->Initialize(thread, spawnParams, spawnDef));
+		RKIT_CHECK(rkit::New<WorldObjectContainer>(container));
+		rkit::UniquePtr<WorldObject> obj;
+		ObjectFieldsBase<TObjClass> *fieldsRef = nullptr;
+		RKIT_CHECK(WorldObjectInstantiator<TObjClass>::CreateObject(obj, fieldsRef));
 		outObject = WorldObjectContainer::Wrap(std::move(container), std::move(obj));
-		CORO_RETURN_OK;
+		outDeserializeFunction = SerializeFromLevelCB<TObjClass>;
+		outFieldsRef = static_cast<void *>(fieldsRef);
+		RKIT_RETURN_OK;
+	}
+
+	template<class TObjClass>
+	rkit::Result WorldObjectFactory::SerializeFromLevelCB(void *fieldsRef, const WorldObjectSpawnParams &spawnParams)
+	{
+		return WorldObjectInstantiator<TObjClass>::LoadObjectFromLevel(*static_cast<ObjectFieldsBase<TObjClass> *>(fieldsRef), spawnParams);
 	}
 };
 
-#define ANOX_IMPLEMENT_WORLD_OBJECT_INSTANTIATOR(objClass, eclass) \
+
+#define ANOX_IMPLEMENT_WORLD_OBJECT_INSTANTIATOR(objClass) \
 template<>\
-rkit::ResultCoroutine anox::game::WorldObjectInstantiator<::anox::data::EClass_ ## eclass>::SpawnObject(rkit::ICoroThread &thread, rkit::RCPtr<anox::game::WorldObject> &outObject, const anox::game::WorldObjectSpawnParams &spawnParams, const anox::data::EClass_ ## eclass &spawnDef)\
+rkit::Result anox::game::WorldObjectInstantiator<objClass>::CreateObject(rkit::UniquePtr<WorldObject> &outObject, ObjectFieldsBase<objClass> *&outFieldsRef)\
 {\
-	return ::anox::game::WorldObjectFactory::SpawnObjectTemplate<objClass, ::anox::data::EClass_ ## eclass>(thread, outObject, spawnParams, spawnDef);\
+	rkit::UniquePtr<objClass> obj;\
+	RKIT_CHECK(rkit::New<objClass>(obj));\
+	outFieldsRef = ::anox::game::priv::PrivateAccessor::ImplicitCast<ObjectFieldsBase<objClass>>(obj.Get());\
+	outObject = std::move(obj);\
+	RKIT_RETURN_OK;\
 }

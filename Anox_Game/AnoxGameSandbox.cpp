@@ -1,7 +1,6 @@
 #include "anox/Sandbox/AnoxGame.sb.generated.inl"
 
 #include "anox/Game/UserEntityDefValues.h"
-#include "anox/Game/SpawnDef.h"
 
 #include "anox/AnoxModule.h"
 
@@ -160,7 +159,7 @@ namespace anox::game::sandbox
 	}
 
 	rkit::Result SandboxExports::MTAsync_SpawnInitialEntities(void *gameSession,
-		void *spawnDefs, size_t numSpawnDefs,
+		void *entityTypes, size_t numEntityTypes,
 		void *spawnData, size_t numSpawnData,
 		void *stringLengths, size_t numStrings,
 		void *stringData, size_t numStringData,
@@ -169,9 +168,9 @@ namespace anox::game::sandbox
 	{
 		Session *session = static_cast<Session *>(gameSession);
 
-		const rkit::ConstSpan<game::SpawnDef> spawnDefsSpan(static_cast<const game::SpawnDef *>(spawnDefs), numSpawnDefs);
+		const rkit::ConstSpan<rkit::endian::LittleUInt32_t> entityTypesSpan(static_cast<const rkit::endian::LittleUInt32_t *>(entityTypes), numEntityTypes);
 		const rkit::ConstSpan<uint8_t> spawnDataSpan(static_cast<const uint8_t *>(spawnData), numSpawnData);
-		const rkit::ConstSpan<uint32_t> stringLengthsSpan(static_cast<const uint32_t *>(stringLengths), numStrings);
+		const rkit::ConstSpan<rkit::endian::LittleUInt32_t> stringLengthsSpan(static_cast<const rkit::endian::LittleUInt32_t *>(stringLengths), numStrings);
 		const rkit::ConstSpan<uint8_t> stringDataSpan(static_cast<const uint8_t *>(stringData), numStringData);
 		const rkit::ConstSpan<game::UserEntityDefValues> udefValuesSpan(static_cast<const game::UserEntityDefValues *>(udefValues), numUDefs);
 		const rkit::ConstSpan<uint8_t> udefDescsDataSpan(static_cast<const uint8_t *>(udefStringData), udefStringDataSize);
@@ -179,7 +178,7 @@ namespace anox::game::sandbox
 		rkit::Vector<rkit::ByteStringView> spawnDataStrings;
 		{
 			uint32_t stringDataPos = 0;
-			for (uint32_t stringLength : stringLengthsSpan)
+			for (const rkit::endian::LittleUInt32_t &stringLength : stringLengthsSpan)
 			{
 				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 			}
@@ -204,7 +203,7 @@ namespace anox::game::sandbox
 			}
 		}
 
-		RKIT_CHECK(session->AsyncSpawnInitialEntities(spawnDefsSpan, session->GetWorld(), spawnDataSpan, spawnDataStrings.ToSpan(), udefValuesSpan, udefDescs.ToSpan()));
+		RKIT_CHECK(session->AsyncSpawnInitialEntities(session->GetWorld(), entityTypesSpan, spawnDataSpan, spawnDataStrings.ToSpan(), udefValuesSpan, udefDescs.ToSpan()));
 		RKIT_RETURN_OK;
 	}
 

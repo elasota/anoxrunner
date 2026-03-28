@@ -6,11 +6,11 @@
 
 #define ANOX_SERIALIZABLE_PROTOTYPE	\
 public:\
-rkit::Result Serialize(::anox::game::ISerializer &serializer);
+rkit::Result Serialize(::anox::game::IWorldObjectSerializer &serializer);
 
 namespace anox::game
 {
-	struct ISerializer;
+	struct IWorldObjectSerializer;
 
 	class SerializableBase : public DynamicObject
 	{
@@ -19,7 +19,7 @@ namespace anox::game
 	protected:
 		struct VTable
 		{
-			rkit::Result(*m_serializeFunc)(SerializableBase *object, ISerializer &serializer);
+			rkit::Result(*m_serializeFunc)(SerializableBase *object, IWorldObjectSerializer &serializer);
 		};
 
 		SerializableBase() = delete;
@@ -36,7 +36,7 @@ namespace anox::game
 		Serializable();
 
 	private:
-		static rkit::Result StaticSerialize(SerializableBase *object, ISerializer &serializer);
+		static rkit::Result StaticSerialize(SerializableBase *object, IWorldObjectSerializer &serializer);
 
 		static const typename SerializableBase::VTable ms_vtable;
 	};
@@ -52,7 +52,7 @@ namespace anox::game
 	}
 
 	template<class TType>
-	rkit::Result Serializable<TType>::StaticSerialize(SerializableBase *object, ISerializer &serializer)
+	rkit::Result Serializable<TType>::StaticSerialize(SerializableBase *object, IWorldObjectSerializer &serializer)
 	{
 		//return static_cast<TType *>(static_cast<Serializable<TType> *>(object))->Serialize(serializer);
 	}

@@ -83,35 +83,20 @@ namespace anox
 	public:
 		friend struct AnoxSpawnDefsLoaderInfo;
 
-		rkit::Span<const game::SpawnDef> GetSpawnDefs() const override;
 		const data::EntitySpawnDataChunks &GetChunks() const override;
-		rkit::Span<const uint8_t> GetDataBuffer() const override;
 		rkit::CallbackSpan<AnoxEntityDefResourceBase *, const AnoxSpawnDefsResourceBase *> GetUserEntityDefs() const override;
 
 	private:
 		static AnoxEntityDefResourceBase *StaticGetUserEntityDef(AnoxSpawnDefsResourceBase const * const& selfPtr, size_t index);
 
 		rkit::Vector<rkit::RCPtr<AnoxEntityDefResourceBase>> m_userEntityDefs;
-		rkit::Vector<game::SpawnDef> m_spawnDefs;
 
 		data::EntitySpawnDataChunks m_chunks;
-
-		rkit::Vector<uint8_t> m_objectDataBuffer;
 	};
-
-	rkit::Span<const game::SpawnDef> AnoxSpawnDefsResource::GetSpawnDefs() const
-	{
-		return m_spawnDefs.ToSpan();
-	}
 
 	const data::EntitySpawnDataChunks &AnoxSpawnDefsResource::GetChunks() const
 	{
 		return m_chunks;
-	}
-
-	rkit::Span<const uint8_t> AnoxSpawnDefsResource::GetDataBuffer() const
-	{
-		return this->m_objectDataBuffer.ToSpan();
 	}
 
 	rkit::CallbackSpan<AnoxEntityDefResourceBase *, const AnoxSpawnDefsResourceBase *> AnoxSpawnDefsResource::GetUserEntityDefs() const
@@ -191,78 +176,6 @@ namespace anox
 			{
 				outEDef = inFuture.GetResult().m_resourceHandle.StaticCast<AnoxEntityDefResourceBase>();
 			});
-
-		anox::IUtilitiesDriver *anoxUtils = static_cast<anox::IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, u8"Utilities"));
-		const data::EntityDefsSchema &schema = utils::GetEntityDefs();
-
-		const size_t numSpawnDefs = resource.m_chunks.m_entityTypes.Count();
-
-		rkit::Vector<game::SpawnDef> &outSpawnDefs = resource.m_spawnDefs;
-		RKIT_CHECK(outSpawnDefs.Resize(numSpawnDefs));
-
-		rkit::Vector<size_t> spawnDefStartOffsets;
-		RKIT_CHECK(spawnDefStartOffsets.Reserve(numSpawnDefs));
-
-		size_t entityDataSize = 0;
-
-		{
-			for (const rkit::endian::LittleUInt32_t &entityType : resource.m_chunks.m_entityTypes)
-			{
-				const uint32_t etype = entityType.Get();
-
-				if (etype >= schema.m_numClassDefs)
-					RKIT_THROW(rkit::ResultCode::kDataError);
-
-				const data::EntityClassDef *eclass = schema.m_classDefs[etype];
-
-				size_t startPos = 0;
-				RKIT_CHECK(rkit::SafeAlignUp(startPos, entityDataSize, eclass->m_structAlignment));
-				RKIT_CHECK(spawnDefStartOffsets.Append(startPos));
-				RKIT_CHECK(rkit::SafeAdd(entityDataSize, startPos, eclass->m_structSize));
-			}
-		}
-
-		if (entityDataSize > std::numeric_limits<uint32_t>::max())
-			RKIT_THROW(rkit::ResultCode::kDataError);
-
-		RKIT_CHECK(resource.m_objectDataBuffer.Resize(entityDataSize));
-
-		uint8_t *structDataStart = resource.m_objectDataBuffer.GetBuffer();
-
-		rkit::ProcessParallelSpans(outSpawnDefs.ToSpan(), spawnDefStartOffsets.ToSpan(),
-			[]
-			(game::SpawnDef &outSpawnDef, size_t inOffset)
-			{
-				outSpawnDef.m_dataOffset = static_cast<uint32_t>(inOffset);
-			});
-
-		rkit::ReadOnlyMemoryStream stream(resource.m_chunks.m_entityData.ToSpan());
-
-		RKIT_CHECK((rkit::CheckedProcessParallelSpans(outSpawnDefs.ToSpan(), resource.m_chunks.m_entityTypes.ToSpan(),
-			[&schema, &stream, &resource, structDataStart]
-			(game::SpawnDef &outSpawnDef, const rkit::endian::LittleUInt32_t &inEntityType)
-			-> rkit::Result
-			{
-				const uint32_t etype = inEntityType.Get();
-
-				if (etype >= schema.m_numClassDefs)
-					RKIT_THROW(rkit::ResultCode::kDataError);
-
-				const data::EntityClassDef *eclass = schema.m_classDefs[etype];
-				outSpawnDef.m_eclassIndex = etype;
-
-				rkit::ConstSpan<uint8_t> dataSpan;
-				RKIT_CHECK(stream.ExtractSpan(dataSpan, eclass->m_dataSize));
-
-				return ParseEntity(structDataStart + outSpawnDef.m_dataOffset, resource, dataSpan, eclass);
-			}
-		)));
-
-		if (stream.Tell() != stream.GetSize())
-			RKIT_THROW(rkit::ResultCode::kDataError);
-
-		if (resource.m_chunks.m_entityStringLengths.Count())
-			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 
 		RKIT_RETURN_OK;
 	}

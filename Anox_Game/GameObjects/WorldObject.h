@@ -19,6 +19,7 @@ namespace anox::game
 {
 	class WorldObject;
 	class WorldImpl;
+	struct WorldObjectSpawnParams;
 
 	class WorldObjectContainer
 	{

@@ -91,13 +91,6 @@ namespace anox::game
 	{
 		return Impl().AddObject(std::move(obj));
 	}
-
-	template<>
-	rkit::ResultCoroutine WorldObjectInstantiator<data::EClass_worldspawn>::SpawnObject(rkit::ICoroThread &thread, rkit::RCPtr<WorldObject> &outObject, const WorldObjectSpawnParams &spawnParams, const data::EClass_worldspawn &spawnDef)
-	{
-		CORO_CHECK(spawnParams.m_world.ApplyParams(spawnParams, spawnDef));
-		CORO_RETURN_OK;
-	}
 }
 
 RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR(anox::game::WorldImpl)

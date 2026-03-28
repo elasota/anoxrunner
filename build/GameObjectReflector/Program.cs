@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using Microsoft.VisualBasic.FileIO;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Text;
 
 namespace GameObjectReflector
@@ -77,15 +79,661 @@ namespace GameObjectReflector
             EntityClassCollection ec = new EntityClassCollection();
 
             CompileECFile(ec, lines);
+
+            DumpECFile(outFileBase, ec);
+        }
+
+        private static void DumpECFile(string outFileBase, EntityClassCollection ec)
+        {
+            List<string> sortedClasses = new List<string>();
+
+            {
+                List<string> sortedClassNames = new List<string>(ec.Classes.Keys);
+                sortedClassNames.Sort();
+
+                Dictionary<string, bool> classIsFinalized = new Dictionary<string, bool>();
+
+                foreach (string className in sortedClassNames)
+                    RecursiveDetermineDumpOrder(ec, className, classIsFinalized, sortedClasses);
+            }
+
+            string buildPath = Path.Combine(outFileBase, "Anox_Build");
+            string gamePath = Path.Combine(outFileBase, "Anox_Game");
+            string objectsPath = Path.Combine(outFileBase, "Anox_Game", "GameObjects");
+
+            Directory.CreateDirectory(buildPath);
+            Directory.CreateDirectory(gamePath);
+            Directory.CreateDirectory(objectsPath);
+
+            DumpLevelEntityDefs(buildPath, gamePath, objectsPath, ec, sortedClasses);
+
+            int nn = 0;
+        }
+
+        private static void DumpLevelEntityDefs(string buildPath, string gamePath, string objectsPath, EntityClassCollection ec, IEnumerable<string> classNames)
+        {
+            Dictionary<string, int> classNameToClassID = new Dictionary<string, int>();
+            List<string> levelClassList = new List<string>();
+
+            foreach (string className in classNames)
+            {
+                ClassDef2 cdef = ec.Classes[className];
+
+                if (cdef.ClassType == ClassType.Class)
+                {
+                    if (cdef.TryGetAttributeOfType<LevelTypeDefAttribute>() != null
+                        || cdef.TryGetAttributeOfType<UserEntityTypeDefAttribute>() != null)
+                        levelClassList.Add(className);
+                }
+            }
+
+            for (int i = 0; i < levelClassList.Count; i++)
+                classNameToClassID[levelClassList[i]] = i;
+
+            Dictionary<string, int> classSizes = new Dictionary<string, int>();
+            Dictionary<string, int> fieldCounts = new Dictionary<string, int>();
+
+            using (StreamWriter writer = new StreamWriter(Path.Combine(buildPath, "LevelEntities.generated.inl")))
+            {
+                writer.NewLine = "\n";
+
+                writer.WriteLine("#include \"anox/Data/EntityDef.h\"");
+                writer.WriteLine();
+
+                writer.WriteLine("namespace anox::data::priv");
+                writer.WriteLine("{");
+
+                foreach (string className in levelClassList)
+                {
+                    Dictionary<string, LevelFieldInfo> fieldOffsetsDict = new Dictionary<string, LevelFieldInfo>();
+                    int classSize = 0;
+                    ResolveLevelFieldOffsets(ec, className, out classSize, fieldOffsetsDict, 0);
+
+                    classSizes[className] = classSize;
+
+                    List<string> sortedFieldNames = new List<string>(fieldOffsetsDict.Keys);
+                    sortedFieldNames.Sort();
+
+                    fieldCounts[className] = sortedFieldNames.Count;
+
+                    if (sortedFieldNames.Count > 0)
+                    {
+                        writer.WriteLine($"\tstatic const EntityFieldDef2 gs_levelEntityClassFields_{className}[{sortedFieldNames.Count}] =");
+                        writer.WriteLine("\t{");
+
+                        foreach (string fieldName in sortedFieldNames)
+                        {
+                            LevelFieldInfo fieldInfo = fieldOffsetsDict[fieldName];
+                            writer.WriteLine("\t\t{");
+                            writer.WriteLine($"\t\t\t{fieldInfo.Offset},");
+                            writer.Write($"\t\t\tEntityFieldType::");
+
+                            string fieldTypeStr;
+                            switch (fieldInfo.FieldType)
+                            {
+                                case FieldType.Float:
+                                    fieldTypeStr = "kFloat";
+                                    break;
+                                case FieldType.UInt:
+                                    fieldTypeStr = "kUInt";
+                                    break;
+                                case FieldType.Vec2:
+                                    fieldTypeStr = "kVec2";
+                                    break;
+                                case FieldType.Vec3:
+                                    fieldTypeStr = "kVec3";
+                                    break;
+                                case FieldType.Vec4:
+                                    fieldTypeStr = "kVec4";
+                                    break;
+                                case FieldType.Bool:
+                                    if (fieldInfo.IsOnOffBool)
+                                        fieldTypeStr = "kBoolOnOff";
+                                    else
+                                        fieldTypeStr = "kBool";
+                                    break;
+                                case FieldType.ByteString:
+                                    fieldTypeStr = "kByteString";
+                                    break;
+                                case FieldType.Label:
+                                    fieldTypeStr = "kLabel";
+                                    break;
+                                case FieldType.BspModel:
+                                    fieldTypeStr = "kBSPModel";
+                                    break;
+                                case FieldType.Broken:
+                                    fieldTypeStr = "kIgnore";
+                                    break;
+                                case FieldType.EDef:
+                                    fieldTypeStr = "kEntityDef";
+                                    break;
+                                default:
+                                    throw new Exception("Unhandled field def");
+                            }
+
+                            writer.Write(fieldTypeStr);
+                            writer.WriteLine(",");
+                            writer.Write("\t\t\tu8\"");
+                            writer.Write(fieldName);
+                            writer.WriteLine("\",");
+                            writer.WriteLine($"\t\t\t{fieldName.Length}");
+                            writer.WriteLine("\t\t},");
+                        }
+                    }
+
+                    writer.WriteLine("\t};");
+                    writer.WriteLine();
+                }
+
+                writer.WriteLine("\tstatic const EntityClassDef2 gs_levelEntityClasses[" + levelClassList.Count + "] =");
+                writer.WriteLine("\t{");
+
+                for (int classIndex = 0; classIndex < levelClassList.Count; classIndex++)
+                {
+                    string className = levelClassList[classIndex];
+
+                    ClassDef2 cdef = ec.Classes[className];
+
+                    string levelClassName;
+
+                    LevelTypeDefAttribute? levelTypeAttrib = cdef.TryGetAttributeOfType<LevelTypeDefAttribute>();
+                    UserEntityTypeDefAttribute? userEntityTypeDefAttrib = cdef.TryGetAttributeOfType<UserEntityTypeDefAttribute>();
+
+                    if (levelTypeAttrib != null)
+                        levelClassName = levelTypeAttrib.NameInLevel;
+                    else if (userEntityTypeDefAttrib != null)
+                        levelClassName = "userentity_" + userEntityTypeDefAttrib.EdefName;
+                    else
+                        throw new Exception("Internal error: Failed to resolve type name");
+
+                    writer.WriteLine("\t\t{");
+                    writer.WriteLine($"\t\t\t{classIndex},");
+                    writer.WriteLine($"\t\t\tu8\"{levelClassName}\",");
+                    writer.WriteLine($"\t\t\t{levelClassName.Length},");
+                    writer.WriteLine($"\t\t\t{classSizes[className]},");
+                    writer.WriteLine($"\t\t\tgs_levelEntityClassFields_{className},");
+                    writer.WriteLine($"\t\t\tsizeof(gs_levelEntityClassFields_{className}) / sizeof(gs_levelEntityClassFields_{className}[0]),");
+                    writer.WriteLine("\t\t},");
+                }
+
+                writer.WriteLine("\t};");
+                writer.WriteLine("}");
+            }
+
+            using (StreamWriter writer = new StreamWriter(Path.Combine(gamePath, "WorldObjectSpawnDispatcher.generated.inl")))
+            {
+                writer.NewLine = "\n";
+
+                writer.WriteLine("namespace anox::game");
+                writer.WriteLine("{");
+                foreach (string className in levelClassList)
+                    writer.WriteLine($"\tclass {className};");
+
+                writer.WriteLine();
+                writer.WriteLine("\trkit::Result WorldObjectFactory::CreateLevelObject(uint32_t levelObjectID, size_t &outSize, rkit::RCPtr<WorldObject> &outObject, void *&outFieldsRef, SerializeFromLevelFunction_t &outDeserializeFunction)");
+                writer.WriteLine("\t{");
+                writer.WriteLine("\t\toutObject.Reset();");
+                writer.WriteLine("\t\toutSize = 0;");
+                writer.WriteLine();
+                writer.WriteLine("\t\tswitch (levelObjectID)");
+                writer.WriteLine("\t\t{");
+                for (int classIndex = 0; classIndex < levelClassList.Count; classIndex++)
+                {
+                    string className = levelClassList[classIndex];
+
+                    ClassDef2 cdef = ec.Classes[className];
+                    writer.WriteLine($"\t\tcase {classIndex}:");
+                    writer.WriteLine($"\t\t\toutSize = {classSizes[className]};");
+                    writer.WriteLine($"\t\t\treturn CreateLevelObjectTemplate<{className}>(outObject, outFieldsRef, outDeserializeFunction);");
+                }
+                writer.WriteLine("\t\tdefault:");
+                writer.WriteLine("\t\t\tbreak;");
+                writer.WriteLine("\t\t};");
+                writer.WriteLine("\t\tRKIT_RETURN_OK;");
+                writer.WriteLine("\t}");
+                writer.WriteLine("}");
+            }
+
+
+            foreach (string className in classNames)
+            {
+                using (StreamWriter writer = new StreamWriter(Path.Combine(objectsPath, className + ".generated.h")))
+                {
+                    writer.NewLine = "\n";
+
+                    ClassDef2 cdef = ec.Classes[className];
+
+                    writer.WriteLine("#pragma once");
+                    writer.WriteLine();
+                    writer.WriteLine("#include \"anox/Game/UserEntityDefValues.h\"");
+                    writer.WriteLine("#include \"ObjectFields.h\"");
+                    writer.WriteLine("#include \"rkit/Math/Vec.h\"");
+                    writer.WriteLine("#include \"rkit/Core/String.h\"");
+                    if (cdef.ParentClasses.Count == 0)
+                    {
+                        if (cdef.ClassType == ClassType.Class)
+                            writer.WriteLine("#include \"WorldObject.h\"");
+                        else
+                            writer.WriteLine("#include \"DynamicObject.h\"");
+                    }
+                    else
+                    {
+
+                        foreach (string baseClass in cdef.ParentClasses)
+                            writer.WriteLine($"#include \"{baseClass}.h\"");
+                    }
+                    writer.WriteLine();
+                    writer.WriteLine("namespace anox::game");
+                    writer.WriteLine("{");
+                    writer.WriteLine($"\tclass {className};");
+                    writer.WriteLine("}");
+                    writer.WriteLine();
+                    writer.WriteLine("namespace anox::game::priv");
+                    writer.WriteLine("{");
+                    writer.WriteLine("\ttemplate<>");
+                    writer.WriteLine($"\tstruct ObjectRTTIImpl<::anox::game::{className}>;");
+                    writer.WriteLine("\ttemplate<>");
+                    writer.WriteLine($"\tstruct ObjectFieldsImpl<::anox::game::{className}>;");
+                    writer.WriteLine();
+                    writer.WriteLine("\ttemplate<>");
+                    writer.WriteLine($"\tstruct ObjectFieldsImpl<::anox::game::{className}>");
+                    writer.WriteLine($"\t\t: public ObjectFieldsBase<::anox::game::{className}>");
+                    writer.WriteLine("\t{");
+
+                    foreach (FieldDef fieldDef in cdef.FieldDefs)
+                    {
+                        string? initValue = null;
+                        string fieldType;
+                        bool ignore = false;
+                        switch (fieldDef.FieldType)
+                        {
+                            case FieldType.Float:
+                                fieldType = "float";
+                                initValue = "0.f";
+                                break;
+                            case FieldType.UInt:
+                                fieldType = "uint32_t";
+                                initValue = "0";
+                                break;
+                            case FieldType.Vec2:
+                                fieldType = "::rkit::math::Vec2";
+                                break;
+                            case FieldType.Vec3:
+                                fieldType = "::rkit::math::Vec3";
+                                break;
+                            case FieldType.Vec4:
+                                fieldType = "::rkit::math::Vec4";
+                                break;
+                            case FieldType.Bool:
+                                fieldType = "bool";
+                                initValue = "false";
+                                break;
+                            case FieldType.ByteString:
+                                fieldType = "::rkit::ByteString";
+                                break;
+                            case FieldType.Label:
+                                fieldType = "::anox::Label";
+                                break;
+                            case FieldType.BspModel:
+                                fieldType = "uint32_t";
+                                initValue = "0";
+                                break;
+                            case FieldType.EDef:
+                                fieldType = "::anox::game::UserEntityDefValues";
+                                break;
+                            case FieldType.Broken:
+                                fieldType = "";
+                                ignore = true;
+                                break;
+                            default:
+                                throw new Exception("Unhandled field type");
+                        };
+
+                        if (fieldDef.TryGetAttributeOfType<AliasFieldAttribute>() != null)
+                            ignore = true;
+
+                        if (!ignore)
+                        {
+                            writer.Write("\t\t");
+                            writer.Write(fieldType);
+                            writer.Write(" m_");
+                            writer.Write(fieldDef.FieldName);
+
+                            if (initValue != null)
+                            {
+                                writer.Write(" = ");
+                                writer.Write(initValue);
+                            }
+
+                            writer.WriteLine(";");
+                        }
+                    }
+                    writer.WriteLine("\t};");
+                    writer.WriteLine();
+                    writer.WriteLine("\ttemplate<>");
+                    writer.WriteLine($"\tstruct ObjectRTTIImpl<::anox::game::{className}>");
+                    writer.WriteLine($"\t\t: private ObjectFieldsImpl<::anox::game::{className}>");
+
+                    if (cdef.ParentClasses.Count == 0)
+                    {
+                        if (cdef.ClassType == ClassType.Component)
+                            writer.WriteLine("\t\t, public ::anox::game::DynamicObject");
+                        else if (cdef.ClassType == ClassType.Class)
+                            writer.WriteLine("\t\t, public ::anox::game::WorldObject");
+                        else
+                            throw new Exception("Unhandled class type");
+                    }
+                    else
+                    {
+                        foreach (string baseClass in cdef.ParentClasses)
+                            writer.WriteLine($"\t\t, public ::anox::game::{baseClass}");
+                    }
+
+                    writer.WriteLine("\t{");
+                    writer.WriteLine("\t\tfriend struct ::anox::game::priv::PrivateAccessor;");
+                    writer.WriteLine();
+                    writer.WriteLine("\t\tconst RuntimeTypeInfo *GetMostDerivedType() override;");
+                    writer.WriteLine("\t\tvoid *GetMostDerivedObject() override;");
+                    writer.WriteLine("\t};");
+                    writer.WriteLine();
+                    writer.WriteLine("\ttemplate<>");
+                    writer.WriteLine($"\tstruct ObjectRTTIResolver<::anox::game::{className}>");
+                    writer.WriteLine("\t{");
+                    writer.WriteLine($"\t\ttypedef ObjectFieldsImpl<::anox::game::{className}> FieldType_t;");
+                    writer.WriteLine($"\t\ttypedef ObjectRTTIImpl<::anox::game::{className}> RTTIType_t;");
+                    writer.WriteLine("\t};");
+                    writer.WriteLine("}");
+                }
+
+                using (StreamWriter writer = new StreamWriter(Path.Combine(objectsPath, className + ".generated.inl")))
+                {
+                    writer.NewLine = "\n";
+
+                    ClassDef2 cdef = ec.Classes[className];
+
+                    writer.WriteLine("#include \"" + className + ".generated.h\"");
+                    writer.WriteLine("#include \"AnoxWorldObjectFactory.h\"");
+                    writer.WriteLine("#include \"EntityLevelLoader.h\"");
+                    writer.WriteLine();
+                    writer.WriteLine("namespace anox::game");
+                    writer.WriteLine("{");
+                    writer.WriteLine($"\trkit::Result WorldObjectInstantiator<{className}>::CreateObject(rkit::UniquePtr<WorldObject> &outObject, ObjectFieldsBase<{className}> *&outFieldsRef)");
+                    writer.WriteLine("\t{");
+	                writer.WriteLine($"\t\trkit::UniquePtr<{className}> obj;");
+	                writer.WriteLine($"\t\tRKIT_CHECK(rkit::New<{className}>(obj));");
+	                writer.WriteLine($"\t\toutFieldsRef = ::anox::game::priv::PrivateAccessor::ImplicitCast<ObjectFieldsBase<{className}>>(obj.Get());");
+	                writer.WriteLine("\t\toutObject = std::move(obj);");
+	                writer.WriteLine("\t\tRKIT_RETURN_OK;");
+                    writer.WriteLine("\t}");
+                    writer.WriteLine();
+                    writer.WriteLine($"\trkit::Result WorldObjectInstantiator<{className}>::LoadObjectFromLevel(ObjectFieldsBase<{className}> &fieldsBase, const WorldObjectSpawnParams &spawnParams)");
+                    writer.WriteLine("\t{");
+                    writer.WriteLine($"\t\tObjectFields<{className}> &fields = static_cast<ObjectFields<{className}> &>(fieldsBase);");
+                    writer.WriteLine($"\t\tconst uint8_t *bytes = spawnParams.m_data.Ptr();");
+
+                    {
+                        int classSize;
+                        Dictionary<string, int> fieldOffsets = new Dictionary<string, int>();
+                        Dictionary<string, int> parentClassOffsets = new Dictionary<string, int>();
+                        Dictionary<string, LevelFieldInfo> levelFieldOffsets = new Dictionary<string, LevelFieldInfo>();
+                        ResolveFieldOffsets(className, ec, className, out classSize, fieldOffsets, parentClassOffsets, levelFieldOffsets, 0);
+
+                        foreach (FieldDef fieldDef in cdef.FieldDefs)
+                        {
+                            if (fieldDef.TryGetAttributeOfType<AliasFieldAttribute>() != null || fieldDef.FieldType == FieldType.Broken)
+                                continue;
+
+                            string fieldName = fieldDef.FieldName;
+                            string fieldTypeName = fieldDef.FieldType.ToString();
+
+                            if (FieldLoaderCanFault(fieldDef.FieldType))
+                            {
+                                writer.WriteLine($"\t\tRKIT_CHECK(EntityLevelLoader::Load{fieldTypeName}(fields.m_{fieldName}, bytes + {fieldOffsets[fieldDef.FieldName]}, spawnParams));");
+                            }
+                            else
+                            {
+                                writer.WriteLine($"\t\tEntityLevelLoader::Load{fieldTypeName}(fields.m_{fieldName}, bytes + {fieldOffsets[fieldDef.FieldName]});");
+                            }
+                        }
+                    }
+
+                    writer.WriteLine("\t\tRKIT_RETURN_OK;");
+                    writer.WriteLine("\t}");
+                    writer.WriteLine("}");
+                    writer.WriteLine();
+                    writer.WriteLine("namespace anox::game::priv");
+                    writer.WriteLine("{");
+                    writer.WriteLine($"\tconst RuntimeTypeInfo *ObjectRTTIImpl<::anox::game::{className}>::GetMostDerivedType()");
+                    writer.WriteLine("\t{");
+
+                    {
+                        List<string> baseClassNames = new List<string>();
+                        if (cdef.ClassType == ClassType.Class && cdef.ParentClasses.Count == 0)
+                            baseClassNames.Add("WorldObject");
+                        else
+                            baseClassNames.AddRange(cdef.ParentClasses);
+
+                        writer.Write("\t\ttypedef rkit::TypeList<");
+                        for (int i = 0; i < baseClassNames.Count; i++)
+                        {
+                            if (i != 0)
+                                writer.Write(", ");
+                            writer.Write(baseClassNames[i]);
+                        }
+                        writer.WriteLine("> BaseClasses_t;");
+                    }
+
+
+                    writer.WriteLine($"\t\treturn &AutoRTTI<::anox::game::{className}, BaseClasses_t>::ms_instance;");
+                    writer.WriteLine("\t}");
+                    writer.WriteLine();
+                    writer.WriteLine($"\tvoid *ObjectRTTIImpl<::anox::game::{className}>::GetMostDerivedObject()");
+                    writer.WriteLine("\t{");
+                    writer.WriteLine($"\t\treturn static_cast<::anox::game::{className} *>(this);");
+                    writer.WriteLine("\t}");
+                    writer.WriteLine("}");
+                }
+            }
+        }
+
+        private static bool FieldLoaderCanFault(FieldType fieldType)
+        {
+            switch (fieldType)
+            {
+                case FieldType.Float:
+                case FieldType.UInt:
+                case FieldType.Vec2:
+                case FieldType.Vec3:
+                case FieldType.Vec4:
+                case FieldType.Bool:
+                case FieldType.Label:
+                case FieldType.BspModel:
+                    return false;
+                case FieldType.ByteString:
+                case FieldType.EDef:
+                    return true;
+                default:
+                    throw new Exception("Unhandled field type");
+            }
+        }
+
+        private static void ResolveLevelFieldOffsets(EntityClassCollection ec, string className, out int classSize, Dictionary<string, LevelFieldInfo> levelFieldOffsetsDict, int baseOffset)
+        {
+            Dictionary<string, int> fieldOffsetsDict = new Dictionary<string, int>();
+            Dictionary<string, int> parentClassOffsetsDict = new Dictionary<string, int>();
+
+            ResolveFieldOffsets(className, ec, className, out classSize, fieldOffsetsDict, parentClassOffsetsDict, levelFieldOffsetsDict, baseOffset);
+        }
+
+        private static void ResolveFieldOffsets(string topLevelClass, EntityClassCollection ec, string className, out int classSize, Dictionary<string, int> fieldOffsetsDict, Dictionary<string, int> parentClassesOffsetsDict, Dictionary<string, LevelFieldInfo> levelFieldOffsetsDict, int baseOffset)
+        {
+            classSize = 0;
+            ClassDef2 cdef = ec.Classes[className];
+
+            foreach (string parentClass in cdef.ParentClasses)
+            {
+                Dictionary<string, int> scratchFieldOffsetsDict = new Dictionary<string, int>();
+                Dictionary<string, int> scratchParentClassOffsetsDict = new Dictionary<string, int>();
+                int parentClassSize = 0;
+
+                ResolveFieldOffsets(topLevelClass, ec, parentClass, out parentClassSize, scratchFieldOffsetsDict, scratchParentClassOffsetsDict, levelFieldOffsetsDict, baseOffset + classSize);
+
+                parentClassesOffsetsDict[parentClass] = classSize + baseOffset;
+
+                classSize += parentClassSize;
+            }
+
+            Dictionary<string, FieldDef> nameToField = new Dictionary<string, FieldDef>();
+
+            foreach (FieldDef fieldDef in cdef.FieldDefs)
+            {
+                int fieldOffset = classSize + baseOffset;
+                AliasFieldAttribute? aliasAttrib = fieldDef.TryGetAttributeOfType<AliasFieldAttribute>();
+                if (aliasAttrib == null)
+                {
+                    int fieldSize = ResolveFieldSize(fieldDef.FieldType);
+                    classSize += fieldSize;
+                }
+                else
+                {
+                    FieldDef existingFieldDef;
+                    if (!nameToField.TryGetValue(aliasAttrib.AliasName, out existingFieldDef))
+                        throw new ReflectorException("Field " + fieldDef.FieldName + " references alias field " + aliasAttrib.AliasName + " which hasn't been defined prior to it");
+
+                    if (existingFieldDef.FieldType != fieldDef.FieldType)
+                        throw new ReflectorException("Field " + fieldDef.FieldName + " references alias field " + aliasAttrib.AliasName + " which is a different type");
+
+                    fieldOffset = fieldOffsetsDict[aliasAttrib.AliasName];
+                }
+
+                nameToField[fieldDef.FieldName] = fieldDef;
+
+                if (!fieldOffsetsDict.TryAdd(fieldDef.FieldName, fieldOffset))
+                    throw new ReflectorException("Field " + fieldDef.FieldName + " was defined multiple times in class " + topLevelClass);
+
+                bool isOnOff = false;
+                LevelFieldAttribute? levelFieldAttrib = fieldDef.TryGetAttributeOfType<LevelFieldAttribute>();
+                if (levelFieldAttrib != null)
+                {
+                    isOnOff = levelFieldAttrib.IsOnOff;
+                    List<KeyValuePair<string, LevelFieldInfo>> levelFieldInfos = new List<KeyValuePair<string, LevelFieldInfo>>();
+                    string[]? scalarizedFields = levelFieldAttrib.ScalarizedFields;
+                    if (scalarizedFields == null)
+                    {
+                        string name = fieldDef.FieldName;
+                        if (levelFieldAttrib.OverrideName != null)
+                            name = levelFieldAttrib.OverrideName;
+
+                        levelFieldInfos.Add(new KeyValuePair<string, LevelFieldInfo>(name, new LevelFieldInfo(fieldDef.FieldType, fieldOffset)));
+                    }
+                    else
+                    {
+                        if (levelFieldAttrib.OverrideName != null)
+                            throw new ReflectorException("Field " + fieldDef.FieldName + " can't use both name and scalarized");
+
+                        int expectedScalarFields = 0;
+                        FieldType scalarFieldFype;
+                        switch (fieldDef.FieldType)
+                        {
+                            case FieldType.Vec2:
+                                expectedScalarFields = 2;
+                                scalarFieldFype = FieldType.Float;
+                                break;
+                            case FieldType.Vec3:
+                                expectedScalarFields = 3;
+                                scalarFieldFype = FieldType.Float;
+                                break;
+                            case FieldType.Vec4:
+                                expectedScalarFields = 4;
+                                scalarFieldFype = FieldType.Float;
+                                break;
+                            default:
+                                throw new ReflectorException("Scalarized level field " + fieldDef.FieldName + " is not a scalarizable type");
+                        }
+
+                        if (expectedScalarFields != scalarizedFields!.Length)
+                            throw new ReflectorException($"Scalarized level field {fieldDef.FieldName} requires {expectedScalarFields} but only {scalarizedFields!.Length} were provided");
+
+                        int scalarSize = ResolveFieldSize(scalarFieldFype);
+
+                        for (int i = 0; i < expectedScalarFields; i++)
+                            levelFieldInfos.Add(new KeyValuePair<string, LevelFieldInfo>(scalarizedFields[i], new LevelFieldInfo(scalarFieldFype, fieldOffset + i * scalarSize)));
+                    }
+
+                    foreach (KeyValuePair<string, LevelFieldInfo> levelFieldInfo in levelFieldInfos)
+                    {
+                        LevelFieldInfo lfi = levelFieldInfo.Value;
+
+                        if (lfi.IsOnOffBool && lfi.FieldType != FieldType.Bool)
+                            throw new ReflectorException("Level field " + levelFieldInfo.Key + " is flagged as onoff but isn't bool");
+
+                        if (!levelFieldOffsetsDict.TryAdd(levelFieldInfo.Key, lfi))
+                            throw new ReflectorException("Level field " + levelFieldInfo.Key + " was set multiple times");
+                    }
+                }
+            }
+        }
+
+        private static int ResolveFieldSize(FieldType fieldType)
+        {
+            switch (fieldType)
+            {
+                case FieldType.Bool:
+                    return 1;
+                case FieldType.Float:
+                case FieldType.UInt:
+                case FieldType.EDef:
+                case FieldType.ByteString:
+                case FieldType.Label:
+                case FieldType.BspModel:
+                    return 4;
+                case FieldType.Vec2:
+                    return 8;
+                case FieldType.Vec3:
+                    return 12;
+                case FieldType.Vec4:
+                    return 16;
+                case FieldType.Broken:
+                    return 0;
+                default:
+                    throw new Exception("Unhandled field type");
+            }
+        }
+
+        private static void RecursiveDetermineDumpOrder(EntityClassCollection ec, string className, Dictionary<string, bool> classIsFinalized, List<string> sortedClasses)
+        {
+            if (classIsFinalized.TryGetValue(className, out bool isFinalized))
+            {
+                if (isFinalized)
+                    return;
+                else
+                    throw new ReflectorException("Class " + className + " inherits from itself");
+            }
+
+            classIsFinalized[className] = false;
+
+            HashSet<string> hasParentAlready = new HashSet<string>();
+            foreach (string parentClass in ec.Classes[className].ParentClasses)
+            {
+                if (hasParentAlready.Contains(parentClass))
+                    throw new ReflectorException("Class " + className + " includes parent class " + parentClass + " multiple times");
+
+                hasParentAlready.Add(parentClass);
+
+                RecursiveDetermineDumpOrder(ec, parentClass, classIsFinalized, sortedClasses);
+            }
+
+            sortedClasses.Add(className);
+            classIsFinalized[className] = true;
         }
 
         private static void CompileECFile(EntityClassCollection ec, List<string> lines)
         {
             int lineNum = 0;
 
+            List<TypeDefAttribute> typeDefAttribs = new List<TypeDefAttribute>();
             while (lineNum < lines.Count)
             {
-                List<TypeDefAttribute> typeDefAttribs = new List<TypeDefAttribute>();
                 string line = PullLine(lines, ref lineNum);
 
                 int col = 0;
@@ -107,7 +755,7 @@ namespace GameObjectReflector
                 }
                 else if (token == "component")
                 {
-                    ec.AddComponent(ParseClass(ClassType.Component, typeDefAttribs.ToArray(), lines, ref lineNum, line, col));
+                    ec.AddClass(ParseClass(ClassType.Component, typeDefAttribs.ToArray(), lines, ref lineNum, line, col));
                     typeDefAttribs.Clear();
                 }
             }
@@ -147,7 +795,7 @@ namespace GameObjectReflector
 
         private static ClassDef2 ParseClass(ClassType classType, TypeDefAttribute[] typeDefAttributes, IReadOnlyList<string> lines, ref int lineNum, string line, int col)
         {
-            string componentName = PullTokenOfType(line, ref col, TokenType.Identifier);
+            string className = PullTokenOfType(line, ref col, TokenType.Identifier);
 
             List<string> parentClasses = new List<string>();
             List<FieldDef> fieldDefs = new List<FieldDef>();
@@ -199,7 +847,7 @@ namespace GameObjectReflector
                 fieldDefs.Add(new FieldDef(fieldAttribs.ToArray(), fieldName, fieldType));
             }
 
-            return new ClassDef2(classType, typeDefAttributes, parentClasses, fieldDefs.ToArray());
+            return new ClassDef2(className, classType, typeDefAttributes, parentClasses, fieldDefs.ToArray());
         }
 
         private static FieldType DetermineFieldType(string token)

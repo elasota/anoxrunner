@@ -1,4 +1,5 @@
-﻿namespace GameObjectReflector
+﻿
+namespace GameObjectReflector
 {
     internal class FieldDef
     {
@@ -12,5 +13,18 @@
         public FieldAttribute[] FieldAttributes { get; }
         public string FieldName { get; }
         public FieldType FieldType { get; }
+
+        internal T? TryGetAttributeOfType<T>()
+            where T : FieldAttribute
+        {
+            foreach (FieldAttribute attrib in FieldAttributes)
+            {
+                T? recastAttrib = (attrib as T);
+                if (recastAttrib != null)
+                    return recastAttrib;
+            }
+
+            return null;
+        }
     }
 }

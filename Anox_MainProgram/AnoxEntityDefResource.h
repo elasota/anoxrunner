@@ -4,7 +4,6 @@
 #include "rkit/Core/String.h"
 #include "rkit/Math/Vec.h"
 
-#include "anox/Game/SpawnDef.h"
 #include "anox/Game/UserEntityDefValues.h"
 #include "anox/Data/EntityDef.h"
 #include "anox/Label.h"

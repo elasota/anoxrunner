@@ -1,4 +1,4 @@
-#include "AnoxWorldObject.h"
+#include "WorldObject.h"
 
 #include "rkit/Core/RKitAssert.h"
 

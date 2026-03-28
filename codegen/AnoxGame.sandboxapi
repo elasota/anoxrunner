@@ -7,7 +7,7 @@ import MemFree(uint32 mmid) noexcept
 export Initialize() -> (address outGameSessionObject, address outGameSessionMem)
 export Shutdown(address gameSessionObject, address gameSessionMem)
 
-export MTAsync_SpawnInitialEntities(address gameSession, address spawnDefs, size numSpawnDefs, address spawnData, size numSpawnData, address stringLengths, size numStrings, address stringData, size numStringData, address udefValues, size numUDefs, address udefStringData, size udefStringDataSize)
+export MTAsync_SpawnInitialEntities(address gameSession, address entityTypes, size numEntityTypes, address spawnData, size numSpawnData, address stringLengths, size numStrings, address stringData, size numStringData, address udefValues, size numUDefs, address udefStringData, size udefStringDataSize)
 export MTAsync_PostSpawnInitialEntities(address gameSession)
 export MTAsync_EnterGameSession(address gameSession)
 export MTAsync_RunFrame(address gameSession)

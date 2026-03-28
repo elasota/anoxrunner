@@ -4,54 +4,61 @@
 
 #include "rkit/Core/Coroutine.h"
 
-#define ANOX_UNIMPLEMENTED_ECLASS(eclass)\
+#define ANOX_UNIMPLEMENTED_ECLASS(objClass) \
+class objClass;\
 template<>\
-rkit::ResultCoroutine WorldObjectInstantiator<data::eclass>::SpawnObject(rkit::ICoroThread &thread, rkit::RCPtr<WorldObject> &outObject, const WorldObjectSpawnParams &spawnParams, const data::eclass &spawnDef)\
+rkit::Result WorldObjectInstantiator<objClass>::CreateObject(rkit::UniquePtr<WorldObject> &outObject, ObjectFieldsBase<objClass> *&outFieldsRef) \
 {\
-	if (true)\
-		CORO_THROW(rkit::ResultCode::kNotYetImplemented);\
-	CORO_RETURN_OK;\
+	RKIT_THROW(rkit::ResultCode::kNotYetImplemented);\
+}\
+template<>\
+rkit::Result WorldObjectInstantiator<objClass>::LoadObjectFromLevel(ObjectFieldsBase<objClass> &object, const WorldObjectSpawnParams &spawnParams) \
+{ \
+	RKIT_THROW(rkit::ResultCode::kNotYetImplemented); \
 }
+
 
 namespace anox::game
 {
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_info_party_start)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_func_areaportal)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_func_button)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_func_fog)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_func_group)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_door)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_func_door)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_func_door_rotating)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_func_particle)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_func_plat)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_func_ridebox)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_func_rotating)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_func_train)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_func_wall)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_light)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_path_corner)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_path_grid_center)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_spew)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_target_speaker)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_trigger_console)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_trigger_changelevel)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_trigger_elevator)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_trigger_once)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_trigger_multiple)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_trigger_push)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_trigger_relay)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_playerchar)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_char)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_charfly)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_noclip)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_trashspawn)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_bugspawn)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_lottobot)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_pickup)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_scavenger)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_effect)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_container)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_lightsource)
-	ANOX_UNIMPLEMENTED_ECLASS(EClass_userentity_sunpoint)
+	ANOX_UNIMPLEMENTED_ECLASS(AreaPortalObject)
+	ANOX_UNIMPLEMENTED_ECLASS(BugSpawnUserEntityObject)
+	ANOX_UNIMPLEMENTED_ECLASS(ButtonObject)
+	ANOX_UNIMPLEMENTED_ECLASS(ChangeLevelTriggerObject)
+	ANOX_UNIMPLEMENTED_ECLASS(CharFlyUserEntityObject)
+	ANOX_UNIMPLEMENTED_ECLASS(CharUserEntityObject)
+	ANOX_UNIMPLEMENTED_ECLASS(ConsoleTriggerObject)
+	ANOX_UNIMPLEMENTED_ECLASS(ContainerUserEntityObject)
+	ANOX_UNIMPLEMENTED_ECLASS(DoorObject)
+	ANOX_UNIMPLEMENTED_ECLASS(EffectUserEntityObject)
+	ANOX_UNIMPLEMENTED_ECLASS(ElevatorTriggerObject)
+	ANOX_UNIMPLEMENTED_ECLASS(FogVolumeObject)
+	ANOX_UNIMPLEMENTED_ECLASS(GeneralUserEntityObject)
+	ANOX_UNIMPLEMENTED_ECLASS(GroupObject)
+	ANOX_UNIMPLEMENTED_ECLASS(InfoNullObject)
+	ANOX_UNIMPLEMENTED_ECLASS(InfoPartyStartObject)
+	ANOX_UNIMPLEMENTED_ECLASS(InfoPlayerStartObject)
+	ANOX_UNIMPLEMENTED_ECLASS(LightObject)
+	ANOX_UNIMPLEMENTED_ECLASS(LightSourceUserEntity)
+	ANOX_UNIMPLEMENTED_ECLASS(LottoBotUserEntityObject)
+	ANOX_UNIMPLEMENTED_ECLASS(NoClipUserEntityObject)
+	ANOX_UNIMPLEMENTED_ECLASS(OnceTriggerObject)
+	ANOX_UNIMPLEMENTED_ECLASS(ParticleVolumeObject)
+	ANOX_UNIMPLEMENTED_ECLASS(PathCornerObject)
+	ANOX_UNIMPLEMENTED_ECLASS(PathGridCenterObject)
+	ANOX_UNIMPLEMENTED_ECLASS(PickupUserEntityObject)
+	ANOX_UNIMPLEMENTED_ECLASS(PlatformObject)
+	ANOX_UNIMPLEMENTED_ECLASS(PlayerCharUserEntityObject)
+	ANOX_UNIMPLEMENTED_ECLASS(PushTriggerObject)
+	ANOX_UNIMPLEMENTED_ECLASS(RelayTriggerObject)
+	ANOX_UNIMPLEMENTED_ECLASS(RideBoxObject)
+	ANOX_UNIMPLEMENTED_ECLASS(RotatingDoorObject)
+	ANOX_UNIMPLEMENTED_ECLASS(RotatingGeometricObject)
+	ANOX_UNIMPLEMENTED_ECLASS(ScavengerUserEntityObject)
+	ANOX_UNIMPLEMENTED_ECLASS(SpewObject)
+	ANOX_UNIMPLEMENTED_ECLASS(SunPointUserEntity)
+	ANOX_UNIMPLEMENTED_ECLASS(TargetSpeakerObject)
+	ANOX_UNIMPLEMENTED_ECLASS(TrainObject)
+	ANOX_UNIMPLEMENTED_ECLASS(TrashSpawnUserEntityObject)
+	ANOX_UNIMPLEMENTED_ECLASS(TriggerMultipleObject)
+	ANOX_UNIMPLEMENTED_ECLASS(WallObject)
 }
