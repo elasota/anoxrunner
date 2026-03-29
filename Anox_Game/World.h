@@ -26,7 +26,7 @@ namespace anox::data
 namespace anox::game
 {
 	class WorldImpl;
-	class WorldObjectSpawnParams;
+	struct WorldObjectSpawnParams;
 	class WorldObject;
 
 	class World final : public rkit::Opaque<WorldImpl>

@@ -39,17 +39,16 @@ namespace anox::game
 		rkit::Span<const rkit::ByteStringView> m_spawnDefStrings;
 		rkit::Span<const UserEntityDefValues> m_udefs;
 		rkit::Span<const rkit::ByteString> m_udefDescriptions;
-		rkit::Span<const uint8_t> m_data;
 	};
 
-	typedef rkit::Result (*SerializeFromLevelFunction_t)(void *fieldsRef, const WorldObjectSpawnParams &spawnParams);
+	typedef rkit::Result (*SerializeFromLevelFunction_t)(void *fieldsRef, const WorldObjectSpawnParams &spawnParams, const uint8_t *bytes);
 
 	template<class TObjectType>
 	class WorldObjectInstantiator
 	{
 	public:
 		static rkit::Result CreateObject(rkit::UniquePtr<WorldObject> &outObject, ObjectFieldsBase<TObjectType> *&outFieldsRef);
-		static rkit::Result LoadObjectFromLevel(ObjectFieldsBase<TObjectType> &object, const WorldObjectSpawnParams &spawnParams);
+		static rkit::Result LoadObjectFromLevel(ObjectFieldsBase<TObjectType> &object, const WorldObjectSpawnParams &spawnParams, const uint8_t *bytes);
 	};
 
 	class WorldObjectFactory
@@ -63,7 +62,7 @@ namespace anox::game
 
 	private:
 		template<class TObjClass>
-		static rkit::Result SerializeFromLevelCB(void *fieldsRef, const WorldObjectSpawnParams &spawnParams);
+		static rkit::Result SerializeFromLevelCB(void *fieldsRef, const WorldObjectSpawnParams &spawnParams, const uint8_t *bytes);
 	};
 }
 
@@ -87,9 +86,9 @@ namespace anox::game
 	}
 
 	template<class TObjClass>
-	rkit::Result WorldObjectFactory::SerializeFromLevelCB(void *fieldsRef, const WorldObjectSpawnParams &spawnParams)
+	rkit::Result WorldObjectFactory::SerializeFromLevelCB(void *fieldsRef, const WorldObjectSpawnParams &spawnParams, const uint8_t *bytes)
 	{
-		return WorldObjectInstantiator<TObjClass>::LoadObjectFromLevel(*static_cast<ObjectFieldsBase<TObjClass> *>(fieldsRef), spawnParams);
+		return WorldObjectInstantiator<TObjClass>::LoadObjectFromLevel(*static_cast<ObjectFieldsBase<TObjClass> *>(fieldsRef), spawnParams, bytes);
 	}
 };
 

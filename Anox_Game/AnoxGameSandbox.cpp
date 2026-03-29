@@ -203,7 +203,7 @@ namespace anox::game::sandbox
 			}
 		}
 
-		RKIT_CHECK(session->AsyncSpawnInitialEntities(session->GetWorld(), entityTypesSpan, spawnDataSpan, spawnDataStrings.ToSpan(), udefValuesSpan, udefDescs.ToSpan()));
+		RKIT_CHECK(session->AsyncSpawnInitialEntities(session->GetWorld(), entityTypesSpan, spawnDataSpan, std::move(spawnDataStrings), udefValuesSpan, std::move(udefDescs)));
 		RKIT_RETURN_OK;
 	}
 

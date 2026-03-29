@@ -11,6 +11,9 @@ namespace rkit
 	template<class T>
 	class Span;
 
+	template<class T>
+	class Vector;
+
 	struct IMallocDriver;
 }
 
@@ -29,8 +32,9 @@ namespace anox::game
 		rkit::Result AsyncSpawnInitialEntities(World &world,
 			rkit::Span<const rkit::endian::LittleUInt32_t> entityTypes,
 			rkit::Span<const uint8_t> spawnData,
-			rkit::Span<const rkit::ByteStringView> spawnDefStrings, rkit::Span<const game::UserEntityDefValues> udefs,
-			rkit::Span<const rkit::ByteString> udefDescriptions);
+			rkit::Vector<rkit::ByteStringView> spawnDefStrings,
+			rkit::Span<const game::UserEntityDefValues> udefs,
+			rkit::Vector<rkit::ByteString> udefDescriptions);
 		rkit::Result AsyncPostSpawnInitialEntities(World &world);
 		rkit::Result AsyncRunFrame(World &world);
 		rkit::Result AsyncEnterGameSession(World &world);

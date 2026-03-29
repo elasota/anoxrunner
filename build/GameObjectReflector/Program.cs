@@ -127,8 +127,15 @@ namespace GameObjectReflector
                 }
             }
 
+            HashSet<string> isOrIsUsedByLevelClass = new HashSet<string>();
+
             for (int i = 0; i < levelClassList.Count; i++)
                 classNameToClassID[levelClassList[i]] = i;
+
+            foreach (string className in levelClassList)
+            {
+                RecursiveAddUsedByLevelClass(isOrIsUsedByLevelClass, ec, className);
+            }
 
             Dictionary<string, int> classSizes = new Dictionary<string, int>();
             Dictionary<string, int> fieldCounts = new Dictionary<string, int>();
@@ -297,6 +304,8 @@ namespace GameObjectReflector
 
             foreach (string className in classNames)
             {
+                bool needsExplicitWorldObjectBase = false;
+
                 using (StreamWriter writer = new StreamWriter(Path.Combine(objectsPath, className + ".generated.h")))
                 {
                     writer.NewLine = "\n";
@@ -305,23 +314,32 @@ namespace GameObjectReflector
 
                     writer.WriteLine("#pragma once");
                     writer.WriteLine();
-                    writer.WriteLine("#include \"anox/Game/UserEntityDefValues.h\"");
+                    writer.WriteLine("#include \"UserEntityDef.h\"");
                     writer.WriteLine("#include \"ObjectFields.h\"");
                     writer.WriteLine("#include \"rkit/Math/Vec.h\"");
                     writer.WriteLine("#include \"rkit/Core/String.h\"");
-                    if (cdef.ParentClasses.Count == 0)
-                    {
-                        if (cdef.ClassType == ClassType.Class)
-                            writer.WriteLine("#include \"WorldObject.h\"");
-                        else
-                            writer.WriteLine("#include \"DynamicObject.h\"");
-                    }
-                    else
-                    {
 
+                    if (cdef.ClassType == ClassType.Class)
+                    {
+                        needsExplicitWorldObjectBase = true;
                         foreach (string baseClass in cdef.ParentClasses)
-                            writer.WriteLine($"#include \"{baseClass}.h\"");
+                        {
+                            if (ec.Classes[baseClass].ClassType == ClassType.Class)
+                            {
+                                needsExplicitWorldObjectBase = false;
+                                break;
+                            }
+                        }
                     }
+
+                    if (cdef.ClassType == ClassType.Class)
+                        writer.WriteLine("#include \"WorldObject.h\"");
+                    else
+                        writer.WriteLine("#include \"DynamicObject.h\"");
+
+                    foreach (string baseClass in cdef.ParentClasses)
+                        writer.WriteLine($"#include \"{baseClass}.h\"");
+
                     writer.WriteLine();
                     writer.WriteLine("namespace anox::game");
                     writer.WriteLine("{");
@@ -379,7 +397,7 @@ namespace GameObjectReflector
                                 initValue = "0";
                                 break;
                             case FieldType.EDef:
-                                fieldType = "::anox::game::UserEntityDefValues";
+                                fieldType = "::anox::game::UserEntityDef";
                                 break;
                             case FieldType.Broken:
                                 fieldType = "";
@@ -414,12 +432,16 @@ namespace GameObjectReflector
                     writer.WriteLine($"\tstruct ObjectRTTIImpl<::anox::game::{className}>");
                     writer.WriteLine($"\t\t: private ObjectFieldsImpl<::anox::game::{className}>");
 
+                    if (needsExplicitWorldObjectBase)
+                        writer.WriteLine("\t\t, public ::anox::game::WorldObject");
+
                     if (cdef.ParentClasses.Count == 0)
                     {
                         if (cdef.ClassType == ClassType.Component)
                             writer.WriteLine("\t\t, public ::anox::game::DynamicObject");
                         else if (cdef.ClassType == ClassType.Class)
-                            writer.WriteLine("\t\t, public ::anox::game::WorldObject");
+                        {
+                        }
                         else
                             throw new Exception("Unhandled class type");
                     }
@@ -432,6 +454,27 @@ namespace GameObjectReflector
                     writer.WriteLine("\t{");
                     writer.WriteLine("\t\tfriend struct ::anox::game::priv::PrivateAccessor;");
                     writer.WriteLine();
+
+
+
+                    {
+                        List<string> baseClassNames = new List<string>();
+                        if (needsExplicitWorldObjectBase)
+                            baseClassNames.Add("WorldObject");
+                        baseClassNames.AddRange(cdef.ParentClasses);
+
+                        writer.Write("\t\ttypedef ::rkit::TypeList<");
+                        for (int i = 0; i < baseClassNames.Count; i++)
+                        {
+                            if (i != 0)
+                                writer.Write(", ");
+                            writer.Write(baseClassNames[i]);
+                        }
+                        writer.WriteLine("> BaseClasses_t;");
+                    }
+                    writer.WriteLine($"\t\ttypedef {className} ThisClass_t;");
+                    writer.WriteLine($"\t\ttypedef ::anox::game::priv::AutoRTTI<ThisClass_t, BaseClasses_t> RTTIType_t;");
+
                     writer.WriteLine("\t\tconst RuntimeTypeInfo *GetMostDerivedType() override;");
                     writer.WriteLine("\t\tvoid *GetMostDerivedObject() override;");
                     writer.WriteLine("\t};");
@@ -457,71 +500,72 @@ namespace GameObjectReflector
                     writer.WriteLine();
                     writer.WriteLine("namespace anox::game");
                     writer.WriteLine("{");
-                    writer.WriteLine($"\trkit::Result WorldObjectInstantiator<{className}>::CreateObject(rkit::UniquePtr<WorldObject> &outObject, ObjectFieldsBase<{className}> *&outFieldsRef)");
-                    writer.WriteLine("\t{");
-	                writer.WriteLine($"\t\trkit::UniquePtr<{className}> obj;");
-	                writer.WriteLine($"\t\tRKIT_CHECK(rkit::New<{className}>(obj));");
-	                writer.WriteLine($"\t\toutFieldsRef = ::anox::game::priv::PrivateAccessor::ImplicitCast<ObjectFieldsBase<{className}>>(obj.Get());");
-	                writer.WriteLine("\t\toutObject = std::move(obj);");
-	                writer.WriteLine("\t\tRKIT_RETURN_OK;");
-                    writer.WriteLine("\t}");
-                    writer.WriteLine();
-                    writer.WriteLine($"\trkit::Result WorldObjectInstantiator<{className}>::LoadObjectFromLevel(ObjectFieldsBase<{className}> &fieldsBase, const WorldObjectSpawnParams &spawnParams)");
-                    writer.WriteLine("\t{");
-                    writer.WriteLine($"\t\tObjectFields<{className}> &fields = static_cast<ObjectFields<{className}> &>(fieldsBase);");
-                    writer.WriteLine($"\t\tconst uint8_t *bytes = spawnParams.m_data.Ptr();");
 
+                    if (cdef.ClassType == ClassType.Class)
                     {
-                        int classSize;
-                        Dictionary<string, int> fieldOffsets = new Dictionary<string, int>();
-                        Dictionary<string, int> parentClassOffsets = new Dictionary<string, int>();
-                        Dictionary<string, LevelFieldInfo> levelFieldOffsets = new Dictionary<string, LevelFieldInfo>();
-                        ResolveFieldOffsets(className, ec, className, out classSize, fieldOffsets, parentClassOffsets, levelFieldOffsets, 0);
-
-                        foreach (FieldDef fieldDef in cdef.FieldDefs)
-                        {
-                            if (fieldDef.TryGetAttributeOfType<AliasFieldAttribute>() != null || fieldDef.FieldType == FieldType.Broken)
-                                continue;
-
-                            string fieldName = fieldDef.FieldName;
-                            string fieldTypeName = fieldDef.FieldType.ToString();
-
-                            if (FieldLoaderCanFault(fieldDef.FieldType))
-                            {
-                                writer.WriteLine($"\t\tRKIT_CHECK(EntityLevelLoader::Load{fieldTypeName}(fields.m_{fieldName}, bytes + {fieldOffsets[fieldDef.FieldName]}, spawnParams));");
-                            }
-                            else
-                            {
-                                writer.WriteLine($"\t\tEntityLevelLoader::Load{fieldTypeName}(fields.m_{fieldName}, bytes + {fieldOffsets[fieldDef.FieldName]});");
-                            }
-                        }
+                        writer.WriteLine("\ttemplate<>");
+                        writer.WriteLine($"\trkit::Result WorldObjectInstantiator<{className}>::CreateObject(rkit::UniquePtr<WorldObject> &outObject, ObjectFieldsBase<{className}> *&outFieldsRef)");
+                        writer.WriteLine("\t{");
+                        writer.WriteLine($"\t\trkit::UniquePtr<{className}> obj;");
+                        writer.WriteLine($"\t\tRKIT_CHECK(rkit::New<{className}>(obj));");
+                        writer.WriteLine($"\t\toutFieldsRef = ::anox::game::priv::PrivateAccessor::ImplicitCast<ObjectFieldsBase<{className}>>(obj.Get());");
+                        writer.WriteLine("\t\toutObject = std::move(obj);");
+                        writer.WriteLine("\t\tRKIT_RETURN_OK;");
+                        writer.WriteLine("\t}");
+                        writer.WriteLine();
                     }
 
-                    writer.WriteLine("\t\tRKIT_RETURN_OK;");
-                    writer.WriteLine("\t}");
+                    if (isOrIsUsedByLevelClass.Contains(className))
+                    {
+                        writer.WriteLine("\ttemplate<>");
+                        writer.WriteLine($"\trkit::Result WorldObjectInstantiator<{className}>::LoadObjectFromLevel(ObjectFieldsBase<{className}> &fieldsBase, const WorldObjectSpawnParams &spawnParams, const uint8_t *bytes)");
+                        writer.WriteLine("\t{");
+                        writer.WriteLine($"\t\tObjectFields<{className}> &fields = static_cast<ObjectFields<{className}> &>(fieldsBase);");
+
+                        {
+                            int classSize;
+                            Dictionary<string, int> fieldOffsets = new Dictionary<string, int>();
+                            Dictionary<string, int> parentClassOffsets = new Dictionary<string, int>();
+                            Dictionary<string, LevelFieldInfo> levelFieldOffsets = new Dictionary<string, LevelFieldInfo>();
+                            ResolveFieldOffsets(className, ec, className, out classSize, fieldOffsets, parentClassOffsets, levelFieldOffsets, 0);
+
+                            foreach (string parentClass in cdef.ParentClasses)
+                            {
+                                writer.WriteLine($"\t\tWorldObjectInstantiator<{parentClass}>::LoadObjectFromLevel(");
+                                writer.WriteLine($"\t\t\t*::anox::game::priv::PrivateAccessor::ImplicitCast<ObjectFieldsBase<{parentClass}>>(");
+                                writer.WriteLine($"\t\t\t\t::anox::game::priv::PrivateAccessor::StaticCast<{className}>(&fields)");
+                                writer.WriteLine($"\t\t\t), spawnParams, bytes + {parentClassOffsets[parentClass]});");
+                            }
+
+                            foreach (FieldDef fieldDef in cdef.FieldDefs)
+                            {
+                                if (fieldDef.TryGetAttributeOfType<AliasFieldAttribute>() != null || fieldDef.FieldType == FieldType.Broken)
+                                    continue;
+
+                                string fieldName = fieldDef.FieldName;
+                                string fieldTypeName = fieldDef.FieldType.ToString();
+
+                                if (FieldLoaderCanFault(fieldDef.FieldType))
+                                {
+                                    writer.WriteLine($"\t\tRKIT_CHECK(EntityLevelLoader::Load{fieldTypeName}(fields.m_{fieldName}, bytes + {fieldOffsets[fieldDef.FieldName]}, spawnParams));");
+                                }
+                                else
+                                {
+                                    writer.WriteLine($"\t\tEntityLevelLoader::Load{fieldTypeName}(fields.m_{fieldName}, bytes + {fieldOffsets[fieldDef.FieldName]});");
+                                }
+                            }
+                        }
+
+                        writer.WriteLine("\t\tRKIT_RETURN_OK;");
+                        writer.WriteLine("\t}");
+                    }
                     writer.WriteLine("}");
                     writer.WriteLine();
+
                     writer.WriteLine("namespace anox::game::priv");
                     writer.WriteLine("{");
                     writer.WriteLine($"\tconst RuntimeTypeInfo *ObjectRTTIImpl<::anox::game::{className}>::GetMostDerivedType()");
                     writer.WriteLine("\t{");
-
-                    {
-                        List<string> baseClassNames = new List<string>();
-                        if (cdef.ClassType == ClassType.Class && cdef.ParentClasses.Count == 0)
-                            baseClassNames.Add("WorldObject");
-                        else
-                            baseClassNames.AddRange(cdef.ParentClasses);
-
-                        writer.Write("\t\ttypedef rkit::TypeList<");
-                        for (int i = 0; i < baseClassNames.Count; i++)
-                        {
-                            if (i != 0)
-                                writer.Write(", ");
-                            writer.Write(baseClassNames[i]);
-                        }
-                        writer.WriteLine("> BaseClasses_t;");
-                    }
 
 
                     writer.WriteLine($"\t\treturn &AutoRTTI<::anox::game::{className}, BaseClasses_t>::ms_instance;");
@@ -533,6 +577,16 @@ namespace GameObjectReflector
                     writer.WriteLine("\t}");
                     writer.WriteLine("}");
                 }
+            }
+        }
+
+        private static void RecursiveAddUsedByLevelClass(HashSet<string> isOrIsUsedByLevelClass, EntityClassCollection ec, string className)
+        {
+            if (isOrIsUsedByLevelClass.Add(className))
+            {
+                ClassDef2 cls = ec.Classes[className];
+                foreach (string parentClass in cls.ParentClasses)
+                    RecursiveAddUsedByLevelClass(isOrIsUsedByLevelClass, ec, parentClass);
             }
         }
 

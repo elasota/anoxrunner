@@ -12,7 +12,7 @@ rkit::Result WorldObjectInstantiator<objClass>::CreateObject(rkit::UniquePtr<Wor
 	RKIT_THROW(rkit::ResultCode::kNotYetImplemented);\
 }\
 template<>\
-rkit::Result WorldObjectInstantiator<objClass>::LoadObjectFromLevel(ObjectFieldsBase<objClass> &object, const WorldObjectSpawnParams &spawnParams) \
+rkit::Result WorldObjectInstantiator<objClass>::LoadObjectFromLevel(ObjectFieldsBase<objClass> &object, const WorldObjectSpawnParams &spawnParams, const uint8_t *bytes) \
 { \
 	RKIT_THROW(rkit::ResultCode::kNotYetImplemented); \
 }
@@ -32,11 +32,9 @@ namespace anox::game
 	ANOX_UNIMPLEMENTED_ECLASS(EffectUserEntityObject)
 	ANOX_UNIMPLEMENTED_ECLASS(ElevatorTriggerObject)
 	ANOX_UNIMPLEMENTED_ECLASS(FogVolumeObject)
-	ANOX_UNIMPLEMENTED_ECLASS(GeneralUserEntityObject)
 	ANOX_UNIMPLEMENTED_ECLASS(GroupObject)
 	ANOX_UNIMPLEMENTED_ECLASS(InfoNullObject)
 	ANOX_UNIMPLEMENTED_ECLASS(InfoPartyStartObject)
-	ANOX_UNIMPLEMENTED_ECLASS(InfoPlayerStartObject)
 	ANOX_UNIMPLEMENTED_ECLASS(LightObject)
 	ANOX_UNIMPLEMENTED_ECLASS(LightSourceUserEntity)
 	ANOX_UNIMPLEMENTED_ECLASS(LottoBotUserEntityObject)
