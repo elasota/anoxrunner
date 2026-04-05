@@ -13,6 +13,7 @@
 
 #include "rkit/Render/BackendType.h"
 
+#include "AnoxAPEScriptCompiler.h"
 #include "AnoxBSPMapCompiler.h"
 #include "AnoxModelCompiler.h"
 #include "AnoxEntityDefCompiler.h"
@@ -131,6 +132,15 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 		RKIT_CHECK(buildsystem::BSPMapCompilerBase::CreateEntityCompiler(bspEntCompiler));
 
 		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kBSPEntityID, std::move(bspEntCompiler)));
+	}
+
+	{
+		rkit::UniquePtr<buildsystem::APEScriptCompiler> apeCompiler;
+		RKIT_CHECK(buildsystem::APEScriptCompiler::Create(apeCompiler));
+
+		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kAPEScriptNodeID, std::move(apeCompiler)));
+
+		RKIT_CHECK(instance->RegisterNodeTypeByExtension(u8"ape", kAnoxNamespaceID, buildsystem::kAPEScriptNodeID));
 	}
 
 	{

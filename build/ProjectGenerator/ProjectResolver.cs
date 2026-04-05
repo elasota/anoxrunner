@@ -63,9 +63,42 @@ namespace ProjectGenerator
             resolvedFiles.Add(new ResolvedFile
             {
                 FilePath = filePath,
-                FilterPath = Path.GetFileName(filePath),
+                FilterPath = AdjustGeneratedFilterPath(Path.GetFileName(filePath)),
                 FileType = fileType
             });
+        }
+
+        private static string AdjustGeneratedFilterPath(string path)
+        {
+            string result = path;
+            foreach (string ext in _headerExts)
+            {
+                if (TryAdjustGeneratedFilterPathWithExt(ref result, ext))
+                    return result;
+            }
+            foreach (string ext in _sourceExts)
+            {
+                if (TryAdjustGeneratedFilterPathWithExt(ref result, ext))
+                    return result;
+            }
+
+            return result;
+        }
+
+        private static bool TryAdjustGeneratedFilterPathWithExt(ref string str, string ext)
+        {
+            if (!str.EndsWith(".generated" + ext, StringComparison.InvariantCultureIgnoreCase))
+                return false;
+
+            string? adjustedDir = Path.GetDirectoryName(str);
+            string adjustedFileName = Path.GetFileName(str);
+
+            if (adjustedDir != null)
+                str = Path.Combine(adjustedDir, "Generated", adjustedFileName);
+            else
+                str = Path.Combine("Generated", adjustedFileName);
+
+            return true;
         }
 
         private static string? ConvertWildcardToRegEx(string component)
@@ -123,7 +156,7 @@ namespace ProjectGenerator
             foreach (string ignoreExt in _ignoreExts)
             {
                 if (fileName.EndsWith(ignoreExt, StringComparison.OrdinalIgnoreCase))
-            return ProjectDef.FileType.Misc;
+                    return ProjectDef.FileType.Misc;
             }
 
             foreach (string sourceExt in _sourceExts)
@@ -259,7 +292,7 @@ namespace ProjectGenerator
                 ResolvedFile resolvedFile = new ResolvedFile()
                 {
                     FilePath = Path.Combine(sourceDirectory, fileName),
-                    FilterPath = Path.Combine(filterDirectory, fileName),
+                    FilterPath = AdjustGeneratedFilterPath(Path.Combine(filterDirectory, fileName)),
                     FileType = fileType.Value,
                 };
 

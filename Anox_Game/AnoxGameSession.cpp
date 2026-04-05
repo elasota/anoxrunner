@@ -105,8 +105,6 @@ namespace anox::game
 			CORO_THROW(rkit::ResultCode::kDataError);
 		}
 
-		CORO_THROW(rkit::ResultCode::kNotYetImplemented);
-
 		CORO_RETURN_OK;
 	}
 

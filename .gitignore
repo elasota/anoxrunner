@@ -36,3 +36,5 @@ build/SandboxAPIGenerator/obj/*
 build/SandboxAPIGenerator/bin/*
 build/GameObjectReflector/obj/*
 build/GameObjectReflector/bin/*
+build/APEWindowCommandReflector/obj/*
+build/APEWindowCommandReflector/bin/*

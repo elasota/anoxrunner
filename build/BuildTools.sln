@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SandboxAPIGenerator", "Sand
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameObjectReflector", "GameObjectReflector\GameObjectReflector.csproj", "{E27ECCD1-A196-4000-AE98-427C462C49C9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APEWindowCommandReflector", "APEWindowCommandReflector\APEWindowCommandReflector.csproj", "{65DD8101-E73E-499D-9C45-8160690A1319}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{E27ECCD1-A196-4000-AE98-427C462C49C9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E27ECCD1-A196-4000-AE98-427C462C49C9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E27ECCD1-A196-4000-AE98-427C462C49C9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{65DD8101-E73E-499D-9C45-8160690A1319}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{65DD8101-E73E-499D-9C45-8160690A1319}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{65DD8101-E73E-499D-9C45-8160690A1319}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{65DD8101-E73E-499D-9C45-8160690A1319}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
