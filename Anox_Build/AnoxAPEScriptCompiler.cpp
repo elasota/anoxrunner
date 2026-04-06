@@ -4,6 +4,7 @@
 #include "anox/Data/APEScript.h"
 
 #include "rkit/Core/HashTable.h"
+#include "rkit/Core/MemoryStream.h"
 #include "rkit/Core/NoCopy.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/LogDriver.h"
@@ -108,6 +109,21 @@ namespace anox::buildsystem
 		{
 			rkit::Vector<WindowDef> m_windows;
 		};
+
+		class VectorMemoryStream final : public rkit::IWriteStream
+		{
+		public:
+			explicit VectorMemoryStream(rkit::Vector<uint8_t> &vec);
+
+			rkit::Result WritePartial(const void *data, size_t count, size_t &outCountWritten) override;
+			rkit::Result Flush() override;
+
+		private:
+			rkit::Vector<uint8_t> &m_vec;
+		};
+
+		static rkit::Result CompileWindow(APECompilerContext &ctx, rkit::Vector<uint8_t> &cmdStream, const WindowDef &wdef);
+		static rkit::Result CompileSwitch(APECompilerContext &ctx, rkit::Vector<data::ape::SwitchCommand> &cmdStream, const SwitchDef &switchDef);
 	};
 
 	APEWriter::APEWriter(APECompilerContext &context, rkit::IWriteStream &stream)
@@ -149,7 +165,7 @@ namespace anox::buildsystem
 	{
 		data::ape::ExpressionValue exprValue;
 
-		if (value.IsSet())
+		if (!value.IsSet())
 		{
 			exprValue.m_exprType = data::ape::ExprType::Empty;
 			exprValue.m_index = 0;
@@ -407,6 +423,8 @@ namespace anox::buildsystem
 
 					if (cmd->GetCommandType() == data::WindowCommandType::End)
 						break;
+
+					RKIT_CHECK(windowDef.m_commands.Append(std::move(cmd)));
 				}
 
 				RKIT_CHECK(windowDefs.Append(std::move(windowDef)));
@@ -453,8 +471,39 @@ namespace anox::buildsystem
 					RKIT_CHECK(switchDefs.Append(std::move(switchDef)));
 				}
 			}
-			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 		}
+
+		APECompilerContext compilerCtx;
+
+		rkit::Vector<rkit::Vector<uint8_t>> windowCommandStreams;
+		RKIT_CHECK(windowCommandStreams.Resize(windowDefs.Count()));
+
+		for (size_t windowIndex = 0; windowIndex < windowDefs.Count(); windowIndex++)
+		{
+			RKIT_CHECK(CompileWindow(compilerCtx, windowCommandStreams[windowIndex], windowDefs[windowIndex]));
+		}
+
+
+		rkit::Vector<rkit::Vector<data::ape::SwitchCommand>> switchCommandLists;
+		RKIT_CHECK(switchCommandLists.Resize(switchDefs.Count()));
+
+		for (size_t switchIndex = 0; switchIndex < switchDefs.Count(); switchIndex++)
+		{
+			RKIT_CHECK(CompileSwitch(compilerCtx, switchCommandLists[switchIndex], switchDefs[switchIndex]));
+		}
+
+#if 0
+		rkit::CIPath outPath;
+		{
+			rkit::String pathStr;
+			RKIT_CHECK(pathStr.Format(u8"ax_ape/%s", depsNode->GetIdentifier()));
+			RKIT_CHECK(outPath.Set(outPath));
+		}
+
+
+		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
+		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, path, outFile));
+#endif
 
 		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
@@ -547,7 +596,47 @@ namespace anox::buildsystem
 		return rkit::BinaryHasher<data::ape::Expression>::ComputeHash(0, m_expr);
 	}
 
+
+	APEScriptCompilerImpl::VectorMemoryStream::VectorMemoryStream(rkit::Vector<uint8_t> &vec)
+		: m_vec(vec)
+	{
+	}
+
+	rkit::Result APEScriptCompilerImpl::VectorMemoryStream::WritePartial(const void *data, size_t count, size_t &outCountWritten)
+	{
+		RKIT_CHECK(m_vec.Append(rkit::Span<const uint8_t>(static_cast<const uint8_t *>(data), count)));
+		outCountWritten = count;
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result APEScriptCompilerImpl::VectorMemoryStream::Flush()
+	{
+		RKIT_RETURN_OK;
+	}
+
 	rkit::Result APEScriptCompilerImpl::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+	}
+
+	rkit::Result APEScriptCompilerImpl::CompileWindow(APECompilerContext &ctx, rkit::Vector<uint8_t> &cmdStream, const WindowDef &wdef)
+	{
+		VectorMemoryStream stream(cmdStream);
+
+		APEWriter writer(ctx, stream);
+
+		for (const rkit::UniquePtr<ape_parse::WindowCommand> &cmdPtr : wdef.m_commands)
+		{
+			const ape_parse::WindowCommand &cmd = *cmdPtr;
+
+			RKIT_CHECK(cmdStream.Append(static_cast<uint8_t>(cmd.GetCommandType())));
+			RKIT_CHECK(cmd.Write(writer));
+		}
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result APEScriptCompilerImpl::CompileSwitch(APECompilerContext &ctx, rkit::Vector<data::ape::SwitchCommand> &cmdStream, const SwitchDef &switchDef)
 	{
 		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}

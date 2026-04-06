@@ -183,7 +183,7 @@ namespace anox::game
 	rkit::Result Session::Create(rkit::UniquePtr<Session> &outSession, rkit::IMallocDriver *alloc)
 	{
 		rkit::UniquePtr<Session> session;
-		rkit::NewWithAlloc<Session>(session, alloc);
+		RKIT_CHECK(rkit::NewWithAlloc<Session>(session, alloc));
 
 		RKIT_CHECK(session->Impl().Initialize());
 

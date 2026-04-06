@@ -793,7 +793,7 @@ namespace anox
 	{
 		if (m_sandbox.IsValid())
 		{
-			RKIT_CHECK(m_sandboxImports.MTAsync_RunFrame(m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr));
+			CORO_CHECK(m_sandboxImports.MTAsync_RunFrame(m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr));
 
 			{
 				SandboxMainThreadBlocker mtBlocker(this);

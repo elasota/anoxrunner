@@ -531,10 +531,10 @@ namespace GameObjectReflector
 
                             foreach (string parentClass in cdef.ParentClasses)
                             {
-                                writer.WriteLine($"\t\tWorldObjectInstantiator<{parentClass}>::LoadObjectFromLevel(");
+                                writer.WriteLine($"\t\tRKIT_CHECK(WorldObjectInstantiator<{parentClass}>::LoadObjectFromLevel(");
                                 writer.WriteLine($"\t\t\t*::anox::game::priv::PrivateAccessor::ImplicitCast<ObjectFieldsBase<{parentClass}>>(");
                                 writer.WriteLine($"\t\t\t\t::anox::game::priv::PrivateAccessor::StaticCast<{className}>(&fields)");
-                                writer.WriteLine($"\t\t\t), spawnParams, bytes + {parentClassOffsets[parentClass]});");
+                                writer.WriteLine($"\t\t\t), spawnParams, bytes + {parentClassOffsets[parentClass]}));");
                             }
 
                             foreach (FieldDef fieldDef in cdef.FieldDefs)

@@ -76,6 +76,8 @@ namespace anox::buildsystem::ape_parse
 		}
 		else
 			RKIT_THROW(rkit::ResultCode::kDataError);
+
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result APEReader::Read(rkit::Optional<rkit::ByteString> &value)
@@ -112,6 +114,8 @@ namespace anox::buildsystem::ape_parse
 			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		value = bstr.Get();
+
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result APEReader::Read(FormattingValue &value)

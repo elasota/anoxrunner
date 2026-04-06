@@ -46,6 +46,13 @@ namespace rkit::moduleloader
 		return m_module.m_initFunction(initParams);
 	}
 
+
+	Result StaticModule::InitWithCustomDrivers(const ModuleInitParameters *initParams, Drivers *drivers)
+	{
+		m_isInitialized = true;
+		return m_module.m_initFunction(initParams);
+	}
+
 	void StaticModule::Unload()
 	{
 		if (m_isInitialized)

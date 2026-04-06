@@ -89,7 +89,8 @@ namespace anox::game
 
 	rkit::Result World::AddObject(rkit::RCPtr<WorldObject> &&obj)
 	{
-		return Impl().AddObject(std::move(obj));
+		Impl().AddObject(std::move(obj));
+		RKIT_RETURN_OK;
 	}
 }
 

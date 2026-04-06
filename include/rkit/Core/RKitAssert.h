@@ -4,6 +4,10 @@
 #define RKIT_ASSERTS_ONLY(n)
 #define RKIT_ASSERT(n) ((void)0)
 #define RKIT_VERIFY(n)	((void)!!(n))
+
+#define RKIT_ASSERT_WITH_DRIVER(expr, driver)	RKIT_ASSERT(expr)
+#define RKIT_VERIFY_WITH_DRIVER(expr, driver)	RKIT_VERIFY(expr)
+
 #else
 
 namespace rkit

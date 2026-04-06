@@ -55,8 +55,42 @@ namespace anox::data::ape
 
 	struct ExpressionValue
 	{
-		ExprType m_exprType;
+		ExprType m_exprType = ExprType::Empty;
 		rkit::endian::LittleUInt32_t m_index;
+	};
+
+	struct Window
+	{
+		rkit::endian::LittleUInt32_t m_windowID;
+		rkit::endian::LittleUInt32_t m_commandStreamLength;
+	};
+
+	struct Switch
+	{
+		rkit::endian::LittleUInt32_t m_switchID;
+		rkit::endian::LittleUInt32_t m_numCommands;
+	};
+
+	struct SwitchCommand
+	{
+		rkit::endian::LittleUInt32_t m_numCommands;
+	};
+
+	struct APEScriptCatalog
+	{
+		rkit::endian::LittleUInt32_t m_numStrings;
+		rkit::endian::LittleUInt32_t m_numOperandLists;
+		rkit::endian::LittleUInt32_t m_numWindows;
+		rkit::endian::LittleUInt32_t m_numSwitches;
+
+		// uint32_t m_stringLengths[m_numStrings]
+		// uint32_t m_stringChars[m_numStrings][m_stringLengths[i]]
+		// uint32_t m_operandListCounts[m_numOperandLists]
+		// uint32_t m_operands[m_numOperandLists][m_operandListCounts[i]]
+		// Window m_windows[m_numWindows]
+		// uint8_t m_windowCommandStreams[m_numWindows][window.m_commandStreamLength]
+		// Switch m_switches[m_numSwitches]
+		// SwitchCommand m_switchCommands[m_numSwitches][switch.m_numCommands]
 	};
 }
 
