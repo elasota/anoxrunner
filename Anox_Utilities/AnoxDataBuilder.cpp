@@ -56,6 +56,8 @@ namespace anox { namespace utils
 
 		rkit::Result ResolveFileStatusIfExists(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::CIPathView &path, bool allowDirectories, void *userdata, ApplyFileStatusCallback_t applyStatus) override;
 		rkit::Result TryOpenFileRead(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::CIPathView &path, rkit::UniquePtr<rkit::ISeekableReadStream> &outStream) override;
+
+		// WARNING: This may produce duplicates!
 		rkit::Result EnumerateDirectory(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::CIPathView &path, bool listFiles, bool listDirectories, void *userdata, ApplyFileStatusCallback_t callback) override;
 
 	private:
@@ -472,42 +474,18 @@ namespace anox { namespace utils
 					if (!isDirectory && !listFiles)
 						continue;
 
-					bool haveCollision = false;
+					rkit::CIPath fileNameCI;
+					RKIT_CHECK(fileNameCI.ConvertFrom(item.m_fileName));
 
-					for (size_t prevIndex = 0; prevIndex < srcIndex; prevIndex++)
-					{
-						rkit::OSAbsPath altPath = directories[prevIndex];
-						if (altPath.NumComponents() == 0)
-							continue;
+					rkit::buildsystem::FileStatus fileStatus;
+					RKIT_CHECK(fileStatus.m_filePath.Set(path));
+					RKIT_CHECK(fileStatus.m_filePath.Append(fileNameCI));
+					fileStatus.m_fileSize = item.m_attribs.m_fileSize;
+					fileStatus.m_fileTime = item.m_attribs.m_fileTime;
+					fileStatus.m_isDirectory = isDirectory;
+					fileStatus.m_location = inputFileLocation;
 
-						RKIT_CHECK(altPath.Append(item.m_fileName));
-
-						bool altExists = false;
-						rkit::FileAttributes altAttribs;
-						RKIT_CHECK(sysDriver->GetFileAttributesAbs(succeeded_IGNORE, altExists, altAttribs, altPath, false));
-
-						if (altExists && altAttribs.m_isDirectory == isDirectory)
-						{
-							haveCollision = true;
-							break;
-						}
-					}
-
-					if (!haveCollision)
-					{
-						rkit::CIPath fileNameCI;
-						RKIT_CHECK(fileNameCI.ConvertFrom(item.m_fileName));
-
-						rkit::buildsystem::FileStatus fileStatus;
-						RKIT_CHECK(fileStatus.m_filePath.Set(path));
-						RKIT_CHECK(fileStatus.m_filePath.Append(fileNameCI));
-						fileStatus.m_fileSize = item.m_attribs.m_fileSize;
-						fileStatus.m_fileTime = item.m_attribs.m_fileTime;
-						fileStatus.m_isDirectory = isDirectory;
-						fileStatus.m_location = inputFileLocation;
-
-						RKIT_CHECK(callback(userdata, fileStatus.ToView()));
-					}
+					RKIT_CHECK(callback(userdata, fileStatus.ToView()));
 				}
 			}
 

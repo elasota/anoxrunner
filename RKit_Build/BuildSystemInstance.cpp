@@ -2679,6 +2679,35 @@ namespace rkit { namespace buildsystem
 
 			RKIT_CHECK(m_fs->EnumerateDirectory(location, path, !directoryMode, directoryMode, &shim, ResultCallbackShim::StaticApplyFileStatus));
 
+			// Remove duplicate paths
+			Vector<CIPath> &pathsDirectory = dirScan->m_scan.m_paths;
+			std::sort(pathsDirectory.begin(), pathsDirectory.end());
+
+			size_t numDuplicates = 0;
+			if (pathsDirectory.Count() > 1)
+			{
+				for (Vector<CIPath>::ConstIterator_t it = pathsDirectory.begin(), it2 = (it + static_cast<size_t>(1u)), itEnd = pathsDirectory.end(); it2 != itEnd; it = it2, ++it2)
+				{
+					if ((*it) == (*it2))
+						numDuplicates++;
+				}
+			}
+
+			if (numDuplicates > 0)
+			{
+				Vector<CIPath> filteredPaths;
+				RKIT_CHECK(filteredPaths.Resize(pathsDirectory.Count() - numDuplicates));
+
+				size_t insertIndex = 0;
+				for (const CIPath &path : pathsDirectory)
+				{
+					if (insertIndex == 0 || path != filteredPaths[insertIndex - 1])
+						filteredPaths[insertIndex++] = path;
+				}
+
+				pathsDirectory = std::move(filteredPaths);
+			}
+
 			outExists = true;
 			outStatusView = dirScan->m_scan.ToView();
 		}

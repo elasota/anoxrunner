@@ -17,15 +17,22 @@ namespace anox::buildsystem
 	{
 	public:
 		rkit::Result IndexExpression(uint32_t &outIndex, data::ape::Expression &&expr);
-		rkit::Result IndexOperandList(uint32_t &outIndex, rkit::Vector<uint32_t> &&operands);
+		rkit::Result IndexOperandList(uint32_t &outIndex, rkit::Vector<data::ape::ExpressionValue> &&operands);
 		rkit::Result IndexString(uint32_t &outIndex, const rkit::ByteString &str);
+
+		rkit::Result ConvertOptionalExprValue(data::ape::ExpressionValue &outExprValue, const rkit::Optional<ape_parse::ExpressionValue> &value);
+		rkit::Result ConvertExprValue(uint32_t &outIndex, data::ape::OperandType &outOperandType, bool &outIsString, const ape_parse::ExpressionValue &expr);
+		rkit::Result ConvertOptionalByteString(uint32_t &outDWord, const rkit::Optional<rkit::ByteString> &value);
+		rkit::Result ConvertByteString(uint32_t &outDWord, const rkit::ByteString &value);
+		rkit::Result ConvertFormattingValue(uint32_t &outDWord, const ape_parse::FormattingValue &value);
+		rkit::Result ConvertOperand(uint32_t &outIndex, data::ape::OperandType &outOperandType, bool &outIsString, const ape_parse::Operand &operand);
 
 	private:
 		class OperandListKey final : public rkit::NoCopy
 		{
 		public:
 			OperandListKey() = delete;
-			explicit OperandListKey(rkit::Vector<uint32_t> &&operands);
+			explicit OperandListKey(rkit::Vector<data::ape::ExpressionValue> &&operands);
 			OperandListKey(OperandListKey &&other);
 
 			bool operator==(const OperandListKey &other) const;
@@ -34,7 +41,7 @@ namespace anox::buildsystem
 			rkit::HashValue_t ComputeHash() const;
 
 		private:
-			rkit::Vector<uint32_t> m_operands;
+			rkit::Vector<data::ape::ExpressionValue> m_operands;
 		};
 
 		class ExpressionKey final : public rkit::NoCopy
@@ -78,8 +85,6 @@ namespace anox::buildsystem
 		rkit::Result Write(const ape_parse::FormattingValue &value) override;
 
 	private:
-		rkit::Result ResolveExpr(uint32_t &outIndex, data::ape::OperandType &outOperandType, bool &outIsString, const ape_parse::ExpressionValue &expr);
-		rkit::Result ResolveOperand(uint32_t &outIndex, data::ape::OperandType &outOperandType, bool &outIsString, const ape_parse::Operand &operand);
 		rkit::Result IndexString(uint32_t &outIndex, uint32_t baseIndex, const rkit::ByteString &value);
 
 		APECompilerContext &m_context;
@@ -124,6 +129,8 @@ namespace anox::buildsystem
 
 		static rkit::Result CompileWindow(APECompilerContext &ctx, rkit::Vector<uint8_t> &cmdStream, const WindowDef &wdef);
 		static rkit::Result CompileSwitch(APECompilerContext &ctx, rkit::Vector<data::ape::SwitchCommand> &cmdStream, const SwitchDef &switchDef);
+		static rkit::Result CompileBasicBlock(APECompilerContext &ctx, rkit::Vector<data::ape::SwitchCommand> &cmdStream, const rkit::HashMap<uint64_t, const ape_parse::SwitchCommand *> &tree, uint64_t firstCC);
+		static bool IsTerminalCC(uint64_t cc);
 	};
 
 	APEWriter::APEWriter(APECompilerContext &context, rkit::IWriteStream &stream)
@@ -163,53 +170,18 @@ namespace anox::buildsystem
 
 	rkit::Result APEWriter::Write(const rkit::Optional<ape_parse::ExpressionValue> &value)
 	{
-		data::ape::ExpressionValue exprValue;
-
-		if (!value.IsSet())
-		{
-			exprValue.m_exprType = data::ape::ExprType::Empty;
-			exprValue.m_index = 0;
-		}
-		else
-		{
-			uint32_t index = 0;
-			bool isString = false;
-			data::ape::OperandType operandType = data::ape::OperandType::Invalid;
-			RKIT_CHECK(ResolveExpr(index, operandType, isString, value.Get()));
-
-			switch (operandType)
-			{
-			case data::ape::OperandType::Expression:
-				if (isString)
-					RKIT_THROW(rkit::ResultCode::kDataError);
-				exprValue.m_exprType = data::ape::ExprType::FloatExpression;
-				break;
-			case data::ape::OperandType::Literal:
-				exprValue.m_exprType = isString ? data::ape::ExprType::StringLiteral : data::ape::ExprType::FloatLiteral;
-				break;
-			case data::ape::OperandType::Variable:
-				exprValue.m_exprType = isString ? data::ape::ExprType::StringVariable : data::ape::ExprType::FloatVariable;
-				break;
-			default:
-				RKIT_THROW(rkit::ResultCode::kInternalError);
-			}
-
-			exprValue.m_index = index;
-		}
-
-		return m_stream.WriteOneBinary(exprValue);
+		data::ape::ExpressionValue expr = {};
+		RKIT_CHECK(m_context.ConvertOptionalExprValue(expr, value));
+		return m_stream.WriteOneBinary(expr);
 	}
 
 	rkit::Result APEWriter::Write(const rkit::Optional<rkit::ByteString> &value)
 	{
-		if (!value.IsSet())
-			return m_stream.WriteOneBinary<uint32_t>(0);
-		else
-		{
-			uint32_t index = 0;
-			RKIT_CHECK(IndexString(index, 1, value.Get()));
-			return Write(index);
-		}
+		uint32_t index = 0;
+		RKIT_CHECK(m_context.ConvertOptionalByteString(index, value));
+		rkit::endian::LittleUInt32_t indexData = rkit::endian::LittleUInt32_t(index);
+
+		return m_stream.WriteOneBinary(indexData);
 	}
 
 	rkit::Result APEWriter::Write(const rkit::ByteString &value)
@@ -221,148 +193,11 @@ namespace anox::buildsystem
 
 	rkit::Result APEWriter::Write(const ape_parse::FormattingValue &value)
 	{
-		if (value.m_operands.Count() > std::numeric_limits<uint32_t>::max())
-			RKIT_THROW(rkit::ResultCode::kDataError);
-
-		const uint32_t numOperands = static_cast<uint32_t>(value.m_operands.Count());
-
-		RKIT_CHECK(Write(numOperands));
-
-		for (const rkit::UniquePtr<ape_parse::Operand> &inOperandPtr : value.m_operands)
-		{
-			const ape_parse::Operand &inOperand = *inOperandPtr;
-
-			data::ape::ExprType exprType = data::ape::ExprType::Empty;
-			uint32_t index = 0;
-			data::ape::ExpressionValue outExpr;
-			switch (inOperand.GetOperandType())
-			{
-			case ape_parse::OperandType::FloatLiteral:
-				exprType = data::ape::ExprType::FloatLiteral;
-				memcpy(&index, &static_cast<const ape_parse::FloatOperand &>(inOperand).m_value, 4);
-				break;
-			case ape_parse::OperandType::FloatVariable:
-				exprType = data::ape::ExprType::FloatVariable;
-				RKIT_CHECK(IndexString(index, 0, static_cast<const ape_parse::FloatVariableNameOperand &>(inOperand).m_value));
-				break;
-			case ape_parse::OperandType::StringLiteral:
-				exprType = data::ape::ExprType::StringLiteral;
-				RKIT_CHECK(IndexString(index, 0, static_cast<const ape_parse::StringOperand &>(inOperand).m_value));
-				break;
-			case ape_parse::OperandType::StringVariable:
-				exprType = data::ape::ExprType::StringVariable;
-				RKIT_CHECK(IndexString(index, 0, static_cast<const ape_parse::StringVariableNameOperand &>(inOperand).m_value));
-				break;
-			default:
-				RKIT_THROW(rkit::ResultCode::kInternalError);
-			}
-
-			outExpr.m_exprType = exprType;
-			outExpr.m_index = index;
-			RKIT_CHECK(m_stream.WriteOneBinary(outExpr));
-		}
-
-		RKIT_RETURN_OK;
+		uint32_t index = 0;
+		RKIT_CHECK(m_context.ConvertFormattingValue(index, value));
+		rkit::endian::LittleUInt32_t indexData = rkit::endian::LittleUInt32_t(index);
+		return m_stream.WriteOneBinary(indexData);
 	}
-
-	rkit::Result APEWriter::ResolveExpr(uint32_t &outIndex, data::ape::OperandType &outOperandType, bool &outIsString, const ape_parse::ExpressionValue &expr)
-	{
-		data::ape::Operator op = data::ape::Operator::Invalid;
-		data::ape::OperandType leftOpType = data::ape::OperandType::Invalid;
-		data::ape::OperandType rightOpType = data::ape::OperandType::Invalid;
-
-		bool leftIsString = false;
-		bool rightIsString = false;
-
-		uint32_t leftIndex = 0;
-		uint32_t rightIndex = 0;
-
-		switch (expr.m_operator)
-		{
-		case ape_parse::ExpressionValue::Operator::Or:
-		case ape_parse::ExpressionValue::Operator::And:
-		case ape_parse::ExpressionValue::Operator::Xor:
-		case ape_parse::ExpressionValue::Operator::Gt:
-		case ape_parse::ExpressionValue::Operator::Lt:
-		case ape_parse::ExpressionValue::Operator::Ge:
-		case ape_parse::ExpressionValue::Operator::Le:
-		case ape_parse::ExpressionValue::Operator::Add:
-		case ape_parse::ExpressionValue::Operator::Sub:
-		case ape_parse::ExpressionValue::Operator::Mul:
-		case ape_parse::ExpressionValue::Operator::Div:
-			RKIT_CHECK(ResolveOperand(leftIndex, leftOpType, leftIsString, *expr.m_left));
-			RKIT_CHECK(ResolveOperand(rightIndex, rightOpType, rightIsString, *expr.m_right));
-			if (leftIsString || rightIsString)
-				RKIT_THROW(rkit::ResultCode::kDataError);
-
-			op = static_cast<data::ape::Operator>(expr.m_operator);
-			break;
-		case ape_parse::ExpressionValue::Operator::Eq:
-		case ape_parse::ExpressionValue::Operator::Neq:
-			RKIT_CHECK(ResolveOperand(leftIndex, leftOpType, leftIsString, *expr.m_left));
-			RKIT_CHECK(ResolveOperand(rightIndex, rightOpType, rightIsString, *expr.m_right));
-			if (leftIsString && rightIsString)
-				op = (expr.m_operator == ape_parse::ExpressionValue::Operator::Eq) ? data::ape::Operator::StrEq : data::ape::Operator::StrNeq;
-			else
-			{
-				if (leftIsString || rightIsString)
-					RKIT_THROW(rkit::ResultCode::kDataError);
-
-				op = static_cast<data::ape::Operator>(expr.m_operator);
-			}
-			break;
-		default:
-			RKIT_THROW(rkit::ResultCode::kDataError);
-		};
-
-		data::ape::Expression resultExpr = {};
-		resultExpr.m_leftValue = leftIndex;
-		resultExpr.m_rightValue = rightIndex;
-		resultExpr.m_packedOperandInfo = data::ape::Expression::PackOperandInfo(op, leftOpType, rightOpType);
-
-		uint32_t exprIndex = 0;
-		RKIT_CHECK(m_context.IndexExpression(exprIndex, std::move(resultExpr)));
-
-		outIndex = exprIndex;
-		outIsString = false;
-		outOperandType = data::ape::OperandType::Expression;
-
-		RKIT_RETURN_OK;
-	}
-
-	rkit::Result APEWriter::ResolveOperand(uint32_t &outIndex, data::ape::OperandType &outOperandType, bool &outIsString, const ape_parse::Operand &operand)
-	{
-		switch (operand.GetOperandType())
-		{
-		case ape_parse::OperandType::Expression:
-			return ResolveExpr(outIndex, outOperandType, outIsString, static_cast<const ape_parse::ExpressionOperand &>(operand).m_value);
-		case ape_parse::OperandType::FloatLiteral:
-			memcpy(&outIndex, &static_cast<const ape_parse::FloatOperand &>(operand).m_value, 4);
-			outIsString = false;
-			outOperandType = data::ape::OperandType::Literal;
-			break;
-		case ape_parse::OperandType::FloatVariable:
-			RKIT_CHECK(m_context.IndexString(outIndex, static_cast<const ape_parse::FloatVariableNameOperand &>(operand).m_value));
-			outIsString = false;
-			outOperandType = data::ape::OperandType::Variable;
-			break;
-		case ape_parse::OperandType::StringLiteral:
-			RKIT_CHECK(m_context.IndexString(outIndex, static_cast<const ape_parse::StringOperand &>(operand).m_value));
-			outIsString = true;
-			outOperandType = data::ape::OperandType::Literal;
-			break;
-		case ape_parse::OperandType::StringVariable:
-			RKIT_CHECK(m_context.IndexString(outIndex, static_cast<const ape_parse::StringVariableNameOperand &>(operand).m_value));
-			outIsString = true;
-			outOperandType = data::ape::OperandType::Variable;
-			break;
-		default:
-			RKIT_THROW(rkit::ResultCode::kDataError);
-		}
-
-		RKIT_RETURN_OK;
-	}
-
 
 	rkit::Result APEWriter::IndexString(uint32_t &outIndex, uint32_t baseIndex, const rkit::ByteString &value)
 	{
@@ -515,7 +350,7 @@ namespace anox::buildsystem
 		return IndexValue(outIndex, m_expressions, exprKey.ComputeHash(), std::move(exprKey));
 	}
 
-	rkit::Result APECompilerContext::IndexOperandList(uint32_t &outIndex, rkit::Vector<uint32_t> &&operands)
+	rkit::Result APECompilerContext::IndexOperandList(uint32_t &outIndex, rkit::Vector<data::ape::ExpressionValue> &&operands)
 	{
 		OperandListKey opsKey(std::move(operands));
 		return IndexValue(outIndex, m_operandLists, opsKey.ComputeHash(), std::move(opsKey));
@@ -525,6 +360,206 @@ namespace anox::buildsystem
 	{
 		const rkit::HashValue_t hashValue = rkit::Hasher<rkit::ByteString>::ComputeHash(0, str);
 		return IndexValue<rkit::ByteString>(outIndex, m_strings, hashValue, rkit::ByteString(str));
+	}
+
+	rkit::Result APECompilerContext::ConvertOptionalExprValue(data::ape::ExpressionValue &outExprValue, const rkit::Optional<ape_parse::ExpressionValue> &value)
+	{
+		if (!value.IsSet())
+		{
+			outExprValue.m_exprType = data::ape::ExprType::Empty;
+			outExprValue.m_index = 0;
+		}
+		else
+		{
+			uint32_t index = 0;
+			bool isString = false;
+			data::ape::OperandType operandType = data::ape::OperandType::Invalid;
+			RKIT_CHECK(ConvertExprValue(index, operandType, isString, value.Get()));
+
+			switch (operandType)
+			{
+			case data::ape::OperandType::Expression:
+				if (isString)
+					RKIT_THROW(rkit::ResultCode::kDataError);
+				outExprValue.m_exprType = data::ape::ExprType::FloatExpression;
+				break;
+			case data::ape::OperandType::Literal:
+				outExprValue.m_exprType = isString ? data::ape::ExprType::StringLiteral : data::ape::ExprType::FloatLiteral;
+				break;
+			case data::ape::OperandType::Variable:
+				outExprValue.m_exprType = isString ? data::ape::ExprType::StringVariable : data::ape::ExprType::FloatVariable;
+				break;
+			default:
+				RKIT_THROW(rkit::ResultCode::kInternalError);
+			}
+
+			outExprValue.m_index = index;
+		}
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result APECompilerContext::ConvertExprValue(uint32_t &outIndex, data::ape::OperandType &outOperandType, bool &outIsString, const ape_parse::ExpressionValue &expr)
+	{
+		data::ape::Operator op = data::ape::Operator::Invalid;
+		data::ape::OperandType leftOpType = data::ape::OperandType::Invalid;
+		data::ape::OperandType rightOpType = data::ape::OperandType::Invalid;
+
+		bool leftIsString = false;
+		bool rightIsString = false;
+
+		uint32_t leftIndex = 0;
+		uint32_t rightIndex = 0;
+
+		switch (expr.m_operator)
+		{
+		case ape_parse::ExpressionValue::Operator::Or:
+		case ape_parse::ExpressionValue::Operator::And:
+		case ape_parse::ExpressionValue::Operator::Xor:
+		case ape_parse::ExpressionValue::Operator::Gt:
+		case ape_parse::ExpressionValue::Operator::Lt:
+		case ape_parse::ExpressionValue::Operator::Ge:
+		case ape_parse::ExpressionValue::Operator::Le:
+		case ape_parse::ExpressionValue::Operator::Add:
+		case ape_parse::ExpressionValue::Operator::Sub:
+		case ape_parse::ExpressionValue::Operator::Mul:
+		case ape_parse::ExpressionValue::Operator::Div:
+			RKIT_CHECK(ConvertOperand(leftIndex, leftOpType, leftIsString, *expr.m_left));
+			RKIT_CHECK(ConvertOperand(rightIndex, rightOpType, rightIsString, *expr.m_right));
+			if (leftIsString || rightIsString)
+				RKIT_THROW(rkit::ResultCode::kDataError);
+
+			op = static_cast<data::ape::Operator>(expr.m_operator);
+			break;
+		case ape_parse::ExpressionValue::Operator::Eq:
+		case ape_parse::ExpressionValue::Operator::Neq:
+			RKIT_CHECK(ConvertOperand(leftIndex, leftOpType, leftIsString, *expr.m_left));
+			RKIT_CHECK(ConvertOperand(rightIndex, rightOpType, rightIsString, *expr.m_right));
+			if (leftIsString && rightIsString)
+				op = (expr.m_operator == ape_parse::ExpressionValue::Operator::Eq) ? data::ape::Operator::StrEq : data::ape::Operator::StrNeq;
+			else
+			{
+				if (leftIsString || rightIsString)
+					RKIT_THROW(rkit::ResultCode::kDataError);
+
+				op = static_cast<data::ape::Operator>(expr.m_operator);
+			}
+			break;
+		default:
+			RKIT_THROW(rkit::ResultCode::kDataError);
+		};
+
+		data::ape::Expression resultExpr = {};
+		resultExpr.m_leftValue = leftIndex;
+		resultExpr.m_rightValue = rightIndex;
+		resultExpr.m_packedOperandInfo = data::ape::Expression::PackOperandInfo(op, leftOpType, rightOpType);
+
+		uint32_t exprIndex = 0;
+		RKIT_CHECK(IndexExpression(exprIndex, std::move(resultExpr)));
+
+		outIndex = exprIndex;
+		outIsString = false;
+		outOperandType = data::ape::OperandType::Expression;
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result APECompilerContext::ConvertOperand(uint32_t &outIndex, data::ape::OperandType &outOperandType, bool &outIsString, const ape_parse::Operand &operand)
+	{
+		switch (operand.GetOperandType())
+		{
+		case ape_parse::OperandType::Expression:
+			return ConvertExprValue(outIndex, outOperandType, outIsString, static_cast<const ape_parse::ExpressionOperand &>(operand).m_value);
+		case ape_parse::OperandType::FloatLiteral:
+			memcpy(&outIndex, &static_cast<const ape_parse::FloatOperand &>(operand).m_value, 4);
+			outIsString = false;
+			outOperandType = data::ape::OperandType::Literal;
+			break;
+		case ape_parse::OperandType::FloatVariable:
+			RKIT_CHECK(IndexString(outIndex, static_cast<const ape_parse::FloatVariableNameOperand &>(operand).m_value));
+			outIsString = false;
+			outOperandType = data::ape::OperandType::Variable;
+			break;
+		case ape_parse::OperandType::StringLiteral:
+			RKIT_CHECK(IndexString(outIndex, static_cast<const ape_parse::StringOperand &>(operand).m_value));
+			outIsString = true;
+			outOperandType = data::ape::OperandType::Literal;
+			break;
+		case ape_parse::OperandType::StringVariable:
+			RKIT_CHECK(IndexString(outIndex, static_cast<const ape_parse::StringVariableNameOperand &>(operand).m_value));
+			outIsString = true;
+			outOperandType = data::ape::OperandType::Variable;
+			break;
+		default:
+			RKIT_THROW(rkit::ResultCode::kDataError);
+		}
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result APECompilerContext::ConvertOptionalByteString(uint32_t &outDWord, const rkit::Optional<rkit::ByteString> &value)
+	{
+		if (!value.IsSet())
+			outDWord = 0;
+		else
+		{
+			uint32_t index = 0;
+			RKIT_CHECK(IndexString(index, value.Get()));
+			RKIT_CHECK(rkit::SafeAdd<uint32_t>(outDWord, index, 1));
+		}
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result APECompilerContext::ConvertByteString(uint32_t &outDWord, const rkit::ByteString &value)
+	{
+		return IndexString(outDWord, value);
+	}
+
+	rkit::Result APECompilerContext::ConvertFormattingValue(uint32_t &outDWord, const ape_parse::FormattingValue &value)
+	{
+		if (value.m_operands.Count() > std::numeric_limits<uint32_t>::max())
+			RKIT_THROW(rkit::ResultCode::kDataError);
+
+		const uint32_t numOperands = static_cast<uint32_t>(value.m_operands.Count());
+
+		rkit::Vector<data::ape::ExpressionValue> operands;
+
+		for (const rkit::UniquePtr<ape_parse::Operand> &inOperandPtr : value.m_operands)
+		{
+			const ape_parse::Operand &inOperand = *inOperandPtr;
+
+			data::ape::ExprType exprType = data::ape::ExprType::Empty;
+			uint32_t index = 0;
+			data::ape::ExpressionValue outExpr;
+			switch (inOperand.GetOperandType())
+			{
+			case ape_parse::OperandType::FloatLiteral:
+				exprType = data::ape::ExprType::FloatLiteral;
+				memcpy(&index, &static_cast<const ape_parse::FloatOperand &>(inOperand).m_value, 4);
+				break;
+			case ape_parse::OperandType::FloatVariable:
+				exprType = data::ape::ExprType::FloatVariable;
+				RKIT_CHECK(ConvertByteString(index, static_cast<const ape_parse::FloatVariableNameOperand &>(inOperand).m_value));
+				break;
+			case ape_parse::OperandType::StringLiteral:
+				exprType = data::ape::ExprType::StringLiteral;
+				RKIT_CHECK(ConvertByteString(index, static_cast<const ape_parse::StringOperand &>(inOperand).m_value));
+				break;
+			case ape_parse::OperandType::StringVariable:
+				exprType = data::ape::ExprType::StringVariable;
+				RKIT_CHECK(ConvertByteString(index, static_cast<const ape_parse::StringVariableNameOperand &>(inOperand).m_value));
+				break;
+			default:
+				RKIT_THROW(rkit::ResultCode::kInternalError);
+			}
+
+			outExpr.m_exprType = exprType;
+			outExpr.m_index = index;
+			RKIT_CHECK(operands.Append(outExpr));
+		}
+
+		return IndexOperandList(outDWord, std::move(operands));
 	}
 
 	template<class TKey>
@@ -546,7 +581,7 @@ namespace anox::buildsystem
 		RKIT_RETURN_OK;
 	}
 
-	APECompilerContext::OperandListKey::OperandListKey(rkit::Vector<uint32_t> &&operands)
+	APECompilerContext::OperandListKey::OperandListKey(rkit::Vector<data::ape::ExpressionValue> &&operands)
 		: m_operands(std::move(operands))
 	{
 	}
@@ -558,7 +593,7 @@ namespace anox::buildsystem
 
 	bool APECompilerContext::OperandListKey::operator==(const OperandListKey &other) const
 	{
-		return rkit::CompareSpansEqual(m_operands.ToSpan(), other.m_operands.ToSpan());
+		return rkit::CompareSpansEqual(m_operands.ToSpan().ReinterpretCast<const uint8_t>(), other.m_operands.ToSpan().ReinterpretCast<const uint8_t>());
 	}
 
 	bool APECompilerContext::OperandListKey::operator!=(const OperandListKey &other) const
@@ -568,7 +603,7 @@ namespace anox::buildsystem
 
 	rkit::HashValue_t APECompilerContext::OperandListKey::ComputeHash() const
 	{
-		return rkit::BinaryHasher<uint32_t>::ComputeHash(0, m_operands.ToSpan());
+		return rkit::BinaryHasher<data::ape::ExpressionValue>::ComputeHash(0, m_operands.ToSpan());
 	}
 
 	APECompilerContext::ExpressionKey::ExpressionKey(data::ape::Expression &&expr)
@@ -638,8 +673,108 @@ namespace anox::buildsystem
 
 	rkit::Result APEScriptCompilerImpl::CompileSwitch(APECompilerContext &ctx, rkit::Vector<data::ape::SwitchCommand> &cmdStream, const SwitchDef &switchDef)
 	{
-		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+		rkit::HashMap<uint64_t, const ape_parse::SwitchCommand *> switchCmdTree;
+
+		for (const ape_parse::SwitchCommand &inCmd : switchDef.m_commands)
+		{
+			RKIT_CHECK(switchCmdTree.Set(inCmd.m_cc, &inCmd));
+		}
+
+		return CompileBasicBlock(ctx, cmdStream, switchCmdTree, 1);
 	}
+
+	rkit::Result APEScriptCompilerImpl::CompileBasicBlock(APECompilerContext &ctx, rkit::Vector<data::ape::SwitchCommand> &cmdStream, const rkit::HashMap<uint64_t, const ape_parse::SwitchCommand *> &tree, uint64_t cc)
+	{
+		const uint8_t kIfOpcode = 1;
+		const uint8_t kWhileOpcode = 11;
+		const uint8_t kJumpOpcode = 22;
+		const uint8_t kRJumpOpcode = 23;
+
+		for (;;)
+		{
+			rkit::HashMap<uint64_t, const ape_parse::SwitchCommand *>::ConstIterator_t it = tree.Find(cc);
+			if (it == tree.end())
+				break;
+
+			const ape_parse::SwitchCommand &cmd = *it.Value();
+
+			data::ape::SwitchCommand outCmd = {};
+			outCmd.m_opcode = static_cast<uint8_t>(cmd.m_opcode);
+
+			rkit::Vector<data::ape::SwitchCommand> trueBB;
+			rkit::Vector<data::ape::SwitchCommand> falseBB;
+
+			if (cmd.m_opcode == kIfOpcode)
+			{
+				if (!IsTerminalCC(cc))
+				{
+					RKIT_CHECK(CompileBasicBlock(ctx, trueBB, tree, ((cc << 2) | 1u)));
+					RKIT_CHECK(CompileBasicBlock(ctx, falseBB, tree, ((cc << 2) | 2u)));
+
+					if (falseBB.Count() > std::numeric_limits<uint32_t>::max())
+						RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
+
+					if (falseBB.Count() > 0)
+					{
+						data::ape::SwitchCommand skipFalseBBCmd = {};
+						skipFalseBBCmd.m_opcode = kJumpOpcode;
+						skipFalseBBCmd.m_strValue = static_cast<uint32_t>(falseBB.Count());
+
+						RKIT_CHECK(trueBB.Append(skipFalseBBCmd));
+					}
+
+					if (trueBB.Count() > std::numeric_limits<uint32_t>::max())
+						RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
+				}
+
+				outCmd.m_strValue = static_cast<uint32_t>(trueBB.Count());
+			}
+			else if (cmd.m_opcode == kWhileOpcode)
+			{
+				if (!IsTerminalCC(cc))
+				{
+					RKIT_CHECK(CompileBasicBlock(ctx, trueBB, tree, ((cc << 2) | 1u)));
+
+					data::ape::SwitchCommand repeatCmd = {};
+					repeatCmd.m_opcode = kRJumpOpcode;
+					repeatCmd.m_strValue = static_cast<uint32_t>(trueBB.Count());
+
+					RKIT_CHECK(trueBB.Append(repeatCmd));
+				}
+
+				outCmd.m_strValue = static_cast<uint32_t>(trueBB.Count());
+			}
+			else
+			{
+				uint32_t index = 0;
+				RKIT_CHECK(ctx.ConvertOptionalByteString(index, cmd.m_str));
+				outCmd.m_strValue = index;
+			}
+
+			RKIT_CHECK(ctx.ConvertOptionalExprValue(outCmd.m_exprValue, cmd.m_expr));
+
+			uint32_t fmtValue = 0;
+			RKIT_CHECK(ctx.ConvertFormattingValue(fmtValue, cmd.m_fmt));
+			outCmd.m_fmtValue = fmtValue;
+
+			RKIT_CHECK(cmdStream.Append(outCmd));
+			RKIT_CHECK(cmdStream.Append(trueBB.ToSpan()));
+			RKIT_CHECK(cmdStream.Append(falseBB.ToSpan()));
+
+			if (IsTerminalCC(cc))
+				break;
+
+			cc = (cc << 2) | 3u;
+		}
+
+		RKIT_RETURN_OK;
+	}
+
+	bool APEScriptCompilerImpl::IsTerminalCC(uint64_t cc)
+	{
+		return ((cc >> 62) & 3) != 0;
+	}
+
 
 	bool APEScriptCompiler::HasAnalysisStage() const
 	{

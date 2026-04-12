@@ -73,7 +73,10 @@ namespace anox::data::ape
 
 	struct SwitchCommand
 	{
-		rkit::endian::LittleUInt32_t m_numCommands;
+		uint8_t m_opcode = 0;
+		rkit::endian::LittleUInt32_t m_fmtValue;
+		rkit::endian::LittleUInt32_t m_strValue;	// Also instr jump count for if/jump instrs
+		data::ape::ExpressionValue m_exprValue;
 	};
 
 	struct APEScriptCatalog

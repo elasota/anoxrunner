@@ -331,7 +331,7 @@ namespace rkit
 
 		RKIT_ASSERT(m_strPos < str.Length());
 
-		m_strPos = m_endPos + 1;
+		m_strPos = m_endPos;
 		this->UpdateEndPos();
 
 		return *this;
