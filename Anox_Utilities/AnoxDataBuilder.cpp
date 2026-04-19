@@ -4,6 +4,8 @@
 #include "anox/AFSArchive.h"
 #include "anox/AnoxUtilitiesDriver.h"
 
+#include "anox/Build/NodeIDs.h"
+
 #include "rkit/BuildSystem/BuildSystem.h"
 #include "rkit/BuildSystem/DependencyGraph.h"
 #include "rkit/BuildSystem/PackageBuilder.h"
@@ -11,13 +13,17 @@
 #include "rkit/Core/DirectoryScan.h"
 #include "rkit/Core/Drivers.h"
 #include "rkit/Core/LogDriver.h"
+#include "rkit/Core/HashTable.h"
 #include "rkit/Core/Module.h"
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/Optional.h"
+#include "rkit/Core/QuickSort.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/StaticArray.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/SystemDriver.h"
+
+#include "rkit/Data/ContentID.h"
 
 namespace anox { namespace utils
 {
@@ -41,7 +47,20 @@ namespace anox { namespace utils
 			rkit::buildsystem::IBuildSystemInstance &m_bsi;
 		};
 
+		class ExportScriptCatalogCheckRunner final : public rkit::buildsystem::IBuildSystemAction
+		{
+		public:
+			ExportScriptCatalogCheckRunner(AnoxDataBuilder &dataBuilder, rkit::buildsystem::IBuildSystemInstance &bsi);
+
+			rkit::Result Run() override;
+
+		private:
+			AnoxDataBuilder &m_dataBuilder;
+			rkit::buildsystem::IBuildSystemInstance &m_bsi;
+		};
+
 		rkit::Result ExportPipelineLibraries(rkit::buildsystem::IBuildSystemInstance &bsi);
+		rkit::Result ExportScriptCatalog(rkit::buildsystem::IBuildSystemInstance &bsi);
 
 		rkit::buildsystem::IBuildSystemDriver *m_bsDriver;
 		anox::IUtilitiesDriver *m_utils;
@@ -136,6 +155,72 @@ namespace anox { namespace utils
 		RKIT_CHECK(bsi.OpenFileWrite(rkit::buildsystem::BuildFileLocation::kOutputFiles, u8"pipelines_vk.rkp", outStream));
 
 		RKIT_CHECK(combiner->WritePackage(*outStream));
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result AnoxDataBuilder::ExportScriptCatalog(rkit::buildsystem::IBuildSystemInstance &bsi)
+	{
+		rkit::Vector<rkit::buildsystem::IDependencyNode *> apeGroupNodes;
+
+		bool rebuiltAnyScripts = false;
+		for (rkit::buildsystem::IDependencyNode *node : bsi.GetBuildRelevantNodes())
+		{
+			uint32_t nodeNamespace = node->GetDependencyNodeNamespace();
+			uint32_t nodeType = node->GetDependencyNodeType();
+
+			if (nodeNamespace == kAnoxNamespaceID && nodeType == buildsystem::kAPEGroupNodeID)
+			{
+				RKIT_CHECK(apeGroupNodes.Append(node));
+
+				if (node->WasCompiled())
+					rebuiltAnyScripts = true;
+			}
+		}
+
+		if (!rebuiltAnyScripts)
+			RKIT_RETURN_OK;
+
+		rkit::log::LogInfo(u8"Exporting script catalog libraries...");
+
+		rkit::HashSet<rkit::data::ContentID> contentIDSet;
+		rkit::Vector<rkit::data::ContentID> contentIDs;
+
+		for (rkit::buildsystem::IDependencyNode *node : apeGroupNodes)
+		{
+			for (const rkit::buildsystem::FileStatusView &product : node->GetCompileProducts())
+			{
+				rkit::UniquePtr<rkit::ISeekableReadStream> stream;
+				RKIT_CHECK(bsi.TryOpenFileRead(product.m_location, product.m_filePath, stream));
+
+				if (!stream.IsValid())
+				{
+					rkit::log::ErrorFmt(u8"Failed to open pipeline '{}' for merge", product.m_filePath.GetChars());
+					RKIT_THROW(rkit::ResultCode::kOperationFailed);
+				}
+
+				if (stream->GetSize() > std::numeric_limits<size_t>::max())
+					RKIT_THROW(rkit::ResultCode::kDataError);
+
+				const size_t numContentIDs = static_cast<size_t>(stream->GetSize() / sizeof(rkit::data::ContentID));
+				for (size_t i = 0; i < numContentIDs; i++)
+				{
+					rkit::data::ContentID cid;
+					RKIT_CHECK(stream->ReadOneBinary(cid));
+
+					if (!contentIDSet.Contains(cid))
+					{
+						RKIT_CHECK(contentIDSet.Add(cid));
+						RKIT_CHECK(contentIDs.Append(cid));
+					}
+				}
+			}
+		}
+
+		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
+		RKIT_CHECK(bsi.OpenFileWrite(rkit::buildsystem::BuildFileLocation::kOutputFiles, u8"globalscripts.idx", outStream));
+
+		RKIT_CHECK(outStream->WriteAllSpan(contentIDs.ToSpan()));
 
 		RKIT_RETURN_OK;
 	}
@@ -244,6 +329,9 @@ namespace anox { namespace utils
 		ExportPipelinesCheckRunner exportPipelinesCheck(*this, *instance);
 		RKIT_CHECK(instance->AddPostBuildAction(&exportPipelinesCheck));
 
+		ExportScriptCatalogCheckRunner exportScriptCheck(*this, *instance);
+		RKIT_CHECK(instance->AddPostBuildAction(&exportScriptCheck));
+
 		RKIT_CHECK(instance->Build(&fs));
 
 		RKIT_RETURN_OK;
@@ -258,6 +346,17 @@ namespace anox { namespace utils
 	rkit::Result AnoxDataBuilder::ExportPipelinesCheckRunner::Run()
 	{
 		return m_dataBuilder.ExportPipelineLibraries(m_bsi);
+	}
+
+	AnoxDataBuilder::ExportScriptCatalogCheckRunner::ExportScriptCatalogCheckRunner(AnoxDataBuilder &dataBuilder, rkit::buildsystem::IBuildSystemInstance &bsi)
+		: m_dataBuilder(dataBuilder)
+		, m_bsi(bsi)
+	{
+	}
+
+	rkit::Result AnoxDataBuilder::ExportScriptCatalogCheckRunner::Run()
+	{
+		return m_dataBuilder.ExportScriptCatalog(m_bsi);
 	}
 
 	AnoxFileSystem::AnoxFileSystem()

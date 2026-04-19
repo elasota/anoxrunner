@@ -17,6 +17,7 @@
 
 #include "rkit/Render/BackendType.h"
 
+#include "anox/Build/NodeIDs.h"
 
 namespace anox
 {

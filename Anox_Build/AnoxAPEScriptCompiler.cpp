@@ -8,6 +8,11 @@
 #include "rkit/Core/NoCopy.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/LogDriver.h"
+#include "rkit/Core/QuickSort.h"
+
+#include "rkit/BuildSystem/BuildSystem.h"
+
+#include "rkit/Data/ContentID.h"
 
 namespace anox::buildsystem
 {
@@ -27,6 +32,9 @@ namespace anox::buildsystem
 		rkit::Result ConvertFormattingValue(uint32_t &outDWord, const ape_parse::FormattingValue &value);
 		rkit::Result ConvertOperand(uint32_t &outIndex, data::ape::OperandType &outOperandType, bool &outIsString, const ape_parse::Operand &operand);
 
+		rkit::Result DumpResults(rkit::Vector<rkit::Vector<data::ape::ExpressionValue>> &outOperandLists,
+			rkit::Vector<data::ape::Expression> &outExprs, rkit::Vector<rkit::ByteString> &outStrings) const;
+
 	private:
 		class OperandListKey final : public rkit::NoCopy
 		{
@@ -39,6 +47,8 @@ namespace anox::buildsystem
 			bool operator!=(const OperandListKey &other) const;
 
 			rkit::HashValue_t ComputeHash() const;
+
+			rkit::ConstSpan<data::ape::ExpressionValue> GetOperands() const;
 
 		private:
 			rkit::Vector<data::ape::ExpressionValue> m_operands;
@@ -55,6 +65,8 @@ namespace anox::buildsystem
 			bool operator!=(const ExpressionKey &other) const;
 
 			rkit::HashValue_t ComputeHash() const;
+
+			const data::ape::Expression &GetExpression() const;
 
 		private:
 			data::ape::Expression m_expr;
@@ -104,10 +116,22 @@ namespace anox::buildsystem
 			rkit::Vector<rkit::UniquePtr<ape_parse::WindowCommand>> m_commands;
 		};
 
+		struct CompiledWindowDef
+		{
+			rkit::endian::LittleUInt32_t m_windowID;
+			rkit::Vector<uint8_t> m_commandStream;
+		};
+
 		struct SwitchDef
 		{
 			uint32_t m_switchID = 0;
 			rkit::Vector<ape_parse::SwitchCommand> m_commands;
+		};
+
+		struct CompiledSwitchDef
+		{
+			rkit::endian::LittleUInt32_t m_switchID;
+			rkit::Vector<data::ape::SwitchCommand> m_commands;
 		};
 
 		struct ParseContext
@@ -127,10 +151,34 @@ namespace anox::buildsystem
 			rkit::Vector<uint8_t> &m_vec;
 		};
 
-		static rkit::Result CompileWindow(APECompilerContext &ctx, rkit::Vector<uint8_t> &cmdStream, const WindowDef &wdef);
-		static rkit::Result CompileSwitch(APECompilerContext &ctx, rkit::Vector<data::ape::SwitchCommand> &cmdStream, const SwitchDef &switchDef);
+		static rkit::Result CompileWindow(APECompilerContext &ctx, CompiledWindowDef &compiledWindow, const WindowDef &wdef);
+		static rkit::Result CompileSwitch(APECompilerContext &ctx, CompiledSwitchDef &compiledSwitch, const SwitchDef &switchDef);
 		static rkit::Result CompileBasicBlock(APECompilerContext &ctx, rkit::Vector<data::ape::SwitchCommand> &cmdStream, const rkit::HashMap<uint64_t, const ape_parse::SwitchCommand *> &tree, uint64_t firstCC);
 		static bool IsTerminalCC(uint64_t cc);
+
+		static rkit::Result DumpAPEFile(rkit::IWriteStream &stream, rkit::ConstSpan<rkit::ByteString> strings,
+			rkit::ConstSpan<rkit::Vector<data::ape::ExpressionValue>> operandLists,
+			rkit::ConstSpan<CompiledWindowDef> windows,
+			rkit::ConstSpan<CompiledSwitchDef> switches);
+
+		static rkit::Result ReadAPEFile(rkit::IReadStream &stream, rkit::Vector<rkit::ByteString> &strings,
+			rkit::Vector<rkit::Vector<data::ape::ExpressionValue>> &operandLists,
+			rkit::Vector<CompiledWindowDef> &windows,
+			rkit::Vector<CompiledSwitchDef> &switches);
+
+		static rkit::Result FormatAnalysisPath(rkit::CIPath &outPath, const rkit::StringView &identifier);
+		static rkit::Result FormatOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier);
+	};
+
+
+	class APEGroupCompilerImpl final : public rkit::OpaqueImplementation<APEGroupCompiler>
+	{
+	public:
+		rkit::Result RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+		rkit::Result RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+
+	private:
+		static rkit::Result ResolvePath(rkit::CIPath &depsFilePath, const rkit::StringView &groupNodeIdentifier, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 	};
 
 	APEWriter::APEWriter(APECompilerContext &context, rkit::IWriteStream &stream)
@@ -310,37 +358,40 @@ namespace anox::buildsystem
 
 		APECompilerContext compilerCtx;
 
-		rkit::Vector<rkit::Vector<uint8_t>> windowCommandStreams;
-		RKIT_CHECK(windowCommandStreams.Resize(windowDefs.Count()));
+		rkit::Vector<CompiledWindowDef> compiledWindows;
+
+		RKIT_CHECK(compiledWindows.Resize(windowDefs.Count()));
 
 		for (size_t windowIndex = 0; windowIndex < windowDefs.Count(); windowIndex++)
 		{
-			RKIT_CHECK(CompileWindow(compilerCtx, windowCommandStreams[windowIndex], windowDefs[windowIndex]));
+			RKIT_CHECK(CompileWindow(compilerCtx, compiledWindows[windowIndex], windowDefs[windowIndex]));
 		}
 
+		rkit::Vector<CompiledSwitchDef> compiledSwitches;
 
-		rkit::Vector<rkit::Vector<data::ape::SwitchCommand>> switchCommandLists;
-		RKIT_CHECK(switchCommandLists.Resize(switchDefs.Count()));
+		RKIT_CHECK(compiledSwitches.Resize(switchDefs.Count()));
 
 		for (size_t switchIndex = 0; switchIndex < switchDefs.Count(); switchIndex++)
 		{
-			RKIT_CHECK(CompileSwitch(compilerCtx, switchCommandLists[switchIndex], switchDefs[switchIndex]));
+			RKIT_CHECK(CompileSwitch(compilerCtx, compiledSwitches[switchIndex], switchDefs[switchIndex]));
 		}
 
-#if 0
+		rkit::Vector<rkit::Vector<data::ape::ExpressionValue>> operandLists;
+		rkit::Vector<data::ape::Expression> exprs;
+		rkit::Vector<rkit::ByteString> strings;
+
+		RKIT_CHECK(compilerCtx.DumpResults(operandLists, exprs, strings));
+
 		rkit::CIPath outPath;
-		{
-			rkit::String pathStr;
-			RKIT_CHECK(pathStr.Format(u8"ax_ape/%s", depsNode->GetIdentifier()));
-			RKIT_CHECK(outPath.Set(outPath));
-		}
-
+		RKIT_CHECK(FormatAnalysisPath(outPath, depsNode->GetIdentifier()));
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
-		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, path, outFile));
-#endif
+		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outFile));
 
-		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+		RKIT_CHECK(DumpAPEFile(*outFile, strings.ToSpan(), operandLists.ToSpan(), compiledWindows.ToSpan(),
+			compiledSwitches.ToSpan()));
+
+		RKIT_RETURN_OK;
 	}
 
 
@@ -497,6 +548,34 @@ namespace anox::buildsystem
 		RKIT_RETURN_OK;
 	}
 
+
+	rkit::Result APECompilerContext::DumpResults(rkit::Vector<rkit::Vector<data::ape::ExpressionValue>> &outOperandLists,
+		rkit::Vector<data::ape::Expression> &outExprs, rkit::Vector<rkit::ByteString> &outStrings) const
+	{
+		RKIT_CHECK(outOperandLists.Resize(m_operandLists.Count()));
+		RKIT_CHECK(outExprs.Resize(m_expressions.Count()));
+		RKIT_CHECK(outStrings.Resize(m_strings.Count()));
+
+
+		for (rkit::HashMapKeyValueView<ExpressionKey, const uint32_t> exprPair : m_expressions)
+			outExprs[exprPair.Value()] = exprPair.Key().GetExpression();
+
+		for (rkit::HashMapKeyValueView<rkit::ByteString, const uint32_t> strPair : m_strings)
+			outStrings[strPair.Value()] = strPair.Key();
+
+		for (rkit::HashMapKeyValueView<OperandListKey, const uint32_t> opListPair : m_operandLists)
+		{
+			rkit::Vector<data::ape::ExpressionValue> &outOpList = outOperandLists[opListPair.Value()];
+			rkit::ConstSpan<data::ape::ExpressionValue> inOpList = opListPair.Key().GetOperands();
+
+			RKIT_CHECK(outOpList.Resize(inOpList.Count()));
+
+			rkit::CopySpan(outOpList.ToSpan(), inOpList);
+		}
+
+		RKIT_RETURN_OK;
+	}
+
 	rkit::Result APECompilerContext::ConvertOptionalByteString(uint32_t &outDWord, const rkit::Optional<rkit::ByteString> &value)
 	{
 		if (!value.IsSet())
@@ -606,6 +685,11 @@ namespace anox::buildsystem
 		return rkit::BinaryHasher<data::ape::ExpressionValue>::ComputeHash(0, m_operands.ToSpan());
 	}
 
+	rkit::ConstSpan<data::ape::ExpressionValue> APECompilerContext::OperandListKey::GetOperands() const
+	{
+		return m_operands.ToSpan();
+	}
+
 	APECompilerContext::ExpressionKey::ExpressionKey(data::ape::Expression &&expr)
 		: m_expr(std::move(expr))
 	{
@@ -631,6 +715,11 @@ namespace anox::buildsystem
 		return rkit::BinaryHasher<data::ape::Expression>::ComputeHash(0, m_expr);
 	}
 
+	const data::ape::Expression &APECompilerContext::ExpressionKey::GetExpression() const
+	{
+		return m_expr;
+	}
+
 
 	APEScriptCompilerImpl::VectorMemoryStream::VectorMemoryStream(rkit::Vector<uint8_t> &vec)
 		: m_vec(vec)
@@ -651,12 +740,42 @@ namespace anox::buildsystem
 
 	rkit::Result APEScriptCompilerImpl::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
-		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+		rkit::Vector<rkit::Vector<data::ape::ExpressionValue>> operandLists;
+		rkit::Vector<data::ape::Expression> exprs;
+		rkit::Vector<rkit::ByteString> strings;
+		rkit::Vector<CompiledSwitchDef> switches;
+		rkit::Vector<CompiledWindowDef> windows;
+
+		{
+			rkit::CIPath analysisPath;
+			RKIT_CHECK(FormatAnalysisPath(analysisPath, depsNode->GetIdentifier()));
+
+			rkit::UniquePtr<rkit::ISeekableReadStream> inFile;
+			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, analysisPath, inFile));
+
+			RKIT_CHECK(ReadAPEFile(*inFile, strings, operandLists, windows, switches));
+		}
+
+		{
+			rkit::CIPath outPath;
+			RKIT_CHECK(FormatOutputPath(outPath, depsNode->GetIdentifier()));
+
+			{
+				rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
+				RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outFile));
+
+				RKIT_CHECK(DumpAPEFile(*outFile, strings.ToSpan(), operandLists.ToSpan(), windows.ToSpan(), switches.ToSpan()));
+			}
+		}
+
+		RKIT_RETURN_OK;
 	}
 
-	rkit::Result APEScriptCompilerImpl::CompileWindow(APECompilerContext &ctx, rkit::Vector<uint8_t> &cmdStream, const WindowDef &wdef)
+	rkit::Result APEScriptCompilerImpl::CompileWindow(APECompilerContext &ctx, CompiledWindowDef &compiledWindow, const WindowDef &wdef)
 	{
-		VectorMemoryStream stream(cmdStream);
+		compiledWindow.m_windowID = wdef.m_windowID;
+
+		VectorMemoryStream stream(compiledWindow.m_commandStream);
 
 		APEWriter writer(ctx, stream);
 
@@ -664,15 +783,17 @@ namespace anox::buildsystem
 		{
 			const ape_parse::WindowCommand &cmd = *cmdPtr;
 
-			RKIT_CHECK(cmdStream.Append(static_cast<uint8_t>(cmd.GetCommandType())));
+			RKIT_CHECK(compiledWindow.m_commandStream.Append(static_cast<uint8_t>(cmd.GetCommandType())));
 			RKIT_CHECK(cmd.Write(writer));
 		}
 
 		RKIT_RETURN_OK;
 	}
 
-	rkit::Result APEScriptCompilerImpl::CompileSwitch(APECompilerContext &ctx, rkit::Vector<data::ape::SwitchCommand> &cmdStream, const SwitchDef &switchDef)
+	rkit::Result APEScriptCompilerImpl::CompileSwitch(APECompilerContext &ctx, CompiledSwitchDef &compiledSwitch, const SwitchDef &switchDef)
 	{
+		compiledSwitch.m_switchID = switchDef.m_switchID;
+
 		rkit::HashMap<uint64_t, const ape_parse::SwitchCommand *> switchCmdTree;
 
 		for (const ape_parse::SwitchCommand &inCmd : switchDef.m_commands)
@@ -680,7 +801,7 @@ namespace anox::buildsystem
 			RKIT_CHECK(switchCmdTree.Set(inCmd.m_cc, &inCmd));
 		}
 
-		return CompileBasicBlock(ctx, cmdStream, switchCmdTree, 1);
+		return CompileBasicBlock(ctx, compiledSwitch.m_commands, switchCmdTree, 1);
 	}
 
 	rkit::Result APEScriptCompilerImpl::CompileBasicBlock(APECompilerContext &ctx, rkit::Vector<data::ape::SwitchCommand> &cmdStream, const rkit::HashMap<uint64_t, const ape_parse::SwitchCommand *> &tree, uint64_t cc)
@@ -775,6 +896,166 @@ namespace anox::buildsystem
 		return ((cc >> 62) & 3) != 0;
 	}
 
+	rkit::Result APEScriptCompilerImpl::DumpAPEFile(rkit::IWriteStream &stream, rkit::ConstSpan<rkit::ByteString> strings,
+		rkit::ConstSpan<rkit::Vector<data::ape::ExpressionValue>> operandLists,
+		rkit::ConstSpan<CompiledWindowDef> compiledWindows,
+		rkit::ConstSpan<CompiledSwitchDef> compiledSwitches)
+	{
+		{
+			data::ape::APEScriptCatalog catalog;
+
+			catalog.m_numStrings = static_cast<uint32_t>(strings.Count());
+			catalog.m_numOperandLists = static_cast<uint32_t>(operandLists.Count());
+			catalog.m_numWindows = static_cast<uint32_t>(compiledWindows.Count());
+			catalog.m_numSwitches = static_cast<uint32_t>(compiledSwitches.Count());
+
+			RKIT_CHECK(stream.WriteOneBinary(catalog));
+		}
+
+		for (const rkit::ByteString &str : strings)
+		{
+			rkit::endian::LittleUInt32_t strLength = rkit::endian::LittleUInt32_t(str.Length());
+			RKIT_CHECK(stream.WriteOneBinary(strLength));
+		}
+
+		for (const rkit::ByteString &str : strings)
+		{
+			RKIT_CHECK(stream.WriteAllSpan(str.ToSpan()));
+		}
+
+		for (const rkit::Vector<data::ape::ExpressionValue> &opList : operandLists)
+		{
+			rkit::endian::LittleUInt32_t opListCount = rkit::endian::LittleUInt32_t(opList.Count());
+			RKIT_CHECK(stream.WriteOneBinary(opListCount));
+		}
+
+		for (const rkit::Vector<data::ape::ExpressionValue> &opList : operandLists)
+		{
+			RKIT_CHECK(stream.WriteAllSpan(opList.ToSpan()));
+		}
+
+		for (size_t windowIndex = 0; windowIndex < compiledWindows.Count(); windowIndex++)
+		{
+			data::ape::Window window = {};
+			window.m_commandStreamLength = static_cast<uint32_t>(compiledWindows[windowIndex].m_commandStream.Count());
+			window.m_windowID = compiledWindows[windowIndex].m_windowID;
+			RKIT_CHECK(stream.WriteOneBinary(window));
+		}
+
+		for (const CompiledWindowDef &window : compiledWindows)
+		{
+			RKIT_CHECK(stream.WriteAllSpan(window.m_commandStream.ToSpan()));
+		}
+
+		for (size_t switchIndex = 0; switchIndex < compiledSwitches.Count(); switchIndex++)
+		{
+			data::ape::Switch sw = {};
+			sw.m_numCommands = static_cast<uint32_t>(compiledSwitches[switchIndex].m_commands.Count());
+			sw.m_switchID = compiledSwitches[switchIndex].m_switchID;
+			RKIT_CHECK(stream.WriteOneBinary(sw));
+		}
+
+		for (const CompiledSwitchDef &sw : compiledSwitches)
+		{
+			RKIT_CHECK(stream.WriteAllSpan(sw.m_commands.ToSpan()));
+		}
+
+		RKIT_RETURN_OK;
+	}
+
+	void APEScriptCompilerImpl::ReadAPEFile(rkit::IReadStream &stream, rkit::Vector<rkit::ByteString> &strings,
+		rkit::Vector<rkit::Vector<data::ape::ExpressionValue>> &operandLists,
+		rkit::Vector<CompiledWindowDef> &windows,
+		rkit::Vector<CompiledSwitchDef> &switches)
+	{
+		data::ape::APEScriptCatalog catalog;
+
+		RKIT_CHECK(stream.ReadOneBinary(catalog));
+
+		const size_t numStrings = catalog.m_numStrings.Get();
+		RKIT_CHECK(strings.Resize(numStrings));
+
+		rkit::Vector<rkit::ByteStringConstructionBuffer> stringCBufs;
+		RKIT_CHECK(stringCBufs.Resize(numStrings));
+
+		RKIT_CHECK(operandLists.Resize(catalog.m_numOperandLists.Get()));
+		RKIT_CHECK(windows.Resize(catalog.m_numWindows.Get()));
+		RKIT_CHECK(switches.Resize(catalog.m_numSwitches.Get()));
+
+		for (rkit::ByteStringConstructionBuffer &strCBuf : stringCBufs)
+		{
+			rkit::endian::LittleUInt32_t strLength;
+			RKIT_CHECK(stream.ReadOneBinary(strLength));
+
+			RKIT_CHECK(strCBuf.Allocate(strLength.Get()));
+		}
+
+		for (rkit::ByteStringConstructionBuffer &strCBuf : stringCBufs)
+		{
+			RKIT_CHECK(stream.ReadAllSpan(strCBuf.GetSpan()));
+		}
+
+		rkit::ProcessParallelSpans(strings.ToSpan(), stringCBufs.ToSpan(), [](rkit::ByteString &str, rkit::ByteStringConstructionBuffer &cbuf)
+			{
+				str = rkit::ByteString(std::move(cbuf));
+			});
+
+		for (rkit::Vector<data::ape::ExpressionValue> &opList : operandLists)
+		{
+			rkit::endian::LittleUInt32_t opListCount;
+			RKIT_CHECK(stream.ReadOneBinary(opListCount));
+			RKIT_CHECK(opList.Resize(opListCount.Get()));
+		}
+
+		for (rkit::Vector<data::ape::ExpressionValue> &opList : operandLists)
+		{
+			RKIT_CHECK(stream.ReadAllSpan(opList.ToSpan()));
+		}
+
+		for (size_t windowIndex = 0; windowIndex < windows.Count(); windowIndex++)
+		{
+			data::ape::Window window = {};
+			RKIT_CHECK(stream.ReadOneBinary(window));
+
+			windows[windowIndex].m_windowID = window.m_windowID.Get();
+			RKIT_CHECK(windows[windowIndex].m_commandStream.Resize(window.m_commandStreamLength.Get()));
+		}
+
+		for (CompiledWindowDef &window : windows)
+		{
+			RKIT_CHECK(stream.ReadAllSpan(window.m_commandStream.ToSpan()));
+		}
+
+		for (size_t switchIndex = 0; switchIndex < switches.Count(); switchIndex++)
+		{
+			data::ape::Switch sw = {};
+			RKIT_CHECK(stream.ReadOneBinary(sw));
+
+			switches[switchIndex].m_switchID = sw.m_switchID.Get();
+			RKIT_CHECK(switches[switchIndex].m_commands.Resize(sw.m_numCommands.Get()));
+		}
+
+		for (CompiledSwitchDef &sw : switches)
+		{
+			RKIT_CHECK(stream.ReadAllSpan(sw.m_commands.ToSpan()));
+		}
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result APEScriptCompilerImpl::FormatAnalysisPath(rkit::CIPath &outPath, const rkit::StringView &identifier)
+	{
+		rkit::String formattedPath;
+		RKIT_CHECK(formattedPath.Format(u8"ax_ape/a/{}", identifier));
+		return outPath.Set(formattedPath);
+	}
+
+	rkit::Result APEScriptCompilerImpl::FormatOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier)
+	{
+		rkit::String formattedPath;
+		RKIT_CHECK(formattedPath.Format(u8"ax_ape/c/{}", identifier));
+		return outPath.Set(formattedPath);
+	}
 
 	bool APEScriptCompiler::HasAnalysisStage() const
 	{
@@ -793,13 +1074,131 @@ namespace anox::buildsystem
 
 	uint32_t APEScriptCompiler::GetVersion() const
 	{
-		return 1;
+		return 3;
 	}
 
 	rkit::Result APEScriptCompiler::Create(rkit::UniquePtr<APEScriptCompiler> &outCompiler)
 	{
 		return rkit::New<APEScriptCompiler>(outCompiler);
 	}
+
+	rkit::Result APEGroupCompilerImpl::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		rkit::CIPath depsFilePath;
+		RKIT_CHECK(ResolvePath(depsFilePath, depsNode->GetIdentifier(), feedback));
+
+		RKIT_CHECK(feedback->AddNodeDependency(rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kDepsNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, depsFilePath.ToString()));
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result APEGroupCompilerImpl::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		rkit::Vector<rkit::buildsystem::FileStatus> fileList;
+
+		for (rkit::buildsystem::NodeDependencyInfo nodeDep : depsNode->GetNodeDependencies())
+		{
+			rkit::buildsystem::IDependencyNode *depsFileNode = nodeDep.m_node;
+
+			for (rkit::buildsystem::NodeDependencyInfo depsNodeDep : nodeDep.m_node->GetNodeDependencies())
+			{
+				rkit::buildsystem::IDependencyNode *apeScriptNode = depsNodeDep.m_node;
+
+				for (rkit::buildsystem::FileStatusView fsView : apeScriptNode->GetCompileProducts())
+				{
+					rkit::buildsystem::FileStatus fileInfo;
+					RKIT_CHECK(fileInfo.Set(fsView));
+					RKIT_CHECK(fileList.Append(std::move(fileInfo)));
+				}
+			}
+		}
+
+		rkit::QuickSort(fileList.begin(), fileList.end(), [](const rkit::buildsystem::FileStatus &a, const rkit::buildsystem::FileStatus &b)
+			{
+				return a.m_filePath.ToString() < b.m_filePath.ToString();
+			});
+
+		for (size_t i = 1; i < fileList.Count(); )
+		{
+			if (fileList[i - 1].m_filePath == fileList[i].m_filePath)
+				fileList.RemoveAtIndex(i);
+			else
+				i++;
+		}
+
+		rkit::Vector<rkit::data::ContentID> contentIDs;
+
+		for (const rkit::buildsystem::FileStatus &fileStatus : fileList)
+		{
+			rkit::data::ContentID cid;
+			RKIT_CHECK(feedback->IndexCAS(fileStatus.m_location, fileStatus.m_filePath, cid));
+			RKIT_CHECK(contentIDs.Append(cid));
+		}
+
+		rkit::String outPathStr;
+		RKIT_CHECK(outPathStr.Format(u8"ax_ape/g/{}", depsNode->GetIdentifier()));
+
+		rkit::CIPath outPath;
+		RKIT_CHECK(outPath.Set(outPathStr));
+
+		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
+		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outFile));
+
+		RKIT_CHECK(outFile->WriteAllSpan(contentIDs.ToSpan()));
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result APEGroupCompilerImpl::ResolvePath(rkit::CIPath &depsFilePath, const rkit::StringView &groupNodeIdentifier, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		rkit::CIPath groupPath;
+		RKIT_CHECK(groupPath.Set(groupNodeIdentifier));
+
+		rkit::UniquePtr<rkit::ISeekableReadStream> inFile;
+		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, groupPath, inFile));
+
+		const rkit::FilePos_t fileSize = inFile->GetSize();
+
+		rkit::Vector<rkit::Utf8Char_t> pathBytes;
+		if (inFile->GetSize() > std::numeric_limits<size_t>::max())
+			RKIT_THROW(rkit::ResultCode::kDataError);
+
+		RKIT_CHECK(pathBytes.Resize(static_cast<size_t>(fileSize)));
+
+		RKIT_CHECK(inFile->ReadAllSpan(pathBytes.ToSpan()));
+
+		rkit::StringSliceView slView(pathBytes.ToSpan());
+		if (!slView.Validate())
+			RKIT_THROW(rkit::ResultCode::kDataError);
+
+		return depsFilePath.Set(rkit::StringSliceView(pathBytes.ToSpan()));
+	}
+
+	bool APEGroupCompiler::HasAnalysisStage() const
+	{
+		return true;
+	}
+
+	rkit::Result APEGroupCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		return Impl().RunAnalysis(depsNode, feedback);
+	}
+
+	rkit::Result APEGroupCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		return Impl().RunCompile(depsNode, feedback);
+	}
+
+	uint32_t APEGroupCompiler::GetVersion() const
+	{
+		return 3;
+	}
+
+	rkit::Result APEGroupCompiler::Create(rkit::UniquePtr<APEGroupCompiler> &outCompiler)
+	{
+		return rkit::New<APEGroupCompiler>(outCompiler);
+	}
 }
 
 RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR(anox::buildsystem::APEScriptCompilerImpl)
+RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR(anox::buildsystem::APEGroupCompilerImpl)

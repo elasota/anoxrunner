@@ -87,7 +87,7 @@ namespace anox::data::ape
 		rkit::endian::LittleUInt32_t m_numSwitches;
 
 		// uint32_t m_stringLengths[m_numStrings]
-		// uint32_t m_stringChars[m_numStrings][m_stringLengths[i]]
+		// uint8_t m_stringChars[m_numStrings][m_stringLengths[i]]
 		// uint32_t m_operandListCounts[m_numOperandLists]
 		// uint32_t m_operands[m_numOperandLists][m_operandListCounts[i]]
 		// Window m_windows[m_numWindows]

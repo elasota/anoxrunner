@@ -45,6 +45,7 @@ namespace rkit
 		~Vector();
 
 		void RemoveRange(size_t firstArg, size_t numArgs);
+		void RemoveAtIndex(size_t index);
 		Result ResetAndResize(size_t size);
 		Result Resize(size_t size);
 		Result Reserve(size_t size);
@@ -195,6 +196,12 @@ namespace rkit
 			arr[count - 1 - i].~T();
 
 		m_count -= numElements;
+	}
+
+	template<class T>
+	void Vector<T>::RemoveAtIndex(size_t index)
+	{
+		RemoveRange(index, 1);
 	}
 
 	template<class T>

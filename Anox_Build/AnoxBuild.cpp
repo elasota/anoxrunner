@@ -20,6 +20,8 @@
 #include "AnoxMaterialCompiler.h"
 #include "AnoxTextureCompiler.h"
 
+#include "anox/Build/NodeIDs.h"
+
 namespace anox
 {
 	class BuildDriver final : public rkit::buildsystem::IBuildSystemAddOnDriver
@@ -141,6 +143,15 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kAPEScriptNodeID, std::move(apeCompiler)));
 
 		RKIT_CHECK(instance->RegisterNodeTypeByExtension(u8"ape", kAnoxNamespaceID, buildsystem::kAPEScriptNodeID));
+	}
+
+	{
+		rkit::UniquePtr<buildsystem::APEGroupCompiler> apeGroupCompiler;
+		RKIT_CHECK(buildsystem::APEGroupCompiler::Create(apeGroupCompiler));
+
+		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kAPEGroupNodeID, std::move(apeGroupCompiler)));
+
+		RKIT_CHECK(instance->RegisterNodeTypeByExtension(u8"apegroup", kAnoxNamespaceID, buildsystem::kAPEGroupNodeID));
 	}
 
 	{
