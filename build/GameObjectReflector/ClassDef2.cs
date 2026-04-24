@@ -30,7 +30,7 @@ namespace GameObjectReflector
             return attrib!;
         }
 
-        internal T TryGetAttributeOfType<T>()
+        internal T? TryGetAttributeOfType<T>()
             where T : TypeDefAttribute
         {
             foreach (TypeDefAttribute attrib in TypeDefAttributes)

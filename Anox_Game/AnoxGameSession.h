@@ -36,6 +36,7 @@ namespace anox::game
 			rkit::Span<const game::UserEntityDefValues> udefs,
 			rkit::Vector<rkit::ByteString> udefDescriptions);
 		rkit::Result AsyncPostSpawnInitialEntities(World &world);
+		rkit::Result AsyncPostStartGlobalSession();
 		rkit::Result AsyncRunFrame(World &world);
 		rkit::Result AsyncEnterGameSession(World &world);
 		rkit::Result WaitForMainThreadCoro(bool &outIsFinished);

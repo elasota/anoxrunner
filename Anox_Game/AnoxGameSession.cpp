@@ -32,6 +32,7 @@ namespace anox::game
 			rkit::Span<const game::UserEntityDefValues> udefs, rkit::Vector<rkit::ByteString> udefDescriptions);
 
 		rkit::ResultCoroutine PostSpawnInitialEntities(rkit::ICoroThread &thread, World &world);
+		rkit::ResultCoroutine PostStartGlobalSession(rkit::ICoroThread &thread);
 		rkit::ResultCoroutine EnterGameSession(rkit::ICoroThread &thread, World &world);
 
 		rkit::ResultCoroutine RunFrame(rkit::ICoroThread &thread, World &world);
@@ -108,6 +109,11 @@ namespace anox::game
 		CORO_RETURN_OK;
 	}
 
+	rkit::ResultCoroutine SessionImpl::PostStartGlobalSession(rkit::ICoroThread &thread)
+	{
+		CORO_RETURN_OK;
+	}
+
 	rkit::ResultCoroutine SessionImpl::PostSpawnInitialEntities(rkit::ICoroThread &thread, World &world)
 	{
 		CORO_RETURN_OK;
@@ -138,6 +144,12 @@ namespace anox::game
 	{
 		rkit::ICoroThread &thread = *Impl().m_mainCoroThread;
 		return thread.EnterFunction(Impl().PostSpawnInitialEntities(thread, world));
+	}
+
+	rkit::Result Session::AsyncPostStartGlobalSession()
+	{
+		rkit::ICoroThread &thread = *Impl().m_mainCoroThread;
+		return thread.EnterFunction(Impl().PostStartGlobalSession(thread));
 	}
 
 	rkit::Result Session::AsyncEnterGameSession(World &world)

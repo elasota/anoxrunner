@@ -91,7 +91,7 @@
                             case FieldDef.FieldType.Padding:
                                 break;
                             case FieldDef.FieldType.Bits32:
-                                foreach (KeyValuePair<string, int> bit in fieldDef.Bits)
+                                foreach (KeyValuePair<string, int> bit in fieldDef.Bits!)
                                     sw.WriteLine("\t\tbool m_" + bit.Key + " = false;");
                                 break;
                             case FieldDef.FieldType.UInt16:

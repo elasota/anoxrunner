@@ -4,8 +4,16 @@ class anox.game.sandbox
 import MemAlloc(size size) -> (address ptr, uint32 mmid) noexcept
 import MemFree(uint32 mmid) noexcept
 
+import GetContentIDKeyedResource(uint32 resourceType, address contentID) -> (uint32 reqID)
+import GetCIPathKeyedResource(uint32 resourceType, address chars, size numChars) -> (uint32 reqID)
+import FinishLoadingResourceRequest(uint32 requestID) -> (bool completed, uint32 resID)
+import CancelResourceRequest(uint32 requestID)
+import DiscardResource(uint32 resID)
+
 export Initialize() -> (address outGameSessionObject, address outGameSessionMem)
 export Shutdown(address gameSessionObject, address gameSessionMem)
+
+export MTAsync_StartGlobalSession(address gameSession)
 
 export MTAsync_SpawnInitialEntities(address gameSession, address entityTypes, size numEntityTypes, address spawnData, size numSpawnData, address stringLengths, size numStrings, address stringData, size numStringData, address udefValues, size numUDefs, address udefStringData, size udefStringDataSize)
 export MTAsync_PostSpawnInitialEntities(address gameSession)

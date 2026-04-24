@@ -218,7 +218,7 @@ namespace anox { namespace utils
 		}
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
-		RKIT_CHECK(bsi.OpenFileWrite(rkit::buildsystem::BuildFileLocation::kOutputFiles, u8"globalscripts.idx", outStream));
+		RKIT_CHECK(bsi.OpenFileWrite(rkit::buildsystem::BuildFileLocation::kOutputFiles, u8"loose/globalscripts.idx", outStream));
 
 		RKIT_CHECK(outStream->WriteAllSpan(contentIDs.ToSpan()));
 

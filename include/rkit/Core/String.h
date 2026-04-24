@@ -89,7 +89,8 @@ namespace rkit
 		typedef BaseStringView<TChar, TEncoding> View_t;
 		typedef BaseStringSliceView<TChar, TEncoding> SliceView_t;
 
-		static const size_t kStaticSize = TStaticSize;
+		static constexpr size_t kStaticSize = TStaticSize;
+		static constexpr CharacterEncoding kEncoding = TEncoding;
 
 		BaseString();
 		BaseString(const BaseString &other);

@@ -15,13 +15,13 @@ namespace GameObjectReflector
 
     internal class PropertyDef
     {
-        public string Type { get; set; }
-        public string Name { get; set; }
+        public string? Type { get; set; }
+        public string? Name { get; set; }
     }
 
     internal class ClassDef
     {
-        public string Name { get; set; }
+        public string? Name { get; set; }
         public List<PropertyDef> Properties { get; } = new List<PropertyDef>();
     }
 
@@ -106,8 +106,6 @@ namespace GameObjectReflector
             Directory.CreateDirectory(objectsPath);
 
             DumpLevelEntityDefs(buildPath, gamePath, objectsPath, ec, sortedClasses);
-
-            int nn = 0;
         }
 
         private static void DumpLevelEntityDefs(string buildPath, string gamePath, string objectsPath, EntityClassCollection ec, IEnumerable<string> classNames)
@@ -650,7 +648,7 @@ namespace GameObjectReflector
                 }
                 else
                 {
-                    FieldDef existingFieldDef;
+                    FieldDef? existingFieldDef;
                     if (!nameToField.TryGetValue(aliasAttrib.AliasName, out existingFieldDef))
                         throw new ReflectorException("Field " + fieldDef.FieldName + " references alias field " + aliasAttrib.AliasName + " which hasn't been defined prior to it");
 
@@ -1092,7 +1090,7 @@ namespace GameObjectReflector
 
             ExpectToken(directiveLine, ref pos, ")");
 
-            ClassDef classDef;
+            ClassDef? classDef;
             if (!rfState.ClassDefs.TryGetValue(typeName, out classDef))
             {
                 classDef = new ClassDef() { Name = typeName };
@@ -1349,8 +1347,6 @@ namespace GameObjectReflector
 
         private static bool IsReflectorStartLine(string line)
         {
-            int reflectorDirectiveStart = 0;
-
             int pos = 0;
             SkipWhitespace(line, ref pos);
 

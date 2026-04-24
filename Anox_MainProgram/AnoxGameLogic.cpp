@@ -104,6 +104,7 @@ namespace anox
 
 		rkit::ResultCoroutine StartUp(rkit::ICoroThread &thread);
 		rkit::ResultCoroutine AsyncRunFrame(rkit::ICoroThread &thread);
+		rkit::ResultCoroutine LoadGlobalScripts(rkit::ICoroThread &thread);
 		rkit::ResultCoroutine LoadMap(rkit::ICoroThread &thread, const rkit::StringSliceView &mapName);
 		rkit::ResultCoroutine SpawnMapInitialObjects(rkit::ICoroThread &thread, const rkit::StringSliceView &mapName);
 		rkit::ResultCoroutine LoadContentIDKeyedResource(rkit::ICoroThread &thread, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::data::ContentID &cid);
@@ -582,6 +583,29 @@ namespace anox
 		CORO_RETURN_OK;
 	}
 
+	rkit::ResultCoroutine AnoxGameLogic::LoadGlobalScripts(rkit::ICoroThread &thread)
+	{
+		rkit::Future<AnoxResourceRetrieveResult> resLoadResult;
+
+		CORO_CHECK(m_game->GetCaptureHarness()->GetCIPathKeyedResource(resLoadResult, anox::resloaders::kRawFileResourceTypeCode, u8"globalscripts.idx"));
+		CORO_CHECK(co_await thread.AwaitFuture(resLoadResult));
+
+		AnoxResourceRetrieveResult& loadResult = resLoadResult.GetResult();
+
+		const rkit::ConstSpan<uint8_t> contents = loadResult.m_resourceHandle.StaticCast<AnoxFileResourceBase>()->GetContents();
+
+		if (contents.Count() % sizeof(rkit::data::ContentID) != 0)
+			RKIT_THROW(rkit::ResultCode::kDataError);
+
+		const rkit::ConstSpan<rkit::data::ContentID> contentIDs = contents.ReinterpretCast<const rkit::data::ContentID>();
+
+		for (const rkit::data::ContentID &cid : contentIDs)
+		{
+		}
+
+		CORO_RETURN_OK;
+	}
+
 	rkit::ResultCoroutine AnoxGameLogic::LoadMap(rkit::ICoroThread &thread, const rkit::StringSliceView &mapName)
 	{
 		AnoxResourceRetrieveResult modelLoadResult;
@@ -752,6 +776,7 @@ namespace anox
 			CORO_THROW(rkit::ResultCode::kDataError);
 		}
 
+		CORO_CHECK(co_await LoadGlobalScripts(thread));
 		CORO_CHECK(co_await LoadMap(thread, mapName));
 		CORO_CHECK(co_await SpawnMapInitialObjects(thread, mapName));
 
