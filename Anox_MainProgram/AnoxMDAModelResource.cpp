@@ -7,17 +7,19 @@
 #include "rkit/Core/Pair.h"
 #include "rkit/Core/Vector.h"
 
+#include "rkit/Math/TRMat34.h"
+
 #include "rkit/Render/DeviceCaps.h"
 
-#include "anox/AnoxGraphicsSubsystem.h"
 #include "anox/Data/MDAModel.h"
+#include "anox/Data/ResourceTypeCodes.h"
+
+#include "anox/AnoxGraphicsSubsystem.h"
 
 #include "AnoxDataReader.h"
 #include "AnoxGameFileSystem.h"
 #include "AnoxLoadEntireFileJob.h"
 #include "AnoxAbstractSingleFileResource.h"
-
-#include "rkit/Math/TRMat34.h"
 
 #if RKIT_PLATFORM_ARCH_HAVE_SSE2 != 0
 #include <emmintrin.h>

@@ -963,7 +963,7 @@ namespace anox::buildsystem
 		RKIT_RETURN_OK;
 	}
 
-	void APEScriptCompilerImpl::ReadAPEFile(rkit::IReadStream &stream, rkit::Vector<rkit::ByteString> &strings,
+	rkit::Result APEScriptCompilerImpl::ReadAPEFile(rkit::IReadStream &stream, rkit::Vector<rkit::ByteString> &strings,
 		rkit::Vector<rkit::Vector<data::ape::ExpressionValue>> &operandLists,
 		rkit::Vector<CompiledWindowDef> &windows,
 		rkit::Vector<CompiledSwitchDef> &switches)

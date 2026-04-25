@@ -57,7 +57,8 @@ namespace rkit
 		friend class priv::OpaqueDestructor<TImpl>;
 
 		template<class... TArgs>
-		explicit Opaque(TArgs... args);
+		explicit Opaque(TArgs&&... args);
+
 		~Opaque();
 
 	protected:
@@ -140,7 +141,7 @@ namespace rkit
 
 	template<class TImpl>
 	template<class... TArgs>
-	Opaque<TImpl>::Opaque(TArgs... args)
+	Opaque<TImpl>::Opaque(TArgs&&... args)
 #if RKIT_IS_DEBUG
 		: m_impl(Impl())
 #endif

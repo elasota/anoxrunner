@@ -7,7 +7,11 @@
 #include "rkit/Core/Vector.h"
 
 #include "anox/Data/EntityDef.h"
+#include "anox/Data/ResourceTypeCodes.h"
+
 #include "anox/CoreUtils/CoreUtils.h"
+
+#include "SandboxResourceLoader.h"
 
 #include "AnoxGameSession.h"
 #include "AnoxWorldObjectFactory.h"
@@ -32,7 +36,7 @@ namespace anox::game
 			rkit::Span<const game::UserEntityDefValues> udefs, rkit::Vector<rkit::ByteString> udefDescriptions);
 
 		rkit::ResultCoroutine PostSpawnInitialEntities(rkit::ICoroThread &thread, World &world);
-		rkit::ResultCoroutine PostStartGlobalSession(rkit::ICoroThread &thread);
+		rkit::ResultCoroutine StartGlobalSession(rkit::ICoroThread &thread);
 		rkit::ResultCoroutine EnterGameSession(rkit::ICoroThread &thread, World &world);
 
 		rkit::ResultCoroutine RunFrame(rkit::ICoroThread &thread, World &world);
@@ -109,8 +113,17 @@ namespace anox::game
 		CORO_RETURN_OK;
 	}
 
-	rkit::ResultCoroutine SessionImpl::PostStartGlobalSession(rkit::ICoroThread &thread)
+	rkit::ResultCoroutine SessionImpl::StartGlobalSession(rkit::ICoroThread &thread)
 	{
+		SandboxResourceRequestHandle req;
+		CORO_CHECK(SandboxResourceLoader::LoadCIPathKeyedResource(req, resloaders::kRawFileResourceTypeCode, u8"globalscripts.idx"));
+
+		SandboxResourceHandle res;
+		CORO_CHECK(co_await req.WaitForLoaded(thread, res));
+
+		SandboxResourceDataBlob blob;
+		CORO_CHECK(SandboxResourceLoader::GetFileResourceContents(blob, res));
+
 		CORO_RETURN_OK;
 	}
 
@@ -146,10 +159,10 @@ namespace anox::game
 		return thread.EnterFunction(Impl().PostSpawnInitialEntities(thread, world));
 	}
 
-	rkit::Result Session::AsyncPostStartGlobalSession()
+	rkit::Result Session::AsyncStartGlobalSession()
 	{
 		rkit::ICoroThread &thread = *Impl().m_mainCoroThread;
-		return thread.EnterFunction(Impl().PostStartGlobalSession(thread));
+		return thread.EnterFunction(Impl().StartGlobalSession(thread));
 	}
 
 	rkit::Result Session::AsyncEnterGameSession(World &world)

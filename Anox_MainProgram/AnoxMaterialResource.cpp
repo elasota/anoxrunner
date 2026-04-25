@@ -3,6 +3,7 @@
 #include "AnoxLoadEntireFileJob.h"
 
 #include "anox/Data/MaterialData.h"
+#include "anox/Data/ResourceTypeCodes.h"
 
 #include "rkit/Core/Future.h"
 #include "rkit/Core/Job.h"

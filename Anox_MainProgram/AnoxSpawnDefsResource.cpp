@@ -7,8 +7,10 @@
 #include "rkit/Core/Sanitizers.h"
 
 #include "anox/CoreUtils/CoreUtils.h"
+
 #include "anox/Data/EntitySpawnData.h"
 #include "anox/Data/EntityStructs.h"
+#include "anox/Data/ResourceTypeCodes.h"
 
 #include "anox/AnoxUtilitiesDriver.h"
 #include "anox/AnoxModule.h"

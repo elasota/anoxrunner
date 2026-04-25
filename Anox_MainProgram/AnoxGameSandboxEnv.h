@@ -6,6 +6,10 @@
 namespace anox
 {
 	class AnoxSpawnDefsResourceBase;
+}
+
+namespace anox::game
+{
 	class GameResourceManager;
 }
 

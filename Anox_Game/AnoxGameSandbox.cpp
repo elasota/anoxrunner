@@ -222,7 +222,7 @@ namespace anox::game::sandbox
 	rkit::Result SandboxExports::MTAsync_StartGlobalSession(void *gameSession)
 	{
 		Session *session = static_cast<Session *>(gameSession);
-		return session->AsyncPostStartGlobalSession();
+		return session->AsyncStartGlobalSession();
 	}
 
 	::rkit::Result SandboxExports::MTAsync_EnterGameSession(void *gameSession)

@@ -29,10 +29,13 @@
 #include "AnoxResourceManager.h"
 #include "AnoxSpawnDefsResource.h"
 #include "AnoxGlobalVars.h"
+#include "AnoxGameResourceManager.h"
+
 #include "anox/AnoxModule.h"
 
 #include "anox/Game/UserEntityDefValues.h"
 #include "anox/Data/EntitySpawnData.h"
+#include "anox/Data/ResourceTypeCodes.h"
 #include "anox/Sandbox/AnoxGame.host.generated.h"
 
 namespace anox
@@ -122,7 +125,9 @@ namespace anox
 		rkit::UniquePtr<rkit::ICoroThread> m_mainCoroThread;
 		rkit::UniquePtr<AnoxCommandStackBase> m_commandStack;
 
+		rkit::UniquePtr<game::GameResourceManager> m_resManager;
 		rkit::UniquePtr<game::GlobalVars> m_globalVars;
+
 		rkit::UniquePtr<rkit::ISandbox> m_sandbox;
 		rkit::UniquePtr<rkit::sandbox::IThreadContext> m_sandboxMainThreadContext;
 		anox::game::sandbox::HostImports m_sandboxImports;
@@ -143,7 +148,7 @@ namespace anox
 
 	rkit::CoroThreadBlocker AnoxGameLogic::SandboxMainThreadBlocker::CreateBlocker()
 	{
-		return rkit::CoroThreadBlocker::Create(this, StaticCheckUnblock, StaticConsume, StaticRelease, true);
+		return rkit::CoroThreadBlocker::Create(this, StaticCheckUnblock, StaticConsume, StaticRelease, false);
 	}
 
 	bool AnoxGameLogic::SandboxMainThreadBlocker::StaticCheckUnblock(void *selfPtr)
@@ -585,22 +590,12 @@ namespace anox
 
 	rkit::ResultCoroutine AnoxGameLogic::LoadGlobalScripts(rkit::ICoroThread &thread)
 	{
-		rkit::Future<AnoxResourceRetrieveResult> resLoadResult;
+		CORO_CHECK(m_sandboxImports.MTAsync_StartGlobalSession(
+			m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr));
 
-		CORO_CHECK(m_game->GetCaptureHarness()->GetCIPathKeyedResource(resLoadResult, anox::resloaders::kRawFileResourceTypeCode, u8"globalscripts.idx"));
-		CORO_CHECK(co_await thread.AwaitFuture(resLoadResult));
-
-		AnoxResourceRetrieveResult& loadResult = resLoadResult.GetResult();
-
-		const rkit::ConstSpan<uint8_t> contents = loadResult.m_resourceHandle.StaticCast<AnoxFileResourceBase>()->GetContents();
-
-		if (contents.Count() % sizeof(rkit::data::ContentID) != 0)
-			RKIT_THROW(rkit::ResultCode::kDataError);
-
-		const rkit::ConstSpan<rkit::data::ContentID> contentIDs = contents.ReinterpretCast<const rkit::data::ContentID>();
-
-		for (const rkit::data::ContentID &cid : contentIDs)
 		{
+			SandboxMainThreadBlocker mtBlocker(this);
+			CORO_CHECK(co_await thread.AwaitBlocker(mtBlocker.CreateBlocker()));
 		}
 
 		CORO_RETURN_OK;
@@ -725,6 +720,11 @@ namespace anox
 	{
 		const IConfigurationState *configState = nullptr;
 
+		m_resManager.Reset();
+
+		RKIT_CHECK(game::GameResourceManager::Create(m_resManager));
+		m_resManager->SetCaptureHarness(m_game->GetCaptureHarness());
+
 		RKIT_ASSERT(!m_sandbox.IsValid());
 
 		{
@@ -736,6 +736,7 @@ namespace anox
 			CORO_CHECK(rkit::GetDrivers().m_utilitiesDriver->CreateModuleSandbox(sandbox, kAnoxNamespaceID, u8"Game", m_sandboxImports.GetHostAPIDescriptor().m_sysCallCatalog, m_sandboxEnv));
 
 			m_sandboxEnv.m_sandbox = sandbox.Get();
+			m_sandboxEnv.m_resManager = m_resManager.Get();
 
 			CORO_CHECK(rkit::GetDrivers().m_utilitiesDriver->LinkSandbox(*sandbox, m_sandboxImports.GetHostAPIDescriptor()));
 

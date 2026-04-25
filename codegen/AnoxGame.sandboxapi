@@ -7,8 +7,9 @@ import MemFree(uint32 mmid) noexcept
 import GetContentIDKeyedResource(uint32 resourceType, address contentID) -> (uint32 reqID)
 import GetCIPathKeyedResource(uint32 resourceType, address chars, size numChars) -> (uint32 reqID)
 import FinishLoadingResourceRequest(uint32 requestID) -> (bool completed, uint32 resID)
-import CancelResourceRequest(uint32 requestID)
-import DiscardResource(uint32 resID)
+import CancelResourceRequest(uint32 requestID) noexcept
+import DecRefResource(uint32 resID) noexcept
+import GetFileResourceContents(uint32 resID) -> (address ptr, size size, uint32 mmid)
 
 export Initialize() -> (address outGameSessionObject, address outGameSessionMem)
 export Shutdown(address gameSessionObject, address gameSessionMem)

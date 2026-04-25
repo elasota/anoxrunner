@@ -1,13 +1,15 @@
 #include "AnoxBSPModelResource.h"
 #include "AnoxMaterialResource.h"
 #include "AnoxAbstractSingleFileResource.h"
-#include "anox/AnoxGraphicsSubsystem.h"
 #include "AnoxGameFileSystem.h"
 
 #include "anox/Data/CompressedNormal.h"
 #include "anox/Data/BSPModel.h"
 
 #include "anox/Data/EntityStructs.h"
+#include "anox/Data/ResourceTypeCodes.h"
+
+#include "anox/AnoxGraphicsSubsystem.h"
 
 #include "rkit/Data/ContentID.h"
 

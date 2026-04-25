@@ -85,10 +85,35 @@ namespace anox::game::sandbox
 		return env.m_resManager->DiscardRequest(requestID);
 	}
 
-	::rkit::Result HostExports::DiscardResource(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t resID)
+	::rkit::Result HostExports::DecRefResource(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t resID)
 	{
 		AnoxGameSandboxEnvironment &env = static_cast<AnoxGameSandboxEnvironment &>(envBase);
-		return env.m_resManager->DiscardResource(resID);
+		return env.m_resManager->DecRefResource(resID);
+	}
+
+	::rkit::Result HostExports::GetFileResourceContents(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, ::rkit::sandbox::Address_t &ptr, size_t &size, uint32_t &mmid, uint32_t resID)
+	{
+		AnoxGameSandboxEnvironment &env = static_cast<AnoxGameSandboxEnvironment &>(envBase);
+
+		rkit::RCPtr<AnoxResourceBase> keepAlive;
+		rkit::Span<const uint8_t> contentsSpan;
+
+		RKIT_CHECK(env.m_resManager->GetFileResourceContents(keepAlive, contentsSpan, resID));
+
+		rkit::sandbox::Address_t memAddr = 0;
+		uint32_t tempMMID = 0;
+		RKIT_CHECK(env.m_sandbox->AllocDynamicMemory(memAddr, tempMMID, contentsSpan.Count()));
+
+		void *outputMem = nullptr;
+
+		RKIT_CHECK(env.m_sandbox->AccessMemoryRange(outputMem, memAddr, contentsSpan.Count()));
+
+		rkit::CopySpanNonOverlapping(rkit::Span<uint8_t>(static_cast<uint8_t *>(outputMem), contentsSpan.Count()), contentsSpan);
+		ptr = memAddr;
+		size = contentsSpan.Count();
+		mmid = tempMMID;
+
+		RKIT_RETURN_OK;
 	}
 }
 

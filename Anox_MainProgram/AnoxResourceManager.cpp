@@ -15,6 +15,8 @@
 
 #include "rkit/Data/ContentID.h"
 
+#include "anox/Data/ResourceTypeCodes.h"
+
 #include "AnoxBSPModelResource.h"
 #include "AnoxEntityDefResource.h"
 #include "AnoxFileResource.h"

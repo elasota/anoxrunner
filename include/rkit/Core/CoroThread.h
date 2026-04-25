@@ -34,6 +34,9 @@ namespace rkit
 		// Release the blocker without consuming its result
 		ReleaseFunc_t m_releaseFunc = nullptr;
 
+		// Automatically release the blocker when resuming the coroutine.
+		// This should ONLY be done if the blocker is not being awaited,
+		// such as for root-level calls.
 		bool m_autoReleaseOnResume = false;
 
 		static CoroThreadBlocker Create(void *context, CheckUnblockFunc_t checkFunc, ConsumeFunc_t consumeFunc, ReleaseFunc_t releaseFunc, bool autoReleaseOnResume);

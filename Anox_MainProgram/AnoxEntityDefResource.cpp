@@ -8,12 +8,14 @@
 #include "rkit/Core/VectorTrait.h"
 
 #include "anox/Data/EntityDef.h"
+#include "anox/Data/ResourceTypeCodes.h"
+
+#include "anox/AnoxModule.h"
 #include "anox/AnoxUtilitiesDriver.h"
 
 #include "AnoxDataReader.h"
 #include "AnoxGameFileSystem.h"
 #include "AnoxLoadEntireFileJob.h"
-#include "anox/AnoxModule.h"
 
 #include "AnoxAbstractSingleFileResource.h"
 
