@@ -10,6 +10,7 @@ namespace anox { namespace buildsystem
 	static const uint32_t kBSPLightmapNodeID = RKIT_FOURCC('B', 'S', 'P', 'L');
 	static const uint32_t kBSPGeometryID = RKIT_FOURCC('B', 'S', 'P', 'G');
 	static const uint32_t kBSPEntityID = RKIT_FOURCC('B', 'S', 'P', 'E');
+	static const uint32_t kBSPScriptID = RKIT_FOURCC('B', 'S', 'P', 'S');
 
 	struct IDependencyNodeCompilerFeedback;
 
@@ -20,5 +21,12 @@ namespace anox { namespace buildsystem
 		static rkit::Result CreateLightingCompiler(rkit::UniquePtr<BSPMapCompilerBase> &outCompiler);
 		static rkit::Result CreateGeometryCompiler(rkit::UniquePtr<BSPMapCompilerBase> &outCompiler);
 		static rkit::Result CreateEntityCompiler(rkit::UniquePtr<BSPMapCompilerBase> &outCompiler);
+	};
+
+
+	class BSPScriptCompilerBase : public rkit::buildsystem::IDependencyNodeCompiler
+	{
+	public:
+		static rkit::Result CreateEntityCompiler(rkit::UniquePtr<BSPScriptCompilerBase> &outCompiler);
 	};
 } } // anox::buildsystem

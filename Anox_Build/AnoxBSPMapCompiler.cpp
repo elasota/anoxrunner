@@ -20,6 +20,8 @@
 
 #include "rkit/Math/SoftFloat.h"
 
+#include "anox/Build/NodeIDs.h"
+
 #include "anox/CoreUtils/CoreUtils.h"
 
 #include "anox/Data/CompressedNormal.h"
@@ -31,6 +33,8 @@
 #include "anox/AnoxUtilitiesDriver.h"
 
 #include "anox/Label.h"
+
+#include "AnoxAPEScriptCompiler.h"
 
 #include <cmath>
 
@@ -397,6 +401,7 @@ namespace anox { namespace buildsystem
 
 		static rkit::Result FormatLightmapPath(rkit::String &path, const rkit::StringView &identifier, size_t lightmapIndex);
 		static rkit::Result FormatModelPath(rkit::String &path, const rkit::StringView &identifier);
+		static rkit::Result FormatScriptPackagePath(rkit::String &path, const rkit::StringView &identifier);
 		static rkit::Result FormatObjectsPath(rkit::String &path, const rkit::StringView &identifier);
 		static rkit::Result FormatFaceStatsPath(rkit::String &path, const rkit::StringView &identifier);
 		static rkit::Result FormatGeometryPath(rkit::String &path, const rkit::StringView &identifier);
@@ -508,6 +513,7 @@ namespace anox { namespace buildsystem
 		};
 
 		static rkit::Result ParseEntityData(const UserEntityDictionaryBase &dict, const rkit::ConstSpan<char> &entityData, IEntityDataHandler &handler);
+		static rkit::Result FindScriptPath(bool &outHaveScript, rkit::String &outPathStr, const rkit::StringSliceView &identifier, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 
 		static void SkipWhitespace(rkit::ConstSpan<char> &span);
 
@@ -1189,6 +1195,16 @@ namespace anox { namespace buildsystem
 
 	rkit::Result BSPEntityCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
+		bool haveScripts = false;
+		rkit::String scriptsPathStr;
+
+		RKIT_CHECK(FindScriptPath(haveScripts, scriptsPathStr, depsNode->GetIdentifier(), feedback));
+
+		if (haveScripts)
+		{
+			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kAPEScriptNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, scriptsPathStr));
+		}
+
 		rkit::UniquePtr<UserEntityDictionaryBase> dictionary;
 		RKIT_CHECK(EntityDefCompilerBase::LoadUserEntityDictionary(dictionary, feedback));
 
@@ -1208,6 +1224,24 @@ namespace anox { namespace buildsystem
 
 	rkit::Result BSPEntityCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
+		rkit::data::ContentID scriptsContentID = {};
+
+		{
+			bool haveScripts = false;
+			rkit::String scriptsPathStr;
+
+			RKIT_CHECK(FindScriptPath(haveScripts, scriptsPathStr, depsNode->GetIdentifier(), feedback));
+
+			if (haveScripts)
+			{
+				rkit::CIPath scriptOutputPath;
+				RKIT_CHECK(APEScriptCompiler::FormatOutputPath(scriptOutputPath, scriptsPathStr));
+
+				RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, scriptOutputPath, scriptsContentID));
+			}
+		}
+
+
 		rkit::UniquePtr<UserEntityDictionaryBase> dictionary;
 		RKIT_CHECK(EntityDefCompilerBase::LoadUserEntityDictionary(dictionary, feedback));
 
@@ -1235,12 +1269,28 @@ namespace anox { namespace buildsystem
 			RKIT_CHECK(handler.WriteEntityData(*outStream));
 		}
 
+		{
+			rkit::String outPathStr;
+			RKIT_CHECK(FormatScriptPackagePath(outPathStr, depsNode->GetIdentifier()));
+
+			rkit::CIPath outPath;
+			RKIT_CHECK(outPath.Set(outPathStr));
+
+			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
+			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, outPath, outStream));
+
+			if (scriptsContentID.IsNull())
+			{
+				RKIT_CHECK(outStream->WriteOneBinary(scriptsContentID));
+			}
+		}
+
 		RKIT_RETURN_OK;
 	}
 
 	uint32_t BSPEntityCompiler::GetVersion() const
 	{
-		return 1;
+		return 2;
 	}
 
 	rkit::Result BSPEntityCompiler::ParseEntityData(const UserEntityDictionaryBase &dict, const rkit::ConstSpan<char> &entityDataRef, IEntityDataHandler &handler)
@@ -1360,6 +1410,27 @@ namespace anox { namespace buildsystem
 				RKIT_CHECK(handler.ParseUserEntity(edefID, *userEntityClassDef, keyValuePairs.ToSpan()));
 			}
 		}
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result BSPEntityCompiler::FindScriptPath(bool &outHaveScript, rkit::String &outPathStr, const rkit::StringSliceView &identifier, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		if (identifier.EndsWithNoCase(u8".bsp") && identifier.StartsWithNoCase(u8"maps/"))
+		{
+			rkit::String apePathStr;
+			RKIT_CHECK(apePathStr.Format(u8"gameflow/{}.ape", identifier.SubString(5, identifier.Length() - 9)));
+
+			rkit::CIPath apePath;
+			RKIT_CHECK(apePath.Set(apePathStr));
+
+			RKIT_CHECK(feedback->CheckInputExists(rkit::buildsystem::BuildFileLocation::kSourceDir, apePath, outHaveScript));
+
+			if (outHaveScript)
+				outPathStr = std::move(apePathStr);
+		}
+		else
+			outHaveScript = false;
 
 		RKIT_RETURN_OK;
 	}
@@ -3247,6 +3318,11 @@ namespace anox { namespace buildsystem
 		return path.Format(u8"ax_bsp/{}.objects", identifier.GetChars());
 	}
 
+	rkit::Result BSPMapCompilerBase2::FormatScriptPackagePath(rkit::String &path, const rkit::StringView &identifier)
+	{
+		return path.Format(u8"ax_bsp/{}.scripts", identifier.GetChars());
+	}
+
 	rkit::Result BSPMapCompilerBase2::FormatFaceStatsPath(rkit::String &path, const rkit::StringView &identifier)
 	{
 		return path.Format(u8"ax_bsp/{}.facestats", identifier.GetChars());
@@ -3656,7 +3732,7 @@ namespace anox { namespace buildsystem
 
 	uint32_t BSPMapCompiler::GetVersion() const
 	{
-		return 7;
+		return 8;
 	}
 
 	rkit::Result BSPMapCompiler::FormatWorldMaterialPath(rkit::String &str, const rkit::StringSliceView &textureName)

@@ -106,6 +106,8 @@ namespace anox::buildsystem
 	class APEScriptCompilerImpl : public rkit::OpaqueImplementation<APEScriptCompiler>
 	{
 	public:
+		friend class APEScriptCompiler;
+
 		rkit::Result RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 		rkit::Result RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 
@@ -157,11 +159,13 @@ namespace anox::buildsystem
 		static bool IsTerminalCC(uint64_t cc);
 
 		static rkit::Result DumpAPEFile(rkit::IWriteStream &stream, rkit::ConstSpan<rkit::ByteString> strings,
+			rkit::ConstSpan<data::ape::Expression> exprs,
 			rkit::ConstSpan<rkit::Vector<data::ape::ExpressionValue>> operandLists,
 			rkit::ConstSpan<CompiledWindowDef> windows,
 			rkit::ConstSpan<CompiledSwitchDef> switches);
 
 		static rkit::Result ReadAPEFile(rkit::IReadStream &stream, rkit::Vector<rkit::ByteString> &strings,
+			rkit::Vector<data::ape::Expression> &exprs,
 			rkit::Vector<rkit::Vector<data::ape::ExpressionValue>> &operandLists,
 			rkit::Vector<CompiledWindowDef> &windows,
 			rkit::Vector<CompiledSwitchDef> &switches);
@@ -388,7 +392,7 @@ namespace anox::buildsystem
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
 		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outFile));
 
-		RKIT_CHECK(DumpAPEFile(*outFile, strings.ToSpan(), operandLists.ToSpan(), compiledWindows.ToSpan(),
+		RKIT_CHECK(DumpAPEFile(*outFile, strings.ToSpan(), exprs.ToSpan(), operandLists.ToSpan(), compiledWindows.ToSpan(),
 			compiledSwitches.ToSpan()));
 
 		RKIT_RETURN_OK;
@@ -753,7 +757,7 @@ namespace anox::buildsystem
 			rkit::UniquePtr<rkit::ISeekableReadStream> inFile;
 			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, analysisPath, inFile));
 
-			RKIT_CHECK(ReadAPEFile(*inFile, strings, operandLists, windows, switches));
+			RKIT_CHECK(ReadAPEFile(*inFile, strings, exprs, operandLists, windows, switches));
 		}
 
 		{
@@ -764,7 +768,7 @@ namespace anox::buildsystem
 				rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
 				RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outFile));
 
-				RKIT_CHECK(DumpAPEFile(*outFile, strings.ToSpan(), operandLists.ToSpan(), windows.ToSpan(), switches.ToSpan()));
+				RKIT_CHECK(DumpAPEFile(*outFile, strings.ToSpan(), exprs.ToSpan(), operandLists.ToSpan(), windows.ToSpan(), switches.ToSpan()));
 			}
 		}
 
@@ -897,6 +901,7 @@ namespace anox::buildsystem
 	}
 
 	rkit::Result APEScriptCompilerImpl::DumpAPEFile(rkit::IWriteStream &stream, rkit::ConstSpan<rkit::ByteString> strings,
+		rkit::ConstSpan<data::ape::Expression> exprs,
 		rkit::ConstSpan<rkit::Vector<data::ape::ExpressionValue>> operandLists,
 		rkit::ConstSpan<CompiledWindowDef> compiledWindows,
 		rkit::ConstSpan<CompiledSwitchDef> compiledSwitches)
@@ -905,6 +910,7 @@ namespace anox::buildsystem
 			data::ape::APEScriptCatalog catalog;
 
 			catalog.m_numStrings = static_cast<uint32_t>(strings.Count());
+			catalog.m_numExprs = static_cast<uint32_t>(exprs.Count());
 			catalog.m_numOperandLists = static_cast<uint32_t>(operandLists.Count());
 			catalog.m_numWindows = static_cast<uint32_t>(compiledWindows.Count());
 			catalog.m_numSwitches = static_cast<uint32_t>(compiledSwitches.Count());
@@ -922,6 +928,8 @@ namespace anox::buildsystem
 		{
 			RKIT_CHECK(stream.WriteAllSpan(str.ToSpan()));
 		}
+
+		RKIT_CHECK(stream.WriteAllSpan(exprs));
 
 		for (const rkit::Vector<data::ape::ExpressionValue> &opList : operandLists)
 		{
@@ -964,6 +972,7 @@ namespace anox::buildsystem
 	}
 
 	rkit::Result APEScriptCompilerImpl::ReadAPEFile(rkit::IReadStream &stream, rkit::Vector<rkit::ByteString> &strings,
+		rkit::Vector<data::ape::Expression> &exprs,
 		rkit::Vector<rkit::Vector<data::ape::ExpressionValue>> &operandLists,
 		rkit::Vector<CompiledWindowDef> &windows,
 		rkit::Vector<CompiledSwitchDef> &switches)
@@ -981,6 +990,7 @@ namespace anox::buildsystem
 		RKIT_CHECK(operandLists.Resize(catalog.m_numOperandLists.Get()));
 		RKIT_CHECK(windows.Resize(catalog.m_numWindows.Get()));
 		RKIT_CHECK(switches.Resize(catalog.m_numSwitches.Get()));
+		RKIT_CHECK(exprs.Resize(catalog.m_numExprs.Get()));
 
 		for (rkit::ByteStringConstructionBuffer &strCBuf : stringCBufs)
 		{
@@ -999,6 +1009,8 @@ namespace anox::buildsystem
 			{
 				str = rkit::ByteString(std::move(cbuf));
 			});
+
+		RKIT_CHECK(stream.ReadAllSpan(exprs.ToSpan()));
 
 		for (rkit::Vector<data::ape::ExpressionValue> &opList : operandLists)
 		{
@@ -1074,7 +1086,12 @@ namespace anox::buildsystem
 
 	uint32_t APEScriptCompiler::GetVersion() const
 	{
-		return 3;
+		return 4;
+	}
+
+	rkit::Result APEScriptCompiler::FormatOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier)
+	{
+		return APEScriptCompilerImpl::FormatOutputPath(outPath, identifier);
 	}
 
 	rkit::Result APEScriptCompiler::Create(rkit::UniquePtr<APEScriptCompiler> &outCompiler)

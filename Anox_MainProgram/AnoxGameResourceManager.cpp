@@ -101,7 +101,7 @@ namespace anox::game
 	{
 		if (resList.m_numFreeIDs == 0)
 		{
-			if (resList.m_freeIDs.Count() == 0)
+			if (resList.m_freeIDs.Count() <= resList.m_items.Count())
 			{
 				RKIT_CHECK(resList.m_freeIDs.Append(0));
 			}
@@ -329,7 +329,7 @@ namespace anox::game
 		uint32_t resType = 0;
 		RKIT_CHECK(impl.AcquireResource(res, resType, resID));
 
-		if (resType != resloaders::kRawFileResourceTypeCode)
+		if (resType != resloaders::kCIPathRawFileResourceTypeCode && resType != resloaders::kContentIDRawFileResourceTypeCode)
 			RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 
 		outBytes = static_cast<AnoxFileResourceBase *>(res.Get())->GetContents();

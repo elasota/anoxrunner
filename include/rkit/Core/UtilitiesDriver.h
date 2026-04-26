@@ -84,8 +84,6 @@ namespace rkit
 
 		virtual Result CreateThreadPool(UniquePtr<utils::IThreadPool> &outThreadPool, uint32_t numThreads) const = 0;
 
-		virtual HashValue_t ComputeHash(HashValue_t baseHash, const void *value, size_t size) const = 0;
-
 		virtual Result CreateTextParser(const Span<const uint8_t> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<utils::ITextParser> &outParser) const = 0;
 		virtual Result ReadEntireFile(ISeekableReadStream &stream, Vector<uint8_t> &outBytes) const = 0;
 

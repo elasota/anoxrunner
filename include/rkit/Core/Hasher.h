@@ -119,18 +119,18 @@ namespace rkit
 
 #include "Drivers.h"
 #include "Span.h"
-#include "UtilitiesDriver.h"
+#include "CoreLib.h"
 
 template<class T>
 rkit::HashValue_t rkit::BinaryHasher<T>::ComputeHash(HashValue_t baseHash, const T &value)
 {
-	return GetDrivers().m_utilitiesDriver->ComputeHash(baseHash, &value, sizeof(value));
+	return rkit::utils::ComputeHash(baseHash, &value, sizeof(value));
 }
 
 template<class T>
 rkit::HashValue_t rkit::BinaryHasher<T>::ComputeHash(HashValue_t baseHash, const Span<const T> &values)
 {
-	return GetDrivers().m_utilitiesDriver->ComputeHash(baseHash, values.Ptr(), values.Count() * sizeof(T));
+	return rkit::utils::ComputeHash(baseHash, values.Ptr(), values.Count() * sizeof(T));
 }
 
 template<class T>

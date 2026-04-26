@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rkit/Core/Algorithm.h"
+#include "rkit/Core/Hasher.h"
 
 #include <stdint.h>
 
@@ -22,6 +23,9 @@ namespace anox
 		LabelValue_t RawValue() const;
 
 		static bool IsValid(uint32_t high, uint32_t low);
+
+		bool operator==(const Label &other) const;
+		bool operator!=(const Label &other) const;
 
 	private:
 		explicit Label(uint32_t value);
@@ -72,4 +76,22 @@ namespace anox
 
 		return true;
 	}
+
+	inline bool Label::operator==(const Label &other) const
+	{
+		return m_value == other.m_value;
+	}
+
+	inline bool Label::operator!=(const Label &other) const
+	{
+		return m_value != other.m_value;
+	}
+}
+
+namespace rkit
+{
+	template<>
+	struct Hasher<anox::Label> : public BinaryHasher<anox::Label>
+	{
+	};
 }

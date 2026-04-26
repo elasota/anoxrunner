@@ -73,6 +73,8 @@ namespace anox::buildsystem::ape_parse
 			RKIT_CHECK(m_stream.ReadOneBinary(zeroCheck));
 			if (zeroCheck.Get() != 0)
 				RKIT_THROW(rkit::ResultCode::kDataError);
+
+			value = std::move(expr);
 		}
 		else
 			RKIT_THROW(rkit::ResultCode::kDataError);

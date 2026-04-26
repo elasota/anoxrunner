@@ -2,6 +2,7 @@
 
 #include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/CharacterEncoding.h"
+#include "rkit/Core/HashValue.h"
 
 #if RKIT_CORELIB_DLL != 0
 #	ifdef RKIT_CORELIB_INTERNAL
@@ -73,4 +74,6 @@ namespace rkit::utils
 		, IAssertDriver *assertDriver
 #endif
 	);
+
+	::rkit::HashValue_t RKIT_CORELIB_API ComputeHash(::rkit::HashValue_t baseHash, const void *data, size_t size);
 }

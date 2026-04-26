@@ -6,6 +6,11 @@
 #include "rkit/Core/PathProto.h"
 #include "rkit/Core/StringProto.h"
 
+namespace rkit::data
+{
+	struct ContentID;
+}
+
 namespace anox::game
 {
 	class SandboxResource;
@@ -23,7 +28,7 @@ namespace anox::game
 		~SandboxResourceHandle();
 
 		SandboxResourceHandle &operator=(const SandboxResourceHandle &other) = delete;
-		SandboxResourceHandle &operator=(SandboxResourceHandle &&other) noexcept;;
+		SandboxResourceHandle &operator=(SandboxResourceHandle &&other) noexcept;
 
 		uint32_t GetResourceID() const;
 
@@ -47,7 +52,7 @@ namespace anox::game
 
 		rkit::Result TryFinishLoading(bool &isFinished, SandboxResourceHandle& reqHandle);
 
-		rkit::ResultCoroutine WaitForLoaded(rkit::ICoroThread &thread, SandboxResourceHandle &outReqHandle);
+		rkit::ResultCoroutine WaitForLoaded(rkit::ICoroThread &thread, SandboxResourceHandle &outResHandle);
 
 		uint32_t GetRequestID() const;
 		bool IsValid() const;
@@ -84,8 +89,12 @@ namespace anox::game
 	{
 	public:
 		static rkit::Result LoadCIPathKeyedResource(SandboxResourceRequestHandle &outRequest, uint32_t resourceType, const rkit::StringSliceView &path);
-
+		static rkit::Result LoadContentKeyedResource(SandboxResourceRequestHandle &outRequest, uint32_t resourceType, const rkit::data::ContentID &cid);
 		static rkit::Result GetFileResourceContents(SandboxResourceDataBlob &outBlob, const SandboxResourceHandle &res);
+
+		// This queues up a load of the resource immediately and returns a coroutine that completes it,
+		// so it can be used for parallel loads.
+		static rkit::ResultCoroutine BlockingLoadCIPathKeyedFileResource(rkit::ICoroThread &thread, SandboxResourceDataBlob &outBlob, const rkit::StringSliceView &path);
 	};
 }
 

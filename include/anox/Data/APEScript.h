@@ -51,6 +51,8 @@ namespace anox::data::ape
 		StringLiteral,
 		FloatVariable,
 		StringVariable,
+
+		Count,
 	};
 
 	struct ExpressionValue
@@ -82,12 +84,14 @@ namespace anox::data::ape
 	struct APEScriptCatalog
 	{
 		rkit::endian::LittleUInt32_t m_numStrings;
+		rkit::endian::LittleUInt32_t m_numExprs;
 		rkit::endian::LittleUInt32_t m_numOperandLists;
 		rkit::endian::LittleUInt32_t m_numWindows;
 		rkit::endian::LittleUInt32_t m_numSwitches;
 
 		// uint32_t m_stringLengths[m_numStrings]
 		// uint8_t m_stringChars[m_numStrings][m_stringLengths[i]]
+		// Expression m_exprs[m_numExprs]
 		// uint32_t m_operandListCounts[m_numOperandLists]
 		// uint32_t m_operands[m_numOperandLists][m_operandListCounts[i]]
 		// Window m_windows[m_numWindows]
@@ -99,12 +103,12 @@ namespace anox::data::ape
 
 namespace anox::data::ape
 {
-	uint8_t Expression::PackOperandInfo(Operator op, OperandType leftOperandType, OperandType rightOperandType)
+	inline uint8_t Expression::PackOperandInfo(Operator op, OperandType leftOperandType, OperandType rightOperandType)
 	{
 		return static_cast<uint8_t>(op) | (static_cast<uint8_t>(leftOperandType) << 4) | (static_cast<uint8_t>(rightOperandType) << 6);
 	}
 
-	void Expression::UnpackOperandInfo(uint8_t packed, Operator &outOp, OperandType &outLeftOperandType, OperandType &outRightOperandType)
+	inline void Expression::UnpackOperandInfo(uint8_t packed, Operator &outOp, OperandType &outLeftOperandType, OperandType &outRightOperandType)
 	{
 		outOp = static_cast<Operator>(packed & 0xf);
 		outLeftOperandType = static_cast<OperandType>((packed >> 4) & 0x3);

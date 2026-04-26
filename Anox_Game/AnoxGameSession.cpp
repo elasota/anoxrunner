@@ -5,7 +5,9 @@
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/String.h"
 #include "rkit/Core/Vector.h"
+#include "rkit/Core/MemoryStream.h"
 
+#include "anox/Data/APEScript.h"
 #include "anox/Data/EntityDef.h"
 #include "anox/Data/ResourceTypeCodes.h"
 
@@ -16,6 +18,7 @@
 #include "AnoxGameSession.h"
 #include "AnoxWorldObjectFactory.h"
 
+#include "ScriptManager.h"
 #include "World.h"
 
 namespace anox::game
@@ -37,12 +40,16 @@ namespace anox::game
 
 		rkit::ResultCoroutine PostSpawnInitialEntities(rkit::ICoroThread &thread, World &world);
 		rkit::ResultCoroutine StartGlobalSession(rkit::ICoroThread &thread);
+		rkit::ResultCoroutine LoadMapScriptPackage(rkit::ICoroThread &thread, rkit::Span<const rkit::data::ContentID> scriptContentIDs);
 		rkit::ResultCoroutine EnterGameSession(rkit::ICoroThread &thread, World &world);
 
 		rkit::ResultCoroutine RunFrame(rkit::ICoroThread &thread, World &world);
 
 	private:
+		rkit::ResultCoroutine LoadMultipleScripts(rkit::ICoroThread &thread, ScriptManager::ScriptLayer layer, rkit::Span<const rkit::data::ContentID> contentIDs);
+
 		rkit::UniquePtr<World> m_world;
+		rkit::UniquePtr<ScriptManager> m_scriptManager;
 		rkit::UniquePtr<rkit::ICoroThread> m_mainCoroThread;
 	};
 }
@@ -59,6 +66,7 @@ namespace anox::game
 		RKIT_CHECK(rkit::utils::CreateCoroThread(m_mainCoroThread, allocDriver, 1 * 1024 * 1024, rkit::GetDrivers().GetAssertDriver()));
 
 		RKIT_CHECK(World::Create(m_world));
+		RKIT_CHECK(ScriptManager::Create(m_scriptManager));
 
 		RKIT_RETURN_OK;
 	}
@@ -115,16 +123,26 @@ namespace anox::game
 
 	rkit::ResultCoroutine SessionImpl::StartGlobalSession(rkit::ICoroThread &thread)
 	{
-		SandboxResourceRequestHandle req;
-		CORO_CHECK(SandboxResourceLoader::LoadCIPathKeyedResource(req, resloaders::kRawFileResourceTypeCode, u8"globalscripts.idx"));
+		SandboxResourceDataBlob globalScriptsIndexBlob;
 
-		SandboxResourceHandle res;
-		CORO_CHECK(co_await req.WaitForLoaded(thread, res));
+		CORO_CHECK(co_await SandboxResourceLoader::BlockingLoadCIPathKeyedFileResource(thread, globalScriptsIndexBlob, u8"globalscripts.idx"));
 
-		SandboxResourceDataBlob blob;
-		CORO_CHECK(SandboxResourceLoader::GetFileResourceContents(blob, res));
+		const rkit::ConstSpan<uint8_t> indexBytes = globalScriptsIndexBlob.GetContents();
+
+		if (indexBytes.Count() % sizeof(rkit::data::ContentID) != 0)
+			CORO_THROW(rkit::ResultCode::kDataError);
+
+		const rkit::ConstSpan<rkit::data::ContentID> contentIDs = indexBytes.ReinterpretCast<const rkit::data::ContentID>();
+
+		CORO_CHECK(co_await SessionImpl::LoadMultipleScripts(thread, ScriptManager::ScriptLayer::kGlobal, contentIDs));
 
 		CORO_RETURN_OK;
+	}
+
+	rkit::ResultCoroutine SessionImpl::LoadMapScriptPackage(rkit::ICoroThread &thread, rkit::Span<const rkit::data::ContentID> contentIDs)
+	{
+		m_scriptManager->UnloadLayer(ScriptManager::ScriptLayer::kMap);
+		return LoadMultipleScripts(thread, ScriptManager::ScriptLayer::kMap, contentIDs);
 	}
 
 	rkit::ResultCoroutine SessionImpl::PostSpawnInitialEntities(rkit::ICoroThread &thread, World &world)
@@ -139,6 +157,33 @@ namespace anox::game
 
 	rkit::ResultCoroutine SessionImpl::RunFrame(rkit::ICoroThread &thread, World &world)
 	{
+		CORO_RETURN_OK;
+	}
+
+	rkit::ResultCoroutine SessionImpl::LoadMultipleScripts(rkit::ICoroThread &thread, ScriptManager::ScriptLayer layer, rkit::Span<const rkit::data::ContentID> contentIDs)
+	{
+		const size_t numScripts = contentIDs.Count();
+
+		rkit::Vector<SandboxResourceRequestHandle> requestHandles;
+
+		CORO_CHECK(requestHandles.Resize(numScripts));
+
+		for (size_t i = 0; i < numScripts; i++)
+		{
+			CORO_CHECK(SandboxResourceLoader::LoadContentKeyedResource(requestHandles[i], resloaders::kContentIDRawFileResourceTypeCode, contentIDs[i]));
+		}
+
+		for (size_t i = 0; i < numScripts; i++)
+		{
+			SandboxResourceHandle resHandle;
+			CORO_CHECK(co_await requestHandles[i].WaitForLoaded(thread, resHandle));
+
+			SandboxResourceDataBlob blob;
+			CORO_CHECK(SandboxResourceLoader::GetFileResourceContents(blob, resHandle));
+
+			CORO_CHECK(m_scriptManager->LoadScriptPackage(layer, blob.GetContents()));
+		}
+
 		CORO_RETURN_OK;
 	}
 
@@ -163,6 +208,12 @@ namespace anox::game
 	{
 		rkit::ICoroThread &thread = *Impl().m_mainCoroThread;
 		return thread.EnterFunction(Impl().StartGlobalSession(thread));
+	}
+
+	rkit::Result Session::AsyncLoadMapScriptPackage(const rkit::Span<const rkit::data::ContentID> &scriptContentIDs)
+	{
+		rkit::ICoroThread &thread = *Impl().m_mainCoroThread;
+		return thread.EnterFunction(Impl().LoadMapScriptPackage(thread, scriptContentIDs));
 	}
 
 	rkit::Result Session::AsyncEnterGameSession(World &world)

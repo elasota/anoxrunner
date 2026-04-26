@@ -17,8 +17,14 @@ namespace rkit
 	struct IMallocDriver;
 }
 
+namespace rkit::data
+{
+	struct ContentID;
+}
+
 namespace anox::game
 {
+	class ScriptManager;
 	class SessionImpl;
 	class World;
 	struct SpawnDef;
@@ -36,6 +42,7 @@ namespace anox::game
 			rkit::Span<const game::UserEntityDefValues> udefs,
 			rkit::Vector<rkit::ByteString> udefDescriptions);
 		rkit::Result AsyncStartGlobalSession();
+		rkit::Result AsyncLoadMapScriptPackage(const rkit::Span<const rkit::data::ContentID> &scriptContentIDs);
 		rkit::Result AsyncPostSpawnInitialEntities(World &world);
 		rkit::Result AsyncRunFrame(World &world);
 		rkit::Result AsyncEnterGameSession(World &world);

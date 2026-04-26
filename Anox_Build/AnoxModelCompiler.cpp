@@ -1986,7 +1986,7 @@ namespace anox { namespace buildsystem
 				for (size_t axis = 0; axis < 2; axis++)
 					triCompoundVert.m_compressedUV[axis] = CompressUV(triTexCoords.m_texCoords[ptIndex].m_uvFloatBits[axis].GetBits());
 
-				const rkit::HashValue_t hashValue = rkit::GetDrivers().m_utilitiesDriver->ComputeHash(0, &triCompoundVert, sizeof(triCompoundVert));
+				const rkit::HashValue_t hashValue = rkit::utils::ComputeHash(0, &triCompoundVert, sizeof(triCompoundVert));
 
 				triCompoundVertHashes[ptIndex] = hashValue;
 

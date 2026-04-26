@@ -18,6 +18,8 @@ namespace anox::buildsystem
 
 		uint32_t GetVersion() const override;
 
+		static rkit::Result FormatOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier);
+
 		static rkit::Result Create(rkit::UniquePtr<APEScriptCompiler> &outCompiler);
 	};
 

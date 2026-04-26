@@ -17,12 +17,14 @@ namespace anox
 	// Job chart:
 	// Open -> Post IO Job         (Signaler) -> IO Complete
 	//             `-----> IO Request --^
-	class AnoxFileResourceLoader;
+	class AnoxPathFileResourceLoader;
+	class AnoxContentFileResourceLoader;
 
 	class AnoxFileResource : public AnoxFileResourceBase
 	{
 	public:
-		friend class AnoxFileResourceLoader;
+		friend class AnoxPathFileResourceLoader;
+		friend class AnoxContentFileResourceLoader;
 
 		AnoxFileResource();
 
@@ -32,10 +34,17 @@ namespace anox
 		rkit::Vector<uint8_t> m_fileBytes;
 	};
 
-	class AnoxFileResourceLoader final : public AnoxFileResourceLoaderBase
+	class AnoxPathFileResourceLoader final : public AnoxPathFileResourceLoaderBase
 	{
 	public:
 		rkit::Result CreateLoadJob(const rkit::RCPtr<AnoxFileResourceBase> &resource, const AnoxResourceLoaderSystems &systems, const rkit::CIPathView &key, rkit::RCPtr<rkit::Job> &outJob) const override;
+		rkit::Result CreateResourceObject(rkit::UniquePtr<AnoxFileResourceBase> &outResource) const override;
+	};
+
+	class AnoxContentFileResourceLoader final : public AnoxContentFileResourceLoaderBase
+	{
+	public:
+		rkit::Result CreateLoadJob(const rkit::RCPtr<AnoxFileResourceBase> &resource, const AnoxResourceLoaderSystems &systems, const rkit::data::ContentID &key, rkit::RCPtr<rkit::Job> &outJob) const override;
 		rkit::Result CreateResourceObject(rkit::UniquePtr<AnoxFileResourceBase> &outResource) const override;
 	};
 
@@ -48,28 +57,48 @@ namespace anox
 		return m_fileBytes.ToSpan();
 	}
 
-	rkit::Result AnoxFileResourceLoader::CreateLoadJob(const rkit::RCPtr<AnoxFileResourceBase> &resource, const AnoxResourceLoaderSystems &systems, const rkit::CIPathView &key, rkit::RCPtr<rkit::Job> &outJob) const
+	rkit::Result AnoxPathFileResourceLoader::CreateLoadJob(const rkit::RCPtr<AnoxFileResourceBase> &resource, const AnoxResourceLoaderSystems &systems, const rkit::CIPathView &key, rkit::RCPtr<rkit::Job> &outJob) const
 	{
 		rkit::RCPtr<rkit::Job> openJob;
 
-		rkit::CIPath loosePath;
-		RKIT_CHECK(loosePath.AppendComponent(u8"loose"));
-		RKIT_CHECK(loosePath.Append(key));
-
 		rkit::RCPtr<rkit::Vector<uint8_t>> resourceBufferRCPtr = resource.StaticCast<AnoxFileResource>().FieldRef(&AnoxFileResource::m_fileBytes);
 
-		return CreateLoadEntireFileJob(outJob, resourceBufferRCPtr, *systems.m_fileSystem, loosePath);
+		return CreateLoadEntireFileJob(outJob, resourceBufferRCPtr, *systems.m_fileSystem, key);
 	}
 
-	rkit::Result AnoxFileResourceLoader::CreateResourceObject(rkit::UniquePtr<AnoxFileResourceBase> &outResource) const
+	rkit::Result AnoxPathFileResourceLoader::CreateResourceObject(rkit::UniquePtr<AnoxFileResourceBase> &outResource) const
 	{
 		return rkit::New<AnoxFileResource>(outResource);
 	}
 
-	rkit::Result AnoxFileResourceLoaderBase::Create(rkit::RCPtr<AnoxFileResourceLoaderBase> &outFactory)
+	rkit::Result AnoxPathFileResourceLoaderBase::Create(rkit::RCPtr<AnoxPathFileResourceLoaderBase> &outFactory)
 	{
-		rkit::RCPtr<AnoxFileResourceLoader> resLoaderFactory;
-		RKIT_CHECK(rkit::New<AnoxFileResourceLoader>(resLoaderFactory));
+		rkit::RCPtr<AnoxPathFileResourceLoader> resLoaderFactory;
+		RKIT_CHECK(rkit::New<AnoxPathFileResourceLoader>(resLoaderFactory));
+
+		outFactory = std::move(resLoaderFactory);
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result AnoxContentFileResourceLoader::CreateLoadJob(const rkit::RCPtr<AnoxFileResourceBase> &resource, const AnoxResourceLoaderSystems &systems, const rkit::data::ContentID &key, rkit::RCPtr<rkit::Job> &outJob) const
+	{
+		rkit::RCPtr<rkit::Job> openJob;
+
+		rkit::RCPtr<rkit::Vector<uint8_t>> resourceBufferRCPtr = resource.StaticCast<AnoxFileResource>().FieldRef(&AnoxFileResource::m_fileBytes);
+
+		return CreateLoadEntireFileJob(outJob, resourceBufferRCPtr, *systems.m_fileSystem, key);
+	}
+
+	rkit::Result AnoxContentFileResourceLoader::CreateResourceObject(rkit::UniquePtr<AnoxFileResourceBase> &outResource) const
+	{
+		return rkit::New<AnoxFileResource>(outResource);
+	}
+
+	rkit::Result AnoxContentFileResourceLoaderBase::Create(rkit::RCPtr<AnoxContentFileResourceLoaderBase> &outFactory)
+	{
+		rkit::RCPtr<AnoxContentFileResourceLoader> resLoaderFactory;
+		RKIT_CHECK(rkit::New<AnoxContentFileResourceLoader>(resLoaderFactory));
 
 		outFactory = std::move(resLoaderFactory);
 

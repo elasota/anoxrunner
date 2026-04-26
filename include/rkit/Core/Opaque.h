@@ -6,7 +6,8 @@ namespace rkit
 	class Opaque;
 }
 
-namespace rkit { namespace priv {
+namespace rkit::priv
+{
 	template<class TImpl>
 	struct OpaqueDestructor
 	{
@@ -15,10 +16,14 @@ namespace rkit { namespace priv {
 	private:
 		static void DestructImplAuto(Opaque<TImpl> *obj);
 	};
-} }
+}
 
 namespace rkit
 {
+	class OpaqueInstantiator
+	{
+	};
+
 	template<class TImpl>
 	class Opaque;
 

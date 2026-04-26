@@ -164,7 +164,8 @@ namespace anox::game::sandbox
 		void *stringLengths, size_t numStrings,
 		void *stringData, size_t numStringData,
 		void *udefValues, size_t numUDefs,
-		void *udefStringData, size_t udefStringDataSize)
+		void *udefStringData, size_t udefStringDataSize
+		)
 	{
 		Session *session = static_cast<Session *>(gameSession);
 
@@ -211,6 +212,13 @@ namespace anox::game::sandbox
 	{
 		Session *session = static_cast<Session *>(gameSession);
 		return session->AsyncRunFrame(session->GetWorld());
+	}
+
+	rkit::Result SandboxExports::MTAsync_LoadMapScriptPackage(void *gameSession, void *scriptCatalogData, size_t scriptCatalogSize)
+	{
+		Session *session = static_cast<Session *>(gameSession);
+		return session->AsyncLoadMapScriptPackage(
+			rkit::ConstSpan<uint8_t>(static_cast<const uint8_t *>(scriptCatalogData), scriptCatalogSize).ReinterpretCast<const rkit::data::ContentID>());
 	}
 
 	rkit::Result SandboxExports::MTAsync_PostSpawnInitialEntities(void *gameSession)

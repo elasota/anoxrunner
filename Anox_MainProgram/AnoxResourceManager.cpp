@@ -434,10 +434,17 @@ namespace anox
 		RKIT_CHECK(m_sync->Init());
 
 		{
-			rkit::RCPtr<AnoxFileResourceLoaderBase> fileLoaderFactory;
-			RKIT_CHECK(AnoxFileResourceLoaderBase::Create(fileLoaderFactory));
+			rkit::RCPtr<AnoxPathFileResourceLoaderBase> fileLoaderFactory;
+			RKIT_CHECK(AnoxPathFileResourceLoaderBase::Create(fileLoaderFactory));
 
-			RKIT_CHECK(RegisterCIPathKeyedLoader(resloaders::kRawFileResourceTypeCode, std::move(fileLoaderFactory)));
+			RKIT_CHECK(RegisterCIPathKeyedLoader(resloaders::kCIPathRawFileResourceTypeCode, std::move(fileLoaderFactory)));
+		}
+
+		{
+			rkit::RCPtr<AnoxContentFileResourceLoaderBase> fileLoaderFactory;
+			RKIT_CHECK(AnoxContentFileResourceLoaderBase::Create(fileLoaderFactory));
+
+			RKIT_CHECK(RegisterContentKeyedLoader(resloaders::kContentIDRawFileResourceTypeCode, std::move(fileLoaderFactory)));
 		}
 
 		{

@@ -3,6 +3,7 @@
 #include "rkit/Core/Coroutine.h"
 #include "rkit/Core/StringView.h"
 
+#include "anox/Data/ResourceTypeCodes.h"
 #include "anox/Sandbox/AnoxGame.sb.generated.h"
 
 namespace anox::game
@@ -84,6 +85,16 @@ namespace anox::game
 		RKIT_RETURN_OK;
 	}
 
+	rkit::Result SandboxResourceLoader::LoadContentKeyedResource(SandboxResourceRequestHandle &outRequest, uint32_t resourceType, const rkit::data::ContentID &cid)
+	{
+		uint32_t reqID = 0;
+		RKIT_CHECK(sandbox::SandboxImports::GetContentIDKeyedResource(reqID, resourceType, const_cast<rkit::data::ContentID *>(&cid)));
+
+		outRequest = SandboxResourceRequestHandle(reqID);
+
+		RKIT_RETURN_OK;
+	}
+
 	rkit::Result SandboxResourceLoader::GetFileResourceContents(SandboxResourceDataBlob &outBlob, const SandboxResourceHandle &res)
 	{
 		void *ptr = nullptr;
@@ -94,6 +105,17 @@ namespace anox::game
 		outBlob = SandboxResourceDataBlob(mmid, ptr, size);
 
 		RKIT_RETURN_OK;
+	}
+
+	rkit::ResultCoroutine SandboxResourceLoader::BlockingLoadCIPathKeyedFileResource(rkit::ICoroThread &thread, SandboxResourceDataBlob &outBlob, const rkit::StringSliceView &path)
+	{
+		SandboxResourceRequestHandle req;
+		CORO_CHECK(LoadCIPathKeyedResource(req, resloaders::kCIPathRawFileResourceTypeCode, path));
+
+		SandboxResourceHandle res;
+		CORO_CHECK(co_await req.WaitForLoaded(thread, res));
+
+		co_return SandboxResourceLoader::GetFileResourceContents(outBlob, res);
 	}
 
 	void SandboxResourceHandle::Dispose(uint32_t resID)
@@ -123,9 +145,9 @@ namespace anox::game
 		RKIT_RETURN_OK;
 	}
 
-	rkit::ResultCoroutine SandboxResourceRequestHandle::WaitForLoaded(rkit::ICoroThread &thread, SandboxResourceHandle &outReqHandle)
+	rkit::ResultCoroutine SandboxResourceRequestHandle::WaitForLoaded(rkit::ICoroThread &thread, SandboxResourceHandle &outResHandle)
 	{
-		SandboxResourceBlockerContext blockerContext(*this, outReqHandle);
+		SandboxResourceBlockerContext blockerContext(*this, outResHandle);
 		rkit::CoroThreadBlocker blocker = blockerContext.CreateBlocker();
 		CORO_CHECK(co_await thread.AwaitBlocker(blocker));
 		CORO_RETURN_OK;

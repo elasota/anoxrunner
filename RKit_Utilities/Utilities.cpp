@@ -68,8 +68,6 @@ namespace rkit
 
 		Result CreateThreadPool(UniquePtr<utils::IThreadPool> &outThreadPool, uint32_t numThreads) const override;
 
-		HashValue_t ComputeHash(HashValue_t baseHash, const void *data, size_t size) const override;
-
 		Result CreateTextParser(const Span<const uint8_t> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<utils::ITextParser> &outParser) const override;
 		Result ReadEntireFile(ISeekableReadStream &stream, Vector<uint8_t> &outBytes) const override;
 
@@ -312,18 +310,6 @@ namespace rkit
 		outThreadPool = std::move(threadPool);
 
 		RKIT_RETURN_OK;
-	}
-
-	HashValue_t UtilitiesDriver::ComputeHash(HashValue_t baseHash, const void *value, size_t size) const
-	{
-		const uint8_t *bytes = static_cast<const uint8_t *>(value);
-
-		// TODO: Improve this
-		HashValue_t hash = baseHash;
-		for (size_t i = 0; i < size; i++)
-			hash = hash * 223u + bytes[i] * 4447u;
-
-		return hash;
 	}
 
 	Result UtilitiesDriver::CreateTextParser(const Span<const uint8_t> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<utils::ITextParser> &outParser) const

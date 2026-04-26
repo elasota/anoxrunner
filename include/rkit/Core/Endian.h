@@ -84,6 +84,8 @@ namespace rkit
 
 			void ConvertToHostOrderInPlace();
 
+			static void StaticConvertToHostOrderInPlace(Number_t &number);
+
 		private:
 			enum class BitsSignal
 			{
@@ -234,5 +236,14 @@ namespace rkit { namespace endian
 	{
 		const Bits_t bits = this->GetBits();
 		memcpy(m_bytes.GetBuffer(), &bits, sizeof(bits));
+	}
+
+	template<class THelper>
+	void SwappableNumber<THelper>::StaticConvertToHostOrderInPlace(Number_t &number)
+	{
+		SwappableNumber<THelper> swappedNumber;
+		memcpy(swappedNumber.m_bytes.GetBuffer(), &number, sizeof(Number_t));
+
+		number = swappedNumber.Get();
 	}
 } } // rkit::endian

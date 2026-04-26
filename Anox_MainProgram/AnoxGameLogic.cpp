@@ -109,6 +109,7 @@ namespace anox
 		rkit::ResultCoroutine AsyncRunFrame(rkit::ICoroThread &thread);
 		rkit::ResultCoroutine LoadGlobalScripts(rkit::ICoroThread &thread);
 		rkit::ResultCoroutine LoadMap(rkit::ICoroThread &thread, const rkit::StringSliceView &mapName);
+		rkit::ResultCoroutine LoadMapScripts(rkit::ICoroThread &thread, const rkit::StringSliceView &mapName);
 		rkit::ResultCoroutine SpawnMapInitialObjects(rkit::ICoroThread &thread, const rkit::StringSliceView &mapName);
 		rkit::ResultCoroutine LoadContentIDKeyedResource(rkit::ICoroThread &thread, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::data::ContentID &cid);
 		rkit::ResultCoroutine LoadCIPathKeyedResource(rkit::ICoroThread &thread, AnoxResourceRetrieveResult &loadResult, uint32_t resourceType, const rkit::CIPathView &path);
@@ -412,7 +413,11 @@ namespace anox
 	{
 		AnoxResourceRetrieveResult resLoadResult;
 
-		CORO_CHECK(co_await LoadCIPathKeyedResource(thread, resLoadResult, anox::resloaders::kRawFileResourceTypeCode, path));
+		rkit::CIPath loosePath;
+		RKIT_CHECK(loosePath.AppendComponent(u8"loose"));
+		RKIT_CHECK(loosePath.Append(path));
+
+		CORO_CHECK(co_await LoadCIPathKeyedResource(thread, resLoadResult, anox::resloaders::kCIPathRawFileResourceTypeCode, loosePath));
 
 		CORO_CHECK(commandStack.Parse(resLoadResult.m_resourceHandle.StaticCast<AnoxFileResourceBase>()->GetContents()));
 		CORO_CHECK(co_await RunCommands(thread, commandStack));
@@ -626,6 +631,44 @@ namespace anox
 		CORO_RETURN_OK;
 	}
 
+	rkit::ResultCoroutine AnoxGameLogic::LoadMapScripts(rkit::ICoroThread &thread, const rkit::StringSliceView &mapName)
+	{
+		AnoxResourceRetrieveResult scriptLoadResult;
+		rkit::CIPath path;
+
+		{
+			rkit::String fullPathStr;
+			CORO_CHECK(fullPathStr.Format(u8"ax_bsp/maps/{}.bsp.bspmodel", mapName));
+
+			CORO_CHECK(path.Set(fullPathStr));
+		}
+
+		rkit::log::LogInfo(u8"GameLogic: Loading script package");
+
+		CORO_CHECK(co_await LoadCIPathKeyedResource(thread, scriptLoadResult, anox::resloaders::kCIPathRawFileResourceTypeCode, path));
+
+		rkit::RCPtr<AnoxFileResourceBase> fileResource = scriptLoadResult.m_resourceHandle.StaticCast<AnoxFileResourceBase>();
+
+
+		SandboxMemObject scriptPackageMO = {};
+		CORO_CHECK(CopySpanToSandbox(scriptPackageMO, fileResource->GetContents()));
+
+		CORO_CHECK(m_sandboxImports.MTAsync_LoadMapScriptPackage(
+			m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr,
+			scriptPackageMO.m_addr, scriptPackageMO.m_size));
+
+		{
+			SandboxMainThreadBlocker mtBlocker(this);
+			CORO_CHECK(co_await thread.AwaitBlocker(mtBlocker.CreateBlocker()));
+		}
+
+		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(scriptPackageMO.m_mmid));
+
+		rkit::log::LogInfo(u8"GameLogic: Script package loaded successfully");
+
+		CORO_RETURN_OK;
+	}
+
 	rkit::ResultCoroutine AnoxGameLogic::SpawnMapInitialObjects(rkit::ICoroThread &thread, const rkit::StringSliceView &mapName)
 	{
 		AnoxResourceRetrieveResult objectsLoadResult;
@@ -691,7 +734,8 @@ namespace anox
 			stringLengthsMO.m_addr, stringLengthsMO.m_size / sizeof(uint32_t),
 			stringDataMO.m_addr, stringDataMO.m_size / sizeof(uint8_t),
 			entityDefValuesMO.m_addr, entityDefValuesMO.m_size / sizeof(game::UserEntityDefValues),
-			udefDescBytesMO.m_addr, udefDescBytesMO.m_size / sizeof(uint8_t)));
+			udefDescBytesMO.m_addr, udefDescBytesMO.m_size / sizeof(uint8_t)
+		));
 
 		{
 			SandboxMainThreadBlocker mtBlocker(this);
@@ -779,6 +823,7 @@ namespace anox
 
 		CORO_CHECK(co_await LoadGlobalScripts(thread));
 		CORO_CHECK(co_await LoadMap(thread, mapName));
+		CORO_CHECK(co_await LoadMapScripts(thread, mapName));
 		CORO_CHECK(co_await SpawnMapInitialObjects(thread, mapName));
 
 		CORO_CHECK(m_sandboxImports.MTAsync_EnterGameSession(m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr));

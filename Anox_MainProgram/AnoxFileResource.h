@@ -12,10 +12,16 @@ namespace anox
 {
 	class AnoxFileResourceBase;
 
-	class AnoxFileResourceLoaderBase : public AnoxCIPathKeyedResourceLoader<AnoxFileResourceBase>
+	class AnoxPathFileResourceLoaderBase : public AnoxCIPathKeyedResourceLoader<AnoxFileResourceBase>
 	{
 	public:
-		static rkit::Result Create(rkit::RCPtr<AnoxFileResourceLoaderBase> &resLoader);
+		static rkit::Result Create(rkit::RCPtr<AnoxPathFileResourceLoaderBase> &resLoader);
+	};
+
+	class AnoxContentFileResourceLoaderBase : public AnoxContentIDKeyedResourceLoader<AnoxFileResourceBase>
+	{
+	public:
+		static rkit::Result Create(rkit::RCPtr<AnoxContentFileResourceLoaderBase> &resLoader);
 	};
 
 	class AnoxFileResourceBase : public AnoxResourceBase
