@@ -176,7 +176,7 @@ namespace rkit
 		void CreatePositionForNewEntryNoResize(HashValue_t newKeyHash, TSize &outPosition);
 
 		void ReserveMainPosition(HashValue_t newKeyHash, TSize position);
-		void ReserveNonMainPosition(HashValue_t newKeyHash, TSize initialFreePosition, TSize &newFreePosition);
+		void ReserveNonMainPosition(HashValue_t newKeyHash, TSize mainPosition, TSize initialFreePosition, TSize &newFreePosition);
 		void RemoveEntryNoDestruct(TSize position);
 
 		void RemoveEntryAtPosition(TSize position);
@@ -754,9 +754,10 @@ rkit::Result rkit::HashTableBase<TKey, TValue, TSize>::CreatePositionForNewEntry
 	if (m_count == std::numeric_limits<TSize>::max())
 		RKIT_THROW(ResultCode::kOutOfMemory);
 
+	TSize mainPosition = 0;
 	if (m_capacity > 0)
 	{
-		TSize mainPosition = GetMainPosition(newKeyHash);
+		mainPosition = GetMainPosition(newKeyHash);
 
 		if (!GetOccupancyAt(mainPosition))
 		{
@@ -784,7 +785,7 @@ rkit::Result rkit::HashTableBase<TKey, TValue, TSize>::CreatePositionForNewEntry
 
 	m_freePosScan = insertPosition + 1;
 
-	ReserveNonMainPosition(newKeyHash, insertPosition, outPosition);
+	ReserveNonMainPosition(newKeyHash, mainPosition, insertPosition, outPosition);
 
 	RKIT_RETURN_OK;
 }
@@ -815,7 +816,7 @@ void rkit::HashTableBase<TKey, TValue, TSize>::CreatePositionForNewEntryNoResize
 		insertPosition++;
 	}
 
-	ReserveNonMainPosition(newKeyHash, insertPosition, outPosition);
+	ReserveNonMainPosition(newKeyHash, mainPosition, insertPosition, outPosition);
 }
 
 template<class TKey, class TValue, class TSize>
@@ -828,10 +829,8 @@ void rkit::HashTableBase<TKey, TValue, TSize>::ReserveMainPosition(HashValue_t n
 }
 
 template<class TKey, class TValue, class TSize>
-void rkit::HashTableBase<TKey, TValue, TSize>::ReserveNonMainPosition(HashValue_t newKeyHash, TSize initialFreePosition, TSize &outNewFreePosition)
+void rkit::HashTableBase<TKey, TValue, TSize>::ReserveNonMainPosition(HashValue_t newKeyHash, TSize mainPosition, TSize initialFreePosition, TSize &outNewFreePosition)
 {
-	TSize mainPosition = GetMainPosition(newKeyHash);
-
 	RKIT_ASSERT(!GetOccupancyAt(initialFreePosition));
 	RKIT_ASSERT(GetOccupancyAt(mainPosition));
 
@@ -856,8 +855,20 @@ void rkit::HashTableBase<TKey, TValue, TSize>::ReserveNonMainPosition(HashValue_
 		newFreePosition = mainPosition;
 	}
 
-	m_nextAndOccupancy[initialFreePosition].m_next = m_nextAndOccupancy[mainPosition].m_next;
-	m_nextAndOccupancy[mainPosition].m_next = initialFreePosition;
+	bool isAlreadyInLoop = false;
+	TSize initialFreePositionPredecessor = initialFreePosition;
+
+	// First condition checks if the free position isn't already in the same chain as the main position
+	while (initialFreePositionPredecessor != mainPosition && m_nextAndOccupancy[initialFreePositionPredecessor].m_next != initialFreePosition)
+		initialFreePositionPredecessor = m_nextAndOccupancy[initialFreePositionPredecessor].m_next;
+
+	// Initial free position isn't in the chain already, so combine the chains
+	// MP -> IFP ... IFPP -> MP.next ...
+	if (initialFreePositionPredecessor != mainPosition)
+	{
+		m_nextAndOccupancy[initialFreePositionPredecessor].m_next = m_nextAndOccupancy[mainPosition].m_next;
+		m_nextAndOccupancy[mainPosition].m_next = initialFreePosition;
+	}
 
 	SetOccupancyAt(initialFreePosition, true);
 
