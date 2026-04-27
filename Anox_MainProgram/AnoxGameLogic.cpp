@@ -638,7 +638,7 @@ namespace anox
 
 		{
 			rkit::String fullPathStr;
-			CORO_CHECK(fullPathStr.Format(u8"ax_bsp/maps/{}.bsp.bspmodel", mapName));
+			CORO_CHECK(fullPathStr.Format(u8"ax_bsp/maps/{}.bsp.scripts", mapName));
 
 			CORO_CHECK(path.Set(fullPathStr));
 		}
@@ -825,6 +825,8 @@ namespace anox
 		CORO_CHECK(co_await LoadMap(thread, mapName));
 		CORO_CHECK(co_await LoadMapScripts(thread, mapName));
 		CORO_CHECK(co_await SpawnMapInitialObjects(thread, mapName));
+
+		rkit::log::LogInfo(u8"GameLogic: Entering game session");
 
 		CORO_CHECK(m_sandboxImports.MTAsync_EnterGameSession(m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr));
 
