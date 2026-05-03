@@ -15,6 +15,7 @@
 
 #include "SandboxResourceLoader.h"
 
+#include "AllWorldObjects.h"
 #include "AnoxGameSession.h"
 #include "AnoxWorldObjectFactory.h"
 
@@ -147,6 +148,8 @@ namespace anox::game
 
 	rkit::ResultCoroutine SessionImpl::PostSpawnInitialEntities(rkit::ICoroThread &thread, World &world)
 	{
+		CORO_CHECK(co_await world.OnWorldStarted(thread));
+
 		CORO_RETURN_OK;
 	}
 

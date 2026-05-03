@@ -13,6 +13,9 @@ namespace rkit
 
 	template<class T>
 	class RCPtr;
+
+	template<class T>
+	class WeakPtr;
 }
 
 namespace anox::game
@@ -31,11 +34,16 @@ namespace anox::game
 		template<class T>
 		static rkit::RCPtr<T> Wrap(rkit::UniquePtr<WorldObjectContainer> &&self, rkit::UniquePtr<T> &&obj);
 
+		template<class T>
+		static rkit::WeakPtr<T> Weaken(const rkit::RCPtr<T> &ptr);
+
 	private:
 		static void StaticStrongDelete(void *self) noexcept;
 		static void StaticFinalDelete(void *self) noexcept;
 
 		static rkit::RCPtr<WorldObject> InternalWrap(rkit::UniquePtr<WorldObjectContainer> &&self, rkit::UniquePtr<WorldObject> &&obj);
+		static rkit::WeakPtr<WorldObject> InternalWeaken(WorldObject *obj, rkit::RefCountedTracker *strongTracker);
+		static rkit::WeakPtr<const WorldObject> InternalWeaken(const WorldObject *obj, rkit::RefCountedTracker *strongTracker);
 
 		rkit::WeakRefTracker m_weakRefTracker;
 
@@ -49,19 +57,24 @@ namespace anox::game
 
 	public:
 		friend class WorldImpl;
+		friend class WorldObjectContainer;
 
-		rkit::RCPtr<WorldObject> GetRefCounted();
-		rkit::RCPtr<const WorldObject> GetRefCounted() const;
+		rkit::WeakPtr<WorldObject> GetNext() const;
+		WorldObject* GetNextUnsafe() const;
+
+		rkit::RCPtr<WorldObject> GetStrongRef();
+		rkit::RCPtr<const WorldObject> GetStrongRef() const;
+
+		rkit::WeakPtr<WorldObject> GetWeakRef();
+		rkit::WeakPtr<const WorldObject> GetWeakRef() const;
 
 	private:
-		void SetContainer(WorldObjectContainer *container);
-
 		WorldObjectContainer *m_container = nullptr;
+
 		WorldObject *m_prevObject = nullptr;
 		rkit::RCPtr<WorldObject> m_nextObject;
 	};
 }
-
 
 namespace anox::game
 {
@@ -69,5 +82,21 @@ namespace anox::game
 	rkit::RCPtr<T> WorldObjectContainer::Wrap(rkit::UniquePtr<WorldObjectContainer> &&self, rkit::UniquePtr<T> &&obj)
 	{
 		return InternalWrap(std::move(self), rkit::UniquePtr<WorldObject>(std::move(obj))).StaticCastMove<T>();
+	}
+
+	template<class T>
+	rkit::WeakPtr<T> WorldObjectContainer::Weaken(const rkit::RCPtr<T> &ptr)
+	{
+		return InternalWeaken(ptr.Get(), ptr.GetTracker()).StaticCastMove<T>();
+	}
+
+	inline rkit::RCPtr<const WorldObject> WorldObject::GetStrongRef() const
+	{
+		return const_cast<WorldObject *>(this)->GetStrongRef();
+	}
+
+	inline rkit::WeakPtr<const WorldObject> WorldObject::GetWeakRef() const
+	{
+		return const_cast<WorldObject *>(this)->GetWeakRef();
 	}
 }

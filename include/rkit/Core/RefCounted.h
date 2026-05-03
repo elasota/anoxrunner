@@ -126,6 +126,9 @@ namespace rkit
 		template<class TOther>
 		RCPtr<TOther> ConstCast() const;
 
+		template<class TOther, class TFunction>
+		RCPtr<TOther> CastWithFunction(const TFunction &function) const;
+
 		template<class TOther>
 		RCPtr<TOther> StaticCastMove();
 
@@ -134,6 +137,9 @@ namespace rkit
 
 		template<class TOther>
 		RCPtr<TOther> ConstCastMove();
+
+		template<class TOther, class TFunction>
+		RCPtr<TOther> CastWithFunctionMove(const TFunction &function);
 
 		template<class TField, class TObject>
 		RCPtr<TField> FieldRef(TField TObject::* fieldRef) const;
@@ -540,6 +546,18 @@ namespace rkit
 	}
 
 	template<class T>
+	template<class TOther, class TFunction>
+	RCPtr<TOther> RCPtr<T>::CastWithFunction(const TFunction &function) const
+	{
+		TOther *castPtr = function(static_cast<T *>(m_object));
+
+		if (castPtr == nullptr)
+			return RCPtr<TOther>();
+
+		return RCPtr<TOther>(castPtr, m_tracker);
+	}
+
+	template<class T>
 	template<class TOther>
 	RCPtr<TOther> RCPtr<T>::StaticCastMove()
 	{
@@ -578,6 +596,25 @@ namespace rkit
 		return RCPtr<TOther>(RCPtrMoveTag(), object, tracker);
 	}
 
+	template<class T>
+	template<class TOther, class TFunction>
+	RCPtr<TOther> RCPtr<T>::CastWithFunctionMove(const TFunction &function)
+	{
+		if (m_object == nullptr)
+			return RCPtr<TOther>();
+
+		TOther *castPtr = function(static_cast<T *>(m_object));
+
+		if (castPtr == nullptr)
+			return RCPtr<TOther>();
+
+		RefCountedTracker *tracker = m_tracker;
+
+		m_object = nullptr;
+		m_tracker = nullptr;
+
+		return RCPtr<TOther>(RCPtrMoveTag(), castPtr, m_tracker);
+	}
 
 	template<class T>
 	template<class TField, class TObject>

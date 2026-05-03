@@ -99,11 +99,17 @@ namespace anox::game
 		ANOX_RTTI_CLASS_NO_BASE(DynamicObject)
 
 	public:
+
+	private:
+		static void *InternalDynamicCast(void *ptr, const RuntimeTypeInfo *ptrType);
 	};
 }
 
 namespace anox::game::priv
 {
+	void *DynamicCastToAny(DynamicObject *obj, const RuntimeTypeInfo *destRTTI);
+	bool DynamicIsDerivedFrom(DynamicObject *obj, const RuntimeTypeInfo *destRTTI);
+
 	template<class TBase, class TInitial>
 	TBase *PrivateAccessor::ImplicitCast(TInitial *ptr)
 	{
@@ -114,7 +120,7 @@ namespace anox::game::priv
 	template<class TCastTo, class TInitial>
 	TCastTo *PrivateAccessor::StaticCast(TInitial *ptr)
 	{
-		TCastTo *recastPtr = static_cast<TCastTo *>(ptr);;
+		TCastTo *recastPtr = static_cast<TCastTo *>(ptr);
 		return recastPtr;
 	}
 
@@ -153,4 +159,48 @@ namespace anox::game::priv
 	{
 		{ RTTIPtrAdjust<TDerivedClass, TBaseClasses>::DerivedToBase, RTTIPtrAdjust<TDerivedClass, TBaseClasses>::BaseToDerived, &TBaseClasses::RTTIType_t::ms_instance }...
 	};
+}
+
+#include <type_traits>
+
+namespace anox::game
+{
+	template<class TDestType, class TSourceType>
+	inline TDestType *DynamicCast(TSourceType *srcPtr)
+	{
+		typedef typename std::remove_volatile<typename std::remove_const<TSourceType>::type>::type CVRemovedSource_t;
+		typedef typename std::remove_volatile<typename std::remove_const<TDestType>::type>::type CVRemovedDest_t;
+
+		if (srcPtr == nullptr)
+			return nullptr;
+
+		static_assert(std::is_const<TSourceType>::value || !std::is_const<TDestType>::value, "const qualifiers of dest are incompatible with source");
+		static_assert(std::is_volatile<TSourceType>::value || !std::is_volatile<TDestType>::value, "volatile qualifiers of dest are incompatible with source");
+
+		if constexpr (std::is_base_of<CVRemovedDest_t, CVRemovedSource_t>::value)
+			return srcPtr;
+		else
+		{
+			CVRemovedSource_t *cvRemovedSrc = const_cast<CVRemovedSource_t *>(srcPtr);
+
+			if constexpr (std::is_same<typename CVRemovedDest_t::ThisClass_t, CVRemovedDest_t>::value)
+			{
+				if constexpr (std::is_base_of<CVRemovedSource_t, CVRemovedDest_t>())
+				{
+					const RuntimeTypeInfo *destRTTI = &CVRemovedDest_t::RTTIType_t::ms_instance;
+					if (priv::DynamicIsDerivedFrom(cvRemovedSrc, destRTTI))
+						return static_cast<CVRemovedDest_t *>(srcPtr);
+					else
+						return nullptr;
+				}
+				else
+				{
+					const RuntimeTypeInfo *destRTTI = &CVRemovedDest_t::RTTIType_t::ms_instance;
+					return static_cast<CVRemovedDest_t *>(priv::DynamicCastToAny(cvRemovedSrc, destRTTI));
+				}
+			}
+			else
+				static_assert(false, "Can't dynamic_cast to derived type that isn't the same as the RTTIType_t of the target");
+		}
+	}
 }

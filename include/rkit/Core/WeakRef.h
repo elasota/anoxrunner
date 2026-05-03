@@ -50,6 +50,12 @@ namespace rkit
 		RefCountedTracker &GetWeakTracker();
 		RefCountedTracker &GetStrongTracker();
 
+		// WARNING: These only work for refs that were created using WeakRefTracker in the first place!
+		static WeakRefTracker *FromStrongTracker(RefCountedTracker *tracker);
+		static const WeakRefTracker *FromStrongTracker(const RefCountedTracker *tracker);
+		static WeakRefTracker *FromWeakTracker(RefCountedTracker *tracker);
+		static const WeakRefTracker *FromWeakTracker(const RefCountedTracker *tracker);
+
 	private:
 		void StrongTrackerZero() override;
 		void WeakTrackerZero() override;
@@ -179,6 +185,26 @@ namespace rkit
 	{
 		priv::WeakRefStrongTracker *self = this;
 		return *self;
+	}
+
+	inline WeakRefTracker *WeakRefTracker::FromStrongTracker(RefCountedTracker *tracker)
+	{
+		return static_cast<WeakRefTracker *>(static_cast<priv::WeakRefStrongTracker *>(tracker));
+	}
+
+	inline const WeakRefTracker *WeakRefTracker::FromStrongTracker(const RefCountedTracker *tracker)
+	{
+		return static_cast<const WeakRefTracker *>(static_cast<const priv::WeakRefStrongTracker *>(tracker));
+	}
+
+	inline WeakRefTracker *WeakRefTracker::FromWeakTracker(RefCountedTracker *tracker)
+	{
+		return static_cast<WeakRefTracker *>(static_cast<priv::WeakRefWeakTracker *>(tracker));
+	}
+
+	inline const WeakRefTracker *WeakRefTracker::FromWeakTracker(const RefCountedTracker *tracker)
+	{
+		return static_cast<const WeakRefTracker *>(static_cast<const priv::WeakRefWeakTracker *>(tracker));
 	}
 
 	inline void WeakRefTracker::StrongTrackerZero()
@@ -415,7 +441,7 @@ namespace rkit
 	WeakPtr<TOther> WeakPtr<T>::StaticCastMove()
 	{
 		// Should use is_virtual_base_of in C++26 here
-		TOther *recastPtr = static_cast<TOther>(m_object);
+		TOther *recastPtr = static_cast<TOther *>(m_object);
 		WeakRefTracker *tracker = m_tracker;
 
 		m_tracker = nullptr;
@@ -428,7 +454,7 @@ namespace rkit
 	template<class TOther>
 	WeakPtr<TOther> WeakPtr<T>::ReinterpretCastMove()
 	{
-		TOther *recastPtr = reinterpret_cast<TOther>(m_object);
+		TOther *recastPtr = reinterpret_cast<TOther *>(m_object);
 		WeakRefTracker *tracker = m_tracker;
 
 		m_tracker = nullptr;

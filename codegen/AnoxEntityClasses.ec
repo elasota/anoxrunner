@@ -270,7 +270,7 @@ class ElevatorTriggerObject : PlacedComponent
 [level(trigger_once)]
 class OnceTriggerObject : GeometricComponent
 {
-	[level] bytestring sequence
+	[level] label sequence
 	[level] bytestring target
 }
 
@@ -310,7 +310,7 @@ class RelayTriggerObject : GeometricComponent
 }
 
 [level(worldspawn)]
-class WorldSpawnObject
+class GlobalSingleton
 {
 	[level] label sequence
 	[level] vec4 fog
@@ -472,3 +472,4 @@ class LightSourceUserEntity : AbstractUserEntityComponent
 class SunPointUserEntity : AbstractUserEntityComponent
 {
 }
+

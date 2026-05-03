@@ -11,6 +11,11 @@ namespace rkit
 
 	template<class T>
 	class RCPtr;
+
+	template<class T>
+	class WeakPtr;
+
+	struct ICoroThread;
 }
 
 namespace anox
@@ -18,24 +23,28 @@ namespace anox
 	class AnoxSpawnDefsResourceBase;
 }
 
-namespace anox::data
-{
-	struct EClass_worldspawn;
-}
-
 namespace anox::game
 {
 	class WorldImpl;
 	struct WorldObjectSpawnParams;
 	class WorldObject;
+	class AllWorldObjectsCollection;
+	class AllWorldObjectsUnsafeCollection;
 
 	class World final : public rkit::Opaque<WorldImpl>
 	{
 	public:
 		World();
 
-		rkit::Result ApplyParams(const WorldObjectSpawnParams &spawnParams, const data::EClass_worldspawn &spawnDef);
 		rkit::Result AddObject(rkit::RCPtr<WorldObject> &&obj);
+
+		rkit::WeakPtr<WorldObject> GetFirstObject() const;
+		WorldObject* GetFirstObjectUnsafe() const;
+
+		// Include AllWorldObjects.h for these
+		AllWorldObjectsCollection GetAllObjects() const;
+
+		rkit::ResultCoroutine OnWorldStarted(rkit::ICoroThread &thread);
 
 		static rkit::Result Create(rkit::UniquePtr<World> &outWorld);
 	};
