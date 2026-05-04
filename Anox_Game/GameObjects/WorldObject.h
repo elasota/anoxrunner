@@ -1,8 +1,10 @@
 #pragma once
 
+#include "rkit/Core/CoroutineProtos.h"
 #include "rkit/Core/RefCounted.h"
 #include "rkit/Core/NoCopy.h"
 #include "rkit/Core/WeakRef.h"
+
 #include "DynamicObject.h"
 
 #define ANOX_OBJECT_RTTI_BASE(type)
@@ -20,7 +22,9 @@ namespace rkit
 
 namespace anox::game
 {
+	class ScriptContext;
 	class WorldObject;
+	class World;
 	class WorldImpl;
 	struct WorldObjectSpawnParams;
 
@@ -56,6 +60,9 @@ namespace anox::game
 		ANOX_RTTI_CLASS(WorldObject, DynamicObject)
 
 	public:
+		WorldObject();
+		~WorldObject();
+
 		friend class WorldImpl;
 		friend class WorldObjectContainer;
 
@@ -68,11 +75,21 @@ namespace anox::game
 		rkit::WeakPtr<WorldObject> GetWeakRef();
 		rkit::WeakPtr<const WorldObject> GetWeakRef() const;
 
+		rkit::Result Initialize(World &world);
+		virtual rkit::ResultCoroutine OnSpawnedFromLevel(rkit::ICoroThread &thread);
+
+	protected:
+		World &GetWorld() const;
+		ScriptContext &GetScriptContext();
+
 	private:
+		World *m_world = nullptr;
 		WorldObjectContainer *m_container = nullptr;
 
 		WorldObject *m_prevObject = nullptr;
 		rkit::RCPtr<WorldObject> m_nextObject;
+
+		rkit::UniquePtr<ScriptContext> m_scriptContext;
 	};
 }
 
@@ -87,7 +104,7 @@ namespace anox::game
 	template<class T>
 	rkit::WeakPtr<T> WorldObjectContainer::Weaken(const rkit::RCPtr<T> &ptr)
 	{
-		return InternalWeaken(ptr.Get(), ptr.GetTracker()).StaticCastMove<T>();
+		return InternalWeaken(ptr.Get(), ptr.GetTracker()).template StaticCastMove<T>();
 	}
 
 	inline rkit::RCPtr<const WorldObject> WorldObject::GetStrongRef() const
@@ -98,5 +115,15 @@ namespace anox::game
 	inline rkit::WeakPtr<const WorldObject> WorldObject::GetWeakRef() const
 	{
 		return const_cast<WorldObject *>(this)->GetWeakRef();
+	}
+
+	inline World &WorldObject::GetWorld() const
+	{
+		return *m_world;
+	}
+
+	inline ScriptContext &WorldObject::GetScriptContext()
+	{
+		return *m_scriptContext;
 	}
 }

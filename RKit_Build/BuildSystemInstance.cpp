@@ -1995,7 +1995,7 @@ namespace rkit { namespace buildsystem
 
 			IDependencyNode *nodePtr = node.Get();
 
-			RKIT_CHECK(AddNode(node.StaticCast<DependencyNode>()));
+			RKIT_CHECK(AddNode(node.StaticCastMove<DependencyNode>()));
 
 			outNode = nodePtr;
 		}
@@ -2023,7 +2023,7 @@ namespace rkit { namespace buildsystem
 
 			IDependencyNode *nodePtr = node.Get();
 
-			RKIT_CHECK(AddNode(node.StaticCast<DependencyNode>()));
+			RKIT_CHECK(AddNode(node.StaticCastMove<DependencyNode>()));
 
 			outNode = nodePtr;
 		}

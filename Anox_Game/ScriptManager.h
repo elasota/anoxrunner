@@ -14,7 +14,9 @@ namespace rkit
 
 namespace anox::game
 {
+	class ScriptEnvironment;
 	class ScriptManagerImpl;
+	class ScriptHandle;
 
 	class ScriptManager final : public rkit::Opaque<ScriptManagerImpl>
 	{
@@ -29,6 +31,8 @@ namespace anox::game
 
 		rkit::Result LoadScriptPackage(ScriptLayer layer, const rkit::Span<const uint8_t> &contents);
 		void UnloadLayer(ScriptLayer layer);
+
+		rkit::Result CreateScriptEnvironment(rkit::UniquePtr<ScriptEnvironment> &outScriptEnvironment);
 
 		static rkit::Result Create(rkit::UniquePtr<ScriptManager> &outScriptManager);
 	};

@@ -1,5 +1,11 @@
 #include "WorldObject.h"
 
+#include "ScriptContext.h"
+#include "ScriptEnvironment.h"
+#include "ScriptManager.h"
+#include "World.h"
+
+#include "rkit/Core/Coroutine.h"
 #include "rkit/Core/RKitAssert.h"
 
 namespace anox::game
@@ -48,6 +54,14 @@ namespace anox::game
 		return InternalWeaken(const_cast<WorldObject *>(obj), strongTracker);
 	}
 
+	WorldObject::WorldObject()
+	{
+	}
+
+	WorldObject::~WorldObject()
+	{
+	}
+
 	rkit::WeakPtr<WorldObject> WorldObject::GetNext() const
 	{
 		return WorldObjectContainer::Weaken(m_nextObject);
@@ -66,5 +80,18 @@ namespace anox::game
 	rkit::WeakPtr<WorldObject> WorldObject::GetWeakRef()
 	{
 		return rkit::WeakPtr<WorldObject>(this, &m_container->m_weakRefTracker);
+	}
+
+	rkit::Result WorldObject::Initialize(World &world)
+	{
+		m_world = &world;
+		CORO_CHECK(GetWorld().GetScriptEnvironment().CreateScriptContext(m_scriptContext));
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::ResultCoroutine WorldObject::OnSpawnedFromLevel(rkit::ICoroThread &thread)
+	{
+		CORO_RETURN_OK;
 	}
 }

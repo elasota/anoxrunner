@@ -1,30 +1,32 @@
 #include "ScriptManager.h"
 
+#include "ScriptContext.h"
+#include "ScriptEnvironment.h"
+
 #include "anox/Data/APEScript.h"
 
 #include "anox/Label.h"
 
+#include "rkit/Core/Coroutine.h"
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/MemoryStream.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/Vector.h"
 
+#include "GameObjects/ScriptWindowInstance.h"
+#include "AnoxWorldObjectFactory.h"
+
+#include "anox/Game/APECommandDispatcher.generated.h"
+
 namespace anox::game
 {
-	using ScriptExprType = data::ape::ExprType;
-	using ScriptOperator = data::ape::Operator;
-	using ScriptOperandType = data::ape::OperandType;
+	struct ScriptPackage;
 
 	struct ScriptWindow
 	{
 		Label m_windowID;
 		rkit::ConstSpan<uint8_t> m_commandStream;
-	};
-
-	struct ScriptExprValue
-	{
-		ScriptExprType m_exprType = ScriptExprType::Empty;
-		uint32_t m_index;
+		const ScriptPackage *m_package = nullptr;
 	};
 
 	struct ScriptExpression
@@ -49,6 +51,7 @@ namespace anox::game
 	{
 		Label m_switchID;
 		rkit::ConstSpan<ScriptSwitchCommand> m_commands;
+		const ScriptPackage *m_package = nullptr;
 	};
 
 	struct ScriptPackage
@@ -68,17 +71,51 @@ namespace anox::game
 	class ScriptLayerInstance
 	{
 	public:
-		rkit::Result AddPackage(ScriptPackage &&package);
+		rkit::Result AddPackage(rkit::UniquePtr<ScriptPackage> &&package);
 
 		void UnloadAll();
 
+		const ScriptWindow *FindWindow(const Label &label) const;
+		const ScriptWindow *FindWindowPrehashed(const Label &label, rkit::HashValue_t hashValue) const;
+		const ScriptSwitch *FindSwitch(const Label &label) const;
+		const ScriptSwitch *FindSwitchPrehashed(const Label &label, rkit::HashValue_t hashValue) const;
+
 	private:
-		rkit::Vector<ScriptPackage> m_packages;
+
+		rkit::Vector<rkit::UniquePtr<ScriptPackage>> m_packages;
 		rkit::HashMap<Label, const ScriptWindow *> m_windows;
 		rkit::HashMap<Label, const ScriptSwitch *> m_switches;
 	};
 
-	class ScriptEnvironment
+	class ScriptEnvironmentImpl final : public rkit::OpaqueImplementation<ScriptEnvironment>
+	{
+	public:
+		explicit ScriptEnvironmentImpl(ScriptManagerImpl &scriptManager);
+
+		rkit::ResultCoroutine StartSequence(rkit::ICoroThread &thread, ScriptContext &scriptContext, const Label &label, World &world);
+
+	private:
+		class WindowCommandParserImpl final : public APEWindowCommandParser
+		{
+		public:
+			WindowCommandParserImpl() = delete;
+			explicit WindowCommandParserImpl(const ScriptPackage &package);
+
+		private:
+			rkit::Result ParseString(uint32_t index, rkit::ByteStringView &value) override;
+			rkit::Result ParseOperandList(uint32_t index, ScriptOperandList &value) override;
+
+			const ScriptPackage &m_package;
+		};
+
+		rkit::ResultCoroutine ExecuteWindowCommands(rkit::ICoroThread &thread, ScriptWindowInstance &windowInstance, const ScriptWindow &window);
+
+		ScriptManagerImpl &m_scriptManager;
+
+		rkit::Vector<ScriptWindowInstance*> m_activeWindows;
+	};
+
+	class ScriptContextImpl final : public rkit::OpaqueImplementation<ScriptContext>
 	{
 	};
 
@@ -90,6 +127,11 @@ namespace anox::game
 		ScriptLayerInstance &GetLayer(ScriptManager::ScriptLayer layer);
 		const ScriptLayerInstance &GetLayer(ScriptManager::ScriptLayer layer) const;
 
+		void FindScript(const anox::Label &label, const ScriptWindow *&outWindow, const ScriptSwitch *&outSwitch) const;
+		void FindScriptPrehashed(const anox::Label &label, rkit::HashValue_t hashValue, const ScriptWindow *&outWindow, const ScriptSwitch *&outSwitch) const;
+
+		rkit::Result CreateScriptEnvironment(rkit::UniquePtr<ScriptEnvironment> &outScriptEnvironment);
+
 	private:
 		static rkit::Result LoadScriptCommand(ScriptSwitchCommand &outCommand, const data::ape::SwitchCommand &inCommand);
 		static rkit::Result LoadScriptExpression(ScriptExpression &outExpr, const data::ape::Expression &inExpr);
@@ -98,6 +140,79 @@ namespace anox::game
 
 		rkit::StaticArray<ScriptLayerInstance, kNumScriptLayers> m_layers;
 	};
+
+	ScriptEnvironmentImpl::WindowCommandParserImpl::WindowCommandParserImpl(const ScriptPackage &package)
+		: m_package(package)
+	{
+	}
+
+	rkit::Result ScriptEnvironmentImpl::WindowCommandParserImpl::ParseString(uint32_t index, rkit::ByteStringView &value)
+	{
+		if (index >= m_package.m_strings.Count())
+			RKIT_THROW(rkit::ResultCode::kDataError);
+
+		value = m_package.m_strings[index];
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result ScriptEnvironmentImpl::WindowCommandParserImpl::ParseOperandList(uint32_t index, ScriptOperandList &value)
+	{
+		if (index >= m_package.m_operandLists.Count())
+			RKIT_THROW(rkit::ResultCode::kDataError);
+
+		value = m_package.m_operandLists[index];
+		RKIT_RETURN_OK;
+	}
+
+	ScriptEnvironmentImpl::ScriptEnvironmentImpl(ScriptManagerImpl &scriptManager)
+		: m_scriptManager(scriptManager)
+	{
+	}
+
+	rkit::ResultCoroutine ScriptEnvironmentImpl::StartSequence(rkit::ICoroThread &thread, ScriptContext &scriptContext, const Label &label, World &world)
+	{
+		const ScriptWindow *window = nullptr;
+		const ScriptSwitch *sw = nullptr;
+
+		m_scriptManager.FindScript(label, window, sw);
+
+		if (window)
+		{
+			// Do nothing if the window is already active
+			for (ScriptWindowInstance* windowPtr : m_activeWindows)
+			{
+				if (windowPtr->GetWindowID() == label)
+					CORO_RETURN_OK;
+			}
+
+			ScriptWindowInstance *instance = nullptr;
+			CORO_CHECK(WorldObjectFactory::CreateDynamic<ScriptWindowInstance>(world, instance));
+
+			CORO_CHECK(m_activeWindows.Append(instance));
+
+			CORO_CHECK(co_await ExecuteWindowCommands(thread, *instance, *window));
+		}
+
+		CORO_RETURN_OK;
+	}
+
+	rkit::ResultCoroutine ScriptEnvironmentImpl::ExecuteWindowCommands(rkit::ICoroThread &thread, ScriptWindowInstance &windowInstance, const ScriptWindow &window)
+	{
+		const ScriptPackage &pkg = *window.m_package;
+		rkit::ConstSpan<uint8_t> cmdStream = window.m_commandStream;
+
+		WindowCommandParserImpl cmdParser(pkg);
+
+		while (cmdStream.Count() > 0)
+		{
+			size_t consumed = 0;
+			CORO_CHECK(ape::HandleCommand(cmdStream.Ptr(), cmdStream.Count(), consumed, cmdParser, windowInstance, this->Base()));
+
+			cmdStream = cmdStream.SubSpan(consumed);
+		}
+
+		CORO_RETURN_OK;
+	}
 
 	rkit::Result ScriptManagerImpl::LoadScriptPackage(ScriptManager::ScriptLayer layer, const rkit::Span<const uint8_t> &contents)
 	{
@@ -257,17 +372,25 @@ namespace anox::game
 				});
 		}
 
-		ScriptPackage package;
-		package.m_windows = std::move(scriptWindows);
-		package.m_switches = std::move(scriptSwitches);
-		package.m_expressions = std::move(scriptExprs);
-		package.m_strings = std::move(strViews);
-		package.m_operandLists = std::move(operandLists);
+		rkit::UniquePtr<ScriptPackage> package;
+		RKIT_CHECK(rkit::New<ScriptPackage>(package));
 
-		package.m_allStrings = std::move(strBytes);
-		package.m_allOperands = std::move(operands);
-		package.m_allWindowCommands = std::move(windowCommandStreamBytes);
-		package.m_allSwitchCommands = std::move(switchCommands);
+		for (ScriptWindow &window : scriptWindows)
+			window.m_package = package.Get();
+
+		for (ScriptSwitch &sw : scriptSwitches)
+			sw.m_package = package.Get();
+
+		package->m_windows = std::move(scriptWindows);
+		package->m_switches = std::move(scriptSwitches);
+		package->m_expressions = std::move(scriptExprs);
+		package->m_strings = std::move(strViews);
+		package->m_operandLists = std::move(operandLists);
+
+		package->m_allStrings = std::move(strBytes);
+		package->m_allOperands = std::move(operands);
+		package->m_allWindowCommands = std::move(windowCommandStreamBytes);
+		package->m_allSwitchCommands = std::move(switchCommands);
 
 		RKIT_CHECK(GetLayer(layer).AddPackage(std::move(package)));
 
@@ -311,11 +434,46 @@ namespace anox::game
 		return m_layers[static_cast<size_t>(layer)];
 	}
 
-	rkit::Result ScriptLayerInstance::AddPackage(ScriptPackage &&packageMoved)
+	void ScriptManagerImpl::FindScript(const Label &label, const ScriptWindow *&outWindow, const ScriptSwitch *&outSwitch) const
 	{
-		RKIT_CHECK(m_packages.Append(std::move(packageMoved)));
+		return FindScriptPrehashed(label, rkit::Hasher<Label>::ComputeHash(0, label), outWindow, outSwitch);
+	}
 
-		const ScriptPackage &package = m_packages[m_packages.Count() - 1];
+	void ScriptManagerImpl::FindScriptPrehashed(const Label &label, rkit::HashValue_t hashValue, const ScriptWindow *&outWindow, const ScriptSwitch *&outSwitch) const
+	{
+		for (size_t layerPlusOne = static_cast<size_t>(ScriptManager::ScriptLayer::kCount); layerPlusOne > 0; layerPlusOne--)
+		{
+			const ScriptLayerInstance &layer = m_layers[layerPlusOne - 1];
+
+			if (const ScriptWindow *window = layer.FindWindowPrehashed(label, hashValue))
+			{
+				outWindow = window;
+				outSwitch = nullptr;
+				return;
+			}
+
+			if (const ScriptSwitch *sw = layer.FindSwitchPrehashed(label, hashValue))
+			{
+				outWindow = nullptr;
+				outSwitch = sw;
+				return;
+			}
+		}
+
+		outWindow = nullptr;
+		outSwitch = nullptr;
+	}
+
+	rkit::Result ScriptManagerImpl::CreateScriptEnvironment(rkit::UniquePtr<ScriptEnvironment> &outScriptEnvironment)
+	{
+		return rkit::New<ScriptEnvironment>(outScriptEnvironment, *this);
+	}
+
+	rkit::Result ScriptLayerInstance::AddPackage(rkit::UniquePtr<ScriptPackage> &&packageMoved)
+	{
+		const ScriptPackage &package = *packageMoved;
+
+		RKIT_CHECK(m_packages.Append(std::move(packageMoved)));
 
 		for (const ScriptWindow &window : package.m_windows)
 		{
@@ -336,6 +494,34 @@ namespace anox::game
 		m_switches.Clear();
 	}
 
+	const ScriptWindow *ScriptLayerInstance::FindWindow(const Label &label) const
+	{
+		return FindWindowPrehashed(label, rkit::Hasher<Label>::ComputeHash(0, label));
+	}
+
+	const ScriptWindow *ScriptLayerInstance::FindWindowPrehashed(const Label &label, rkit::HashValue_t hashValue) const
+	{
+		const rkit::HashMap<Label, const ScriptWindow *>::ConstIterator_t it = m_windows.FindPrehashed(hashValue, label);
+		if (it == m_windows.end())
+			return nullptr;
+
+		return it.Value();
+	}
+
+	const ScriptSwitch *ScriptLayerInstance::FindSwitch(const Label &label) const
+	{
+		return FindSwitchPrehashed(label, rkit::Hasher<Label>::ComputeHash(0, label));
+	}
+
+	const ScriptSwitch *ScriptLayerInstance::FindSwitchPrehashed(const Label &label, rkit::HashValue_t hashValue) const
+	{
+		const rkit::HashMap<Label, const ScriptSwitch *>::ConstIterator_t it = m_switches.FindPrehashed(hashValue, label);
+		if (it == m_switches.end())
+			return nullptr;
+
+		return it.Value();
+	}
+
 	rkit::Result ScriptManager::LoadScriptPackage(ScriptLayer layer, const rkit::Span<const uint8_t> &contents)
 	{
 		return Impl().LoadScriptPackage(layer, contents);
@@ -346,10 +532,38 @@ namespace anox::game
 		Impl().GetLayer(layer).UnloadAll();
 	}
 
+	rkit::Result ScriptManager::CreateScriptEnvironment(rkit::UniquePtr<ScriptEnvironment> &outScriptEnvironment)
+	{
+		rkit::UniquePtr<ScriptEnvironment> scriptEnvironment;
+
+		RKIT_CHECK(Impl().CreateScriptEnvironment(scriptEnvironment));
+
+		outScriptEnvironment = std::move(scriptEnvironment);
+
+		RKIT_RETURN_OK;
+	}
+
 	rkit::Result ScriptManager::Create(rkit::UniquePtr<ScriptManager> &outScriptManager)
 	{
 		return rkit::New<ScriptManager>(outScriptManager);
 	}
+
+	rkit::Result ScriptEnvironment::CreateScriptContext(rkit::UniquePtr<ScriptContext> &outScriptCtx)
+	{
+		return rkit::New<ScriptContext>(outScriptCtx);
+	}
+
+	ScriptEnvironment::ScriptEnvironment(ScriptManagerImpl &scriptManager)
+		: Opaque<ScriptEnvironmentImpl>(scriptManager)
+	{
+	}
+
+	rkit::ResultCoroutine ScriptEnvironment::StartSequence(rkit::ICoroThread &thread, ScriptContext &scriptContext, const Label &label, World &world)
+	{
+		return Impl().StartSequence(thread, scriptContext, label, world);
+	}
 }
 
 RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR(anox::game::ScriptManagerImpl)
+RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR(anox::game::ScriptContextImpl)
+RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR(anox::game::ScriptEnvironmentImpl)

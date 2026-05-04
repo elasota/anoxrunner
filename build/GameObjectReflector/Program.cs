@@ -428,7 +428,7 @@ namespace GameObjectReflector
                     writer.WriteLine();
                     writer.WriteLine("\ttemplate<>");
                     writer.WriteLine($"\tstruct ObjectRTTIImpl<::anox::game::{className}>");
-                    writer.WriteLine($"\t\t: private ObjectFieldsImpl<::anox::game::{className}>");
+                    writer.WriteLine($"\t\t: protected ObjectFieldsImpl<::anox::game::{className}>");
 
                     if (needsExplicitWorldObjectBase)
                         writer.WriteLine("\t\t, public ::anox::game::WorldObject");

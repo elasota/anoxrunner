@@ -7,7 +7,7 @@
 
 #define ANOX_RTTI_CLASS_MULTI_BASE(cls, ...)	\
 public:\
-	friend class ::anox::game::priv::PrivateAccessor;\
+	friend struct ::anox::game::priv::PrivateAccessor;\
 	typedef ::rkit::TypeList<__VA_ARGS__> BaseClasses_t;\
 	typedef cls ThisClass_t;\
 	typedef ::anox::game::priv::AutoRTTI<ThisClass_t, BaseClasses_t> RTTIType_t;\

@@ -54,8 +54,10 @@ namespace anox::game
 	class WorldObjectFactory
 	{
 	public:
-
 		static rkit::Result CreateLevelObject(uint32_t levelObjectID, size_t &outSize, rkit::RCPtr<WorldObject> &outObject, void *&outFieldsRef, SerializeFromLevelFunction_t &outDeserializeFunction);
+
+		template<class TObjClass>
+		static rkit::Result CreateDynamic(World &world, TObjClass*& outObject);
 
 		template<class TObjClass>
 		static rkit::Result CreateLevelObjectTemplate(rkit::RCPtr<anox::game::WorldObject> &outObject, void *&outFieldsRef, SerializeFromLevelFunction_t &outDeserializeFunction);
@@ -63,6 +65,8 @@ namespace anox::game
 	private:
 		template<class TObjClass>
 		static rkit::Result SerializeFromLevelCB(void *fieldsRef, const WorldObjectSpawnParams &spawnParams, const uint8_t *bytes);
+
+		static rkit::Result AddObjectToWorld(World &world, rkit::RCPtr<WorldObject>&& object);
 	};
 }
 
@@ -71,6 +75,25 @@ namespace anox::game
 
 namespace anox::game
 {
+	template<class TObjClass>
+	static rkit::Result WorldObjectFactory::CreateDynamic(World &world, TObjClass*& outObject)
+	{
+		rkit::UniquePtr<WorldObjectContainer> container;
+		RKIT_CHECK(rkit::New<WorldObjectContainer>(container));
+
+		rkit::UniquePtr<WorldObject> obj;
+		ObjectFieldsBase<TObjClass> *fieldsRef = nullptr;
+
+		RKIT_CHECK(WorldObjectInstantiator<TObjClass>::CreateObject(obj, fieldsRef));
+
+		TObjClass *objPtr = static_cast<TObjClass *>(obj.Get());
+
+		RKIT_CHECK(AddObjectToWorld(world, WorldObjectContainer::Wrap(std::move(container), std::move(obj))));
+
+		outObject = objPtr;
+		RKIT_RETURN_OK;
+	}
+
 	template<class TObjClass>
 	rkit::Result WorldObjectFactory::CreateLevelObjectTemplate(rkit::RCPtr<anox::game::WorldObject> &outObject, void *&outFieldsRef, SerializeFromLevelFunction_t &outDeserializeFunction)
 	{

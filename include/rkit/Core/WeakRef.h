@@ -102,6 +102,7 @@ namespace rkit
 
 		WeakPtr &operator=(std::nullptr_t);
 
+		T *GetUnsafe() const;
 		RCPtr<T> Lock() const;
 		RefCountedTracker *GetWeakTracker() const;
 		RefCountedTracker *GetStrongTracker() const;
@@ -394,7 +395,13 @@ namespace rkit
 				return RCPtr<T>(RCPtrMoveTag(), m_object, strongTracker);
 		}
 
-		return nullptr;
+		return RCPtr<T>();
+	}
+
+	template<class T>
+	T *WeakPtr<T>::GetUnsafe() const
+	{
+		return m_object;
 	}
 
 	template<class T>

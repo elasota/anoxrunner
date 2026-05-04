@@ -30,11 +30,13 @@ namespace anox::game
 	class WorldObject;
 	class AllWorldObjectsCollection;
 	class AllWorldObjectsUnsafeCollection;
+	class ScriptEnvironment;
+	class ScriptManager;
 
 	class World final : public rkit::Opaque<WorldImpl>
 	{
 	public:
-		World();
+		explicit World(ScriptManager &scriptManager);
 
 		rkit::Result AddObject(rkit::RCPtr<WorldObject> &&obj);
 
@@ -46,6 +48,12 @@ namespace anox::game
 
 		rkit::ResultCoroutine OnWorldStarted(rkit::ICoroThread &thread);
 
-		static rkit::Result Create(rkit::UniquePtr<World> &outWorld);
+		ScriptManager &GetScriptManager() const;
+		ScriptEnvironment &GetScriptEnvironment() const;
+
+		static rkit::Result Create(rkit::UniquePtr<World> &outWorld, ScriptManager &scriptManager);
+
+	private:
+		World() = delete;
 	};
 }

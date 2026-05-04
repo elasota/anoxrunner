@@ -66,8 +66,8 @@ namespace anox::game
 		rkit::IMallocDriver *allocDriver = rkit::GetDrivers().m_mallocDriver;
 		RKIT_CHECK(rkit::utils::CreateCoroThread(m_mainCoroThread, allocDriver, 1 * 1024 * 1024, rkit::GetDrivers().GetAssertDriver()));
 
-		RKIT_CHECK(World::Create(m_world));
 		RKIT_CHECK(ScriptManager::Create(m_scriptManager));
+		RKIT_CHECK(World::Create(m_world, *m_scriptManager));
 
 		RKIT_RETURN_OK;
 	}
@@ -93,6 +93,8 @@ namespace anox::game
 				rkit::log::Error(u8"Entity type was invalid");
 				CORO_THROW(rkit::ResultCode::kDataError);
 			}
+
+			CORO_CHECK(obj->Initialize(world));
 
 			if (spawnDataSize > spawnData.Count())
 			{

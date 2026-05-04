@@ -1,4 +1,6 @@
-﻿namespace APEWindowCommandReflector
+﻿using System;
+
+namespace APEWindowCommandReflector
 {
     internal class FieldDef
     {
@@ -49,6 +51,50 @@
 
     internal class Program
     {
+        static int? SizeIntForField(FieldDef.FieldType type)
+        {
+            switch (type)
+            {
+                case FieldDef.FieldType.UInt16:
+                    return 2;
+                case FieldDef.FieldType.UInt32:
+                case FieldDef.FieldType.Str:
+                case FieldDef.FieldType.OptStr:
+                case FieldDef.FieldType.Format:
+                case FieldDef.FieldType.Bits32:
+                    return 4;
+
+                case FieldDef.FieldType.Padding:
+                    return 0;
+
+                case FieldDef.FieldType.OptExpr:
+                    return null;
+
+                default:
+                    throw new Exception();
+            }
+        }
+
+        static string? SizeStringForField(FieldDef.FieldType type)
+        {
+            switch (type)
+            {
+                case FieldDef.FieldType.UInt16:
+                case FieldDef.FieldType.UInt32:
+                case FieldDef.FieldType.Str:
+                case FieldDef.FieldType.OptStr:
+                case FieldDef.FieldType.Format:
+                case FieldDef.FieldType.Bits32:
+                case FieldDef.FieldType.Padding:
+                    return null;
+                case FieldDef.FieldType.OptExpr:
+                    return "sizeof(::anox::data::ape::ExpressionValue)";
+
+                default:
+                    throw new Exception();
+            }
+        }
+
         static void Main(string[] args)
         {
             if (args.Length != 2)
@@ -60,9 +106,11 @@
 
             string outBuildDir = Path.Combine(args[1], "Anox_Build").Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
             string outDataIncludeDir = Path.Combine(args[1], "include", "anox", "Data").Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            string outGameIncludeDir = Path.Combine(args[1], "include", "anox", "Game").Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
 
             Directory.CreateDirectory(outBuildDir);
             Directory.CreateDirectory(outDataIncludeDir);
+            Directory.CreateDirectory(outGameIncludeDir);
 
             using (StreamWriter sw = new StreamWriter(Path.Combine(outBuildDir, "AnoxAPEWindowCommandData.generated.h")))
             {
@@ -250,6 +298,191 @@
                 sw.WriteLine("\t\tCount,");
 
                 sw.WriteLine("\t};");
+                sw.WriteLine("}");
+            }
+
+            using (StreamWriter sw = new StreamWriter(Path.Combine(outGameIncludeDir, "APEWindowCommandHandler.generated.h")))
+            {
+                sw.WriteLine("#pragma once");
+                sw.WriteLine();
+                sw.WriteLine("namespace anox::game");
+                sw.WriteLine("{");
+                sw.WriteLine("\tclass ScriptEnvironment;");
+                sw.WriteLine("}");
+                sw.WriteLine();
+                sw.WriteLine("namespace anox::game::ape");
+                sw.WriteLine("{");
+                foreach (WindowCommandDef wcDef in windowCommandDefs)
+                    sw.WriteLine("\tstruct " + wcDef.Name + ";");
+                sw.WriteLine();
+
+                sw.WriteLine("\tstruct IAPEWindowCommandHandler");
+                sw.WriteLine("\t{");
+                sw.WriteLine("\t\tvirtual rkit::Result InvalidCommand() = 0;");
+                foreach (WindowCommandDef wcDef in windowCommandDefs)
+                {
+                    sw.WriteLine("\t\tvirtual rkit::Result HandleCommand(ScriptEnvironment &env, const " + wcDef.Name + " &cmd) = 0;");
+                }
+                sw.WriteLine("\t};");
+                sw.WriteLine("}");
+            }
+
+            using (StreamWriter sw = new StreamWriter(Path.Combine(outGameIncludeDir, "APECommandDispatcher.generated.h")))
+            {
+                sw.NewLine = "\n";
+
+                sw.WriteLine("#pragma once");
+                sw.WriteLine();
+                sw.WriteLine("#include \"APEWindowCommandParser.h\"");
+                sw.WriteLine("#include \"APEWindowCommandHandler.generated.h\"");
+                sw.WriteLine();
+                sw.WriteLine("#include \"anox/Data/APEWindowCommandOpcodes.generated.h\"");
+                sw.WriteLine();
+                sw.WriteLine("#include \"rkit/Core/Optional.h\"");
+                sw.WriteLine("#include \"rkit/Core/Span.h\"");
+                sw.WriteLine("#include \"rkit/Core/StringView.h\"");
+                sw.WriteLine();
+                sw.WriteLine("#include <stdint.h>");
+                sw.WriteLine();
+                sw.WriteLine("namespace anox::game");
+                sw.WriteLine("{");
+                sw.WriteLine("\tclass ScriptEnvironment;");
+                sw.WriteLine("}");
+                sw.WriteLine();
+                sw.WriteLine("namespace anox::game::ape");
+                sw.WriteLine("{");
+                foreach (WindowCommandDef wcDef in windowCommandDefs)
+                {
+                    sw.WriteLine("\tstruct " + wcDef.Name + "");
+                    sw.WriteLine("\t{");
+
+                    foreach (FieldDef fDef in wcDef.Fields)
+                    {
+                        string? fldType = null;
+                        switch (fDef.Type)
+                        {
+                        case FieldDef.FieldType.UInt16:
+                            fldType = "uint16_t";
+                            break;
+                        case FieldDef.FieldType.UInt32:
+                            fldType = "uint32_t";
+                            break;
+                        case FieldDef.FieldType.Str:
+                            fldType = "rkit::ByteStringView";
+                            break;
+                        case FieldDef.FieldType.OptStr:
+                            fldType = "rkit::Optional<rkit::ByteStringView>";
+                            break;
+                        case FieldDef.FieldType.Format:
+                            fldType = "ScriptOperandList";
+                            break;
+                        case FieldDef.FieldType.OptExpr:
+                            fldType = "ScriptExprValue";
+                            break;
+                        case FieldDef.FieldType.Bits32:
+                            foreach (KeyValuePair<string, int> bit in fDef.Bits!)
+                                sw.WriteLine("\t\tbool m_" + bit.Key + ";");
+                            break;
+
+                        case FieldDef.FieldType.Padding:
+                            break;
+
+                        default:
+                            throw new Exception();
+                        }
+
+                        if (fldType != null)
+                            sw.WriteLine("\t\t" + fldType + " m_" + fDef.Name + ";");
+                    }
+                    
+                    sw.WriteLine("\t};");
+                    sw.WriteLine();
+                }
+
+                sw.WriteLine("\tinline rkit::Result HandleCommand(const uint8_t *byteStream, size_t available, size_t &outConsumed, APEWindowCommandParser &parser, IAPEWindowCommandHandler &cmdHandler, ScriptEnvironment &env)");
+                sw.WriteLine("\t{");
+                sw.WriteLine("\t\tconst uint8_t opcode = *byteStream++;");
+                sw.WriteLine("\t\tswitch (opcode)");
+                sw.WriteLine("\t\t{");
+
+                foreach (WindowCommandDef wcDef in windowCommandDefs)
+                {
+                    sw.WriteLine("\t\tcase static_cast<uint8_t>(::anox::data::WindowCommandType::" + wcDef.Name + "):");
+                    sw.WriteLine("\t\t\t{");
+
+                    int sizeBytes = 1;
+                    List<string> sizeStrings = new List<string>();
+                    foreach (FieldDef fDef in wcDef.Fields)
+                    {
+                        int? fieldSizeBytes = SizeIntForField(fDef.Type);
+                        if (fieldSizeBytes != null)
+                            sizeBytes += (int)fieldSizeBytes;
+                        else
+                        {
+                            string? sizeString = SizeStringForField(fDef.Type);
+                            if (sizeString != null)
+                                sizeStrings.Add(sizeString);
+                        }
+                    }
+
+                    sw.Write("\t\t\t\tconst size_t bytesRequired = " + sizeBytes.ToString() + "u");
+
+                    foreach (string sizeString in sizeStrings)
+                        sw.Write(" + " + sizeString);
+                    sw.WriteLine(";");
+                    sw.WriteLine("\t\t\t\tif (available < bytesRequired)");
+                    sw.WriteLine("\t\t\t\t\tRKIT_THROW(rkit::ResultCode::kDataError);");
+                    sw.WriteLine();
+                    sw.WriteLine("\t\t\t\toutConsumed = bytesRequired;");
+                    sw.WriteLine();
+
+                    sw.WriteLine("\t\t\t\t" + wcDef.Name + " cmd;");
+
+
+                    foreach (FieldDef fDef in wcDef.Fields)
+                    {
+                        switch (fDef.Type)
+                        {
+                            case FieldDef.FieldType.UInt16:
+                            case FieldDef.FieldType.UInt32:
+                            case FieldDef.FieldType.OptExpr:
+                                sw.WriteLine("\t\t\t\tAPEWindowCommandParser::ParseStatic(byteStream, cmd.m_" + fDef.Name + ");");
+                                break;
+                            case FieldDef.FieldType.Str:
+                            case FieldDef.FieldType.OptStr:
+                            case FieldDef.FieldType.Format:
+                                sw.WriteLine("\t\t\t\tRKIT_CHECK(parser.ParseInstanced(byteStream, cmd.m_" + fDef.Name + "));");
+                                break;
+                            case FieldDef.FieldType.Bits32:
+                                sw.WriteLine("\t\t\t\t{");
+                                sw.WriteLine("\t\t\t\t\tuint32_t tempBits = 0;");
+                                sw.WriteLine("\t\t\t\t\tAPEWindowCommandParser::ParseStatic(byteStream, tempBits);");
+                                foreach (KeyValuePair<string, int> bit in fDef.Bits!)
+                                {
+                                    int bitMask = (1 << bit.Value);
+                                    sw.WriteLine("\t\t\t\t\tcmd.m_" + bit.Key + " = ((tempBits & " + bitMask.ToString() + "u) != 0u);");
+                                }
+                                sw.WriteLine("\t\t\t\t}");
+                                break;
+
+                            case FieldDef.FieldType.Padding:
+                                break;
+
+                            default:
+                                throw new Exception();
+                        }
+                    }
+
+                    sw.WriteLine("\t\t\t\treturn cmdHandler.HandleCommand(env, cmd);");
+
+                    sw.WriteLine("\t\t\t}");
+                    sw.WriteLine("\t\t\tbreak;");
+                }
+                sw.WriteLine("\t\tdefault:");
+                sw.WriteLine("\t\t\tRKIT_THROW(rkit::ResultCode::kDataError);");
+                sw.WriteLine("\t\t};");
+
+                sw.WriteLine("\t}");
                 sw.WriteLine("}");
             }
         }

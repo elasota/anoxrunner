@@ -25,7 +25,7 @@ namespace rkit
 		SimpleObjectAllocation<T> Detach();
 
 		template<class TOther>
-		UniquePtr<TOther> StaticCast();
+		UniquePtr<TOther> StaticCastMove();
 
 		void Reset();
 
@@ -123,7 +123,7 @@ rkit::SimpleObjectAllocation<T> rkit::UniquePtr<T>::Detach()
 
 template<class T>
 template<class TOther>
-rkit::UniquePtr<TOther> rkit::UniquePtr<T>::StaticCast()
+rkit::UniquePtr<TOther> rkit::UniquePtr<T>::StaticCastMove()
 {
 	rkit::SimpleObjectAllocation<T> detached = Detach();
 

@@ -473,3 +473,10 @@ class SunPointUserEntity : AbstractUserEntityComponent
 {
 }
 
+class ScriptWindowInstance
+{
+	label windowID
+	label startSwitch
+	label thinkSwitch
+	label finishSwitch
+}

@@ -1798,7 +1798,7 @@ namespace rkit
 
 		dirScan->SetHandle(ffHandle);
 
-		outDirectoryScan = dirScan.StaticCast<IDirectoryScan>();
+		outDirectoryScan = dirScan.StaticCastMove<IDirectoryScan>();
 
 		RKIT_RETURN_OK;
 	}

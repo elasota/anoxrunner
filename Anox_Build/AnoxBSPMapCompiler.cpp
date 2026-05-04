@@ -1279,7 +1279,7 @@ namespace anox { namespace buildsystem
 			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
 			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, outPath, outStream));
 
-			if (scriptsContentID.IsNull())
+			if (!scriptsContentID.IsNull())
 			{
 				RKIT_CHECK(outStream->WriteOneBinary(scriptsContentID));
 			}
