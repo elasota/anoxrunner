@@ -60,17 +60,16 @@ namespace anox::game
 		rkit::Vector<ScriptWindow> m_windows;
 		rkit::Vector<ScriptSwitch> m_switches;
 		rkit::Vector<ScriptExpression> m_expressions;
-		rkit::Vector<rkit::ByteStringView> m_strings;
+		rkit::Vector<rkit::ByteString> m_strings;
 		rkit::Vector<rkit::Span<const uint32_t>> m_operandLists;
 
-		rkit::Vector<uint8_t> m_allStrings;
 		rkit::Vector<uint32_t> m_allOperands;
 		rkit::Vector<uint8_t> m_allWindowCommands;
 		rkit::Vector<ScriptSwitchCommand> m_allSwitchCommands;
 
 		rkit::Vector<rkit::data::ContentID> m_materialContentIDs;
 		rkit::Vector<uint32_t> m_materialNameLookups;
-		rkit::HashMap<rkit::ByteStringView, uint32_t> m_wildcardLookups;
+		rkit::HashMap<rkit::ByteString, uint32_t> m_wildcardLookups;
 	};
 
 	class ScriptLayerInstance
@@ -100,6 +99,7 @@ namespace anox::game
 		rkit::ResultCoroutine StartSequence(rkit::ICoroThread &thread, ScriptContext &scriptContext, const Label &label, World &world);
 
 		bool TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, uint32_t exprID, int depth) const;
+		bool TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, const ScriptExprValue &exprValue, int depth) const;
 		bool TryEvaluateFloatScriptOperand(float &outValue, const ScriptPackage &pkg, const ScriptOperandType opType, uint32_t value, int depth) const;
 
 	private:
@@ -117,8 +117,21 @@ namespace anox::game
 		};
 
 		rkit::ResultCoroutine ExecuteWindowCommands(rkit::ICoroThread &thread, ScriptWindowInstance &windowInstance, const ScriptWindow &window);
+		rkit::ResultCoroutine ExecuteSwitchCommands(rkit::ICoroThread &thread, const ScriptPackage *pkg, rkit::Span<const ScriptSwitchCommand> cmds, int &loopCounter, int depth);
+
+		bool TryResolveOptionalString(rkit::ByteString &outBStr, const ScriptPackage &pkg, uint32_t strID) const;
+
+		rkit::Result ClearFloatVariable(const rkit::ByteStringView &bstr);
+		rkit::Result SetFloatVariable(rkit::ByteString &&bstr, float value);
+
+		bool ParseLabel(Label &outLabel, const rkit::ByteStringView bstr);
+
+		static constexpr int kLoopCounterLimit = 1000;
 
 		ScriptManagerImpl &m_scriptManager;
+
+		rkit::HashMap<rkit::ByteString, float> m_floatVariables;
+		rkit::HashMap<rkit::ByteString, rkit::Vector<float>> m_floatArrays;
 
 		rkit::Vector<ScriptWindowInstance*> m_activeWindows;
 	};
@@ -138,9 +151,18 @@ namespace anox::game
 		void FindScript(const anox::Label &label, const ScriptWindow *&outWindow, const ScriptSwitch *&outSwitch) const;
 		void FindScriptPrehashed(const anox::Label &label, rkit::HashValue_t hashValue, const ScriptWindow *&outWindow, const ScriptSwitch *&outSwitch) const;
 
+		void FindWindow(const anox::Label &label, const ScriptWindow *&outWindow) const;
+		void FindWindowPrehashed(const anox::Label &label, rkit::HashValue_t hashValue, const ScriptWindow *&outWindow) const;
+
+		void FindSwitch(const anox::Label &label, const ScriptSwitch *&outSwitch) const;
+		void FindSwitchPrehashed(const anox::Label &label, rkit::HashValue_t hashValue, const ScriptSwitch *&outSwitch) const;
+
 		rkit::Result CreateScriptEnvironment(rkit::UniquePtr<ScriptEnvironment> &outScriptEnvironment);
 
 	private:
+		void FindScriptInternal(const anox::Label &label, const ScriptWindow **outWindow, const ScriptSwitch **outSwitch) const;
+		void FindScriptPrehashedInternal(const anox::Label &label, rkit::HashValue_t hashValue, const ScriptWindow **outWindow, const ScriptSwitch **outSwitch) const;
+
 		static rkit::Result LoadScriptCommand(ScriptSwitchCommand &outCommand, const data::ape::SwitchCommand &inCommand);
 		static rkit::Result LoadScriptExpression(ScriptExpression &outExpr, const data::ape::Expression &inExpr);
 
@@ -200,6 +222,22 @@ namespace anox::game
 			instance->Initialize(label);
 
 			CORO_CHECK(co_await ExecuteWindowCommands(thread, *instance, *window));
+
+			const Label startSwitch = instance->GetStartSwitch();
+
+			sw = nullptr;
+			m_scriptManager.FindSwitch(startSwitch, sw);
+			// Fall through and run the start switch
+		}
+
+		if (sw)
+		{
+			rkit::ConstSpan<ScriptSwitchCommand> cmds = sw->m_commands;
+
+			const ScriptPackage &pkg = *sw->m_package;
+
+			int loopCounter = 0;
+			CORO_CHECK(co_await ExecuteSwitchCommands(thread, &pkg, cmds, loopCounter, 0));
 		}
 
 		CORO_RETURN_OK;
@@ -281,6 +319,26 @@ namespace anox::game
 		}
 	}
 
+
+	bool ScriptEnvironmentImpl::TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr, int depth) const
+	{
+		switch (expr.m_exprType)
+		{
+		case ScriptExprType::Empty:
+			return false;
+		case ScriptExprType::FloatLiteral:
+			RKIT_STATIC_ASSERT(sizeof(outValue) == 4);
+			RKIT_STATIC_ASSERT(sizeof(expr.m_index) == 4);
+			memcpy(&outValue, &expr.m_index, 4);
+			return true;
+		case ScriptExprType::FloatExpression:
+			return TryEvaluateFloatScriptExpr(outValue, pkg, expr.m_index, depth);
+		default:
+			rkit::log::Error(u8"Invalid expression type where float expression was expected");
+			return false;
+		}
+	}
+
 	bool ScriptEnvironmentImpl::TryEvaluateFloatScriptOperand(float &outValue, const ScriptPackage &pkg, const ScriptOperandType opType, uint32_t value, int depth) const
 	{
 		switch (opType)
@@ -317,6 +375,187 @@ namespace anox::game
 		CORO_RETURN_OK;
 	}
 
+	rkit::ResultCoroutine ScriptEnvironmentImpl::ExecuteSwitchCommands(rkit::ICoroThread &thread, const ScriptPackage *pkg, rkit::Span<const ScriptSwitchCommand> cmds, int &loopCounter, int depth)
+	{
+		size_t ip = 0;
+		while (ip < cmds.Count())
+		{
+			const ScriptSwitchCommand &cmd = cmds[ip++];
+			switch (cmd.m_opcode)
+			{
+			case 0:	// noop
+				break;
+			//case 1:	// if
+			case 2:	// setfloat
+				{
+					rkit::ByteString varName;
+					if (TryResolveOptionalString(varName, *pkg, cmd.m_strValue))
+					{
+						if (cmd.m_exprValue.m_exprType == ScriptExprType::Empty)
+						{
+							ClearFloatVariable(varName);
+						}
+						else
+						{
+							float v = 0.f;
+							if (TryEvaluateFloatScriptExpr(v, *pkg, cmd.m_exprValue, 0))
+							{
+								CORO_CHECK(SetFloatVariable(std::move(varName), v));
+							}
+						}
+					}
+				}
+				break;
+			//case 2:	// setfloat
+			//case 3:	// setstring
+			case 4:	// goto
+				{
+					rkit::ByteString labelStr;
+					Label destLabel;
+					if (!TryResolveOptionalString(labelStr, *pkg, cmd.m_strValue) || !ParseLabel(destLabel, labelStr))
+					{
+						rkit::log::Error(u8"Couldn't resolve goto destination");
+						CORO_RETURN_OK;
+					}
+					else
+					{
+						// return
+						if (destLabel == Label(0, 0))
+							CORO_RETURN_OK;
+
+						const ScriptSwitch *sw = nullptr;
+						m_scriptManager.FindSwitch(destLabel, sw);
+
+						if (!sw)
+						{
+							rkit::log::Error(u8"Couldn't resolve goto switch");
+							CORO_RETURN_OK;
+						}
+						else
+						{
+							if (loopCounter == kLoopCounterLimit)
+							{
+								rkit::log::Error(u8"Loop counter limit exceeded");
+								CORO_RETURN_OK;
+							}
+
+							loopCounter++;
+							pkg = sw->m_package;
+							cmds = sw->m_commands;
+							ip = 0;
+						}
+					}
+				}
+				break;
+			//case 5:	// gosub
+			//case 6:	// console
+			//case 7:	// echo
+			//case 8:	// target
+			//case 9:	// pathtarget
+			//case 10:	// extern
+			//case 11:	// while
+			//case 12:	// playambient
+			//case 13:	// loopambient
+			//case 14:	// stopambient
+			//case 15:	// playscene
+			//case 16:	// loopscene
+			//case 17:	// stopscene
+			//case 18:	// chainscripts
+			//case 19:	// closewindow
+			//case 20:	// loadape
+			//case 21:	// setfocus
+			//case 22:	// jump
+			//case 23:	// rjump
+			default:
+				rkit::log::Error(u8"Unimplemented APE opcode");
+				break;
+			};
+		}
+
+		CORO_RETURN_OK;
+	}
+
+	bool ScriptEnvironmentImpl::TryResolveOptionalString(rkit::ByteString &outBStr, const ScriptPackage &pkg, uint32_t strID) const
+	{
+		if (strID == 0)
+			return false;
+
+		strID--;
+		if (strID >= pkg.m_strings.Count())
+			return false;
+
+		outBStr = pkg.m_strings[strID];
+		return true;
+	}
+
+	rkit::Result ScriptEnvironmentImpl::ClearFloatVariable(const rkit::ByteStringView &bstr)
+	{
+		m_floatVariables.Remove(bstr);
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result ScriptEnvironmentImpl::SetFloatVariable(rkit::ByteString &&bstr, float value)
+	{
+		for (uint8_t ch : bstr.ToSpan())
+		{
+			if (ch == '[')
+				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+		}
+
+		if (value == 0.0f)
+		{
+			m_floatVariables.Remove(bstr);
+			RKIT_RETURN_OK;
+		}
+		else
+			return m_floatVariables.Set(std::move(bstr), value);
+	}
+
+	bool ScriptEnvironmentImpl::ParseLabel(Label &outLabel, const rkit::ByteStringView bstr)
+	{
+		rkit::Span<const uint8_t> bytes = bstr.ToSpan();
+		size_t splitIndex = 0;
+		while (splitIndex < bytes.Count() && bstr[splitIndex] != ':')
+			splitIndex++;
+
+		if (splitIndex == bytes.Count())
+			return false;
+
+		const rkit::Span<const uint8_t> halfBytes[2] = { bytes.SubSpan(0, splitIndex), bytes.SubSpan(splitIndex + 1) };
+		uint32_t halfValues[2] = { };
+
+		for (int half = 0; half < 2; half++)
+		{
+			rkit::Span<const uint8_t> bspan = halfBytes[half];
+			uint32_t value = 0;
+
+			const uint32_t upperLimit = std::numeric_limits<uint32_t>::max() / 10u;
+
+			if (bspan.Count() == 0)
+				return false;
+
+			for (uint8_t ch : bspan)
+			{
+				if (ch < '0' || ch > '9')
+					return false;
+
+				if (value > upperLimit)
+					return false;
+
+				value *= 10u;
+				value += static_cast<uint32_t>(ch - '0');
+			}
+
+			halfValues[half] = value;
+		}
+
+		if (!Label::IsValid(halfValues[0], halfValues[1]))
+			return false;
+
+		outLabel = Label(halfValues[0], halfValues[1]);
+		return true;
+	}
+
 	rkit::Result ScriptManagerImpl::LoadScriptPackage(ScriptManager::ScriptLayer layer, const rkit::Span<const uint8_t> &contents)
 	{
 		rkit::ReadOnlyMemoryStream stream(contents);
@@ -343,40 +582,30 @@ namespace anox::game
 			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
-		rkit::Vector<rkit::endian::LittleUInt32_t> strLengths;
-		RKIT_CHECK(strLengths.Resize(numStrings));
+		rkit::Vector<rkit::ByteStringConstructionBuffer> strCBufs;
+		rkit::Vector<rkit::ByteString> strings;
 
-		RKIT_CHECK(stream.ReadAllSpan(strLengths.ToSpan()));
+		RKIT_CHECK(strCBufs.Resize(numStrings));
+		RKIT_CHECK(strings.Resize(numStrings));
 
-		size_t totalChars = 0;
-		for (const rkit::endian::LittleUInt32_t &strLength : strLengths)
+		// Read lengths
+		for (size_t i = 0; i < numStrings; i++)
 		{
-			RKIT_CHECK(rkit::SafeAdd<size_t>(totalChars, totalChars, strLength.Get()));
+			rkit::endian::LittleUInt32_t strLength;
+			RKIT_CHECK(stream.ReadOneBinary(strLength));
+			RKIT_CHECK(strCBufs[i].Allocate(strLength.Get()));
 		}
 
-		// Reserve space for zero terminators
-		RKIT_CHECK(rkit::SafeAdd<size_t>(totalChars, totalChars, numStrings));
-
-		rkit::Vector<rkit::ByteStringView> strViews;
-		rkit::Vector<uint8_t> strBytes;
-
-		RKIT_CHECK(strBytes.Resize(totalChars));
-		RKIT_CHECK(strViews.Reserve(numStrings));
-
+		// Read strings
 		{
-			size_t startOffset = 0;
-			for (const rkit::endian::LittleUInt32_t &strLengthData : strLengths)
-			{
-				const uint32_t strLength = strLengthData.Get();
+			auto processOne = [&stream](rkit::ByteString &outString, rkit::ByteStringConstructionBuffer &cbuf) -> rkit::Result
+				{
+					RKIT_CHECK(stream.ReadAllSpan(cbuf.GetSpan()));
+					outString = rkit::ByteString(std::move(cbuf));
+					RKIT_RETURN_OK;
+				};
 
-				const rkit::Span<uint8_t> strBytesSpan = strBytes.ToSpan().SubSpan(startOffset, strLength);
-				RKIT_CHECK(stream.ReadAllSpan(strBytesSpan));
-
-				startOffset += strLength;
-				strBytes[startOffset++] = 0;
-
-				RKIT_CHECK(strViews.Append(rkit::ByteStringView(strBytesSpan.Ptr(), strBytesSpan.Count())));
-			}
+			RKIT_CHECK(rkit::CheckedProcessParallelSpans(strings.ToSpan(), strCBufs.ToSpan(), processOne));
 		}
 
 		rkit::Vector<ScriptExpression> scriptExprs;
@@ -474,9 +703,9 @@ namespace anox::game
 		RKIT_CHECK(switchCommandData.Resize(totalSwitchCommands));
 		RKIT_CHECK(switchCommands.Resize(totalSwitchCommands));
 
-		RKIT_CHECK(rkit::CheckedProcessParallelSpans(switchCommands.ToSpan(), switchCommandData.ToSpan(), LoadScriptCommand));
-
 		RKIT_CHECK(stream.ReadAllSpan(switchCommandData.ToSpan()));
+
+		RKIT_CHECK(rkit::CheckedProcessParallelSpans(switchCommands.ToSpan(), switchCommandData.ToSpan(), LoadScriptCommand));
 
 		{
 			size_t startOffset = 0;
@@ -505,7 +734,7 @@ namespace anox::game
 				RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
-		rkit::HashMap<rkit::ByteStringView, uint32_t> wildcardLookups;
+		rkit::HashMap<rkit::ByteString, uint32_t> wildcardLookups;
 		for (size_t i = 0; i < numMaterialWildcardLookups; i++)
 		{
 			data::ape::MaterialWildcardLookup lookup;
@@ -517,7 +746,7 @@ namespace anox::game
 			if (cidIndex >= numMaterialContentIDs || strIndex >= numStrings)
 				RKIT_THROW(rkit::ResultCode::kDataError);
 
-			RKIT_CHECK(wildcardLookups.Set(strViews[strIndex], cidIndex));
+			RKIT_CHECK(wildcardLookups.Set(strings[strIndex], cidIndex));
 		}
 
 		rkit::UniquePtr<ScriptPackage> package;
@@ -532,10 +761,9 @@ namespace anox::game
 		package->m_windows = std::move(scriptWindows);
 		package->m_switches = std::move(scriptSwitches);
 		package->m_expressions = std::move(scriptExprs);
-		package->m_strings = std::move(strViews);
+		package->m_strings = std::move(strings);
 		package->m_operandLists = std::move(operandLists);
 
-		package->m_allStrings = std::move(strBytes);
 		package->m_allOperands = std::move(operands);
 		package->m_allWindowCommands = std::move(windowCommandStreamBytes);
 		package->m_allSwitchCommands = std::move(switchCommands);
@@ -588,32 +816,72 @@ namespace anox::game
 
 	void ScriptManagerImpl::FindScript(const Label &label, const ScriptWindow *&outWindow, const ScriptSwitch *&outSwitch) const
 	{
-		return FindScriptPrehashed(label, rkit::Hasher<Label>::ComputeHash(0, label), outWindow, outSwitch);
+		return FindScriptInternal(label, &outWindow, &outSwitch);
 	}
 
 	void ScriptManagerImpl::FindScriptPrehashed(const Label &label, rkit::HashValue_t hashValue, const ScriptWindow *&outWindow, const ScriptSwitch *&outSwitch) const
+	{
+		return FindScriptPrehashedInternal(label, hashValue, &outWindow, &outSwitch);
+	}
+
+	void ScriptManagerImpl::FindWindow(const anox::Label &label, const ScriptWindow *&outWindow) const
+	{
+		return FindScriptInternal(label, &outWindow, nullptr);
+	}
+
+	void ScriptManagerImpl::FindWindowPrehashed(const anox::Label &label, rkit::HashValue_t hashValue, const ScriptWindow *&outWindow) const
+	{
+		return FindScriptPrehashedInternal(label, hashValue, &outWindow, nullptr);
+	}
+
+	void ScriptManagerImpl::FindSwitch(const anox::Label &label, const ScriptSwitch *&outSwitch) const
+	{
+		return FindScriptInternal(label, nullptr, &outSwitch);
+	}
+
+	void ScriptManagerImpl::FindSwitchPrehashed(const anox::Label &label, rkit::HashValue_t hashValue, const ScriptSwitch *&outSwitch) const
+	{
+		return FindScriptPrehashedInternal(label, hashValue, nullptr, &outSwitch);
+	}
+
+	void ScriptManagerImpl::FindScriptInternal(const Label &label, const ScriptWindow **outWindow, const ScriptSwitch **outSwitch) const
+	{
+		return FindScriptPrehashedInternal(label, rkit::Hasher<Label>::ComputeHash(0, label), outWindow, outSwitch);
+	}
+
+	void ScriptManagerImpl::FindScriptPrehashedInternal(const Label &label, rkit::HashValue_t hashValue, const ScriptWindow **outWindow, const ScriptSwitch **outSwitch) const
 	{
 		for (size_t layerPlusOne = static_cast<size_t>(ScriptManager::ScriptLayer::kCount); layerPlusOne > 0; layerPlusOne--)
 		{
 			const ScriptLayerInstance &layer = m_layers[layerPlusOne - 1];
 
-			if (const ScriptWindow *window = layer.FindWindowPrehashed(label, hashValue))
+			if (outWindow)
 			{
-				outWindow = window;
-				outSwitch = nullptr;
-				return;
+				if (const ScriptWindow *window = layer.FindWindowPrehashed(label, hashValue))
+				{
+					*outWindow = window;
+					if (outSwitch)
+						*outSwitch = nullptr;
+					return;
+				}
 			}
 
-			if (const ScriptSwitch *sw = layer.FindSwitchPrehashed(label, hashValue))
+			if (outSwitch)
 			{
-				outWindow = nullptr;
-				outSwitch = sw;
-				return;
+				if (const ScriptSwitch *sw = layer.FindSwitchPrehashed(label, hashValue))
+				{
+					if (outWindow)
+						*outWindow = nullptr;
+					*outSwitch = sw;
+					return;
+				}
 			}
 		}
 
-		outWindow = nullptr;
-		outSwitch = nullptr;
+		if (outWindow)
+			*outWindow = nullptr;
+		if (outSwitch)
+			*outSwitch = nullptr;
 	}
 
 	rkit::Result ScriptManagerImpl::CreateScriptEnvironment(rkit::UniquePtr<ScriptEnvironment> &outScriptEnvironment)
@@ -707,21 +975,7 @@ namespace anox::game
 
 	bool ScriptEnvironment::TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const
 	{
-		switch (expr.m_exprType)
-		{
-		case ScriptExprType::Empty:
-			return false;
-		case ScriptExprType::FloatLiteral:
-			RKIT_STATIC_ASSERT(sizeof(outValue) == 4);
-			RKIT_STATIC_ASSERT(sizeof(expr.m_index) == 4);
-			memcpy(&outValue, &expr.m_index, 4);
-			return true;
-		case ScriptExprType::FloatExpression:
-			return Impl().TryEvaluateFloatScriptExpr(outValue, pkg, expr.m_index, 0);
-		default:
-			rkit::log::Error(u8"Invalid expression type where float expression was expected");
-			return false;
-		}
+		return Impl().TryEvaluateFloatScriptExpr(outValue, pkg, expr, 0);
 	}
 
 	ScriptEnvironment::ScriptEnvironment(ScriptManagerImpl &scriptManager)

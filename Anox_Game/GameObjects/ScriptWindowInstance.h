@@ -14,6 +14,9 @@ namespace anox::game
 		void Initialize(Label label);
 
 		const Label &GetWindowID() const;
+		const Label &GetStartSwitch() const;
+		const Label &GetFinishSwitch() const;
+		const Label &GetThinkSwitch() const;
 
 		void ClearStyle();
 

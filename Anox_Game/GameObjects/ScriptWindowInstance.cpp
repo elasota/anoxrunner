@@ -22,6 +22,21 @@ namespace anox::game
 		return this->m_windowID;
 	}
 
+	const Label &ScriptWindowInstance::GetStartSwitch() const
+	{
+		return m_startSwitch;
+	}
+
+	const Label &ScriptWindowInstance::GetFinishSwitch() const
+	{
+		return m_finishSwitch;
+	}
+
+	const Label &ScriptWindowInstance::GetThinkSwitch() const
+	{
+		return m_thinkSwitch;
+	}
+
 	rkit::Result ScriptWindowInstance::InvalidCommand()
 	{
 		RKIT_THROW(rkit::ResultCode::kDataError);
