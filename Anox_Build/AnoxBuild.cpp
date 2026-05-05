@@ -100,6 +100,15 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 	}
 
 	{
+		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler;
+		RKIT_CHECK(rkit::New<buildsystem::MaterialCompiler>(matCompiler, *m_pngDriver));
+
+		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kInterfaceMaterialNodeID, std::move(matCompiler)));
+
+		RKIT_CHECK(instance->RegisterNodeTypeByExtension(buildsystem::MaterialCompiler::GetInterfaceMaterialExtension(), kAnoxNamespaceID, buildsystem::kInterfaceMaterialNodeID));
+	}
+
+	{
 		rkit::UniquePtr<buildsystem::TextureCompilerBase> texCompiler;
 		RKIT_CHECK(buildsystem::TextureCompilerBase::Create(texCompiler, *m_pngDriver));
 

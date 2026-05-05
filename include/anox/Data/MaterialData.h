@@ -42,6 +42,30 @@ namespace anox { namespace data
 		rkit::data::ContentID m_contentID;
 	};
 
+	enum class MaterialInterformMovement : uint8_t
+	{
+		kNone,
+		kScroll,
+		kWander,
+	};
+
+	struct MaterialInterformHalf
+	{
+		data::MaterialInterformMovement m_movement = data::MaterialInterformMovement::kNone;
+		rkit::endian::LittleUInt32_t m_bitmap;
+		rkit::endian::LittleFloat32_t m_vx;
+		rkit::endian::LittleFloat32_t m_vy;
+		rkit::endian::LittleFloat32_t m_rate;
+		rkit::endian::LittleFloat32_t m_strength;
+		rkit::endian::LittleFloat32_t m_speed;
+	};
+
+	struct MaterialInterformData
+	{
+		MaterialInterformHalf m_halves[2];
+		rkit::endian::LittleUInt32_t m_paletteBitmap;
+	};
+
 	struct MaterialHeader
 	{
 		static const uint32_t kExpectedMagic = RKIT_FOURCC('A', 'M', 'T', 'L');
@@ -62,5 +86,6 @@ namespace anox { namespace data
 
 		// MaterialBitmapDef m_bitmapDefs
 		// MaterialFrameDef m_frameDefs
+		// if (m_materialType == MaterialType::kInterform) MaterialInterformData m_interform
 	};
 } } // anox::data

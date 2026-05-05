@@ -41,7 +41,6 @@ namespace anox { namespace buildsystem
 		bool m_bilinear;
 		bool m_clamp;
 		bool m_isAutoColorType;
-		ImageImportDisposition m_importDisposition = ImageImportDisposition::kCount;
 	};
 
 	struct MaterialAnalysisBitmapDef
@@ -53,24 +52,19 @@ namespace anox { namespace buildsystem
 	{
 		rkit::String m_identifier;
 		bool m_isGenerated;
-	};
-
-	enum class InterformMaterialMovement
-	{
-		kNone,
-		kScroll,
-		kWander,
+		ImageImportDisposition m_importDisposition;
 	};
 
 	struct MaterialAnalysisInterformHalfData
 	{
 		MaterialAnalysisBitmapDef m_bitmap;
 
-		InterformMaterialMovement m_movement = InterformMaterialMovement::kNone;
+		data::MaterialInterformMovement m_movement = data::MaterialInterformMovement::kNone;
 		float m_vx = 0;
 		float m_vy = 0;
 		float m_rate = 0;
 		float m_strength = 0;
+		float m_speed = 0;
 	};
 
 	struct MaterialAnalysisInterformData
@@ -78,7 +72,6 @@ namespace anox { namespace buildsystem
 		MaterialAnalysisInterformHalfData m_halves[2];
 		MaterialAnalysisBitmapDef m_palette;
 	};
-
 
 	struct MaterialAnalysisFrameDef
 	{
@@ -213,6 +206,9 @@ namespace anox { namespace buildsystem
 			break;
 		case anox::buildsystem::kModelMaterialNodeID:
 			outNodeType = data::MaterialResourceType::kModel;
+			break;
+		case anox::buildsystem::kInterfaceMaterialNodeID:
+			outNodeType = data::MaterialResourceType::kInterface;
 			break;
 		default:
 			RKIT_THROW(rkit::ResultCode::kInternalError);
@@ -385,9 +381,8 @@ namespace anox { namespace buildsystem
 				RKIT_CHECK(textParser.ExpectToken(u8"="));
 				RKIT_CHECK(textParser.RequireToken(token));
 
-
 				MaterialAnalysisBitmapDef bitmapDef = {};
-				RKIT_CHECK(ParseImageImport(token, buildsystem::ImageImportDisposition::kCount, dynamicData, bitmapDef, feedback));
+				RKIT_CHECK(ParseImageImport(token, buildsystem::ImageImportDisposition::kWorldAlphaTestedNoMip, dynamicData, bitmapDef, feedback));
 
 				RKIT_CHECK(dynamicData.m_bitmapDefs.Append(bitmapDef));
 			}
@@ -551,11 +546,11 @@ namespace anox { namespace buildsystem
 
 				if (IsToken(moveTypeToken, u8"scroll"))
 				{
-					dynamicData.m_interform.Get().m_halves[half].m_movement = InterformMaterialMovement::kScroll;
+					dynamicData.m_interform.Get().m_halves[half].m_movement = data::MaterialInterformMovement::kScroll;
 				}
 				else if (IsToken(moveTypeToken, u8"wander"))
 				{
-					dynamicData.m_interform.Get().m_halves[half].m_movement = InterformMaterialMovement::kWander;
+					dynamicData.m_interform.Get().m_halves[half].m_movement = data::MaterialInterformMovement::kWander;
 				}
 				else
 				{
@@ -570,6 +565,8 @@ namespace anox { namespace buildsystem
 				|| IsToken(token, u8"father_vy")
 				|| IsToken(token, u8"mother_rate")
 				|| IsToken(token, u8"father_rate")
+				|| IsToken(token, u8"mother_speed")
+				|| IsToken(token, u8"father_speed")
 				|| IsToken(token, u8"mother_strength")
 				|| IsToken(token, u8"father_strength")
 				) && haveType && analysisHeader.m_materialType == data::MaterialType::kInterform)
@@ -601,6 +598,8 @@ namespace anox { namespace buildsystem
 					halfData.m_rate = static_cast<float>(value);
 				else if (tokenSlice.EndsWith(u8"_strength"))
 					halfData.m_strength = static_cast<float>(value);
+				else if (tokenSlice.EndsWith(u8"_speed"))
+					halfData.m_speed = static_cast<float>(value);
 			}
 			else if ((IsToken(token, u8"palette")) && haveType && analysisHeader.m_materialType == data::MaterialType::kInterform)
 			{
@@ -644,7 +643,8 @@ namespace anox { namespace buildsystem
 
 		if (analysisHeader.m_materialType == data::MaterialType::kAnimation)
 		{
-			analysisHeader.m_importDisposition = ImageImportDisposition::kWorldAlphaTestedNoMip;
+			// ???
+			//analysisHeader.m_importDisposition = ImageImportDisposition::kWorldAlphaTestedNoMip;
 		}
 
 		if (analysisHeader.m_materialType == data::MaterialType::kInterform)
@@ -655,7 +655,6 @@ namespace anox { namespace buildsystem
 				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 		}
-
 
 		if (analysisHeader.m_materialType == data::MaterialType::kAnimation
 			|| analysisHeader.m_materialType == data::MaterialType::kSingle)
@@ -674,7 +673,7 @@ namespace anox { namespace buildsystem
 		{
 			if (!imageImport.m_isGenerated)
 			{
-				RKIT_CHECK(TextureCompilerBase::CreateImportIdentifier(imageImport.m_identifier, imageImport.m_identifier, analysisHeader.m_importDisposition));
+				RKIT_CHECK(TextureCompilerBase::CreateImportIdentifier(imageImport.m_identifier, imageImport.m_identifier, imageImport.m_importDisposition));
 			}
 		}
 
@@ -716,7 +715,7 @@ namespace anox { namespace buildsystem
 	rkit::Result MaterialCompiler::ConstructOutputPath(rkit::CIPath &outputPath, data::MaterialResourceType nodeType, const rkit::StringView &identifier)
 	{
 		rkit::String pathStr;
-		RKIT_CHECK(pathStr.Format(u8"anox/mat/{}/{}", static_cast<int>(nodeType), identifier.GetChars()));
+		RKIT_CHECK(pathStr.Format(u8"anox/mat/{}/{}.o", static_cast<int>(nodeType), identifier.GetChars()));
 
 		RKIT_CHECK(outputPath.Set(pathStr));
 
@@ -739,23 +738,30 @@ namespace anox { namespace buildsystem
 
 		RKIT_CHECK(MaterialNodeTypeFromFourCC(nodeType, depsNode->GetDependencyNodeType()));
 
+		ImageImportDisposition importDisposition = ImageImportDisposition::kCount;
+
 		// Don't fill in width and height
 		switch (nodeType)
 		{
 		case data::MaterialResourceType::kFont:
 			analysisHeader.m_bilinear = false;
 			analysisHeader.m_mipMapped = false;
-			analysisHeader.m_importDisposition = ImageImportDisposition::kGraphicTransparent;
+			importDisposition = ImageImportDisposition::kGraphicTransparent;
 			break;
 		case data::MaterialResourceType::kWorld:
 			analysisHeader.m_bilinear = true;
 			analysisHeader.m_mipMapped = true;
-			analysisHeader.m_importDisposition = ImageImportDisposition::kWorldAlphaTested;
+			importDisposition = ImageImportDisposition::kWorldAlphaTested;
 			break;
 		case data::MaterialResourceType::kModel:
 			analysisHeader.m_bilinear = true;
 			analysisHeader.m_mipMapped = true;
-			analysisHeader.m_importDisposition = ImageImportDisposition::kModel;
+			importDisposition = ImageImportDisposition::kModel;
+			break;
+		case data::MaterialResourceType::kInterface:
+			analysisHeader.m_bilinear = false;
+			analysisHeader.m_mipMapped = false;
+			importDisposition = ImageImportDisposition::kGraphicTransparent;
 			break;
 		default:
 			RKIT_THROW(rkit::ResultCode::kInternalError);
@@ -766,7 +772,8 @@ namespace anox { namespace buildsystem
 		RKIT_CHECK(dynamicData.m_imageImports.Resize(1));
 
 		MaterialAnalysisImageImport &imageImport = dynamicData.m_imageImports[0];
-		RKIT_CHECK(TextureCompilerBase::CreateImportIdentifier(imageImport.m_identifier, longName, analysisHeader.m_importDisposition));
+		imageImport.m_importDisposition = importDisposition;
+		RKIT_CHECK(TextureCompilerBase::CreateImportIdentifier(imageImport.m_identifier, longName, importDisposition));
 
 		RKIT_CHECK(dynamicData.m_bitmapDefs.Resize(1));
 
@@ -845,13 +852,14 @@ namespace anox { namespace buildsystem
 			}
 		}
 
-		if (!extPos.IsSet())
+		if (extPos.IsSet())
 		{
-			rkit::log::ErrorFmt(u8"Material '{}' didn't end with a material extension", identifier.GetChars());
-			RKIT_THROW(rkit::ResultCode::kInternalError);
+			return shortName.Set(identifier.SubString(0, extPos.Get()));
 		}
-
-		RKIT_CHECK(shortName.Set(identifier.SubString(0, extPos.Get())));
+		else
+		{
+			return shortName.Set(identifier);
+		}
 
 		RKIT_RETURN_OK;
 	}
@@ -885,7 +893,18 @@ namespace anox { namespace buildsystem
 	rkit::Result MaterialCompiler::ParseImageImport(const rkit::Span<const rkit::Utf8Char_t> &token, ImageImportDisposition disposition, MaterialAnalysisDynamicData &dynamicData, MaterialAnalysisBitmapDef &bitmapDef, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		rkit::Vector<rkit::Utf8Char_t> lower;
-		RKIT_CHECK(lower.Append(token));
+
+		if (token[0] == u8'/' || token[0] == u8'\\')
+		{
+			if (token.Count() == 1)
+				RKIT_THROW(rkit::ResultCode::kDataError);
+
+			RKIT_CHECK(lower.Append(token.SubSpan(1)));
+		}
+		else
+		{
+			RKIT_CHECK(lower.Append(token));
+		}
 
 		for (rkit::Utf8Char_t &c : lower)
 		{
@@ -975,7 +994,10 @@ namespace anox { namespace buildsystem
 
 			if (imageIndex == dynamicData.m_imageImports.Count())
 			{
+				RKIT_ASSERT(disposition < ImageImportDisposition::kCount);
+
 				MaterialAnalysisImageImport imageImport = {};
+				imageImport.m_importDisposition = disposition;
 				RKIT_CHECK(imageImport.m_identifier.Set(lower.ToSpan()));
 				RKIT_CHECK(dynamicData.m_imageImports.Append(std::move(imageImport)));
 			}
@@ -1084,9 +1106,7 @@ namespace anox { namespace buildsystem
 		rkit::Vector<bool> handledFrame;
 		RKIT_CHECK(handledFrame.Resize(numFrames));
 
-		ImageImportDisposition disposition = header.m_importDisposition;
-
-		auto loadBitmapForFrame = [this, feedback, disposition, &dynamicData, &baseBitmaps](rkit::RCPtr<rkit::utils::IImage> *optBitmapPtr, size_t frameIndex) -> rkit::Result
+		auto loadBitmapForFrame = [this, feedback, &dynamicData, &baseBitmaps](rkit::RCPtr<rkit::utils::IImage> *optBitmapPtr, size_t frameIndex) -> rkit::Result
 			{
 				const MaterialAnalysisFrameDef &frameDef = dynamicData.m_frameDefs[frameIndex];
 				const MaterialAnalysisBitmapDef &frameBitmapDef = dynamicData.m_bitmapDefs[frameDef.m_bitmap];
@@ -1100,7 +1120,7 @@ namespace anox { namespace buildsystem
 					RKIT_CHECK(path.Set(frameImportDef.m_identifier));
 
 					rkit::UniquePtr<rkit::utils::IImage> image;
-					RKIT_CHECK(TextureCompilerBase::GetImage(image, feedback, m_pngDriver, rkit::buildsystem::BuildFileLocation::kSourceDir, path, disposition));
+					RKIT_CHECK(TextureCompilerBase::GetImage(image, feedback, m_pngDriver, rkit::buildsystem::BuildFileLocation::kSourceDir, path, frameImportDef.m_importDisposition));
 
 					RKIT_CHECK(rkit::MakeRC(bitmapPtrRef, std::move(image)));
 				}
@@ -1265,7 +1285,7 @@ namespace anox { namespace buildsystem
 							rkit::CIPath path;
 							RKIT_CHECK(path.Set(imageImport.m_identifier));
 
-							RKIT_CHECK(TextureCompilerBase::CompileImage(*frameImages[currentFrame], path, feedback, disposition));
+							RKIT_CHECK(TextureCompilerBase::CompileImage(*frameImages[currentFrame], path, feedback, imageImport.m_importDisposition));
 						}
 					}
 					else
@@ -1321,6 +1341,12 @@ namespace anox { namespace buildsystem
 
 	rkit::Result MaterialCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
+		if (depsNode->GetIdentifier() == u8"interface/windows/style_simplebox")
+		{
+			int n = 0;
+			(void)n;
+		}
+
 		const rkit::StringView identifier = depsNode->GetIdentifier();
 
 		rkit::String shortName;
@@ -1370,6 +1396,12 @@ namespace anox { namespace buildsystem
 
 	rkit::Result MaterialCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
+		if (depsNode->GetIdentifier() == u8"interface/windows/style_simplebox")
+		{
+			int n = 0;
+			(void)n;
+		}
+
 		struct DeduplicatedContentID
 		{
 			rkit::data::ContentID m_contentID = {};
@@ -1487,6 +1519,27 @@ namespace anox { namespace buildsystem
 		materialHeader.m_numBitmaps = static_cast<uint32_t>(bitmapDefs.Count());
 		materialHeader.m_numFrames = static_cast<uint32_t>(frameDefs.Count());
 
+		data::MaterialInterformData interformData;
+		if (analysisHeader.m_materialType == data::MaterialType::kInterform)
+		{
+			const MaterialAnalysisInterformData &inData = dynamicData.m_interform.Get();
+			interformData.m_paletteBitmap = static_cast<uint32_t>(bitmapContentIDs[inData.m_palette.m_nameIndex].m_uniqueIndex);
+
+			for (size_t halfIndex = 0; halfIndex < 2; halfIndex++)
+			{
+				const MaterialAnalysisInterformHalfData &inHalf = inData.m_halves[halfIndex];
+				data::MaterialInterformHalf &outHalf = interformData.m_halves[halfIndex];
+
+				outHalf.m_bitmap = static_cast<uint32_t>(bitmapContentIDs[inHalf.m_bitmap.m_nameIndex].m_uniqueIndex);
+				outHalf.m_movement = inHalf.m_movement;
+				outHalf.m_vx = inHalf.m_vx;
+				outHalf.m_vy = inHalf.m_vy;
+				outHalf.m_rate = inHalf.m_rate;
+				outHalf.m_strength = inHalf.m_strength;
+				outHalf.m_speed = inHalf.m_speed;
+			}
+		}
+
 		if (analysisHeader.m_isAutoColorType)
 		{
 			if (rgbUsage)
@@ -1505,6 +1558,11 @@ namespace anox { namespace buildsystem
 			RKIT_CHECK(outFile->WriteAll(&materialHeader, sizeof(materialHeader)));
 			RKIT_CHECK(outFile->WriteAll(bitmapDefs.GetBuffer(), bitmapDefs.Count() * sizeof(bitmapDefs[0])));
 			RKIT_CHECK(outFile->WriteAll(frameDefs.GetBuffer(), frameDefs.Count() * sizeof(frameDefs[0])));
+
+			if (analysisHeader.m_materialType == data::MaterialType::kInterform)
+			{
+				RKIT_CHECK(outFile->WriteOneBinary(interformData));
+			}
 		}
 
 		RKIT_RETURN_OK;
@@ -1513,6 +1571,11 @@ namespace anox { namespace buildsystem
 	rkit::StringView MaterialCompiler::GetFontMaterialExtension()
 	{
 		return u8"fontmaterial";
+	}
+
+	rkit::StringView MaterialCompiler::GetInterfaceMaterialExtension()
+	{
+		return u8"interfacematerial";
 	}
 
 	rkit::StringView MaterialCompiler::GetWorldMaterialExtension()

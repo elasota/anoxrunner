@@ -479,4 +479,14 @@ class ScriptWindowInstance
 	label startSwitch
 	label thinkSwitch
 	label finishSwitch
+	bool persist
+	bool noBackground
+	bool noScroll
+	bool noGrab
+	bool noRelease
+	bool subtitle
+	bool passive2D
+	bool passive
+	vec2 pos
+	vec2 size
 }

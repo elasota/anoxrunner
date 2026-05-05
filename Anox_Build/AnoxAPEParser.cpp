@@ -148,6 +148,16 @@ namespace anox::buildsystem::ape_parse
 		RKIT_RETURN_OK;
 	}
 
+	rkit::Result APEReader::Read(TextureID &value)
+	{
+		return Read(value.m_str);
+	}
+
+	rkit::Result APEReader::Read(WindowStyleID &value)
+	{
+		return Read(value.m_str);
+	}
+
 	rkit::Result APEReader::SkipPadding(size_t count)
 	{
 		rkit::endian::LittleUInt64_t padding;

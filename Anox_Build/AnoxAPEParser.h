@@ -7,6 +7,8 @@
 #include "rkit/Core/UniquePtr.h"
 #include "rkit/Core/Vector.h"
 
+#include "rkit/Data/ContentID.h"
+
 #include "anox/Data/APEWindowCommandOpcodes.generated.h"
 
 namespace rkit
@@ -20,6 +22,16 @@ namespace anox::buildsystem::ape_parse
 	struct IAPEWriter;
 	class APEReader;
 	struct Operand;
+
+	struct TextureID
+	{
+		rkit::ByteString m_str;
+	};
+
+	struct WindowStyleID
+	{
+		rkit::ByteString m_str;
+	};
 
 	struct ExpressionValue
 	{
@@ -143,6 +155,8 @@ namespace anox::buildsystem::ape_parse
 		virtual rkit::Result Write(const rkit::Optional<rkit::ByteString> &value) = 0;
 		virtual rkit::Result Write(const rkit::ByteString &value) = 0;
 		virtual rkit::Result Write(const FormattingValue &value) = 0;
+		virtual rkit::Result Write(const TextureID &textureID) = 0;
+		virtual rkit::Result Write(const WindowStyleID &styleID) = 0;
 	};
 
 	class APEReader
@@ -160,6 +174,8 @@ namespace anox::buildsystem::ape_parse
 		rkit::Result Read(rkit::Optional<rkit::ByteString> &value);
 		rkit::Result Read(rkit::ByteString &value);
 		rkit::Result Read(FormattingValue &value);
+		rkit::Result Read(TextureID &value);
+		rkit::Result Read(WindowStyleID &value);
 		rkit::Result SkipPadding(size_t count);
 
 	private:

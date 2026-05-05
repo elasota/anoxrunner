@@ -9,6 +9,8 @@ namespace APEWindowCommandReflector
             UInt16,
             UInt32,
             Str,
+            Texture,
+            WindowStyle,
             OptStr,
             Format,
             OptExpr,
@@ -68,6 +70,8 @@ namespace APEWindowCommandReflector
                     return 0;
 
                 case FieldDef.FieldType.OptExpr:
+                case FieldDef.FieldType.Texture:
+                case FieldDef.FieldType.WindowStyle:
                     return null;
 
                 default:
@@ -87,6 +91,9 @@ namespace APEWindowCommandReflector
                 case FieldDef.FieldType.Bits32:
                 case FieldDef.FieldType.Padding:
                     return null;
+                case FieldDef.FieldType.Texture:
+                case FieldDef.FieldType.WindowStyle:
+                    return "sizeof(::anox::data::ape::MaterialReference)";
                 case FieldDef.FieldType.OptExpr:
                     return "sizeof(::anox::data::ape::ExpressionValue)";
 
@@ -161,6 +168,12 @@ namespace APEWindowCommandReflector
                                 break;
                             case FieldDef.FieldType.OptExpr:
                                 fieldCppType = "::rkit::Optional<ExpressionValue>";
+                                break;
+                            case FieldDef.FieldType.Texture:
+                                fieldCppType = "TextureID";
+                                break;
+                            case FieldDef.FieldType.WindowStyle:
+                                fieldCppType = "WindowStyleID";
                                 break;
                             default:
                                 throw new Exception("Unhandled fielddef type");
@@ -308,6 +321,7 @@ namespace APEWindowCommandReflector
                 sw.WriteLine("namespace anox::game");
                 sw.WriteLine("{");
                 sw.WriteLine("\tclass ScriptEnvironment;");
+                sw.WriteLine("\tclass ScriptPackage;");
                 sw.WriteLine("}");
                 sw.WriteLine();
                 sw.WriteLine("namespace anox::game::ape");
@@ -321,7 +335,7 @@ namespace APEWindowCommandReflector
                 sw.WriteLine("\t\tvirtual rkit::Result InvalidCommand() = 0;");
                 foreach (WindowCommandDef wcDef in windowCommandDefs)
                 {
-                    sw.WriteLine("\t\tvirtual rkit::Result HandleCommand(ScriptEnvironment &env, const " + wcDef.Name + " &cmd) = 0;");
+                    sw.WriteLine("\t\tvirtual rkit::Result HandleCommand(ScriptEnvironment &env, const ScriptPackage &pkg, const " + wcDef.Name + " &cmd) = 0;");
                 }
                 sw.WriteLine("\t};");
                 sw.WriteLine("}");
@@ -347,6 +361,7 @@ namespace APEWindowCommandReflector
                 sw.WriteLine("namespace anox::game");
                 sw.WriteLine("{");
                 sw.WriteLine("\tclass ScriptEnvironment;");
+                sw.WriteLine("\tclass ScriptPackage;");
                 sw.WriteLine("}");
                 sw.WriteLine();
                 sw.WriteLine("namespace anox::game::ape");
@@ -361,6 +376,10 @@ namespace APEWindowCommandReflector
                         string? fldType = null;
                         switch (fDef.Type)
                         {
+                        case FieldDef.FieldType.Texture:
+                        case FieldDef.FieldType.WindowStyle:
+                            fldType = "ScriptMaterialReference";
+                            break;
                         case FieldDef.FieldType.UInt16:
                             fldType = "uint16_t";
                             break;
@@ -399,7 +418,7 @@ namespace APEWindowCommandReflector
                     sw.WriteLine();
                 }
 
-                sw.WriteLine("\tinline rkit::Result HandleCommand(const uint8_t *byteStream, size_t available, size_t &outConsumed, APEWindowCommandParser &parser, IAPEWindowCommandHandler &cmdHandler, ScriptEnvironment &env)");
+                sw.WriteLine("\tinline rkit::Result HandleCommand(const uint8_t *byteStream, size_t available, size_t &outConsumed, APEWindowCommandParser &parser, IAPEWindowCommandHandler &cmdHandler, ScriptEnvironment &env, const ScriptPackage &pkg)");
                 sw.WriteLine("\t{");
                 sw.WriteLine("\t\tconst uint8_t opcode = *byteStream++;");
                 sw.WriteLine("\t\tswitch (opcode)");
@@ -446,6 +465,8 @@ namespace APEWindowCommandReflector
                             case FieldDef.FieldType.UInt16:
                             case FieldDef.FieldType.UInt32:
                             case FieldDef.FieldType.OptExpr:
+                            case FieldDef.FieldType.Texture:
+                            case FieldDef.FieldType.WindowStyle:
                                 sw.WriteLine("\t\t\t\tAPEWindowCommandParser::ParseStatic(byteStream, cmd.m_" + fDef.Name + ");");
                                 break;
                             case FieldDef.FieldType.Str:
@@ -473,7 +494,7 @@ namespace APEWindowCommandReflector
                         }
                     }
 
-                    sw.WriteLine("\t\t\t\treturn cmdHandler.HandleCommand(env, cmd);");
+                    sw.WriteLine("\t\t\t\treturn cmdHandler.HandleCommand(env, pkg, cmd);");
 
                     sw.WriteLine("\t\t\t}");
                     sw.WriteLine("\t\t\tbreak;");
@@ -584,6 +605,10 @@ namespace APEWindowCommandReflector
                             fieldType = FieldDef.FieldType.UInt32;
                         else if (fieldTypeName == "str")
                             fieldType = FieldDef.FieldType.Str;
+                        else if (fieldTypeName == "texture")
+                            fieldType = FieldDef.FieldType.Texture;
+                        else if (fieldTypeName == "windowstyle")
+                            fieldType = FieldDef.FieldType.WindowStyle;
                         else if (fieldTypeName == "optstr")
                             fieldType = FieldDef.FieldType.OptStr;
                         else if (fieldTypeName == "fmt")

@@ -4,6 +4,7 @@
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/Stream.h"
+#include "rkit/Core/Optional.h"
 #include "rkit/Core/Vector.h"
 
 #include "rkit/Core/UtilitiesDriver.h"
@@ -29,7 +30,7 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(nodePath.Set(depsNode->GetIdentifier()));
 
 		rkit::UniquePtr<ISeekableReadStream> stream;
-		RKIT_CHECK(feedback->TryOpenInput(BuildFileLocation::kSourceDir, nodePath, stream));
+		RKIT_CHECK(feedback->TryOpenInput(depsNode->GetInputFileLocation(), nodePath, stream));
 
 		if (!stream.Get())
 		{
@@ -62,6 +63,24 @@ namespace rkit { namespace buildsystem
 
 			if (!haveToken)
 				break;
+
+			rkit::Optional<uint32_t> coercedNamespace;
+			rkit::Optional<uint32_t> coercedType;
+
+			if (token.Count() == 10 && token[0] == ':' && token[5] == ':')
+			{
+				coercedNamespace = rkit::utils::ComputeFourCC(token[1], token[2], token[3], token[4]);
+				coercedType = rkit::utils::ComputeFourCC(token[6], token[7], token[8], token[9]);
+
+				parser->GetLocation(line, col);
+				RKIT_CHECK(parser->ReadToken(haveToken, token));
+
+				if (!haveToken)
+				{
+					rkit::log::Error(u8"Deps line had a type prefix but no contents");
+					RKIT_THROW(ResultCode::kDataError);
+				}
+			}
 
 			Vector<CIPath> pathScans;
 
@@ -228,19 +247,28 @@ namespace rkit { namespace buildsystem
 					RKIT_THROW(ResultCode::kMalformedFile);
 				}
 
-				StringSliceView extStrView;
-				if (!utils->FindFilePathExtension(path[path.NumComponents() - 1], extStrView))
-				{
-					rkit::log::ErrorFmt(u8"{}:{}: Path has no extension", line, col);
-					RKIT_THROW(ResultCode::kMalformedFile);
-				}
-
 				uint32_t nodeNamespace = 0;
 				uint32_t nodeType = 0;
-				if (!feedback->FindNodeTypeByFileExtension(extStrView, nodeNamespace, nodeType))
+
+				if (coercedNamespace.IsSet())
 				{
-					rkit::log::ErrorFmt(u8"{}:{}: Unrecognized file extension: '{}'", line, col, extStrView.GetChars());
-					RKIT_THROW(ResultCode::kMalformedFile);
+					nodeNamespace = coercedNamespace.Get();
+					nodeType = coercedType.Get();
+				}
+				else
+				{
+					StringSliceView extStrView;
+					if (!utils->FindFilePathExtension(path[path.NumComponents() - 1], extStrView))
+					{
+						rkit::log::ErrorFmt(u8"{}:{}: Path has no extension", line, col);
+						RKIT_THROW(ResultCode::kMalformedFile);
+					}
+
+					if (!feedback->FindNodeTypeByFileExtension(extStrView, nodeNamespace, nodeType))
+					{
+						rkit::log::ErrorFmt(u8"{}:{}: Unrecognized file extension: '{}'", line, col, extStrView.GetChars());
+						RKIT_THROW(ResultCode::kMalformedFile);
+					}
 				}
 
 				RKIT_CHECK(feedback->AddNodeDependency(nodeNamespace, nodeType, BuildFileLocation::kSourceDir, path.ToString()));

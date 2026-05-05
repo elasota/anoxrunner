@@ -320,6 +320,18 @@ namespace anox
 					return FileHandle(this, static_cast<uint32_t>(i), false);
 			}
 
+			if (allowDirectories)
+			{
+				size_t numDirectories = m_directories.Count();
+				for (size_t i = 0; i < numDirectories; i++)
+				{
+					const DirectoryInfo &dinfo = m_directories[i];
+
+					if (dinfo.m_fullPath.RemoveEncoding() == fileName)
+						return FileHandle(this, static_cast<uint32_t>(i), true);
+				}
+			}
+
 			return FileHandle();
 		}
 

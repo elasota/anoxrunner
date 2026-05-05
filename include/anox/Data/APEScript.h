@@ -25,6 +25,14 @@ namespace anox::data::ape
 		StrNeq = 15,
 	};
 
+	enum class MaterialReferenceType : uint8_t
+	{
+		Invalid,
+		WildcardString,
+		ContentID,
+		Null,
+	};
+
 	enum class OperandType : uint8_t
 	{
 		Invalid,
@@ -55,6 +63,12 @@ namespace anox::data::ape
 		Count,
 	};
 
+	struct MaterialReference
+	{
+		MaterialReferenceType m_refType = MaterialReferenceType::Invalid;
+		rkit::endian::LittleUInt32_t m_index;
+	};
+
 	struct ExpressionValue
 	{
 		ExprType m_exprType = ExprType::Empty;
@@ -81,6 +95,12 @@ namespace anox::data::ape
 		data::ape::ExpressionValue m_exprValue;
 	};
 
+	struct MaterialWildcardLookup
+	{
+		rkit::endian::LittleUInt32_t m_stringIndex;
+		rkit::endian::LittleUInt32_t m_materialContentIndex;
+	};
+
 	struct APEScriptCatalog
 	{
 		rkit::endian::LittleUInt32_t m_numStrings;
@@ -88,6 +108,13 @@ namespace anox::data::ape
 		rkit::endian::LittleUInt32_t m_numOperandLists;
 		rkit::endian::LittleUInt32_t m_numWindows;
 		rkit::endian::LittleUInt32_t m_numSwitches;
+
+		rkit::endian::LittleUInt32_t m_numMaterialWildcards;
+		rkit::endian::LittleUInt32_t m_numMaterialNames;
+
+		rkit::endian::LittleUInt32_t m_numMaterialContentIDs;
+		rkit::endian::LittleUInt32_t m_numMaterialNameLookups;
+		rkit::endian::LittleUInt32_t m_numMaterialWildcardLookups;
 
 		// uint32_t m_stringLengths[m_numStrings]
 		// uint8_t m_stringChars[m_numStrings][m_stringLengths[i]]
@@ -98,6 +125,11 @@ namespace anox::data::ape
 		// uint8_t m_windowCommandStreams[m_numWindows][window.m_commandStreamLength]
 		// Switch m_switches[m_numSwitches]
 		// SwitchCommand m_switchCommands[m_numSwitches][switch.m_numCommands]
+		// ByteString m_materialWildcards[m_numMaterialWildcards] (only in temp)
+		// ByteString m_materialNames[m_numMaterialWildcards] (only in temp)
+		// ContentID m_materialContentIDs[m_numMaterialContentIDs]
+		// uint32_t m_numMaterialNameLookups[m_numMaterialNameLookups]
+		// MaterialWildcardLookup m_materialWildcardLookups[m_numMaterialWildcardLookups]
 	};
 }
 

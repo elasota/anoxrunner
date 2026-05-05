@@ -1454,6 +1454,7 @@ namespace anox { namespace buildsystem
 
 	rkit::Result TextureCompilerBase::CreateImportIdentifier(rkit::String &result, const rkit::StringView &imagePath, ImageImportDisposition disposition)
 	{
+		RKIT_ASSERT(disposition < ImageImportDisposition::kCount);
 		return result.Format(u8"{}.{}", imagePath.GetChars(), static_cast<int>(disposition));
 	}
 

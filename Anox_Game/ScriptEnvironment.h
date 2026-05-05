@@ -20,6 +20,8 @@ namespace anox::game
 	class ScriptEnvironmentImpl;
 	class ScriptManagerImpl;
 	class ScriptContext;
+	class ScriptPackage;
+	class ScriptExprValue;
 	class World;
 
 	class ScriptEnvironment final : public rkit::Opaque<ScriptEnvironmentImpl>
@@ -30,6 +32,8 @@ namespace anox::game
 		rkit::ResultCoroutine StartSequence(rkit::ICoroThread &thread, ScriptContext &scriptContext, const Label &label, World &world);
 
 		rkit::Result CreateScriptContext(rkit::UniquePtr<ScriptContext> &outScriptCtx);
+
+		bool TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const;
 
 	private:
 		ScriptEnvironment() = delete;

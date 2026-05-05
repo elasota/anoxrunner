@@ -602,7 +602,7 @@ namespace anox { namespace utils
 						else
 						{
 							rkit::StringSliceView remainder = path.ToStringView().SubString(firstComponent.Length() + 1);
-							afs::FileHandle dirHandle = archive.m_archive->FindFile(remainder.RemoveEncoding(), true);
+							dirHandle = archive.m_archive->FindFile(remainder.RemoveEncoding(), true);
 						}
 
 						if (dirHandle.IsValid() && dirHandle.IsDirectory())

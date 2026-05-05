@@ -13,7 +13,9 @@
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/NewDelete.h"
 #include "rkit/Core/Optional.h"
+#include "rkit/Core/Pair.h"
 #include "rkit/Core/Path.h"
+#include "rkit/Core/QuickSort.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/String.h"
 #include "rkit/Core/StringPool.h"
@@ -2360,7 +2362,21 @@ namespace rkit { namespace buildsystem
 			{
 				if (node->GetCompiler()->HasAnalysisStage())
 				{
-					rkit::log::LogInfoFmt(u8"Build Analysis: {} {} {}", FourCCToPrintable(node->GetDependencyNodeNamespace()).GetStr(), FourCCToPrintable(node->GetDependencyNodeType()).GetStr(), node->GetIdentifier());
+					rkit::StringView locationStr = u8"Unk";
+
+					switch (node->GetInputFileLocation())
+					{
+					case BuildFileLocation::kSourceDir:
+						locationStr = u8"Src";
+						break;
+					case BuildFileLocation::kIntermediateDir:
+						locationStr = u8"Imd";
+						break;
+					default:
+						break;
+					};
+
+					rkit::log::LogInfoFmt(u8"Build Analysis: {} {} {} -> '{}'", FourCCToPrintable(node->GetDependencyNodeNamespace()).GetStr(), FourCCToPrintable(node->GetDependencyNodeType()).GetStr(), locationStr, node->GetIdentifier());
 					RKIT_CHECK(node->RunAnalysis(this));
 				}
 
@@ -2625,12 +2641,7 @@ namespace rkit { namespace buildsystem
 				const CachedDirScan *fStatus = lookupIt.Value().Get();
 
 				outExists = fStatus->m_exists;
-
-				if (fStatus->m_exists)
-					outStatusView = fStatus->m_scan.ToView();
-				else
-					outStatusView = DirectoryScanView();
-
+				outStatusView = fStatus->m_scan.ToView();
 				RKIT_RETURN_OK;
 			}
 		}
@@ -2857,7 +2868,6 @@ namespace rkit { namespace buildsystem
 		}
 
 		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
-
 
 		FileAttributes attribs;
 		bool exists = false;

@@ -135,6 +135,8 @@ namespace rkit
 		bool EndsWith(TChar ch) const;
 		bool EndsWithNoCase(const SliceView_t &other) const;
 
+		bool EqualsNoCase(const SliceView_t &other) const;
+
 		operator View_t() const;
 		operator SliceView_t() const;
 
@@ -893,6 +895,13 @@ bool rkit::BaseString<TChar, TEncoding, TStaticSize>::EndsWithNoCase(const Slice
 {
 	SliceView_t slice = *this;
 	return slice.EndsWithNoCase(other);
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+bool rkit::BaseString<TChar, TEncoding, TStaticSize>::EqualsNoCase(const SliceView_t &other) const
+{
+	SliceView_t slice = *this;
+	return slice.EqualsNoCase(other);
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
