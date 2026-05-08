@@ -7,8 +7,10 @@
 #include "AnoxGameSession.h"
 
 #include "rkit/Sandbox/SandboxModuleImpl.h"
+
 #include "rkit/Core/String.h"
 #include "rkit/Core/Vector.h"
+#include "rkit/Core/LogDriver.h"
 
 namespace anox::game
 {
@@ -39,6 +41,29 @@ namespace anox::game::sandbox
 		void *InternalAlloc(size_t size) override;
 		void *InternalRealloc(void *ptr, size_t size) override;
 		void InternalFree(void *ptr) override;
+	};
+
+	class InternalLogDriver final : public rkit::ILogDriver
+	{
+	public:
+		void LogMessage(rkit::LogSeverity severity, const rkit::StringSliceView &msg) override;
+		void VLogMessage(rkit::LogSeverity severity, const rkit::StringSliceView &msg, const rkit::FormatParameterList<rkit::Utf8Char_t> &args) override;
+
+	private:
+		class VectorOutputFormatter final : public rkit::IFormatStringWriter<rkit::Utf8Char_t>
+		{
+		public:
+			explicit VectorOutputFormatter(rkit::Vector<rkit::Utf8Char_t> &v);
+
+			void WriteChars(const rkit::ConstSpan<rkit::Utf8Char_t> &chars) override;
+			rkit::CharacterEncoding GetEncoding() const override;
+
+			rkit::PackedResultAndExtCode GetResult() const;
+
+		private:
+			rkit::Vector<rkit::Utf8Char_t> &m_v;
+			rkit::PackedResultAndExtCode m_result;
+		};
 	};
 
 	void *InternalMallocDriver::StaticAlloc(size_t size)
@@ -108,6 +133,48 @@ namespace anox::game::sandbox
 	{
 		StaticFree(ptr);
 	}
+
+	void InternalLogDriver::LogMessage(rkit::LogSeverity severity, const rkit::StringSliceView &msg)
+	{
+		SandboxImports::LogUtf8Message(static_cast<uint32_t>(severity), const_cast<rkit::Utf8Char_t *>(msg.GetChars()), msg.Length());
+	}
+
+	void InternalLogDriver::VLogMessage(rkit::LogSeverity severity, const rkit::StringSliceView &msg, const rkit::FormatParameterList<rkit::Utf8Char_t> &args)
+	{
+		rkit::Vector<rkit::Utf8Char_t> v;
+
+		VectorOutputFormatter formatter(v);
+		rkit::FormatString(formatter, msg, args);
+
+		if (rkit::utils::ResultIsOK(formatter.GetResult()))
+			this->LogMessage(severity, rkit::StringSliceView(v.ToSpan()));
+	}
+
+
+	InternalLogDriver::VectorOutputFormatter::VectorOutputFormatter(rkit::Vector<rkit::Utf8Char_t> &v)
+		: m_v(v)
+		, m_result(rkit::utils::PackResult(rkit::ResultCode::kOK))
+	{
+	}
+
+	void InternalLogDriver::VectorOutputFormatter::WriteChars(const rkit::ConstSpan<rkit::Utf8Char_t> &chars)
+	{
+		if (!rkit::utils::ResultIsOK(m_result))
+			return;
+
+		m_result = RKIT_TRY_EVAL(m_v.Append(chars));
+	}
+
+	rkit::CharacterEncoding InternalLogDriver::VectorOutputFormatter::GetEncoding() const
+	{
+		return rkit::CharacterEncoding::kUTF8;
+	}
+
+	rkit::PackedResultAndExtCode InternalLogDriver::VectorOutputFormatter::GetResult() const
+	{
+		return m_result;
+	}
+
 }
 #endif
 
@@ -129,6 +196,12 @@ namespace anox::game::sandbox
 			mallocDriverPtr.m_obj = mallocDriver;
 
 			rkit::GetMutableDrivers().m_mallocDriver = mallocDriverPtr;
+		}
+
+		{
+			rkit::UniquePtr<InternalLogDriver> logDriver;
+			RKIT_CHECK(rkit::New<InternalLogDriver>(logDriver));
+			rkit::GetMutableDrivers().m_logDriver = logDriver.Detach();
 		}
 #endif
 
@@ -154,6 +227,11 @@ namespace anox::game::sandbox
 
 			rkit::Delete(sessionAllocation);
 		}
+
+#if !!RKIT_SANDBOX_USE_PRIVATE_DRIVERS
+		rkit::SafeDelete(rkit::GetMutableDrivers().m_logDriver);
+		rkit::SafeDelete(rkit::GetMutableDrivers().m_mallocDriver);
+#endif
 
 		RKIT_RETURN_OK;
 	}

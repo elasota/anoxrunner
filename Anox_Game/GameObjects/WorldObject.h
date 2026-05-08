@@ -27,32 +27,59 @@ namespace anox::game
 	class World;
 	class WorldImpl;
 	struct WorldObjectSpawnParams;
+	struct WorldObjectProxy;
 
-	class WorldObjectContainer
+	template<class T>
+	class ObjRef final
 	{
 	public:
-		WorldObjectContainer();
+		template<class TOther>
+		friend class ObjRef;
 
-		friend class WorldObject;
+		ObjRef() = default;
 
-		template<class T>
-		static rkit::RCPtr<T> Wrap(rkit::UniquePtr<WorldObjectContainer> &&self, rkit::UniquePtr<T> &&obj);
+		ObjRef(T *ptr);
 
-		template<class T>
-		static rkit::WeakPtr<T> Weaken(const rkit::RCPtr<T> &ptr);
+		template<class TOther>
+		ObjRef(const ObjRef<TOther> &otherRef);
+
+		template<class TOther>
+		ObjRef(ObjRef<TOther> &&otherRef);
+
+		ObjRef(const ObjRef<T> &) = default;
+		ObjRef(ObjRef<T> &&) = default;
+
+		ObjRef &operator=(const ObjRef &) = default;
+		ObjRef &operator=(ObjRef &&) = default;
+
+		T *GetObject() const;
+
+		template<class TOther>
+		ObjRef<TOther> DynamicCast() const;
+
+		template<class TOther>
+		ObjRef<TOther> DynamicCastMove();
+
+		template<class TOther>
+		ObjRef<TOther> StaticCast() const;
+
+		template<class TOther>
+		ObjRef<TOther> StaticCastMove();
 
 	private:
-		static void StaticStrongDelete(void *self) noexcept;
-		static void StaticFinalDelete(void *self) noexcept;
+		explicit ObjRef(const rkit::RCPtr<WorldObjectProxy> &proxy);
+		explicit ObjRef(rkit::RCPtr<WorldObjectProxy> &&proxy);
 
-		static rkit::RCPtr<WorldObject> InternalWrap(rkit::UniquePtr<WorldObjectContainer> &&self, rkit::UniquePtr<WorldObject> &&obj);
-		static rkit::WeakPtr<WorldObject> InternalWeaken(WorldObject *obj, rkit::RefCountedTracker *strongTracker);
-		static rkit::WeakPtr<const WorldObject> InternalWeaken(const WorldObject *obj, rkit::RefCountedTracker *strongTracker);
+		rkit::RCPtr<WorldObjectProxy> m_proxy;
+	};
 
-		rkit::WeakRefTracker m_weakRefTracker;
-
+	struct WorldObjectProxy final : public rkit::RefCounted
+	{
+		WorldObjectProxy *m_prev = nullptr;
+		rkit::RCPtr<WorldObjectProxy> m_next;
 		rkit::UniquePtr<WorldObject> m_object;
-		rkit::UniquePtr<WorldObjectContainer> m_self;
+
+		WorldObjectProxy *m_nextDead = nullptr;
 	};
 
 	class WorldObject : public DynamicObject
@@ -64,19 +91,12 @@ namespace anox::game
 		~WorldObject();
 
 		friend class WorldImpl;
-		friend class WorldObjectContainer;
 
-		rkit::WeakPtr<WorldObject> GetNext() const;
-		WorldObject* GetNextUnsafe() const;
-
-		rkit::RCPtr<WorldObject> GetStrongRef();
-		rkit::RCPtr<const WorldObject> GetStrongRef() const;
-
-		rkit::WeakPtr<WorldObject> GetWeakRef();
-		rkit::WeakPtr<const WorldObject> GetWeakRef() const;
-
-		rkit::Result Initialize(World &world);
+		virtual rkit::Result Initialize(World &world);
 		virtual rkit::ResultCoroutine OnSpawnedFromLevel(rkit::ICoroThread &thread);
+		virtual rkit::ResultCoroutine OnFrame(rkit::ICoroThread &thread);
+
+		WorldObjectProxy &GetProxy() const;
 
 	protected:
 		World &GetWorld() const;
@@ -84,37 +104,79 @@ namespace anox::game
 
 	private:
 		World *m_world = nullptr;
-		WorldObjectContainer *m_container = nullptr;
-
-		WorldObject *m_prevObject = nullptr;
-		rkit::RCPtr<WorldObject> m_nextObject;
+		WorldObjectProxy *m_proxy = nullptr;
 
 		rkit::UniquePtr<ScriptContext> m_scriptContext;
 	};
 }
 
+#include <type_traits>
+
 namespace anox::game
 {
 	template<class T>
-	rkit::RCPtr<T> WorldObjectContainer::Wrap(rkit::UniquePtr<WorldObjectContainer> &&self, rkit::UniquePtr<T> &&obj)
+	template<class TOther>
+	inline ObjRef<T>::ObjRef(const ObjRef<TOther> &otherRef)
+		: m_proxy(otherRef.m_proxy)
 	{
-		return InternalWrap(std::move(self), rkit::UniquePtr<WorldObject>(std::move(obj))).StaticCastMove<T>();
+		static_assert(std::is_convertible<T *, TOther *>::value, "Reference is not implicitly convertible");
+	}
+
+
+	template<class T>
+	ObjRef<T>::ObjRef(T *ptr)
+		: m_proxy(ptr == nullptr ? nullptr : &static_cast<const WorldObject *>(ptr)->GetProxy())
+	{
 	}
 
 	template<class T>
-	rkit::WeakPtr<T> WorldObjectContainer::Weaken(const rkit::RCPtr<T> &ptr)
+	template<class TOther>
+	inline ObjRef<T>::ObjRef(ObjRef<TOther> &&otherRef)
+		: m_proxy(std::move(otherRef.m_proxy))
 	{
-		return InternalWeaken(ptr.Get(), ptr.GetTracker()).template StaticCastMove<T>();
+		static_assert(std::is_convertible<T *, TOther *>::value, "Reference is not implicitly convertible");
 	}
 
-	inline rkit::RCPtr<const WorldObject> WorldObject::GetStrongRef() const
+	template<class T>
+	T *ObjRef<T>::GetObject() const
 	{
-		return const_cast<WorldObject *>(this)->GetStrongRef();
+		return m_proxy.IsValid() ? static_cast<T *>(this->m_proxy.Get()->m_object.Get()) : nullptr;
 	}
 
-	inline rkit::WeakPtr<const WorldObject> WorldObject::GetWeakRef() const
+	template<class T>
+	template<class TOther>
+	ObjRef<TOther> ObjRef<T>::DynamicCast() const
 	{
-		return const_cast<WorldObject *>(this)->GetWeakRef();
+		TOther *otherRef = game::DynamicCast<TOther>(this->GetObject());
+		if (otherRef)
+			return ObjRef<TOther>(m_proxy);
+
+		return ObjRef<TOther>();
+	}
+
+	template<class T>
+	template<class TOther>
+	ObjRef<TOther> ObjRef<T>::DynamicCastMove()
+	{
+		TOther *otherRef = game::DynamicCast<TOther>(this->GetObject());
+		if (otherRef)
+			return ObjRef<TOther>(std::move(m_proxy));
+
+		return ObjRef<TOther>();
+	}
+
+	template<class T>
+	template<class TOther>
+	ObjRef<TOther> ObjRef<T>::StaticCast() const
+	{
+		return ObjRef<TOther>(m_proxy);
+	}
+
+	template<class T>
+	template<class TOther>
+	ObjRef<TOther> ObjRef<T>::StaticCastMove()
+	{
+		return ObjRef<TOther>(std::move(m_proxy));
 	}
 
 	inline World &WorldObject::GetWorld() const
@@ -125,5 +187,10 @@ namespace anox::game
 	inline ScriptContext &WorldObject::GetScriptContext()
 	{
 		return *m_scriptContext;
+	}
+
+	inline WorldObjectProxy &WorldObject::GetProxy() const
+	{
+		return *m_proxy;
 	}
 }

@@ -95,9 +95,14 @@
 	"RKit_CoreLib" :
 	{
 		"type": "linked_module",
+		"refs":
+		[
+			"ryu"
+		],
 		"configs":
 		[
-			"CoreLib_Internal"
+			"CoreLib_Internal",
+			"ryu_export"
 		]
 	},
 	"RKit_Data" :
@@ -148,7 +153,11 @@
 		[
 			"RKit_ShaderC_DLL/shaderc_debug",
 			"VulkanSDK"
-		]
+		],
+		"refs":
+		[
+			"RKit_CoreLib"
+		],
 	},
 	"RKit_System_Win32" :
 	{
@@ -171,14 +180,12 @@
 		"type": "module",
 		"configs":
 		[
-			"ryu_export",
 			"rapidjson_export",
 			"zlib_export"
 		],
 		"refs":
 		[
 			"RKit_CoreLib",
-			"ryu",
 			"zlib"
 		],
 		"extra_dirs":

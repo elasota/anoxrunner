@@ -6,13 +6,20 @@
 
 #include "anox/Game/APECommandDispatcher.generated.h"
 
+#include "World.h"
+
 namespace anox::game
 {
 	ScriptWindowInstance::ScriptWindowInstance()
 	{
 	}
 
-	void ScriptWindowInstance::Initialize(Label label)
+	rkit::Result ScriptWindowInstance::Initialize(World &world)
+	{
+		RKIT_CHECK(WorldObject::Initialize(world));
+	}
+
+	void ScriptWindowInstance::SetWindowID(const Label &label)
 	{
 		m_windowID = label;
 	}
@@ -189,5 +196,16 @@ namespace anox::game
 
 	void ScriptWindowInstance::ClearStyle()
 	{
+	}
+
+	rkit::ResultCoroutine ScriptWindowInstance::OnFrame(rkit::ICoroThread &thread)
+	{
+		if (m_thinkSwitch != Label())
+		{
+			World &world = GetWorld();
+			CORO_CHECK(co_await GetWorld().GetScriptEnvironment().RunSwitch(thread, this->GetScriptContext(), m_thinkSwitch, GetWorld()));
+		}
+
+		CORO_RETURN_OK;
 	}
 }

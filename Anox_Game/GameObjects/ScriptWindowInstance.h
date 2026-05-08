@@ -11,7 +11,8 @@ namespace anox::game
 	public:
 		ScriptWindowInstance();
 
-		void Initialize(Label label);
+		rkit::Result Initialize(World &world) override;
+		void SetWindowID(const Label &label);
 
 		const Label &GetWindowID() const;
 		const Label &GetStartSwitch() const;
@@ -19,6 +20,8 @@ namespace anox::game
 		const Label &GetThinkSwitch() const;
 
 		void ClearStyle();
+
+		rkit::ResultCoroutine OnFrame(rkit::ICoroThread &thread) override;
 
 	private:
 		rkit::Result InvalidCommand() override;

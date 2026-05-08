@@ -24,45 +24,27 @@ namespace rkit
 	};
 }
 
-namespace rkit { namespace priv {
-	struct DefaultFormatters
-	{
-		static void FormatSignedInt(IFormatStringWriter<Utf8Char_t> &writer, intmax_t value);
-		static void FormatUnsignedInt(IFormatStringWriter<Utf8Char_t> &writer, uintmax_t value);
-		static void FormatFloat(IFormatStringWriter<Utf8Char_t> &writer, float f);
-		static void FormatDouble(IFormatStringWriter<Utf8Char_t> &writer, double f);
-		static void FormatUtf8String(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t *str);
-		static void FormatCString(IFormatStringWriter<char> &writer, const char *str);
-	};
-
+namespace rkit::priv
+{
 	template<class T, size_t TSize, bool TIsIntegral, bool TIsSigned>
 	struct DefaultFormatter
 	{
 		template<class TChar>
-		inline static void Format(IFormatStringWriter<TChar> &writer, const T &value)
-		{
-			value.FormatValue(writer);
-		}
+		static void Format(IFormatStringWriter<TChar> &writer, const T &value);
 	};
 
 	template<class TSignedInt, size_t TSize>
 	struct DefaultFormatter<TSignedInt, TSize, true, true>
 	{
-		inline static void Format(IFormatStringWriter<Utf8Char_t> &writer, TSignedInt value)
-		{
-			return DefaultFormatters::FormatSignedInt(writer, value);
-		}
+		static void Format(IFormatStringWriter<Utf8Char_t> &writer, TSignedInt value);
 	};
 
 	template<class TUnsignedInt, size_t TSize>
 	struct DefaultFormatter<TUnsignedInt, TSize, true, false>
 	{
-		static void Format(IFormatStringWriter<Utf8Char_t> &writer, TUnsignedInt value)
-		{
-			DefaultFormatters::FormatSignedInt(writer, value);
-		}
+		static void Format(IFormatStringWriter<Utf8Char_t> &writer, TUnsignedInt value);
 	};
-} }
+}
 
 namespace rkit
 {
@@ -109,10 +91,7 @@ namespace rkit
 	template<>
 	struct Formatter<const Utf8Char_t *>
 	{
-		inline static void Format(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t *value)
-		{
-			priv::DefaultFormatters::FormatUtf8String(writer, value);
-		}
+		static void Format(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t *value);
 	};
 
 	template<>
@@ -144,7 +123,8 @@ namespace rkit
 }
 
 
-namespace rkit { namespace priv {
+namespace rkit::priv
+{
 	template<class TChar, class TType>
 	struct FormatterCreator
 	{
@@ -158,7 +138,7 @@ namespace rkit { namespace priv {
 		static void ThunkRefFormatter(IFormatStringWriter<TChar> &writer, const void *dataPtr);
 		static void ThunkValueFormatter(IFormatStringWriter<TChar> &writer, const void *dataPtr);
 	};
-} }
+}
 
 #include "CoreLib.h"
 #include "Span.h"
@@ -167,6 +147,11 @@ namespace rkit { namespace priv {
 
 namespace rkit
 {
+	inline void Formatter<const Utf8Char_t *>::Format(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t *value)
+	{
+		::rkit::text::formatters::FormatUtf8String(writer, value);
+	}
+
 	template<class TChar, class... TParameter>
 	typename SizedFormatParameterList<TChar, TypeListSize<typename TypeList<TParameter...> >::kValue> CreateFormatParameterList(const TParameter &... params)
 	{
@@ -192,9 +177,15 @@ namespace rkit
 	{
 		return FormatParameterList<TChar>(m_formatters, TSize);
 	}
+
+	inline void FormatString(IFormatStringWriter<Utf8Char_t> &writer, const StringSliceView &fmt, const FormatParameterList<Utf8Char_t> &paramList)
+	{
+		::rkit::text::FormatUtf8String(writer, fmt.GetChars(), fmt.Length(), paramList.Ptr(), paramList.Count());
+	}
 }
 
-namespace rkit { namespace priv {
+namespace rkit::priv
+{
 	template<class TChar, class TType>
 	FormatParameter<TChar> FormatterCreator<TChar, TType>::Create(const TType &type, RefCallback_t)
 	{
@@ -221,33 +212,23 @@ namespace rkit { namespace priv {
 		cb(writer, *static_cast<const TType *>(dataPtr));
 	}
 
-	inline void DefaultFormatters::FormatSignedInt(IFormatStringWriter<Utf8Char_t> &writer, intmax_t value)
+
+	template<class T, size_t TSize, bool TIsIntegral, bool TIsSigned>
+	template<class TChar>
+	void DefaultFormatter<T, TSize, TIsIntegral, TIsSigned>::Format(IFormatStringWriter<TChar> &writer, const T &value)
 	{
-		GetDrivers().m_utilitiesDriver->FormatSignedInt(writer, value);
+		return value.FormatValue(writer);
 	}
 
-	inline void DefaultFormatters::FormatUnsignedInt(IFormatStringWriter<Utf8Char_t> &writer, uintmax_t value)
+	template<class TSignedInt, size_t TSize>
+	void DefaultFormatter<TSignedInt, TSize, true, true>::Format(IFormatStringWriter<Utf8Char_t> &writer, TSignedInt value)
 	{
-		GetDrivers().m_utilitiesDriver->FormatUnsignedInt(writer, value);
+		return ::rkit::text::formatters::FormatSignedInt(writer, value);
 	}
 
-	inline void DefaultFormatters::FormatFloat(IFormatStringWriter<Utf8Char_t> &writer, float f)
+	template<class TUnsignedInt, size_t TSize>
+	void DefaultFormatter<TUnsignedInt, TSize, true, false>::Format(IFormatStringWriter<Utf8Char_t> &writer, TUnsignedInt value)
 	{
-		GetDrivers().m_utilitiesDriver->FormatFloat(writer, f);
+		return ::rkit::text::formatters::FormatUnsignedInt(writer, value);
 	}
-
-	inline void DefaultFormatters::FormatDouble(IFormatStringWriter<Utf8Char_t> &writer, double f)
-	{
-		GetDrivers().m_utilitiesDriver->FormatDouble(writer, f);
-	}
-
-	inline void DefaultFormatters::FormatUtf8String(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t *str)
-	{
-		GetDrivers().m_utilitiesDriver->FormatUtf8String(writer, str);
-	}
-
-	inline void DefaultFormatters::FormatCString(IFormatStringWriter<char> &writer, const char *str)
-	{
-		GetDrivers().m_utilitiesDriver->FormatCString(writer, str);
-	}
-} }
+}

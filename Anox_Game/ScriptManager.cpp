@@ -97,6 +97,7 @@ namespace anox::game
 		explicit ScriptEnvironmentImpl(ScriptManagerImpl &scriptManager);
 
 		rkit::ResultCoroutine StartSequence(rkit::ICoroThread &thread, ScriptContext &scriptContext, const Label &label, World &world);
+		rkit::ResultCoroutine RunSwitch(rkit::ICoroThread &thread, ScriptContext &scriptContext, const Label &label, World &world);
 
 		bool TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, uint32_t exprID, int depth) const;
 		bool TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, const ScriptExprValue &exprValue, int depth) const;
@@ -119,10 +120,12 @@ namespace anox::game
 		rkit::ResultCoroutine ExecuteWindowCommands(rkit::ICoroThread &thread, ScriptWindowInstance &windowInstance, const ScriptWindow &window);
 		rkit::ResultCoroutine ExecuteSwitchCommands(rkit::ICoroThread &thread, const ScriptPackage *pkg, rkit::Span<const ScriptSwitchCommand> cmds, int &loopCounter, int depth);
 
+		bool TryResolveString(rkit::ByteString &outBStr, const ScriptPackage &pkg, uint32_t strID) const;
 		bool TryResolveOptionalString(rkit::ByteString &outBStr, const ScriptPackage &pkg, uint32_t strID) const;
 
 		rkit::Result ClearFloatVariable(const rkit::ByteStringView &bstr);
 		rkit::Result SetFloatVariable(rkit::ByteString &&bstr, float value);
+		bool TryLoadFloatVariable(float &outValue, const rkit::ByteStringView &bstr) const;
 
 		bool ParseLabel(Label &outLabel, const rkit::ByteStringView bstr);
 
@@ -219,7 +222,7 @@ namespace anox::game
 			CORO_CHECK(WorldObjectFactory::CreateDynamic<ScriptWindowInstance>(world, instance));
 
 			CORO_CHECK(m_activeWindows.Append(instance));
-			instance->Initialize(label);
+			instance->SetWindowID(label);
 
 			CORO_CHECK(co_await ExecuteWindowCommands(thread, *instance, *window));
 
@@ -229,6 +232,25 @@ namespace anox::game
 			m_scriptManager.FindSwitch(startSwitch, sw);
 			// Fall through and run the start switch
 		}
+
+		if (sw)
+		{
+			rkit::ConstSpan<ScriptSwitchCommand> cmds = sw->m_commands;
+
+			const ScriptPackage &pkg = *sw->m_package;
+
+			int loopCounter = 0;
+			CORO_CHECK(co_await ExecuteSwitchCommands(thread, &pkg, cmds, loopCounter, 0));
+		}
+
+		CORO_RETURN_OK;
+	}
+
+	rkit::ResultCoroutine ScriptEnvironmentImpl::RunSwitch(rkit::ICoroThread &thread, ScriptContext &scriptContext, const Label &label, World &world)
+	{
+		const ScriptSwitch *sw = nullptr;
+
+		m_scriptManager.FindSwitch(label, sw);
 
 		if (sw)
 		{
@@ -349,8 +371,15 @@ namespace anox::game
 		case ScriptOperandType::Expression:
 			return TryEvaluateFloatScriptExpr(outValue, pkg, value, depth);
 		case ScriptOperandType::Variable:
-			rkit::log::Error(u8"Not yet implemented");
-			return false;
+			{
+				rkit::ByteString str;
+				if (!TryResolveString(str, pkg, value))
+					return false;
+
+				if (!TryLoadFloatVariable(outValue, str))
+					outValue = 0.f;
+				return true;
+			}
 		default:
 			rkit::log::Error(u8"Invalid operand type");
 			return false;
@@ -385,23 +414,25 @@ namespace anox::game
 			{
 			case 0:	// noop
 				break;
-			//case 1:	// if
+			case 1:	// if
+				{
+					float v = 0.f;
+					if (!TryEvaluateFloatScriptExpr(v, *pkg, cmd.m_exprValue, 0) || !(v != 0.f))
+					{
+						const size_t maxSkipAhead = cmds.Count() - ip;
+						ip += rkit::Max<size_t>(maxSkipAhead, cmd.m_strValue);
+					}
+				}
+				break;
 			case 2:	// setfloat
 				{
 					rkit::ByteString varName;
 					if (TryResolveOptionalString(varName, *pkg, cmd.m_strValue))
 					{
-						if (cmd.m_exprValue.m_exprType == ScriptExprType::Empty)
+						float v = 0.f;
+						if (cmd.m_exprValue.m_exprType == ScriptExprType::Empty || TryEvaluateFloatScriptExpr(v, *pkg, cmd.m_exprValue, 0))
 						{
-							ClearFloatVariable(varName);
-						}
-						else
-						{
-							float v = 0.f;
-							if (TryEvaluateFloatScriptExpr(v, *pkg, cmd.m_exprValue, 0))
-							{
-								CORO_CHECK(SetFloatVariable(std::move(varName), v));
-							}
+							CORO_CHECK(SetFloatVariable(std::move(varName), v));
 						}
 					}
 				}
@@ -475,17 +506,21 @@ namespace anox::game
 		CORO_RETURN_OK;
 	}
 
-	bool ScriptEnvironmentImpl::TryResolveOptionalString(rkit::ByteString &outBStr, const ScriptPackage &pkg, uint32_t strID) const
+	bool ScriptEnvironmentImpl::TryResolveString(rkit::ByteString &outBStr, const ScriptPackage &pkg, uint32_t strID) const
 	{
-		if (strID == 0)
-			return false;
-
-		strID--;
 		if (strID >= pkg.m_strings.Count())
 			return false;
 
 		outBStr = pkg.m_strings[strID];
 		return true;
+	}
+
+	bool ScriptEnvironmentImpl::TryResolveOptionalString(rkit::ByteString &outBStr, const ScriptPackage &pkg, uint32_t strID) const
+	{
+		if (strID == 0)
+			return false;
+
+		return TryResolveString(outBStr, pkg, strID - 1u);
 	}
 
 	rkit::Result ScriptEnvironmentImpl::ClearFloatVariable(const rkit::ByteStringView &bstr)
@@ -509,6 +544,22 @@ namespace anox::game
 		}
 		else
 			return m_floatVariables.Set(std::move(bstr), value);
+	}
+
+	bool ScriptEnvironmentImpl::TryLoadFloatVariable(float &outValue, const rkit::ByteStringView &bstr) const
+	{
+		for (uint8_t ch : bstr.ToSpan())
+		{
+			if (ch == '[')
+				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+		}
+
+		rkit::HashMap<rkit::ByteString, float>::ConstIterator_t it = m_floatVariables.Find(bstr);
+		if (it == m_floatVariables.end())
+			return false;
+
+		outValue = it.Value();
+		return true;
 	}
 
 	bool ScriptEnvironmentImpl::ParseLabel(Label &outLabel, const rkit::ByteStringView bstr)
@@ -986,6 +1037,11 @@ namespace anox::game
 	rkit::ResultCoroutine ScriptEnvironment::StartSequence(rkit::ICoroThread &thread, ScriptContext &scriptContext, const Label &label, World &world)
 	{
 		return Impl().StartSequence(thread, scriptContext, label, world);
+	}
+
+	rkit::ResultCoroutine ScriptEnvironment::RunSwitch(rkit::ICoroThread &thread, ScriptContext &scriptContext, const Label &label, World &world)
+	{
+		return Impl().RunSwitch(thread, scriptContext, label, world);
 	}
 }
 

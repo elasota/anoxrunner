@@ -3,15 +3,17 @@
 namespace anox::game
 {
 	class WorldObject;
+	struct WorldObjectProxy;
 	class WorldImpl;
 
 	class AllWorldObjectsIterator
 	{
 	public:
-		AllWorldObjectsIterator();
-		explicit AllWorldObjectsIterator(WorldObject *obj);
+		friend class AllWorldObjectsCollection;
 
-		WorldObject *operator*() const;
+		AllWorldObjectsIterator();
+
+		WorldObject &operator*() const;
 
 		bool operator==(const AllWorldObjectsIterator &other) const;
 		bool operator!=(const AllWorldObjectsIterator &other) const;
@@ -20,7 +22,9 @@ namespace anox::game
 		AllWorldObjectsIterator &operator++();
 
 	private:
-		WorldObject *m_obj;
+		explicit AllWorldObjectsIterator(WorldObjectProxy *obj);
+
+		WorldObjectProxy *m_proxy;
 	};
 
 	// NOTE: Adding objects while iterating a collection is safe.
@@ -37,37 +41,36 @@ namespace anox::game
 		AllWorldObjectsIterator end() const;
 
 	private:
-		explicit AllWorldObjectsCollection(WorldObject *firstObj);
+		explicit AllWorldObjectsCollection(WorldObjectProxy *firstProxy);
 
-		WorldObject *m_firstObject;
+		WorldObjectProxy *m_firstProxy;
 	};
 }
+
+#include "GameObjects/WorldObject.h"
+
+#include "rkit/Core/RKitAssert.h"
 
 namespace anox::game
 {
 	inline AllWorldObjectsIterator::AllWorldObjectsIterator()
-		: m_obj(nullptr)
+		: m_proxy(nullptr)
 	{
 	}
 
-	inline AllWorldObjectsIterator::AllWorldObjectsIterator(WorldObject *obj)
-		: m_obj(obj)
+	inline AllWorldObjectsIterator::AllWorldObjectsIterator(WorldObjectProxy *proxy)
+		: m_proxy(proxy)
 	{
-	}
-
-	inline WorldObject *AllWorldObjectsIterator::operator*() const
-	{
-		return m_obj;
 	}
 
 	inline bool AllWorldObjectsIterator::operator==(const AllWorldObjectsIterator &other) const
 	{
-		return m_obj == other.m_obj;
+		return m_proxy == other.m_proxy;
 	}
 
 	inline bool AllWorldObjectsIterator::operator!=(const AllWorldObjectsIterator &other) const
 	{
-		return m_obj != other.m_obj;
+		return m_proxy != other.m_proxy;
 	}
 
 	inline AllWorldObjectsIterator AllWorldObjectsIterator::operator++(int)
@@ -77,18 +80,25 @@ namespace anox::game
 		return copy;
 	}
 
-	inline AllWorldObjectsCollection::AllWorldObjectsCollection(WorldObject *firstObj)
-		: m_firstObject(firstObj)
+	inline AllWorldObjectsCollection::AllWorldObjectsCollection(WorldObjectProxy *firstProxy)
+		: m_firstProxy(firstProxy)
 	{
 	}
 
 	inline AllWorldObjectsIterator AllWorldObjectsCollection::begin() const
 	{
-		return AllWorldObjectsIterator(m_firstObject);
+		return AllWorldObjectsIterator(m_firstProxy);
 	}
 
 	inline AllWorldObjectsIterator AllWorldObjectsCollection::end() const
 	{
 		return AllWorldObjectsIterator();
+	}
+
+	inline WorldObject &AllWorldObjectsIterator::operator*() const
+	{
+		WorldObject *obj = this->m_proxy->m_object.Get();
+		RKIT_ASSERT(obj != nullptr);
+		return *obj;
 	}
 }

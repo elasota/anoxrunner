@@ -82,19 +82,19 @@ namespace anox::game
 			const uint32_t entityTypeID = entityTypeLEU32.Get();
 			size_t spawnDataSize = 0;
 
-			rkit::RCPtr<WorldObject> obj;
+			rkit::RCPtr<WorldObjectProxy> objProxy;
 			void *fieldsRef = nullptr;
 			SerializeFromLevelFunction_t deserializeFunc = nullptr;
 
-			CORO_CHECK(WorldObjectFactory::CreateLevelObject(entityTypeID, spawnDataSize, obj, fieldsRef, deserializeFunc));
+			CORO_CHECK(WorldObjectFactory::CreateLevelObject(entityTypeID, spawnDataSize, objProxy, fieldsRef, deserializeFunc));
 
-			if (!obj)
+			if (!objProxy)
 			{
 				rkit::log::Error(u8"Entity type was invalid");
 				CORO_THROW(rkit::ResultCode::kDataError);
 			}
 
-			CORO_CHECK(obj->Initialize(world));
+			CORO_CHECK(objProxy->m_object->Initialize(world));
 
 			if (spawnDataSize > spawnData.Count())
 			{
@@ -112,7 +112,7 @@ namespace anox::game
 			CORO_CHECK(deserializeFunc(fieldsRef, spawnParams, spawnData.Ptr()));
 			spawnData = spawnData.SubSpan(spawnDataSize);
 
-			CORO_CHECK(world.AddObject(std::move(obj)));
+			CORO_CHECK(world.AddObject(std::move(objProxy)));
 		}
 
 		if (spawnData.Count() > 0)
@@ -162,6 +162,7 @@ namespace anox::game
 
 	rkit::ResultCoroutine SessionImpl::RunFrame(rkit::ICoroThread &thread, World &world)
 	{
+		CORO_CHECK(co_await world.OnRunFrame(thread));
 		CORO_RETURN_OK;
 	}
 

@@ -8,7 +8,7 @@
 
 namespace rkit
 {
-	enum class LogSeverity
+	enum class LogSeverity : uint32_t
 	{
 		kInfo,
 		kWarning,

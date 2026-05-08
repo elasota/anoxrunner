@@ -215,9 +215,8 @@ namespace rkit
 	{
 		FileOutputFormatter outputFormatter(f);
 
-		GetDrivers().m_utilitiesDriver->FormatString(outputFormatter, fmt, args);
+		FormatString(outputFormatter, fmt, args);
 	}
-
 
 	ConsoleLogDriver_Win32::FileOutputFormatter::FileOutputFormatter(FILE *f)
 		: m_f(f)

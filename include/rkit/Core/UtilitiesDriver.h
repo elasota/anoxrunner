@@ -134,15 +134,6 @@ namespace rkit
 		virtual Result BlitImageSigned(utils::IImage &destImage, const utils::IImage &srcImage, ptrdiff_t srcX, ptrdiff_t srcY, ptrdiff_t destX, ptrdiff_t destY, size_t width, size_t height) const = 0;
 		virtual Result BlitImage(utils::IImage &destImage, const utils::IImage &srcImage, size_t srcX, size_t srcY, size_t destX, size_t destY, size_t width, size_t height) const = 0;
 
-		virtual void FormatSignedInt(IFormatStringWriter<Utf8Char_t> &writer, intmax_t value) const = 0;
-		virtual void FormatUnsignedInt(IFormatStringWriter<Utf8Char_t> &writer, uintmax_t value) const = 0;
-		virtual void FormatFloat(IFormatStringWriter<Utf8Char_t> &writer, float f) const = 0;
-		virtual void FormatDouble(IFormatStringWriter<Utf8Char_t> &writer, double f) const = 0;
-		virtual void FormatCString(IFormatStringWriter<char> &writer, const char *str) const = 0;
-		virtual void FormatUtf8String(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t *str) const = 0;
-
-		virtual void FormatString(IFormatStringWriter<Utf8Char_t> &writer, const StringSliceView &fmt, const FormatParameterList<Utf8Char_t> &paramList) const = 0;
-
 		virtual void SanitizeClampFloats(const Span<float> &outFloats, const Span<const endian::LittleFloat32_t> &inFloats, int maxMagnitude) const = 0;
 		virtual void SanitizeClampUInt16s(const Span<uint16_t> &outFloats, const Span<const endian::LittleUInt16_t> &inFloats, uint16_t maxValue) const = 0;
 

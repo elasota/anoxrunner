@@ -7,9 +7,13 @@ namespace anox::game
 {
 	AllWorldObjectsIterator &AllWorldObjectsIterator::operator++()
 	{
-		RKIT_ASSERT(m_obj != nullptr);
+		RKIT_ASSERT(m_proxy != nullptr);
 
-		m_obj = m_obj->GetNextUnsafe();
+		WorldObjectProxy *nextProxy = m_proxy->m_next;
+		while (nextProxy != nullptr && nextProxy->m_object.Get() == nullptr)
+			nextProxy = nextProxy->m_next.Get();
+
+		m_proxy = nextProxy;
 		return *this;
 	}
 }

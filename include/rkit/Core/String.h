@@ -193,14 +193,12 @@ namespace rkit
 }
 
 #include "RKitAssert.h"
-#include "Algorithm.h"
 #include "CharacterEncodingValidator.h"
 #include "Format.h"
 #include "MallocDriver.h"
 #include "StaticArray.h"
 #include "StringView.h"
 #include "TypeTraits.h"
-#include "UtilitiesDriver.h"
 #include "Result.h"
 
 #include <cstring>
@@ -542,7 +540,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::VFormat(const Base
 
 		formatHelper.m_charsBuffer = tempStaticBuffer.ToSpan();
 
-		GetDrivers().m_utilitiesDriver->FormatString(formatHelper, fmt, args);
+		::rkit::FormatString(formatHelper, fmt, args);
 		if (formatHelper.m_overflowed)
 			RKIT_THROW(rkit::ResultCode::kOutOfMemory);
 
@@ -567,7 +565,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::VFormat(const Base
 
 		formatHelper.m_charsBuffer = constructionBuffer.GetSpan();
 
-		GetDrivers().m_utilitiesDriver->FormatString(formatHelper, fmt, args);
+		::rkit::FormatString(formatHelper, fmt, args);
 		RKIT_ASSERT(!formatHelper.m_overflowed);
 		RKIT_ASSERT(formatHelper.m_charsRequired == charsRequired);
 	}

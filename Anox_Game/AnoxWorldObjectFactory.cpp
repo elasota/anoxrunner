@@ -8,7 +8,7 @@
 
 namespace anox::game
 {
-	rkit::Result WorldObjectFactory::AddObjectToWorld(World &world, rkit::RCPtr<WorldObject> &&object)
+	rkit::Result WorldObjectFactory::AddObjectToWorld(World &world, rkit::RCPtr<WorldObjectProxy> &&object)
 	{
 		return world.AddObject(std::move(object));
 	}

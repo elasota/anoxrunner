@@ -5,6 +5,7 @@
 
 #include "rkit/Core/Path.h"
 #include "rkit/Core/String.h"
+#include "rkit/Core/LogDriver.h"
 #include "rkit/Core/Optional.h"
 
 #include "rkit/Data/ContentID.h"
@@ -26,6 +27,19 @@ namespace anox::game::sandbox
 	::rkit::Result HostExports::MemFree(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, uint32_t mmid)
 	{
 		return static_cast<AnoxGameSandboxEnvironment &>(env).m_sandbox->ReleaseDynamicMemory(mmid);
+	}
+
+	::rkit::Result HostExports::LogUtf8Message(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, uint32_t severity, ::rkit::sandbox::Address_t ptr, size_t size)
+	{
+		if (rkit::ILogDriver *logDriver = rkit::GetDrivers().m_logDriver)
+		{
+			void *charsMemory = nullptr;
+			RKIT_CHECK(static_cast<AnoxGameSandboxEnvironment &>(env).m_sandbox->AccessMemoryRange(charsMemory, ptr, size));
+
+			logDriver->LogMessage(static_cast<rkit::LogSeverity>(severity), rkit::StringSliceView(static_cast<const rkit::Utf8Char_t *>(charsMemory), size));
+		}
+
+		RKIT_RETURN_OK;
 	}
 
 	::rkit::Result HostExports::GetContentIDKeyedResource(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t &reqID, uint32_t resourceType, ::rkit::sandbox::Address_t contentIDAddr)

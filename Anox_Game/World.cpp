@@ -33,23 +33,25 @@ namespace anox::game
 
 		rkit::Result Initialize();
 
-		void AddObject(rkit::RCPtr<WorldObject> &&obj);
+		void AddObject(rkit::RCPtr<WorldObjectProxy> &&obj);
 		void RemoveObject(WorldObject *obj);
-
-		rkit::WeakPtr<WorldObject> GetFirstObject() const;
-		WorldObject* GetFirstObjectUnsafe() const;
 
 		AllWorldObjectsCollection GetAllObjects() const;
 
 		rkit::ResultCoroutine OnWorldStarted(rkit::ICoroThread &thread);
+		rkit::ResultCoroutine OnRunFrame(rkit::ICoroThread &thread);
 
 	private:
-		rkit::WeakPtr<GlobalSingleton> m_globalSingleton;
+		void CleanUpObject(WorldObjectProxy *obj);
+
+		ObjRef<GlobalSingleton> m_globalSingleton;
 		ScriptManager &m_scriptManager;
 		rkit::UniquePtr<ScriptEnvironment> m_scriptEnvironment;
 
-		rkit::RCPtr<WorldObject> m_firstObj;
-		WorldObject *m_lastObject = nullptr;
+		rkit::RCPtr<WorldObjectProxy> m_firstObj;
+		WorldObjectProxy* m_lastObject = nullptr;
+
+		WorldObjectProxy *m_firstDead = nullptr;
 	};
 
 	WorldImpl::WorldImpl(ScriptManager &scriptManager)
@@ -60,7 +62,7 @@ namespace anox::game
 	WorldImpl::~WorldImpl()
 	{
 		while (m_firstObj.IsValid())
-			m_firstObj = std::move(m_firstObj->m_nextObject);
+			m_firstObj = std::move(m_firstObj->m_next);
 	}
 
 	rkit::Result WorldImpl::Initialize()
@@ -70,80 +72,85 @@ namespace anox::game
 		RKIT_RETURN_OK;
 	}
 
-	void WorldImpl::AddObject(rkit::RCPtr<WorldObject> &&obj)
+	void WorldImpl::AddObject(rkit::RCPtr<WorldObjectProxy> &&objProxyRCPtr)
 	{
-		WorldObject *objPtr = obj.Get();
-		if (m_lastObject)
-			m_lastObject->m_nextObject = std::move(obj);
-		else
-			m_firstObj = std::move(obj);
+		WorldObjectProxy *proxyPtr = objProxyRCPtr.Get();
 
-		m_lastObject = objPtr;
+		WorldObject *obj = proxyPtr->m_object.Get();
+
+		RKIT_ASSERT(obj != nullptr);
+
+		obj->m_proxy = proxyPtr;
+		obj->m_world = &this->Base();
+
+		if (m_lastObject)
+			m_lastObject->m_next = std::move(objProxyRCPtr);
+		else
+			m_firstObj = std::move(objProxyRCPtr);
+
+		m_lastObject = proxyPtr;
 	}
 
 	void WorldImpl::RemoveObject(WorldObject *obj)
 	{
-		WorldObject *nextObjPtr = obj->m_nextObject.Get();
-		WorldObject *prevObj = obj->m_prevObject;
+		WorldObjectProxy *proxy = obj->m_proxy;
+		proxy->m_object.Reset();
 
-		if (nextObjPtr)
-			nextObjPtr->m_prevObject = prevObj;
+		proxy->m_nextDead = m_firstDead;
+		m_firstDead = proxy;
+	}
+
+	void WorldImpl::CleanUpObject(WorldObjectProxy *proxy)
+	{
+		WorldObjectProxy *nextProxyPtr = proxy->m_next.Get();
+		WorldObjectProxy *prevProxy = proxy->m_prev;
+
+		if (nextProxyPtr)
+			nextProxyPtr->m_prev = prevProxy;
 		else
-			m_lastObject = prevObj;
+			m_lastObject = prevProxy;
 
 		// This will destroy the object!  Do not reference it after this line!
-		if (prevObj)
-			prevObj->m_nextObject = std::move(obj->m_nextObject);
+		if (prevProxy)
+			prevProxy->m_next = std::move(proxy->m_next);
 		else
-			m_firstObj = std::move(obj->m_nextObject);
-	}
-
-	rkit::WeakPtr<WorldObject> WorldImpl::GetFirstObject() const
-	{
-		return WorldObjectContainer::Weaken(m_firstObj);
-	}
-
-	WorldObject *WorldImpl::GetFirstObjectUnsafe() const
-	{
-		return m_firstObj.Get();
+			m_firstObj = std::move(proxy->m_next);
 	}
 
 	AllWorldObjectsCollection WorldImpl::GetAllObjects() const
 	{
-		return AllWorldObjectsCollection(GetFirstObjectUnsafe());
+		WorldObjectProxy *firstValidProxy = m_firstObj;
+
+		while (firstValidProxy != nullptr && !firstValidProxy->m_object.IsValid())
+			firstValidProxy = firstValidProxy->m_next;
+
+		return AllWorldObjectsCollection(firstValidProxy);
 	}
 
 	rkit::ResultCoroutine WorldImpl::OnWorldStarted(rkit::ICoroThread &thread)
 	{
+		for (WorldObject &obj : GetAllObjects())
 		{
-			rkit::WeakPtr<GlobalSingleton> globalSingleton;
-
-			for (WorldObject *obj : GetAllObjects())
+			if (GlobalSingleton *singleton = DynamicCast<GlobalSingleton>(&obj))
 			{
-				if (GlobalSingleton *singleton = DynamicCast<GlobalSingleton>(obj))
-				{
-					globalSingleton = singleton->GetWeakRef().StaticCastMove<GlobalSingleton>();
-					break;
-				}
+				m_globalSingleton = singleton;
+				break;
 			}
-
-			m_globalSingleton = std::move(globalSingleton);
 		}
 
-		rkit::Vector<rkit::WeakPtr<WorldObject>> objs;
-		for (WorldObject *obj : GetAllObjects())
+		for (WorldObject &obj : GetAllObjects())
 		{
-			CORO_CHECK(objs.Append(obj->GetWeakRef()));
+			CORO_CHECK(co_await obj.OnSpawnedFromLevel(thread));
 		}
 
-		for (const rkit::WeakPtr<WorldObject> &objWeak : objs)
-		{
-			rkit::RCPtr<WorldObject> lockedObj = objWeak.Lock();
+		CORO_RETURN_OK;
+	}
 
-			if (lockedObj.IsValid())
-			{
-				CORO_CHECK(co_await lockedObj->OnSpawnedFromLevel(thread));
-			}
+	rkit::ResultCoroutine WorldImpl::OnRunFrame(rkit::ICoroThread &thread)
+	{
+		for (WorldObject &obj : GetAllObjects())
+		{
+			CORO_CHECK(co_await obj.OnFrame(thread));
 		}
 
 		CORO_RETURN_OK;
@@ -167,20 +174,10 @@ namespace anox::game
 		RKIT_RETURN_OK;
 	}
 
-	rkit::Result World::AddObject(rkit::RCPtr<WorldObject> &&obj)
+	rkit::Result World::AddObject(rkit::RCPtr<WorldObjectProxy> &&obj)
 	{
 		Impl().AddObject(std::move(obj));
 		RKIT_RETURN_OK;
-	}
-
-	rkit::WeakPtr<WorldObject> World::GetFirstObject() const
-	{
-		return Impl().GetFirstObject();
-	}
-
-	WorldObject *World::GetFirstObjectUnsafe() const
-	{
-		return Impl().GetFirstObjectUnsafe();
 	}
 
 	AllWorldObjectsCollection World::GetAllObjects() const
@@ -191,6 +188,11 @@ namespace anox::game
 	rkit::ResultCoroutine World::OnWorldStarted(rkit::ICoroThread &thread)
 	{
 		return Impl().OnWorldStarted(thread);
+	}
+
+	rkit::ResultCoroutine World::OnRunFrame(rkit::ICoroThread &thread)
+	{
+		return Impl().OnRunFrame(thread);
 	}
 
 	ScriptManager &World::GetScriptManager() const

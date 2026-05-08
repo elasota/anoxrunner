@@ -3,6 +3,7 @@ class anox.game.sandbox
 
 import MemAlloc(size size) -> (address ptr, uint32 mmid) noexcept
 import MemFree(uint32 mmid) noexcept
+import LogUtf8Message(uint32 severity, address ptr, size size) noexcept
 
 import GetContentIDKeyedResource(uint32 resourceType, address contentID) -> (uint32 reqID)
 import GetCIPathKeyedResource(uint32 resourceType, address chars, size numChars) -> (uint32 reqID)

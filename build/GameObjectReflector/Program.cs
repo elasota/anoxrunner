@@ -275,7 +275,7 @@ namespace GameObjectReflector
                     writer.WriteLine($"\tclass {className};");
 
                 writer.WriteLine();
-                writer.WriteLine("\trkit::Result WorldObjectFactory::CreateLevelObject(uint32_t levelObjectID, size_t &outSize, rkit::RCPtr<WorldObject> &outObject, void *&outFieldsRef, SerializeFromLevelFunction_t &outDeserializeFunction)");
+                writer.WriteLine("\trkit::Result WorldObjectFactory::CreateLevelObject(uint32_t levelObjectID, size_t &outSize, rkit::RCPtr<WorldObjectProxy> &outObject, void *&outFieldsRef, SerializeFromLevelFunction_t &outDeserializeFunction)");
                 writer.WriteLine("\t{");
                 writer.WriteLine("\t\toutObject.Reset();");
                 writer.WriteLine("\t\toutSize = 0;");

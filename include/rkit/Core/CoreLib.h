@@ -25,12 +25,29 @@ namespace rkit
 #ifndef NDEBUG
 	struct IAssertDriver;
 #endif
+
+	template<class TChar>
+	struct IFormatStringWriter;
+
+	template<class TChar>
+	struct FormatParameter;
 }
 
 namespace rkit::math
 {
 	float RKIT_CORELIB_API SoftwareSqrtf(float f);
 	double RKIT_CORELIB_API SoftwareSqrt(double f);
+}
+
+namespace rkit::text::formatters
+{
+	void RKIT_CORELIB_API FormatSizedUtf8String(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t *strChars, size_t numStrChars, const FormatParameter<Utf8Char_t> *formatParameters, size_t numFormatParameters);
+	void RKIT_CORELIB_API FormatSignedInt(IFormatStringWriter<Utf8Char_t> &writer, intmax_t value);
+	void RKIT_CORELIB_API FormatUnsignedInt(IFormatStringWriter<Utf8Char_t> &writer, uintmax_t value);
+	void RKIT_CORELIB_API FormatFloat(IFormatStringWriter<Utf8Char_t> &writer, float f);
+	void RKIT_CORELIB_API FormatDouble(IFormatStringWriter<Utf8Char_t> &writer, double f);
+	void RKIT_CORELIB_API FormatUtf8String(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t *str);
+	void RKIT_CORELIB_API FormatCString(IFormatStringWriter<char> &writer, const char *str);
 }
 
 namespace rkit::text
@@ -54,6 +71,8 @@ namespace rkit::text
 	// The output and input buffers must not overlap.
 	size_t RKIT_CORELIB_API ConvertText(void *outputChars, CharacterEncoding outEncoding, size_t outMaxChars, size_t &outCharsEmitted,
 		const void *inputChars, CharacterEncoding inEncoding, size_t inCharCount, UnknownCharBehavior unknownCharBehavior, uint32_t unknownReplacementChar);
+
+	void RKIT_CORELIB_API FormatUtf8String(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t *fmtChars, size_t numFmtChars, const FormatParameter<Utf8Char_t> *fmtParameters, size_t numFmtParameters);
 }
 
 
