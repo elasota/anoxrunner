@@ -924,8 +924,8 @@ namespace ProjectGenerator
             {
                 tw.WriteLine();
                 tw.WriteLine("Microsoft Visual Studio Solution File, Format Version 12.00");
-                tw.WriteLine("# Visual Studio Version 17");
-                tw.WriteLine("VisualStudioVersion = 17.9.34607.119");
+                tw.WriteLine("# Visual Studio Version 18");
+                tw.WriteLine("VisualStudioVersion = 18.6.11806.211 stable");
                 tw.WriteLine("MinimumVisualStudioVersion = 10.0.40219.1");
 
                 foreach (KeyValuePair<string, ProjectDef> projNameAndDef in sortedDefs)

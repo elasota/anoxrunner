@@ -48,7 +48,7 @@
 
             TargetConfiguration defaultConfig = new TargetConfiguration("Common");
             defaultConfig.Configs.Add("Common");
-            defaultConfig.PlatformToolset = "v143";
+            defaultConfig.PlatformToolset = "v145";
 
             {
                 TargetConfiguration debugConfig = new TargetConfiguration("Debug");
