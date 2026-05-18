@@ -12,6 +12,8 @@ namespace APEWindowCommandReflector
             Int32,
             Str,
             StrVar,
+            Obj,
+            ObjVar,
             Texture,
             WindowStyle,
             OptStr,
@@ -802,6 +804,10 @@ namespace APEWindowCommandReflector
                         fieldType = FieldDef.FieldType.Expr;
                     else if (typeStr == "floatvar")
                         fieldType = FieldDef.FieldType.FloatVar;
+                    else if (typeStr == "obj")
+                        fieldType = FieldDef.FieldType.Obj;
+                    else if (typeStr == "objvar")
+                        fieldType = FieldDef.FieldType.ObjVar;
                     else if (typeStr == "int")
                         fieldType = FieldDef.FieldType.Int32;
                     else if (typeStr == "uint")

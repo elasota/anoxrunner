@@ -13,6 +13,8 @@ namespace anox::buildsystem::ape_parse
 		Int32,
 		Str,
 		StrVar,
+		Obj,
+		ObjVar,
 		Bool,
 		Label,
 		Expr,

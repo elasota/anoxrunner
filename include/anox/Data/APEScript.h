@@ -59,6 +59,7 @@ namespace anox::data::ape
 		StringLiteral,
 		FloatVariable,
 		StringVariable,
+		ObjectVariable,
 		UIntLiteral,
 		IntLiteral,
 

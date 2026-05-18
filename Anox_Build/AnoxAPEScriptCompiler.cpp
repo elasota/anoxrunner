@@ -3,6 +3,7 @@
 
 #include "anox/Data/APEScript.h"
 #include "anox/AnoxModule.h"
+#include "anox/Label.h"
 
 #include "rkit/Core/Algorithm.h"
 #include "rkit/Core/HashTable.h"
@@ -1311,6 +1312,40 @@ namespace anox::buildsystem
 
 				switch (argMetadata.m_fieldType)
 				{
+				case ape_parse::ExternFieldType::Label:
+					{
+						rkit::Optional<size_t> splitPos;
+						for (size_t i = 0; i < arg.Length(); i++)
+						{
+							if (arg[i] == ':')
+							{
+								splitPos = i;
+								break;
+							}
+						}
+
+						if (!splitPos.IsSet() || splitPos.Get() == 0 || splitPos.Get() == arg.Length() - 1u)
+						{
+							rkit::log::Error(u8"Invalid label");
+							RKIT_THROW(rkit::ResultCode::kDataError);
+						}
+
+						rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
+
+						// FIXME: Make a function for this
+						uint32_t labelHigh = 0;
+						uint32_t labelLow = 0;
+						if (!utils->ParseUInt32(arg.SubString(0, splitPos.Get()), 10, labelHigh) || !utils->ParseUInt32(arg.SubString(splitPos.Get() + 1), 10, labelLow) || !Label::IsValid(labelHigh, labelLow))
+						{
+							rkit::log::Error(u8"Invalid label");
+							RKIT_THROW(rkit::ResultCode::kDataError);
+						}
+
+						outValue.m_exprType = data::ape::ExprType::UIntLiteral;
+						outValue.m_index = Label(labelHigh, labelLow).RawValue();
+					}
+					break;
+
 				case ape_parse::ExternFieldType::FloatExpr:
 					if (couldBeVariable)
 					{
@@ -1363,6 +1398,63 @@ namespace anox::buildsystem
 
 						outValue.m_exprType = data::ape::ExprType::UIntLiteral;
 						outValue.m_index = uintLiteral;
+					}
+					break;
+				case ape_parse::ExternFieldType::Int32:
+					{
+						int32_t intLiteral = 0;
+						if (!rkit::GetDrivers().m_utilitiesDriver->ParseInt32(arg, 10, intLiteral))
+						{
+							rkit::log::ErrorFmt(u8"Invalid uint parameter value for argument {} of op {}", rkit::AsciiStringView(argMetadata.m_name, argMetadata.m_nameLength),
+								rkit::AsciiStringView(opMetadata.m_name, opMetadata.m_nameLength));
+							RKIT_THROW(rkit::ResultCode::kDataError);
+						}
+
+						outValue.m_exprType = data::ape::ExprType::IntLiteral;
+						outValue.m_index = static_cast<uint32_t>(intLiteral);
+					}
+					break;
+				case ape_parse::ExternFieldType::Bool:
+					if (arg.EqualsNoCase(rkit::StringView(u8"true").RemoveEncoding()))
+					{
+						outValue.m_exprType = data::ape::ExprType::UIntLiteral;
+						outValue.m_index = 1;
+						break;
+					}
+					else if (arg.EqualsNoCase(rkit::StringView(u8"false").RemoveEncoding()))
+					{
+						outValue.m_exprType = data::ape::ExprType::UIntLiteral;
+						outValue.m_index = 0;
+						break;
+					}
+					else
+					{
+						rkit::log::ErrorFmt(u8"Invalid bool parameter value for argument {} of op {}", rkit::AsciiStringView(argMetadata.m_name, argMetadata.m_nameLength),
+							rkit::AsciiStringView(opMetadata.m_name, opMetadata.m_nameLength));
+						RKIT_THROW(rkit::ResultCode::kDataError);
+					}
+					break;
+				case ape_parse::ExternFieldType::Obj:
+					if (arg.EqualsNoCase(rkit::StringView(u8"null").RemoveEncoding()))
+					{
+						outValue.m_exprType = data::ape::ExprType::Empty;
+						outValue.m_index = 0;
+						break;
+					}
+
+					[[fallthrough]];
+				case ape_parse::ExternFieldType::ObjVar:
+					{
+						if (!couldBeVariable)
+						{
+							rkit::log::ErrorFmt(u8"Argument {} of op {} was not a variable", rkit::AsciiStringView(argMetadata.m_name, argMetadata.m_nameLength),
+								rkit::AsciiStringView(opMetadata.m_name, opMetadata.m_nameLength));
+							RKIT_THROW(rkit::ResultCode::kDataError);
+						}
+
+						isVariable = true;
+						indexIsStr = true;
+						outValue.m_exprType = data::ape::ExprType::ObjectVariable;
 					}
 					break;
 				case ape_parse::ExternFieldType::FloatVar:
