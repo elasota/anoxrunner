@@ -21,10 +21,22 @@
 			</ArrayItems>
 		</Expand>
 	</Type>
-	<Type Name="rkit::BaseStringView&lt;char&gt;">
+	<Type Name="rkit::BaseStringView&lt;unsigned char,*&gt;">
 		<DisplayString>{m_span.m_arr,s}</DisplayString>
 	</Type>
-	<Type Name="rkit::BaseStringSliceView&lt;char&gt;">
+	<Type Name="rkit::BaseStringSliceView&lt;unsigned char,*&gt;">
+		<DisplayString>{m_span.m_arr,s}</DisplayString>
+	</Type>
+	<Type Name="rkit::BaseStringView&lt;char,*&gt;">
+		<DisplayString>{m_span.m_arr,s}</DisplayString>
+	</Type>
+	<Type Name="rkit::BaseStringSliceView&lt;char,*&gt;">
+		<DisplayString>{m_span.m_arr,s}</DisplayString>
+	</Type>
+	<Type Name="rkit::BaseStringView&lt;char8_t,*&gt;">
+		<DisplayString>{m_span.m_arr,s}</DisplayString>
+	</Type>
+	<Type Name="rkit::BaseStringSliceView&lt;char8_t,*&gt;">
 		<DisplayString>{m_span.m_arr,s}</DisplayString>
 	</Type>
 	<Type Name="rkit::BaseStringView&lt;wchar_t&gt;">

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 
 namespace APEWindowCommandReflector
 {
@@ -8,7 +9,9 @@ namespace APEWindowCommandReflector
         {
             UInt16,
             UInt32,
+            Int32,
             Str,
+            StrVar,
             Texture,
             WindowStyle,
             OptStr,
@@ -16,6 +19,21 @@ namespace APEWindowCommandReflector
             OptExpr,
             Bits32,
             Padding,
+            Float,
+            FloatExpr,
+            FloatVar,
+            Expr,
+            Bool,
+            Label,
+            ScriptResource,
+            ImageResource,
+            SoundResource,
+            FontResource,
+            MusicSegResource,
+            ParticleResource,
+            MusicResource,
+            SceneResource,
+            ModelResource,
         }
 
         public FieldType Type { get; }
@@ -33,6 +51,26 @@ namespace APEWindowCommandReflector
             Type = FieldType.Bits32;
             Bits = bits;
             Name = "bits";
+        }
+    }
+
+    internal class ExternCommandDef
+    {
+        public string Name { get; }
+        public uint Opcode { get; }
+        public IReadOnlyList<FieldDef> Fields { get; }
+        public bool IsSpecial { get; }
+        public uint NumUnnamedParameters { get; }
+        public uint NumRequiredParameters { get; }
+
+        public ExternCommandDef(string name, uint opcode, IReadOnlyList<FieldDef> fields, bool isSpecial, uint numUnnamedParameters, uint numRequiredParameters)
+        {
+            Name = name;
+            Opcode = opcode;
+            Fields = fields;
+            IsSpecial = isSpecial;
+            NumUnnamedParameters = numUnnamedParameters;
+            NumRequiredParameters = numRequiredParameters;
         }
     }
 
@@ -102,18 +140,93 @@ namespace APEWindowCommandReflector
             }
         }
 
-        static void Main(string[] args)
+        static void CompileExternCommands(string fileName, string outPath)
         {
-            if (args.Length != 2)
-                throw new Exception("Usage: APEWindowCommandReflector <defs file> <output directory>");
+            string[] defLines = File.ReadAllLines(fileName);
 
-            string[] defLines = File.ReadAllLines(args[0]);
+            List<ExternCommandDef> externDefs = ParseExternCommandDefs(defLines);
+
+            string outBuildDir = Path.Combine(outPath, "Anox_Build").Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            string outDataIncludeDir = Path.Combine(outPath, "include", "anox", "Data").Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            string outGameIncludeDir = Path.Combine(outPath, "include", "anox", "Game").Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+
+            Directory.CreateDirectory(outBuildDir);
+            Directory.CreateDirectory(outDataIncludeDir);
+
+            using (StreamWriter sw = new StreamWriter(Path.Combine(outGameIncludeDir, "APEExternOpcodes.generated.h")))
+            {
+                sw.NewLine = "\n";
+
+                sw.WriteLine("#pragma once");
+                sw.WriteLine();
+                sw.WriteLine("namespace anox::game::ape");
+                sw.WriteLine("{");
+                sw.WriteLine("\tenum class ExternOpcode");
+                sw.WriteLine("\t{");
+
+                foreach (ExternCommandDef def in externDefs)
+                {
+                    sw.WriteLine("\t\t" + def.Name + ",");
+                }
+
+                sw.WriteLine("\t};");
+                sw.WriteLine("}");
+            }
+
+            using (StreamWriter sw = new StreamWriter(Path.Combine(outBuildDir, "APEExternMetadata.generated.inl")))
+            {
+                sw.NewLine = "\n";
+
+                sw.WriteLine("#pragma once");
+                sw.WriteLine();
+                sw.WriteLine("#include \"APEExternMetadata.h\"");
+                sw.WriteLine();
+                sw.WriteLine("namespace anox::buildsystem::ape_parse");
+                sw.WriteLine("{");
+
+                sw.WriteLine("\tstatic const ExternOpcodeArgMetadata g_externOpcodeArgMetadata[] =");
+                sw.WriteLine("\t{");
+                foreach (ExternCommandDef externDef in externDefs)
+                {
+                    foreach (FieldDef fieldDef in externDef.Fields)
+                        sw.WriteLine("\t\t{ \"" + fieldDef.Name + "\", " + fieldDef.Name.Length.ToString() + ", ExternFieldType::" + fieldDef.Type.ToString() + " },");
+                }
+                sw.WriteLine("\t};");
+                sw.WriteLine();
+                sw.WriteLine("\tstatic const ExternOpcodeMetadata g_externOpcodeMetadata[] =");
+                sw.WriteLine("\t{");
+                {
+                    int startOffset = 0;
+                    foreach (ExternCommandDef externDef in externDefs)
+                    {
+                        sw.WriteLine("\t\t{ \"" + externDef.Name + "\""
+                            + ", " + externDef.Name.Length.ToString()
+                            + ", " + "g_externOpcodeArgMetadata + " + startOffset.ToString()
+                            + ", " + externDef.Fields.Count.ToString()
+                            + ", " + externDef.Opcode
+                            + ", " + (externDef.IsSpecial ? "true" : "false")
+                            + ", " + externDef.NumUnnamedParameters.ToString()
+                            + ", " + externDef.NumRequiredParameters
+                            + " },");
+
+                        startOffset += externDef.Fields.Count;
+                    }
+                }
+                sw.WriteLine("\t};");
+
+                sw.WriteLine("}");
+            }
+        }
+
+        static void CompileWindowCommands(string fileName, string outPath)
+        {
+            string[] defLines = File.ReadAllLines(fileName);
 
             List<WindowCommandDef> windowCommandDefs = ParseWindowCommandDefs(defLines);
 
-            string outBuildDir = Path.Combine(args[1], "Anox_Build").Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
-            string outDataIncludeDir = Path.Combine(args[1], "include", "anox", "Data").Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
-            string outGameIncludeDir = Path.Combine(args[1], "include", "anox", "Game").Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            string outBuildDir = Path.Combine(outPath, "Anox_Build").Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            string outDataIncludeDir = Path.Combine(outPath, "include", "anox", "Data").Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            string outGameIncludeDir = Path.Combine(outPath, "include", "anox", "Game").Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
 
             Directory.CreateDirectory(outBuildDir);
             Directory.CreateDirectory(outDataIncludeDir);
@@ -376,44 +489,44 @@ namespace APEWindowCommandReflector
                         string? fldType = null;
                         switch (fDef.Type)
                         {
-                        case FieldDef.FieldType.Texture:
-                        case FieldDef.FieldType.WindowStyle:
-                            fldType = "ScriptMaterialReference";
-                            break;
-                        case FieldDef.FieldType.UInt16:
-                            fldType = "uint16_t";
-                            break;
-                        case FieldDef.FieldType.UInt32:
-                            fldType = "uint32_t";
-                            break;
-                        case FieldDef.FieldType.Str:
-                            fldType = "rkit::ByteStringView";
-                            break;
-                        case FieldDef.FieldType.OptStr:
-                            fldType = "rkit::Optional<rkit::ByteStringView>";
-                            break;
-                        case FieldDef.FieldType.Format:
-                            fldType = "ScriptOperandList";
-                            break;
-                        case FieldDef.FieldType.OptExpr:
-                            fldType = "ScriptExprValue";
-                            break;
-                        case FieldDef.FieldType.Bits32:
-                            foreach (KeyValuePair<string, int> bit in fDef.Bits!)
-                                sw.WriteLine("\t\tbool m_" + bit.Key + ";");
-                            break;
+                            case FieldDef.FieldType.Texture:
+                            case FieldDef.FieldType.WindowStyle:
+                                fldType = "ScriptMaterialReference";
+                                break;
+                            case FieldDef.FieldType.UInt16:
+                                fldType = "uint16_t";
+                                break;
+                            case FieldDef.FieldType.UInt32:
+                                fldType = "uint32_t";
+                                break;
+                            case FieldDef.FieldType.Str:
+                                fldType = "rkit::ByteStringView";
+                                break;
+                            case FieldDef.FieldType.OptStr:
+                                fldType = "rkit::Optional<rkit::ByteStringView>";
+                                break;
+                            case FieldDef.FieldType.Format:
+                                fldType = "ScriptOperandList";
+                                break;
+                            case FieldDef.FieldType.OptExpr:
+                                fldType = "ScriptExprValue";
+                                break;
+                            case FieldDef.FieldType.Bits32:
+                                foreach (KeyValuePair<string, int> bit in fDef.Bits!)
+                                    sw.WriteLine("\t\tbool m_" + bit.Key + ";");
+                                break;
 
-                        case FieldDef.FieldType.Padding:
-                            break;
+                            case FieldDef.FieldType.Padding:
+                                break;
 
-                        default:
-                            throw new Exception();
+                            default:
+                                throw new Exception();
                         }
 
                         if (fldType != null)
                             sw.WriteLine("\t\t" + fldType + " m_" + fDef.Name + ";");
                     }
-                    
+
                     sw.WriteLine("\t};");
                     sw.WriteLine();
                 }
@@ -508,51 +621,54 @@ namespace APEWindowCommandReflector
             }
         }
 
+        private static List<string> TokenizeLine(string line)
+        {
+            List<string> tokens = new List<string>();
+            tokens.AddRange(line.Split(' '));
+
+            string splitChars = "()=";
+
+            foreach (char splitChar in splitChars)
+            {
+                List<string> reformedTokens = new List<string>();
+
+                foreach (string baseToken in tokens)
+                {
+                    string token = baseToken;
+
+                    int splitPos = token.IndexOf(splitChar);
+                    while (splitPos > 0)
+                    {
+                        reformedTokens.Add(token.Substring(0, splitPos));
+                        reformedTokens.Add(splitChar.ToString());
+                        token = token.Substring(splitPos + 1);
+
+                        splitPos = token.IndexOf(splitChar);
+                    }
+
+                    reformedTokens.Add(token);
+                }
+
+                tokens = reformedTokens;
+            }
+
+            List<string> filteredTokens = new List<string>();
+            foreach (string token in tokens)
+            {
+                if (token.Length != 0)
+                    filteredTokens.Add(token);
+            }
+
+            return filteredTokens;
+        }
+
         private static List<WindowCommandDef> ParseWindowCommandDefs(string[] defLines)
         {
             List<WindowCommandDef> wcDefs = new List<WindowCommandDef>();
 
             foreach (string line in defLines)
             {
-                List<string> tokens = new List<string>();
-                tokens.AddRange(line.Split(' '));
-
-                {
-                    string splitChars = "()=";
-
-                    foreach (char splitChar in splitChars)
-                    {
-                        List<string> reformedTokens = new List<string>();
-
-                        foreach (string baseToken in tokens)
-                        {
-                            string token = baseToken;
-
-                            int splitPos = token.IndexOf(splitChar);
-                            while (splitPos > 0)
-                            {
-                                reformedTokens.Add(token.Substring(0, splitPos));
-                                reformedTokens.Add(splitChar.ToString());
-                                token = token.Substring(splitPos + 1);
-
-                                splitPos = token.IndexOf(splitChar);
-                            }
-
-                            reformedTokens.Add(token);
-                        }
-
-                        tokens = reformedTokens;
-                    }
-
-                    List<string> filteredTokens = new List<string>();
-                    foreach (string token in tokens)
-                    {
-                        if (token.Length != 0)
-                            filteredTokens.Add(token);
-                    }
-
-                    tokens = filteredTokens;
-                }
+                List<string> tokens = TokenizeLine(line);
 
                 if (tokens.Count == 0)
                     continue;
@@ -628,6 +744,125 @@ namespace APEWindowCommandReflector
             }
 
             return wcDefs;
+        }
+
+        private static List<ExternCommandDef> ParseExternCommandDefs(string[] defLines)
+        {
+            List<ExternCommandDef> defs = new List<ExternCommandDef>();
+
+            foreach (string line in defLines)
+            {
+                List<string> tokens = TokenizeLine(line);
+
+                if (tokens.Count == 0)
+                    continue;
+
+                List<FieldDef> fieldDefs = new List<FieldDef>();
+
+                int parmIndex = 0;
+                string opName = tokens[parmIndex++];
+                bool isSpecial = false;
+                bool isParsingOptional = false;
+                bool isParsingNamed = false;
+
+                uint numRequiredParameters = 0;
+                uint numUnnamedParameters = 0;
+
+                while (parmIndex < tokens.Count)
+                {
+                    string typeStr = tokens[parmIndex++];
+
+                    if (typeStr == "optional")
+                    {
+                        isParsingOptional = true;
+                        continue;
+                    }
+
+                    if (typeStr == "special")
+                    {
+                        isSpecial = true;
+                        continue;
+                    }
+
+                    if (typeStr == "named")
+                    {
+                        isParsingNamed = true;
+                        continue;
+                    }
+
+                    if (tokens[parmIndex++] != "(")
+                        throw new Exception("Expected (");
+
+                    FieldDef.FieldType fieldType;
+                    if (typeStr == "float")
+                        fieldType = FieldDef.FieldType.Float;
+                    else if (typeStr == "floatexpr")
+                        fieldType = FieldDef.FieldType.FloatExpr;
+                    else if (typeStr == "expr")
+                        fieldType = FieldDef.FieldType.Expr;
+                    else if (typeStr == "floatvar")
+                        fieldType = FieldDef.FieldType.FloatVar;
+                    else if (typeStr == "int")
+                        fieldType = FieldDef.FieldType.Int32;
+                    else if (typeStr == "uint")
+                        fieldType = FieldDef.FieldType.UInt32;
+                    else if (typeStr == "str")
+                        fieldType = FieldDef.FieldType.Str;
+                    else if (typeStr == "strvar")
+                        fieldType = FieldDef.FieldType.StrVar;
+                    else if (typeStr == "bool")
+                        fieldType = FieldDef.FieldType.Bool;
+                    else if (typeStr == "label")
+                        fieldType = FieldDef.FieldType.Label;
+                    else if (typeStr == "scriptresource")
+                        fieldType = FieldDef.FieldType.ScriptResource;
+                    else if (typeStr == "imageresource")
+                        fieldType = FieldDef.FieldType.ImageResource;
+                    else if (typeStr == "soundresource")
+                        fieldType = FieldDef.FieldType.SoundResource;
+                    else if (typeStr == "fontresource")
+                        fieldType = FieldDef.FieldType.FontResource;
+                    else if (typeStr == "musicsegresource")
+                        fieldType = FieldDef.FieldType.MusicSegResource;
+                    else if (typeStr == "particleresource")
+                        fieldType = FieldDef.FieldType.ParticleResource;
+                    else if (typeStr == "musicresource")
+                        fieldType = FieldDef.FieldType.MusicResource;
+                    else if (typeStr == "sceneresource")
+                        fieldType = FieldDef.FieldType.SceneResource;
+                    else if (typeStr == "modelresource")
+                        fieldType = FieldDef.FieldType.ModelResource;
+                    else
+                        throw new Exception("Unknown extern field type " + typeStr);
+
+                    string fieldName = tokens[parmIndex++];
+
+                    if (tokens[parmIndex++] != ")")
+                        throw new Exception("Expected (");
+
+                    if (!isParsingNamed)
+                        numUnnamedParameters++;
+
+                    if (!isParsingOptional)
+                        numRequiredParameters++;
+
+                    fieldDefs.Add(new FieldDef(fieldType, fieldName));
+                }
+
+                defs.Add(new ExternCommandDef(opName, (uint)defs.Count, fieldDefs, isSpecial, numUnnamedParameters, numRequiredParameters));
+            }
+
+            
+            return defs;
+        }
+
+        static void Main(string[] args)
+        {
+            if (args.Length != 3)
+                throw new Exception("Usage: APEWindowCommandReflector <window defs file> <extern defs file> <output directory>");
+
+            CompileWindowCommands(args[0], args[2]);
+            CompileExternCommands(args[1], args[2]);
         }
     }
 }

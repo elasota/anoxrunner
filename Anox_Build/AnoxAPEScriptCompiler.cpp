@@ -4,6 +4,7 @@
 #include "anox/Data/APEScript.h"
 #include "anox/AnoxModule.h"
 
+#include "rkit/Core/Algorithm.h"
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/MemoryStream.h"
 #include "rkit/Core/NoCopy.h"
@@ -16,6 +17,7 @@
 
 #include "AnoxMaterialCompiler.h"
 
+#include "APEExternMetadata.generated.inl"
 
 namespace anox::buildsystem
 {
@@ -188,6 +190,7 @@ namespace anox::buildsystem
 		static rkit::Result CompileWindow(APECompilerContext &ctx, CompiledWindowDef &compiledWindow, const WindowDef &wdef);
 		static rkit::Result CompileSwitch(APECompilerContext &ctx, CompiledSwitchDef &compiledSwitch, const SwitchDef &switchDef);
 		static rkit::Result CompileBasicBlock(APECompilerContext &ctx, rkit::Vector<data::ape::SwitchCommand> &cmdStream, const rkit::HashMap<uint64_t, const ape_parse::SwitchCommand *> &tree, uint64_t firstCC);
+		static rkit::Result CompileExtern(APECompilerContext &ctx, uint32_t &outOpcode, uint32_t &outArgList, const rkit::ByteStringView &str);
 		static bool IsTerminalCC(uint64_t cc);
 
 		static rkit::Result DumpAPEFile(rkit::IWriteStream &stream, const APEBlob &blob);
@@ -1109,6 +1112,7 @@ namespace anox::buildsystem
 	rkit::Result APEScriptCompilerImpl::CompileBasicBlock(APECompilerContext &ctx, rkit::Vector<data::ape::SwitchCommand> &cmdStream, const rkit::HashMap<uint64_t, const ape_parse::SwitchCommand *> &tree, uint64_t cc)
 	{
 		const uint8_t kIfOpcode = 1;
+		const uint8_t kExternOpcode = 10;
 		const uint8_t kWhileOpcode = 11;
 		const uint8_t kJumpOpcode = 22;
 		const uint8_t kRJumpOpcode = 23;
@@ -1167,6 +1171,17 @@ namespace anox::buildsystem
 
 				outCmd.m_strValue = static_cast<uint32_t>(trueBB.Count());
 			}
+			else if (cmd.m_opcode == kExternOpcode)
+			{
+				uint32_t externOpcode = 0;
+				uint32_t externArgList = 0;
+				if (!cmd.m_str.IsSet())
+					RKIT_THROW(rkit::ResultCode::kDataError);
+
+				RKIT_CHECK(CompileExtern(ctx, externOpcode, externArgList, cmd.m_str.Get()));
+				outCmd.m_fmtValue = externOpcode;
+				outCmd.m_strValue = externArgList;
+			}
 			else
 			{
 				uint32_t index = 0;
@@ -1189,6 +1204,261 @@ namespace anox::buildsystem
 
 			cc = (cc << 2) | 3u;
 		}
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result APEScriptCompilerImpl::CompileExtern(APECompilerContext &ctx, uint32_t &outOpcode, uint32_t &outArgList, const rkit::ByteStringView &str)
+	{
+		size_t offset = 0;
+		auto skipWhitespace = [&offset, &str]()
+			{
+				while (offset < str.Length() && rkit::IsASCIIWhitespace(static_cast<char>(str[offset])))
+					offset++;
+			};
+
+		auto parseToken = [&skipWhitespace, &offset, &str](rkit::ByteStringSliceView& outArg, bool stopAtNameToken) -> rkit::Result
+		{
+			skipWhitespace();
+
+			if (offset == str.Length())
+			{
+				outArg = rkit::ByteStringSliceView();
+				RKIT_RETURN_OK;
+			}
+
+			size_t startPos = offset;
+			uint8_t firstChar = str[offset++];
+
+			if (stopAtNameToken && firstChar == '=')
+			{
+				outArg = str.SubString(startPos, offset - startPos);
+				RKIT_RETURN_OK;
+			}
+
+			if (firstChar == '\"')
+			{
+				for (;;)
+				{
+					if (offset == str.Length())
+					{
+						rkit::log::Error(u8"Unterminated string arg");
+						RKIT_THROW(rkit::ResultCode::kDataError);
+					}
+
+					if (str[offset++] == '\"')
+						break;
+				}
+			}
+			else
+			{
+				while (offset < str.Length())
+				{
+					char ch = static_cast<char>(str[offset]);
+					if (rkit::IsASCIIWhitespace(static_cast<char>(ch)) || (stopAtNameToken && ch == '='))
+						break;
+
+					offset++;
+				}
+			}
+
+			outArg = str.SubString(startPos, offset - startPos);
+			RKIT_RETURN_OK;
+		};
+
+		skipWhitespace();
+
+		rkit::ByteStringSliceView cmdName;
+		RKIT_CHECK(parseToken(cmdName, false));
+
+		const rkit::ConstSpan<ape_parse::ExternOpcodeMetadata> opcodeMetadatas(ape_parse::g_externOpcodeMetadata, rkit::ArraySize(ape_parse::g_externOpcodeMetadata));
+
+		const ape_parse::ExternOpcodeMetadata *selectedOp = nullptr;
+		for (const ape_parse::ExternOpcodeMetadata &op : opcodeMetadatas)
+		{
+			if (cmdName.EqualsNoCase(rkit::ByteStringSliceView(reinterpret_cast<const uint8_t *>(op.m_name), op.m_nameLength)))
+			{
+				selectedOp = &op;
+				break;
+			}
+		}
+
+		if (selectedOp == nullptr)
+		{
+			rkit::log::Error(u8"Unknown extern op");
+			RKIT_THROW(rkit::ResultCode::kDataError);
+		}
+
+		rkit::Vector<data::ape::ExpressionValue> argValues;
+		RKIT_CHECK(argValues.Resize(selectedOp->m_argCount));
+
+		for (data::ape::ExpressionValue &argValue : argValues)
+		{
+			argValue.m_exprType = data::ape::ExprType::Empty;
+			argValue.m_index = 0;
+		}
+
+		auto parseArg = [&ctx](data::ape::ExpressionValue &outValue, const ape_parse::ExternOpcodeMetadata& opMetadata, const ape_parse::ExternOpcodeArgMetadata& argMetadata, rkit::ByteStringSliceView arg) -> rkit::Result
+			{
+				bool couldBeVariable = false;
+				{
+					uint8_t firstCh = arg[0];
+					couldBeVariable = (firstCh == '@') || (firstCh == '_') || (firstCh >= 'a' && firstCh < 'z') || (firstCh >= 'A' && firstCh <= 'Z');
+				}
+
+				bool indexIsStr = false;
+				bool isVariable = false;
+
+				switch (argMetadata.m_fieldType)
+				{
+				case ape_parse::ExternFieldType::FloatExpr:
+					if (couldBeVariable)
+					{
+						indexIsStr = true;
+						isVariable = true;
+						outValue.m_exprType = data::ape::ExprType::FloatExpression;
+						break;
+					}
+
+					[[fallthrough]];
+				case ape_parse::ExternFieldType::Float:
+					{
+						float f = 0.f;
+						if (!rkit::GetDrivers().m_utilitiesDriver->ParseFloat(arg, f))
+						{
+							rkit::log::ErrorFmt(u8"Invalid float parameter value for argument {} of op {}", rkit::AsciiStringView(argMetadata.m_name, argMetadata.m_nameLength),
+								rkit::AsciiStringView(opMetadata.m_name, opMetadata.m_nameLength));
+							RKIT_THROW(rkit::ResultCode::kDataError);
+						}
+
+						uint32_t bits = 0;
+						memcpy(&bits, &f, 4);
+
+						outValue.m_exprType = data::ape::ExprType::FloatLiteral;
+						outValue.m_index = rkit::endian::LittleUInt32_t::FromBits(bits);
+					}
+					break;
+				case ape_parse::ExternFieldType::SoundResource:
+				case ape_parse::ExternFieldType::SceneResource:
+				case ape_parse::ExternFieldType::Str:
+					{
+						if (arg.Length() >= 2 && arg[0] == '\"' && arg[arg.Length() - 1] == '\"')
+							arg = arg.SubString(1, arg.Length() - 2);
+						else if (arg.Length() >= 1 && arg[arg.Length() - 1] == '$')
+							isVariable = true;
+
+						indexIsStr = true;
+						outValue.m_exprType = isVariable ? data::ape::ExprType::StringVariable : data::ape::ExprType::StringLiteral;
+					}
+					break;
+				case ape_parse::ExternFieldType::UInt32:
+					{
+						uint32_t uintLiteral = 0;
+						if (!rkit::GetDrivers().m_utilitiesDriver->ParseUInt32(arg, 10, uintLiteral))
+						{
+							rkit::log::ErrorFmt(u8"Invalid uint parameter value for argument {} of op {}", rkit::AsciiStringView(argMetadata.m_name, argMetadata.m_nameLength),
+								rkit::AsciiStringView(opMetadata.m_name, opMetadata.m_nameLength));
+							RKIT_THROW(rkit::ResultCode::kDataError);
+						}
+
+						outValue.m_exprType = data::ape::ExprType::UIntLiteral;
+						outValue.m_index = uintLiteral;
+					}
+					break;
+				case ape_parse::ExternFieldType::FloatVar:
+					{
+						if (!couldBeVariable)
+						{
+							rkit::log::ErrorFmt(u8"Argument {} of op {} was not a variable", rkit::AsciiStringView(argMetadata.m_name, argMetadata.m_nameLength),
+								rkit::AsciiStringView(opMetadata.m_name, opMetadata.m_nameLength));
+							RKIT_THROW(rkit::ResultCode::kDataError);
+						}
+
+						isVariable = true;
+						indexIsStr = true;
+						outValue.m_exprType = data::ape::ExprType::FloatVariable;
+					}
+					break;
+				case ape_parse::ExternFieldType::StrVar:
+					{
+						if (!couldBeVariable || arg[arg.Length() - 1] != '$')
+						{
+							rkit::log::ErrorFmt(u8"Argument {} of op {} was not a variable", rkit::AsciiStringView(argMetadata.m_name, argMetadata.m_nameLength),
+								rkit::AsciiStringView(opMetadata.m_name, opMetadata.m_nameLength));
+							RKIT_THROW(rkit::ResultCode::kDataError);
+						}
+
+						isVariable = true;
+						indexIsStr = true;
+						outValue.m_exprType = data::ape::ExprType::StringVariable;
+					}
+					break;
+				default:
+					RKIT_THROW(rkit::ResultCode::kInternalError);
+				}
+
+				if (indexIsStr)
+				{
+					uint32_t strIndex = 0;
+					rkit::ByteString bstr;
+					RKIT_CHECK(bstr.Set(arg));
+
+					if (isVariable)
+					{
+						RKIT_CHECK(bstr.MakeLower());
+					}
+
+					RKIT_CHECK(ctx.IndexString(strIndex, bstr));
+					outValue.m_index = strIndex;
+				}
+
+				RKIT_RETURN_OK;
+			};
+
+		bool isMalformed = false;
+		for (size_t argIndex = 0; argIndex < selectedOp->m_numRequiredParameters; argIndex++)
+		{
+			rkit::ByteStringSliceView argToken;
+			RKIT_CHECK(parseToken(argToken, false));
+
+			if (argToken.Length() == 0)
+			{
+				rkit::log::ErrorFmt(u8"Missing required argument for {}", rkit::AsciiStringView(selectedOp->m_name, selectedOp->m_nameLength));
+				RKIT_THROW(rkit::ResultCode::kDataError);
+			}
+
+			RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken));
+		}
+
+		for (size_t argIndex = selectedOp->m_numRequiredParameters; argIndex < selectedOp->m_numUnnamedParameters; argIndex++)
+		{
+			rkit::ByteStringSliceView argToken;
+			RKIT_CHECK(parseToken(argToken, false));
+
+			if (argToken.Length() == 0)
+				break;
+
+			RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken));
+		}
+
+		if (selectedOp->m_numUnnamedParameters < selectedOp->m_argCount)
+		{
+			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+		}
+
+		{
+			rkit::ByteStringSliceView argToken;
+			RKIT_CHECK(parseToken(argToken, false));
+
+			if (argToken.Length() > 0)
+			{
+				rkit::log::ErrorFmt(u8"Too many arguments for extern {}", rkit::AsciiStringView(selectedOp->m_name, selectedOp->m_nameLength));
+				RKIT_THROW(rkit::ResultCode::kDataError);
+			}
+		}
+
+		RKIT_CHECK(ctx.IndexOperandList(outArgList, std::move(argValues)));
+		outOpcode = selectedOp->m_opcode;
 
 		RKIT_RETURN_OK;
 	}

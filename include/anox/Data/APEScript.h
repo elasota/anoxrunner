@@ -59,6 +59,8 @@ namespace anox::data::ape
 		StringLiteral,
 		FloatVariable,
 		StringVariable,
+		UIntLiteral,
+		IntLiteral,
 
 		Count,
 	};
@@ -90,8 +92,8 @@ namespace anox::data::ape
 	struct SwitchCommand
 	{
 		uint8_t m_opcode = 0;
-		rkit::endian::LittleUInt32_t m_fmtValue;
-		rkit::endian::LittleUInt32_t m_strValue;	// Also instr jump count for if/jump instrs
+		rkit::endian::LittleUInt32_t m_fmtValue;	// extern opcode for extern
+		rkit::endian::LittleUInt32_t m_strValue;	// instr jump count for if/jump instrs, arg list for extern
 		data::ape::ExpressionValue m_exprValue;
 	};
 

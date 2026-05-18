@@ -6,7 +6,8 @@
 #include <stdint.h>
 #include <type_traits>
 
-namespace rkit { namespace priv {
+namespace rkit::priv
+{
 	template<class TType, bool TIsFloatingPoint>
 	struct StrongComparerHelper
 	{
@@ -23,7 +24,7 @@ namespace rkit { namespace priv {
 	{
 		static Ordering Compare(const TType &a, const TType &b);
 	};
-} }
+}
 
 namespace rkit
 {
@@ -427,6 +428,12 @@ namespace rkit
 
 	template<class TDest, class TSrc, class TProcessor>
 	Result CheckedProcessParallelSpans(const Span<TDest> &dest, const Span<TSrc> &src, const TProcessor &processor);
+
+	template<class T, size_t TSize>
+	constexpr size_t ArraySize(const T(&array)[TSize])
+	{
+		return TSize;
+	}
 }
 
 #include "Result.h"
