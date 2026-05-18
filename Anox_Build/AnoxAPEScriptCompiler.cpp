@@ -1415,45 +1415,51 @@ namespace anox::buildsystem
 				RKIT_RETURN_OK;
 			};
 
-		bool isMalformed = false;
-		for (size_t argIndex = 0; argIndex < selectedOp->m_numRequiredParameters; argIndex++)
-		{
-			rkit::ByteStringSliceView argToken;
-			RKIT_CHECK(parseToken(argToken, false));
-
-			if (argToken.Length() == 0)
-			{
-				rkit::log::ErrorFmt(u8"Missing required argument for {}", rkit::AsciiStringView(selectedOp->m_name, selectedOp->m_nameLength));
-				RKIT_THROW(rkit::ResultCode::kDataError);
-			}
-
-			RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken));
-		}
-
-		for (size_t argIndex = selectedOp->m_numRequiredParameters; argIndex < selectedOp->m_numUnnamedParameters; argIndex++)
-		{
-			rkit::ByteStringSliceView argToken;
-			RKIT_CHECK(parseToken(argToken, false));
-
-			if (argToken.Length() == 0)
-				break;
-
-			RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken));
-		}
-
-		if (selectedOp->m_numUnnamedParameters < selectedOp->m_argCount)
+		if (selectedOp->m_isSpecial)
 		{
 			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 		}
-
+		else
 		{
-			rkit::ByteStringSliceView argToken;
-			RKIT_CHECK(parseToken(argToken, false));
-
-			if (argToken.Length() > 0)
+			for (size_t argIndex = 0; argIndex < selectedOp->m_numRequiredParameters; argIndex++)
 			{
-				rkit::log::ErrorFmt(u8"Too many arguments for extern {}", rkit::AsciiStringView(selectedOp->m_name, selectedOp->m_nameLength));
-				RKIT_THROW(rkit::ResultCode::kDataError);
+				rkit::ByteStringSliceView argToken;
+				RKIT_CHECK(parseToken(argToken, false));
+
+				if (argToken.Length() == 0)
+				{
+					rkit::log::ErrorFmt(u8"Missing required argument for {}", rkit::AsciiStringView(selectedOp->m_name, selectedOp->m_nameLength));
+					RKIT_THROW(rkit::ResultCode::kDataError);
+				}
+
+				RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken));
+			}
+
+			for (size_t argIndex = selectedOp->m_numRequiredParameters; argIndex < selectedOp->m_numUnnamedParameters; argIndex++)
+			{
+				rkit::ByteStringSliceView argToken;
+				RKIT_CHECK(parseToken(argToken, false));
+
+				if (argToken.Length() == 0)
+					break;
+
+				RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken));
+			}
+
+			if (selectedOp->m_numUnnamedParameters < selectedOp->m_argCount)
+			{
+				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+			}
+
+			{
+				rkit::ByteStringSliceView argToken;
+				RKIT_CHECK(parseToken(argToken, false));
+
+				if (argToken.Length() > 0)
+				{
+					rkit::log::ErrorFmt(u8"Too many arguments for extern {}", rkit::AsciiStringView(selectedOp->m_name, selectedOp->m_nameLength));
+					RKIT_THROW(rkit::ResultCode::kDataError);
+				}
 			}
 		}
 
