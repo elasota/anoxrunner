@@ -4,11 +4,11 @@
 #include "rkit/Core/Hasher.h"
 
 #include <stdint.h>
-
+#include <compare>
 
 namespace anox
 {
-	class Label final : public rkit::DefaultOperatorsMixin<Label>
+	class Label final
 	{
 	public:
 		typedef uint32_t LabelValue_t;
@@ -25,7 +25,7 @@ namespace anox
 		static bool IsValid(uint32_t high, uint32_t low);
 
 		bool operator==(const Label &other) const;
-		bool operator!=(const Label &other) const;
+		std::strong_ordering operator<=>(const Label &other) const;
 
 	private:
 		explicit Label(uint32_t value);
@@ -82,9 +82,9 @@ namespace anox
 		return m_value == other.m_value;
 	}
 
-	inline bool Label::operator!=(const Label &other) const
+	inline std::strong_ordering Label::operator<=>(const Label &other) const
 	{
-		return m_value != other.m_value;
+		return m_value <=> other.m_value;
 	}
 }
 

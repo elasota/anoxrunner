@@ -147,20 +147,19 @@ namespace anox
 
 			const IConfigurationValueView candidateView = priv::ConfigBuilderValueFuncs::CreateViewOfValue(testPair.m_key);
 
-			const rkit::Ordering ordering = ConfigurationValueViewComparer::Compare(keyView, candidateView);
+			const std::strong_ordering ordering = ConfigurationValueViewComparer::Compare(keyView, candidateView);
 
-			switch (ordering)
+			if (ordering == std::strong_ordering::equal)
 			{
-			case rkit::Ordering::kEqual:
 				m_keyValueTable.Modify()[testPos].m_value = std::move(valueAsCBV);
 				RKIT_RETURN_OK;
-			case rkit::Ordering::kLess:
+			}
+			else if (ordering == std::strong_ordering::less)
 				insertPosMaxExclusive = testPos;
-				break;
-			case rkit::Ordering::kGreater:
+			else if (ordering == std::strong_ordering::greater)
 				insertPosMinInclusive = testPos + 1u;
-				break;
-			default:
+			else
+			{
 				RKIT_THROW(rkit::ResultCode::kInternalError);
 			}
 		}

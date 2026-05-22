@@ -25,12 +25,6 @@ namespace anox
 }
 
 namespace anox { namespace priv {
-	struct ConfigBuilderKeyValueTablePreds
-	{
-		template<class TPred>
-		static bool CompareWithPred(const ConfigBuilderKeyValueTable &a, const ConfigBuilderKeyValueTable &b, const TPred &pred);
-	};
-
 	template<class TSrc, class TDest>
 	struct ConfigReadWriteConverter
 	{
@@ -50,7 +44,7 @@ namespace anox
 		ConfigBuilderKeyValueTable
 	> ConfigBuilderValue_t;
 
-	class ConfigBuilderKeyValueTable final : public rkit::CompareWithOrderingOperatorsMixin<ConfigBuilderKeyValueTable, priv::ConfigBuilderKeyValueTablePreds>
+	class ConfigBuilderKeyValueTable final
 	{
 	public:
 		ConfigBuilderKeyValueTable() = default;
@@ -61,13 +55,14 @@ namespace anox
 		rkit::Vector<ConfigBuilderKeyValuePair> &Modify();
 		rkit::ConstSpan<ConfigBuilderKeyValuePair> GetValues() const;
 
-		rkit::Ordering Compare(const ConfigBuilderKeyValueTable &other);
+		std::strong_ordering CompareOrdered(const ConfigBuilderKeyValueTable &other) const;
+		std::strong_ordering operator<=>(const ConfigBuilderKeyValueTable &other) const;
 
 	private:
 		rkit::Vector<ConfigBuilderKeyValuePair> m_values;
 	};
 
-	class ConfigBuilderValueList final : public rkit::CompareWithOrderingOperatorsMixin<ConfigBuilderValueList, priv::ConfigBuilderKeyValueTablePreds>
+	class ConfigBuilderValueList final
 	{
 	public:
 		ConfigBuilderValueList() = default;
@@ -85,7 +80,8 @@ namespace anox
 		rkit::Vector<ConfigBuilderValue_t> &Modify();
 		rkit::ConstSpan<ConfigBuilderValue_t> GetValues() const;
 
-		rkit::Ordering Compare(const ConfigBuilderValueList &other);
+		std::strong_ordering CompareOrdered(const ConfigBuilderValueList &other) const;
+		std::strong_ordering operator<=>(const ConfigBuilderValueList &other) const;
 
 	private:
 		rkit::Vector<ConfigBuilderValue_t> m_values;

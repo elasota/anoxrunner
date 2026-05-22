@@ -70,7 +70,7 @@ namespace rkit
 
 		BasePathIterator() = delete;
 
-		BasePathIterator(const BasePath<TIsAbsolute, TPathTraits> &path, size_t pos);
+		BasePathIterator(const BasePathView<TIsAbsolute, TPathTraits> &path, size_t pos);
 
 		BasePathIterator<TIsAbsolute, TPathTraits> &operator++();
 		BasePathIterator<TIsAbsolute, TPathTraits> operator++(int);
@@ -81,12 +81,11 @@ namespace rkit
 		BaseStringSliceView<typename TPathTraits::Char_t, TPathTraits::kEncoding> operator*() const;
 
 		bool operator==(const BasePathIterator<TIsAbsolute, TPathTraits> &other) const;
-		bool operator!=(const BasePathIterator<TIsAbsolute, TPathTraits> &other) const;
 
 	private:
 		void UpdateEndPos();
 
-		const BasePath<TIsAbsolute, TPathTraits> &m_path;
+		const BasePathView<TIsAbsolute, TPathTraits> m_path;
 
 		size_t m_strPos;
 		size_t m_endPos;
@@ -122,13 +121,7 @@ namespace rkit
 		BaseStringSliceView<Char_t, TPathTraits::kEncoding> ToStringSliceView() const;
 
 		bool operator==(const BasePathSliceView<TIsAbsolute, TPathTraits> &path) const;
-		bool operator!=(const BasePathSliceView<TIsAbsolute, TPathTraits> &path) const;
-
-		bool operator<(const BasePathSliceView<TIsAbsolute, TPathTraits> &path) const;
-		bool operator>(const BasePathSliceView<TIsAbsolute, TPathTraits> &path) const;
-
-		bool operator<=(const BasePathSliceView<TIsAbsolute, TPathTraits> &path) const;
-		bool operator>=(const BasePathSliceView<TIsAbsolute, TPathTraits> &path) const;
+		std::strong_ordering operator<=>(const BasePathSliceView<TIsAbsolute, TPathTraits> &path) const;
 
 	private:
 		BaseStringSliceView<Char_t, kEncoding> m_view;
@@ -153,6 +146,15 @@ namespace rkit
 		LastComponentView_t LastComponent() const;
 
 		BaseStringView<Char_t, TPathTraits::kEncoding> ToStringView() const;
+
+		BasePathIterator<TIsAbsolute, TPathTraits> begin() const;
+		BasePathIterator<TIsAbsolute, TPathTraits> end() const;
+
+		std::strong_ordering CompareOrdered(const BasePathView &other) const;
+		bool CompareEqual(const BasePathView &other) const;
+
+		bool operator==(const BasePathView &other) const;
+		std::strong_ordering operator<=>(const BasePathView &other) const;
 	};
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -176,8 +178,14 @@ namespace rkit
 		BasePath<TIsAbsolute, TPathTraits> &operator=(const BasePath<TIsAbsolute, TPathTraits> &other);
 		BasePath<TIsAbsolute, TPathTraits> &operator=(BasePath<TIsAbsolute, TPathTraits> &&other) noexcept;
 
+		std::strong_ordering CompareOrdered(const View_t &other) const;
+		bool CompareEqual(const View_t &other) const;
+
 		bool operator==(const View_t &other) const;
-		bool operator!=(const View_t &other) const;
+		std::strong_ordering operator<=>(const View_t &other) const;
+
+		bool operator==(const BasePath &other) const;
+		std::strong_ordering operator<=>(const BasePath &other) const;
 
 		BasePathIterator<TIsAbsolute, TPathTraits> begin() const;
 		BasePathIterator<TIsAbsolute, TPathTraits> end() const;
@@ -213,12 +221,6 @@ namespace rkit
 
 		static PathValidationResult Validate(const BaseStringSliceView<Char_t, kEncoding> &str);
 
-		bool operator<(const BasePath<TIsAbsolute, TPathTraits> &other);
-		bool operator>(const BasePath<TIsAbsolute, TPathTraits> &other);
-		bool operator<=(const BasePath<TIsAbsolute, TPathTraits> &other);
-		bool operator>=(const BasePath<TIsAbsolute, TPathTraits> &other);
-		bool operator==(const BasePath<TIsAbsolute, TPathTraits> &other);
-		bool operator!=(const BasePath<TIsAbsolute, TPathTraits> &other);
 
 	private:
 		Result SetConvert(const BaseStringSliceView<Char_t, kEncoding> &str);
@@ -298,7 +300,7 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	BasePathIterator<TIsAbsolute, TPathTraits>::BasePathIterator(const BasePath<TIsAbsolute, TPathTraits> &path, size_t pos)
+	BasePathIterator<TIsAbsolute, TPathTraits>::BasePathIterator(const BasePathView<TIsAbsolute, TPathTraits> &path, size_t pos)
 		: m_path(path)
 		, m_strPos(pos)
 		, m_endPos(0)
@@ -309,9 +311,9 @@ namespace rkit
 	template<bool TIsAbsolute, class TPathTraits>
 	void BasePathIterator<TIsAbsolute, TPathTraits>::UpdateEndPos()
 	{
-		const BaseString<Char_t, TPathTraits::kEncoding> &str = m_path.ToString();
+		const BaseStringView<Char_t, TPathTraits::kEncoding> str = m_path.ToStringView();
 		const size_t length = str.Length();
-		const Char_t *chars = str.CStr();
+		const Char_t *chars = str.GetChars();
 
 		size_t strPos = m_strPos;
 
@@ -327,7 +329,7 @@ namespace rkit
 	template<bool TIsAbsolute, class TPathTraits>
 	BasePathIterator<TIsAbsolute, TPathTraits> &BasePathIterator<TIsAbsolute, TPathTraits>::operator++()
 	{
-		const BaseString<Char_t, TPathTraits::kEncoding> &str = m_path.ToString();
+		const BaseStringView<Char_t, TPathTraits::kEncoding> str = m_path.ToStringView();
 
 		RKIT_ASSERT(m_strPos < str.Length());
 
@@ -348,7 +350,7 @@ namespace rkit
 	template<bool TIsAbsolute, class TPathTraits>
 	BasePathIterator<TIsAbsolute, TPathTraits> &BasePathIterator<TIsAbsolute, TPathTraits>::operator--()
 	{
-		const BaseString<Char_t, TPathTraits::kEncoding> &str = m_path.ToString();
+		const BaseStringView<Char_t, TPathTraits::kEncoding> str = m_path.ToStringView();
 		const size_t length = str.Length();
 		const Char_t *chars = str.CStr();
 
@@ -378,21 +380,13 @@ namespace rkit
 	template<bool TIsAbsolute, class TPathTraits>
 	BaseStringSliceView<typename TPathTraits::Char_t, TPathTraits::kEncoding> BasePathIterator<TIsAbsolute, TPathTraits>::operator*() const
 	{
-		const BaseString<Char_t, TPathTraits::kEncoding> &str = m_path.ToString();
-
-		return str.SubString(m_strPos, m_endPos - m_strPos);
+		return m_path.ToStringView().SubString(m_strPos, m_endPos - m_strPos);
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
 	bool BasePathIterator<TIsAbsolute, TPathTraits>::operator==(const BasePathIterator<TIsAbsolute, TPathTraits> &other) const
 	{
-		return (&m_path == &other.m_path) && (m_strPos == other.m_strPos);
-	}
-
-	template<bool TIsAbsolute, class TPathTraits>
-	bool BasePathIterator<TIsAbsolute, TPathTraits>::operator!=(const BasePathIterator<TIsAbsolute, TPathTraits> &other) const
-	{
-		return !((*this) == other);
+		return m_strPos == other.m_strPos;
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -571,36 +565,6 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	bool BasePathSliceView<TIsAbsolute, TPathTraits>::operator!=(const BasePathSliceView<TIsAbsolute, TPathTraits> &other) const
-	{
-		return !((*this) == other);
-	}
-
-	template<bool TIsAbsolute, class TPathTraits>
-	bool BasePathSliceView<TIsAbsolute, TPathTraits>::operator<(const BasePathSliceView<TIsAbsolute, TPathTraits> &other) const
-	{
-		return m_view < other.m_view;
-	}
-
-	template<bool TIsAbsolute, class TPathTraits>
-	bool BasePathSliceView<TIsAbsolute, TPathTraits>::operator>(const BasePathSliceView<TIsAbsolute, TPathTraits> &other) const
-	{
-		return other < (*this);
-	}
-
-	template<bool TIsAbsolute, class TPathTraits>
-	bool BasePathSliceView<TIsAbsolute, TPathTraits>::operator<=(const BasePathSliceView<TIsAbsolute, TPathTraits> &other) const
-	{
-		return !(other < (*this));
-	}
-
-	template<bool TIsAbsolute, class TPathTraits>
-	bool BasePathSliceView<TIsAbsolute, TPathTraits>::operator>=(const BasePathSliceView<TIsAbsolute, TPathTraits> &other) const
-	{
-		return !((*this) < other);
-	}
-
-	template<bool TIsAbsolute, class TPathTraits>
 	BasePathView<TIsAbsolute, TPathTraits>::BasePathView()
 	{
 	}
@@ -631,6 +595,65 @@ namespace rkit
 	{
 		const BaseStringSliceView<Char_t, kEncoding> stringSlice = this->ToStringSliceView();
 		return BaseStringView<Char_t, kEncoding>(stringSlice.GetChars(), stringSlice.Length());
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	std::strong_ordering BasePathView<TIsAbsolute, TPathTraits>::CompareOrdered(const BasePathView &other) const
+	{
+		BasePathIterator<TIsAbsolute, TPathTraits> thisIt = this->begin();
+		BasePathIterator<TIsAbsolute, TPathTraits> thisEnd = this->end();
+		BasePathIterator<TIsAbsolute, TPathTraits> otherIt = other.begin();
+		BasePathIterator<TIsAbsolute, TPathTraits> otherEnd = other.end();
+
+		for (;;)
+		{
+			if (otherIt == otherEnd)
+				return std::strong_ordering::greater;
+
+			if (thisIt == thisEnd)
+				return std::strong_ordering::less;
+
+			const BaseStringSliceView<typename TPathTraits::Char_t, TPathTraits::kEncoding> thisSlice = *thisIt;
+			const BaseStringSliceView<typename TPathTraits::Char_t, TPathTraits::kEncoding> otherSlice = *otherIt;
+
+			const std::strong_ordering comparison = thisSlice.CompareOrdered(otherSlice);
+
+			if (comparison != std::strong_ordering::equal)
+				return comparison;
+
+			++thisIt;
+			++otherIt;
+		}
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	bool BasePathView<TIsAbsolute, TPathTraits>::CompareEqual(const BasePathView &other) const
+	{
+		return this->ToStringView().CompareEqual(other.ToStringView());
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	bool BasePathView<TIsAbsolute, TPathTraits>::operator==(const BasePathView &other) const
+	{
+		return this->CompareEqual(other);
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	std::strong_ordering BasePathView<TIsAbsolute, TPathTraits>::operator<=>(const BasePathView &other) const
+	{
+		return this->CompareOrdered(other);
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	BasePathIterator<TIsAbsolute, TPathTraits> BasePathView<TIsAbsolute, TPathTraits>::begin() const
+	{
+		return BasePathIterator<TIsAbsolute, TPathTraits>(*this, 0);
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	BasePathIterator<TIsAbsolute, TPathTraits> BasePathView<TIsAbsolute, TPathTraits>::end() const
+	{
+		return BasePathIterator<TIsAbsolute, TPathTraits>(*this, this->Length());
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -665,15 +688,39 @@ namespace rkit
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	bool BasePath<TIsAbsolute, TPathTraits>::operator==(const View_t &other) const
+	std::strong_ordering BasePath<TIsAbsolute, TPathTraits>::CompareOrdered(const View_t &other) const
 	{
-		return ToString() == other.ToStringView();
+		return static_cast<View_t>(*this).CompareOrdered(other);
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
-	bool BasePath<TIsAbsolute, TPathTraits>::operator!=(const View_t &other) const
+	bool BasePath<TIsAbsolute, TPathTraits>::CompareEqual(const View_t &other) const
 	{
-		return !((*this) == other);
+		return static_cast<View_t>(*this).CompareEqual(other);
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	bool BasePath<TIsAbsolute, TPathTraits>::operator==(const View_t &other) const
+	{
+		return static_cast<View_t>(*this).CompareEqual(other);
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	std::strong_ordering BasePath<TIsAbsolute, TPathTraits>::operator<=>(const View_t &other) const
+	{
+		return static_cast<View_t>(*this).CompareOrdered(other);
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	bool BasePath<TIsAbsolute, TPathTraits>::operator==(const BasePath &other) const
+	{
+		return this->ToString() == other.ToString();
+	}
+
+	template<bool TIsAbsolute, class TPathTraits>
+	std::strong_ordering BasePath<TIsAbsolute, TPathTraits>::operator<=>(const BasePath &other) const
+	{
+		return static_cast<View_t>(*this).CompareOrdered(other);
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>
@@ -1009,67 +1056,6 @@ namespace rkit
 			return PathValidationResult::kConvertible;
 
 		return PathValidationResult::kValid;
-	}
-
-	template<bool TIsAbsolute, class TPathTraits>
-	bool BasePath<TIsAbsolute, TPathTraits>::operator<(const BasePath<TIsAbsolute, TPathTraits> &other)
-	{
-		BasePathIterator<TIsAbsolute, TPathTraits> thisIt = this->begin();
-		BasePathIterator<TIsAbsolute, TPathTraits> thisEnd = this->end();
-		BasePathIterator<TIsAbsolute, TPathTraits> otherIt = other.begin();
-		BasePathIterator<TIsAbsolute, TPathTraits> otherEnd = other.end();
-
-		for (;;)
-		{
-			if (otherIt == otherEnd)
-				return false;
-
-			if (thisIt == thisEnd)
-				return true;
-
-			BaseStringSliceView<typename TPathTraits::Char_t, TPathTraits::kEncoding> thisSlice = *thisIt;
-			BaseStringSliceView<typename TPathTraits::Char_t, TPathTraits::kEncoding> otherSlice = *otherIt;
-
-			Ordering comparison = thisSlice.Compare(otherSlice);
-
-			if (comparison == Ordering::kLess)
-				return true;
-			else if (comparison == Ordering::kGreater)
-				return false;
-
-			++thisIt;
-			++otherIt;
-		}
-	}
-
-	template<bool TIsAbsolute, class TPathTraits>
-	bool BasePath<TIsAbsolute, TPathTraits>::operator>(const BasePath<TIsAbsolute, TPathTraits> &other)
-	{
-		return other < *this;
-	}
-
-	template<bool TIsAbsolute, class TPathTraits>
-	bool BasePath<TIsAbsolute, TPathTraits>::operator<=(const BasePath<TIsAbsolute, TPathTraits> &other)
-	{
-		return !(other < (*this));
-	}
-
-	template<bool TIsAbsolute, class TPathTraits>
-	bool BasePath<TIsAbsolute, TPathTraits>::operator>=(const BasePath<TIsAbsolute, TPathTraits> &other)
-	{
-		return !((*this) < other);
-	}
-
-	template<bool TIsAbsolute, class TPathTraits>
-	bool BasePath<TIsAbsolute, TPathTraits>::operator==(const BasePath<TIsAbsolute, TPathTraits> &other)
-	{
-		return m_path == other.m_path;
-	}
-
-	template<bool TIsAbsolute, class TPathTraits>
-	bool BasePath<TIsAbsolute, TPathTraits>::operator!=(const BasePath<TIsAbsolute, TPathTraits> &other)
-	{
-		return !((*this) == other);
 	}
 
 	template<bool TIsAbsolute, class TPathTraits>

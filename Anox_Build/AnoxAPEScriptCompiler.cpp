@@ -15,6 +15,7 @@
 
 #include "rkit/BuildSystem/BuildSystem.h"
 #include "rkit/Data/ContentID.h"
+#include "rkit/Core/Pair.h"
 
 #include "AnoxMaterialCompiler.h"
 
@@ -1218,8 +1219,22 @@ namespace anox::buildsystem
 					offset++;
 			};
 
-		auto parseToken = [&skipWhitespace, &offset, &str](rkit::ByteStringSliceView& outArg, bool stopAtNameToken) -> rkit::Result
+		auto parseToken = [&skipWhitespace, &offset, &str](rkit::ByteStringSliceView& outArg, const char *extraDelimiters = "") -> rkit::Result
 		{
+			auto isInDelimiterList = [extraDelimiters](uint8_t ch)
+				{
+					const char *scan = extraDelimiters;
+					while (*scan)
+					{
+						if (ch == static_cast<uint8_t>(*scan))
+							return true;
+
+						scan++;
+					}
+
+					return false;
+				};
+
 			skipWhitespace();
 
 			if (offset == str.Length())
@@ -1231,7 +1246,7 @@ namespace anox::buildsystem
 			size_t startPos = offset;
 			uint8_t firstChar = str[offset++];
 
-			if (stopAtNameToken && firstChar == '=')
+			if (isInDelimiterList(firstChar == '='))
 			{
 				outArg = str.SubString(startPos, offset - startPos);
 				RKIT_RETURN_OK;
@@ -1256,7 +1271,7 @@ namespace anox::buildsystem
 				while (offset < str.Length())
 				{
 					char ch = static_cast<char>(str[offset]);
-					if (rkit::IsASCIIWhitespace(static_cast<char>(ch)) || (stopAtNameToken && ch == '='))
+					if (rkit::IsASCIIWhitespace(static_cast<char>(ch)) || isInDelimiterList(ch))
 						break;
 
 					offset++;
@@ -1270,14 +1285,16 @@ namespace anox::buildsystem
 		skipWhitespace();
 
 		rkit::ByteStringSliceView cmdName;
-		RKIT_CHECK(parseToken(cmdName, false));
+		RKIT_CHECK(parseToken(cmdName));
 
 		const rkit::ConstSpan<ape_parse::ExternOpcodeMetadata> opcodeMetadatas(ape_parse::g_externOpcodeMetadata, rkit::ArraySize(ape_parse::g_externOpcodeMetadata));
 
+		rkit::ByteStringView opName;
 		const ape_parse::ExternOpcodeMetadata *selectedOp = nullptr;
 		for (const ape_parse::ExternOpcodeMetadata &op : opcodeMetadatas)
 		{
-			if (cmdName.EqualsNoCase(rkit::ByteStringSliceView(reinterpret_cast<const uint8_t *>(op.m_name), op.m_nameLength)))
+			opName = rkit::ByteStringView(reinterpret_cast<const uint8_t *>(op.m_name), op.m_nameLength);
+			if (cmdName.EqualsNoCase(opName))
 			{
 				selectedOp = &op;
 				break;
@@ -1509,14 +1526,103 @@ namespace anox::buildsystem
 
 		if (selectedOp->m_isSpecial)
 		{
-			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+			const rkit::ConstSpan<ape_parse::ExternOpcodeArgMetadata> argMetadatas(selectedOp->m_argMetadata, selectedOp->m_argCount);
+
+			auto findArg = [argMetadatas](const rkit::AsciiStringView &name) -> size_t
+				{
+					size_t index = 0;
+					for (const ape_parse::ExternOpcodeArgMetadata &argMetadata : argMetadatas)
+					{
+						if (name.EqualsNoCase(rkit::AsciiStringView(argMetadata.m_name, argMetadata.m_nameLength)))
+							break;
+
+						index++;
+					}
+
+					RKIT_ASSERT(index != argMetadatas.Count());
+
+					return index;
+				};
+
+			rkit::Vector<rkit::Pair<rkit::AsciiStringView, data::ape::ExpressionValue>> namedParams;
+
+			if (opName.EqualsNoCase(rkit::AsciiStringView("cam_set").RemoveEncoding()))
+			{
+				rkit::ByteStringSliceView argToken;
+				RKIT_CHECK(parseToken(argToken, "("));
+
+				if (argToken.Length() == 0)
+				{
+					rkit::log::Error(u8"Missing property argument for cam_set");
+					RKIT_THROW(rkit::ResultCode::kDataError);
+				}
+
+				size_t argIndex = findArg("property");
+				RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken));
+
+				if (argToken.EqualsNoCase(rkit::AsciiStringView("from").RemoveEncoding()) || argToken.EqualsNoCase(rkit::AsciiStringView("to").RemoveEncoding()))
+				{
+					RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+				}
+				else
+				{
+					const bool isStringArg = argToken.EqualsNoCase(rkit::AsciiStringView("cam_owner").RemoveEncoding());
+
+					argIndex = findArg(isStringArg ? rkit::AsciiStringView("str") : rkit::AsciiStringView("v0"));
+
+					RKIT_CHECK(parseToken(argToken));
+
+					if (argToken.Length() == 0)
+					{
+						rkit::log::Error(u8"Missing value argument for cam_set");
+						RKIT_THROW(rkit::ResultCode::kDataError);
+					}
+
+					RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken));
+				}
+			}
+			else if (opName.EqualsNoCase(rkit::AsciiStringView("cam_to").RemoveEncoding())
+				|| opName.EqualsNoCase(rkit::AsciiStringView("cam_from").RemoveEncoding()))
+			{
+				const rkit::AsciiStringView xyzArgList[] = {"x", "y", "z" };
+				const rkit::AsciiStringView targetArgList[] = {"target"};
+
+				rkit::ByteStringSliceView argTokens[3];
+
+				for (size_t i = 0; i < 3; i++)
+				{
+					RKIT_CHECK(parseToken(argTokens[i]));
+				}
+
+				rkit::ConstSpan<rkit::AsciiStringView> propertyNames;
+				if (argTokens[0].Length() > 0 && argTokens[1].Length() == 0 && argTokens[2].Length() == 0)
+					propertyNames = rkit::ConstSpan<rkit::AsciiStringView>(targetArgList);
+				else if (argTokens[0].Length() > 0 && argTokens[1].Length() > 0 && argTokens[2].Length() > 0)
+					propertyNames = rkit::ConstSpan<rkit::AsciiStringView>(xyzArgList);
+				else
+				{
+					rkit::log::ErrorFmt(u8"Invalid argument count for {}", rkit::AsciiStringView(selectedOp->m_name, selectedOp->m_nameLength));
+					RKIT_THROW(rkit::ResultCode::kDataError);
+				}
+
+				for (size_t inArgIndex = 0; inArgIndex < propertyNames.Count(); inArgIndex++)
+				{
+					const size_t outArgIndex = findArg(propertyNames[inArgIndex]);
+					RKIT_CHECK(parseArg(argValues[outArgIndex], *selectedOp, selectedOp->m_argMetadata[inArgIndex], argTokens[inArgIndex]));
+				}
+			}
+			else
+			{
+				// Unknown special op
+				RKIT_THROW(rkit::ResultCode::kInternalError);
+			}
 		}
 		else
 		{
 			for (size_t argIndex = 0; argIndex < selectedOp->m_numRequiredParameters; argIndex++)
 			{
 				rkit::ByteStringSliceView argToken;
-				RKIT_CHECK(parseToken(argToken, false));
+				RKIT_CHECK(parseToken(argToken));
 
 				if (argToken.Length() == 0)
 				{
@@ -1530,7 +1636,7 @@ namespace anox::buildsystem
 			for (size_t argIndex = selectedOp->m_numRequiredParameters; argIndex < selectedOp->m_numUnnamedParameters; argIndex++)
 			{
 				rkit::ByteStringSliceView argToken;
-				RKIT_CHECK(parseToken(argToken, false));
+				RKIT_CHECK(parseToken(argToken));
 
 				if (argToken.Length() == 0)
 					break;
@@ -1538,20 +1644,43 @@ namespace anox::buildsystem
 				RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken));
 			}
 
+			for (;;)
+			{
+				rkit::ByteStringSliceView nameToken;
+				RKIT_CHECK(parseToken(nameToken, "="));
+
+				if (nameToken.Length() == 0)
+					break;
+
+				rkit::ByteStringSliceView eqToken;
+				RKIT_CHECK(parseToken(eqToken, "="));
+
+
+				rkit::ByteStringSliceView valueToken;
+				RKIT_CHECK(parseToken(valueToken));
+
+				if (eqToken != rkit::AsciiStringView("=").RemoveEncoding() || valueToken.Length() == 0)
+				{
+					rkit::log::ErrorFmt(u8"Missing required argument for {}", rkit::AsciiStringView(selectedOp->m_name, selectedOp->m_nameLength));
+					RKIT_THROW(rkit::ResultCode::kDataError);
+				}
+
+			}
 			if (selectedOp->m_numUnnamedParameters < selectedOp->m_argCount)
 			{
 				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 			}
+		}
 
+		// Check for extra args
+		{
+			rkit::ByteStringSliceView argToken;
+			RKIT_CHECK(parseToken(argToken));
+
+			if (argToken.Length() > 0)
 			{
-				rkit::ByteStringSliceView argToken;
-				RKIT_CHECK(parseToken(argToken, false));
-
-				if (argToken.Length() > 0)
-				{
-					rkit::log::ErrorFmt(u8"Too many arguments for extern {}", rkit::AsciiStringView(selectedOp->m_name, selectedOp->m_nameLength));
-					RKIT_THROW(rkit::ResultCode::kDataError);
-				}
+				rkit::log::ErrorFmt(u8"Too many arguments for extern {}", rkit::AsciiStringView(selectedOp->m_name, selectedOp->m_nameLength));
+				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 		}
 

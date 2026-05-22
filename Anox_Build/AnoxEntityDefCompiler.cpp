@@ -89,18 +89,18 @@ namespace anox { namespace buildsystem {
 		{
 			const size_t testIndex = (minInclusive + maxExclusive) / 2;
 
-			rkit::Ordering ordering = m_defs[testIndex].m_className.ToByteView().Compare(name);
-			if (ordering == rkit::Ordering::kEqual)
+			std::strong_ordering ordering = m_defs[testIndex].m_className.ToByteView().CompareOrdered(name);
+			if (ordering == std::strong_ordering::equal)
 			{
 				outEDefID = static_cast<uint32_t>(testIndex);
 				return true;
 			}
 
-			if (ordering == rkit::Ordering::kGreater)
+			if (ordering == std::strong_ordering::greater)
 				maxExclusive = testIndex;
 			else
 			{
-				RKIT_ASSERT(ordering == rkit::Ordering::kLess);
+				RKIT_ASSERT(ordering == std::strong_ordering::less);
 				minInclusive = testIndex + 1;
 			}
 		}

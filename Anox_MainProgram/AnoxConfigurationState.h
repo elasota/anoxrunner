@@ -49,12 +49,12 @@ namespace anox
 
 	struct ConfigurationValueViewComparer
 	{
-		static rkit::Ordering Compare(const IConfigurationValueView &a, const IConfigurationValueView &b);
-		static rkit::Ordering CompareArrays(const rkit::ISpan<IConfigurationValueView> &a, const rkit::ISpan<IConfigurationValueView> &b);
-		static rkit::Ordering CompareKeyValuePairs(const rkit::ISpan<IConfigurationKeyValuePair> &a, const rkit::ISpan<IConfigurationKeyValuePair> &b);
+		static std::strong_ordering Compare(const IConfigurationValueView &a, const IConfigurationValueView &b);
+		static std::strong_ordering CompareArrays(const rkit::ISpan<IConfigurationValueView> &a, const rkit::ISpan<IConfigurationValueView> &b);
+		static std::strong_ordering CompareKeyValuePairs(const rkit::ISpan<IConfigurationKeyValuePair> &a, const rkit::ISpan<IConfigurationKeyValuePair> &b);
 	};
 
-	struct IConfigurationValueView final : public rkit::CompareWithOrderingOperatorsMixin<IConfigurationValueView, ConfigurationValueViewComparer>
+	struct IConfigurationValueView final
 	{
 		const void *m_userdataPtr;
 		uint64_t m_userdataUInt;
@@ -81,6 +81,9 @@ namespace anox
 
 		template<class T>
 		rkit::Result Get(T &outValue) const;
+
+		bool operator==(const IConfigurationValueView &other) const;
+		std::strong_ordering operator<=>(const IConfigurationValueView &other) const;
 
 	private:
 		template<class T>

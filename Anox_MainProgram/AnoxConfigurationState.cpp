@@ -5,79 +5,76 @@
 
 namespace anox
 {
-	rkit::Ordering ConfigurationValueViewComparer::Compare(const IConfigurationValueView &a, const IConfigurationValueView &b)
+	std::strong_ordering ConfigurationValueViewComparer::Compare(const IConfigurationValueView &a, const IConfigurationValueView &b)
 	{
 		ConfigurationValueType typeA = a.m_getType(a);
 		ConfigurationValueType typeB = b.m_getType(b);
 
-		const rkit::StrongComparePred pred;
+		std::strong_ordering typeOrder = (typeA <=> typeB);
 
-		if (typeA != typeB)
-			return pred(typeA, typeB);
+		if (typeOrder != std::strong_ordering::equal)
+			return typeOrder;
 
 		switch (typeA)
 		{
 		case ConfigurationValueType::kUInt64:
-			return pred(a.m_getValueFuncs.m_getUInt64(a), b.m_getValueFuncs.m_getUInt64(b));
+			return a.m_getValueFuncs.m_getUInt64(a) <=> b.m_getValueFuncs.m_getUInt64(b);
 		case ConfigurationValueType::kInt64:
-			return pred(a.m_getValueFuncs.m_getInt64(a), b.m_getValueFuncs.m_getInt64(b));
+			return a.m_getValueFuncs.m_getInt64(a) <=> b.m_getValueFuncs.m_getInt64(b);
 		case ConfigurationValueType::kFloat64:
-			return pred(a.m_getValueFuncs.m_getFloat64(a), b.m_getValueFuncs.m_getFloat64(b));
+			return rkit::BitCast<uint64_t>(a.m_getValueFuncs.m_getFloat64(a)) <=> rkit::BitCast<uint64_t>(b.m_getValueFuncs.m_getFloat64(b));
 		case ConfigurationValueType::kString:
-			return pred(a.m_getValueFuncs.m_getString(a), b.m_getValueFuncs.m_getString(b));
+			return a.m_getValueFuncs.m_getString(a) <=> b.m_getValueFuncs.m_getString(b);
 		case ConfigurationValueType::kArray:
 			return CompareArrays(a.m_getValueFuncs.m_getArray(a), b.m_getValueFuncs.m_getArray(b));
 		case ConfigurationValueType::kKeyValueTable:
 			return CompareKeyValuePairs(a.m_getValueFuncs.m_keyValueTableFuncs->m_getKeyValuePairs(a), b.m_getValueFuncs.m_keyValueTableFuncs->m_getKeyValuePairs(b));
 		default:
-			return rkit::Ordering::kUnordered;
+			RKIT_ASSERT(false);
+			return std::strong_ordering::equivalent;
 		}
 	}
 
-	rkit::Ordering ConfigurationValueViewComparer::CompareArrays(const rkit::ISpan<IConfigurationValueView> &a, const rkit::ISpan<IConfigurationValueView> &b)
+	std::strong_ordering ConfigurationValueViewComparer::CompareArrays(const rkit::ISpan<IConfigurationValueView> &a, const rkit::ISpan<IConfigurationValueView> &b)
 	{
 		const size_t countA = a.Count();
 		const size_t countB = b.Count();
 		const size_t lesserCount = rkit::Min(countA, countB);
-
-		const rkit::StrongComparePred pred;
 
 		for (size_t i = 0; i < lesserCount; i++)
 		{
-			const rkit::Ordering ordering = Compare(a[i], b[i]);
+			const std::strong_ordering ordering = Compare(a[i], b[i]);
 
-			if (ordering != rkit::Ordering::kEqual)
+			if (ordering != std::strong_ordering::equal)
 				return ordering;
 		}
 
-		return pred(countA, countB);
+		return countA <=> countB;
 	}
 
-	rkit::Ordering ConfigurationValueViewComparer::CompareKeyValuePairs(const rkit::ISpan<IConfigurationKeyValuePair> &a, const rkit::ISpan<IConfigurationKeyValuePair> &b)
+	std::strong_ordering ConfigurationValueViewComparer::CompareKeyValuePairs(const rkit::ISpan<IConfigurationKeyValuePair> &a, const rkit::ISpan<IConfigurationKeyValuePair> &b)
 	{
 		const size_t countA = a.Count();
 		const size_t countB = b.Count();
 		const size_t lesserCount = rkit::Min(countA, countB);
-
-		const rkit::StrongComparePred pred;
 
 		for (size_t i = 0; i < lesserCount; i++)
 		{
 			const IConfigurationKeyValuePair kvpA = a[i];
 			const IConfigurationKeyValuePair kvpB = b[i];
 
-			const rkit::Ordering keyOrdering = Compare(kvpA.m_key, kvpA.m_value);
+			const std::strong_ordering keyOrdering = Compare(kvpA.m_key, kvpA.m_value);
 
-			if (keyOrdering != rkit::Ordering::kEqual)
+			if (keyOrdering != std::strong_ordering::equal)
 				return keyOrdering;
 
-			const rkit::Ordering valueOrdering = Compare(kvpA.m_value, kvpA.m_value);
+			const std::strong_ordering valueOrdering = Compare(kvpA.m_value, kvpA.m_value);
 
-			if (valueOrdering != rkit::Ordering::kEqual)
+			if (valueOrdering != std::strong_ordering::equal)
 				return valueOrdering;
 		}
 
-		return pred(countA, countB);
+		return countA <=> countB;
 	}
 
 	rkit::Optional<IConfigurationValueView> IConfigurationKeyValueTableView::GetValueFromKey(const IConfigurationValueView &key)
@@ -178,6 +175,16 @@ namespace anox
 
 		outKeyValueTable = IConfigurationKeyValueTableView(*this);
 		return true;
+	}
+
+	bool IConfigurationValueView::operator==(const IConfigurationValueView &other) const
+	{
+		return ((*this) <=> other) == std::strong_ordering::equal;
+	}
+
+	std::strong_ordering IConfigurationValueView::operator<=>(const IConfigurationValueView &other) const
+	{
+		return ConfigurationValueViewComparer::Compare(*this, other);
 	}
 
 	template<class T>

@@ -83,7 +83,6 @@ namespace rkit
 
 	template<class TChar, CharacterEncoding TEncoding, size_t TStaticSize>
 	class BaseString
-		: public rkit::CompareWithOrderingOperatorsMixin<BaseString<TChar, TEncoding, TStaticSize>, BaseStringSliceViewComparer<TChar, TEncoding>>
 	{
 	public:
 		typedef BaseStringView<TChar, TEncoding> View_t;
@@ -134,8 +133,13 @@ namespace rkit
 		bool EndsWith(const Span<const TChar> &span) const;
 		bool EndsWith(TChar ch) const;
 		bool EndsWithNoCase(const SliceView_t &other) const;
-
 		bool EqualsNoCase(const SliceView_t &other) const;
+
+		bool operator==(const BaseString &other) const;
+		std::strong_ordering operator<=>(const BaseString &other) const;
+
+		bool operator==(const SliceView_t &other) const;
+		std::strong_ordering operator<=>(const SliceView_t &other) const;
 
 		operator View_t() const;
 		operator SliceView_t() const;
@@ -155,7 +159,8 @@ namespace rkit
 
 		Result VFormat(const BaseStringSliceView<TChar, TEncoding> &fmt, const FormatParameterList<TChar> &formatParams);
 
-		Ordering Compare(const BaseStringSliceView<TChar, TEncoding> &other) const;
+		std::strong_ordering CompareOrdered(const BaseStringSliceView<TChar, TEncoding> &other) const;
+		bool CompareEqual(const BaseStringSliceView<TChar, TEncoding> &other) const;
 
 		template<class TOtherChar>
 		void FormatValue(IFormatStringWriter<TOtherChar> &writer) const;
@@ -576,11 +581,16 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::VFormat(const Base
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
-rkit::Ordering rkit::BaseString<TChar, TEncoding, TStaticSize>::Compare(const BaseStringSliceView<TChar, TEncoding> &other) const
+std::strong_ordering rkit::BaseString<TChar, TEncoding, TStaticSize>::CompareOrdered(const BaseStringSliceView<TChar, TEncoding> &other) const
 {
-	return static_cast<BaseStringSliceView<TChar, TEncoding>>(*this).Compare(other);
+	return static_cast<BaseStringSliceView<TChar, TEncoding>>(*this).CompareOrdered(other);
 }
 
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+bool rkit::BaseString<TChar, TEncoding, TStaticSize>::CompareEqual(const BaseStringSliceView<TChar, TEncoding> &other) const
+{
+	return static_cast<BaseStringSliceView<TChar, TEncoding>>(*this).CompareEqual(other);
+}
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
 template<class TOtherChar>
@@ -900,6 +910,30 @@ bool rkit::BaseString<TChar, TEncoding, TStaticSize>::EqualsNoCase(const SliceVi
 {
 	SliceView_t slice = *this;
 	return slice.EqualsNoCase(other);
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+bool rkit::BaseString<TChar, TEncoding, TStaticSize>::operator==(const BaseString &other) const
+{
+	return this->CompareEqual(other);
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+std::strong_ordering rkit::BaseString<TChar, TEncoding, TStaticSize>::operator<=>(const BaseString &other) const
+{
+	return this->CompareOrdered(other);
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+bool rkit::BaseString<TChar, TEncoding, TStaticSize>::operator==(const SliceView_t &other) const
+{
+	return this->CompareEqual(other);
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>
+std::strong_ordering rkit::BaseString<TChar, TEncoding, TStaticSize>::operator<=>(const SliceView_t &other) const
+{
+	return this->CompareOrdered(other);
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding, size_t TStaticSize>

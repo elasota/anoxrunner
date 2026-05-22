@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Ordering.h"
+#include <compare>
 
 namespace rkit
 {
@@ -16,7 +16,7 @@ namespace rkit
 	class CharStrictComparer
 	{
 	public:
-		static Ordering Compare(TChar a, TChar b);
+		static std::strong_ordering CompareOrdered(TChar a, TChar b);
 		static bool CompareEqual(TChar a, TChar b);
 	};
 
@@ -24,7 +24,7 @@ namespace rkit
 	class CharCaseInsensitiveComparer
 	{
 	public:
-		static Ordering Compare(TChar a, TChar b);
+		static std::strong_ordering CompareOrdered(TChar a, TChar b);
 		static bool CompareEqual(TChar a, TChar b);
 	};
 }
@@ -49,15 +49,9 @@ TChar rkit::InvariantCharCaseAdjuster<TChar>::ToLower(TChar c)
 }
 
 template<class TChar>
-rkit::Ordering rkit::CharStrictComparer<TChar>::Compare(TChar a, TChar b)
+std::strong_ordering rkit::CharStrictComparer<TChar>::CompareOrdered(TChar a, TChar b)
 {
-	if (a < b)
-		return Ordering::kLess;
-		
-	if (a > b)
-		return Ordering::kGreater;
-
-	return Ordering::kEqual;
+	return a <=> b;
 }
 
 template<class TChar>
@@ -67,7 +61,7 @@ bool rkit::CharStrictComparer<TChar>::CompareEqual(TChar a, TChar b)
 }
 
 template<class TChar, class TCaseAdjuster>
-rkit::Ordering rkit::CharCaseInsensitiveComparer<TChar, TCaseAdjuster>::Compare(TChar a, TChar b)
+std::strong_ordering rkit::CharCaseInsensitiveComparer<TChar, TCaseAdjuster>::CompareOrdered(TChar a, TChar b)
 {
 	a = TCaseAdjuster::ToLower(a);
 	b = TCaseAdjuster::ToLower(b);

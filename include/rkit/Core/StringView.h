@@ -2,12 +2,12 @@
 
 #include "Algorithm.h"
 #include "CharacterEncoding.h"
-#include "Ordering.h"
 #include "Span.h"
 #include "StringProto.h"
 
 #include <cstddef>
 #include <type_traits>
+#include <compare>
 
 namespace rkit
 {
@@ -23,14 +23,15 @@ namespace rkit
 	template<class TChar, CharacterEncoding TEncoding>
 	struct BaseStringSliceViewComparer
 	{
-		static Ordering Compare(const BaseStringSliceView<TChar, TEncoding> &a, const BaseStringSliceView<TChar, TEncoding> &b);
+		static bool CompareEqual(const BaseStringSliceView<TChar, TEncoding> &a, const BaseStringSliceView<TChar, TEncoding> &b);
+		static std::strong_ordering CompareOrdered(const BaseStringSliceView<TChar, TEncoding> &a, const BaseStringSliceView<TChar, TEncoding> &b);
 	};
 
 	template<class T>
 	struct IFormatStringWriter;
 
 	template<class TChar, CharacterEncoding TEncoding>
-	class BaseStringSliceView : public CompareWithOrderingOperatorsMixin<BaseStringSliceView<TChar, TEncoding>, BaseStringSliceViewComparer<TChar, TEncoding>>
+	class BaseStringSliceView
 	{
 	public:
 		BaseStringSliceView();
@@ -72,7 +73,11 @@ namespace rkit
 		bool Equals(const BaseStringSliceView<TChar, TEncoding> &other) const;
 		bool EqualsNoCase(const BaseStringSliceView<TChar, TEncoding> &other) const;
 
-		Ordering Compare(const BaseStringSliceView<TChar, TEncoding> &other) const;
+		std::strong_ordering CompareOrdered(const BaseStringSliceView<TChar, TEncoding> &other) const;
+		bool CompareEqual(const BaseStringSliceView<TChar, TEncoding> &other) const;
+
+		std::strong_ordering operator<=>(const BaseStringSliceView<TChar, TEncoding> &other) const;
+		bool operator==(const BaseStringSliceView<TChar, TEncoding> &other) const;
 
 		bool Validate() const;
 
@@ -120,9 +125,9 @@ namespace rkit
 #include "StringUtil.h"
 
 template<class TChar, rkit::CharacterEncoding TEncoding>
-rkit::Ordering rkit::BaseStringSliceViewComparer<TChar, TEncoding>::Compare(const BaseStringSliceView<TChar, TEncoding> &a, const BaseStringSliceView<TChar, TEncoding> &b)
+std::strong_ordering rkit::BaseStringSliceViewComparer<TChar, TEncoding>::CompareOrdered(const BaseStringSliceView<TChar, TEncoding> &a, const BaseStringSliceView<TChar, TEncoding> &b)
 {
-	return CharCompare<TChar, TEncoding>::Compare(a.ToSpan(), b.ToSpan());
+	return CharCompare<TChar, TEncoding>::CompareOrdered(a.ToSpan(), b.ToSpan());
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding>
@@ -236,7 +241,7 @@ bool rkit::BaseStringSliceView<TChar, TEncoding>::StartsWith(const BaseStringSli
 
 	for (size_t i = 0; i < cmpLength; i++)
 	{
-		if (TComparer::Compare(thisChars[i], otherChars[i]) != Ordering::kEqual)
+		if (!TComparer::CompareEqual(thisChars[i], otherChars[i]))
 			return false;
 	}
 
@@ -268,7 +273,7 @@ bool rkit::BaseStringSliceView<TChar, TEncoding>::EndsWith(const BaseStringSlice
 
 	for (size_t i = 0; i < cmpLength; i++)
 	{
-		if (TComparer::Compare(thisChars[i], otherChars[i]) != Ordering::kEqual)
+		if (!TComparer::CompareEqual(thisChars[i], otherChars[i]))
 			return false;
 	}
 
@@ -300,7 +305,7 @@ bool rkit::BaseStringSliceView<TChar, TEncoding>::Equals(const BaseStringSliceVi
 
 	for (size_t i = 0; i < cmpLength; i++)
 	{
-		if (TComparer::Compare(thisChars[i], otherChars[i]) != Ordering::kEqual)
+		if (!TComparer::CompareEqual(thisChars[i], otherChars[i]))
 			return false;
 	}
 
@@ -320,9 +325,27 @@ bool rkit::BaseStringSliceView<TChar, TEncoding>::EqualsNoCase(const BaseStringS
 }
 
 template<class TChar, rkit::CharacterEncoding TEncoding>
-rkit::Ordering rkit::BaseStringSliceView<TChar, TEncoding>::Compare(const BaseStringSliceView<TChar, TEncoding> &other) const
+std::strong_ordering rkit::BaseStringSliceView<TChar, TEncoding>::CompareOrdered(const BaseStringSliceView<TChar, TEncoding> &other) const
 {
-	return CharCompare<TChar, TEncoding>::Compare(m_span, other.m_span);
+	return CharCompare<TChar, TEncoding>::CompareOrdered(m_span, other.m_span);
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding>
+bool rkit::BaseStringSliceView<TChar, TEncoding>::CompareEqual(const BaseStringSliceView<TChar, TEncoding> &other) const
+{
+	return CharCompare<TChar, TEncoding>::CompareEqual(m_span, other.m_span);
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding>
+std::strong_ordering rkit::BaseStringSliceView<TChar, TEncoding>::operator<=>(const BaseStringSliceView<TChar, TEncoding> &other) const
+{
+	return this->CompareOrdered(other);
+}
+
+template<class TChar, rkit::CharacterEncoding TEncoding>
+bool rkit::BaseStringSliceView<TChar, TEncoding>::operator==(const BaseStringSliceView<TChar, TEncoding> &other) const
+{
+	return this->CompareEqual(other);
 }
 
 

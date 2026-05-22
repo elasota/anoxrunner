@@ -1,30 +1,10 @@
 #pragma once
 
 #include "CoreDefs.h"
-#include "Ordering.h"
 
 #include <stdint.h>
 #include <type_traits>
-
-namespace rkit::priv
-{
-	template<class TType, bool TIsFloatingPoint>
-	struct StrongComparerHelper
-	{
-	};
-
-	template<class TType>
-	struct StrongComparerHelper<TType, true>
-	{
-		static Ordering Compare(const TType &a, const TType &b);
-	};
-
-	template<class TType>
-	struct StrongComparerHelper<TType, false>
-	{
-		static Ordering Compare(const TType &a, const TType &b);
-	};
-}
+#include <compare>
 
 namespace rkit
 {
@@ -101,60 +81,13 @@ namespace rkit
 	template<class TLeft, class TRight>
 	struct DefaultComparer
 	{
-		static Ordering Compare(const TLeft &a, const TRight &b);
+		static std::partial_ordering CompareOrdered(const TLeft &a, const TRight &b);
 		static bool CompareEqual(const TLeft &a, const TRight &b);
 		static bool CompareNotEqual(const TLeft &a, const TRight &b);
 		static bool CompareLess(const TLeft &a, const TRight &b);
 		static bool CompareLessEqual(const TLeft &a, const TRight &b);
 		static bool CompareGreater(const TLeft &a, const TRight &b);
 		static bool CompareGreaterEqual(const TLeft &a, const TRight &b);
-	};
-
-	template<class TSubType, class TComparer>
-	struct CompareWithOrderingOperatorsMixin
-	{
-		template<class TOther>
-		bool operator<(const TOther &other) const;
-
-		template<class TOther>
-		bool operator>(const TOther &other) const;
-
-		template<class TOther>
-		bool operator<=(const TOther &other) const;
-
-		template<class TOther>
-		bool operator>=(const TOther &other) const;
-
-		template<class TOther>
-		bool operator==(const TOther &other) const;
-
-		template<class TOther>
-		bool operator!=(const TOther &other) const;
-	};
-
-	template<class TSubType, class TComparer>
-	struct CompareWithPredOperatorsMixin
-	{
-		bool operator<(const TSubType &other) const;
-		bool operator>(const TSubType &other) const;
-		bool operator<=(const TSubType &other) const;
-		bool operator>=(const TSubType &other) const;
-		bool operator==(const TSubType &other) const;
-		bool operator!=(const TSubType &other) const;
-	};
-
-	template<class TType>
-	struct StrongComparer : public priv::StrongComparerHelper<TType, std::is_floating_point<TType>::value>
-	{
-	};
-
-	struct DefaultComparePred
-	{
-		template<class TLeft, class TRight>
-		Ordering operator()(const TLeft &a, const TRight &b) const
-		{
-			return DefaultComparer<TLeft, TRight>::Compare(a, b);
-		}
 	};
 
 	struct DefaultCompareEqualPred
@@ -208,15 +141,6 @@ namespace rkit
 		bool operator()(const TLeft &a, const TRight &b) const
 		{
 			return DefaultComparer<TLeft, TRight>::CompareGreaterEqual(a, b);
-		}
-	};
-
-	struct StrongComparePred
-	{
-		template<class TType>
-		Ordering operator()(const TType &a, const TType &b) const
-		{
-			return StrongComparer<TType>::Compare(a, b);
 		}
 	};
 
@@ -388,14 +312,14 @@ namespace rkit
 	template<class T, class TComparer = DefaultComparer<T, T>>
 	bool CompareSpansEqual(const Span<T> &dest, const Span<const T> &src);
 
-	template<class T, class TComparer = DefaultComparer<T, T>>
-	Ordering CompareSpans(const Span<const T> &dest, const Span<const T> &src);
+	template<class T, class TComparer = DefaultComparer<T, T>, class TOrdering = std::partial_ordering>
+	TOrdering CompareSpans(const Span<const T> &dest, const Span<const T> &src);
 
-	template<class T, class TComparer = DefaultComparer<T, T>>
-	Ordering CompareSpans(const Span<T> &dest, const Span<const T> &src);
+	template<class T, class TComparer = DefaultComparer<T, T>, class TOrdering = std::partial_ordering>
+	TOrdering CompareSpans(const Span<T> &dest, const Span<const T> &src);
 
-	template<class T, class TComparer = DefaultComparer<T, T>>
-	Ordering CompareSpans(const Span<const T> &dest, const Span<T> &src);
+	template<class T, class TComparer = DefaultComparer<T, T>, class TOrdering = std::partial_ordering>
+	TOrdering CompareSpans(const Span<const T> &dest, const Span<T> &src);
 
 	template<class T>
 	int FindLowestSetBit(T value);
@@ -442,33 +366,6 @@ namespace rkit
 #include <limits>
 #include <new>
 #include <string.h>
-
-
-template<class TType>
-rkit::Ordering rkit::priv::StrongComparerHelper<TType, true>::Compare(const TType &a, const TType &b)
-{
-	const size_t kBitCount = sizeof(TType) * 8;
-
-	typedef typename rkit::UIntOfSize<sizeof(TType)>::Type_t UFloatBits_t;
-	typedef typename rkit::SIntOfSize<sizeof(TType)>::Type_t SFloatBits_t;
-	const UFloatBits_t aBits = BitCast<UFloatBits_t>(a);
-	const UFloatBits_t bBits = BitCast<UFloatBits_t>(b);
-
-	const UFloatBits_t aSignExtension = static_cast<UFloatBits_t>(static_cast<SFloatBits_t>(aBits) >> (kBitCount - 1));
-	const UFloatBits_t bSignExtension = static_cast<UFloatBits_t>(static_cast<SFloatBits_t>(bBits) >> (kBitCount - 1));
-
-	const UFloatBits_t kSignBit = static_cast<UFloatBits_t>(1) << (kBitCount - 1);
-	const UFloatBits_t aReordered = ((aBits | kSignBit) ^ aSignExtension);
-	const UFloatBits_t bReordered = ((bBits | kSignBit) ^ bSignExtension);
-
-	return rkit::DefaultComparer<UFloatBits_t, UFloatBits_t>::Compare(aReordered, bReordered);
-}
-
-template<class TType>
-rkit::Ordering rkit::priv::StrongComparerHelper<TType, false>::Compare(const TType &a, const TType &b)
-{
-	return rkit::DefaultComparer<TType, TType>::Compare(a, b);
-}
 
 template<class T>
 rkit::Result rkit::SafeAlignUp(T &result, const T &a, const T &b)
@@ -566,16 +463,9 @@ T rkit::Max(const T &a, const T &b)
 }
 
 template<class TLeft, class TRight>
-rkit::Ordering rkit::DefaultComparer<TLeft, TRight>::Compare(const TLeft &a, const TRight &b)
+std::partial_ordering rkit::DefaultComparer<TLeft, TRight>::CompareOrdered(const TLeft &a, const TRight &b)
 {
-	if (a < b)
-		return rkit::Ordering::kLess;
-	if (b < a)
-		return rkit::Ordering::kGreater;
-	if (a == b)
-		return rkit::Ordering::kEqual;
-
-	return rkit::Ordering::kUnordered;
+	return a <=> b;
 }
 
 template<class TLeft, class TRight>
@@ -613,91 +503,6 @@ bool rkit::DefaultComparer<TLeft, TRight>::CompareGreaterEqual(const TLeft &a, c
 {
 	return a >= b;
 }
-
-template<class TSubType, class TComparer>
-template<class TOther>
-bool rkit::CompareWithOrderingOperatorsMixin<TSubType, TComparer>::operator<(const TOther &other) const
-{
-	const rkit::Ordering ordering = TComparer::Compare(*static_cast<const TSubType *>(this), other);
-	return ordering == Ordering::kLess;
-}
-
-template<class TSubType, class TComparer>
-template<class TOther>
-bool rkit::CompareWithOrderingOperatorsMixin<TSubType, TComparer>::operator>(const TOther &other) const
-{
-	const rkit::Ordering ordering = TComparer::Compare(*static_cast<const TSubType *>(this), other);
-	return ordering == Ordering::kGreater;
-}
-
-template<class TSubType, class TComparer>
-template<class TOther>
-bool rkit::CompareWithOrderingOperatorsMixin<TSubType, TComparer>::operator<=(const TOther &other) const
-{
-	const rkit::Ordering ordering = TComparer::Compare(*static_cast<const TSubType *>(this), other);
-	return ordering == Ordering::kLess || ordering == Ordering::kEqual;
-}
-
-template<class TSubType, class TComparer>
-template<class TOther>
-bool rkit::CompareWithOrderingOperatorsMixin<TSubType, TComparer>::operator>=(const TOther &other) const
-{
-	const rkit::Ordering ordering = TComparer::Compare(*static_cast<const TSubType *>(this), other);
-	return ordering == Ordering::kGreater || ordering == Ordering::kEqual;
-}
-
-template<class TSubType, class TComparer>
-template<class TOther>
-bool rkit::CompareWithOrderingOperatorsMixin<TSubType, TComparer>::operator==(const TOther &other) const
-{
-	const rkit::Ordering ordering = TComparer::Compare(*static_cast<const TSubType *>(this), other);
-	return ordering == Ordering::kEqual;
-}
-
-template<class TSubType, class TComparer>
-template<class TOther>
-bool rkit::CompareWithOrderingOperatorsMixin<TSubType, TComparer>::operator!=(const TOther &other) const
-{
-	const rkit::Ordering ordering = TComparer::Compare(*static_cast<const TSubType *>(this), other);
-	return ordering == Ordering::kGreater || ordering == Ordering::kLess;
-}
-
-template<class TSubType, class TComparer>
-bool rkit::CompareWithPredOperatorsMixin<TSubType, TComparer>::operator<(const TSubType &other) const
-{
-	return TComparer::CompareWithPred(*static_cast<const TSubType *>(this), other, DefaultCompareLessPred());
-}
-
-template<class TSubType, class TComparer>
-bool rkit::CompareWithPredOperatorsMixin<TSubType, TComparer>::operator>(const TSubType &other) const
-{
-	return TComparer::CompareWithPred(*static_cast<const TSubType *>(this), other, DefaultCompareGreaterPred());
-}
-
-template<class TSubType, class TComparer>
-bool rkit::CompareWithPredOperatorsMixin<TSubType, TComparer>::operator<=(const TSubType &other) const
-{
-	return TComparer::CompareWithPred(*static_cast<const TSubType *>(this), other, DefaultCompareLessEqualPred());
-}
-
-template<class TSubType, class TComparer>
-bool rkit::CompareWithPredOperatorsMixin<TSubType, TComparer>::operator>=(const TSubType &other) const
-{
-	return TComparer::CompareWithPred(*static_cast<const TSubType *>(this), other, DefaultCompareGreaterEqualPred());
-}
-
-template<class TSubType, class TComparer>
-bool rkit::CompareWithPredOperatorsMixin<TSubType, TComparer>::operator==(const TSubType &other) const
-{
-	return TComparer::CompareWithPred(*static_cast<const TSubType *>(this), other, DefaultCompareEqualPred());
-}
-
-template<class TSubType, class TComparer>
-bool rkit::CompareWithPredOperatorsMixin<TSubType, TComparer>::operator!=(const TSubType &other) const
-{
-	return TComparer::CompareWithPred(*static_cast<const TSubType *>(this), other, DefaultCompareNotEqualPred());
-}
-
 
 // Signed integers
 template<class T>
@@ -1124,14 +929,14 @@ bool rkit::CompareSpansEqual(const Span<T> &srcA, const Span<const T> &srcB)
 	return CompareSpansEqual(Span<const T>(srcA), srcB);
 }
 
-template<class T, class TComparer>
-rkit::Ordering rkit::CompareSpans(const Span<const T> &srcA, const Span<const T> &srcB)
+template<class T, class TComparer, class TOrdering>
+TOrdering rkit::CompareSpans(const Span<const T> &srcA, const Span<const T> &srcB)
 {
 	if (srcA.Count() > srcB.Count())
-		return Ordering::kLess;
+		return std::strong_ordering::less;
 
 	if (srcA.Count() > srcB.Count())
-		return Ordering::kGreater;
+		return std::strong_ordering::greater;
 
 	const T *ptrsA = srcA.Ptr();
 	const T *ptrsB = srcB.Ptr();
@@ -1139,22 +944,22 @@ rkit::Ordering rkit::CompareSpans(const Span<const T> &srcA, const Span<const T>
 
 	for (size_t i = 0; i < sz; i++)
 	{
-		const Ordering cmp = TComparer::Compare(ptrsA[i], ptrsB[i]);
-		if (cmp != Ordering::kEqual)
+		const std::partial_ordering cmp = TComparer::Compare(ptrsA[i], ptrsB[i]);
+		if (cmp != std::partial_ordering::equivalent)
 			return cmp;
 	}
 
-	return Ordering::kEqual;
+	return std::partial_ordering::equivalent;
 }
 
-template<class T, class TComparer>
-rkit::Ordering rkit::CompareSpans(const Span<const T> &srcA, const Span<T> &srcB)
+template<class T, class TComparer, class TOrdering>
+TOrdering rkit::CompareSpans(const Span<const T> &srcA, const Span<T> &srcB)
 {
 	return CompareSpans(srcA, Span<const T>(srcB));
 }
 
-template<class T, class TComparer>
-rkit::Ordering rkit::CompareSpans(const Span<T> &srcA, const Span<const T> &srcB)
+template<class T, class TComparer, class TOrdering>
+TOrdering rkit::CompareSpans(const Span<T> &srcA, const Span<const T> &srcB)
 {
 	return CompareSpans(Span<const T>(srcA), srcB);
 }
@@ -1200,6 +1005,7 @@ template<class TTo, class TFrom>
 inline TTo rkit::BitCast(const TFrom &from)
 {
 	static_assert(std::is_trivially_constructible<TTo>::value, "Result type must be trivially constructible");
+	static_assert(sizeof(TFrom) == sizeof(TTo), "Result and target type sizes must be the same");
 
 	TTo result;
 	::memcpy(&result, &from, sizeof(TFrom));
