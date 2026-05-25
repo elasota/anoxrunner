@@ -1219,6 +1219,52 @@ namespace anox::buildsystem
 					offset++;
 			};
 
+		auto parseCombinedToken = [&skipWhitespace, &offset, &str](rkit::ByteStringSliceView &outArg, const char *extraDelimiters = "") -> rkit::Result
+			{
+				skipWhitespace();
+
+				if (offset == str.Length())
+				{
+					outArg = rkit::ByteStringSliceView();
+					RKIT_RETURN_OK;
+				}
+
+				size_t startPos = offset;
+				uint8_t firstChar = str[offset++];
+
+				if (firstChar == '\"')
+				{
+					for (;;)
+					{
+						if (offset == str.Length())
+						{
+							rkit::log::Warning(u8"Unterminated string arg");
+							break;
+						}
+
+						if (str[offset++] == '\"')
+							break;
+					}
+				}
+				else
+				{
+					size_t lastNonWhitespace = offset;
+					while (offset < str.Length())
+					{
+						char ch = static_cast<char>(str[offset]);
+						if (!rkit::IsASCIIWhitespace(static_cast<char>(ch)))
+							lastNonWhitespace = offset;
+
+						offset++;
+					}
+
+					offset = lastNonWhitespace + 1;
+				}
+
+				outArg = str.SubString(startPos, offset - startPos);
+				RKIT_RETURN_OK;
+			};
+
 		auto parseToken = [&skipWhitespace, &offset, &str](rkit::ByteStringSliceView& outArg, const char *extraDelimiters = "") -> rkit::Result
 		{
 			auto isInDelimiterList = [extraDelimiters](uint8_t ch)
@@ -1246,7 +1292,7 @@ namespace anox::buildsystem
 			size_t startPos = offset;
 			uint8_t firstChar = str[offset++];
 
-			if (isInDelimiterList(firstChar == '='))
+			if (isInDelimiterList(firstChar))
 			{
 				outArg = str.SubString(startPos, offset - startPos);
 				RKIT_RETURN_OK;
@@ -1258,8 +1304,8 @@ namespace anox::buildsystem
 				{
 					if (offset == str.Length())
 					{
-						rkit::log::Error(u8"Unterminated string arg");
-						RKIT_THROW(rkit::ResultCode::kDataError);
+						rkit::log::Warning(u8"Unterminated string arg");
+						break;
 					}
 
 					if (str[offset++] == '\"')
@@ -1330,6 +1376,13 @@ namespace anox::buildsystem
 				switch (argMetadata.m_fieldType)
 				{
 				case ape_parse::ExternFieldType::Label:
+					if (couldBeVariable && arg[arg.Length() - 1] == '$')
+					{
+						isVariable = true;
+						indexIsStr = true;
+						outValue.m_exprType = data::ape::ExprType::StringVariable;
+					}
+					else
 					{
 						rkit::Optional<size_t> splitPos;
 						for (size_t i = 0; i < arg.Length(); i++)
@@ -1392,10 +1445,18 @@ namespace anox::buildsystem
 					break;
 				case ape_parse::ExternFieldType::SoundResource:
 				case ape_parse::ExternFieldType::SceneResource:
+				case ape_parse::ExternFieldType::ImageResource:
+				case ape_parse::ExternFieldType::FontResource:
+				case ape_parse::ExternFieldType::FileResource:
+				case ape_parse::ExternFieldType::ParticleResource:
 				case ape_parse::ExternFieldType::Str:
 					{
-						if (arg.Length() >= 2 && arg[0] == '\"' && arg[arg.Length() - 1] == '\"')
-							arg = arg.SubString(1, arg.Length() - 2);
+						if (arg.Length() >= 1 && arg[0] == '\"')
+						{
+							arg = arg.SubString(1);
+							if (arg[arg.Length() - 1] == '\"')
+								arg = arg.SubString(0, arg.Length() - 1);
+						}
 						else if (arg.Length() >= 1 && arg[arg.Length() - 1] == '$')
 							isVariable = true;
 
@@ -1462,17 +1523,37 @@ namespace anox::buildsystem
 					[[fallthrough]];
 				case ape_parse::ExternFieldType::ObjVar:
 					{
-						if (!couldBeVariable)
+						if (arg.Equals(rkit::AsciiStringView("0").RemoveEncoding()))
 						{
-							rkit::log::ErrorFmt(u8"Argument {} of op {} was not a variable", rkit::AsciiStringView(argMetadata.m_name, argMetadata.m_nameLength),
-								rkit::AsciiStringView(opMetadata.m_name, opMetadata.m_nameLength));
-							RKIT_THROW(rkit::ResultCode::kDataError);
+							outValue.m_exprType = data::ape::ExprType::Empty;
+							outValue.m_index = 0;
 						}
+						else
+						{
+							if (!couldBeVariable)
+							{
+								rkit::log::ErrorFmt(u8"Argument {} of op {} was not a variable", rkit::AsciiStringView(argMetadata.m_name, argMetadata.m_nameLength),
+									rkit::AsciiStringView(opMetadata.m_name, opMetadata.m_nameLength));
+								RKIT_THROW(rkit::ResultCode::kDataError);
+							}
 
-						isVariable = true;
-						indexIsStr = true;
-						outValue.m_exprType = data::ape::ExprType::ObjectVariable;
+							isVariable = true;
+							indexIsStr = true;
+							outValue.m_exprType = data::ape::ExprType::ObjectVariable;
+						}
 					}
+					break;
+				case ape_parse::ExternFieldType::TextureVar:
+					if (!couldBeVariable)
+					{
+						rkit::log::ErrorFmt(u8"Argument {} of op {} was not a variable", rkit::AsciiStringView(argMetadata.m_name, argMetadata.m_nameLength),
+							rkit::AsciiStringView(opMetadata.m_name, opMetadata.m_nameLength));
+						RKIT_THROW(rkit::ResultCode::kDataError);
+					}
+
+					isVariable = true;
+					indexIsStr = true;
+					outValue.m_exprType = data::ape::ExprType::TextureVariable;
 					break;
 				case ape_parse::ExternFieldType::FloatVar:
 					{
@@ -1608,8 +1689,177 @@ namespace anox::buildsystem
 				for (size_t inArgIndex = 0; inArgIndex < propertyNames.Count(); inArgIndex++)
 				{
 					const size_t outArgIndex = findArg(propertyNames[inArgIndex]);
-					RKIT_CHECK(parseArg(argValues[outArgIndex], *selectedOp, selectedOp->m_argMetadata[inArgIndex], argTokens[inArgIndex]));
+					RKIT_CHECK(parseArg(argValues[outArgIndex], *selectedOp, selectedOp->m_argMetadata[outArgIndex], argTokens[inArgIndex]));
 				}
+			}
+			else if (opName.EqualsNoCase(rkit::AsciiStringView("set2dcursor").RemoveEncoding()))
+			{
+				const size_t kMaxImageArgs = 5;
+
+				rkit::ByteStringSliceView imageArgTokens[kMaxImageArgs];
+				const rkit::AsciiStringView imageArgNames[kMaxImageArgs] =
+				{
+					"frame0",
+					"frame1",
+					"frame2",
+					"frame3",
+					"frame4",
+				};
+
+				const size_t kMaxNumericArgs = 3;
+				rkit::ByteStringSliceView numericArgTokens[kMaxNumericArgs];
+				const rkit::AsciiStringView numericArgNames[kMaxNumericArgs] =
+				{
+					"param0",
+					"param1",
+					"param2",
+				};
+
+				size_t numImageArgs = 0;
+				size_t numNumericArgs = 0;
+
+				rkit::ByteStringSliceView argToken;
+				RKIT_CHECK(parseToken(argToken, "("));
+
+				auto isNumericTokenOrEmpty = [](const rkit::ByteStringSliceView &str)
+					{
+						for (uint8_t ch : str)
+						{
+							if (ch < '0' || ch > '9')
+								return false;
+						}
+
+						return true;
+					};
+
+				while (argToken.Length() > 0)
+				{
+					if (isNumericTokenOrEmpty(argToken))
+						break;
+
+					if (numImageArgs == kMaxImageArgs)
+					{
+						rkit::log::Error(u8"Too many image args for Set2DCursor");
+						RKIT_THROW(rkit::ResultCode::kDataError);
+					}
+
+					imageArgTokens[numImageArgs++] = argToken;
+					RKIT_CHECK(parseToken(argToken));
+				}
+
+				while (argToken.Length() > 0)
+				{
+					if (numNumericArgs == kMaxNumericArgs)
+					{
+						rkit::log::Error(u8"Too many image args for Set2DCursor");
+						RKIT_THROW(rkit::ResultCode::kDataError);
+					}
+
+					numericArgTokens[numNumericArgs++] = argToken;
+					RKIT_CHECK(parseToken(argToken));
+
+					if (!isNumericTokenOrEmpty(argToken))
+					{
+						rkit::log::Error(u8"Expected numeric arg for Set2DCursor");
+						RKIT_THROW(rkit::ResultCode::kDataError);
+					}
+				}
+
+				auto mapArgList = [&findArg, &parseArg, &argValues, selectedOp](const rkit::ByteStringSliceView *tokens, const rkit::AsciiStringView *argNames, size_t numArgs) -> rkit::Result
+					{
+						for (size_t inputIndex = 0; inputIndex < numArgs; inputIndex++)
+						{
+							const size_t argIndex = findArg(argNames[inputIndex]);
+							RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], tokens[inputIndex]));
+						}
+					};
+
+				if (numImageArgs == 0)
+				{
+					rkit::log::Error(u8"No frames specified for Set2DCursor");
+					RKIT_THROW(rkit::ResultCode::kDataError);
+				}
+
+				if (imageArgTokens[0].EqualsNoCase(rkit::AsciiStringView("default").RemoveEncoding()))
+				{
+					const rkit::ByteStringSliceView defaultArgToken = rkit::AsciiStringView("true").RemoveEncoding();
+					const rkit::AsciiStringView defaultArgName = rkit::AsciiStringView("default");
+
+					RKIT_CHECK(mapArgList(&defaultArgToken, &defaultArgName, 1));
+				}
+				else
+				{
+					RKIT_CHECK(mapArgList(numericArgTokens, numericArgNames, numNumericArgs));
+					RKIT_CHECK(mapArgList(imageArgTokens, imageArgNames, numImageArgs));
+				}
+			}
+			else if (opName.EqualsNoCase(rkit::AsciiStringView("adjust_stat").RemoveEncoding()))
+			{
+				rkit::ByteStringSliceView argToken;
+				RKIT_CHECK(parseToken(argToken));
+
+				if (argToken.Length() == 0)
+				{
+					rkit::log::Error(u8"Missing target for adjust_stat");
+					RKIT_THROW(rkit::ResultCode::kDataError);
+				}
+
+				const rkit::ConstSpan<ape_parse::ExternOpcodeArgMetadata> args(selectedOp->m_argMetadata, selectedOp->m_argCount);
+
+				const size_t targetArgIndex = (argToken.Length() > 0 && argToken[0] == '@') ? findArg("targetobj") : findArg("targetName");
+				RKIT_CHECK(parseArg(argValues[targetArgIndex], *selectedOp, args[targetArgIndex], argToken));
+
+				const size_t statArgIndex = findArg("stat");
+				const size_t amountArgIndex = findArg("amount");
+
+				rkit::ByteStringSliceView statToken;
+				rkit::ByteStringSliceView amountToken;
+
+				RKIT_CHECK(parseToken(statToken));
+
+				if (statToken.Length() == 0)
+				{
+					rkit::log::Error(u8"Missing target for adjust_stat");
+					RKIT_THROW(rkit::ResultCode::kDataError);
+				}
+
+				if (statToken[0] == '\"')
+				{
+					statToken = statToken.SubString(1);
+					if (statToken.Length() > 0 && statToken[statToken.Length() - 1] == '\"')
+						statToken = statToken.SubString(0, statToken.Length() - 1);
+
+					size_t splitIndex = 0;
+					while (splitIndex < statToken.Length())
+					{
+						if (statToken[splitIndex] == '=')
+							break;
+						else
+							splitIndex++;
+					}
+
+					if (splitIndex == statToken.Length())
+					{
+						rkit::log::Error(u8"Missing amount for adjust_stat");
+						RKIT_THROW(rkit::ResultCode::kDataError);
+					}
+
+					amountToken = statToken.SubString(splitIndex + 1);
+					statToken = statToken.SubString(0, splitIndex);
+				}
+				else
+				{
+					RKIT_CHECK(parseToken(amountToken));
+				}
+
+				if (statToken.Length() == 0)
+				{
+					rkit::log::Error(u8"Missing amount for adjust_stat");
+					RKIT_THROW(rkit::ResultCode::kDataError);
+				}
+
+				RKIT_CHECK(parseArg(argValues[statArgIndex], *selectedOp, args[statArgIndex], statToken));
+				RKIT_CHECK(parseArg(argValues[amountArgIndex], *selectedOp, args[amountArgIndex], amountToken));
 			}
 			else
 			{
@@ -1619,10 +1869,19 @@ namespace anox::buildsystem
 		}
 		else
 		{
+			// Normal not-special arg parsing
 			for (size_t argIndex = 0; argIndex < selectedOp->m_numRequiredParameters; argIndex++)
 			{
 				rkit::ByteStringSliceView argToken;
-				RKIT_CHECK(parseToken(argToken));
+
+				if (selectedOp->m_isCombined)
+				{
+					RKIT_CHECK(parseCombinedToken(argToken));
+				}
+				else
+				{
+					RKIT_CHECK(parseToken(argToken));
+				}
 
 				if (argToken.Length() == 0)
 				{
@@ -1644,31 +1903,48 @@ namespace anox::buildsystem
 				RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken));
 			}
 
-			for (;;)
-			{
-				rkit::ByteStringSliceView nameToken;
-				RKIT_CHECK(parseToken(nameToken, "="));
-
-				if (nameToken.Length() == 0)
-					break;
-
-				rkit::ByteStringSliceView eqToken;
-				RKIT_CHECK(parseToken(eqToken, "="));
-
-
-				rkit::ByteStringSliceView valueToken;
-				RKIT_CHECK(parseToken(valueToken));
-
-				if (eqToken != rkit::AsciiStringView("=").RemoveEncoding() || valueToken.Length() == 0)
-				{
-					rkit::log::ErrorFmt(u8"Missing required argument for {}", rkit::AsciiStringView(selectedOp->m_name, selectedOp->m_nameLength));
-					RKIT_THROW(rkit::ResultCode::kDataError);
-				}
-
-			}
 			if (selectedOp->m_numUnnamedParameters < selectedOp->m_argCount)
 			{
-				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+				for (;;)
+				{
+					rkit::ByteStringSliceView nameToken;
+					RKIT_CHECK(parseToken(nameToken, "="));
+
+					if (nameToken.Length() == 0)
+						break;
+
+					rkit::ByteStringSliceView eqToken;
+					RKIT_CHECK(parseToken(eqToken, "="));
+
+
+					rkit::ByteStringSliceView valueToken;
+					RKIT_CHECK(parseToken(valueToken));
+
+					if (eqToken != rkit::AsciiStringView("=").RemoveEncoding() || valueToken.Length() == 0)
+					{
+						rkit::log::ErrorFmt(u8"Missing required argument for {}", rkit::AsciiStringView(selectedOp->m_name, selectedOp->m_nameLength));
+						RKIT_THROW(rkit::ResultCode::kDataError);
+					}
+
+					rkit::Optional<size_t> argIndex;
+					for (size_t i = selectedOp->m_numUnnamedParameters; i < selectedOp->m_argCount; i++)
+					{
+						const ape_parse::ExternOpcodeArgMetadata &argMetadata = selectedOp->m_argMetadata[i];
+						if (nameToken.EqualsNoCase(rkit::AsciiStringView(argMetadata.m_name, argMetadata.m_nameLength).RemoveEncoding()))
+						{
+							argIndex = i;
+							break;
+						}
+					}
+
+					if (!argIndex.IsSet())
+					{
+						rkit::log::ErrorFmt(u8"Unrecognized argument for {}", rkit::AsciiStringView(selectedOp->m_name, selectedOp->m_nameLength));
+						RKIT_THROW(rkit::ResultCode::kDataError);
+					}
+
+					RKIT_CHECK(parseArg(argValues[argIndex.Get()], *selectedOp, selectedOp->m_argMetadata[argIndex.Get()], valueToken));
+				}
 			}
 		}
 

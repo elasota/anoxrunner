@@ -15,6 +15,7 @@ namespace anox::buildsystem::ape_parse
 		StrVar,
 		Obj,
 		ObjVar,
+		TextureVar,
 		Bool,
 		Label,
 		Expr,
@@ -27,6 +28,7 @@ namespace anox::buildsystem::ape_parse
 		MusicResource,
 		SceneResource,
 		ModelResource,
+		FileResource,
 	};
 
 	struct ExternOpcodeArgMetadata
@@ -44,6 +46,7 @@ namespace anox::buildsystem::ape_parse
 		uint32_t m_argCount;
 		uint16_t m_opcode;
 		bool m_isSpecial;
+		bool m_isCombined;
 		uint32_t m_numUnnamedParameters;
 		uint32_t m_numRequiredParameters;
 	};

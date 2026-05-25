@@ -62,6 +62,7 @@ namespace anox::data::ape
 		ObjectVariable,
 		UIntLiteral,
 		IntLiteral,
+		TextureVariable,
 
 		Count,
 	};

@@ -15,6 +15,7 @@ namespace APEWindowCommandReflector
             Obj,
             ObjVar,
             Texture,
+            TextureVar,
             WindowStyle,
             OptStr,
             Format,
@@ -36,6 +37,7 @@ namespace APEWindowCommandReflector
             MusicResource,
             SceneResource,
             ModelResource,
+            FileResource,
         }
 
         public FieldType Type { get; }
@@ -62,15 +64,17 @@ namespace APEWindowCommandReflector
         public uint Opcode { get; }
         public IReadOnlyList<FieldDef> Fields { get; }
         public bool IsSpecial { get; }
+        public bool IsCombined { get; }
         public uint NumUnnamedParameters { get; }
         public uint NumRequiredParameters { get; }
 
-        public ExternCommandDef(string name, uint opcode, IReadOnlyList<FieldDef> fields, bool isSpecial, uint numUnnamedParameters, uint numRequiredParameters)
+        public ExternCommandDef(string name, uint opcode, IReadOnlyList<FieldDef> fields, bool isSpecial, bool isCombined, uint numUnnamedParameters, uint numRequiredParameters)
         {
             Name = name;
             Opcode = opcode;
             Fields = fields;
             IsSpecial = isSpecial;
+            IsCombined = isCombined;
             NumUnnamedParameters = numUnnamedParameters;
             NumRequiredParameters = numRequiredParameters;
         }
@@ -207,6 +211,7 @@ namespace APEWindowCommandReflector
                             + ", " + externDef.Fields.Count.ToString()
                             + ", " + externDef.Opcode
                             + ", " + (externDef.IsSpecial ? "true" : "false")
+                            + ", " + (externDef.IsCombined ? "true" : "false")
                             + ", " + externDef.NumUnnamedParameters.ToString()
                             + ", " + externDef.NumRequiredParameters
                             + " },");
@@ -764,6 +769,7 @@ namespace APEWindowCommandReflector
                 int parmIndex = 0;
                 string opName = tokens[parmIndex++];
                 bool isSpecial = false;
+                bool isCombined = false;
                 bool isParsingOptional = false;
                 bool isParsingNamed = false;
 
@@ -783,6 +789,12 @@ namespace APEWindowCommandReflector
                     if (typeStr == "special")
                     {
                         isSpecial = true;
+                        continue;
+                    }
+
+                    if (typeStr == "combine")
+                    {
+                        isCombined = true;
                         continue;
                     }
 
@@ -808,6 +820,8 @@ namespace APEWindowCommandReflector
                         fieldType = FieldDef.FieldType.Obj;
                     else if (typeStr == "objvar")
                         fieldType = FieldDef.FieldType.ObjVar;
+                    else if (typeStr == "texturevar")
+                        fieldType = FieldDef.FieldType.TextureVar;
                     else if (typeStr == "int")
                         fieldType = FieldDef.FieldType.Int32;
                     else if (typeStr == "uint")
@@ -838,6 +852,8 @@ namespace APEWindowCommandReflector
                         fieldType = FieldDef.FieldType.SceneResource;
                     else if (typeStr == "modelresource")
                         fieldType = FieldDef.FieldType.ModelResource;
+                    else if (typeStr == "fileresource")
+                        fieldType = FieldDef.FieldType.FileResource;
                     else
                         throw new Exception("Unknown extern field type " + typeStr);
 
@@ -855,7 +871,7 @@ namespace APEWindowCommandReflector
                     fieldDefs.Add(new FieldDef(fieldType, fieldName));
                 }
 
-                defs.Add(new ExternCommandDef(opName, (uint)defs.Count, fieldDefs, isSpecial, numUnnamedParameters, numRequiredParameters));
+                defs.Add(new ExternCommandDef(opName, (uint)defs.Count, fieldDefs, isSpecial, isCombined, numUnnamedParameters, numRequiredParameters));
             }
 
             
