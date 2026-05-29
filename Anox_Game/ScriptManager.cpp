@@ -119,6 +119,7 @@ namespace anox::game
 
 		rkit::ResultCoroutine ExecuteWindowCommands(rkit::ICoroThread &thread, ScriptWindowInstance &windowInstance, const ScriptWindow &window);
 		rkit::ResultCoroutine ExecuteSwitchCommands(rkit::ICoroThread &thread, const ScriptPackage *pkg, rkit::Span<const ScriptSwitchCommand> cmds, int &loopCounter, int depth);
+		rkit::ResultCoroutine ExecuteExtern(rkit::ICoroThread &thread, const ScriptPackage *pkg, uint32_t opcode, const ScriptOperandList &operands);
 
 		bool TryResolveString(rkit::ByteString &outBStr, const ScriptPackage &pkg, uint32_t strID) const;
 		bool TryResolveOptionalString(rkit::ByteString &outBStr, const ScriptPackage &pkg, uint32_t strID) const;
@@ -483,7 +484,20 @@ namespace anox::game
 			//case 7:	// echo
 			//case 8:	// target
 			//case 9:	// pathtarget
-			//case 10:	// extern
+			case 10:	// extern
+				{
+					const uint32_t externOpcode = cmd.m_fmtValue;
+					const uint32_t externArgList = cmd.m_strValue;
+
+					if (externArgList >= pkg->m_operandLists.Count())
+					{
+						rkit::log::Error(u8"Extern invalid arg list");
+						CORO_RETURN_OK;
+					}
+
+					RKIT_CHECK(co_await ExecuteExtern(thread, pkg, externOpcode, pkg->m_operandLists[externArgList]));
+				}
+				break;
 			//case 11:	// while
 			//case 12:	// playambient
 			//case 13:	// loopambient
@@ -504,6 +518,11 @@ namespace anox::game
 		}
 
 		CORO_RETURN_OK;
+	}
+
+	rkit::ResultCoroutine ScriptEnvironmentImpl::ExecuteExtern(rkit::ICoroThread &thread, const ScriptPackage *pkg, uint32_t opcode, const ScriptOperandList &operands)
+	{
+		CORO_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
 
 	bool ScriptEnvironmentImpl::TryResolveString(rkit::ByteString &outBStr, const ScriptPackage &pkg, uint32_t strID) const

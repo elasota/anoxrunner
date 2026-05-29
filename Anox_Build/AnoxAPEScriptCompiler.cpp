@@ -1281,9 +1281,12 @@ namespace anox::buildsystem
 
 			RKIT_CHECK(ctx.ConvertOptionalExprValue(outCmd.m_exprValue, cmd.m_expr));
 
-			uint32_t fmtValue = 0;
-			RKIT_CHECK(ctx.ConvertFormattingValue(fmtValue, cmd.m_fmt));
-			outCmd.m_fmtValue = fmtValue;
+			if (cmd.m_opcode != kExternOpcode)
+			{
+				uint32_t fmtValue = 0;
+				RKIT_CHECK(ctx.ConvertFormattingValue(fmtValue, cmd.m_fmt));
+				outCmd.m_fmtValue = fmtValue;
+			}
 
 			RKIT_CHECK(cmdStream.Append(outCmd));
 			RKIT_CHECK(cmdStream.Append(trueBB.ToSpan()));
@@ -2405,7 +2408,6 @@ namespace anox::buildsystem
 		return outPath.Set(formattedPath);
 	}
 
-
 	rkit::Result APEScriptCompilerImpl::ResolveDepResourceType(DepResourceType &resType, const rkit::AsciiStringSliceView &categoryStr)
 	{
 		size_t openBracePos = 0;
@@ -2560,7 +2562,7 @@ namespace anox::buildsystem
 
 	uint32_t APEScriptCompiler::GetVersion() const
 	{
-		return 10;
+		return 11;
 	}
 
 	rkit::Result APEScriptCompiler::FormatOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier)
