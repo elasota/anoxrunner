@@ -20,11 +20,6 @@ namespace rkit { namespace png
 
 namespace anox { namespace buildsystem
 {
-	static const uint32_t kFontMaterialNodeID = RKIT_FOURCC('F', 'M', 'T', 'L');
-	static const uint32_t kWorldMaterialNodeID = RKIT_FOURCC('W', 'M', 'T', 'L');
-	static const uint32_t kModelMaterialNodeID = RKIT_FOURCC('M', 'M', 'T', 'L');
-	static const uint32_t kInterfaceMaterialNodeID = RKIT_FOURCC('I', 'M', 'T', 'L');
-
 	struct IDependencyNodeCompilerFeedback;
 	struct MaterialAnalysisHeader;
 	struct MaterialAnalysisDynamicData;

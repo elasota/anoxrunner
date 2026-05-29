@@ -8,6 +8,21 @@ namespace anox::buildsystem
 {
 	class APEScriptCompilerImpl;
 	class APEGroupCompilerImpl;
+	class APEDepsCompilerImpl;
+
+	class APEDepsCompiler final : public rkit::buildsystem::IDependencyNodeCompiler, public rkit::Opaque<APEDepsCompilerImpl>
+	{
+	public:
+		bool HasAnalysisStage() const override;
+		rkit::Result RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
+		rkit::Result RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback) override;
+
+		uint32_t GetVersion() const override;
+
+		static rkit::Result FormatOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier);
+
+		static rkit::Result Create(rkit::UniquePtr<APEDepsCompiler> &outCompiler);
+	};
 
 	class APEScriptCompiler final : public rkit::buildsystem::IDependencyNodeCompiler, public rkit::Opaque<APEScriptCompilerImpl>
 	{

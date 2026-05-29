@@ -12,10 +12,12 @@ namespace rkit
 
 namespace anox::game
 {
+	struct ScriptExprValue;
+
 	using ScriptExprType = data::ape::ExprType;
 	using ScriptOperator = data::ape::Operator;
 	using ScriptOperandType = data::ape::OperandType;
-	using ScriptOperandList = rkit::Span<const uint32_t>;
+	using ScriptOperandList = rkit::Span<ScriptExprValue>;
 	using ScriptMaterialReferenceType = data::ape::MaterialReferenceType;
 
 	struct ScriptExprValue

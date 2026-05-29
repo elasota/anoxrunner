@@ -94,6 +94,8 @@ namespace rkit
 		friend class HashMapConstIterator<TKey, TValue, TSize>;
 
 	public:
+		HashMapIterator();
+
 		HashMapIterator<TKey, TValue, TSize> &operator++();
 		HashMapIterator<TKey, TValue, TSize> operator++(int);
 
@@ -111,8 +113,6 @@ namespace rkit
 	private:
 		HashMapIterator(HashMap<TKey, TValue, TSize> &hashMap, TSize offset);
 
-		HashMapIterator() = delete;
-
 		void Normalize();
 
 		HashMap<TKey, TValue, TSize> *m_hashMapPtr;
@@ -126,6 +126,7 @@ namespace rkit
 		friend class HashMapIterator<TKey, TValue, TSize>;
 
 	public:
+		HashMapConstIterator();
 		HashMapConstIterator(const HashMapIterator<TKey, TValue, TSize> &other);
 
 		HashMapConstIterator<TKey, TValue, TSize> operator++();
@@ -143,8 +144,6 @@ namespace rkit
 
 	private:
 		HashMapConstIterator(const HashMap<TKey, TValue, TSize> &hashTable, TSize offset);
-
-		HashMapConstIterator() = delete;
 
 		void Normalize();
 
@@ -251,8 +250,26 @@ namespace rkit
 		template<class TCandidateKey, class TCandidateValue, class TKeyHasher = Hasher<TCandidateKey>, class TKeyConstructor = DefaultElementConstructor<TKey, TCandidateKey>, class TValueConstructor = DefaultElementConstructor<TValue, TCandidateValue>>
 		Result Set(TCandidateKey &&key, TCandidateValue &&value);
 
+		template<class TCandidateKey, class TCandidateValue, class TKeyHasher = Hasher<TCandidateKey>, class TKeyConstructor = DefaultElementConstructor<TKey, TCandidateKey>, class TValueConstructor = DefaultElementConstructor<TValue, TCandidateValue>>
+		Result SetAndGetIterator(Iterator_t &outIterator, TCandidateKey &&key, TCandidateValue &&value);
+
+		template<class TCandidateKey, class TCandidateValue, class TKeyHasher = Hasher<TCandidateKey>, class TKeyConstructor = DefaultElementConstructor<TKey, TCandidateKey>, class TValueConstructor = DefaultElementConstructor<TValue, TCandidateValue>>
+		Result SetAndReplaceKey(TCandidateKey &&key, TCandidateValue &&value);
+
+		template<class TCandidateKey, class TCandidateValue, class TKeyHasher = Hasher<TCandidateKey>, class TKeyConstructor = DefaultElementConstructor<TKey, TCandidateKey>, class TValueConstructor = DefaultElementConstructor<TValue, TCandidateValue>>
+		Result SetAndReplaceKeyAndGetIterator(Iterator_t &outIterator, TCandidateKey &&key, TCandidateValue &&value);
+
 		template<class TCandidateKey, class TCandidateValue, class TKeyConstructor = DefaultElementConstructor<TKey, TCandidateKey>, class TValueConstructor = DefaultElementConstructor<TValue, TCandidateValue>>
 		Result SetPrehashed(HashValue_t hash, TCandidateKey &&key, TCandidateValue &&value);
+
+		template<class TCandidateKey, class TCandidateValue, class TKeyConstructor = DefaultElementConstructor<TKey, TCandidateKey>, class TValueConstructor = DefaultElementConstructor<TValue, TCandidateValue>>
+		Result SetAndGetIteratorPrehashed(Iterator_t &outIterator, HashValue_t hash, TCandidateKey &&key, TCandidateValue &&value);
+
+		template<class TCandidateKey, class TCandidateValue, class TKeyConstructor = DefaultElementConstructor<TKey, TCandidateKey>, class TValueConstructor = DefaultElementConstructor<TValue, TCandidateValue>>
+		Result SetAndReplaceKeyPrehashed(HashValue_t hash, TCandidateKey &&key, TCandidateValue &&value);
+
+		template<class TCandidateKey, class TCandidateValue, class TKeyConstructor = DefaultElementConstructor<TKey, TCandidateKey>, class TValueConstructor = DefaultElementConstructor<TValue, TCandidateValue>>
+		Result SetAndReplaceKeyAndGetIteratorPrehashed(Iterator_t &outIterator, HashValue_t hash, TCandidateKey &&key, TCandidateValue &&value);
 
 		HashMapIterator<TKey, TValue, TSize> begin();
 		HashMapIterator<TKey, TValue, TSize> end();
@@ -277,6 +294,10 @@ namespace rkit
 
 		void RemoveAtAndInvalidateIterator(const HashMapIterator<TKey, TValue, TSize> &it);
 		void RemoveAtAndStepIterator(const HashMapIterator<TKey, TValue, TSize> &it);
+
+	private:
+		template<class TCandidateKey, class TCandidateValue, class TKeyConstructor, class TValueConstructor, bool TWriteIterator, bool TReplaceKey>
+		Result SetPrehashedInternal(Iterator_t *outIterator, HashValue_t hash, TCandidateKey &&key, TCandidateValue &&value);
 	};
 }
 
@@ -416,6 +437,13 @@ rkit::HashMapIterator<TKey, TValue, TSize>::HashMapIterator(HashMap<TKey, TValue
 }
 
 template<class TKey, class TValue, class TSize>
+rkit::HashMapIterator<TKey, TValue, TSize>::HashMapIterator()
+	: m_hashMapPtr(0)
+	, m_offset(0)
+{
+}
+
+template<class TKey, class TValue, class TSize>
 void rkit::HashMapIterator<TKey, TValue, TSize>::Normalize()
 {
 	TSize capacity = m_hashMapPtr->m_capacity;
@@ -495,6 +523,13 @@ template<class TKey, class TValue, class TSize>
 rkit::HashMapConstIterator<TKey, TValue, TSize>::HashMapConstIterator(const HashMap<TKey, TValue, TSize> &hashMap, TSize offset)
 	: m_hashMapPtr(&hashMap)
 	, m_offset(offset)
+{
+}
+
+template<class TKey, class TValue, class TSize>
+rkit::HashMapConstIterator<TKey, TValue, TSize>::HashMapConstIterator()
+	: m_hashMapPtr(nullptr)
+	, m_offset(0)
 {
 }
 
@@ -1000,17 +1035,81 @@ rkit::Result rkit::HashMap<TKey, TValue, TSize>::Set(TCandidateKey &&key, TCandi
 }
 
 template<class TKey, class TValue, class TSize>
+template<class TCandidateKey, class TCandidateValue, class TKeyHasher, class TKeyConstructor, class TValueConstructor>
+rkit::Result rkit::HashMap<TKey, TValue, TSize>::SetAndGetIterator(Iterator_t &outIterator, TCandidateKey &&key, TCandidateValue &&value)
+{
+	const HashValue_t hash = TKeyHasher::ComputeHash(0, key);
+
+	return SetAndGetIteratorPrehashed<TCandidateKey, TCandidateValue, TKeyConstructor, TValueConstructor>(outIterator, hash, std::forward<TCandidateKey>(key), std::forward<TCandidateValue>(value));
+}
+
+template<class TKey, class TValue, class TSize>
+template<class TCandidateKey, class TCandidateValue, class TKeyHasher, class TKeyConstructor, class TValueConstructor>
+rkit::Result rkit::HashMap<TKey, TValue, TSize>::SetAndReplaceKey(TCandidateKey &&key, TCandidateValue &&value)
+{
+	const HashValue_t hash = TKeyHasher::ComputeHash(0, key);
+
+	return SetAndReplaceKeyPrehashed<TCandidateKey, TCandidateValue, TKeyConstructor, TValueConstructor>(hash, std::forward<TCandidateKey>(key), std::forward<TCandidateValue>(value));
+}
+
+template<class TKey, class TValue, class TSize>
+template<class TCandidateKey, class TCandidateValue, class TKeyHasher, class TKeyConstructor, class TValueConstructor>
+rkit::Result rkit::HashMap<TKey, TValue, TSize>::SetAndReplaceKeyAndGetIterator(Iterator_t &outIterator, TCandidateKey &&key, TCandidateValue &&value)
+{
+	const HashValue_t hash = TKeyHasher::ComputeHash(0, key);
+
+	return SetAndReplaceKeyAndGetIteratorPrehashed<TCandidateKey, TCandidateValue, TKeyConstructor, TValueConstructor>(outIterator, hash, std::forward<TCandidateKey>(key), std::forward<TCandidateValue>(value));
+}
+
+template<class TKey, class TValue, class TSize>
 template<class TCandidateKey, class TCandidateValue, class TKeyConstructor, class TValueConstructor>
 rkit::Result rkit::HashMap<TKey, TValue, TSize>::SetPrehashed(HashValue_t hash, TCandidateKey &&key, TCandidateValue &&value)
+{
+	return SetPrehashedInternal<TCandidateKey, TCandidateValue, TKeyConstructor, TValueConstructor, false, false>(nullptr, hash, std::forward<TCandidateKey>(key), std::forward<TCandidateValue>(value));
+}
+
+template<class TKey, class TValue, class TSize>
+template<class TCandidateKey, class TCandidateValue, class TKeyConstructor, class TValueConstructor>
+rkit::Result rkit::HashMap<TKey, TValue, TSize>::SetAndGetIteratorPrehashed(Iterator_t &outIterator, HashValue_t hash, TCandidateKey &&key, TCandidateValue &&value)
+{
+	return SetPrehashedInternal<TCandidateKey, TCandidateValue, TKeyConstructor, TValueConstructor, true, false>(&outIterator, hash, std::forward<TCandidateKey>(key), std::forward<TCandidateValue>(value));
+}
+
+template<class TKey, class TValue, class TSize>
+template<class TCandidateKey, class TCandidateValue, class TKeyConstructor, class TValueConstructor>
+rkit::Result rkit::HashMap<TKey, TValue, TSize>::SetAndReplaceKeyPrehashed(HashValue_t hash, TCandidateKey &&key, TCandidateValue &&value)
+{
+	return SetPrehashedInternal<TCandidateKey, TCandidateValue, TKeyConstructor, TValueConstructor, false, true>(nullptr, hash, std::forward<TCandidateKey>(key), std::forward<TCandidateValue>(value));
+}
+
+template<class TKey, class TValue, class TSize>
+template<class TCandidateKey, class TCandidateValue, class TKeyConstructor, class TValueConstructor>
+rkit::Result rkit::HashMap<TKey, TValue, TSize>::SetAndReplaceKeyAndGetIteratorPrehashed(Iterator_t &outIterator, HashValue_t hash, TCandidateKey &&key, TCandidateValue &&value)
+{
+	return SetPrehashedInternal<TCandidateKey, TCandidateValue, TKeyConstructor, TValueConstructor, true, true>(&outIterator, hash, std::forward<TCandidateKey>(key), std::forward<TCandidateValue>(value));
+}
+
+template<class TKey, class TValue, class TSize>
+template<class TCandidateKey, class TCandidateValue, class TKeyConstructor, class TValueConstructor, bool TWriteIterator, bool TReplaceKey>
+rkit::Result rkit::HashMap<TKey, TValue, TSize>::SetPrehashedInternal(Iterator_t *outIterator, HashValue_t hash, TCandidateKey &&key, TCandidateValue &&value)
 {
 	TSize position = 0;
 	if (this->FindKeyPosition<TCandidateKey>(hash, key, position))
 	{
+		if constexpr (TWriteIterator)
+			*outIterator = Iterator_t(*this, position);
+
+		if constexpr (TReplaceKey)
+			this->m_keys[position] = std::forward<TCandidateKey>(key);
+
 		TValue *valuePtr = this->m_values.GetValuePtrAt(position);
 		return TValueConstructor::Assign(*valuePtr, std::forward<TCandidateValue>(value));
 	}
 
 	RKIT_CHECK(this->CreatePositionForNewEntry(hash, position));
+
+	if constexpr (TWriteIterator)
+		*outIterator = Iterator_t(*this, position);
 
 	{
 		RKIT_TRY_CATCH_RETHROW(TKeyConstructor::Construct(this->m_keys + position, std::forward<TCandidateKey>(key)),

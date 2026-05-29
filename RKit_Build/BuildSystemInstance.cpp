@@ -441,6 +441,7 @@ namespace rkit { namespace buildsystem
 
 			Result IndexCAS(BuildFileLocation location, const CIPathView &path, data::ContentID &outContentID) override;
 
+			Result AddUnorderedNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) override;
 			Result AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) override;
 			bool FindNodeTypeByFileExtension(const StringSliceView &ext, uint32_t &outNamespace, uint32_t &outType) const override;
 
@@ -1342,7 +1343,6 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(stream.ReadAll(&outNodeNamespace, sizeof(outNodeNamespace)));
 		RKIT_CHECK(stream.ReadAll(&outNodeType, sizeof(outNodeType)));
 
-
 		uint64_t contentSize = 0;
 		RKIT_CHECK(stream.ReadAll(&contentSize, sizeof(contentSize)));
 
@@ -1600,6 +1600,11 @@ namespace rkit { namespace buildsystem
 		RKIT_CHECK(m_dependencyNode->AddCASProduct(outContentID));
 
 		RKIT_RETURN_OK;
+	}
+
+	Result DependencyNode::DependencyNodeCompilerFeedback::AddUnorderedNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier)
+	{
+		RKIT_THROW(ResultCode::kNotYetImplemented);
 	}
 
 	Result DependencyNode::DependencyNodeCompilerFeedback::AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier)
@@ -2774,7 +2779,7 @@ namespace rkit { namespace buildsystem
 		const CachedFileStatus *cfs = fileStatus.Get();
 
 		FileLocationKey insertLocKey(location, fileStatus->m_status.m_filePath);
-		RKIT_CHECK(m_cachedFileStatus.Set(insertLocKey, std::move(fileStatus)));
+		RKIT_CHECK(m_cachedFileStatus.SetAndReplaceKey(insertLocKey, std::move(fileStatus)));
 
 		if (cfs->m_exists)
 			outStatusView = cfs->m_status.ToView();

@@ -146,6 +146,15 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 	}
 
 	{
+		rkit::UniquePtr<buildsystem::APEDepsCompiler> apeDepsCompiler;
+		RKIT_CHECK(buildsystem::APEDepsCompiler::Create(apeDepsCompiler));
+
+		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kAPEDepsNodeID, std::move(apeDepsCompiler)));
+
+		RKIT_CHECK(instance->RegisterNodeTypeByExtension(u8"apedeps", kAnoxNamespaceID, buildsystem::kAPEDepsNodeID));
+	}
+
+	{
 		rkit::UniquePtr<buildsystem::APEScriptCompiler> apeCompiler;
 		RKIT_CHECK(buildsystem::APEScriptCompiler::Create(apeCompiler));
 

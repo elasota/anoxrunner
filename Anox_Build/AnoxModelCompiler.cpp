@@ -16,9 +16,10 @@
 #include "rkit/Math/Vec.h"
 #include "rkit/Math/Quat.h"
 
-#include "anox/AnoxModule.h"
+#include "anox/Build/NodeIDs.h"
 #include "anox/Data/MDAModel.h"
 #include "anox/Data/MaterialData.h"
+#include "anox/AnoxModule.h"
 
 #include "AnoxMaterialCompiler.h"
 #include "AnoxPrecompiledMesh.h"

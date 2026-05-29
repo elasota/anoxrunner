@@ -192,6 +192,7 @@ namespace rkit
 			virtual Result IndexCAS(BuildFileLocation location, const CIPathView &path, data::ContentID &outContentID) = 0;
 			virtual Result AddAnonymousDeployableContent(BuildFileLocation location, const CIPathView &path) = 0;
 
+			virtual Result AddUnorderedNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) = 0;
 			virtual Result AddNodeDependency(uint32_t nodeTypeNamespace, uint32_t nodeTypeID, BuildFileLocation inputFileLocation, const StringView &identifier) = 0;
 			virtual bool FindNodeTypeByFileExtension(const StringSliceView &ext, uint32_t &outNamespace, uint32_t &outType) const = 0;
 

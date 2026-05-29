@@ -1,6 +1,7 @@
 #include "AnoxAPEScriptCompiler.h"
 #include "AnoxAPEWindowCommandData.generated.h"
 
+#include "anox/Build/NodeIDs.h"
 #include "anox/Data/APEScript.h"
 #include "anox/AnoxModule.h"
 #include "anox/Label.h"
@@ -123,6 +124,16 @@ namespace anox::buildsystem
 		rkit::IWriteStream &m_stream;
 	};
 
+
+	class APEDepsCompilerImpl : public rkit::OpaqueImplementation<APEDepsCompiler>
+	{
+	public:
+		friend class APEDepsCompilerImpl;
+
+		rkit::Result RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+		rkit::Result RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+	};
+
 	class APEScriptCompilerImpl : public rkit::OpaqueImplementation<APEScriptCompiler>
 	{
 	public:
@@ -132,7 +143,38 @@ namespace anox::buildsystem
 		rkit::Result RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 
 	private:
+		enum class DepResourceType
+		{
+			Script,
+			Image,
+			Texture,
+			Sound,
+			Font,
+			MusicSeg,
+			Particle,
+			Music,
+			Scene,
+			Model,
+			File,
+			Invalid,
+		};
+
 		typedef rkit::BasePath<false, rkit::DefaultPathTraits<rkit::PathTraitFlags::kIsCaseInsensitive | rkit::PathTraitFlags::kAllowWildcards>> WildcardPath_t;
+
+		struct DynamicResourceDef
+		{
+			rkit::AsciiString m_path;
+		};
+
+		struct DynamicResourceCategory
+		{
+			rkit::Vector<DynamicResourceDef> m_defs;
+		};
+
+		struct DynamicResourcesDictionary
+		{
+			rkit::HashMap<rkit::AsciiString, DynamicResourceCategory> m_resCategories;
+		};
 
 		struct WindowDef
 		{
@@ -199,11 +241,18 @@ namespace anox::buildsystem
 
 		static rkit::Result ReadAPEFile(rkit::IReadStream &stream, APEBlob& blob);
 
+		static rkit::Result ReadDepsCatalog(DynamicResourcesDictionary &resDict, const rkit::StringView &identifier, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+
 		static rkit::Result FormatExtraDepsPath(rkit::CIPath &outPath, const rkit::StringView &identifier);
 		static rkit::Result FormatAnalysisPath(rkit::CIPath &outPath, const rkit::StringView &identifier);
 		static rkit::Result FormatOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier);
-	};
 
+		static rkit::Result ResolveDepResourceType(DepResourceType &resType, const rkit::AsciiStringSliceView &categoryStr);
+		static rkit::Result NormalizeResourcePath(rkit::AsciiString &outString, DepResourceType resType, const rkit::AsciiStringSliceView &categoryStr);
+
+		template<class TFunc>
+		static rkit::Result ForEachDependency(const DynamicResourcesDictionary &dict, const TFunc &func);
+	};
 
 	class APEGroupCompilerImpl final : public rkit::OpaqueImplementation<APEGroupCompiler>
 	{
@@ -337,8 +386,48 @@ namespace anox::buildsystem
 		RKIT_RETURN_OK;
 	}
 
+
+	rkit::Result APEDepsCompilerImpl::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+	}
+
+	rkit::Result APEDepsCompilerImpl::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+	}
+
 	rkit::Result APEScriptCompilerImpl::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
+		DynamicResourcesDictionary depsDict;
+		RKIT_CHECK(ReadDepsCatalog(depsDict, depsNode->GetIdentifier(), feedback));
+
+		auto depsProcessFunc = [feedback](const rkit::AsciiStringSliceView &categoryName, const DynamicResourceCategory &category) -> rkit::Result
+			{
+				DepResourceType resType = DepResourceType::Invalid;
+
+				RKIT_CHECK(ResolveDepResourceType(resType, categoryName));
+
+				for (const DynamicResourceDef &resDef : category.m_defs)
+				{
+					rkit::AsciiString normalizedPath;
+					RKIT_CHECK(NormalizeResourcePath(normalizedPath, resType, resDef.m_path));
+
+					switch (resType)
+					{
+					case DepResourceType::Image:
+						RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kInterfaceMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, normalizedPath.ToUTF8View()));
+						break;
+					default:
+						RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+					}
+				}
+
+				RKIT_RETURN_OK;
+			};
+
+		RKIT_CHECK(ForEachDependency(depsDict, depsProcessFunc));
+
 		rkit::CIPath path;
 		RKIT_CHECK(path.Set(depsNode->GetIdentifier()));
 
@@ -434,7 +523,6 @@ namespace anox::buildsystem
 		}
 
 		APECompilerContext compilerCtx;
-
 
 		APEBlob blob;
 
@@ -2177,6 +2265,125 @@ namespace anox::buildsystem
 		RKIT_RETURN_OK;
 	}
 
+	rkit::Result APEScriptCompilerImpl::ReadDepsCatalog(DynamicResourcesDictionary &resDict, const rkit::StringView &identifier, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		rkit::Vector<char> depsFileContentsVector;
+
+		size_t fileSize = 0;
+		{
+			rkit::String pathStr;
+			RKIT_CHECK(pathStr.Format(u8"anox/apedeps/{}deps", identifier));
+
+			rkit::CIPath path;
+			RKIT_CHECK(path.Set(pathStr));
+
+			rkit::UniquePtr<rkit::ISeekableReadStream> inputFile;
+			RKIT_CHECK(feedback->TryOpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, path, inputFile));
+
+			if (!inputFile.IsValid())
+			{
+				resDict.m_resCategories.Clear();
+				RKIT_RETURN_OK;
+			}
+
+			if (inputFile->GetSize() > std::numeric_limits<size_t>::max())
+				RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
+
+			fileSize = static_cast<size_t>(inputFile->GetSize());
+			RKIT_CHECK(depsFileContentsVector.Resize(fileSize));
+			RKIT_CHECK(inputFile->ReadAllSpan(depsFileContentsVector.ToSpan()));
+		}
+
+		DynamicResourceCategory *category = nullptr;
+
+		const rkit::ConstSpan<char> depsFileContents = depsFileContentsVector.ToSpan();
+
+		size_t lineStart = 0;
+
+		while (lineStart < fileSize)
+		{
+			size_t nextLineStart = 0;
+			size_t lineEnd = lineStart;
+
+			for (;;)
+			{
+				if (lineEnd == fileSize)
+				{
+					nextLineStart = lineEnd;
+					break;
+				}
+
+				const char ch = depsFileContents[lineEnd];
+				if (ch == '\r')
+				{
+					nextLineStart = lineEnd + 1;
+					if (nextLineStart < fileSize && depsFileContents[nextLineStart] == '\n')
+						nextLineStart++;
+					break;
+				}
+				if (ch == '\n')
+				{
+					nextLineStart = lineEnd + 1;
+					break;
+				}
+
+				lineEnd++;
+			}
+
+			const rkit::ConstSpan<char> lineContentsSpan = depsFileContents.SubSpan(lineStart, lineEnd - lineStart);
+			lineStart = nextLineStart;
+
+			if (lineContentsSpan.Count() == 0)
+				continue;
+
+			if (!rkit::CharacterEncodingValidator<rkit::CharacterEncoding::kASCII>::ValidateSpan(lineContentsSpan))
+			{
+				rkit::log::Error(u8"Invalid ASCII path");
+				RKIT_THROW(rkit::ResultCode::kInvalidUnicode);
+			}
+
+			const rkit::AsciiStringSliceView lineContents(lineContentsSpan);
+
+			if (lineContents.StartsWith("["))
+			{
+				if (!lineContents.EndsWith("]"))
+				{
+					rkit::log::Error(u8"Invalid category");
+					RKIT_THROW(rkit::ResultCode::kInvalidUnicode);
+				}
+
+				rkit::AsciiString categoryStr;
+				RKIT_CHECK(categoryStr.Set(lineContents.SubString(1, lineContents.Length() - 2)));
+
+				const rkit::HashValue_t hash = rkit::Hasher<rkit::AsciiString>::ComputeHash(0, categoryStr);
+				const rkit::HashMap<rkit::AsciiString, DynamicResourceCategory>::Iterator_t existingIt = resDict.m_resCategories.FindPrehashed(hash, categoryStr);
+				if (existingIt == resDict.m_resCategories.end())
+				{
+					rkit::HashMap<rkit::AsciiString, DynamicResourceCategory>::Iterator_t newIt;
+					RKIT_CHECK(resDict.m_resCategories.SetAndGetIterator(newIt, std::move(categoryStr), DynamicResourceCategory()));
+
+					category = &newIt.Value();
+				}
+				else
+					category = &existingIt.Value();
+			}
+			else
+			{
+				if (!category)
+				{
+					rkit::log::Error(u8"File was specified outside of a category");
+					RKIT_THROW(rkit::ResultCode::kInvalidUnicode);
+				}
+
+				DynamicResourceDef resDef;
+				RKIT_CHECK(resDef.m_path.Set(lineContents));
+				RKIT_CHECK(category->m_defs.Append(std::move(resDef)));
+			}
+		}
+
+		RKIT_RETURN_OK;
+	}
+
 	rkit::Result APEScriptCompilerImpl::FormatAnalysisPath(rkit::CIPath &outPath, const rkit::StringView &identifier)
 	{
 		rkit::String formattedPath;
@@ -2198,6 +2405,144 @@ namespace anox::buildsystem
 		return outPath.Set(formattedPath);
 	}
 
+
+	rkit::Result APEScriptCompilerImpl::ResolveDepResourceType(DepResourceType &resType, const rkit::AsciiStringSliceView &categoryStr)
+	{
+		size_t openBracePos = 0;
+		while (openBracePos < categoryStr.Length())
+		{
+			if (categoryStr[openBracePos] == '(')
+				break;
+			else
+				openBracePos++;
+		}
+
+		const rkit::AsciiStringSliceView assetTypeName = categoryStr.SubString(0, openBracePos);
+
+		if (assetTypeName.EqualsNoCase("image"))
+			resType = DepResourceType::Image;
+		else if (assetTypeName.EqualsNoCase("texture"))
+			resType = DepResourceType::Texture;
+		else if (assetTypeName.EqualsNoCase("sound"))
+			resType = DepResourceType::Sound;
+		else if (assetTypeName.EqualsNoCase("font"))
+			resType = DepResourceType::Font;
+		else if (assetTypeName.EqualsNoCase("musicseg"))
+			resType = DepResourceType::MusicSeg;
+		else if (assetTypeName.EqualsNoCase("music"))
+			resType = DepResourceType::Music;
+		else if (assetTypeName.EqualsNoCase("particle"))
+			resType = DepResourceType::Particle;
+		else if (assetTypeName.EqualsNoCase("scene"))
+			resType = DepResourceType::Scene;
+		else if (assetTypeName.EqualsNoCase("model"))
+			resType = DepResourceType::Model;
+		else if (assetTypeName.EqualsNoCase("file"))
+			resType = DepResourceType::File;
+		else
+		{
+			rkit::log::Error(u8"Unknown asset type name");
+			RKIT_THROW(rkit::ResultCode::kDataError);
+		}
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result APEScriptCompilerImpl::NormalizeResourcePath(rkit::AsciiString &outString, DepResourceType resType, const rkit::AsciiStringSliceView &categoryStr)
+	{
+		rkit::AsciiStringView prefixStr;
+
+		switch (resType)
+		{
+		case DepResourceType::Image:
+			prefixStr = rkit::AsciiStringView("gameflow/");
+			break;
+		default:
+			break;
+		}
+
+		rkit::Vector<char> resultChars;
+		RKIT_CHECK(resultChars.Append(prefixStr.ToSpan()));
+
+		for (char ch : categoryStr)
+		{
+			if (ch == '\\' || ch == '/')
+			{
+				if (resultChars.Count() > 0 && resultChars[resultChars.Count() - 1] != '/')
+				{
+					RKIT_CHECK(resultChars.Append('/'));
+				}
+			}
+			else
+			{
+				if (ch >= 'A' && ch <= 'Z')
+					ch = ch - 'A' + 'a';
+
+				RKIT_CHECK(resultChars.Append(ch));
+			}
+		}
+
+		bool shouldRemoveExtension = false;
+
+		switch (resType)
+		{
+		case DepResourceType::Image:
+			shouldRemoveExtension = true;
+			break;
+		default:
+			break;
+		}
+
+		if (shouldRemoveExtension)
+		{
+			size_t extPos = resultChars.Count();
+			while (extPos > 0)
+			{
+				const char ch = resultChars[--extPos];
+				if (ch == '.')
+				{
+					resultChars.ShrinkToSize(extPos);
+					break;
+				}
+
+				if (ch == '/')
+					break;
+			}
+		}
+
+		rkit::AsciiStringConstructionBuffer cbuf;
+		RKIT_CHECK(cbuf.Allocate(resultChars.Count()));
+		RKIT_CHECK(rkit::CopySpanNonOverlapping(cbuf.GetSpan(), resultChars.ToSpan()));
+
+		outString = rkit::AsciiString(std::move(cbuf));
+
+		RKIT_RETURN_OK;
+	}
+
+	template<class TFunc>
+	rkit::Result APEScriptCompilerImpl::ForEachDependency(const DynamicResourcesDictionary &dict, const TFunc &func)
+	{
+		typedef rkit::Pair<const rkit::AsciiString *, const DynamicResourceCategory *> KeyValuePair_t;
+		rkit::Vector<KeyValuePair_t> sortedCategories;
+
+		for (const rkit::HashMapKeyValueView<rkit::AsciiString, const DynamicResourceCategory> &kvp : dict.m_resCategories)
+		{
+			RKIT_CHECK(sortedCategories.Append(KeyValuePair_t(&kvp.Key(), &kvp.Value())));
+		}
+
+		rkit::QuickSort(sortedCategories.begin(), sortedCategories.end(), [](const KeyValuePair_t &a, const KeyValuePair_t &b)
+			{
+				return (*a.First()) < (*b.First());
+			});
+
+		for (const KeyValuePair_t &kvp : sortedCategories)
+		{
+			RKIT_CHECK(func(*kvp.First(), *kvp.Second()));
+		}
+
+		RKIT_RETURN_OK;
+	}
+
 	bool APEScriptCompiler::HasAnalysisStage() const
 	{
 		return true;
@@ -2215,7 +2560,7 @@ namespace anox::buildsystem
 
 	uint32_t APEScriptCompiler::GetVersion() const
 	{
-		return 8;
+		return 10;
 	}
 
 	rkit::Result APEScriptCompiler::FormatOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier)
@@ -2344,7 +2689,33 @@ namespace anox::buildsystem
 	{
 		return rkit::New<APEGroupCompiler>(outCompiler);
 	}
+	
+	bool APEDepsCompiler::HasAnalysisStage() const
+	{
+		return true;
+	}
+
+	rkit::Result APEDepsCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		return Impl().RunAnalysis(depsNode, feedback);
+	}
+
+	rkit::Result APEDepsCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		return Impl().RunCompile(depsNode, feedback);
+	}
+
+	uint32_t APEDepsCompiler::GetVersion() const
+	{
+		return 1;
+	}
+
+	rkit::Result APEDepsCompiler::Create(rkit::UniquePtr<APEDepsCompiler> &outCompiler)
+	{
+		return rkit::New<APEDepsCompiler>(outCompiler);
+	}
 }
 
+RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR(anox::buildsystem::APEDepsCompilerImpl)
 RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR(anox::buildsystem::APEScriptCompilerImpl)
 RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR(anox::buildsystem::APEGroupCompilerImpl)

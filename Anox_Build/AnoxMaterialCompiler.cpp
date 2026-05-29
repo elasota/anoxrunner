@@ -22,6 +22,7 @@
 #include "rkit/Png/PngDriver.h"
 
 #include "AnoxTextureCompiler.h"
+#include "anox/Build/NodeIDs.h"
 
 namespace anox { namespace buildsystem
 {
@@ -1341,12 +1342,6 @@ namespace anox { namespace buildsystem
 
 	rkit::Result MaterialCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
-		if (depsNode->GetIdentifier() == u8"interface/windows/style_simplebox")
-		{
-			int n = 0;
-			(void)n;
-		}
-
 		const rkit::StringView identifier = depsNode->GetIdentifier();
 
 		rkit::String shortName;

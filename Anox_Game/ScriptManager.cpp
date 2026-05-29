@@ -61,9 +61,9 @@ namespace anox::game
 		rkit::Vector<ScriptSwitch> m_switches;
 		rkit::Vector<ScriptExpression> m_expressions;
 		rkit::Vector<rkit::ByteString> m_strings;
-		rkit::Vector<rkit::Span<const uint32_t>> m_operandLists;
+		rkit::Vector<rkit::Span<ScriptExprValue>> m_operandLists;
 
-		rkit::Vector<uint32_t> m_allOperands;
+		rkit::Vector<ScriptExprValue> m_allOperands;
 		rkit::Vector<uint8_t> m_allWindowCommands;
 		rkit::Vector<ScriptSwitchCommand> m_allSwitchCommands;
 
@@ -681,15 +681,23 @@ namespace anox::game
 			RKIT_CHECK(rkit::SafeAdd<size_t>(totalOperands, totalOperands, operandListCount));
 		}
 
-		rkit::Vector<uint32_t> operands;
+		rkit::Vector<ScriptExprValue> operands;
 		RKIT_CHECK(operands.Resize(totalOperands));
 
-		RKIT_CHECK(stream.ReadAllSpan(operands.ToSpan()));
+		{
+			rkit::Vector<data::ape::ExpressionValue> inOperands;
+			RKIT_CHECK(inOperands.Resize(totalOperands));
 
-		for (uint32_t &operand : operands)
-			rkit::endian::LittleUInt32_t::StaticConvertToHostOrderInPlace(operand);
+			RKIT_CHECK(stream.ReadAllSpan(inOperands.ToSpan()));
 
-		rkit::Vector<rkit::Span<const uint32_t>> operandLists;
+			rkit::ProcessParallelSpans(operands.ToSpan(), inOperands.ToSpan(), [](ScriptExprValue &outExprValue, const data::ape::ExpressionValue &inExprValue)
+				{
+					outExprValue.m_exprType = inExprValue.m_exprType;
+					outExprValue.m_index = inExprValue.m_index.Get();
+				});
+		}
+
+		rkit::Vector<rkit::Span<ScriptExprValue>> operandLists;
 		RKIT_CHECK(operandLists.Reserve(numOperandLists));
 
 		{
