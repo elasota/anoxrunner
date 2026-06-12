@@ -424,14 +424,14 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanPipelineLibraryLoader::Initialize()
 	{
-		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
-		IUtilitiesDriver *utilsDriver = GetDrivers().m_utilitiesDriver;
+		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
+		IUtilitiesDriver &utilsDriver = *GetDrivers().m_utilitiesDriver;
 
-		RKIT_CHECK(sysDriver->CreateMutex(m_packageStreamMutex));
-		RKIT_CHECK(sysDriver->CreateMutex(m_cacheStreamMutex));
-		RKIT_CHECK(sysDriver->CreateMutex(m_shaderModuleMutex));
+		RKIT_CHECK(sysDriver.CreateMutex(m_packageStreamMutex));
+		RKIT_CHECK(sysDriver.CreateMutex(m_cacheStreamMutex));
+		RKIT_CHECK(sysDriver.CreateMutex(m_shaderModuleMutex));
 
-		ConfigHashComputer hashComputer(utilsDriver->GetSha256Calculator());
+		ConfigHashComputer hashComputer(utilsDriver.GetSha256Calculator());
 		RKIT_CHECK(m_validator->WriteConfig(hashComputer));
 
 		m_configHashBytes = hashComputer.FinishSHA();

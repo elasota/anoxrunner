@@ -33,7 +33,7 @@ namespace rkit
 	{
 		inline void VMessageFmt(LogSeverity severity, const rkit::StringSliceView &fmt, const FormatParameterList<Utf8Char_t> &args)
 		{
-			if (ILogDriver *logDriver = GetDrivers().m_logDriver)
+			if (ILogDriver *logDriver = GetDrivers().m_logDriver.Get())
 				logDriver->VLogMessage(severity, fmt, args);
 		}
 
@@ -45,7 +45,7 @@ namespace rkit
 
 		inline void Message(LogSeverity severity, const rkit::StringSliceView &msg)
 		{
-			if (ILogDriver *logDriver = GetDrivers().m_logDriver)
+			if (ILogDriver *logDriver = GetDrivers().m_logDriver.Get())
 				logDriver->LogMessage(severity, msg);
 		}
 

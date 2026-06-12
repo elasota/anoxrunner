@@ -1,5 +1,7 @@
 #pragma once
 
+#include "RKitAssert.h"
+
 namespace rkit
 {
 	struct IMallocDriver;
@@ -11,20 +13,35 @@ namespace rkit
 		void *m_mem;
 		IMallocDriver *m_alloc;
 
-		operator T *() const;
+		T& operator*() const;
 		T *operator->() const;
 
 		template<class TOther>
 		operator SimpleObjectAllocation<TOther>() const;
 
+		T *Get() const;
+		bool IsValid() const;
 		void Clear();
 	};
 }
 
 template<class T>
-rkit::SimpleObjectAllocation<T>::operator T *() const
+T& rkit::SimpleObjectAllocation<T>::operator*() const
+{
+	RKIT_ASSERT(m_obj != nullptr);
+	return *m_obj;
+}
+
+template<class T>
+T *rkit::SimpleObjectAllocation<T>::Get() const
 {
 	return m_obj;
+}
+
+template<class T>
+bool rkit::SimpleObjectAllocation<T>::IsValid() const
+{
+	return m_obj != nullptr;
 }
 
 template<class T>

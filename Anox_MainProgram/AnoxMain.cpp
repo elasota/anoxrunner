@@ -48,12 +48,12 @@ void anox::MainProgramDriver::ShutdownDriver()
 
 rkit::Result anox::MainProgramDriver::InitProgram()
 {
-	rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
-	rkit::IUtilitiesDriver *utilsDriver = rkit::GetDrivers().m_utilitiesDriver;
+	rkit::ISystemDriver &sysDriver = *rkit::GetDrivers().m_systemDriver;
+	rkit::IUtilitiesDriver &utilsDriver = *rkit::GetDrivers().m_utilitiesDriver;
 
 	RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->SetProgramName(u8"Anox Runner"));
 
-	rkit::Span<const rkit::StringView> args = sysDriver->GetCommandLine();
+	rkit::Span<const rkit::StringView> args = sysDriver.GetCommandLine();
 
 	bool autoBuild = false;
 	bool run = false;
@@ -196,11 +196,11 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 
 	if (dataDirectory.Length() > 0)
 	{
-		RKIT_CHECK(sysDriver->SetGameDirectoryOverride(dataDirectory));
+		RKIT_CHECK(sysDriver.SetGameDirectoryOverride(dataDirectory));
 	}
 
 	// FIXME: Move this to RKit Config
-	RKIT_CHECK(sysDriver->SetSettingsDirectory(u8"AnoxRunner"));
+	RKIT_CHECK(sysDriver.SetSettingsDirectory(u8"AnoxRunner"));
 
 	if (autoBuild)
 	{

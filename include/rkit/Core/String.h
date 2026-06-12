@@ -295,7 +295,7 @@ rkit::BaseStringConstructionBuffer<TChar>::~BaseStringConstructionBuffer()
 template<class TChar>
 rkit::Result rkit::BaseStringConstructionBuffer<TChar>::Allocate(size_t numChars)
 {
-	return Allocate(numChars, GetDrivers().m_mallocDriver);
+	return Allocate(numChars, GetDrivers().m_mallocDriver.Get());
 }
 
 template<class TChar>

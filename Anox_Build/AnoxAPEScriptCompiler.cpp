@@ -1491,12 +1491,12 @@ namespace anox::buildsystem
 							RKIT_THROW(rkit::ResultCode::kDataError);
 						}
 
-						rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
+						rkit::IUtilitiesDriver &utils = *rkit::GetDrivers().m_utilitiesDriver;
 
 						// FIXME: Make a function for this
 						uint32_t labelHigh = 0;
 						uint32_t labelLow = 0;
-						if (!utils->ParseUInt32(arg.SubString(0, splitPos.Get()), 10, labelHigh) || !utils->ParseUInt32(arg.SubString(splitPos.Get() + 1), 10, labelLow) || !Label::IsValid(labelHigh, labelLow))
+						if (!utils.ParseUInt32(arg.SubString(0, splitPos.Get()), 10, labelHigh) || !utils.ParseUInt32(arg.SubString(splitPos.Get() + 1), 10, labelLow) || !Label::IsValid(labelHigh, labelLow))
 						{
 							rkit::log::Error(u8"Invalid label");
 							RKIT_THROW(rkit::ResultCode::kDataError);

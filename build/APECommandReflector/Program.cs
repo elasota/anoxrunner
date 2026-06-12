@@ -153,11 +153,40 @@ namespace APEWindowCommandReflector
             List<ExternCommandDef> externDefs = ParseExternCommandDefs(defLines);
 
             string outBuildDir = Path.Combine(outPath, "Anox_Build").Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            string outGameDir = Path.Combine(outPath, "Anox_Game").Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
             string outDataIncludeDir = Path.Combine(outPath, "include", "anox", "Data").Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
             string outGameIncludeDir = Path.Combine(outPath, "include", "anox", "Game").Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
 
+            Directory.CreateDirectory(outGameDir);
             Directory.CreateDirectory(outBuildDir);
             Directory.CreateDirectory(outDataIncludeDir);
+
+            using (StreamWriter sw = new StreamWriter(Path.Combine(outGameDir, "APEExternDispatch.generated.h")))
+            {
+                sw.NewLine = "\n";
+                sw.WriteLine("#pragma once");
+                sw.WriteLine();
+                sw.WriteLine("#include \"anox/Game/APEExternOpcodes.generated.h\"");
+                sw.WriteLine();
+                sw.WriteLine("namespace anox::game::ape");
+                sw.WriteLine("{");
+                sw.WriteLine("\tstruct ExternDispatchContext;");
+                sw.WriteLine("\tstruct ScriptExprValue;");
+                sw.WriteLine("}");
+                sw.WriteLine();
+                sw.WriteLine("namespace anox::game::ape::externs");
+                sw.WriteLine("{");
+                foreach (ExternCommandDef def in externDefs)
+                {
+                    sw.WriteLine("\tclass " + def.Name);
+                    sw.WriteLine("\t{");
+                    sw.WriteLine("\tpublic:");
+                    sw.WriteLine("\t\tstatic constexpr ExternOpcode kOpcode = ExternOpcode::" + def.Name + ";");
+                    sw.WriteLine("\t\tstatic rkit::ResultCoroutine Dispatch(rkit::ICoroThread &thread, const ExternDispatchContext &dispatchContext);");
+                    sw.WriteLine("\t};");
+                }
+                sw.WriteLine("}");
+            }
 
             using (StreamWriter sw = new StreamWriter(Path.Combine(outGameIncludeDir, "APEExternOpcodes.generated.h")))
             {
@@ -165,8 +194,12 @@ namespace APEWindowCommandReflector
 
                 sw.WriteLine("#pragma once");
                 sw.WriteLine();
+                sw.WriteLine("#include <stddef.h>");
+                sw.WriteLine();
                 sw.WriteLine("namespace anox::game::ape");
                 sw.WriteLine("{");
+                sw.WriteLine("\tstatic constexpr size_t kNumExternOpcodes = " + externDefs.Count.ToString() + ";");
+                sw.WriteLine();
                 sw.WriteLine("\tenum class ExternOpcode");
                 sw.WriteLine("\t{");
 

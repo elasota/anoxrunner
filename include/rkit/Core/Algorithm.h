@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <type_traits>
 #include <compare>
+#include <bit>
 
 namespace rkit
 {
@@ -78,10 +79,10 @@ namespace rkit
 		bool operator!=(const TSubType &other) const;
 	};
 
-	template<class TLeft, class TRight>
+	template<class TLeft, class TRight, class TOrdering>
 	struct DefaultComparer
 	{
-		static std::partial_ordering CompareOrdered(const TLeft &a, const TRight &b);
+		static TOrdering CompareOrdered(const TLeft &a, const TRight &b);
 		static bool CompareEqual(const TLeft &a, const TRight &b);
 		static bool CompareNotEqual(const TLeft &a, const TRight &b);
 		static bool CompareLess(const TLeft &a, const TRight &b);
@@ -95,7 +96,7 @@ namespace rkit
 		template<class TLeft, class TRight>
 		bool operator()(const TLeft &a, const TRight &b) const
 		{
-			return DefaultComparer<TLeft, TRight>::CompareEqual(a, b);
+			return DefaultComparer<TLeft, TRight, void>::CompareEqual(a, b);
 		}
 	};
 
@@ -104,7 +105,7 @@ namespace rkit
 		template<class TLeft, class TRight>
 		bool operator()(const TLeft &a, const TRight &b) const
 		{
-			return DefaultComparer<TLeft, TRight>::CompareNotEqual(a, b);
+			return DefaultComparer<TLeft, TRight, void>::CompareNotEqual(a, b);
 		}
 	};
 
@@ -113,7 +114,7 @@ namespace rkit
 		template<class TLeft, class TRight>
 		bool operator()(const TLeft &a, const TRight &b) const
 		{
-			return DefaultComparer<TLeft, TRight>::CompareLess(a, b);
+			return DefaultComparer<TLeft, TRight, void>::CompareLess(a, b);
 		}
 	};
 
@@ -122,7 +123,7 @@ namespace rkit
 		template<class TLeft, class TRight>
 		bool operator()(const TLeft &a, const TRight &b) const
 		{
-			return DefaultComparer<TLeft, TRight>::CompareLessEqual(a, b);
+			return DefaultComparer<TLeft, TRight, void>::CompareLessEqual(a, b);
 		}
 	};
 
@@ -131,7 +132,7 @@ namespace rkit
 		template<class TLeft, class TRight>
 		bool operator()(const TLeft &a, const TRight &b) const
 		{
-			return DefaultComparer<TLeft, TRight>::CompareGreater(a, b);
+			return DefaultComparer<TLeft, TRight, void>::CompareGreater(a, b);
 		}
 	};
 
@@ -140,7 +141,7 @@ namespace rkit
 		template<class TLeft, class TRight>
 		bool operator()(const TLeft &a, const TRight &b) const
 		{
-			return DefaultComparer<TLeft, TRight>::CompareGreaterEqual(a, b);
+			return DefaultComparer<TLeft, TRight, void>::CompareGreaterEqual(a, b);
 		}
 	};
 
@@ -246,6 +247,7 @@ namespace rkit
 		{
 			static int FindLowestSetBit(T value);
 			static int FindHighestSetBit(T value);
+			static int CountSetBits(T value);
 		};
 	}
 
@@ -303,22 +305,22 @@ namespace rkit
 	template<class T>
 	void MoveSpan(const Span<T> &dest, const Span<T> &src);
 
-	template<class T, class TComparer = DefaultComparer<T, T>>
+	template<class T, class TComparer = DefaultComparer<T, T, void>>
 	bool CompareSpansEqual(const Span<const T> &dest, const Span<const T> &src);
 
-	template<class T, class TComparer = DefaultComparer<T, T>>
+	template<class T, class TComparer = DefaultComparer<T, T, void>>
 	bool CompareSpansEqual(const Span<const T> &dest, const Span<T> &src);
 
-	template<class T, class TComparer = DefaultComparer<T, T>>
+	template<class T, class TComparer = DefaultComparer<T, T, void>>
 	bool CompareSpansEqual(const Span<T> &dest, const Span<const T> &src);
 
-	template<class T, class TComparer = DefaultComparer<T, T>, class TOrdering = std::partial_ordering>
+	template<class T, class TComparer = DefaultComparer<T, T, std::partial_ordering>, class TOrdering = std::partial_ordering>
 	TOrdering CompareSpans(const Span<const T> &dest, const Span<const T> &src);
 
-	template<class T, class TComparer = DefaultComparer<T, T>, class TOrdering = std::partial_ordering>
+	template<class T, class TComparer = DefaultComparer<T, T, std::partial_ordering>, class TOrdering = std::partial_ordering>
 	TOrdering CompareSpans(const Span<T> &dest, const Span<const T> &src);
 
-	template<class T, class TComparer = DefaultComparer<T, T>, class TOrdering = std::partial_ordering>
+	template<class T, class TComparer = DefaultComparer<T, T, std::partial_ordering>, class TOrdering = std::partial_ordering>
 	TOrdering CompareSpans(const Span<const T> &dest, const Span<T> &src);
 
 	template<class T>
@@ -326,6 +328,9 @@ namespace rkit
 
 	template<class T>
 	int FindHighestSetBit(T value);
+
+	template<class T>
+	int CountSetBits(T value);
 
 	template<class T>
 	void Swap(T &a, T &b);
@@ -462,44 +467,44 @@ T rkit::Max(const T &a, const T &b)
 	return b;
 }
 
-template<class TLeft, class TRight>
-std::partial_ordering rkit::DefaultComparer<TLeft, TRight>::CompareOrdered(const TLeft &a, const TRight &b)
+template<class TLeft, class TRight, class TOrdering>
+TOrdering rkit::DefaultComparer<TLeft, TRight, TOrdering>::CompareOrdered(const TLeft &a, const TRight &b)
 {
 	return a <=> b;
 }
 
-template<class TLeft, class TRight>
-bool rkit::DefaultComparer<TLeft, TRight>::CompareEqual(const TLeft &a, const TRight &b)
+template<class TLeft, class TRight, class TOrdering>
+bool rkit::DefaultComparer<TLeft, TRight, TOrdering>::CompareEqual(const TLeft &a, const TRight &b)
 {
 	return a == b;
 }
 
-template<class TLeft, class TRight>
-bool rkit::DefaultComparer<TLeft, TRight>::CompareNotEqual(const TLeft &a, const TRight &b)
+template<class TLeft, class TRight, class TOrdering>
+bool rkit::DefaultComparer<TLeft, TRight, TOrdering>::CompareNotEqual(const TLeft &a, const TRight &b)
 {
 	return a != b;
 }
 
-template<class TLeft, class TRight>
-bool rkit::DefaultComparer<TLeft, TRight>::CompareLess(const TLeft &a, const TRight &b)
+template<class TLeft, class TRight, class TOrdering>
+bool rkit::DefaultComparer<TLeft, TRight, TOrdering>::CompareLess(const TLeft &a, const TRight &b)
 {
 	return a < b;
 }
 
-template<class TLeft, class TRight>
-bool rkit::DefaultComparer<TLeft, TRight>::CompareLessEqual(const TLeft &a, const TRight &b)
+template<class TLeft, class TRight, class TOrdering>
+bool rkit::DefaultComparer<TLeft, TRight, TOrdering>::CompareLessEqual(const TLeft &a, const TRight &b)
 {
 	return a <= b;
 }
 
-template<class TLeft, class TRight>
-bool rkit::DefaultComparer<TLeft, TRight>::CompareGreater(const TLeft &a, const TRight &b)
+template<class TLeft, class TRight, class TOrdering>
+bool rkit::DefaultComparer<TLeft, TRight, TOrdering>::CompareGreater(const TLeft &a, const TRight &b)
 {
 	return a > b;
 }
 
-template<class TLeft, class TRight>
-bool rkit::DefaultComparer<TLeft, TRight>::CompareGreaterEqual(const TLeft &a, const TRight &b)
+template<class TLeft, class TRight, class TOrdering>
+bool rkit::DefaultComparer<TLeft, TRight, TOrdering>::CompareGreaterEqual(const TLeft &a, const TRight &b)
 {
 	return a >= b;
 }
@@ -823,6 +828,12 @@ int rkit::priv::FindBitsHelper<T, true>::FindHighestSetBit(T value)
 }
 
 template<class T>
+int rkit::priv::FindBitsHelper<T, true>::CountSetBits(T value)
+{
+	return std::popcount(value);
+}
+
+template<class T>
 void rkit::priv::SpanOpsHelper<T, true>::CopyConstructSpan(const Span<T> &dest, const Span<const T> &src)
 {
 	RKIT_ASSERT(dest.Count() == src.Count());
@@ -944,12 +955,12 @@ TOrdering rkit::CompareSpans(const Span<const T> &srcA, const Span<const T> &src
 
 	for (size_t i = 0; i < sz; i++)
 	{
-		const std::partial_ordering cmp = TComparer::Compare(ptrsA[i], ptrsB[i]);
-		if (cmp != std::partial_ordering::equivalent)
+		const TOrdering cmp = TComparer::CompareOrdered(ptrsA[i], ptrsB[i]);
+		if (cmp != std::strong_ordering::equal)
 			return cmp;
 	}
 
-	return std::partial_ordering::equivalent;
+	return std::strong_ordering::equal;
 }
 
 template<class T, class TComparer, class TOrdering>
@@ -967,13 +978,19 @@ TOrdering rkit::CompareSpans(const Span<T> &srcA, const Span<const T> &srcB)
 template<class T>
 int rkit::FindLowestSetBit(T value)
 {
-	return rkit::priv::FindBitsHelper<T, std::is_integral<T>::value &&std::is_unsigned<T>::value>::FindLowestSetBit(value);
+	return rkit::priv::FindBitsHelper<T, std::is_integral<T>::value && std::is_unsigned<T>::value>::FindLowestSetBit(value);
 }
 
 template<class T>
 int rkit::FindHighestSetBit(T value)
 {
-	return rkit::priv::FindBitsHelper<T, std::is_integral<T>::value &&std::is_unsigned<T>::value>::FindHighestSetBit(value);
+	return rkit::priv::FindBitsHelper<T, std::is_integral<T>::value && std::is_unsigned<T>::value>::FindHighestSetBit(value);
+}
+
+template<class T>
+int rkit::CountSetBits(T value)
+{
+	return rkit::priv::FindBitsHelper<T, std::is_integral<T>::value && std::is_unsigned<T>::value>::CountSetBits(value);
 }
 
 

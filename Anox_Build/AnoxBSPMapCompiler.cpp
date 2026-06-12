@@ -1039,17 +1039,17 @@ namespace anox { namespace buildsystem
 
 				const rkit::ConstSpan<uint8_t> valueChars = propertyValue.ToSpan();
 
-				rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
+				rkit::IUtilitiesDriver &utils = *rkit::GetDrivers().m_utilitiesDriver;
 				uint32_t labelHigh = 0;
 				uint32_t labelLow = 0;
 
 				// FIXME: Crappy type punning
-				if (!utils->ParseUInt32(rkit::ByteStringSliceView(valueChars.SubSpan(0, colonPos.Get())), 10, labelHigh))
+				if (!utils.ParseUInt32(rkit::ByteStringSliceView(valueChars.SubSpan(0, colonPos.Get())), 10, labelHigh))
 				{
 					rkit::log::Error(u8"Invalid label value");
 					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
-				if (!utils->ParseUInt32(rkit::ByteStringSliceView(valueChars.SubSpan(colonPos.Get() + 1)), 10, labelLow))
+				if (!utils.ParseUInt32(rkit::ByteStringSliceView(valueChars.SubSpan(colonPos.Get() + 1)), 10, labelLow))
 				{
 					rkit::log::Error(u8"Invalid label value");
 					RKIT_THROW(rkit::ResultCode::kDataError);
@@ -1089,7 +1089,7 @@ namespace anox { namespace buildsystem
 
 	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseFloatSequence(const rkit::Span<uint8_t> &span, size_t numFloats, const rkit::ByteStringSliceView &propertyValue)
 	{
-		rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
+		rkit::IUtilitiesDriver &utils = *rkit::GetDrivers().m_utilitiesDriver;
 
 		size_t startPos = 0;
 		for (size_t floatIndex = 0; floatIndex < numFloats; floatIndex++)
@@ -1112,7 +1112,7 @@ namespace anox { namespace buildsystem
 			}
 
 			float f = 0.f;
-			if (!utils->ParseFloat(rkit::ByteStringSliceView(charsSpan), f))
+			if (!utils.ParseFloat(rkit::ByteStringSliceView(charsSpan), f))
 			{
 				rkit::log::Error(u8"Malformed float value");
 				RKIT_THROW(rkit::ResultCode::kDataError);

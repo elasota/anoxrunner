@@ -1093,7 +1093,7 @@ namespace anox { namespace buildsystem
 		if (allFullFrame)
 			RKIT_RETURN_OK;
 
-		rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
+		rkit::IUtilitiesDriver &utils = *rkit::GetDrivers().m_utilitiesDriver;
 
 		rkit::Vector<rkit::RCPtr<rkit::utils::IImage>> baseBitmaps;
 		rkit::Vector<rkit::RCPtr<rkit::utils::IImage>> frameImages;
@@ -1213,11 +1213,11 @@ namespace anox { namespace buildsystem
 
 						{
 							rkit::UniquePtr<rkit::utils::IImage> currentFrameImageUPtr;
-							RKIT_CHECK(utils->CloneImage(currentFrameImageUPtr, *prevFrameImage));
+							RKIT_CHECK(utils.CloneImage(currentFrameImageUPtr, *prevFrameImage));
 							RKIT_CHECK(rkit::MakeRC(currentFrameImage, std::move(currentFrameImageUPtr)));
 						}
 
-						RKIT_CHECK(utils->BlitImageSigned(*currentFrameImage, *currentFrameBitmap, 0, 0, frameDef.m_xOffset, frameDef.m_yOffset, currentFrameBitmap->GetWidth(), currentFrameBitmap->GetHeight()));
+						RKIT_CHECK(utils.BlitImageSigned(*currentFrameImage, *currentFrameBitmap, 0, 0, frameDef.m_xOffset, frameDef.m_yOffset, currentFrameBitmap->GetWidth(), currentFrameBitmap->GetHeight()));
 
 						frameImages[currentFrame] = currentFrameImage;
 

@@ -703,8 +703,8 @@ namespace rkit { namespace render { namespace vulkan
 			ISystemLibrary &m_lib;
 		};
 
-		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
-		RKIT_CHECK(sysDriver->OpenSystemLibrary(m_vkLibrary, SystemLibraryType::kVulkan));
+		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
+		RKIT_CHECK(sysDriver.OpenSystemLibrary(m_vkLibrary, SystemLibraryType::kVulkan));
 
 		GlobalFunctionResolver resolver(*this, *m_vkLibrary);
 
@@ -738,8 +738,8 @@ namespace rkit { namespace render { namespace vulkan
 			VkInstance m_inst;
 		};
 
-		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
-		RKIT_CHECK(sysDriver->OpenSystemLibrary(m_vkLibrary, SystemLibraryType::kVulkan));
+		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
+		RKIT_CHECK(sysDriver.OpenSystemLibrary(m_vkLibrary, SystemLibraryType::kVulkan));
 
 		InstanceFunctionResolver resolver(*this, m_vkInstance);
 
@@ -929,9 +929,9 @@ namespace rkit { namespace render { namespace vulkan
 
 		m_validationLevel = initParams->m_validationLevel;
 
-		m_alloc = GetDrivers().m_mallocDriver;
+		m_alloc = GetDrivers().m_mallocDriver.Get();
 
-		IUtilitiesDriver *utils = GetDrivers().m_utilitiesDriver;
+		IUtilitiesDriver &utils = *GetDrivers().m_utilitiesDriver;
 
 		RKIT_CHECK(LoadVulkanGlobalAPI());
 
@@ -1064,15 +1064,15 @@ namespace rkit { namespace render { namespace vulkan
 
 		VkApplicationInfo appInfo = {};
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-		appInfo.pApplicationName = ReinterpretUtf8CharToAnsiChar(utils->GetProgramName().GetChars());
+		appInfo.pApplicationName = ReinterpretUtf8CharToAnsiChar(utils.GetProgramName().GetChars());
 
 		uint32_t vMajor = 0;
 		uint32_t vMinor = 0;
 		uint32_t vPatch = 0;
-		utils->GetProgramVersion(vMajor, vMinor, vPatch);
+		utils.GetProgramVersion(vMajor, vMinor, vPatch);
 		appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
 
-		utils->GetRKitVersion(vMajor, vMinor, vPatch);
+		utils.GetRKitVersion(vMajor, vMinor, vPatch);
 		appInfo.pEngineName = "Gale Force Games RKit";
 		appInfo.engineVersion = VK_MAKE_VERSION(vMajor, vMinor, vPatch);
 		appInfo.apiVersion = VK_API_VERSION_1_0;

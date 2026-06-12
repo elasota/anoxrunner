@@ -38,15 +38,15 @@ namespace rkit { namespace buildsystem
 			RKIT_THROW(ResultCode::kFileOpenError);
 		}
 
-		IUtilitiesDriver *utils = GetDrivers().m_utilitiesDriver;
+		IUtilitiesDriver &utils = *GetDrivers().m_utilitiesDriver;
 
 		Vector<uint8_t> fileContents;
-		RKIT_CHECK(utils->ReadEntireFile(*stream, fileContents));
+		RKIT_CHECK(utils.ReadEntireFile(*stream, fileContents));
 
 		stream.Reset();
 
 		UniquePtr<utils::ITextParser> parser;
-		RKIT_CHECK(utils->CreateTextParser(fileContents.ToSpan(), utils::TextParserCommentType::kBash, utils::TextParserLexerType::kSimple, parser));
+		RKIT_CHECK(utils.CreateTextParser(fileContents.ToSpan(), utils::TextParserCommentType::kBash, utils::TextParserLexerType::kSimple, parser));
 
 		for (;;)
 		{
@@ -213,11 +213,11 @@ namespace rkit { namespace buildsystem
 
 						Vector<CIPath> newPaths;
 
-						IUtilitiesDriver *utils = GetDrivers().m_utilitiesDriver;
+						IUtilitiesDriver &utils = *GetDrivers().m_utilitiesDriver;
 
 						for (const CIPath &path : pathScans)
 						{
-							PathEnumerator enumerator(path, newPaths, chunkSlice, utils);
+							PathEnumerator enumerator(path, newPaths, chunkSlice, &utils);
 
 							if (isLast)
 							{
@@ -258,7 +258,7 @@ namespace rkit { namespace buildsystem
 				else
 				{
 					StringSliceView extStrView;
-					if (!utils->FindFilePathExtension(path[path.NumComponents() - 1], extStrView))
+					if (!utils.FindFilePathExtension(path[path.NumComponents() - 1], extStrView))
 					{
 						rkit::log::ErrorFmt(u8"{}:{}: Path has no extension", line, col);
 						RKIT_THROW(ResultCode::kMalformedFile);

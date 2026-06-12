@@ -40,7 +40,7 @@
 #define RKIT_IMPLEMENT_RESULT_FIRST_CHANCE_RESULT_FAILURE	\
 	void rkit::utils::FirstChanceResultFailure(PackedResultAndExtCode packedResult)\
 	{\
-		::rkit::ISystemDriver *sysDriver = ::rkit::GetDrivers().m_systemDriver; \
+		::rkit::ISystemDriver *sysDriver = ::rkit::GetDrivers().m_systemDriver.Get(); \
 		if (sysDriver) sysDriver->FirstChanceResultFailure(packedResult); \
 	}
 

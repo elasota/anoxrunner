@@ -15,6 +15,7 @@ namespace rkit
 		kNotYetImplemented,
 		kInternalError,
 		kCppException,
+		kComError,
 
 		kDataError,
 

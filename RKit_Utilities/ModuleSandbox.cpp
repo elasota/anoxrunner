@@ -217,7 +217,7 @@ namespace rkit::utils
 	{
 		uint64_t entryDescriptor = 0;
 		sandbox::SandboxModuleInitParams params;
-		IMallocDriver *alloc = GetDrivers().m_mallocDriver;
+		IMallocDriver &alloc = *GetDrivers().m_mallocDriver;
 
 		ISandbox **internalSandboxPtr = nullptr;
 
@@ -237,7 +237,7 @@ namespace rkit::utils
 		UniquePtr<ModuleSandbox> sandbox;
 
 		RKIT_TRY_CATCH_RETHROW(
-			NewWithAlloc<ModuleSandbox>(sandbox, alloc, entryDescriptor, module, alloc, std::move(memMutex)),
+			NewWithAlloc<ModuleSandbox>(sandbox, &alloc, entryDescriptor, module, &alloc, std::move(memMutex)),
 			rkit::CatchContext(
 				[module]
 				{

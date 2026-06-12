@@ -18,6 +18,9 @@
 #include "AnoxWorldObjectFactory.h"
 
 #include "anox/Game/APECommandDispatcher.generated.h"
+#include "anox/Game/APEExternOpcodes.generated.h"
+
+#include "APEExternDispatch.generated.h"
 
 namespace anox::game
 {
@@ -163,7 +166,15 @@ namespace anox::game
 
 		rkit::Result CreateScriptEnvironment(rkit::UniquePtr<ScriptEnvironment> &outScriptEnvironment);
 
+		void RegisterExtern(size_t slot, ScriptManager::ExternDispatchFunc_t dispatchFunc);
+
 	private:
+
+		struct ExternOpcodeSlot
+		{
+			ScriptManager::ExternDispatchFunc_t m_dispatchFunc = nullptr;
+		};
+
 		void FindScriptInternal(const anox::Label &label, const ScriptWindow **outWindow, const ScriptSwitch **outSwitch) const;
 		void FindScriptPrehashedInternal(const anox::Label &label, rkit::HashValue_t hashValue, const ScriptWindow **outWindow, const ScriptSwitch **outSwitch) const;
 
@@ -173,6 +184,7 @@ namespace anox::game
 		static constexpr size_t kNumScriptLayers = static_cast<size_t>(ScriptManager::ScriptLayer::kCount);
 
 		rkit::StaticArray<ScriptLayerInstance, kNumScriptLayers> m_layers;
+		rkit::StaticArray<ExternOpcodeSlot, ape::kNumExternOpcodes> m_externOps;
 	};
 
 	ScriptEnvironmentImpl::WindowCommandParserImpl::WindowCommandParserImpl(const ScriptPackage &package)

@@ -332,7 +332,7 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanDevice::ResolveQueues(CommandQueueType queueType, size_t firstQueueID, uint32_t queueFamilyIndex, uint32_t numQueues)
 	{
-		IMallocDriver *alloc = GetDrivers().m_mallocDriver;
+		IMallocDriver *alloc = GetDrivers().m_mallocDriver.Get();
 
 		QueueFamily &queueFamily = m_queueFamilies[static_cast<size_t>(queueType)];
 		queueFamily.m_vkQueueFamily = queueFamilyIndex;
@@ -821,10 +821,10 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanDeviceBase::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const QueueFamilySpec(&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RenderDeviceRequirements &reqs, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<AsciiStringView> &&enabledExts, const VkPhysicalDeviceMemoryProperties &memProperties)
 	{
-		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
 
 		UniquePtr<IMutex> queueMutex;
-		RKIT_CHECK(sysDriver->CreateMutex(queueMutex));
+		RKIT_CHECK(sysDriver.CreateMutex(queueMutex));
 
 		UniquePtr<VulkanDevice> vkDevice;
 		RKIT_CHECK(New<VulkanDevice>(vkDevice, vkg, vki, vkg_p, vki_p, inst, device, allocCallbacks, caps, reqs, physDevice, std::move(enabledExts), memProperties, std::move(queueMutex)));

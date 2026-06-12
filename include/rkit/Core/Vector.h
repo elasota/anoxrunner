@@ -141,7 +141,7 @@ namespace rkit
 {
 	template<class T>
 	inline Vector<T>::Vector()
-		: m_alloc(GetDrivers().m_mallocDriver)
+		: m_alloc(GetDrivers().m_mallocDriver.Get())
 		, m_count(0)
 		, m_capacity(0)
 		, m_arr(nullptr)

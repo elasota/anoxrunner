@@ -191,7 +191,7 @@ namespace anox
 
 		RKIT_CHECK(AnoxCommandStackBase::Create(m_commandStack, 64 * 1024, 1024));
 
-		RKIT_CHECK(rkit::utils::CreateCoroThread(m_mainCoroThread, rkit::GetDrivers().m_mallocDriver, 1 * 1024 * 1024, rkit::GetDrivers().GetAssertDriver()));
+		RKIT_CHECK(rkit::utils::CreateCoroThread(m_mainCoroThread, rkit::GetDrivers().m_mallocDriver.Get(), 1 * 1024 * 1024, rkit::GetDrivers().GetAssertDriver()));
 		RKIT_CHECK(m_mainCoroThread->EnterFunction(StartUp(*m_mainCoroThread)));
 
 		RKIT_RETURN_OK;

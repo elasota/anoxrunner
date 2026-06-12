@@ -31,7 +31,7 @@ namespace anox::game::sandbox
 
 	::rkit::Result HostExports::LogUtf8Message(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, uint32_t severity, ::rkit::sandbox::Address_t ptr, size_t size)
 	{
-		if (rkit::ILogDriver *logDriver = rkit::GetDrivers().m_logDriver)
+		if (rkit::ILogDriver *logDriver = rkit::GetDrivers().m_logDriver.Get())
 		{
 			void *charsMemory = nullptr;
 			RKIT_CHECK(static_cast<AnoxGameSandboxEnvironment &>(env).m_sandbox->AccessMemoryRange(charsMemory, ptr, size));

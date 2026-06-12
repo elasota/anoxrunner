@@ -68,6 +68,16 @@ namespace rkit
 		kVulkan,
 	};
 
+	enum class ThreadPriority
+	{
+		kLowest,
+		kLow,
+		kNormal,
+		kHigh,
+		kHighest,
+		kCritical,
+	};
+
 	struct ISystemDriver
 	{
 		virtual ~ISystemDriver() {}
@@ -91,7 +101,8 @@ namespace rkit
 		virtual Result OpenFileReadWrite(UniquePtr<ISeekableReadWriteStream> &outStream, FileLocation location, const CIPathView &path, bool createIfNotExists, bool createDirectories, bool truncateIfExists, bool allowFailure) = 0;
 		virtual Result OpenFileReadWriteAbs(UniquePtr<ISeekableReadWriteStream> &outStream, const OSAbsPathView &path, bool createIfNotExists, bool createDirectories, bool truncateIfExists, bool allowFailure) = 0;
 
-		virtual Result CreateThread(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContext, const StringView &threadName) = 0;
+		virtual Result CreateThreadWithPriority(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContext, ThreadPriority priority, const StringView &threadName) = 0;
+		Result CreateThread(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContext, const StringView &threadName);
 		virtual Result CreateMutex(UniquePtr<IMutex> &outMutex) = 0;
 		virtual Result CreateEvent(UniquePtr<IEvent> &outEvent, bool autoReset, bool startSignaled) = 0;
 		virtual void SleepMSec(uint32_t msec) const = 0;
@@ -122,6 +133,15 @@ namespace rkit
 		virtual uint32_t GetProcessorCount() const = 0;
 
 		virtual render::IDisplayManager *GetDisplayManager() const = 0;
-
 	};
+}
+
+#include <utility>
+
+namespace rkit
+{
+	inline Result ISystemDriver::CreateThread(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContext, const StringView &threadName)
+	{
+		return this->CreateThreadWithPriority(outThread, std::move(threadContext), ThreadPriority::kNormal, threadName);
+	}
 }

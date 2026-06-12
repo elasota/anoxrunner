@@ -68,7 +68,7 @@ rkit::Result rkit::DriverModuleStub<TDriver, TDriverInterface, TDriverMember>::I
 template<class TDriver, class TDriverInterface, ::rkit::SimpleObjectAllocation<TDriverInterface> rkit::Drivers:: *TDriverMember>
 void rkit::DriverModuleStub<TDriver, TDriverInterface, TDriverMember>::Shutdown()
 {
-	if (ms_driver)
+	if (ms_driver.IsValid())
 	{
 		ms_driver->ShutdownDriver();
 		SafeDelete(ms_driver);
@@ -77,7 +77,7 @@ void rkit::DriverModuleStub<TDriver, TDriverInterface, TDriverMember>::Shutdown(
 }
 
 template<class TDriver, class TDriverInterface, ::rkit::SimpleObjectAllocation<TDriverInterface> rkit::Drivers:: *TDriverMember>
-rkit::SimpleObjectAllocation<TDriver> rkit::DriverModuleStub<TDriver, TDriverInterface, TDriverMember>::ms_driver;
+rkit::SimpleObjectAllocation<TDriver> rkit::DriverModuleStub<TDriver, TDriverInterface, TDriverMember>::ms_driver = {};
 
 template<class TDriver>
 rkit::Result rkit::CustomDriverModuleStub<TDriver>::Init(const ModuleInitParameters *initParams)

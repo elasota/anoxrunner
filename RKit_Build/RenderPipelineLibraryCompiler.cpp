@@ -674,10 +674,10 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			}
 		}
 
-		IUtilitiesDriver *utils = GetDrivers().m_utilitiesDriver;
+		IUtilitiesDriver &utils = *GetDrivers().m_utilitiesDriver;
 
 		Vector<uint8_t> streamBytes;
-		RKIT_CHECK(utils->ReadEntireFile(*stream, streamBytes));
+		RKIT_CHECK(utils.ReadEntireFile(*stream, streamBytes));
 
 		item.m_fileContents = std::move(streamBytes);
 
@@ -687,7 +687,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			RKIT_THROW(ResultCode::kInvalidUnicode);
 		}
 
-		RKIT_CHECK(utils->CreateTextParser(item.m_fileContents.ToSpan(), utils::TextParserCommentType::kC, utils::TextParserLexerType::kC, item.m_textParser));
+		RKIT_CHECK(utils.CreateTextParser(item.m_fileContents.ToSpan(), utils::TextParserCommentType::kC, utils::TextParserLexerType::kC, item.m_textParser));
 		item.m_isScanning = false;
 
 		RKIT_RETURN_OK;
@@ -1828,10 +1828,10 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		RKIT_CHECK(ResolveQuotedString(path, token));
 
-		IUtilitiesDriver *utils = GetDrivers().m_utilitiesDriver;
+		IUtilitiesDriver &utils = *GetDrivers().m_utilitiesDriver;
 
-		utils->NormalizeFilePath(path.GetChars());
-		if (!utils->ValidateFilePath(path.GetChars(), false))
+		utils.NormalizeFilePath(path.GetChars());
+		if (!utils.ValidateFilePath(path.GetChars(), false))
 		{
 			rkit::log::ErrorFmt(u8"{} [{}:{}] Invalid file path", blamePath, line, col);
 			RKIT_THROW(ResultCode::kMalformedFile);
@@ -2344,13 +2344,13 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 
-		rkit::IUtilitiesDriver *utils = GetDrivers().m_utilitiesDriver;
+		IUtilitiesDriver &utils = *GetDrivers().m_utilitiesDriver;
 
 		Vector<Utf8Char_t> escapedStr;
 		RKIT_CHECK(escapedStr.Append(token));
 
 		size_t newLength = 0;
-		RKIT_CHECK(utils->EscapeCStringInPlace(escapedStr.ToSpan(), newLength));
+		RKIT_CHECK(utils.EscapeCStringInPlace(escapedStr.ToSpan(), newLength));
 
 		RKIT_CHECK(escapedStr.Resize(newLength));
 

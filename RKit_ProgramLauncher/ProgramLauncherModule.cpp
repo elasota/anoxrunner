@@ -107,7 +107,7 @@ namespace rkit
 			RKIT_CHECK(GetDrivers().m_systemDriver->OpenFileRead(configStream, FileLocation::kProgramDirectory, u8"rkitmoduleconfig.json", false));
 
 			UniquePtr<utils::IJsonDocument> configJsonDoc;
-			RKIT_CHECK(GetDrivers().m_utilitiesDriver->CreateJsonDocument(configJsonDoc, GetDrivers().m_mallocDriver, configStream.Get()));
+			RKIT_CHECK(GetDrivers().m_utilitiesDriver->CreateJsonDocument(configJsonDoc, GetDrivers().m_mallocDriver.Get(), configStream.Get()));
 
 			utils::JsonValue docJV;
 			RKIT_CHECK(configJsonDoc->ToJsonValue(docJV));
@@ -509,7 +509,7 @@ namespace rkit
 	{
 		SafeDelete(ms_moduleConfig);
 
-		if (ms_trackedModuleDriver)
+		if (ms_trackedModuleDriver.IsValid())
 		{
 			// Unload all tracked modules
 			ms_trackedModuleDriver->UnloadAllTrackedModules();

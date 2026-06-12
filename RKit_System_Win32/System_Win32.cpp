@@ -296,7 +296,7 @@ namespace rkit
 		Span<const StringView> GetCommandLine() const override;
 		void FirstChanceResultFailure(PackedResultAndExtCode result) override;
 
-		Result CreateThread(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContext, const StringView &threadName) override;
+		Result CreateThreadWithPriority(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContext, ThreadPriority priority, const StringView &threadName) override;
 		Result CreateMutex(UniquePtr<IMutex> &mutex) override;
 		Result CreateEvent(UniquePtr<IEvent> &outEvent, bool autoReset, bool startSignaled) override;
 		void SleepMSec(uint32_t msec) const override;
@@ -1508,7 +1508,7 @@ namespace rkit
 		RKIT_RETURN_OK;
 	}
 
-	Result SystemDriver_Win32::CreateThread(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContextRef, const StringView &threadName)
+	Result SystemDriver_Win32::CreateThreadWithPriority(UniqueThreadRef &outThread, UniquePtr<IThreadContext> &&threadContextRef, ThreadPriority priority, const StringView &threadName)
 	{
 		UniquePtr<IThreadContext> threadContext(std::move(threadContextRef));
 
@@ -1548,6 +1548,30 @@ namespace rkit
 		{
 			::CloseHandle(hKickoffEvent);
 			RKIT_THROW(ResultCode::kOperationFailed);
+		}
+
+		switch (priority)
+		{
+		case ThreadPriority::kLowest:
+			::SetThreadPriority(hThread, THREAD_PRIORITY_LOWEST);
+			break;
+		case ThreadPriority::kLow:
+			::SetThreadPriority(hThread, THREAD_PRIORITY_BELOW_NORMAL);
+			break;
+		case ThreadPriority::kNormal:
+			// Already set to normal
+			break;
+		case ThreadPriority::kHigh:
+			::SetThreadPriority(hThread, THREAD_PRIORITY_ABOVE_NORMAL);
+			break;
+		case ThreadPriority::kHighest:
+			::SetThreadPriority(hThread, THREAD_PRIORITY_HIGHEST);
+			break;
+		case ThreadPriority::kCritical:
+			::SetThreadPriority(hThread, THREAD_PRIORITY_TIME_CRITICAL);
+			break;
+		default:
+			break;
 		}
 
 		WaitForSingleObject(hKickoffEvent, INFINITE);
@@ -1916,7 +1940,7 @@ namespace rkit
 
 	Result SystemDriver_Win32::OpenSystemLibrary(UniquePtr<ISystemLibrary> &outLibrary, SystemLibraryType libType) const
 	{
-		IMallocDriver *alloc = GetDrivers().m_mallocDriver;
+		IMallocDriver &alloc = *GetDrivers().m_mallocDriver;
 
 		const wchar_t *libName = nullptr;
 
@@ -2249,7 +2273,7 @@ namespace rkit
 
 	Result SystemModule_Win32::Init(const ModuleInitParameters *baseInitParams)
 	{
-		IMallocDriver *alloc = GetDrivers().m_mallocDriver;
+		IMallocDriver *alloc = GetDrivers().m_mallocDriver.Get();
 
 		UniquePtr<SystemDriver_Win32> driver;
 

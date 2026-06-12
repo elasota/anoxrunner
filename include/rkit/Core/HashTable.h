@@ -553,7 +553,7 @@ void rkit::HashMapConstIterator<TKey, TValue, TSize>::Normalize()
 // HashTableBase
 template<class TKey, class TValue, class TSize>
 rkit::HashTableBase<TKey, TValue, TSize>::HashTableBase()
-	: m_alloc(rkit::GetDrivers().m_mallocDriver)
+	: m_alloc(rkit::GetDrivers().m_mallocDriver.Get())
 	, m_memoryBlob(nullptr)
 	, m_nextAndOccupancy(nullptr)
 	, m_keys(nullptr)

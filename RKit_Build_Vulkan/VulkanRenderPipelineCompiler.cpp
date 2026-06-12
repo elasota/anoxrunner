@@ -458,7 +458,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		, m_feedback(feedback)
 		, m_pipelineType(pipelineType)
 		, m_glslangStage(GLSLANG_STAGE_COUNT)
-		, m_alloc(GetDrivers().m_mallocDriver)
+		, m_alloc(GetDrivers().m_mallocDriver.Get())
 		, m_glslangResource{}
 		, m_glslc(glslc)
 	{

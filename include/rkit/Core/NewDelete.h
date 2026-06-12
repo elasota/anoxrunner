@@ -141,7 +141,7 @@ inline rkit::Result rkit::NewWithAlloc(UniquePtr<TPtrType> &objPtr, IMallocDrive
 template<class TType, class TPtrType, class... TArgs>
 inline rkit::Result rkit::New(UniquePtr<TPtrType> &objPtr, TArgs&& ...args)
 {
-	return NewWithAlloc<TType, TPtrType, TArgs...>(objPtr, GetDrivers().m_mallocDriver, std::forward<TArgs>(args)...);
+	return NewWithAlloc<TType, TPtrType, TArgs...>(objPtr, GetDrivers().m_mallocDriver.Get(), std::forward<TArgs>(args)...);
 }
 
 template<class TType, class TPtrType>
@@ -160,13 +160,13 @@ rkit::Result rkit::NewWithAlloc(UniquePtr<TPtrType> &objPtr, IMallocDriver *allo
 template<class TType, class TPtrType>
 rkit::Result rkit::New(UniquePtr<TPtrType> &objPtr)
 {
-	return NewWithAlloc<TType, TPtrType>(objPtr, GetDrivers().m_mallocDriver);
+	return NewWithAlloc<TType, TPtrType>(objPtr, GetDrivers().m_mallocDriver.Get());
 }
 
 template<class TType, class TPtrType>
 rkit::Result rkit::NewUPtr(UniquePtr<TPtrType> &objPtr)
 {
-	return NewWithAlloc<TType, TPtrType>(objPtr, GetDrivers().m_mallocDriver);
+	return NewWithAlloc<TType, TPtrType>(objPtr, GetDrivers().m_mallocDriver.Get());
 }
 
 

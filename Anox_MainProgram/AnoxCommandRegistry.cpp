@@ -125,7 +125,7 @@ namespace anox
 
 	rkit::Result AnoxCommandRegistry::TrySetCVar(const AnoxRegisteredConsoleVar &cvar, const AnoxPrehashedRegistryKeyView &name, bool &outSetOK) const
 	{
-		rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
+		rkit::IUtilitiesDriver &utils = *rkit::GetDrivers().m_utilitiesDriver;
 
 		switch (cvar.m_varType)
 		{

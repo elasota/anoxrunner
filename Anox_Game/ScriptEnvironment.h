@@ -21,7 +21,7 @@ namespace anox::game
 	class ScriptManagerImpl;
 	class ScriptContext;
 	class ScriptPackage;
-	class ScriptExprValue;
+	struct ScriptExprValue;
 	class World;
 	class ScriptWindowInstance;
 	struct ScriptWindow;

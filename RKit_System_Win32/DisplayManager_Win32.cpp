@@ -1214,7 +1214,7 @@ namespace rkit { namespace render
 		UniquePtr<RenderWindow_Win32> renderWindow;
 		RKIT_CHECK(NewWithAlloc<RenderWindow_Win32>(renderWindow, m_alloc, m_alloc, m_hInst));
 
-		RKIT_CHECK(renderWindow->Initialize(GetDrivers().m_systemDriver, m_renderWCAtom, width, height));
+		RKIT_CHECK(renderWindow->Initialize(GetDrivers().m_systemDriver.Get(), m_renderWCAtom, width, height));
 
 		if (renderWindow->GetDisplayMode() != displayMode)
 		{

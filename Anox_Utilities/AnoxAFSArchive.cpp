@@ -337,7 +337,7 @@ namespace anox
 
 		rkit::Result Archive::OpenFileByIndex(uint32_t fileIndex, rkit::UniquePtr<rkit::ISeekableReadStream> &outStream) const
 		{
-			rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
+			rkit::IUtilitiesDriver &utils = *rkit::GetDrivers().m_utilitiesDriver;
 
 			const FileInfo &fileInfo = m_files[fileIndex];
 
@@ -347,13 +347,13 @@ namespace anox
 			if (fileInfo.m_compressedSize > 0)
 			{
 				rkit::UniquePtr<rkit::ISeekableReadStream> sliceStream;
-				RKIT_CHECK(utils->CreateRangeLimitedReadStream(sliceStream, std::move(mutualAccessorStream), fileInfo.m_filePosition, fileInfo.m_compressedSize));
+				RKIT_CHECK(utils.CreateRangeLimitedReadStream(sliceStream, std::move(mutualAccessorStream), fileInfo.m_filePosition, fileInfo.m_compressedSize));
 
-				RKIT_CHECK(utils->CreateRestartableDeflateDecompressStream(outStream, std::move(sliceStream), fileInfo.m_uncompressedSize));
+				RKIT_CHECK(utils.CreateRestartableDeflateDecompressStream(outStream, std::move(sliceStream), fileInfo.m_uncompressedSize));
 			}
 			else
 			{
-				RKIT_CHECK(utils->CreateRangeLimitedReadStream(outStream, std::move(mutualAccessorStream), fileInfo.m_filePosition, fileInfo.m_uncompressedSize));
+				RKIT_CHECK(utils.CreateRangeLimitedReadStream(outStream, std::move(mutualAccessorStream), fileInfo.m_filePosition, fileInfo.m_uncompressedSize));
 			}
 
 			RKIT_RETURN_OK;

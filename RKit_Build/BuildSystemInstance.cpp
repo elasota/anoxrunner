@@ -1928,10 +1928,10 @@ namespace rkit { namespace buildsystem
 		OSAbsPath cacheFullPath;
 		RKIT_CHECK(ConstructIntermediatePath(cacheFullPath, GetCacheFileName()));
 
-		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
 
 		UniquePtr<ISeekableReadStream> graphStream;
-		RKIT_CHECK(sysDriver->OpenFileReadAbs(graphStream, cacheFullPath, true));
+		RKIT_CHECK(sysDriver.OpenFileReadAbs(graphStream, cacheFullPath, true));
 
 		if (!graphStream.IsValid())
 			RKIT_RETURN_OK;
@@ -2172,9 +2172,9 @@ namespace rkit { namespace buildsystem
 		OSAbsPath cacheFullPath;
 		RKIT_CHECK(ConstructIntermediatePath(cacheFullPath, GetCacheFileName()));
 
-		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
 		UniquePtr<ISeekableReadWriteStream> graphStream;
-		RKIT_CHECK(sysDriver->OpenFileReadWriteAbs(graphStream, cacheFullPath, true, true, false, false));
+		RKIT_CHECK(sysDriver.OpenFileReadWriteAbs(graphStream, cacheFullPath, true, true, false, false));
 
 		bool headerOK = false;
 
@@ -2817,8 +2817,8 @@ namespace rkit { namespace buildsystem
 			RKIT_THROW(ResultCode::kFileOpenError);
 
 
-		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
-		RKIT_TRY_CATCH_RETHROW(sysDriver->OpenFileReadWriteAbs(outFile, fullPath, true, true, true, false),
+		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
+		RKIT_TRY_CATCH_RETHROW(sysDriver.OpenFileReadWriteAbs(outFile, fullPath, true, true, true, false),
 			CatchContext(
 				[path]
 				{
@@ -2872,12 +2872,12 @@ namespace rkit { namespace buildsystem
 			RKIT_CHECK(contentPath.Append(osRelPath));
 		}
 
-		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
 
 		FileAttributes attribs;
 		bool exists = false;
 		bool succeeded_IGNORE = false;
-		RKIT_CHECK(sysDriver->GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, contentPath, false));
+		RKIT_CHECK(sysDriver.GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, contentPath, false));
 
 		if (!exists)
 		{
@@ -2912,7 +2912,7 @@ namespace rkit { namespace buildsystem
 			}
 
 			UniquePtr<ISeekableWriteStream> outStream;
-			RKIT_CHECK(sysDriver->OpenFileWriteAbs(outStream, tempPath, true, true, true, false));
+			RKIT_CHECK(sysDriver.OpenFileWriteAbs(outStream, tempPath, true, true, true, false));
 
 			FilePos_t amountRemaining = inStream->GetSize();
 			while (amountRemaining > 0)
@@ -2933,7 +2933,7 @@ namespace rkit { namespace buildsystem
 			outStream.Reset();
 			inStream.Reset();
 
-			RKIT_CHECK(sysDriver->MoveFileFromAbsToAbs(succeeded_IGNORE, tempPath, contentPath, true, false));
+			RKIT_CHECK(sysDriver.MoveFileFromAbsToAbs(succeeded_IGNORE, tempPath, contentPath, true, false));
 		}
 
 		RKIT_RETURN_OK;

@@ -6,7 +6,7 @@
 #include "AnoxSubmitJobRunner.h"
 #include "AnoxRenderedWindow.h"
 
-#include "anox/AnoxGraphicsSubsystem.h"
+#include "AnoxGraphicsSubsystem.h"
 
 #include "rkit/Render/Barrier.h"
 #include "rkit/Render/CommandBatch.h"

@@ -1,6 +1,6 @@
 #include "AnoxGraphicTimelinedResource.h"
 
-#include "anox/AnoxGraphicsSubsystem.h"
+#include "AnoxGraphicsSubsystem.h"
 
 namespace anox
 {

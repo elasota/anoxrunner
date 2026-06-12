@@ -235,14 +235,14 @@ namespace rkit
 
 	template<class T, size_t TStaticSize>
 	inline HybridVector<T, TStaticSize>::HybridVector()
-		: m_storage(GetDrivers().m_mallocDriver)
+		: m_storage(GetDrivers().m_mallocDriver.Get())
 		, m_isUsingStaticStorage(true)
 	{
 	}
 
 	template<class T, size_t TStaticSize>
 	inline HybridVector<T, TStaticSize>::HybridVector(IMallocDriver *alloc)
-		: m_storage(GetDrivers().m_mallocDriver)
+		: m_storage(GetDrivers().m_mallocDriver.Get())
 		, m_isUsingStaticStorage(true)
 	{
 	}

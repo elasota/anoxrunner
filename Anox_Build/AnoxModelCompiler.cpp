@@ -638,7 +638,7 @@ namespace anox { namespace buildsystem
 		rkit::UniquePtr<rkit::ISeekableReadStream> inputFile;
 		rkit::Vector<uint8_t> mdaBytes;
 
-		rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
+		rkit::IUtilitiesDriver &utils = *rkit::GetDrivers().m_utilitiesDriver;
 
 		{
 			rkit::CIPath path;
@@ -662,7 +662,7 @@ namespace anox { namespace buildsystem
 
 			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, path, inputFile));
 
-			RKIT_CHECK(utils->ReadEntireFile(*inputFile, mdaBytes));
+			RKIT_CHECK(utils.ReadEntireFile(*inputFile, mdaBytes));
 		}
 
 		rkit::ConstSpan<char> fileSpan = mdaBytes.ToSpan().ReinterpretCast<char>();
@@ -770,9 +770,9 @@ namespace anox { namespace buildsystem
 					if (!ParseToken(triVert0Token, line)
 						|| !ParseToken(triVert1Token, line)
 						|| !ParseToken(triVert2Token, line)
-						|| !utils->ParseUInt32(rkit::AsciiStringSliceView(triVert0Token).RemoveEncoding(), 10, triVerts[0])
-						|| !utils->ParseUInt32(rkit::AsciiStringSliceView(triVert1Token).RemoveEncoding(), 10, triVerts[1])
-						|| !utils->ParseUInt32(rkit::AsciiStringSliceView(triVert2Token).RemoveEncoding(), 10, triVerts[2])
+						|| !utils.ParseUInt32(rkit::AsciiStringSliceView(triVert0Token).RemoveEncoding(), 10, triVerts[0])
+						|| !utils.ParseUInt32(rkit::AsciiStringSliceView(triVert1Token).RemoveEncoding(), 10, triVerts[1])
+						|| !utils.ParseUInt32(rkit::AsciiStringSliceView(triVert2Token).RemoveEncoding(), 10, triVerts[2])
 						)
 					{
 						rkit::log::Error(u8"Malformed headtri directive");
@@ -874,7 +874,7 @@ namespace anox { namespace buildsystem
 											RKIT_CHECK(ExpectToken(token, line));
 
 											uint32_t depthWriteFlag = 0;
-											if (!utils->ParseUInt32(rkit::AsciiStringSliceView(token).RemoveEncoding(), 10, depthWriteFlag))
+											if (!utils.ParseUInt32(rkit::AsciiStringSliceView(token).RemoveEncoding(), 10, depthWriteFlag))
 											{
 												rkit::log::Error(u8"Invalid depthwrite value");
 												RKIT_THROW(rkit::ResultCode::kDataError);
@@ -909,7 +909,7 @@ namespace anox { namespace buildsystem
 													rkit::AsciiString tokenStr;
 													RKIT_CHECK(tokenStr.Set(token));
 
-													if (!utils->ParseDouble(tokenStr.ToByteView(), uvScroll[axis]))
+													if (!utils.ParseDouble(tokenStr.ToByteView(), uvScroll[axis]))
 													{
 														rkit::log::Error(u8"Invalid scroll");
 														RKIT_THROW(rkit::ResultCode::kDataError);

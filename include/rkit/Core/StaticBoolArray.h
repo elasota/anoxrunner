@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "Algorithm.h"
+
 namespace rkit
 {
 	template<class T>
@@ -84,6 +86,8 @@ namespace rkit
 
 		bool FindFirstSet(size_t &outIndex) const;
 		bool FindLastSet(size_t &outIndex) const;
+
+		size_t CountSetBits() const;
 
 		static StaticBoolArray<TSize> FromBitsUnchecked(const uint8_t *bits);
 
@@ -374,6 +378,16 @@ namespace rkit
 		}
 
 		return false;
+	}
+
+	template<size_t TSize>
+	size_t StaticBoolArray<TSize>::CountSetBits() const
+	{
+		size_t bitCount = 0;
+		for (const auto &item : m_bytes)
+			bitCount += static_cast<size_t>(rkit::CountSetBits(item));
+
+		return bitCount;
 	}
 
 	template<size_t TSize>

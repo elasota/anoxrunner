@@ -114,7 +114,7 @@ namespace rkit
 
 		T *Get() const;
 		RefCountedTracker *GetTracker() const;
-		operator T *() const;
+		T& operator*() const;
 		T *operator->() const;
 
 		template<class TOther>
@@ -629,9 +629,10 @@ namespace rkit
 	}
 
 	template<class T>
-	inline RCPtr<T>::operator T *() const
+	inline T& RCPtr<T>::operator*() const
 	{
-		return m_object;
+		RKIT_ASSERT(m_object != nullptr);
+		return *m_object;
 	}
 
 	template<class T>
@@ -667,7 +668,7 @@ namespace rkit
 	template<class TType, class TPtrType, class... TArgs>
 	inline Result New(RCPtr<TPtrType> &objPtr, TArgs&& ...args)
 	{
-		return NewWithAlloc<TType, TPtrType, TArgs...>(objPtr, GetDrivers().m_mallocDriver, std::forward<TArgs>(args)...);
+		return NewWithAlloc<TType, TPtrType, TArgs...>(objPtr, GetDrivers().m_mallocDriver.Get(), std::forward<TArgs>(args)...);
 	}
 
 	template<class TType, class TPtrType>
@@ -697,7 +698,7 @@ namespace rkit
 	template<class TType, class TPtrType>
 	Result New(RCPtr<TPtrType> &objPtr)
 	{
-		return NewWithAlloc<TType, TPtrType>(objPtr, GetDrivers().m_mallocDriver);
+		return NewWithAlloc<TType, TPtrType>(objPtr, GetDrivers().m_mallocDriver.Get());
 	}
 
 	template<class RCType, class UPtrType>

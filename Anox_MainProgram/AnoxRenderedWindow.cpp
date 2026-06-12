@@ -1,6 +1,6 @@
 #include "AnoxRenderedWindow.h"
 
-#include "anox/AnoxGraphicsSubsystem.h"
+#include "AnoxGraphicsSubsystem.h"
 
 #include "AnoxPeriodicResources.h"
 #include "AnoxRecordJobRunner.h"

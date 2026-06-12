@@ -143,9 +143,9 @@ namespace rkit { namespace utils
 
 	Result ThreadPool::Initialize()
 	{
-		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
 
-		RKIT_CHECK(m_utils.CreateJobQueue(m_jobQueue, GetDrivers().m_mallocDriver));
+		RKIT_CHECK(m_utils.CreateJobQueue(m_jobQueue, GetDrivers().m_mallocDriver.Get()));
 
 		RKIT_CHECK(m_threads.Resize(m_numThreads));
 
@@ -171,8 +171,8 @@ namespace rkit { namespace utils
 			UniquePtr<IEvent> wakeEvent;
 			UniquePtr<IEvent> terminateEvent;
 
-			RKIT_CHECK(sysDriver->CreateEvent(wakeEvent, true, false));
-			RKIT_CHECK(sysDriver->CreateEvent(terminateEvent, true, false));
+			RKIT_CHECK(sysDriver.CreateEvent(wakeEvent, true, false));
+			RKIT_CHECK(sysDriver.CreateEvent(terminateEvent, true, false));
 
 			UniquePtr<IThreadContext> context;
 			RKIT_CHECK(New<ThreadPoolThreadContext>(context, *this, std::move(jobTypes), std::move(wakeEvent), std::move(terminateEvent)));
@@ -201,7 +201,7 @@ namespace rkit { namespace utils
 		for (;;)
 		{
 			RCPtr<Job> job = m_pool.GetJobQueue()->WaitForWork(m_jobTypes.ToSpan().ToValueISpan(), true, m_wakeEvent.Get(), m_terminateEvent.Get());
-			if (!job)
+			if (!job.IsValid())
 				break;
 
 			job->Run();

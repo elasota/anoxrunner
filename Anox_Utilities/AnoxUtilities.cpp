@@ -42,7 +42,7 @@ rkit::Result anox::UtilitiesDriver::OpenAFSArchive(rkit::UniquePtr<rkit::ISeekab
 	rkit::UniquePtr<rkit::ISeekableReadStream> stream(std::move(streamSrc));
 
 	rkit::UniquePtr<anox::afs::Archive> archive;
-	RKIT_CHECK(rkit::New<anox::afs::Archive>(archive, rkit::GetDrivers().m_mallocDriver));
+	RKIT_CHECK(rkit::New<anox::afs::Archive>(archive, rkit::GetDrivers().m_mallocDriver.Get()));
 
 	RKIT_CHECK(archive->Open(std::move(stream), true));
 

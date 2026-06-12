@@ -119,10 +119,10 @@ namespace anox::game
 
 	AllWorldObjectsCollection WorldImpl::GetAllObjects() const
 	{
-		WorldObjectProxy *firstValidProxy = m_firstObj;
+		WorldObjectProxy *firstValidProxy = m_firstObj.Get();
 
 		while (firstValidProxy != nullptr && !firstValidProxy->m_object.IsValid())
-			firstValidProxy = firstValidProxy->m_next;
+			firstValidProxy = firstValidProxy->m_next.Get();
 
 		return AllWorldObjectsCollection(firstValidProxy);
 	}

@@ -328,7 +328,7 @@ namespace anox { namespace buildsystem {
 
 	rkit::Result EntityDefCompiler::ParseLabel(const rkit::ConstSpan<uint8_t> &span, Label &outLabel)
 	{
-		rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
+		rkit::IUtilitiesDriver &utils = *rkit::GetDrivers().m_utilitiesDriver;
 
 		size_t dividerPos = 0;
 		bool foundDivider = false;
@@ -366,8 +366,8 @@ namespace anox { namespace buildsystem {
 
 		uint32_t highPart = 0;
 		uint32_t lowPart = 0;
-		if (!utils->ParseUInt32(rkit::ByteStringSliceView(span.SubSpan(0, dividerPos)), 10, highPart)
-			|| !utils->ParseUInt32(rkit::ByteStringSliceView(span.SubSpan(dividerPos + 1)), 10, lowPart)
+		if (!utils.ParseUInt32(rkit::ByteStringSliceView(span.SubSpan(0, dividerPos)), 10, highPart)
+			|| !utils.ParseUInt32(rkit::ByteStringSliceView(span.SubSpan(dividerPos + 1)), 10, lowPart)
 			|| !Label::IsValid(highPart, lowPart))
 			RKIT_THROW(rkit::ResultCode::kDataError);
 
@@ -403,7 +403,7 @@ namespace anox { namespace buildsystem {
 
 		rkit::Vector<UserEntityDef2> edefs;
 
-		rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
+		rkit::IUtilitiesDriver &utils = *rkit::GetDrivers().m_utilitiesDriver;
 
 		size_t lineStart = 0;
 		for (size_t lineEnd = 0; lineEnd <= fileSize; lineEnd++)
@@ -527,7 +527,7 @@ namespace anox { namespace buildsystem {
 						}
 						else
 						{
-							if (!utils->ParseDouble(str, d))
+							if (!utils.ParseDouble(str, d))
 								RKIT_THROW(rkit::ResultCode::kDataError);
 						}
 

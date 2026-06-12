@@ -14,7 +14,7 @@
 #include "anox/Data/MDAModel.h"
 #include "anox/Data/ResourceTypeCodes.h"
 
-#include "anox/AnoxGraphicsSubsystem.h"
+#include "AnoxGraphicsSubsystem.h"
 
 #include "AnoxDataReader.h"
 #include "AnoxGameFileSystem.h"

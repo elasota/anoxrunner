@@ -80,6 +80,8 @@ namespace rkit
 		BoolVectorType_t &AsBoolVector();
 		const BoolVectorType_t &AsBoolVector() const;
 
+		size_t CountSetBits() const;
+
 	private:
 		explicit EnumMask(const StaticBoolArray<kMax> &boolVector);
 
@@ -292,6 +294,12 @@ namespace rkit
 	const typename EnumMask<T>::BoolVectorType_t &EnumMask<T>::AsBoolVector() const
 	{
 		return m_boolVector;
+	}
+
+	template<class T>
+	size_t EnumMask<T>::CountSetBits() const
+	{
+		return m_boolVector.CountSetBits();
 	}
 
 	template<class T>

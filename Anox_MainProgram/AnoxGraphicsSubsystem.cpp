@@ -7,7 +7,7 @@
 #include "AnoxSubmitJobRunner.h"
 
 #include "anox/AnoxFileSystem.h"
-#include "anox/AnoxGraphicsSubsystem.h"
+#include "AnoxGraphicsSubsystem.h"
 
 #include "rkit/Render/Barrier.h"
 #include "rkit/Render/BufferSpec.h"
@@ -852,8 +852,8 @@ namespace anox
 
 	rkit::Result GraphicsSubsystem::CheckPipelinesJob::Run()
 	{
-		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
-		rkit::IUtilitiesDriver *utilsDriver = rkit::GetDrivers().m_utilitiesDriver;
+		rkit::ISystemDriver &sysDriver = *rkit::GetDrivers().m_systemDriver;
+		rkit::IUtilitiesDriver &utilsDriver = *rkit::GetDrivers().m_utilitiesDriver;
 		rkit::data::IDataDriver *dataDriver = &m_graphicsSubsystem.GetDataDriver();
 
 		rkit::UniquePtr<rkit::ISeekableReadStream> pipelinesFile = std::move(m_stream.GetResult());
@@ -875,7 +875,7 @@ namespace anox
 
 		// Try opening the cache itself
 		// FIXME: Is this supposed to be a soft failure?
-		RKIT_CHECK(sysDriver->OpenFileRead(cacheReadStream, rkit::FileLocation::kUserSettingsDirectory, m_pipelinesCacheFileName, true));
+		RKIT_CHECK(sysDriver.OpenFileRead(cacheReadStream, rkit::FileLocation::kUserSettingsDirectory, m_pipelinesCacheFileName, true));
 
 		const bool haveCache = cacheReadStream.IsValid();
 		if (!haveCache)
@@ -1022,12 +1022,12 @@ namespace anox
 
 	rkit::Result GraphicsSubsystem::CreateNewIndividualCacheJob::Run()
 	{
-		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
+		rkit::ISystemDriver &sysDriver = *rkit::GetDrivers().m_systemDriver;
 
 		m_graphicsSubsystem.m_pipelineLibraryLoader->CloseMergedLibrary(true, true);
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> pipelinesFile;
-		RKIT_CHECK(sysDriver->OpenFileReadWrite(pipelinesFile, rkit::FileLocation::kUserSettingsDirectory, m_graphicsSubsystem.m_pipelinesCacheFileName, true, true, true, false));
+		RKIT_CHECK(sysDriver.OpenFileReadWrite(pipelinesFile, rkit::FileLocation::kUserSettingsDirectory, m_graphicsSubsystem.m_pipelinesCacheFileName, true, true, true, false));
 
 		rkit::ISeekableReadWriteStream *writeStream = pipelinesFile.Get();
 
@@ -1234,7 +1234,7 @@ namespace anox
 
 		if (m_graphicsSubsystem.m_renderDevice->SupportsInitialBufferData())
 		{
-			if (m_doneCopyingSignaler)
+			if (m_doneCopyingSignaler.IsValid())
 				m_doneCopyingSignaler->SignalDone(rkit::ResultCode::kOK);
 		}
 		else
@@ -1501,7 +1501,7 @@ namespace anox
 
 		if (m_graphicsSubsystem.m_renderDevice->SupportsInitialTextureData())
 		{
-			if (m_doneCopyingSignaler)
+			if (m_doneCopyingSignaler.IsValid())
 				m_doneCopyingSignaler->SignalDone(rkit::ResultCode::kOK);
 		}
 		else
@@ -1723,19 +1723,19 @@ namespace anox
 
 		for (const BufferToTextureCopyAction &copyAction : m_syncPoint.m_asyncUploadActionSet.m_bufferToTextureCopy)
 		{
-			Texture *texture = copyAction.m_texture;
-			texture->Touch(m_globalSyncPoint);
+			Texture &texture = *copyAction.m_texture;
+			texture.Touch(m_globalSyncPoint);
 
-			RKIT_CHECK(cmdEncoder->CopyBufferToImage(*texture->GetRenderResource(), copyAction.m_destRect, *copyAction.m_buffer, copyAction.m_footprint,
+			RKIT_CHECK(cmdEncoder->CopyBufferToImage(*texture.GetRenderResource(), copyAction.m_destRect, *copyAction.m_buffer, copyAction.m_footprint,
 				copyAction.m_imageLayout, copyAction.m_mipLevel, copyAction.m_arrayElement, copyAction.m_imagePlane));
 		}
 
 		for (const BufferToBufferCopyAction &copyAction : m_syncPoint.m_asyncUploadActionSet.m_bufferToBufferCopy)
 		{
-			Buffer *destBuffer = copyAction.m_destBuffer;
-			destBuffer->Touch(m_globalSyncPoint);
+			Buffer &destBuffer = *copyAction.m_destBuffer;
+			destBuffer.Touch(m_globalSyncPoint);
 
-			RKIT_CHECK(cmdEncoder->CopyBufferToBuffer(*destBuffer->GetRenderResource(), copyAction.m_destOffset,
+			RKIT_CHECK(cmdEncoder->CopyBufferToBuffer(*destBuffer.GetRenderResource(), copyAction.m_destOffset,
 				*copyAction.m_srcBuffer, copyAction.m_srcOffset, copyAction.m_size));
 		}
 
@@ -2242,15 +2242,15 @@ namespace anox
 
 	rkit::Result GraphicsSubsystem::Initialize()
 	{
-		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
+		rkit::ISystemDriver &sysDriver = *rkit::GetDrivers().m_systemDriver;
 
-		RKIT_CHECK(sysDriver->CreateMutex(m_setupMutex));
-		RKIT_CHECK(sysDriver->CreateMutex(m_asyncUploadMutex));
+		RKIT_CHECK(sysDriver.CreateMutex(m_setupMutex));
+		RKIT_CHECK(sysDriver.CreateMutex(m_asyncUploadMutex));
 
-		RKIT_CHECK(sysDriver->CreateEvent(m_shutdownJoinEvent, true, false));
-		RKIT_CHECK(sysDriver->CreateEvent(m_shutdownTerminateEvent, true, false));
-		RKIT_CHECK(sysDriver->CreateEvent(m_prevFrameWaitWakeEvent, true, false));
-		RKIT_CHECK(sysDriver->CreateEvent(m_prevFrameWaitTerminateEvent, true, false));
+		RKIT_CHECK(sysDriver.CreateEvent(m_shutdownJoinEvent, true, false));
+		RKIT_CHECK(sysDriver.CreateEvent(m_shutdownTerminateEvent, true, false));
+		RKIT_CHECK(sysDriver.CreateEvent(m_prevFrameWaitWakeEvent, true, false));
+		RKIT_CHECK(sysDriver.CreateEvent(m_prevFrameWaitTerminateEvent, true, false));
 
 		RKIT_CHECK(IFrameDrawer::Create(m_frameDrawer));
 

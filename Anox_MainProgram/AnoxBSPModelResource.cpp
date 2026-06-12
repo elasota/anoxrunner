@@ -9,7 +9,7 @@
 #include "anox/Data/EntityStructs.h"
 #include "anox/Data/ResourceTypeCodes.h"
 
-#include "anox/AnoxGraphicsSubsystem.h"
+#include "AnoxGraphicsSubsystem.h"
 
 #include "rkit/Data/ContentID.h"
 
@@ -123,7 +123,7 @@ namespace anox
 
 	rkit::Result AnoxBSPModelLoaderInfo::LoadHeaderAndQueueDependencies(State_t &state, Resource_t &resource, rkit::traits::TraitRef<rkit::VectorTrait<rkit::RCPtr<rkit::Job>>> outDeps)
 	{
-		rkit::IUtilitiesDriver *utils = rkit::GetDrivers().m_utilitiesDriver;
+		rkit::IUtilitiesDriver &utils = *rkit::GetDrivers().m_utilitiesDriver;
 
 		{
 			rkit::FixedSizeMemoryStream stream(state.m_fileContents.GetBuffer(), state.m_fileContents.Count());
@@ -391,7 +391,7 @@ namespace anox
 			if (numBrushes > 0x10000)
 				RKIT_THROW(rkit::ResultCode::kDataError);
 
-			utils->SanitizeClampUInt16s(outLeafBrushes.ToSpan(), chunks.m_leafBrushes, static_cast<uint16_t>(numBrushes - 1));
+			utils.SanitizeClampUInt16s(outLeafBrushes.ToSpan(), chunks.m_leafBrushes, static_cast<uint16_t>(numBrushes - 1));
 		}
 
 		{
@@ -581,13 +581,13 @@ namespace anox
 			uint32_t maxFlippableNormalValue = (numNormals * 2u) - 1u;
 
 			rkit::ProcessParallelSpans(outDrawVerts.ToSpan(), chunks.m_drawVerts,
-				[maxFlippableNormalValue, utils]
+				[maxFlippableNormalValue, &utils]
 				(AnoxBSPModelResourceGPUResources::DrawVert &outVert, const data::BSPDrawVertex &inVert)
 				{
-					utils->SanitizeClampFloats(rkit::Span<float>(outVert.m_xyz), rkit::Span<const rkit::endian::LittleFloat32_t>(inVert.m_xyz), 20);
+					utils.SanitizeClampFloats(rkit::Span<float>(outVert.m_xyz), rkit::Span<const rkit::endian::LittleFloat32_t>(inVert.m_xyz), 20);
 					outVert.m_flippableNormalIndex = rkit::Min(maxFlippableNormalValue, inVert.m_normal.Get());
-					utils->SanitizeClampFloats(rkit::Span<float>(outVert.m_lightUV), rkit::Span<const rkit::endian::LittleFloat32_t>(inVert.m_lightUV), 1);
-					utils->SanitizeClampFloats(rkit::Span<float>(outVert.m_uv), rkit::Span<const rkit::endian::LittleFloat32_t>(inVert.m_uv), 20);
+					utils.SanitizeClampFloats(rkit::Span<float>(outVert.m_lightUV), rkit::Span<const rkit::endian::LittleFloat32_t>(inVert.m_lightUV), 1);
+					utils.SanitizeClampFloats(rkit::Span<float>(outVert.m_uv), rkit::Span<const rkit::endian::LittleFloat32_t>(inVert.m_uv), 20);
 				});
 		}
 
@@ -804,7 +804,7 @@ namespace anox
 				const rkit::Span<uint16_t> outTriIndexSpan = gpuResources->m_triIndexes.ToSpan().SubSpan(firstTriIndex, numTriIndexes);
 				const rkit::Span<const rkit::endian::LittleUInt16_t> inTriIndexSpan = chunks.m_drawTriIndexes.SubSpan(firstTriIndex, numTriIndexes);
 
-				utils->SanitizeClampUInt16s(outTriIndexSpan, inTriIndexSpan, maxVertIndex);
+				utils.SanitizeClampUInt16s(outTriIndexSpan, inTriIndexSpan, maxVertIndex);
 			}
 
 			if (firstVertIndex != numDrawVerts)

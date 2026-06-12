@@ -365,7 +365,7 @@ namespace anox { namespace utils
 
 	rkit::Result AnoxFileSystem::ResolveFileStatusIfExists(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::CIPathView &path, bool allowDirectories, void *userdata, ApplyFileStatusCallback_t applyStatus)
 	{
-		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
+		rkit::ISystemDriver &sysDriver = *rkit::GetDrivers().m_systemDriver;
 
 		rkit::FileAttributes attribs;
 		bool exists = false;
@@ -392,14 +392,14 @@ namespace anox { namespace utils
 				RKIT_CHECK(osPath.Append(relPath));
 
 				bool succeeded_IGNORE = false;
-				RKIT_CHECK(sysDriver->GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, osPath, false));
+				RKIT_CHECK(sysDriver.GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, osPath, false));
 
 				if (!exists)
 				{
 					osPath = m_sourceDir;
 					RKIT_CHECK(osPath.Append(relPath));
 
-					RKIT_CHECK(sysDriver->GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, osPath, false));
+					RKIT_CHECK(sysDriver.GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, osPath, false));
 				}
 			}
 		}
@@ -433,7 +433,7 @@ namespace anox { namespace utils
 			}
 
 			bool succeeded_IGNORE = false;
-			RKIT_CHECK(sysDriver->GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, osPath, false));
+			RKIT_CHECK(sysDriver.GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, osPath, false));
 		}
 
 		// Try to import file from the root directory
@@ -457,7 +457,7 @@ namespace anox { namespace utils
 
 	rkit::Result AnoxFileSystem::TryOpenFileRead(rkit::buildsystem::BuildFileLocation inputFileLocation, const rkit::CIPathView &path, rkit::UniquePtr<rkit::ISeekableReadStream> &outStream)
 	{
-		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
+		rkit::ISystemDriver &sysDriver = *rkit::GetDrivers().m_systemDriver;
 
 		rkit::FileLocation fileLocation = rkit::FileLocation::kGameDirectory;
 
@@ -474,13 +474,13 @@ namespace anox { namespace utils
 			rkit::OSAbsPath osPath = m_dataSourceDir;
 			RKIT_CHECK(osPath.Append(relPath));
 
-			RKIT_CHECK(sysDriver->OpenFileReadAbs(outStream, osPath, true));
+			RKIT_CHECK(sysDriver.OpenFileReadAbs(outStream, osPath, true));
 			if (!outStream.IsValid())
 			{
 				osPath = m_sourceDir;
 				RKIT_CHECK(osPath.Append(relPath));
 
-				RKIT_CHECK(sysDriver->OpenFileReadAbs(outStream, osPath, true));
+				RKIT_CHECK(sysDriver.OpenFileReadAbs(outStream, osPath, true));
 			}
 
 			RKIT_RETURN_OK;
@@ -508,7 +508,7 @@ namespace anox { namespace utils
 				RKIT_CHECK(osPath.Append(relPath));
 			}
 
-			RKIT_CHECK(sysDriver->OpenFileReadAbs(outStream, osPath, true));
+			RKIT_CHECK(sysDriver.OpenFileReadAbs(outStream, osPath, true));
 		}
 
 		RKIT_RETURN_OK;
@@ -535,7 +535,7 @@ namespace anox { namespace utils
 				RKIT_CHECK(directory.Append(osRelPath));
 			}
 
-			rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
+			rkit::ISystemDriver &sysDriver = *rkit::GetDrivers().m_systemDriver;
 
 			for (size_t srcIndex = 0; srcIndex < directories.Count(); srcIndex++)
 			{
@@ -544,7 +544,7 @@ namespace anox { namespace utils
 				bool directoryExists = false;
 				rkit::FileAttributes dirAttribs;
 				bool succeeded_IGNORE = false;
-				RKIT_CHECK(sysDriver->GetFileAttributesAbs(succeeded_IGNORE, directoryExists, dirAttribs, dirPath, false));
+				RKIT_CHECK(sysDriver.GetFileAttributesAbs(succeeded_IGNORE, directoryExists, dirAttribs, dirPath, false));
 
 				// See if this actually exists, otherwise blank it out so future scans ignore it
 				if (!directoryExists || !dirAttribs.m_isDirectory)
@@ -554,7 +554,7 @@ namespace anox { namespace utils
 				}
 
 				rkit::UniquePtr<rkit::IDirectoryScan> dirScan;
-				RKIT_CHECK(sysDriver->OpenDirectoryScanAbs(dirScan, directories[srcIndex], false));
+				RKIT_CHECK(sysDriver.OpenDirectoryScanAbs(dirScan, directories[srcIndex], false));
 
 				for (;;)
 				{
@@ -755,10 +755,10 @@ namespace anox { namespace utils
 		RKIT_CHECK(m_dataContentDir.Set(dataContentDir));
 		RKIT_CHECK(m_dataSourceDir.Set(dataSourceDir));
 
-		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
+		rkit::ISystemDriver &sysDriver = *rkit::GetDrivers().m_systemDriver;
 
 		rkit::UniquePtr<rkit::IDirectoryScan> dirScan;
-		RKIT_CHECK(sysDriver->OpenDirectoryScanAbs(dirScan, m_sourceDir, false));
+		RKIT_CHECK(sysDriver.OpenDirectoryScanAbs(dirScan, m_sourceDir, false));
 
 		if (dirScan.Get())
 		{
@@ -778,7 +778,7 @@ namespace anox { namespace utils
 
 					rkit::UniquePtr<rkit::ISeekableReadStream> archiveStream;
 
-					RKIT_TRY_CATCH_RETHROW(sysDriver->OpenFileReadAbs(archiveStream, archivePath, false),
+					RKIT_TRY_CATCH_RETHROW(sysDriver.OpenFileReadAbs(archiveStream, archivePath, false),
 						rkit::CatchContext(
 							[]
 							{

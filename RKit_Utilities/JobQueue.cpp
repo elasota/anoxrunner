@@ -411,7 +411,7 @@ namespace rkit { namespace utils
 		{
 			for (const PendingJobList &catInfo : m_pendingJobLists)
 			{
-				RKIT_ASSERT(catInfo.m_firstJob == nullptr);
+				RKIT_ASSERT(!catInfo.m_firstJob.IsValid());
 			}
 			for (const CategoryThreadWaitList &catWaitList : m_singleCategoryThreadWaitLists)
 			{
@@ -882,14 +882,14 @@ namespace rkit { namespace utils
 							// Unlink from the pending job list.  Need to be careful here since the next-job and first-job
 							// references are RCPtr but the last-job and prev-job references are not!
 							PendingJobList &pendingJobList = m_pendingJobLists[static_cast<size_t>(jobToWaitFor->m_jobType)];
-							if (pendingJobList.m_firstJob == jobToWaitFor)
+							if (pendingJobList.m_firstJob.Get() == jobToWaitFor)
 								pendingJobList.m_firstJob = jobToWaitFor->m_nextRunnableJob;
 							if (pendingJobList.m_lastJob == jobToWaitFor)
 								pendingJobList.m_lastJob = jobToWaitFor->m_prevRunnableJob;
 
 							if (jobToWaitFor->m_prevRunnableJob)
 								jobToWaitFor->m_prevRunnableJob->m_nextRunnableJob = jobToWaitFor->m_nextRunnableJob;
-							if (jobToWaitFor->m_nextRunnableJob)
+							if (jobToWaitFor->m_nextRunnableJob.IsValid())
 								jobToWaitFor->m_nextRunnableJob->m_prevRunnableJob = jobToWaitFor->m_prevRunnableJob;
 
 							jobToWaitFor->m_nextRunnableJob.Reset();
@@ -919,10 +919,10 @@ namespace rkit { namespace utils
 						PendingJobList &ci = m_pendingJobLists[jobTypeInt];
 
 						ci.m_firstJob = nextJob;
-						if (!ci.m_firstJob)
+						if (!ci.m_firstJob.IsValid())
 							ci.m_lastJob = nullptr;
 
-						if (nextJob)
+						if (nextJob.IsValid())
 							nextJob->m_prevRunnableJob = nullptr;
 
 						break;
@@ -931,7 +931,7 @@ namespace rkit { namespace utils
 					waitListMask.Set(jobTypeInt, true);
 				}
 
-				if (job)
+				if (job.IsValid())
 				{
 					// Found something to run
 					job->m_nextRunnableJob = nullptr;
@@ -1040,11 +1040,11 @@ namespace rkit { namespace utils
 
 	Result JobQueue::Init()
 	{
-		ISystemDriver *sysDriver = GetDrivers().m_systemDriver;
+		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
 
-		RKIT_CHECK(sysDriver->CreateMutex(m_depGraphMutex));
-		RKIT_CHECK(sysDriver->CreateMutex(m_resultMutex));
-		RKIT_CHECK(sysDriver->CreateMutex(m_distributorMutex));
+		RKIT_CHECK(sysDriver.CreateMutex(m_depGraphMutex));
+		RKIT_CHECK(sysDriver.CreateMutex(m_resultMutex));
+		RKIT_CHECK(sysDriver.CreateMutex(m_distributorMutex));
 
 		m_isInitialized = true;
 

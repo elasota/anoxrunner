@@ -1,12 +1,13 @@
 #include "anox/AnoxGame.h"
-#include "anox/AnoxGraphicsSubsystem.h"
 #include "anox/AnoxFileSystem.h"
 
+#include "AnoxAudioSubsystem.h"
 #include "AnoxConfigurationState.h"
 #include "AnoxCaptureHarness.h"
 #include "AnoxCommandRegistry.h"
 #include "AnoxGameLogic.h"
 #include "AnoxGameFileSystem.h"
+#include "AnoxGraphicsSubsystem.h"
 #include "AnoxKeybindManager.h"
 #include "AnoxResourceManager.h"
 
@@ -34,6 +35,8 @@
 
 namespace anox
 {
+	class AudioSubsystem;
+
 	class AnoxGame final : public IAnoxGame
 	{
 	public:
@@ -59,6 +62,7 @@ namespace anox
 		rkit::UniquePtr<AnoxResourceManagerBase> m_resourceManager;
 		rkit::UniquePtr<AnoxCommandRegistryBase> m_commandRegistry;
 		rkit::UniquePtr<AnoxKeybindManagerBase> m_keybindManager;
+		rkit::UniquePtr<AudioSubsystem> m_audioSubsystem;
 		rkit::UniquePtr<IGraphicsSubsystem> m_graphicsSubsystem;
 		rkit::UniquePtr<IGameLogic> m_gameLogic;
 		rkit::UniquePtr<ICaptureHarness> m_captureHarness;
@@ -134,6 +138,7 @@ namespace anox
 		rkit::UniquePtr<IConfigurationState> emptyConfig;
 		RKIT_CHECK(ICaptureHarness::CreateRealTime(m_captureHarness, *this, *m_resourceManager, std::move(emptyConfig)));
 
+		RKIT_CHECK(AudioSubsystem::Create(m_audioSubsystem));
 		RKIT_CHECK(IGraphicsSubsystem::Create(m_graphicsSubsystem, *m_fileSystem, *m_dataDriver, *m_threadPool, anox::RenderBackend::kVulkan));
 
 		m_resourceManager->SetGraphicsSubsystem(m_graphicsSubsystem.Get());

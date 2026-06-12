@@ -9,7 +9,7 @@ namespace anox::game
 	{
 		RKIT_ASSERT(m_proxy != nullptr);
 
-		WorldObjectProxy *nextProxy = m_proxy->m_next;
+		WorldObjectProxy *nextProxy = m_proxy->m_next.Get();
 		while (nextProxy != nullptr && nextProxy->m_object.Get() == nullptr)
 			nextProxy = nextProxy->m_next.Get();
 

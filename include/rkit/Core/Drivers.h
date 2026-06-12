@@ -113,9 +113,9 @@ inline rkit::ICustomDriver *rkit::Drivers::FindDriver(uint32_t namespaceID, cons
 {
 	for (const CustomDriverLink *link = m_firstCustomDriverLink; link != nullptr; link = link->m_next)
 	{
-		ICustomDriver *driver = link->m_driver;
-		if (driver->GetDriverNamespaceID() == namespaceID && driver->GetDriverName() == driverName)
-			return driver;
+		ICustomDriver &driver = *link->m_driver;
+		if (driver.GetDriverNamespaceID() == namespaceID && driver.GetDriverName() == driverName)
+			return &driver;
 	}
 
 	return nullptr;

@@ -5,7 +5,7 @@
 
 #include "rkit/Core/JobDependencyList.h"
 #include "rkit/Core/Vector.h"
-#include "anox/AnoxGraphicsSubsystem.h"
+#include "AnoxGraphicsSubsystem.h"
 
 namespace anox
 {

@@ -292,7 +292,7 @@ namespace anox
 
 		futureContainerRCPtr->Fail();
 
-		if (completionSignaler)
+		if (completionSignaler.IsValid())
 			completionSignaler->SignalDone(rkit::ResultCode::kOperationFailed);
 	}
 
@@ -319,7 +319,7 @@ namespace anox
 
 		futureContainerRCPtr->Complete(std::move(result));
 
-		if (completionSignaler)
+		if (completionSignaler.IsValid())
 			completionSignaler->SignalDone(rkit::ResultCode::kOK);
 	}
 
@@ -330,7 +330,7 @@ namespace anox
 
 	AnoxResourceLoadCompletionNotifier::~AnoxResourceLoadCompletionNotifier()
 	{
-		if (m_resource)
+		if (m_resource.IsValid())
 			m_resource->FailLoading();
 	}
 
@@ -426,10 +426,10 @@ namespace anox
 
 	rkit::Result AnoxResourceManager::Initialize()
 	{
-		rkit::ISystemDriver *sysDriver = rkit::GetDrivers().m_systemDriver;
+		rkit::ISystemDriver &sysDriver = *rkit::GetDrivers().m_systemDriver;
 
 		RKIT_CHECK(rkit::New<AnoxResourceLoaderSynchronizer>(m_sync, this));
-		RKIT_CHECK(sysDriver->CreateMutex(m_loaderMutex));
+		RKIT_CHECK(sysDriver.CreateMutex(m_loaderMutex));
 
 		RKIT_CHECK(m_sync->Init());
 
@@ -560,7 +560,7 @@ namespace anox
 				{
 					// We don't create the signaler/completion job normally, only if there are multiple requests for
 					// the same resource
-					if (!tracker->m_loadCompletionSignaler)
+					if (!tracker->m_loadCompletionSignaler.IsValid())
 					{
 						RKIT_CHECK(m_jobQueue->CreateSignaledJob(tracker->m_loadCompletionSignaler, tracker->m_loadCompletionJob));
 					}

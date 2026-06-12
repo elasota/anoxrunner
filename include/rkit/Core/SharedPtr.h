@@ -211,7 +211,7 @@ rkit::Result rkit::MakeSharedWithAlloc(SharedPtr<T> &outRCPtr, IMallocDriver *al
 template<class T>
 rkit::Result rkit::MakeShared(SharedPtr<T> &outRCPtr, UniquePtr<T> &&original)
 {
-	return MakeSharedWithAlloc<T>(outRCPtr, GetDrivers().m_mallocDriver, std::move(original));
+	return MakeSharedWithAlloc<T>(outRCPtr, GetDrivers().m_mallocDriver.Get(), std::move(original));
 }
 
 inline void rkit::BaseRefCountTracker::ReleaseCheckDelete()

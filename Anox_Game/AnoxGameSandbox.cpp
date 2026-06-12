@@ -206,7 +206,7 @@ namespace anox::game::sandbox
 #endif
 
 		rkit::UniquePtr<Session> session;
-		RKIT_CHECK(Session::Create(session, rkit::GetDrivers().m_mallocDriver));
+		RKIT_CHECK(Session::Create(session, rkit::GetDrivers().m_mallocDriver.Get()));
 
 		rkit::SimpleObjectAllocation<Session> sessionAllocation = session.Detach();
 
@@ -223,7 +223,7 @@ namespace anox::game::sandbox
 			rkit::SimpleObjectAllocation<Session> sessionAllocation;
 			sessionAllocation.m_obj = static_cast<Session *>(gameSessionObject);
 			sessionAllocation.m_mem = gameSessionMem;
-			sessionAllocation.m_alloc = rkit::GetDrivers().m_mallocDriver;
+			sessionAllocation.m_alloc = rkit::GetDrivers().m_mallocDriver.Get();
 
 			rkit::Delete(sessionAllocation);
 		}

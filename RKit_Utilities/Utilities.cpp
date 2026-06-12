@@ -252,7 +252,7 @@ namespace rkit
 
 	Result UtilitiesDriver::CreateRestartableDeflateDecompressStream(UniquePtr<ISeekableReadStream> &outStream, UniquePtr<ISeekableReadStream> &&compressedStream, FilePos_t decompressedSize) const
 	{
-		IMallocDriver *alloc = GetDrivers().m_mallocDriver;
+		IMallocDriver *alloc = GetDrivers().m_mallocDriver.Get();
 
 		ISeekableStream *seekable = compressedStream.Get();
 		UniquePtr<IReadStream> streamMoved(std::move(compressedStream));
@@ -267,7 +267,7 @@ namespace rkit
 
 	Result UtilitiesDriver::CreateDeflateDecompressStream(UniquePtr<IReadStream> &outStream, UniquePtr<IReadStream> &&compressedStream) const
 	{
-		IMallocDriver *alloc = GetDrivers().m_mallocDriver;
+		IMallocDriver *alloc = GetDrivers().m_mallocDriver.Get();
 
 		UniquePtr<IReadStream> streamMoved(std::move(compressedStream));
 
@@ -281,7 +281,7 @@ namespace rkit
 
 	Result UtilitiesDriver::CreateRangeLimitedReadStream(UniquePtr<ISeekableReadStream> &outStream, UniquePtr<ISeekableReadStream> &&streamSrc, FilePos_t startPos, FilePos_t size) const
 	{
-		IMallocDriver *alloc = GetDrivers().m_mallocDriver;
+		IMallocDriver *alloc = GetDrivers().m_mallocDriver.Get();
 
 		UniquePtr<ISeekableReadStream> stream(std::move(streamSrc));
 
@@ -2493,7 +2493,7 @@ namespace rkit
 	Result UtilitiesDriver::CreateModuleSandbox(UniquePtr<ISandbox> &outSandbox, uint32_t moduleNamespace, const Utf8Char_t *moduleName, const sandbox::SysCallCatalog &sysCalls, sandbox::Environment &env) const
 	{
 		UniquePtr<utils::ModuleSandbox> sandbox;
-		RKIT_CHECK(utils::ModuleSandbox::Create(sandbox, GetDrivers().m_moduleDriver, moduleNamespace, moduleName, sysCalls, env));
+		RKIT_CHECK(utils::ModuleSandbox::Create(sandbox, GetDrivers().m_moduleDriver.Get(), moduleNamespace, moduleName, sysCalls, env));
 		outSandbox = std::move(sandbox);
 
 		RKIT_RETURN_OK;
