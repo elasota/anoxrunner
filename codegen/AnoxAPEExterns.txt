@@ -1,224 +1,224 @@
-activate_party floatexpr(party)
-add_battle_skill combine str(skill)
-remove_battle_skill str(skill)
-add_hitpoints uint(character) uint(amount)
-add_money floatexpr(amount)
-set_money floatexpr(amount)
-check_money floatvar(money)
-remove_money floatexpr(amount)
-add_npc_to_party str(character)
-Add_XP str(character) uint(amount)
-addnew_to_inventory str(item) optional uint(quantity)
-is_in_inventory str(item) floatvar(have)
-remove_from_inventory str(item) optional uint(count)
-adjust_nrg floatexpr(handle) int(amount)
-adjust_stat special str(targetname) obj(targetobj) str(stat) floatexpr(amount)
-AI_Anim uint(handle) uint(anim) uint(param0) uint(param1) uint(param2)
-AI_AvoidEnts obj(handle) bool(flag)
-AI_DeSolidify obj(handle)
-AI_DestroyEntity obj(handle)
-AI_Distance2d floatvar(dist) obj(handle0) obj(handle1)
-AI_Distance3D floatvar(dist) obj(handle0) obj(handle1)
-AI_DistanceSquared3D floatvar(var) obj(handle0) obj(handle1)
-AI_FindEntity objvar(handle) str(target)
-AI_FollowRigid obj(handle) uint(target) uint(param0)
-AI_GetClosestEntity obj(handle) uint(type) uint(param0) uint(var)
-AI_GetEdictNumber str(target) objvar(edict)
-AI_GetFRU uint(handle) uint(fx) uint(fy) uint(fz) uint(rx) uint(ry) uint(rz) uint(ux) uint(uy) uint(uz)
-AI_GetPitch uint(handle) uint(pitch)
-AI_GetPlayerLocation floatvar(x) floatvar(y) floatvar(z)
-AI_GetRoll uint(handle) uint(roll)
-AI_GetScreenSphere obj(handle) floatvar(x) floatvar(y) floatvar(r) floatvar(valid) floatvar(dist)
-AI_GetScreenXY obj(handle) floatvar(x) floatvar(y) floatvar(valid)
-AI_GetViewAngles floatvar(yaw) floatvar(pitch) floatvar(roll)
-AI_GetViewForward floatvar(x) floatvar(y) floatvar(z)
-AI_GetXYZ obj(handle) floatvar(x) floatvar(y) floatvar(z)
-AI_GetYaw obj(handle) floatvar(yaw)
-AI_GrabEntity str(target) objvar(handle)
-AI_MakeSmart obj(handle)
-AI_NoEntCollision obj(handle) bool(enable)
-AI_Path obj(handle) uint(target)
-AI_Release obj(handle)
-AI_ReleaseEntity obj(handle)
-AI_Seek obj(handle) uint(target)
-AI_SeekAndFace obj(handle) str(target) optional str(lookat)
-AI_SetCompletionCallback obj(handle) label(func)
-AI_SetPitch obj(handle) floatexpr(pitch)
-AI_SetYaw obj(handle) floatexpr(yaw)
-AI_SetRoll obj(handle) floatexpr(roll)
-AI_SetScale obj(handle) floatexpr(x) floatexpr(y) floatexpr(z)
-AI_SetVelocityXYZ obj(handle) floatexpr(x) floatexpr(y) floatexpr(z)
-AI_SetXYZ obj(handle) floatexpr(x) floatexpr(y) floatexpr(z)
-AI_SetX obj(handle) floatexpr(x)
-AI_SetY obj(handle) floatexpr(y)
-AI_SetZ obj(handle) floatexpr(z)
-AI_SnapMove obj(handle)
-AI_SpawnEntity obj(handle) str(eclass) optional str(target) label(sequence) str(spawnloc)
-AI_TalkStop obj(target)
-AI_Wait obj(handle) uint(amount)
-AI_WaitAndFace obj(handle) uint(param0) uint(target)
-ambi_baltownr
-ANIM_MakeDumb obj(handle)
-ANIM_MakeSmart obj(handle)
-ANIM_MakeStupid obj(handle)
-ANIM_PlayAnim obj(handle) str(state) optional uint(loop) uint(flush) uint(holdframe)
-ANIM_PlaySequence obj(handle) uint(anim)
-ANIM_SetCallback obj(handle) label(func)
-ANIM_Stop uint(handle)
-APE_ARCADE_RegisterGame uint(name) scriptresource(script) label(sequence) uint(desc) imageresource(card)
-APE_ARCADE_ReturnFromGame
-ApplyLevelConfiguration uint(config)
-Assign floatvar(var) optional floatexpr(v0) floatexpr(v1) floatexpr(v2) floatexpr(v3) floatexpr(v4) floatexpr(v5) floatexpr(v6) floatexpr(v7) floatexpr(v8) floatexpr(v9) floatexpr(v10) floatexpr(v11) floatexpr(v12) floatexpr(v13) floatexpr(v14) floatexpr(v15) floatexpr(v16) floatexpr(v17) floatexpr(v18) floatexpr(v19) floatexpr(v20) floatexpr(v21) floatexpr(v22) floatexpr(v23) floatexpr(v24) floatexpr(v25) floatexpr(v26) floatexpr(v27) floatexpr(v28) floatexpr(v29) floatexpr(v30) floatexpr(v31) floatexpr(v32) floatexpr(v33) floatexpr(v34) floatexpr(v35) floatexpr(v36) floatexpr(v37) floatexpr(v38) floatexpr(v39) floatexpr(v40) floatexpr(v41) floatexpr(v42) floatexpr(v43)
-BATTLE_AffectNodeOccupant uint(target) uint(effect)
-BATTLE_AttachNode uint(node0) uint(node1)
-BATTLE_Choice_Disable uint(type)
-BATTLE_Choice_Enable uint(type)
-BATTLE_DetachNode uint(node0) uint(node1)
-BATTLE_EndBattle
-BATTLE_EndIntro
-BATTLE_EndTurn
-BATTLE_FocusOnNode uint(uid)
-BATTLE_GetAttachedNodeUID uint(uid) uint(var)
-BATTLE_GetHandleFromUID uint(uid) uint(var)
-BATTLE_GetHitPoints uint(target) uint(var)
-BATTLE_GetTurnCharName uint(str)
-BATTLE_GetTurnEntUID uint(uid)
-BATTLE_GetUIDFromKey uint(key) uint(value) uint(var)
-BATTLE_IsNodeOccupied uint(uid) uint(var)
-BATTLE_PositionNode uint(uid) uint(x) uint(y) uint(z)
-BATTLE_RemoveFromBattle uint(uid)
-BATTLE_ResetTimer uint(uid)
-BATTLE_SetNumBosses uint(amount)
-BATTLE_SpawnMonster uint(monster) uint(target)
-BATTLE_StartTime
-BATTLE_StopTime
-BATTLE_SwapOccupants uint(node0) uint(node1)
-BATTLE_SwapPlayers uint(character) uint(replacement)
-BATTLE_UnaffectNodeOccupant uint(target) uint(effect)
-BattleStart uint(battle)
-BEAM_CreateBeam obj(handle) obj(targethandle) floatexpr(r) floatexpr(g) floatexpr(b) floatexpr(a) floatexpr(time) floatexpr(radius) uint(flags)
-BEAM_CreateBeamEx obj(handle) str(srcsurf) obj(targethandle) str(targetsurf) floatexpr(r) floatexpr(g) floatexpr(b) floatexpr(a) floatexpr(r2) floatexpr(g2) floatexpr(b2) floatexpr(time) floatexpr(radius) floatexpr(radius2) uint(texturenum) floatexpr(scrollx) floatexpr(scrolly) uint(flags)
-BEAM_KillBeam obj(handle)
-CacheSound soundresource(sound)
-cam_anoxmariomode uint(value)
-cam_define_var_set special uint(desc) uint(category) uint(state) uint(ownercond) bool(zip) uint(pitch) uint(yaw) uint(roll) uint(fardist) uint(neardist) uint(movespeed) uint(lagfactor) bool(noidle) bool(occlude) uint(lift) bool(moverestore)
-cam_lift uint(param0)
-cam_restore
-cam_set special str(property) optional float(v0) float(v1) float(v2) str(str)
-cam_to special optional float(x) float(y) float(z) str(target)
-cam_to_edictnumber obj(handle)
-cam_from special optional float(x) float(y) float(z) str(target)
-cam_zip
-CamInit uint(type)
-CamKill
-chainscripts uint(param0) uint(param1)
-check_party_size uint(var)
-check_stat uint(character) uint(stat) uint(var)
-checkgamestate str(var)
-ClampPartyLevelToMinimum uint(level)
-add_quest str(name)
-cancel_quest str(name)
-complete_quest str(name)
-is_quest_done str(name) floatvar(var)
-create_party uint(party) str(member0) optional str(member1) str(member2)
-CreateAPE2DControl str(type) str(name) float(x) float(y) optional named bool(nodrawflag) named uint(width) named uint(height) named label(sequence) named floatvar(gamevar) named int(returnvalue) named bool(holdfocusflag) named fontresource(font) named str(message) imageresource(normal) imageresource(bright) bool(border) fileresource(addfile) str(fontcolor)
-ModifyAPE2DControl str(name) optional named bool(dimflag) str(addline) str(current)
-RemoveAPE2DControl str(name)
-deassign floatvar(var) uint(count)
-DrawNiceRect uint(x0) uint(y0) uint(x1) uint(y1) uint(rgb) uint(alpha)
-DrawPic texturevar(pic) floatexpr(x) floatexpr(y)
-ENT_InstantXYZ obj(handle) floatexpr(x) floatexpr(y) floatexpr(z)
-ENT_InstantYPR obj(handle) floatexpr(yaw) floatexpr(pitch) floatexpr(roll)
-ENT_SetColor obj(handle) floatexpr(r) floatexpr(g) floatexpr(b)
-EntKey uint(handle) uint(key) uint(value)
-equip_item str(item)
-FindEntBySeq uint(handle) uint(sequence)
-FindTexture texturevar(handle) imageresource(image)
-FlashScreenf floatexpr(param0) floatexpr(param1) floatexpr(param2) floatexpr(param3) floatexpr(param4)
-forceplayerlevel str(character) floatexpr(level)
-gdb_listbox uint(param0) uint(param1) uint(param2) uint(param3) str(param4) strvar(param5)
-get_party_order strvar(member0) strvar(member1) strvar(member2)
-getbug
-GetButtonState uint(button) uint(bits) uint(msec)
-getflower
-have_fought_battle uint(battle) uint(var)
-is_equipped str(item) floatvar(var)
-is_skill_acquired str(skill) floatvar(var)
-LetterBox uint(param0) uint(param1) uint(param2)
-light_setambientcolor uint(param0) uint(param1) uint(param2)
-light_setambientdir uint(param0) uint(param1) uint(param2)
-loadmusicseg musicsegresource(seg)
-loopscene sceneresource(scene)
-playscene sceneresource(scene) optional uint(timeoffset) label(sequencecallback) str(srcrelname) str(targetrelname) obj(srcrelobject) obj(targetrelobject) bool(lerpafter) bool(hidecursor)
-stopscene sceneresource(scene)
-loopsound soundresource(sound) optional uint(handle) uint(param0) uint(param1)
-MakeSequence uint(seq1) uint(seq2) uint(seqstr)
-move_party_to float(x) float(y) float(z)
-move_party_to_point uint(member) float(x) float(y) float(z)
-np obj(handle) uint(id) uint(submodel) str(surfname) uint(flags) particleresource(particle)
-npkill obj(handle)
-npsimple obj(handle) particleresource(particle)
-operate_on_party uint(param0)
-PARTICLE_StartEffect obj(handle) str(name) str(desc)
-PARTICLE_StopAllEffects obj(handle)
-PARTICLE_StopEffect obj(handle) str(name) optional str(desc)
-PauseLevelMusic
-photo_findentity uint(var) uint(key) uint(value)
-pickup_getitem obj(target) str(target)
-place_in_party uint(character) uint(pos)
-loopambient sceneresource(scene)
-playambient sceneresource(scene) optional uint(timeoffset) label(sequencecallback) str(srcrelname) str(targetrelname) obj(srcrelobject) obj(targetrelobject) bool(lerpafter) bool(hidecursor)
-stopambient sceneresource(scene)
-playlevelmusic str(music)
-playmusicseg musicsegresource(seg) uint(param0)
-playsound soundresource(sound) optional uint(handle) uint(param0) uint(param1)
-ProjectEntity uint(handle) uint(x) uint(y) uint(z) uint(hit)
-RaiseShields
-rca uint(param0) uint(param1)
-RegisterPic str(pic) imageresource(image)
-ReleaseEntity uint(handle)
-RemoveShield
-ResetBattle uint(battle)
-ResumeLevelMusic
-ScaleEntity uint(handle) uint(x) uint(y) uint(z)
-set_party_leader str(character)
-set_party_members uint(param0) str(member0) optional str(member1) str(member2)
-remove_npc_from_party str(character) optional uint(param0)
-get_world_skill_level str(skill) floatvar(var)
-set_world_skill_level str(skill) floatexpr(level)
-Set2DCursor special bool(default) imageresource(frame0) imageresource(frame1) imageresource(frame2) imageresource(frame3) imageresource(frame4) uint(param0) uint(param1) uint(param2)
-SetAnimFrame texturevar(imghandle) uint(frame)
-SetCollisionCallback uint(eclass1) uint(eclass2) label(func)
-SetDoppler uint(amount)
-setmasterlevel uint(level)
-SetMusicDir uint(dir)
-SetPartyLevel uint(level)
-GetPlayerCurrentBouge str(character) floatvar(var)
-GetPlayerCurrentHP str(character) floatvar(var)
-GetPlayerCurrentNRG str(character) floatvar(var)
-SetPlayerCurrentBouge str(character) floatexpr(amount)
-SetPlayerCurrentHP str(character) floatexpr(hp)
-SetPlayerCurrentNRG str(character) floatexpr(amount)
-SetPlayerModel modelresource(model)
-setvar_flexible strvar(var) floatexpr(value)
-shop_add_object uint(item) uint(param0)
-shop_create uint(name)
-shop_picture imageresource(image)
-shop_set_active uint(name)
-shop_slogan uint(text)
-shop_start label(func)
-ShowEntity uint(handle) optional uint(visible)
-SpawnEntity2 uint(handle) uint(eclass) uint(param0) uint(sequence)
-STAB_Append uint(stab) uint(desc) uint(value)
-STAB_Create uint(stab)
-STAB_Destroy uint(stab)
-STAB_GetElem uint(stab) uint(entry) uint(var)
-STAB_GetSize uint(stab) uint(var)
-stopmusicseg musicsegresource(seg)
-stopsound soundresource(sound) optional uint(handle)
-string_length str(str) floatvar(len)
-UI_FillRect uint(x) uint(y) uint(width) uint(height) uint(alpha) uint(b) uint(g) uint(b)
-ui_playscene sceneresource(scene)
-UnlinkEntity uint(param0) uint(param1)
-UpdateBattleBars
-VecToAngles uint(x) uint(y) uint(z) uint(pitch) uint(yaw) uint(roll)
+activate_party floatexpr(party) stub
+add_battle_skill combine str(skill) stub
+remove_battle_skill str(skill) stub
+add_hitpoints uint(character) uint(amount) stub
+add_money floatexpr(amount) stub
+set_money floatexpr(amount) stub
+check_money floatvar(money) stub
+remove_money floatexpr(amount) stub
+add_npc_to_party str(character) stub
+Add_XP str(character) uint(amount) stub
+addnew_to_inventory str(item) optional uint(quantity) stub
+is_in_inventory str(item) floatvar(have) stub
+remove_from_inventory str(item) optional uint(count) stub
+adjust_nrg floatexpr(handle) int(amount) stub
+adjust_stat special str(targetname) obj(targetobj) str(stat) floatexpr(amount) stub
+AI_Anim uint(handle) uint(anim) uint(param0) uint(param1) uint(param2) stub
+AI_AvoidEnts obj(handle) bool(flag) stub
+AI_DeSolidify obj(handle) stub
+AI_DestroyEntity obj(handle) stub
+AI_Distance2d floatvar(dist) obj(handle0) obj(handle1) stub
+AI_Distance3D floatvar(dist) obj(handle0) obj(handle1) stub
+AI_DistanceSquared3D floatvar(var) obj(handle0) obj(handle1) stub
+AI_FindEntity objvar(handle) str(target) stub
+AI_FollowRigid obj(handle) uint(target) uint(param0) stub
+AI_GetClosestEntity obj(handle) uint(type) uint(param0) uint(var) stub
+AI_GetEdictNumber str(target) objvar(edict) stub
+AI_GetFRU uint(handle) uint(fx) uint(fy) uint(fz) uint(rx) uint(ry) uint(rz) uint(ux) uint(uy) uint(uz) stub
+AI_GetPitch uint(handle) uint(pitch) stub
+AI_GetPlayerLocation floatvar(x) floatvar(y) floatvar(z) stub
+AI_GetRoll uint(handle) uint(roll) stub
+AI_GetScreenSphere obj(handle) floatvar(x) floatvar(y) floatvar(r) floatvar(valid) floatvar(dist) stub
+AI_GetScreenXY obj(handle) floatvar(x) floatvar(y) floatvar(valid) stub
+AI_GetViewAngles floatvar(yaw) floatvar(pitch) floatvar(roll) stub
+AI_GetViewForward floatvar(x) floatvar(y) floatvar(z) stub
+AI_GetXYZ obj(handle) floatvar(x) floatvar(y) floatvar(z) stub
+AI_GetYaw obj(handle) floatvar(yaw) stub
+AI_GrabEntity str(target) objvar(handle) stub
+AI_MakeSmart obj(handle) stub
+AI_NoEntCollision obj(handle) bool(enable) stub
+AI_Path obj(handle) uint(target) stub
+AI_Release obj(handle) stub
+AI_ReleaseEntity obj(handle) stub
+AI_Seek obj(handle) uint(target) stub
+AI_SeekAndFace obj(handle) str(target) optional str(lookat) stub
+AI_SetCompletionCallback obj(handle) label(func) stub
+AI_SetPitch obj(handle) floatexpr(pitch) stub
+AI_SetYaw obj(handle) floatexpr(yaw) stub
+AI_SetRoll obj(handle) floatexpr(roll) stub
+AI_SetScale obj(handle) floatexpr(x) floatexpr(y) floatexpr(z) stub
+AI_SetVelocityXYZ obj(handle) floatexpr(x) floatexpr(y) floatexpr(z) stub
+AI_SetXYZ obj(handle) floatexpr(x) floatexpr(y) floatexpr(z) stub
+AI_SetX obj(handle) floatexpr(x) stub
+AI_SetY obj(handle) floatexpr(y) stub
+AI_SetZ obj(handle) floatexpr(z) stub
+AI_SnapMove obj(handle) stub
+AI_SpawnEntity obj(handle) str(eclass) optional str(target) label(sequence) str(spawnloc) stub
+AI_TalkStop obj(target) stub
+AI_Wait obj(handle) uint(amount) stub
+AI_WaitAndFace obj(handle) uint(param0) uint(target) stub
+ambi_baltownr stub
+ANIM_MakeDumb obj(handle) stub
+ANIM_MakeSmart obj(handle) stub
+ANIM_MakeStupid obj(handle) stub
+ANIM_PlayAnim obj(handle) str(state) optional uint(loop) uint(flush) uint(holdframe) stub
+ANIM_PlaySequence obj(handle) uint(anim) stub
+ANIM_SetCallback obj(handle) label(func) stub
+ANIM_Stop uint(handle) stub
+APE_ARCADE_RegisterGame uint(name) scriptresource(script) label(sequence) uint(desc) imageresource(card) stub
+APE_ARCADE_ReturnFromGame stub
+ApplyLevelConfiguration uint(config) stub
+Assign floatvar(var) optional floatexpr(v0) floatexpr(v1) floatexpr(v2) floatexpr(v3) floatexpr(v4) floatexpr(v5) floatexpr(v6) floatexpr(v7) floatexpr(v8) floatexpr(v9) floatexpr(v10) floatexpr(v11) floatexpr(v12) floatexpr(v13) floatexpr(v14) floatexpr(v15) floatexpr(v16) floatexpr(v17) floatexpr(v18) floatexpr(v19) floatexpr(v20) floatexpr(v21) floatexpr(v22) floatexpr(v23) floatexpr(v24) floatexpr(v25) floatexpr(v26) floatexpr(v27) floatexpr(v28) floatexpr(v29) floatexpr(v30) floatexpr(v31) floatexpr(v32) floatexpr(v33) floatexpr(v34) floatexpr(v35) floatexpr(v36) floatexpr(v37) floatexpr(v38) floatexpr(v39) floatexpr(v40) floatexpr(v41) floatexpr(v42) floatexpr(v43) stub
+BATTLE_AffectNodeOccupant uint(target) uint(effect) stub
+BATTLE_AttachNode uint(node0) uint(node1) stub
+BATTLE_Choice_Disable uint(type) stub
+BATTLE_Choice_Enable uint(type) stub
+BATTLE_DetachNode uint(node0) uint(node1) stub
+BATTLE_EndBattle stub
+BATTLE_EndIntro stub
+BATTLE_EndTurn stub
+BATTLE_FocusOnNode uint(uid) stub
+BATTLE_GetAttachedNodeUID uint(uid) uint(var) stub
+BATTLE_GetHandleFromUID uint(uid) uint(var) stub
+BATTLE_GetHitPoints uint(target) uint(var) stub
+BATTLE_GetTurnCharName uint(str) stub
+BATTLE_GetTurnEntUID uint(uid) stub
+BATTLE_GetUIDFromKey uint(key) uint(value) uint(var) stub
+BATTLE_IsNodeOccupied uint(uid) uint(var) stub
+BATTLE_PositionNode uint(uid) uint(x) uint(y) uint(z) stub
+BATTLE_RemoveFromBattle uint(uid) stub
+BATTLE_ResetTimer uint(uid) stub
+BATTLE_SetNumBosses uint(amount) stub
+BATTLE_SpawnMonster uint(monster) uint(target) stub
+BATTLE_StartTime stub
+BATTLE_StopTime stub
+BATTLE_SwapOccupants uint(node0) uint(node1) stub
+BATTLE_SwapPlayers uint(character) uint(replacement) stub
+BATTLE_UnaffectNodeOccupant uint(target) uint(effect) stub
+BattleStart uint(battle) stub
+BEAM_CreateBeam obj(handle) obj(targethandle) floatexpr(r) floatexpr(g) floatexpr(b) floatexpr(a) floatexpr(time) floatexpr(radius) uint(flags) stub
+BEAM_CreateBeamEx obj(handle) str(srcsurf) obj(targethandle) str(targetsurf) floatexpr(r) floatexpr(g) floatexpr(b) floatexpr(a) floatexpr(r2) floatexpr(g2) floatexpr(b2) floatexpr(time) floatexpr(radius) floatexpr(radius2) uint(texturenum) floatexpr(scrollx) floatexpr(scrolly) uint(flags) stub
+BEAM_KillBeam obj(handle) stub
+CacheSound soundresource(sound) stub
+cam_anoxmariomode uint(value) stub
+cam_define_var_set special uint(desc) uint(category) uint(state) uint(ownercond) bool(zip) uint(pitch) uint(yaw) uint(roll) uint(fardist) uint(neardist) uint(movespeed) uint(lagfactor) bool(noidle) bool(occlude) uint(lift) bool(moverestore) stub
+cam_lift uint(param0) stub
+cam_restore stub
+cam_set special str(property) optional float(v0) float(v1) float(v2) str(str) stub
+cam_to special optional float(x) float(y) float(z) str(target) stub
+cam_to_edictnumber obj(handle) stub
+cam_from special optional float(x) float(y) float(z) str(target) stub
+cam_zip stub
+CamInit uint(type) stub
+CamKill stub
+chainscripts uint(param0) uint(param1) stub
+check_party_size uint(var) stub
+check_stat uint(character) uint(stat) uint(var) stub
+checkgamestate str(var) stub
+ClampPartyLevelToMinimum uint(level) stub
+add_quest str(name) stub
+cancel_quest str(name) stub
+complete_quest str(name) stub
+is_quest_done str(name) floatvar(var) stub
+create_party uint(party) str(member0) optional str(member1) str(member2) stub
+CreateAPE2DControl str(type) str(name) float(x) float(y) optional named bool(nodrawflag) named uint(width) named uint(height) named label(sequence) named floatvar(gamevar) named int(returnvalue) named bool(holdfocusflag) named fontresource(font) named str(message) imageresource(normal) imageresource(bright) bool(border) fileresource(addfile) str(fontcolor) stub
+ModifyAPE2DControl str(name) optional named bool(dimflag) str(addline) str(current) stub
+RemoveAPE2DControl str(name) stub
+deassign floatvar(var) uint(count) stub
+DrawNiceRect uint(x0) uint(y0) uint(x1) uint(y1) uint(rgb) uint(alpha) stub
+DrawPic texturevar(pic) floatexpr(x) floatexpr(y) stub
+ENT_InstantXYZ obj(handle) floatexpr(x) floatexpr(y) floatexpr(z) stub
+ENT_InstantYPR obj(handle) floatexpr(yaw) floatexpr(pitch) floatexpr(roll) stub
+ENT_SetColor obj(handle) floatexpr(r) floatexpr(g) floatexpr(b) stub
+EntKey uint(handle) uint(key) uint(value) stub
+equip_item str(item) stub
+FindEntBySeq uint(handle) uint(sequence) stub
+FindTexture texturevar(handle) imageresource(image) stub
+FlashScreenf floatexpr(param0) floatexpr(param1) floatexpr(param2) floatexpr(param3) floatexpr(param4) stub
+forceplayerlevel str(character) floatexpr(level) stub
+gdb_listbox uint(param0) uint(param1) uint(param2) uint(param3) str(param4) strvar(param5) stub
+get_party_order strvar(member0) strvar(member1) strvar(member2) stub
+getbug stub
+GetButtonState uint(button) uint(bits) uint(msec) stub
+getflower stub
+have_fought_battle uint(battle) uint(var) stub
+is_equipped str(item) floatvar(var) stub
+is_skill_acquired str(skill) floatvar(var) stub
+LetterBox uint(param0) uint(param1) uint(param2) stub
+light_setambientcolor uint(param0) uint(param1) uint(param2) stub
+light_setambientdir uint(param0) uint(param1) uint(param2) stub
+loadmusicseg musicsegresource(seg) stub
+loopscene sceneresource(scene) stub
+playscene sceneresource(scene) optional uint(timeoffset) label(sequencecallback) str(srcrelname) str(targetrelname) obj(srcrelobject) obj(targetrelobject) bool(lerpafter) bool(hidecursor) stub
+stopscene sceneresource(scene) stub
+loopsound soundresource(sound) optional uint(handle) uint(param0) uint(param1) stub
+MakeSequence uint(seq1) uint(seq2) uint(seqstr) stub
+move_party_to float(x) float(y) float(z) stub
+move_party_to_point uint(member) float(x) float(y) float(z) stub
+np obj(handle) uint(id) uint(submodel) str(surfname) uint(flags) particleresource(particle) stub
+npkill obj(handle) stub
+npsimple obj(handle) particleresource(particle) stub
+operate_on_party uint(param0) stub
+PARTICLE_StartEffect obj(handle) str(name) str(desc) stub
+PARTICLE_StopAllEffects obj(handle) stub
+PARTICLE_StopEffect obj(handle) str(name) optional str(desc) stub
+PauseLevelMusic stub
+photo_findentity uint(var) uint(key) uint(value) stub
+pickup_getitem obj(target) str(target2) stub
+place_in_party uint(character) uint(pos) stub
+loopambient sceneresource(scene) stub
+playambient sceneresource(scene) optional uint(timeoffset) label(sequencecallback) str(srcrelname) str(targetrelname) obj(srcrelobject) obj(targetrelobject) bool(lerpafter) bool(hidecursor) stub
+stopambient sceneresource(scene) stub
+playlevelmusic str(music) stub
+playmusicseg musicsegresource(seg) uint(param0) stub
+playsound soundresource(sound) optional uint(handle) uint(param0) uint(param1) stub
+ProjectEntity uint(handle) uint(x) uint(y) uint(z) uint(hit) stub
+RaiseShields stub
+rca uint(param0) uint(param1) stub
+RegisterPic str(pic) imageresource(image) stub
+ReleaseEntity uint(handle) stub
+RemoveShield stub
+ResetBattle uint(battle) stub
+ResumeLevelMusic stub
+ScaleEntity uint(handle) uint(x) uint(y) uint(z) stub
+set_party_leader str(character) stub
+set_party_members uint(param0) str(member0) optional str(member1) str(member2) stub
+remove_npc_from_party str(character) optional uint(param0) stub
+get_world_skill_level str(skill) floatvar(var) stub
+set_world_skill_level str(skill) floatexpr(level) stub
+Set2DCursor special bool(isDefault) imageresource(frame0) imageresource(frame1) imageresource(frame2) imageresource(frame3) imageresource(frame4) uint(param0) uint(param1) uint(param2) stub
+SetAnimFrame texturevar(imghandle) uint(frame) stub
+SetCollisionCallback uint(eclass1) uint(eclass2) label(func) stub
+SetDoppler uint(amount) stub
+setmasterlevel uint(level) stub
+SetMusicDir uint(dir) stub
+SetPartyLevel uint(level) stub
+GetPlayerCurrentBouge str(character) floatvar(var) stub
+GetPlayerCurrentHP str(character) floatvar(var) stub
+GetPlayerCurrentNRG str(character) floatvar(var) stub
+SetPlayerCurrentBouge str(character) floatexpr(amount) stub
+SetPlayerCurrentHP str(character) floatexpr(hp) stub
+SetPlayerCurrentNRG str(character) floatexpr(amount) stub
+SetPlayerModel modelresource(model) stub
+setvar_flexible strvar(var) floatexpr(value) stub
+shop_add_object uint(item) uint(param0) stub
+shop_create uint(name) stub
+shop_picture imageresource(image) stub
+shop_set_active uint(name) stub
+shop_slogan uint(text) stub
+shop_start label(func) stub
+ShowEntity uint(handle) optional uint(visible) stub
+SpawnEntity2 uint(handle) uint(eclass) uint(param0) uint(sequence) stub
+STAB_Append uint(stab) uint(desc) uint(value) stub
+STAB_Create uint(stab) stub
+STAB_Destroy uint(stab) stub
+STAB_GetElem uint(stab) uint(entry) uint(var) stub
+STAB_GetSize uint(stab) uint(var) stub
+stopmusicseg musicsegresource(seg) stub
+stopsound soundresource(sound) optional uint(handle) stub
+string_length str(str) floatvar(len) stub
+UI_FillRect uint(x) uint(y) uint(width) uint(height) uint(alpha) uint(b) uint(g) uint(r) stub
+ui_playscene sceneresource(scene) stub
+UnlinkEntity uint(param0) uint(param1) stub
+UpdateBattleBars stub
+VecToAngles uint(x) uint(y) uint(z) uint(pitch) uint(yaw) uint(roll) stub

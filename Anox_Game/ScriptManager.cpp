@@ -104,6 +104,8 @@ namespace anox::game
 
 		bool TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, uint32_t exprID, int depth) const;
 		bool TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, const ScriptExprValue &exprValue, int depth) const;
+		rkit::Result TryEvaluateStringScriptExpr(bool &outSucceeded, rkit::ByteString &outValue, const ScriptPackage &pkg, const ScriptExprValue &exprValue, int depth) const;
+		rkit::Result TryEvaluateStringVar(bool &outSucceeded, rkit::ByteString &outValue, const ScriptPackage &pkg, const rkit::ByteStringSliceView &varName, int depth) const;
 		bool TryEvaluateFloatScriptOperand(float &outValue, const ScriptPackage &pkg, const ScriptOperandType opType, uint32_t value, int depth) const;
 
 	private:
@@ -167,6 +169,7 @@ namespace anox::game
 		rkit::Result CreateScriptEnvironment(rkit::UniquePtr<ScriptEnvironment> &outScriptEnvironment);
 
 		void RegisterExtern(size_t slot, ScriptManager::ExternDispatchFunc_t dispatchFunc);
+		ScriptManager::ExternDispatchFunc_t GetExtern(size_t opcode) const;
 
 	private:
 
@@ -354,7 +357,6 @@ namespace anox::game
 		}
 	}
 
-
 	bool ScriptEnvironmentImpl::TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr, int depth) const
 	{
 		switch (expr.m_exprType)
@@ -372,6 +374,50 @@ namespace anox::game
 			rkit::log::Error(u8"Invalid expression type where float expression was expected");
 			return false;
 		}
+	}
+
+	rkit::Result ScriptEnvironmentImpl::TryEvaluateStringScriptExpr(bool &outSucceeded, rkit::ByteString &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr, int depth) const
+	{
+		switch (expr.m_exprType)
+		{
+		case ScriptExprType::Empty:
+			outValue.Clear();
+			outSucceeded = true;
+			break;
+		case ScriptExprType::StringLiteral:
+			if (expr.m_index < pkg.m_strings.Count())
+			{
+				outValue = pkg.m_strings[expr.m_index];
+				outSucceeded = true;
+			}
+			else
+			{
+				RKIT_THROW(rkit::ResultCode::kDataError);
+			}
+			break;
+		case ScriptExprType::StringVariable:
+			if (expr.m_index < pkg.m_strings.Count())
+			{
+				const rkit::ByteString &varName = pkg.m_strings[expr.m_index];
+				return TryEvaluateStringVar(outSucceeded, outValue, pkg, varName, depth);
+			}
+			else
+			{
+				RKIT_THROW(rkit::ResultCode::kDataError);
+			}
+		default:
+			rkit::log::Error(u8"Invalid expression type where string expression was expected");
+			outSucceeded = false;
+			outValue.Clear();
+			break;
+		}
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result ScriptEnvironmentImpl::TryEvaluateStringVar(bool &outSucceeded, rkit::ByteString &outValue, const ScriptPackage &pkg, const rkit::ByteStringSliceView &varName, int depth) const
+	{
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
 
 	bool ScriptEnvironmentImpl::TryEvaluateFloatScriptOperand(float &outValue, const ScriptPackage &pkg, const ScriptOperandType opType, uint32_t value, int depth) const
@@ -534,7 +580,15 @@ namespace anox::game
 
 	rkit::ResultCoroutine ScriptEnvironmentImpl::ExecuteExtern(rkit::ICoroThread &thread, const ScriptPackage *pkg, uint32_t opcode, const ScriptOperandList &operands)
 	{
-		CORO_THROW(rkit::ResultCode::kNotYetImplemented);
+		ScriptManager::ExternDispatchFunc_t dispatchFunc = m_scriptManager.GetExtern(opcode);
+		if (!dispatchFunc)
+			CORO_THROW(rkit::ResultCode::kDataError);
+
+		ape::ExternDispatchContext dispatchContext;
+		dispatchContext.m_pkg = pkg;
+		dispatchContext.m_operands = operands;
+
+		return dispatchFunc(thread, dispatchContext);
 	}
 
 	bool ScriptEnvironmentImpl::TryResolveString(rkit::ByteString &outBStr, const ScriptPackage &pkg, uint32_t strID) const
@@ -979,6 +1033,19 @@ namespace anox::game
 		return rkit::New<ScriptEnvironment>(outScriptEnvironment, *this);
 	}
 
+	void ScriptManagerImpl::RegisterExtern(size_t slot, ScriptManager::ExternDispatchFunc_t dispatchFunc)
+	{
+		m_externOps[slot].m_dispatchFunc = dispatchFunc;
+	}
+
+	ScriptManager::ExternDispatchFunc_t ScriptManagerImpl::GetExtern(size_t opcode) const
+	{
+		if (opcode < m_externOps.Count())
+			return m_externOps[opcode].m_dispatchFunc;
+
+		return nullptr;
+	}
+
 	rkit::Result ScriptLayerInstance::AddPackage(rkit::UniquePtr<ScriptPackage> &&packageMoved)
 	{
 		const ScriptPackage &package = *packageMoved;
@@ -1053,9 +1120,25 @@ namespace anox::game
 		RKIT_RETURN_OK;
 	}
 
+	ScriptManager::ExternDispatchFunc_t ScriptManager::GetExtern(size_t opcode) const
+	{
+		return Impl().GetExtern(opcode);
+	}
+
+	void ScriptManager::InternalRegisterExtern(size_t slot, ExternDispatchFunc_t dispatchFunc)
+	{
+		Impl().RegisterExtern(slot, dispatchFunc);
+	}
+
 	rkit::Result ScriptManager::Create(rkit::UniquePtr<ScriptManager> &outScriptManager)
 	{
-		return rkit::New<ScriptManager>(outScriptManager);
+		rkit::UniquePtr<ScriptManager> scriptManager;
+		rkit::New<ScriptManager>(scriptManager);
+
+		scriptManager->RegisterAllExterns();
+		outScriptManager = std::move(scriptManager);
+
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result ScriptEnvironment::CreateScriptContext(rkit::UniquePtr<ScriptContext> &outScriptCtx)
@@ -1066,6 +1149,11 @@ namespace anox::game
 	bool ScriptEnvironment::TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const
 	{
 		return Impl().TryEvaluateFloatScriptExpr(outValue, pkg, expr, 0);
+	}
+
+	rkit::Result ScriptEnvironment::TryEvaluateStringScriptExpr(bool &outSucceeded, rkit::ByteString &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const
+	{
+		return Impl().TryEvaluateStringScriptExpr(outSucceeded, outValue, pkg, expr, 0);
 	}
 
 	ScriptEnvironment::ScriptEnvironment(ScriptManagerImpl &scriptManager)
@@ -1087,3 +1175,5 @@ namespace anox::game
 RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR(anox::game::ScriptManagerImpl)
 RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR(anox::game::ScriptContextImpl)
 RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR(anox::game::ScriptEnvironmentImpl)
+
+#include "APEExternRegister.generated.inl"

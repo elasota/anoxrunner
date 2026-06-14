@@ -35,6 +35,7 @@ namespace rkit::audio::wasapi
 
 		void SignalShutdown();
 
+		// This runs an action on the audio thread.
 		template<class TFunc>
 		void RunActionOnAudioThread(const TFunc &func);
 
@@ -102,9 +103,11 @@ namespace rkit::audio::wasapi
 
 	struct WASAPIAudioOutputStreamProperties
 	{
-		uint32_t m_bufferSize = 0;
 		IAudioOutputRenderer *m_renderer = nullptr;
+
 		AudioFormat m_audioFormat;
+		uint32_t m_bufferSize = 0;
+		uint64_t m_cpuQPCFrequency = 0;
 
 		win32::ComPtr<IAudioClient> m_audioClient;
 		win32::ComPtr<IAudioRenderClient> m_renderClient;
@@ -133,6 +136,8 @@ namespace rkit::audio::wasapi
 		public:
 			StateQuery() = delete;
 			explicit StateQuery(const WASAPIAudioOutputStream &owner);
+
+			bool GetTimestamp(U64Fraction &cpuTime) const override;
 
 		private:
 			const WASAPIAudioOutputStream &m_owner;
@@ -394,6 +399,9 @@ namespace rkit::audio::wasapi
 		if (hr != S_OK)
 			RKIT_RETURN_OK;
 
+		LARGE_INTEGER qpf = {};
+		QueryPerformanceFrequency(&qpf);
+
 		WASAPIAudioOutputStreamProperties streamProps;
 		streamProps.m_audioClient = std::move(audioClient);
 		streamProps.m_audioThread = std::move(audioThread);
@@ -402,6 +410,7 @@ namespace rkit::audio::wasapi
 		streamProps.m_audioFormat = preferredAudioFormat;
 		streamProps.m_renderer = renderer;
 		streamProps.m_bufferSize = bufferSize;
+		streamProps.m_cpuQPCFrequency = qpf.QuadPart;
 
 		RKIT_CHECK(New<WASAPIAudioOutputStream>(outOutputStream, std::move(streamProps)));
 
@@ -430,6 +439,18 @@ namespace rkit::audio::wasapi
 	WASAPIAudioOutputStream::StateQuery::StateQuery(const WASAPIAudioOutputStream &owner)
 		: m_owner(owner)
 	{
+	}
+
+
+	bool WASAPIAudioOutputStream::StateQuery::GetTimestamp(U64Fraction &cpuTime) const
+	{
+		LARGE_INTEGER qpc = {};
+		QueryPerformanceCounter(&qpc);
+
+		cpuTime.m_numerator = qpc.QuadPart;
+		cpuTime.m_denominator = m_owner.m_props.m_cpuQPCFrequency;
+
+		return true;
 	}
 
 	WASAPIAudioOutputStream::WASAPIAudioOutputStream(WASAPIAudioOutputStreamProperties &&properties)
@@ -495,7 +516,8 @@ namespace rkit::audio::wasapi
 			{
 				HRESULT hr = m_props.m_audioClient->Stop();
 
-				// The wakeup event handle may have been set by the audio client, so reset it.
+				// The wakeup event handle may have been set by the audio client, reset it so it doesn't trigger
+				// another wakeup when the thread resumes.
 				::ResetEvent(m_props.m_threadContext->GetWakeUpEventHandle());
 
 				if (hr != S_OK && hr != S_FALSE)

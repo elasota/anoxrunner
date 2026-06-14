@@ -64,17 +64,19 @@ namespace APEWindowCommandReflector
         public uint Opcode { get; }
         public IReadOnlyList<FieldDef> Fields { get; }
         public bool IsSpecial { get; }
+        public bool IsStub { get; }
         public bool IsCombined { get; }
         public uint NumUnnamedParameters { get; }
         public uint NumRequiredParameters { get; }
 
-        public ExternCommandDef(string name, uint opcode, IReadOnlyList<FieldDef> fields, bool isSpecial, bool isCombined, uint numUnnamedParameters, uint numRequiredParameters)
+        public ExternCommandDef(string name, uint opcode, IReadOnlyList<FieldDef> fields, bool isSpecial, bool isCombined, bool isStub, uint numUnnamedParameters, uint numRequiredParameters)
         {
             Name = name;
             Opcode = opcode;
             Fields = fields;
             IsSpecial = isSpecial;
             IsCombined = isCombined;
+            IsStub = isStub;
             NumUnnamedParameters = numUnnamedParameters;
             NumRequiredParameters = numRequiredParameters;
         }
@@ -146,6 +148,58 @@ namespace APEWindowCommandReflector
             }
         }
 
+        static string ArgTypeForFieldDef(FieldDef.FieldType type)
+        {
+            switch (type)
+            {
+                case FieldDef.FieldType.Bool:
+                    return "Bool";
+                case FieldDef.FieldType.Str:
+                    return "Str";
+                case FieldDef.FieldType.FloatExpr:
+                    return "FloatExpr";
+                case FieldDef.FieldType.FloatVar:
+                    return "FloatVar";
+                case FieldDef.FieldType.UInt32:
+                    return "UInt32";
+                case FieldDef.FieldType.Int32:
+                    return "Int32";
+                case FieldDef.FieldType.Float:
+                    return "Float";
+                case FieldDef.FieldType.Obj:
+                    return "Obj";
+                case FieldDef.FieldType.ObjVar:
+                    return "ObjVar";
+                case FieldDef.FieldType.TextureVar:
+                    return "TextureVar";
+                case FieldDef.FieldType.StrVar:
+                    return "StrVar";
+                case FieldDef.FieldType.Label:
+                    return "Label";
+                case FieldDef.FieldType.ScriptResource:
+                    return "ScriptResource";
+                case FieldDef.FieldType.ImageResource:
+                    return "ImageResource";
+                case FieldDef.FieldType.SoundResource:
+                    return "SoundResource";
+                case FieldDef.FieldType.FontResource:
+                    return "FontResource";
+                case FieldDef.FieldType.FileResource:
+                    return "FileResource";
+                case FieldDef.FieldType.MusicSegResource:
+                    return "MusicSegResource";
+                case FieldDef.FieldType.SceneResource:
+                    return "SceneResource";
+                case FieldDef.FieldType.ParticleResource:
+                    return "ParticleResource";
+                case FieldDef.FieldType.ModelResource:
+                    return "ModelResource";
+
+                default:
+                    throw new Exception();
+            }
+        }
+
         static void CompileExternCommands(string fileName, string outPath)
         {
             string[] defLines = File.ReadAllLines(fileName);
@@ -161,17 +215,38 @@ namespace APEWindowCommandReflector
             Directory.CreateDirectory(outBuildDir);
             Directory.CreateDirectory(outDataIncludeDir);
 
+            using (StreamWriter sw = new StreamWriter(Path.Combine(outGameDir, "APEExternRegister.generated.inl")))
+            {
+                sw.NewLine = "\n";
+                sw.WriteLine("namespace anox::game");
+                sw.WriteLine("{");
+                sw.WriteLine("\tvoid ScriptManager::RegisterAllExterns()");
+                sw.WriteLine("\t{");
+                foreach (ExternCommandDef def in externDefs)
+                    sw.WriteLine("\t\tthis->RegisterExtern<::anox::game::ape::externs::" + def.Name + ">();");
+                sw.WriteLine("\t}");
+                sw.WriteLine("}");
+            }
+
             using (StreamWriter sw = new StreamWriter(Path.Combine(outGameDir, "APEExternDispatch.generated.h")))
             {
                 sw.NewLine = "\n";
                 sw.WriteLine("#pragma once");
                 sw.WriteLine();
                 sw.WriteLine("#include \"anox/Game/APEExternOpcodes.generated.h\"");
+                sw.WriteLine("#include \"APEExternDispatchHelper.h\"");
+                sw.WriteLine();
+                sw.WriteLine("#include \"rkit/Core/CoroutineProtos.h\"");
+                sw.WriteLine();
+                sw.WriteLine("namespace anox::game");
+                sw.WriteLine("{");
+                sw.WriteLine("\tclass ScriptEnvironment;");
+                sw.WriteLine("\tstruct ScriptExprValue;");
+                sw.WriteLine("}");
                 sw.WriteLine();
                 sw.WriteLine("namespace anox::game::ape");
                 sw.WriteLine("{");
                 sw.WriteLine("\tstruct ExternDispatchContext;");
-                sw.WriteLine("\tstruct ScriptExprValue;");
                 sw.WriteLine("}");
                 sw.WriteLine();
                 sw.WriteLine("namespace anox::game::ape::externs");
@@ -182,8 +257,94 @@ namespace APEWindowCommandReflector
                     sw.WriteLine("\t{");
                     sw.WriteLine("\tpublic:");
                     sw.WriteLine("\t\tstatic constexpr ExternOpcode kOpcode = ExternOpcode::" + def.Name + ";");
-                    sw.WriteLine("\t\tstatic rkit::ResultCoroutine Dispatch(rkit::ICoroThread &thread, const ExternDispatchContext &dispatchContext);");
+                    sw.WriteLine("\t\tstatic rkit::ResultCoroutine Dispatch(rkit::ICoroThread &thread, ExternDispatchContext dispatchContext);");
+                    sw.WriteLine("\tprivate:");
+
+                    sw.Write("\t\tstatic rkit::ResultCoroutine Execute(rkit::ICoroThread &thread, ScriptEnvironment &env");
+                    foreach (FieldDef fdef in def.Fields)
+                    {
+                        sw.Write(", ExternDispatch::");
+                        sw.Write(ArgTypeForFieldDef(fdef.Type) + "Arg_t ");
+                        sw.Write(fdef.Name);
+                    }   
+                    sw.WriteLine(");");
+
                     sw.WriteLine("\t};");
+                }
+                sw.WriteLine("}");
+            }
+
+
+            using (StreamWriter sw = new StreamWriter(Path.Combine(outGameDir, "APEExternStubs.generated.inl")))
+            {
+                sw.NewLine = "\n";
+                sw.WriteLine("#include \"APEExternDispatch.generated.h\"");
+                sw.WriteLine("#include \"rkit/Core/Coroutine.h\"");
+                sw.WriteLine();
+                sw.WriteLine("namespace anox::game::ape::externs");
+                sw.WriteLine("{");
+                foreach (ExternCommandDef def in externDefs)
+                {
+                    if (!def.IsStub)
+                        continue;
+
+                    sw.Write("\trkit::ResultCoroutine " + def.Name + "::Execute(rkit::ICoroThread &thread, ScriptEnvironment &env");
+                    foreach (FieldDef fdef in def.Fields)
+                    {
+                        sw.Write(", ExternDispatch::");
+                        sw.Write(ArgTypeForFieldDef(fdef.Type) + "Arg_t ");
+                        sw.Write(fdef.Name);
+                    }
+                    sw.WriteLine(")");
+                    sw.WriteLine("\t{");
+                    sw.WriteLine("\t\tCORO_THROW(rkit::ResultCode::kNotYetImplemented);");
+                    sw.WriteLine("\t}");
+                }
+                sw.WriteLine("}");
+            }
+
+
+            using (StreamWriter sw = new StreamWriter(Path.Combine(outGameDir, "APEExternDispatch.generated.inl")))
+            {
+                sw.NewLine = "\n";
+                sw.WriteLine("#include \"APEExternDispatch.generated.h\"");
+                sw.WriteLine("#include \"ScriptManager.h\"");
+                sw.WriteLine("#include \"anox/Game/APEScriptValues.h\"");
+                sw.WriteLine();
+                sw.WriteLine("#include \"rkit/Core/Coroutine.h\"");
+                sw.WriteLine();
+                sw.WriteLine("namespace anox::game::ape::externs");
+                sw.WriteLine("{");
+                foreach (ExternCommandDef def in externDefs)
+                {
+                    sw.WriteLine("\t::rkit::ResultCoroutine " + def.Name + "::Dispatch(rkit::ICoroThread &thread, ExternDispatchContext dispatchContext)");
+                    sw.WriteLine("\t{");
+                    sw.WriteLine("\t\tif (dispatchContext.m_operands.Count() != " + def.Fields.Count.ToString() + ")");
+                    sw.WriteLine("\t\t\tCORO_THROW(rkit::ResultCode::kDataError);");
+                    sw.WriteLine();
+
+                    for (int i = 0; i < def.Fields.Count; i++)
+                    {
+                        FieldDef fdef = def.Fields[i];
+
+                        string argTypeName = ArgTypeForFieldDef(fdef.Type);
+
+                        string fieldName = "field" + i.ToString() + "";
+
+                        sw.WriteLine("\t\tExternDispatch::" + argTypeName + "Arg_t " + fieldName + ";");
+
+                        sw.WriteLine("\t\tCORO_CHECK(ExternDispatch::Parse" + argTypeName + "Arg(" + fieldName + ", *dispatchContext.m_env, *dispatchContext.m_pkg, dispatchContext.m_operands[" + i.ToString() + "]));");
+                    }
+
+                    sw.Write("\t\tCORO_CHECK(co_await Execute(thread, *dispatchContext.m_env");
+                    for (int i = 0; i < def.Fields.Count; i++)
+                        sw.Write(", field" + i.ToString());
+
+                    sw.WriteLine("));");
+                    sw.WriteLine();
+                    sw.WriteLine("\t\tCORO_RETURN_OK;");
+                    sw.WriteLine("\t}");
+                    sw.WriteLine();
                 }
                 sw.WriteLine("}");
             }
@@ -805,6 +966,7 @@ namespace APEWindowCommandReflector
                 bool isCombined = false;
                 bool isParsingOptional = false;
                 bool isParsingNamed = false;
+                bool isStub = false;
 
                 uint numRequiredParameters = 0;
                 uint numUnnamedParameters = 0;
@@ -834,6 +996,12 @@ namespace APEWindowCommandReflector
                     if (typeStr == "named")
                     {
                         isParsingNamed = true;
+                        continue;
+                    }
+
+                    if (typeStr == "stub")
+                    {
+                        isStub = true;
                         continue;
                     }
 
@@ -904,7 +1072,7 @@ namespace APEWindowCommandReflector
                     fieldDefs.Add(new FieldDef(fieldType, fieldName));
                 }
 
-                defs.Add(new ExternCommandDef(opName, (uint)defs.Count, fieldDefs, isSpecial, isCombined, numUnnamedParameters, numRequiredParameters));
+                defs.Add(new ExternCommandDef(opName, (uint)defs.Count, fieldDefs, isSpecial, isCombined, isStub, numUnnamedParameters, numRequiredParameters));
             }
 
             

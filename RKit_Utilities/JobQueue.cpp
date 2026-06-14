@@ -158,7 +158,7 @@ namespace rkit { namespace utils
 		Result CreateSignalJobRunner(UniquePtr<IJobRunner> &outJobRunner, const RCPtr<JobSignaler> &signaller) override;
 
 		// Wait for work or for a specific job.
-		// wakeEvent: Event to use for waking up the thread
+		// wakeEvent: Event to use for waking up the thread (should be auto-reset)
 		// terminatedEvent: Event to be signalled by the waiting thread if it is awoken while the job queue is shutting down.
 		void WaitForJob(Job &job, const ISpan<JobType> &idleJobTypes, IEvent *wakeEvent, IEvent *terminatedEvent) override;
 

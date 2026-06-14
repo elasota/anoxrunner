@@ -129,5 +129,35 @@ namespace anox::game::sandbox
 
 		RKIT_RETURN_OK;
 	}
+
+	::rkit::Result HostExports::SoundEmitter_Create(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, size_t &id, bool positional)
+	{
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+	}
+
+	::rkit::Result HostExports::SoundEmitter_Play(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, size_t id)
+	{
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+	}
+
+	::rkit::Result HostExports::SoundEmitter_Stop(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, size_t id)
+	{
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+	}
+
+	::rkit::Result HostExports::SoundEmitter_Reset(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, size_t id)
+	{
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+	}
+
+	::rkit::Result HostExports::SoundEmitter_AttachSoundResource(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, size_t id, uint32_t resID)
+	{
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+	}
+
+	::rkit::Result HostExports::SoundEmitter_Destroy(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, size_t id)
+	{
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+	}
 }
 

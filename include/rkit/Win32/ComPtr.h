@@ -276,6 +276,12 @@ namespace rkit::win32::priv
 	}
 
 	template<class T>
+	T ComPtrDeclVal(ComPtr<T> &&comPtr)
+	{
+		return std::declval<T>();
+	}
+
+	template<class T>
 	ComPtrWriteback<T> ComPtrWrapWriteback(ComPtr<T> &comPtr)
 	{
 		return ComPtrWriteback<T>::Wrap(comPtr);

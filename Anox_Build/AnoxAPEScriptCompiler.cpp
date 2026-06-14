@@ -1874,7 +1874,7 @@ namespace anox::buildsystem
 				if (imageArgTokens[0].EqualsNoCase(rkit::AsciiStringView("default").RemoveEncoding()))
 				{
 					const rkit::ByteStringSliceView defaultArgToken = rkit::AsciiStringView("true").RemoveEncoding();
-					const rkit::AsciiStringView defaultArgName = rkit::AsciiStringView("default");
+					const rkit::AsciiStringView defaultArgName = rkit::AsciiStringView("isDefault");
 
 					RKIT_CHECK(mapArgList(&defaultArgToken, &defaultArgName, 1));
 				}

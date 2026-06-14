@@ -138,7 +138,7 @@ namespace anox
 		rkit::UniquePtr<IConfigurationState> emptyConfig;
 		RKIT_CHECK(ICaptureHarness::CreateRealTime(m_captureHarness, *this, *m_resourceManager, std::move(emptyConfig)));
 
-		RKIT_CHECK(AudioSubsystem::Create(m_audioSubsystem));
+		RKIT_CHECK(AudioSubsystem::Create(m_audioSubsystem, *m_threadPool->GetJobQueue()));
 		RKIT_CHECK(IGraphicsSubsystem::Create(m_graphicsSubsystem, *m_fileSystem, *m_dataDriver, *m_threadPool, anox::RenderBackend::kVulkan));
 
 		m_resourceManager->SetGraphicsSubsystem(m_graphicsSubsystem.Get());

@@ -3,6 +3,7 @@
 #include "rkit/Core/CoroutineProtos.h"
 #include "rkit/Core/Opaque.h"
 #include "rkit/Core/Result.h"
+#include "rkit/Core/StringProto.h"
 
 namespace rkit
 {
@@ -38,6 +39,7 @@ namespace anox::game
 		rkit::Result CreateScriptContext(rkit::UniquePtr<ScriptContext> &outScriptCtx);
 
 		bool TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const;
+		rkit::Result TryEvaluateStringScriptExpr(bool &outSucceeded, rkit::ByteString &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const;
 
 	private:
 		ScriptEnvironment() = delete;

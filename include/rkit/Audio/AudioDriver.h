@@ -91,7 +91,7 @@ namespace rkit::audio
 
 	struct IAudioOutputStateQuery
 	{
-		//virtual void GetTimestamp(U64Fraction &deviceTime, U64Fraction &cpuTime) const = 0;
+		RKIT_NODISCARD virtual bool GetTimestamp(U64Fraction &cpuTime) const = 0;
 	};
 
 	struct IAudioOutputStream

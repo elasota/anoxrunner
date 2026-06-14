@@ -12,6 +12,13 @@ import CancelResourceRequest(uint32 requestID) noexcept
 import DecRefResource(uint32 resID) noexcept
 import GetFileResourceContents(uint32 resID) -> (address ptr, size size, uint32 mmid)
 
+import SoundEmitter_Create(bool positional) -> (size id)
+import SoundEmitter_Play(size id)
+import SoundEmitter_Stop(size id)
+import SoundEmitter_Reset(size id)
+import SoundEmitter_AttachSoundResource(size id, uint32 resID)
+import SoundEmitter_Destroy(size id)
+
 export Initialize() -> (address outGameSessionObject, address outGameSessionMem)
 export Shutdown(address gameSessionObject, address gameSessionMem)
 
