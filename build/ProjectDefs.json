@@ -32,7 +32,8 @@
 			"RKit_Audio_WASAPI",
 			"RKit_CoreLib",
 			"RKit_Data",
-			"RKit_Render_Vulkan"
+			"RKit_Render_Vulkan",
+			"RKit_MP3"
 		],
 		"extra_dirs":
 		[

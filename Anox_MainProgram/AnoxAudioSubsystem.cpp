@@ -596,6 +596,7 @@ namespace anox
 
 		AudioMixerEmitter *m_nextRemove = nullptr;
 		bool m_isActive = false;
+		bool m_haveEvaluatedChannelMap = false;
 
 		rkit::Optional<AudioFrame> m_currentFrame;
 		rkit::audio::AudioFormat m_currentFrameFormat;
@@ -729,29 +730,34 @@ namespace anox
 		static AudioVolumeLevel ComputeChannelVolume(const AudioMixerEmitter *emitter, rkit::audio::SpeakerPosition outPosition, rkit::audio::SpeakerPosition inPosition);
 
 		static void DeinterleaveAndResample(size_t &outDestSamplesEmitted, size_t &outSourceSamplesConsumed,
-			const AudioScratchBufferInstance &outBuffers,
+			const AudioScratchBufferInstance &outBuffers, size_t outSampleOffset,
 			const void *inData,
 			size_t inDataSamplesCount, size_t outDataSamplesCount,
 			const rkit::audio::AudioFormat &destFormat, const rkit::audio::AudioFormat &sourceFormat);
 
-		static void Deinterleave(const AudioScratchBufferInstance &outBuffers,
+		static void Deinterleave(const AudioScratchBufferInstance &outBuffers, size_t outSampleOffset,
 			const void *inData,
 			size_t sampleCount,
 			rkit::audio::SampleType destSampleType, rkit::audio::SampleType srcSampleType,
 			uint32_t channelCount);
 
 		template<rkit::audio::SampleType TDestSampleType>
-		static void DeinterleaveTo(const AudioScratchBufferInstance &outBuffers,
+		static void DeinterleaveTo(const AudioScratchBufferInstance &outBuffers, size_t outSampleOffset,
 			const void *inData,
 			size_t sampleCount,
 			rkit::audio::SampleType srcSampleType,
 			uint32_t channelCount);
 
 		template<rkit::audio::SampleType TDestSampleType, rkit::audio::SampleType TSrcSampleType>
-		static void DeinterleaveFrom(const AudioScratchBufferInstance &outBuffers,
+		static void DeinterleaveFrom(const AudioScratchBufferInstance &outBuffers, size_t outSampleOffset,
 			const void *inData,
 			size_t sampleCount,
 			uint32_t channelCount);
+
+		static void Interleave(void *outMem, const AudioScratchBufferInstance &inBuffers, size_t numSamples, rkit::audio::SampleType sampleType);
+
+		template<rkit::audio::SampleType TSampleType>
+		static void InterleaveSpecialized(void *outMem, const AudioScratchBufferInstance &inBuffers, size_t numSamples);
 
 		static void Mix(void *outMem, const void *inMem, rkit::audio::SampleType inSampleType,
 			size_t numSamples, AudioVolumeLevel oldVolume, AudioVolumeLevel newVolume);
@@ -1315,9 +1321,6 @@ namespace anox
 		if (!mem)
 			RKIT_THROW(rkit::ResultCode::kOutOfMemory);
 
-		// FIXME: Delete this
-		memset(mem, 0xbb, scratchBufferTotalSize);
-
 		if (m_mem != nullptr)
 			m_alloc->Free(m_mem);
 
@@ -1454,6 +1457,7 @@ namespace anox
 		const rkit::audio::SampleType mixSampleType = m_audioFormat.m_sampleType;
 
 		bool haveAnything = false;
+
 		{
 			AudioMixerEmitter *emitter = m_renderThreadState.m_activeEmitters.GetFirst();
 
@@ -1480,6 +1484,8 @@ namespace anox
 					RenderEmitter(mixChannelBuffers, numSamples, outputQuery, emitter);
 					emitter = next;
 				}
+
+				Interleave(buffer, mixChannelBuffers, numSamples, m_audioFormat.m_sampleType);
 			}
 		}
 
@@ -1526,7 +1532,7 @@ namespace anox
 
 				size_t sourceSamplesConsumed = 0;
 				size_t destSamplesEmitted = 0;
-				DeinterleaveAndResample(destSamplesEmitted, sourceSamplesConsumed, deinterleaveAndResampleBuffers,
+				DeinterleaveAndResample(destSamplesEmitted, sourceSamplesConsumed, deinterleaveAndResampleBuffers, samplesProduced,
 					(static_cast<const uint8_t *>(frame.m_data) + emitter->m_frameReadOffset * sourceFrameSize),
 					destRemaining, sourceFrameRemaining,
 					deinterleaveFormat, sourceFormat);
@@ -1559,8 +1565,8 @@ namespace anox
 				{
 					AudioVolumeLevel &volumeRef = volumes[outChannelIndex];
 
-					const AudioVolumeLevel oldVolume = volumeRef;
 					const AudioVolumeLevel newVolume = ComputeChannelVolume(emitter, outSpeakerPosition, inSpeakerPosition);
+					const AudioVolumeLevel oldVolume = emitter->m_haveEvaluatedChannelMap ? volumeRef : newVolume;
 
 					if (oldVolume != 0 || newVolume != 0)
 					{
@@ -1574,6 +1580,8 @@ namespace anox
 
 				inChannelIndex++;
 			}
+
+			emitter->m_haveEvaluatedChannelMap = true;
 		}
 	}
 
@@ -1704,7 +1712,7 @@ namespace anox
 	}
 
 	void AudioMixer::DeinterleaveAndResample(size_t &outDestSamplesEmitted, size_t &outSourceSamplesConsumed,
-		const AudioScratchBufferInstance &outBuffers,
+		const AudioScratchBufferInstance &outBuffers, size_t outSampleOffset,
 		const void *inData,
 		size_t inDataSamplesCount, size_t outDataSamplesCount,
 		const rkit::audio::AudioFormat &destFormat, const rkit::audio::AudioFormat &sourceFormat)
@@ -1715,14 +1723,14 @@ namespace anox
 		{
 			const size_t sampleCount = rkit::Min(inDataSamplesCount, outDataSamplesCount);
 
-			Deinterleave(outBuffers, inData, sampleCount, destFormat.m_sampleType, sourceFormat.m_sampleType, destFormat.m_speakers.CountSetBits());
+			Deinterleave(outBuffers, outSampleOffset, inData, sampleCount, destFormat.m_sampleType, sourceFormat.m_sampleType, destFormat.m_speakers.CountSetBits());
 
 			outDestSamplesEmitted = sampleCount;
 			outSourceSamplesConsumed = sampleCount;
 		}
 	}
 
-	void AudioMixer::Deinterleave(const AudioScratchBufferInstance &outBuffers,
+	void AudioMixer::Deinterleave(const AudioScratchBufferInstance &outBuffers, size_t outSampleOffset,
 		const void *inData,
 		size_t sampleCount,
 		rkit::audio::SampleType destSampleType, rkit::audio::SampleType srcSampleType,
@@ -1735,16 +1743,16 @@ namespace anox
 			switch (destSampleType)
 			{
 			case rkit::audio::SampleType::kSInt32:
-				DeinterleaveTo<rkit::audio::SampleType::kSInt32>(outBuffers, inData, sampleCount, srcSampleType, channelCount);
+				DeinterleaveTo<rkit::audio::SampleType::kSInt32>(outBuffers, outSampleOffset, inData, sampleCount, srcSampleType, channelCount);
 				break;
 			case rkit::audio::SampleType::kSInt32_24bit:
-				DeinterleaveTo<rkit::audio::SampleType::kSInt32_24bit>(outBuffers, inData, sampleCount, srcSampleType, channelCount);
+				DeinterleaveTo<rkit::audio::SampleType::kSInt32_24bit>(outBuffers, outSampleOffset, inData, sampleCount, srcSampleType, channelCount);
 				break;
 			case rkit::audio::SampleType::kSInt16:
-				DeinterleaveTo<rkit::audio::SampleType::kSInt16>(outBuffers, inData, sampleCount, srcSampleType, channelCount);
+				DeinterleaveTo<rkit::audio::SampleType::kSInt16>(outBuffers, outSampleOffset, inData, sampleCount, srcSampleType, channelCount);
 				break;
 			case rkit::audio::SampleType::kFloat32:
-				DeinterleaveTo<rkit::audio::SampleType::kFloat32>(outBuffers, inData, sampleCount, srcSampleType, channelCount);
+				DeinterleaveTo<rkit::audio::SampleType::kFloat32>(outBuffers, outSampleOffset, inData, sampleCount, srcSampleType, channelCount);
 				break;
 			default:
 				break;
@@ -1753,7 +1761,7 @@ namespace anox
 	}
 
 	template<rkit::audio::SampleType TDestSampleType>
-	void AudioMixer::DeinterleaveTo(const AudioScratchBufferInstance &outBuffers,
+	void AudioMixer::DeinterleaveTo(const AudioScratchBufferInstance &outBuffers, size_t outSampleOffset,
 		const void *inData,
 		size_t sampleCount,
 		rkit::audio::SampleType srcSampleType,
@@ -1762,16 +1770,16 @@ namespace anox
 		switch (srcSampleType)
 		{
 		case rkit::audio::SampleType::kSInt32:
-			DeinterleaveFrom<TDestSampleType, rkit::audio::SampleType::kSInt32>(outBuffers, inData, sampleCount, channelCount);
+			DeinterleaveFrom<TDestSampleType, rkit::audio::SampleType::kSInt32>(outBuffers, outSampleOffset, inData, sampleCount, channelCount);
 			break;
 		case rkit::audio::SampleType::kSInt32_24bit:
-			DeinterleaveFrom<TDestSampleType, rkit::audio::SampleType::kSInt32_24bit>(outBuffers, inData, sampleCount, channelCount);
+			DeinterleaveFrom<TDestSampleType, rkit::audio::SampleType::kSInt32_24bit>(outBuffers, outSampleOffset, inData, sampleCount, channelCount);
 			break;
 		case rkit::audio::SampleType::kSInt16:
-			DeinterleaveFrom<TDestSampleType, rkit::audio::SampleType::kSInt16>(outBuffers, inData, sampleCount, channelCount);
+			DeinterleaveFrom<TDestSampleType, rkit::audio::SampleType::kSInt16>(outBuffers, outSampleOffset, inData, sampleCount, channelCount);
 			break;
 		case rkit::audio::SampleType::kFloat32:
-			DeinterleaveFrom<TDestSampleType, rkit::audio::SampleType::kFloat32>(outBuffers, inData, sampleCount, channelCount);
+			DeinterleaveFrom<TDestSampleType, rkit::audio::SampleType::kFloat32>(outBuffers, outSampleOffset, inData, sampleCount, channelCount);
 			break;
 		default:
 			break;
@@ -1779,7 +1787,7 @@ namespace anox
 	}
 
 	template<rkit::audio::SampleType TDestSampleType, rkit::audio::SampleType TSrcSampleType>
-	void AudioMixer::DeinterleaveFrom(const AudioScratchBufferInstance &outBuffers,
+	void AudioMixer::DeinterleaveFrom(const AudioScratchBufferInstance &outBuffers, size_t outSampleOffset,
 		const void *inData,
 		size_t sampleCount,
 		uint32_t channelCount)
@@ -1787,7 +1795,7 @@ namespace anox
 		using DestSampleData_t = AudioSampleData_t<TDestSampleType>;
 		using SrcSampleData_t = AudioSampleData_t<TSrcSampleType>;
 
-		void *outMem = outBuffers.GetAllMem().Ptr();
+		void *outMem = reinterpret_cast<DestSampleData_t *>(outBuffers.GetAllMem().Ptr()) + outSampleOffset;
 		const int offsetShiftBits = outBuffers.GetOffsetShiftBits();
 
 		//const size_t bulkDeinterleavedCount = AudioSIMDDeinterleaver<TDestSampleType, TSrcSampleType>::Deinterleave(outMem, offsetShiftBits, inData);
@@ -1815,6 +1823,64 @@ namespace anox
 			inData = static_cast<const SrcSampleData_t *>(inData) + channelCount;
 
 			sampleCount--;
+		}
+	}
+
+	void AudioMixer::Interleave(void *outMem, const AudioScratchBufferInstance &inBuffers, size_t numSamples, rkit::audio::SampleType sampleType)
+	{
+		switch (sampleType)
+		{
+		case rkit::audio::SampleType::kSInt32:
+			InterleaveSpecialized<rkit::audio::SampleType::kSInt32>(outMem, inBuffers, numSamples);
+			break;
+		case rkit::audio::SampleType::kSInt32_24bit:
+			InterleaveSpecialized<rkit::audio::SampleType::kSInt32_24bit>(outMem, inBuffers, numSamples);
+			break;
+		case rkit::audio::SampleType::kSInt16:
+			InterleaveSpecialized<rkit::audio::SampleType::kSInt16>(outMem, inBuffers, numSamples);
+			break;
+		case rkit::audio::SampleType::kFloat32:
+			InterleaveSpecialized<rkit::audio::SampleType::kFloat32>(outMem, inBuffers, numSamples);
+			break;
+		default:
+			break;
+		}
+	}
+
+	template<rkit::audio::SampleType TSampleType>
+	void AudioMixer::InterleaveSpecialized(void *outMem, const AudioScratchBufferInstance &inBuffers, size_t numSamples)
+	{
+		uint8_t *destMemAddr = static_cast<uint8_t *>(outMem);
+		const uint8_t *sourceMemAddr = inBuffers.GetAllMem().Ptr();
+		const uint32_t numChannels = inBuffers.GetNumChannels();
+		const int offsetShiftBits = inBuffers.GetOffsetShiftBits();
+
+		using SampleData_t = AudioSampleData_t<TSampleType>;
+
+		constexpr size_t sampleSize = ConstAudioSampleTypeSize(TSampleType);
+		const size_t outFrameSize = sampleSize * numChannels;
+
+		//const size_t bulkInterleaveCount = AudioSIMDMixer<TSampleType>::MixConstantVolume(outSamples, inSamples, volumeScaler);
+		const size_t bulkInterleaveCount = 0;
+
+		sourceMemAddr += bulkInterleaveCount * sampleSize;
+		destMemAddr += bulkInterleaveCount * outFrameSize;
+
+		size_t samplesRemaining = numSamples - bulkInterleaveCount;
+
+		while (samplesRemaining > 0)
+		{
+			SampleData_t *outFrame = reinterpret_cast<SampleData_t *>(destMemAddr);
+
+			for (size_t channelIndex = 0; channelIndex < numChannels; channelIndex++)
+			{
+				const SampleData_t *inSample = reinterpret_cast<const SampleData_t *>(sourceMemAddr + (channelIndex << offsetShiftBits));
+				outFrame[channelIndex] = *inSample;
+			}
+
+			sourceMemAddr += sampleSize;
+			destMemAddr += outFrameSize;
+			samplesRemaining--;
 		}
 	}
 
@@ -2069,7 +2135,7 @@ namespace anox
 		audioFormat.m_sampleRate = 44100;
 		audioFormat.m_sampleType = rkit::audio::SampleType::kSInt16;
 		audioFormat.m_speakers.Set(rkit::audio::SpeakerPosition::kFrontLeft, true);
-		audioFormat.m_speakers.Set(rkit::audio::SpeakerPosition::kFrontCenter, true);
+		audioFormat.m_speakers.Set(rkit::audio::SpeakerPosition::kFrontRight, true);
 
 		rkit::UniquePtr<rkit::audio::IAudioOutputStream> audioOutputStream;
 		RKIT_CHECK(audioOutputEndpoint->TryOpenOutputStream(audioOutputStream, audioFormat, 1024, &m_mixer));
