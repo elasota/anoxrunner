@@ -14,13 +14,18 @@
 #include "rkit/Core/Vector.h"
 #include "rkit/Core/LogDriver.h"
 
+#include "rkit/Data/ContentID.h"
+
 #include "GameObjects/ScriptWindowInstance.h"
+
 #include "AnoxWorldObjectFactory.h"
 
 #include "anox/Game/APECommandDispatcher.generated.h"
 #include "anox/Game/APEExternOpcodes.generated.h"
 
 #include "APEExternDispatch.generated.h"
+
+#include "World.h"
 
 namespace anox::game
 {
@@ -58,6 +63,13 @@ namespace anox::game
 		const ScriptPackage *m_package = nullptr;
 	};
 
+	struct ScriptResourceRef
+	{
+		uint32_t m_resTypeNamespace = 0;
+		uint32_t m_resTypeID = 0;
+		uint32_t m_contentIDIndex = 0;
+	};
+
 	struct ScriptPackage
 	{
 		rkit::Vector<ScriptWindow> m_windows;
@@ -73,6 +85,8 @@ namespace anox::game
 		rkit::Vector<rkit::data::ContentID> m_materialContentIDs;
 		rkit::Vector<uint32_t> m_materialNameLookups;
 		rkit::HashMap<rkit::ByteString, uint32_t> m_wildcardLookups;
+
+		rkit::Vector<ScriptResourceRef> m_resourceRefs;
 	};
 
 	class ScriptLayerInstance
@@ -104,9 +118,12 @@ namespace anox::game
 
 		bool TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, uint32_t exprID, int depth) const;
 		bool TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, const ScriptExprValue &exprValue, int depth) const;
+		bool TryEvaluateFloatScriptOperand(float &outValue, const ScriptPackage &pkg, const ScriptOperandType opType, uint32_t value, int depth) const;
+
 		rkit::Result TryEvaluateStringScriptExpr(bool &outSucceeded, rkit::ByteString &outValue, const ScriptPackage &pkg, const ScriptExprValue &exprValue, int depth) const;
 		rkit::Result TryEvaluateStringVar(bool &outSucceeded, rkit::ByteString &outValue, const ScriptPackage &pkg, const rkit::ByteStringSliceView &varName, int depth) const;
-		bool TryEvaluateFloatScriptOperand(float &outValue, const ScriptPackage &pkg, const ScriptOperandType opType, uint32_t value, int depth) const;
+
+		bool TryEvaluateContentIDScriptExpr(rkit::data::ContentID &outValue, const ScriptPackage &pkg, const ScriptExprValue &exprValue) const;
 
 	private:
 		class WindowCommandParserImpl final : public APEWindowCommandParser
@@ -123,8 +140,8 @@ namespace anox::game
 		};
 
 		rkit::ResultCoroutine ExecuteWindowCommands(rkit::ICoroThread &thread, ScriptWindowInstance &windowInstance, const ScriptWindow &window);
-		rkit::ResultCoroutine ExecuteSwitchCommands(rkit::ICoroThread &thread, const ScriptPackage *pkg, rkit::Span<const ScriptSwitchCommand> cmds, int &loopCounter, int depth);
-		rkit::ResultCoroutine ExecuteExtern(rkit::ICoroThread &thread, const ScriptPackage *pkg, uint32_t opcode, const ScriptOperandList &operands);
+		rkit::ResultCoroutine ExecuteSwitchCommands(rkit::ICoroThread &thread, const ScriptPackage *pkg, rkit::Span<const ScriptSwitchCommand> cmds, int &loopCounter, World &world, int depth);
+		rkit::ResultCoroutine ExecuteExtern(rkit::ICoroThread &thread, const ScriptPackage *pkg, World &world, uint32_t opcode, const ScriptOperandList &operands);
 
 		bool TryResolveString(rkit::ByteString &outBStr, const ScriptPackage &pkg, uint32_t strID) const;
 		bool TryResolveOptionalString(rkit::ByteString &outBStr, const ScriptPackage &pkg, uint32_t strID) const;
@@ -256,7 +273,7 @@ namespace anox::game
 			const ScriptPackage &pkg = *sw->m_package;
 
 			int loopCounter = 0;
-			CORO_CHECK(co_await ExecuteSwitchCommands(thread, &pkg, cmds, loopCounter, 0));
+			CORO_CHECK(co_await ExecuteSwitchCommands(thread, &pkg, cmds, loopCounter, world, 0));
 		}
 
 		CORO_RETURN_OK;
@@ -275,7 +292,7 @@ namespace anox::game
 			const ScriptPackage &pkg = *sw->m_package;
 
 			int loopCounter = 0;
-			CORO_CHECK(co_await ExecuteSwitchCommands(thread, &pkg, cmds, loopCounter, 0));
+			CORO_CHECK(co_await ExecuteSwitchCommands(thread, &pkg, cmds, loopCounter, world, 0));
 		}
 
 		CORO_RETURN_OK;
@@ -420,6 +437,20 @@ namespace anox::game
 		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
 
+
+	bool ScriptEnvironmentImpl::TryEvaluateContentIDScriptExpr(rkit::data::ContentID &outValue, const ScriptPackage &pkg, const ScriptExprValue &exprValue) const
+	{
+		if (exprValue.m_exprType != ScriptExprType::ContentID)
+			return false;
+
+		if (exprValue.m_index >= pkg.m_materialContentIDs.Count())
+			return false;
+
+		outValue = pkg.m_materialContentIDs[exprValue.m_index];
+
+		return true;
+	}
+
 	bool ScriptEnvironmentImpl::TryEvaluateFloatScriptOperand(float &outValue, const ScriptPackage &pkg, const ScriptOperandType opType, uint32_t value, int depth) const
 	{
 		switch (opType)
@@ -463,7 +494,7 @@ namespace anox::game
 		CORO_RETURN_OK;
 	}
 
-	rkit::ResultCoroutine ScriptEnvironmentImpl::ExecuteSwitchCommands(rkit::ICoroThread &thread, const ScriptPackage *pkg, rkit::Span<const ScriptSwitchCommand> cmds, int &loopCounter, int depth)
+	rkit::ResultCoroutine ScriptEnvironmentImpl::ExecuteSwitchCommands(rkit::ICoroThread &thread, const ScriptPackage *pkg, rkit::Span<const ScriptSwitchCommand> cmds, int &loopCounter, World &world, int depth)
 	{
 		size_t ip = 0;
 		while (ip < cmds.Count())
@@ -553,7 +584,7 @@ namespace anox::game
 						CORO_RETURN_OK;
 					}
 
-					RKIT_CHECK(co_await ExecuteExtern(thread, pkg, externOpcode, pkg->m_operandLists[externArgList]));
+					CORO_CHECK(co_await ExecuteExtern(thread, pkg, world, externOpcode, pkg->m_operandLists[externArgList]));
 				}
 				break;
 			//case 11:	// while
@@ -564,7 +595,34 @@ namespace anox::game
 			//case 16:	// loopscene
 			//case 17:	// stopscene
 			//case 18:	// chainscripts
-			//case 19:	// closewindow
+			case 19:	// closewindow
+				{
+					rkit::ByteString labelStr;
+					Label windowLabel;
+					if (!TryResolveOptionalString(labelStr, *pkg, cmd.m_strValue) || !ParseLabel(windowLabel, labelStr))
+					{
+						rkit::log::Error(u8"Couldn't resolve closewindow target");
+						CORO_RETURN_OK;
+					}
+					else
+					{
+						for (rkit::Vector<ScriptWindowInstance *>::Iterator_t it = m_activeWindows.begin(), itEnd = m_activeWindows.end(); it != itEnd; ++it)
+						{
+							ScriptWindowInstance *window = *it;
+							if (window->GetWindowID() == windowLabel)
+							{
+								world.RemoveObject(window);
+								m_activeWindows.RemoveAt(it);
+								break;
+							}
+						}
+
+
+
+					}
+
+				}
+				break;
 			//case 20:	// loadape
 			//case 21:	// setfocus
 			//case 22:	// jump
@@ -578,7 +636,7 @@ namespace anox::game
 		CORO_RETURN_OK;
 	}
 
-	rkit::ResultCoroutine ScriptEnvironmentImpl::ExecuteExtern(rkit::ICoroThread &thread, const ScriptPackage *pkg, uint32_t opcode, const ScriptOperandList &operands)
+	rkit::ResultCoroutine ScriptEnvironmentImpl::ExecuteExtern(rkit::ICoroThread &thread, const ScriptPackage *pkg, World &world, uint32_t opcode, const ScriptOperandList &operands)
 	{
 		ScriptManager::ExternDispatchFunc_t dispatchFunc = m_scriptManager.GetExtern(opcode);
 		if (!dispatchFunc)
@@ -586,9 +644,13 @@ namespace anox::game
 
 		ape::ExternDispatchContext dispatchContext;
 		dispatchContext.m_pkg = pkg;
+		dispatchContext.m_externContext.m_world = &world;
 		dispatchContext.m_operands = operands;
+		dispatchContext.m_externContext.m_env = &this->Base();
 
-		return dispatchFunc(thread, dispatchContext);
+		CORO_CHECK(co_await dispatchFunc(thread, dispatchContext));
+
+		CORO_RETURN_OK;
 	}
 
 	bool ScriptEnvironmentImpl::TryResolveString(rkit::ByteString &outBStr, const ScriptPackage &pkg, uint32_t strID) const
@@ -636,7 +698,10 @@ namespace anox::game
 		for (uint8_t ch : bstr.ToSpan())
 		{
 			if (ch == '[')
-				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+			{
+				// FIXME TODO
+				RKIT_ASSERT(false);
+			}
 		}
 
 		rkit::HashMap<rkit::ByteString, float>::ConstIterator_t it = m_floatVariables.Find(bstr);
@@ -708,9 +773,11 @@ namespace anox::game
 		const uint32_t numMaterialWildcards = catalog.m_numMaterialWildcards.Get();
 		const uint32_t numMaterialNames = catalog.m_numMaterialNames.Get();
 
-		const uint32_t numMaterialContentIDs = catalog.m_numMaterialContentIDs.Get();
+		const uint32_t numContentIDs = catalog.m_numMaterialContentIDs.Get();
 		const uint32_t numMaterialNameLookups = catalog.m_numMaterialNameLookups.Get();
 		const uint32_t numMaterialWildcardLookups = catalog.m_numMaterialWildcardLookups.Get();
+
+		const uint32_t numResourceRefs = catalog.m_numResourceRefs.Get();
 
 		if (numMaterialWildcards != 0 || numMaterialNames != 0)
 		{
@@ -862,10 +929,10 @@ namespace anox::game
 		}
 
 		// Material data
-		rkit::Vector<rkit::data::ContentID> materialContentIDs;
-		RKIT_CHECK(materialContentIDs.Resize(numMaterialContentIDs));
+		rkit::Vector<rkit::data::ContentID> contentIDs;
+		RKIT_CHECK(contentIDs.Resize(numContentIDs));
 
-		RKIT_CHECK(stream.ReadAllSpan(materialContentIDs.ToSpan()));
+		RKIT_CHECK(stream.ReadAllSpan(contentIDs.ToSpan()));
 
 		rkit::Vector<uint32_t> materialNameLookups;
 		RKIT_CHECK(materialNameLookups.Resize(numMaterialNameLookups));
@@ -874,7 +941,7 @@ namespace anox::game
 		for (uint32_t &nameLookup : materialNameLookups)
 		{
 			rkit::endian::LittleUInt32_t::StaticConvertToHostOrderInPlace(nameLookup);
-			if (nameLookup >= numMaterialContentIDs)
+			if (nameLookup >= numContentIDs)
 				RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
@@ -887,10 +954,40 @@ namespace anox::game
 			const uint32_t cidIndex = lookup.m_materialContentIndex.Get();
 			const uint32_t strIndex = lookup.m_stringIndex.Get();
 
-			if (cidIndex >= numMaterialContentIDs || strIndex >= numStrings)
+			if (cidIndex >= numContentIDs || strIndex >= numStrings)
 				RKIT_THROW(rkit::ResultCode::kDataError);
 
 			RKIT_CHECK(wildcardLookups.Set(strings[strIndex], cidIndex));
+		}
+
+		rkit::Vector<ScriptResourceRef> resourceRefs;
+		RKIT_CHECK(resourceRefs.Resize(numResourceRefs));
+
+		{
+			rkit::Vector<data::ape::ResourceRef> dataResourceRefs;
+			RKIT_CHECK(dataResourceRefs.Resize(numResourceRefs));
+
+			RKIT_CHECK(stream.ReadAllSpan(dataResourceRefs.ToSpan()));
+
+			const auto processOneResourceRef = [numContentIDs](ScriptResourceRef &outRef, const data::ape::ResourceRef &inRef) -> rkit::Result
+				{
+					outRef.m_contentIDIndex = inRef.m_contentIDIndex.Get();
+					outRef.m_resTypeID = inRef.m_resType.Get();
+					outRef.m_resTypeNamespace = inRef.m_resNamespace.Get();
+
+					if (outRef.m_contentIDIndex >= numContentIDs)
+						RKIT_THROW(rkit::ResultCode::kDataError);
+
+					RKIT_RETURN_OK;
+				};
+
+			RKIT_CHECK(rkit::CheckedProcessParallelSpans(resourceRefs.ToSpan(), dataResourceRefs.ToSpan(), processOneResourceRef));
+		}
+
+		// DONE READING, there should be no trailing data
+		if (stream.Tell() != stream.GetSize())
+		{
+			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
 		rkit::UniquePtr<ScriptPackage> package;
@@ -912,9 +1009,11 @@ namespace anox::game
 		package->m_allWindowCommands = std::move(windowCommandStreamBytes);
 		package->m_allSwitchCommands = std::move(switchCommands);
 
-		package->m_materialContentIDs = std::move(materialContentIDs);
+		package->m_materialContentIDs = std::move(contentIDs);
 		package->m_materialNameLookups = std::move(materialNameLookups);
 		package->m_wildcardLookups = std::move(wildcardLookups);
+
+		package->m_resourceRefs = std::move(resourceRefs);
 
 		RKIT_CHECK(GetLayer(layer).AddPackage(std::move(package)));
 
@@ -940,7 +1039,7 @@ namespace anox::game
 		data::ape::Expression::UnpackOperandInfo(inExpr.m_packedOperandInfo, outExpr.m_op, outExpr.m_leftOpType, outExpr.m_rightOpType);
 
 		if (outExpr.m_op == ScriptOperator::Invalid || outExpr.m_leftOpType == ScriptOperandType::Invalid || outExpr.m_rightOpType == ScriptOperandType::Invalid)
-			RKIT_CHECK(rkit::ResultCode::kDataError);
+			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		outExpr.m_leftValue = inExpr.m_leftValue.Get();
 		outExpr.m_rightValue = inExpr.m_rightValue.Get();
@@ -1133,7 +1232,7 @@ namespace anox::game
 	rkit::Result ScriptManager::Create(rkit::UniquePtr<ScriptManager> &outScriptManager)
 	{
 		rkit::UniquePtr<ScriptManager> scriptManager;
-		rkit::New<ScriptManager>(scriptManager);
+		RKIT_CHECK(rkit::New<ScriptManager>(scriptManager));
 
 		scriptManager->RegisterAllExterns();
 		outScriptManager = std::move(scriptManager);
@@ -1149,6 +1248,11 @@ namespace anox::game
 	bool ScriptEnvironment::TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const
 	{
 		return Impl().TryEvaluateFloatScriptExpr(outValue, pkg, expr, 0);
+	}
+
+	bool ScriptEnvironment::TryEvaluateContentIDScriptExpr(rkit::data::ContentID &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const
+	{
+		return Impl().TryEvaluateContentIDScriptExpr(outValue, pkg, expr);
 	}
 
 	rkit::Result ScriptEnvironment::TryEvaluateStringScriptExpr(bool &outSucceeded, rkit::ByteString &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const

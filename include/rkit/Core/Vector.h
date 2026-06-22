@@ -46,6 +46,7 @@ namespace rkit
 
 		void RemoveRange(size_t firstArg, size_t numArgs);
 		void RemoveAtIndex(size_t index);
+		void RemoveAt(Iterator_t it);
 		Result ResetAndResize(size_t size);
 		Result Resize(size_t size);
 		Result Reserve(size_t size);
@@ -202,6 +203,12 @@ namespace rkit
 	void Vector<T>::RemoveAtIndex(size_t index)
 	{
 		RemoveRange(index, 1);
+	}
+
+	template<class T>
+	void Vector<T>::RemoveAt(Iterator_t it)
+	{
+		RemoveAtIndex(it - begin());
 	}
 
 	template<class T>

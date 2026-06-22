@@ -17,6 +17,8 @@ namespace anox::game
 	rkit::Result ScriptWindowInstance::Initialize(World &world)
 	{
 		RKIT_CHECK(WorldObject::Initialize(world));
+
+		RKIT_RETURN_OK;
 	}
 
 	void ScriptWindowInstance::SetWindowID(const Label &label)

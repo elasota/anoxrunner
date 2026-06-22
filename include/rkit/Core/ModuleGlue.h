@@ -4,6 +4,12 @@
 #include "rkit/Core/Result.h"
 #include "rkit/Core/FourCC.h"
 
+#include "rkit/Core/SystemDriver.h"
+#include "rkit/Core/Drivers.h"
+
+#include <cstdlib>
+#include <cassert>
+
 #define RKIT_MODULE_LINKER_TYPE_DLL	0
 #define RKIT_MODULE_LINKER_TYPE_STATIC	1
 
@@ -12,12 +18,6 @@
 #define RKIT_IMPLEMENT_ASSERTION_CHECK_FUNC
 
 #else
-
-#include "rkit/Core/SystemDriver.h"
-#include "rkit/Core/Drivers.h"
-
-#include <cstdlib>
-#include <cassert>
 
 #define RKIT_IMPLEMENT_ASSERTION_CHECK_FUNC	\
 	void ::rkit::priv::AssertionCheckFunc(bool expr, const char *exprStr, const char *file, unsigned int line)\

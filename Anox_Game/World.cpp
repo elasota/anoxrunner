@@ -20,6 +20,7 @@
 #include "AllWorldObjects.h"
 #include "ScriptEnvironment.h"
 #include "ScriptManager.h"
+#include "MusicManager.h"
 
 namespace anox::game
 {
@@ -47,6 +48,7 @@ namespace anox::game
 		ObjRef<GlobalSingleton> m_globalSingleton;
 		ScriptManager &m_scriptManager;
 		rkit::UniquePtr<ScriptEnvironment> m_scriptEnvironment;
+		rkit::UniquePtr<MusicManager> m_musicManager;
 
 		rkit::RCPtr<WorldObjectProxy> m_firstObj;
 		WorldObjectProxy* m_lastObject = nullptr;
@@ -68,6 +70,7 @@ namespace anox::game
 	rkit::Result WorldImpl::Initialize()
 	{
 		RKIT_CHECK(m_scriptManager.CreateScriptEnvironment(m_scriptEnvironment));
+		RKIT_CHECK(MusicManager::Create(m_musicManager));
 
 		RKIT_RETURN_OK;
 	}
@@ -94,6 +97,9 @@ namespace anox::game
 	void WorldImpl::RemoveObject(WorldObject *obj)
 	{
 		WorldObjectProxy *proxy = obj->m_proxy;
+
+		RKIT_ASSERT(proxy->m_object.IsValid());
+
 		proxy->m_object.Reset();
 
 		proxy->m_nextDead = m_firstDead;
@@ -153,6 +159,8 @@ namespace anox::game
 			CORO_CHECK(co_await obj.OnFrame(thread));
 		}
 
+		CORO_CHECK(m_musicManager->OnFrame());
+
 		CORO_RETURN_OK;
 	}
 
@@ -180,6 +188,11 @@ namespace anox::game
 		RKIT_RETURN_OK;
 	}
 
+	void World::RemoveObject(WorldObject *obj)
+	{
+		Impl().RemoveObject(obj);
+	}
+
 	AllWorldObjectsCollection World::GetAllObjects() const
 	{
 		return Impl().GetAllObjects();
@@ -203,6 +216,11 @@ namespace anox::game
 	ScriptEnvironment &World::GetScriptEnvironment() const
 	{
 		return *Impl().m_scriptEnvironment;
+	}
+
+	MusicManager &World::GetMusicManager() const
+	{
+		return *Impl().m_musicManager;
 	}
 }
 

@@ -25,6 +25,7 @@
 #include "AnoxConfigurationSaver.h"
 #include "AnoxEntityDefResource.h"
 #include "AnoxFileResource.h"
+#include "AnoxGameAudioManager.h"
 #include "AnoxGameSandboxEnv.h"
 #include "AnoxResourceManager.h"
 #include "AnoxSpawnDefsResource.h"
@@ -127,6 +128,7 @@ namespace anox
 		rkit::UniquePtr<AnoxCommandStackBase> m_commandStack;
 
 		rkit::UniquePtr<game::GameResourceManager> m_resManager;
+		rkit::UniquePtr<game::GameAudioManager> m_audioManager;
 		rkit::UniquePtr<game::GlobalVars> m_globalVars;
 
 		rkit::UniquePtr<rkit::ISandbox> m_sandbox;
@@ -414,8 +416,8 @@ namespace anox
 		AnoxResourceRetrieveResult resLoadResult;
 
 		rkit::CIPath loosePath;
-		RKIT_CHECK(loosePath.AppendComponent(u8"loose"));
-		RKIT_CHECK(loosePath.Append(path));
+		CORO_CHECK(loosePath.AppendComponent(u8"loose"));
+		CORO_CHECK(loosePath.Append(path));
 
 		CORO_CHECK(co_await LoadCIPathKeyedResource(thread, resLoadResult, anox::resloaders::kCIPathRawFileResourceTypeCode, loosePath));
 
@@ -764,10 +766,13 @@ namespace anox
 	{
 		const IConfigurationState *configState = nullptr;
 
+		m_audioManager.Reset();
 		m_resManager.Reset();
 
-		RKIT_CHECK(game::GameResourceManager::Create(m_resManager));
+		CORO_CHECK(game::GameResourceManager::Create(m_resManager));
 		m_resManager->SetCaptureHarness(m_game->GetCaptureHarness());
+
+		CORO_CHECK(game::GameAudioManager::Create(m_audioManager, *m_game->GetAudioSubsystem()));
 
 		RKIT_ASSERT(!m_sandbox.IsValid());
 
@@ -781,6 +786,7 @@ namespace anox
 
 			m_sandboxEnv.m_sandbox = sandbox.Get();
 			m_sandboxEnv.m_resManager = m_resManager.Get();
+			m_sandboxEnv.m_audioManager = m_audioManager.Get();
 
 			CORO_CHECK(rkit::GetDrivers().m_utilitiesDriver->LinkSandbox(*sandbox, m_sandboxImports.GetHostAPIDescriptor()));
 

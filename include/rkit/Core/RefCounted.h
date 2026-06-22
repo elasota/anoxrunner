@@ -72,12 +72,52 @@ namespace rkit
 	{
 	};
 
+	class TypelessRCPtr
+	{
+	public:
+		template<class TOther>
+		friend class RCPtr;
+
+		TypelessRCPtr();
+		explicit TypelessRCPtr(RefCountedTracker *tracker);
+		explicit TypelessRCPtr(RCPtrMoveTag, RefCountedTracker *tracker);
+
+		TypelessRCPtr(const TypelessRCPtr &other);
+		TypelessRCPtr(TypelessRCPtr &&other) noexcept;
+
+		template<class T>
+		TypelessRCPtr(const RCPtr<T> &other);
+		template<class T>
+		TypelessRCPtr(RCPtr<T> &&other) noexcept;
+		~TypelessRCPtr();
+
+		bool IsValid() const;
+		RKIT_NODISCARD RefCountedTracker *Detach();
+
+		void Reset();
+
+		TypelessRCPtr &operator=(const TypelessRCPtr &other) noexcept;
+		TypelessRCPtr &operator=(TypelessRCPtr &&other) noexcept;
+
+		template<class TOther>
+		TypelessRCPtr &operator=(const RCPtr<TOther> &other) noexcept;
+		template<class TOther>
+		TypelessRCPtr &operator=(RCPtr<TOther> &&other) noexcept;
+
+		RefCountedTracker *GetTracker() const;
+
+	private:
+		RefCountedTracker *m_tracker;
+	};
+
 	template<class T>
 	class RCPtr
 	{
 	public:
 		template<class TOther>
 		friend class RCPtr;
+
+		friend class TypelessRCPtr;
 
 		RCPtr();
 		explicit RCPtr(std::nullptr_t);
@@ -160,6 +200,9 @@ namespace rkit
 
 	template<class RCType, class UPtrType>
 	Result MakeRC(RCPtr<RCType> &rcPtr, UniquePtr<UPtrType> &&uniquePtr);
+
+	template<class T>
+	UniquePtr<T> RCPtrToUniquePtr(RCPtr<T> rcPtr);
 }
 
 #include "Drivers.h"
@@ -169,8 +212,17 @@ namespace rkit
 
 #include <utility>
 
-namespace rkit { namespace priv
+namespace rkit::priv
 {
+	struct UniquePtrRCPtrMallocWrapper : public IMallocDriver
+	{
+		void *InternalAlloc(size_t size) override;
+		void *InternalRealloc(void *ptr, size_t size) override;
+		void InternalFree(void *ptr) override;
+
+		static UniquePtrRCPtrMallocWrapper ms_instance;
+	};
+
 	template<class T>
 	class UniquePtrTracker final : public RefCountedTracker
 	{
@@ -208,7 +260,32 @@ namespace rkit { namespace priv
 	{
 		rkit::SafeDelete(m_self);
 	}
-} }
+
+	inline void *UniquePtrRCPtrMallocWrapper::InternalAlloc(size_t size)
+	{
+		RKIT_ASSERT(false);
+		return nullptr;
+	}
+
+	inline void *UniquePtrRCPtrMallocWrapper::InternalRealloc(void *ptr, size_t size)
+	{
+		if (size == 0)
+		{
+			InternalFree(ptr);
+			return nullptr;
+		}
+
+		RKIT_ASSERT(false);
+		return nullptr;
+	}
+
+	inline void UniquePtrRCPtrMallocWrapper::InternalFree(void *ptr)
+	{
+		static_cast<RefCountedTracker *>(ptr)->RCTrackerDecRef();
+	}
+
+	inline UniquePtrRCPtrMallocWrapper UniquePtrRCPtrMallocWrapper::ms_instance;
+}
 
 namespace rkit
 {
@@ -641,6 +718,127 @@ namespace rkit
 		return m_object;
 	}
 
+	// Typeless
+	inline TypelessRCPtr::TypelessRCPtr()
+		: m_tracker(nullptr)
+	{
+	}
+
+	inline TypelessRCPtr::TypelessRCPtr(RefCountedTracker *tracker)
+		: m_tracker(tracker)
+	{
+		if (tracker)
+			tracker->RCTrackerAddRef();
+	}
+
+	inline TypelessRCPtr::TypelessRCPtr(RCPtrMoveTag, RefCountedTracker *tracker)
+		: m_tracker(tracker)
+	{
+	}
+
+	template<class T>
+	inline TypelessRCPtr::TypelessRCPtr(const RCPtr<T> &other)
+		: m_tracker(other.m_tracker)
+	{
+		if (m_tracker)
+			m_tracker->RCTrackerAddRef();
+	}
+
+	template<class T>
+	inline TypelessRCPtr::TypelessRCPtr(RCPtr<T> &&other) noexcept
+		: m_tracker(other.m_tracker)
+	{
+		other.m_object = nullptr;
+		other.m_tracker = nullptr;
+	}
+
+	inline TypelessRCPtr::TypelessRCPtr(const TypelessRCPtr &other)
+		: m_tracker(other.m_tracker)
+	{
+		if (m_tracker)
+			m_tracker->RCTrackerAddRef();
+	}
+
+	inline TypelessRCPtr::TypelessRCPtr(TypelessRCPtr &&other) noexcept
+		: m_tracker(other.m_tracker)
+	{
+		other.m_tracker = nullptr;
+	}
+
+	inline TypelessRCPtr::~TypelessRCPtr()
+	{
+		if (m_tracker)
+			m_tracker->RCTrackerDecRef();
+	}
+
+	inline bool TypelessRCPtr::IsValid() const
+	{
+		return m_tracker != nullptr;
+	}
+
+	inline RefCountedTracker *TypelessRCPtr::Detach()
+	{
+		RefCountedTracker *tracker = m_tracker;
+		m_tracker = nullptr;
+		return tracker;
+	}
+
+	inline void TypelessRCPtr::Reset()
+	{
+		RefCountedTracker *tracker = m_tracker;	// In case this gets destroyed
+		m_tracker = nullptr;
+
+		if (m_tracker)
+			m_tracker->RCTrackerDecRef();
+	}
+
+	inline TypelessRCPtr &TypelessRCPtr::operator=(const TypelessRCPtr &other) noexcept
+	{
+		if (this != &other)
+		{
+			RefCountedTracker *oldTracker = m_tracker;
+			RefCountedTracker *newTracker = other.m_tracker;
+
+			m_tracker = newTracker;
+			if (newTracker)
+				newTracker->RCTrackerAddRef();
+			if (oldTracker)
+				oldTracker->RCTrackerDecRef();			
+		}
+
+		return *this;
+	}
+
+	inline TypelessRCPtr &TypelessRCPtr::operator=(TypelessRCPtr &&other) noexcept
+	{
+		RKIT_ASSERT(this != &other);
+
+		RefCountedTracker *oldTracker = m_tracker;
+		RefCountedTracker *newTracker = other.m_tracker;
+
+		m_tracker = newTracker;
+		other.m_tracker = nullptr;
+
+		if (oldTracker)
+			oldTracker->RCTrackerDecRef();
+
+		return *this;
+	}
+
+	template<class TOther>
+	TypelessRCPtr &TypelessRCPtr::operator=(const RCPtr<TOther> &other) noexcept
+	{
+		(*this) = TypelessRCPtr(other);
+		return *this;
+	}
+
+	template<class TOther>
+	inline TypelessRCPtr &TypelessRCPtr::operator=(RCPtr<TOther> &&other) noexcept
+	{
+		(*this) = TypelessRCPtr(std::move(other));
+		return *this;
+	}
+
 	template<class TType, class TPtrType, class... TArgs>
 	inline Result NewWithAlloc(RCPtr<TPtrType> &objPtr, IMallocDriver *alloc, TArgs&& ...args)
 	{
@@ -720,6 +918,20 @@ namespace rkit
 
 		rcPtr = RCPtr<RCType>(object, trackerAllocation.m_obj);
 		RKIT_RETURN_OK;
+	}
+
+	template<class T>
+	UniquePtr<T> RCPtrToUniquePtr(RCPtr<T> rcPtr)
+	{
+		rkit::RefCountedTracker *tracker = nullptr;
+		T *obj = nullptr;
+
+		rcPtr.Detach(obj, tracker);
+
+		if (!obj)
+			return UniquePtr<T>();
+
+		return UniquePtr<T>(obj, tracker, &priv::UniquePtrRCPtrMallocWrapper::ms_instance);
 	}
 
 	namespace priv

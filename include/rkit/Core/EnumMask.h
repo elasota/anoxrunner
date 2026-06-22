@@ -63,7 +63,6 @@ namespace rkit
 		EnumMask &Remove(const T(&items)[TCount]);
 
 		bool operator==(const EnumMask &other) const;
-		bool operator!=(const EnumMask &other) const;
 
 		EnumMask operator|(const EnumMask &other) const;
 		EnumMask operator&(const EnumMask &other) const;
@@ -225,12 +224,6 @@ namespace rkit
 	bool EnumMask<T>::operator==(const EnumMask &other) const
 	{
 		return m_boolVector == other.m_boolVector;
-	}
-
-	template<class T>
-	bool EnumMask<T>::operator!=(const EnumMask &other) const
-	{
-		return !((*this) == other);
 	}
 
 	template<class T>

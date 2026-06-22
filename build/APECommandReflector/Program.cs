@@ -185,9 +185,9 @@ namespace APEWindowCommandReflector
                 case FieldDef.FieldType.FontResource:
                     return "FontResource";
                 case FieldDef.FieldType.FileResource:
-                    return "FileResource";
+                case FieldDef.FieldType.MusicResource:
                 case FieldDef.FieldType.MusicSegResource:
-                    return "MusicSegResource";
+                    return "FileResource";
                 case FieldDef.FieldType.SceneResource:
                     return "SceneResource";
                 case FieldDef.FieldType.ParticleResource:
@@ -240,7 +240,7 @@ namespace APEWindowCommandReflector
                 sw.WriteLine();
                 sw.WriteLine("namespace anox::game");
                 sw.WriteLine("{");
-                sw.WriteLine("\tclass ScriptEnvironment;");
+                sw.WriteLine("\tstruct ScriptExternContext;");
                 sw.WriteLine("\tstruct ScriptExprValue;");
                 sw.WriteLine("}");
                 sw.WriteLine();
@@ -257,10 +257,10 @@ namespace APEWindowCommandReflector
                     sw.WriteLine("\t{");
                     sw.WriteLine("\tpublic:");
                     sw.WriteLine("\t\tstatic constexpr ExternOpcode kOpcode = ExternOpcode::" + def.Name + ";");
-                    sw.WriteLine("\t\tstatic rkit::ResultCoroutine Dispatch(rkit::ICoroThread &thread, ExternDispatchContext dispatchContext);");
+                    sw.WriteLine("\t\tstatic rkit::ResultCoroutine Dispatch(rkit::ICoroThread &thread, const ExternDispatchContext &dispatchContext);");
                     sw.WriteLine("\tprivate:");
 
-                    sw.Write("\t\tstatic rkit::ResultCoroutine Execute(rkit::ICoroThread &thread, ScriptEnvironment &env");
+                    sw.Write("\t\tstatic rkit::ResultCoroutine Execute(rkit::ICoroThread &, const ScriptExternContext &");
                     foreach (FieldDef fdef in def.Fields)
                     {
                         sw.Write(", ExternDispatch::");
@@ -280,6 +280,7 @@ namespace APEWindowCommandReflector
                 sw.NewLine = "\n";
                 sw.WriteLine("#include \"APEExternDispatch.generated.h\"");
                 sw.WriteLine("#include \"rkit/Core/Coroutine.h\"");
+                sw.WriteLine("#include \"rkit/Data/ContentID.h\"");
                 sw.WriteLine();
                 sw.WriteLine("namespace anox::game::ape::externs");
                 sw.WriteLine("{");
@@ -288,7 +289,7 @@ namespace APEWindowCommandReflector
                     if (!def.IsStub)
                         continue;
 
-                    sw.Write("\trkit::ResultCoroutine " + def.Name + "::Execute(rkit::ICoroThread &thread, ScriptEnvironment &env");
+                    sw.Write("\trkit::ResultCoroutine " + def.Name + "::Execute(rkit::ICoroThread &, const ScriptExternContext &");
                     foreach (FieldDef fdef in def.Fields)
                     {
                         sw.Write(", ExternDispatch::");
@@ -317,7 +318,7 @@ namespace APEWindowCommandReflector
                 sw.WriteLine("{");
                 foreach (ExternCommandDef def in externDefs)
                 {
-                    sw.WriteLine("\t::rkit::ResultCoroutine " + def.Name + "::Dispatch(rkit::ICoroThread &thread, ExternDispatchContext dispatchContext)");
+                    sw.WriteLine("\t::rkit::ResultCoroutine " + def.Name + "::Dispatch(rkit::ICoroThread &thread, const ExternDispatchContext &dispatchContext)");
                     sw.WriteLine("\t{");
                     sw.WriteLine("\t\tif (dispatchContext.m_operands.Count() != " + def.Fields.Count.ToString() + ")");
                     sw.WriteLine("\t\t\tCORO_THROW(rkit::ResultCode::kDataError);");
@@ -333,10 +334,10 @@ namespace APEWindowCommandReflector
 
                         sw.WriteLine("\t\tExternDispatch::" + argTypeName + "Arg_t " + fieldName + ";");
 
-                        sw.WriteLine("\t\tCORO_CHECK(ExternDispatch::Parse" + argTypeName + "Arg(" + fieldName + ", *dispatchContext.m_env, *dispatchContext.m_pkg, dispatchContext.m_operands[" + i.ToString() + "]));");
+                        sw.WriteLine("\t\tCORO_CHECK(ExternDispatch::Parse" + argTypeName + "Arg(" + fieldName + ", *dispatchContext.m_externContext.m_env, *dispatchContext.m_pkg, dispatchContext.m_operands[" + i.ToString() + "]));");
                     }
 
-                    sw.Write("\t\tCORO_CHECK(co_await Execute(thread, *dispatchContext.m_env");
+                    sw.Write("\t\tCORO_CHECK(co_await Execute(thread, dispatchContext.m_externContext");
                     for (int i = 0; i < def.Fields.Count; i++)
                         sw.Write(", field" + i.ToString());
 

@@ -14,18 +14,19 @@ namespace rkit::audio
 		uint64_t m_denominator = 0;
 	};
 
-	enum class SampleType
+	enum class SampleType : uint8_t
 	{
 		kUnknown,
 
 		kSInt32,
 		kSInt32_24bit,
 		kSInt16,
-		kSInt8,
 		kFloat32,
+
+		kLargestSampleType = kFloat32,
 	};
 
-	enum class SpeakerPosition
+	enum class SpeakerPosition : uint8_t
 	{
 		kFrontLeft,
 		kFrontRight,
@@ -54,6 +55,8 @@ namespace rkit::audio
 		uint32_t m_sampleRate = 0;
 		SampleType m_sampleType = SampleType::kUnknown;
 		EnumMask<SpeakerPosition> m_speakers;
+
+		bool operator==(const AudioFormat &other) const = default;
 	};
 
 	struct IAbstractDeviceID : public RefCounted
@@ -91,7 +94,7 @@ namespace rkit::audio
 
 	struct IAudioOutputStateQuery
 	{
-		RKIT_NODISCARD virtual bool GetTimestamp(U64Fraction &cpuTime) const = 0;
+		RKIT_NODISCARD virtual U64Fraction GetTimestamp() const = 0;
 	};
 
 	struct IAudioOutputStream
@@ -117,6 +120,7 @@ namespace rkit::audio
 	{
 		// Return true if there is audio data, false if the entire frame is silent
 		virtual bool Render(void *buffer, size_t numSamples, const IAudioOutputStateQuery &outputQuery) = 0;
+		virtual void RunTrailingActions() = 0;
 	};
 
 	struct IAudioOutputEndpoint : public IAudioEndpoint
@@ -135,6 +139,7 @@ namespace rkit::audio
 		// These may output no endpoint
 		virtual Result GetDefaultInputEndpoint(RCPtr<IAudioInputEndpoint> &outEndpoint) const = 0;
 		virtual Result GetDefaultOutputEndpoint(RCPtr<IAudioOutputEndpoint> &outEndpoint) const = 0;
+		virtual U64Fraction GetTimestamp() const = 0;
 	};
 }
 

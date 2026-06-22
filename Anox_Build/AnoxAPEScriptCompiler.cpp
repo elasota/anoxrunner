@@ -2,7 +2,10 @@
 #include "AnoxAPEWindowCommandData.generated.h"
 
 #include "anox/Build/NodeIDs.h"
+
 #include "anox/Data/APEScript.h"
+#include "anox/Data/ResourceTypeCodes.h"
+
 #include "anox/AnoxModule.h"
 #include "anox/Label.h"
 
@@ -36,12 +39,35 @@ namespace anox::buildsystem
 		static rkit::Result IndexValue(uint32_t &outIndex, rkit::HashMap<TKey, uint32_t> &hashMap, TKey &&key);
 	};
 
+	struct APEResourceRefKey
+	{
+		uint32_t m_resNamespace = 0;
+		uint32_t m_resType = 0;
+		uint32_t m_compileNamespace = 0;
+		uint32_t m_compileType = 0;
+		uint32_t m_pathTempStringIndex = 0;
+
+		bool operator==(const APEResourceRefKey &other) const = default;
+	};
+}
+
+template<>
+struct rkit::Hasher<anox::buildsystem::APEResourceRefKey> : public rkit::BinaryHasher<anox::buildsystem::APEResourceRefKey>
+{
+};
+
+namespace anox::buildsystem
+{
 	class APECompilerContext
 	{
 	public:
+		explicit APECompilerContext(rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+
 		rkit::Result IndexExpression(uint32_t &outIndex, data::ape::Expression &&expr);
 		rkit::Result IndexOperandList(uint32_t &outIndex, rkit::Vector<data::ape::ExpressionValue> &&operands);
 		rkit::Result IndexString(uint32_t &outIndex, const rkit::ByteString &str);
+		rkit::Result IndexResource(uint32_t &outIndex, uint32_t compileNamespace, uint32_t compileNodeType, uint32_t resNamespace, uint32_t resType,
+			const rkit::StringView &prefix, const rkit::ByteStringSliceView &arg);
 
 		rkit::Result ConvertOptionalExprValue(data::ape::ExpressionValue &outExprValue, const rkit::Optional<ape_parse::ExpressionValue> &value);
 		rkit::Result ConvertExprValue(uint32_t &outIndex, data::ape::OperandType &outOperandType, bool &outIsString, const ape_parse::ExpressionValue &expr);
@@ -53,7 +79,9 @@ namespace anox::buildsystem
 
 		rkit::Result DumpResults(rkit::Vector<rkit::Vector<data::ape::ExpressionValue>> &outOperandLists,
 			rkit::Vector<data::ape::Expression> &outExprs, rkit::Vector<rkit::ByteString> &outStrings,
-			rkit::Vector<rkit::String> &outMaterialWildcards, rkit::Vector<rkit::CIPath> &outMaterialNames) const;
+			rkit::Vector<rkit::String> &outMaterialWildcards, rkit::Vector<rkit::CIPath> &outMaterialNames,
+			rkit::Vector<data::ape::ResourceRef> &outResourceRefs, rkit::Vector<data::ape::IntermediateResourceRef> &outIntermediateRefs,
+			rkit::Vector<rkit::String> &outTempStrings) const;
 
 	private:
 		class OperandListKey final : public rkit::NoCopy
@@ -97,6 +125,10 @@ namespace anox::buildsystem
 		rkit::HashMap<OperandListKey, uint32_t> m_operandLists;
 		rkit::HashMap<rkit::CIPath, uint32_t> m_materialNames;
 		rkit::HashMap<rkit::String, uint32_t> m_materialWildcards;
+		rkit::HashMap<APEResourceRefKey, uint32_t> m_resourceRefs;
+		rkit::HashMap<rkit::String, uint32_t> m_tempStrings;
+
+		rkit::buildsystem::IDependencyNodeCompilerFeedback *m_feedback = nullptr;
 	};
 
 	class APEWriter final : public ape_parse::IAPEWriter
@@ -220,6 +252,7 @@ namespace anox::buildsystem
 		struct APEBlob
 		{
 			rkit::Vector<rkit::ByteString> m_strings;
+			rkit::Vector<rkit::String> m_tempStrings;
 			rkit::Vector<data::ape::Expression> m_exprs;
 			rkit::Vector<rkit::Vector<data::ape::ExpressionValue>> m_operandLists;
 			rkit::Vector<CompiledWindowDef> m_windows;
@@ -229,6 +262,8 @@ namespace anox::buildsystem
 			rkit::Vector<rkit::data::ContentID> m_materialContentIDs;
 			rkit::Vector<rkit::endian::LittleUInt32_t> m_materialNameLookups;
 			rkit::Vector<data::ape::MaterialWildcardLookup> m_materialWildcardLookups;
+			rkit::Vector<data::ape::ResourceRef> m_resourceRefs;
+			rkit::Vector<data::ape::IntermediateResourceRef> m_intermediateResourceRefs;
 		};
 
 		static rkit::Result CompileWindow(APECompilerContext &ctx, CompiledWindowDef &compiledWindow, const WindowDef &wdef);
@@ -522,7 +557,7 @@ namespace anox::buildsystem
 			}
 		}
 
-		APECompilerContext compilerCtx;
+		APECompilerContext compilerCtx(feedback);
 
 		APEBlob blob;
 
@@ -540,7 +575,7 @@ namespace anox::buildsystem
 			RKIT_CHECK(CompileSwitch(compilerCtx, blob.m_switches[switchIndex], switchDefs[switchIndex]));
 		}
 
-		RKIT_CHECK(compilerCtx.DumpResults(blob.m_operandLists, blob.m_exprs, blob.m_strings, blob.m_materialWildcards, blob.m_materialNames));
+		RKIT_CHECK(compilerCtx.DumpResults(blob.m_operandLists, blob.m_exprs, blob.m_strings, blob.m_materialWildcards, blob.m_materialNames, blob.m_resourceRefs, blob.m_intermediateResourceRefs, blob.m_tempStrings));
 
 		{
 			rkit::CIPath outPath;
@@ -593,6 +628,10 @@ namespace anox::buildsystem
 		RKIT_RETURN_OK;
 	}
 
+	APECompilerContext::APECompilerContext(rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+		: m_feedback(feedback)
+	{
+	}
 
 	rkit::Result APECompilerContext::IndexExpression(uint32_t &outIndex, data::ape::Expression &&expr)
 	{
@@ -609,6 +648,45 @@ namespace anox::buildsystem
 	rkit::Result APECompilerContext::IndexString(uint32_t &outIndex, const rkit::ByteString &str)
 	{
 		return APECompilerHelper::IndexValue<rkit::ByteString>(outIndex, m_strings, rkit::ByteString(str));
+	}
+
+	rkit::Result APECompilerContext::IndexResource(uint32_t &outIndex, uint32_t compileNamespace, uint32_t compileNodeType, uint32_t resNamespace, uint32_t resType,
+		const rkit::StringView &prefix, const rkit::ByteStringSliceView &argRef)
+	{
+		rkit::StringSliceView arg = argRef.ToUTF8Unsafe();
+
+		if (!arg.Validate())
+			RKIT_THROW(rkit::ResultCode::kInvalidUnicode);
+
+		if (arg.StartsWith(u8"\""))
+			arg = arg.SubString(1);
+		if (arg.EndsWith(u8"\""))
+			arg = arg.SubString(0, arg.Length() - 1);
+
+		rkit::String formattedPathStr;
+		RKIT_CHECK(formattedPathStr.Format(u8"{}{}", prefix, arg));
+
+		rkit::CIPath path;
+		RKIT_CHECK(path.Set(formattedPathStr));
+
+		if (compileNamespace != anox::kAnoxNamespaceID || compileNodeType != anox::buildsystem::kRawFileNodeID)
+		{
+			RKIT_CHECK(m_feedback->AddNodeDependency(compileNamespace, compileNodeType, rkit::buildsystem::BuildFileLocation::kSourceDir, path.ToString()));
+		}
+
+		uint32_t pathIndex = 0;
+		RKIT_CHECK(APECompilerHelper::IndexValue<rkit::String>(pathIndex, m_tempStrings, rkit::String(path.ToString())));
+
+		APEResourceRefKey refKey = {};
+		refKey.m_compileNamespace = compileNamespace;
+		refKey.m_compileType = compileNodeType;
+		refKey.m_pathTempStringIndex = pathIndex;
+		refKey.m_resNamespace = resNamespace;
+		refKey.m_resType = resType;
+
+		RKIT_CHECK(APECompilerHelper::IndexValue<APEResourceRefKey>(outIndex, m_resourceRefs, std::move(refKey)));
+
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result APECompilerContext::ConvertOptionalExprValue(data::ape::ExpressionValue &outExprValue, const rkit::Optional<ape_parse::ExpressionValue> &value)
@@ -835,13 +913,18 @@ namespace anox::buildsystem
 
 	rkit::Result APECompilerContext::DumpResults(rkit::Vector<rkit::Vector<data::ape::ExpressionValue>> &outOperandLists,
 		rkit::Vector<data::ape::Expression> &outExprs, rkit::Vector<rkit::ByteString> &outStrings,
-		rkit::Vector<rkit::String> &outMaterialWildcards, rkit::Vector<rkit::CIPath> &outMaterialNames) const
+		rkit::Vector<rkit::String> &outMaterialWildcards, rkit::Vector<rkit::CIPath> &outMaterialNames,
+		rkit::Vector<data::ape::ResourceRef> &outResourceRefs, rkit::Vector<data::ape::IntermediateResourceRef> &outIntermediateRefs,
+		rkit::Vector<rkit::String> &outTempStrings) const
 	{
 		RKIT_CHECK(outOperandLists.Resize(m_operandLists.Count()));
 		RKIT_CHECK(outExprs.Resize(m_expressions.Count()));
 		RKIT_CHECK(outStrings.Resize(m_strings.Count()));
 		RKIT_CHECK(outMaterialWildcards.Resize(m_materialWildcards.Count()));
 		RKIT_CHECK(outMaterialNames.Resize(m_materialNames.Count()));
+		RKIT_CHECK(outResourceRefs.Resize(m_resourceRefs.Count()));
+		RKIT_CHECK(outIntermediateRefs.Resize(m_resourceRefs.Count()));
+		RKIT_CHECK(outTempStrings.Resize(m_tempStrings.Count()));
 
 
 		for (rkit::HashMapKeyValueView<ExpressionKey, const uint32_t> exprPair : m_expressions)
@@ -849,6 +932,9 @@ namespace anox::buildsystem
 
 		for (rkit::HashMapKeyValueView<rkit::ByteString, const uint32_t> strPair : m_strings)
 			outStrings[strPair.Value()] = strPair.Key();
+
+		for (rkit::HashMapKeyValueView<rkit::String, const uint32_t> strPair : m_tempStrings)
+			outTempStrings[strPair.Value()] = strPair.Key();
 
 		for (rkit::HashMapKeyValueView<rkit::CIPath, const uint32_t> strPair : m_materialNames)
 			outMaterialNames[strPair.Value()] = strPair.Key();
@@ -865,6 +951,26 @@ namespace anox::buildsystem
 
 			rkit::CopySpan(outOpList.ToSpan(), inOpList);
 		}
+
+		for (rkit::HashMapKeyValueView<APEResourceRefKey, const uint32_t> rrPair : m_resourceRefs)
+		{
+			const APEResourceRefKey &rrKey = rrPair.Key();
+
+			data::ape::ResourceRef &rr = outResourceRefs[rrPair.Value()];
+			data::ape::IntermediateResourceRef &irr = outIntermediateRefs[rrPair.Value()];
+
+			rr.m_contentIDIndex = 0;
+			rr.m_resNamespace = rrKey.m_resNamespace;
+			rr.m_resType = rrKey.m_resType;
+
+			irr.m_nodeNamespace = rrKey.m_compileNamespace;
+			irr.m_nodeType = rrKey.m_compileType;
+			irr.m_tempStrIndex = rrKey.m_pathTempStringIndex;
+		}
+
+		RKIT_CHECK(outResourceRefs.Resize(m_resourceRefs.Count()));
+		RKIT_CHECK(outIntermediateRefs.Resize(m_resourceRefs.Count()));
+		RKIT_CHECK(outTempStrings.Resize(m_tempStrings.Count()));
 
 		RKIT_RETURN_OK;
 	}
@@ -1142,6 +1248,31 @@ namespace anox::buildsystem
 			blob.m_materialWildcards.Reset();
 		}
 
+		for (size_t i = 0; i < blob.m_resourceRefs.Count(); i++)
+		{
+			data::ape::ResourceRef &rr = blob.m_resourceRefs[i];
+			const data::ape::IntermediateResourceRef &irr = blob.m_intermediateResourceRefs[i];
+
+			if (irr.m_nodeNamespace.Get() == kAnoxNamespaceID && irr.m_nodeType.Get() == kRawFileNodeID)
+			{
+				// Raw file resource, copy directly from source
+				rkit::CIPath path;
+				RKIT_CHECK(path.Set(blob.m_tempStrings[irr.m_tempStrIndex.Get()]));
+
+				rkit::data::ContentID contentID;
+				RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kSourceDir, path, contentID));
+
+				uint32_t contentIDIndex = 0;
+				RKIT_CHECK(APECompilerHelper::IndexValue<rkit::data::ContentID>(contentIDIndex, contentIDToIndex, std::move(contentID)));
+
+				rr.m_contentIDIndex = contentIDIndex;
+			}
+			else
+			{
+				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+			}
+		}
+
 		RKIT_CHECK(blob.m_materialContentIDs.Resize(contentIDToIndex.Count()));
 		RKIT_CHECK(blob.m_strings.Resize(stringToIndex.Count()));
 
@@ -1150,6 +1281,9 @@ namespace anox::buildsystem
 
 		for (rkit::HashMapKeyValueView<rkit::data::ContentID, uint32_t> kvp : contentIDToIndex)
 			blob.m_materialContentIDs[kvp.Value()] = kvp.Key();
+
+		blob.m_intermediateResourceRefs.Reset();
+		blob.m_tempStrings.Reset();
 
 		{
 			rkit::CIPath outPath;
@@ -1534,6 +1668,20 @@ namespace anox::buildsystem
 						outValue.m_index = rkit::endian::LittleUInt32_t::FromBits(bits);
 					}
 					break;
+				case ape_parse::ExternFieldType::MusicResource:
+					{
+						outValue.m_exprType = data::ape::ExprType::ContentID;
+
+						uint32_t index = 0;
+						RKIT_CHECK(ctx.IndexResource(index,
+							anox::kAnoxNamespaceID, anox::buildsystem::kRawFileNodeID,
+							anox::kAnoxNamespaceID, anox::resloaders::kContentIDRawFileResourceTypeCode,
+							u8"music/", arg));
+
+						outValue.m_index = index;
+					}
+					break;
+
 				case ape_parse::ExternFieldType::SoundResource:
 				case ape_parse::ExternFieldType::SceneResource:
 				case ape_parse::ExternFieldType::ImageResource:
@@ -1863,6 +2011,8 @@ namespace anox::buildsystem
 							const size_t argIndex = findArg(argNames[inputIndex]);
 							RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], tokens[inputIndex]));
 						}
+
+						RKIT_RETURN_OK;
 					};
 
 				if (numImageArgs == 0)
@@ -2068,6 +2218,7 @@ namespace anox::buildsystem
 			data::ape::APEScriptCatalog catalog;
 
 			catalog.m_numStrings = static_cast<uint32_t>(blob.m_strings.Count());
+			catalog.m_numTempStrings = static_cast<uint32_t>(blob.m_tempStrings.Count());
 			catalog.m_numExprs = static_cast<uint32_t>(blob.m_exprs.Count());
 			catalog.m_numOperandLists = static_cast<uint32_t>(blob.m_operandLists.Count());
 			catalog.m_numWindows = static_cast<uint32_t>(blob.m_windows.Count());
@@ -2077,6 +2228,8 @@ namespace anox::buildsystem
 			catalog.m_numMaterialContentIDs = static_cast<uint32_t>(blob.m_materialContentIDs.Count());
 			catalog.m_numMaterialNameLookups = static_cast<uint32_t>(blob.m_materialNameLookups.Count());
 			catalog.m_numMaterialWildcardLookups = static_cast<uint32_t>(blob.m_materialWildcardLookups.Count());
+			catalog.m_numResourceRefs = static_cast<uint32_t>(blob.m_resourceRefs.Count());
+			catalog.m_hasIntermediateResourceRefs = (blob.m_intermediateResourceRefs.Count() > 0) ? 1 : 0;
 
 			RKIT_CHECK(stream.WriteOneBinary(catalog));
 		}
@@ -2149,6 +2302,20 @@ namespace anox::buildsystem
 		RKIT_CHECK(stream.WriteAllSpan(blob.m_materialNameLookups.ToSpan()));
 		RKIT_CHECK(stream.WriteAllSpan(blob.m_materialWildcardLookups.ToSpan()));
 
+		for (const rkit::String &str : blob.m_tempStrings)
+		{
+			rkit::endian::LittleUInt32_t strLength = rkit::endian::LittleUInt32_t(str.Length());
+			RKIT_CHECK(stream.WriteOneBinary(strLength));
+		}
+
+		for (const rkit::String &str : blob.m_tempStrings)
+		{
+			RKIT_CHECK(stream.WriteAllSpan(str.ToSpan()));
+		}
+
+		RKIT_CHECK(stream.WriteAllSpan(blob.m_resourceRefs.ToSpan()));
+		RKIT_CHECK(stream.WriteAllSpan(blob.m_intermediateResourceRefs.ToSpan()));
+
 		RKIT_RETURN_OK;
 	}
 
@@ -2164,6 +2331,12 @@ namespace anox::buildsystem
 		rkit::Vector<rkit::ByteStringConstructionBuffer> stringCBufs;
 		RKIT_CHECK(stringCBufs.Resize(numStrings));
 
+		const size_t numTempStrings = catalog.m_numTempStrings.Get();
+		RKIT_CHECK(blob.m_tempStrings.Resize(numTempStrings));
+
+		rkit::Vector<rkit::StringConstructionBuffer> tempStringCBufs;
+		RKIT_CHECK(tempStringCBufs.Resize(numTempStrings));
+
 		RKIT_CHECK(blob.m_operandLists.Resize(catalog.m_numOperandLists.Get()));
 		RKIT_CHECK(blob.m_windows.Resize(catalog.m_numWindows.Get()));
 		RKIT_CHECK(blob.m_switches.Resize(catalog.m_numSwitches.Get()));
@@ -2173,6 +2346,12 @@ namespace anox::buildsystem
 		RKIT_CHECK(blob.m_materialNameLookups.Resize(catalog.m_numMaterialNameLookups.Get()));
 		RKIT_CHECK(blob.m_materialWildcardLookups.Resize(catalog.m_numMaterialWildcardLookups.Get()));
 		RKIT_CHECK(blob.m_materialWildcards.Resize(catalog.m_numMaterialWildcards.Get()));
+		RKIT_CHECK(blob.m_resourceRefs.Resize(catalog.m_numResourceRefs.Get()));
+
+		if (catalog.m_hasIntermediateResourceRefs)
+		{
+			RKIT_CHECK(blob.m_intermediateResourceRefs.Resize(catalog.m_numResourceRefs.Get()));
+		}
 
 		for (rkit::ByteStringConstructionBuffer &strCBuf : stringCBufs)
 		{
@@ -2264,6 +2443,29 @@ namespace anox::buildsystem
 		RKIT_CHECK(stream.ReadAllSpan(blob.m_materialContentIDs.ToSpan()));
 		RKIT_CHECK(stream.ReadAllSpan(blob.m_materialNameLookups.ToSpan()));
 		RKIT_CHECK(stream.ReadAllSpan(blob.m_materialWildcardLookups.ToSpan()));
+
+
+
+		for (rkit::StringConstructionBuffer &strCBuf : tempStringCBufs)
+		{
+			rkit::endian::LittleUInt32_t strLength;
+			RKIT_CHECK(stream.ReadOneBinary(strLength));
+
+			RKIT_CHECK(strCBuf.Allocate(strLength.Get()));
+		}
+
+		for (rkit::StringConstructionBuffer &strCBuf : tempStringCBufs)
+		{
+			RKIT_CHECK(stream.ReadAllSpan(strCBuf.GetSpan()));
+		}
+
+		rkit::ProcessParallelSpans(blob.m_tempStrings.ToSpan(), tempStringCBufs.ToSpan(), [](rkit::String &str, rkit::StringConstructionBuffer &cbuf)
+			{
+				str = rkit::String(std::move(cbuf));
+			});
+
+		RKIT_CHECK(stream.ReadAllSpan(blob.m_resourceRefs.ToSpan()));
+		RKIT_CHECK(stream.ReadAllSpan(blob.m_intermediateResourceRefs.ToSpan()));
 
 		RKIT_RETURN_OK;
 	}
@@ -2514,7 +2716,7 @@ namespace anox::buildsystem
 
 		rkit::AsciiStringConstructionBuffer cbuf;
 		RKIT_CHECK(cbuf.Allocate(resultChars.Count()));
-		RKIT_CHECK(rkit::CopySpanNonOverlapping(cbuf.GetSpan(), resultChars.ToSpan()));
+		rkit::CopySpanNonOverlapping(cbuf.GetSpan(), resultChars.ToSpan());
 
 		outString = rkit::AsciiString(std::move(cbuf));
 

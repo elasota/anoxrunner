@@ -66,6 +66,8 @@
 #endif
 
 #define RKIT_SIMD_ALIGNMENT	16
+#define RKIT_SIMD_MAX_WIDTH_BITS	512
+#define RKIT_SIMD_MAX_WIDTH_BYTES	(RKIT_SIMD_MAX_WIDTH_BITS / 8)
 
 #ifdef __STDCPP_DEFAULT_NEW_ALIGNMENT__
 namespace rkit { namespace mem {

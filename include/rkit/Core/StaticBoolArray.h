@@ -87,6 +87,9 @@ namespace rkit
 		bool FindFirstSet(size_t &outIndex) const;
 		bool FindLastSet(size_t &outIndex) const;
 
+		bool FindFirstClear(size_t &outIndex) const;
+		bool FindLastClear(size_t &outIndex) const;
+
 		size_t CountSetBits() const;
 
 		static StaticBoolArray<TSize> FromBitsUnchecked(const uint8_t *bits);
@@ -285,7 +288,7 @@ namespace rkit
 	template<size_t TSize>
 	StaticBoolArray<TSize> &StaticBoolArray<TSize>::operator|=(const StaticBoolArray<TSize> &other)
 	{
-		for (size_t i = 0; i < TSize; i++)
+		for (size_t i = 0; i < kNumBytes; i++)
 			m_bytes[i] |= other.m_bytes[i];
 
 		return *this;
@@ -303,7 +306,7 @@ namespace rkit
 	template<size_t TSize>
 	StaticBoolArray<TSize> &StaticBoolArray<TSize>::operator&=(const StaticBoolArray<TSize> &other)
 	{
-		for (size_t i = 0; i < TSize; i++)
+		for (size_t i = 0; i < kNumBytes; i++)
 			m_bytes[i] &= other.m_bytes[i];
 
 		return *this;
@@ -320,7 +323,7 @@ namespace rkit
 	template<size_t TSize>
 	StaticBoolArray<TSize> &StaticBoolArray<TSize>::operator^=(const StaticBoolArray<TSize> &other)
 	{
-		for (size_t i = 0; i < TSize; i++)
+		for (size_t i = 0; i < kNumBytes; i++)
 			m_bytes[i] ^= other.m_bytes[i];
 
 		const size_t trailingBitsCount = TSize % 8u;
@@ -335,7 +338,7 @@ namespace rkit
 	{
 		StaticBoolArray<TSize> result;
 
-		for (size_t i = 0; i < TSize; i++)
+		for (size_t i = 0; i < kNumBytes; i++)
 			result.m_bytes[i] = ~m_bytes[i];
 
 		const size_t trailingBitsCount = TSize % 8u;
@@ -348,7 +351,7 @@ namespace rkit
 	template<size_t TSize>
 	bool StaticBoolArray<TSize>::operator==(const StaticBoolArray<TSize> &other) const
 	{
-		for (size_t i = 0; i < TSize; i++)
+		for (size_t i = 0; i < kNumBytes; i++)
 		{
 			if (m_bytes[i] != other.m_bytes[i])
 				return false;
@@ -361,23 +364,6 @@ namespace rkit
 	bool StaticBoolArray<TSize>::operator!=(const StaticBoolArray<TSize> &other) const
 	{
 		return !((*this) == other);
-	}
-
-	template<size_t TSize>
-	bool StaticBoolArray<TSize>::FindLastSet(size_t &outIndex) const
-	{
-		size_t index = TSize;
-		while (index > 0)
-		{
-			--index;
-			if (Get(index))
-			{
-				outIndex = index;
-				return true;
-			}
-		}
-
-		return false;
 	}
 
 	template<size_t TSize>
@@ -400,7 +386,7 @@ namespace rkit
 	StaticBoolArray<TSize>::StaticBoolArray(const uint8_t *bits)
 		: m_bytes{}
 	{
-		for (size_t i = 0; i < TSize; i++)
+		for (size_t i = 0; i < kNumBytes; i++)
 			m_bytes[i] = bits[i];
 	}
 
@@ -416,6 +402,57 @@ namespace rkit
 				return true;
 			}
 			++index;
+		}
+
+		return false;
+	}
+
+	template<size_t TSize>
+	bool StaticBoolArray<TSize>::FindLastSet(size_t &outIndex) const
+	{
+		size_t index = TSize;
+		while (index > 0)
+		{
+			--index;
+			if (Get(index))
+			{
+				outIndex = index;
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	template<size_t TSize>
+	bool StaticBoolArray<TSize>::FindFirstClear(size_t &outIndex) const
+	{
+		size_t index = 0;
+		while (index < TSize)
+		{
+			if (!Get(index))
+			{
+				outIndex = index;
+				return true;
+			}
+			++index;
+		}
+
+		return false;
+	}
+
+	template<size_t TSize>
+	bool StaticBoolArray<TSize>::FindLastClear(size_t &outIndex) const
+	{
+		size_t index = TSize;
+		while (index > 0)
+		{
+			--index;
+			if (!Get(index))
+			{
+				outIndex = index;
+				return true;
+			}
 		}
 
 		return false;

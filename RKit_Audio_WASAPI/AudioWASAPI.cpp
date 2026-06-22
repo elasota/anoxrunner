@@ -1,5 +1,6 @@
 #include "rkit/Audio/AudioDriver.h"
 
+#include "rkit/Core/Algorithm.h"
 #include "rkit/Core/DriverModuleStub.h"
 #include "rkit/Core/ModuleDriver.h"
 #include "rkit/Core/ModuleGlue.h"
@@ -8,6 +9,7 @@
 #include "rkit/Core/ScopeExit.h"
 #include "rkit/Core/Thread.h"
 #include "rkit/Core/Vector.h"
+
 
 #include "rkit/Win32/IncludeWindows.h"
 
@@ -20,6 +22,7 @@
 namespace rkit::audio::wasapi
 {
 	struct WASAPIAudioOutputStream;
+	class WASAPIAudioDriver;
 
 	class WASAPIAudioOutputThreadContext final : public IThreadContext, public NoCopy
 	{
@@ -76,7 +79,7 @@ namespace rkit::audio::wasapi
 	{
 	public:
 		WASAPIAudioOutputEndpoint() = delete;
-		explicit WASAPIAudioOutputEndpoint(win32::ComPtr<IMMDevice> &&device, win32::ComPtr<IMMEndpoint> &&endpoint, RCPtr<WASAPIAudioDeviceID> &&deviceID);
+		explicit WASAPIAudioOutputEndpoint(win32::ComPtr<IMMDevice> &&device, win32::ComPtr<IMMEndpoint> &&endpoint, RCPtr<WASAPIAudioDeviceID> &&deviceID, const WASAPIAudioDriver &audioDriver);
 
 		const IAudioDeviceInfo &GetDeviceInfo() const override;
 		Result GetAudioFormat(AudioFormat &outFormat) const override;
@@ -99,6 +102,8 @@ namespace rkit::audio::wasapi
 		win32::ComPtr<IMMDevice> m_device;
 		win32::ComPtr<IMMEndpoint> m_endpoint;
 		AudioDeviceInfo m_deviceInfo;
+
+		const WASAPIAudioDriver &m_audioDriver;
 	};
 
 	struct WASAPIAudioOutputStreamProperties
@@ -107,7 +112,7 @@ namespace rkit::audio::wasapi
 
 		AudioFormat m_audioFormat;
 		uint32_t m_bufferSize = 0;
-		uint64_t m_cpuQPCFrequency = 0;
+		const WASAPIAudioDriver *m_audioDriver = nullptr;
 
 		win32::ComPtr<IAudioClient> m_audioClient;
 		win32::ComPtr<IAudioRenderClient> m_renderClient;
@@ -135,12 +140,13 @@ namespace rkit::audio::wasapi
 		{
 		public:
 			StateQuery() = delete;
-			explicit StateQuery(const WASAPIAudioOutputStream &owner);
+			explicit StateQuery(const WASAPIAudioOutputStream &owner, const U64Fraction &timestamp);
 
-			bool GetTimestamp(U64Fraction &cpuTime) const override;
+			U64Fraction GetTimestamp() const override;
 
 		private:
 			const WASAPIAudioOutputStream &m_owner;
+			U64Fraction m_timestamp;
 		};
 
 		void SetFault();
@@ -168,6 +174,7 @@ namespace rkit::audio::wasapi
 
 		Result GetDefaultInputEndpoint(RCPtr<IAudioInputEndpoint> &outEndpoint) const override;
 		Result GetDefaultOutputEndpoint(RCPtr<IAudioOutputEndpoint> &outEndpoint) const override;
+		rkit::audio::U64Fraction GetTimestamp() const override;
 
 		static AudioFormat WaveFormatToAudioFormat(const WAVEFORMATEX &waveFormat);
 		static AudioFormat WaveFormatToAudioFormat(const WAVEFORMATEXTENSIBLE &waveFormat);
@@ -189,6 +196,9 @@ namespace rkit::audio::wasapi
 
 		bool m_comInitialized = false;
 		ComResources m_comRes;
+
+		uint64_t m_qpcStart = 0;
+		uint64_t m_qpf = 0;
 
 		static const ChannelBitAssociation ms_channelBitAssociations[];
 	};
@@ -306,10 +316,11 @@ namespace rkit::audio::wasapi
 		return nullTerminatedSpan.SubSpan(0, nullTerminatedSpan.Count() - 1);
 	}
 
-	WASAPIAudioOutputEndpoint::WASAPIAudioOutputEndpoint(win32::ComPtr<IMMDevice> &&device, win32::ComPtr<IMMEndpoint> &&endpoint, RCPtr<WASAPIAudioDeviceID> &&deviceID)
+	WASAPIAudioOutputEndpoint::WASAPIAudioOutputEndpoint(win32::ComPtr<IMMDevice> &&device, win32::ComPtr<IMMEndpoint> &&endpoint, RCPtr<WASAPIAudioDeviceID> &&deviceID, const WASAPIAudioDriver &audioDriver)
 		: m_device(std::move(device))
 		, m_endpoint(std::move(endpoint))
 		, m_deviceID(std::move(deviceID))
+		, m_audioDriver(audioDriver)
 	{
 	}
 
@@ -399,9 +410,6 @@ namespace rkit::audio::wasapi
 		if (hr != S_OK)
 			RKIT_RETURN_OK;
 
-		LARGE_INTEGER qpf = {};
-		QueryPerformanceFrequency(&qpf);
-
 		WASAPIAudioOutputStreamProperties streamProps;
 		streamProps.m_audioClient = std::move(audioClient);
 		streamProps.m_audioThread = std::move(audioThread);
@@ -410,7 +418,7 @@ namespace rkit::audio::wasapi
 		streamProps.m_audioFormat = preferredAudioFormat;
 		streamProps.m_renderer = renderer;
 		streamProps.m_bufferSize = bufferSize;
-		streamProps.m_cpuQPCFrequency = qpf.QuadPart;
+		streamProps.m_audioDriver = &m_audioDriver;
 
 		RKIT_CHECK(New<WASAPIAudioOutputStream>(outOutputStream, std::move(streamProps)));
 
@@ -436,21 +444,15 @@ namespace rkit::audio::wasapi
 	}
 
 
-	WASAPIAudioOutputStream::StateQuery::StateQuery(const WASAPIAudioOutputStream &owner)
+	WASAPIAudioOutputStream::StateQuery::StateQuery(const WASAPIAudioOutputStream &owner, const U64Fraction &timestamp)
 		: m_owner(owner)
+		, m_timestamp(timestamp)
 	{
 	}
 
-
-	bool WASAPIAudioOutputStream::StateQuery::GetTimestamp(U64Fraction &cpuTime) const
+	U64Fraction WASAPIAudioOutputStream::StateQuery::GetTimestamp() const
 	{
-		LARGE_INTEGER qpc = {};
-		QueryPerformanceCounter(&qpc);
-
-		cpuTime.m_numerator = qpc.QuadPart;
-		cpuTime.m_denominator = m_owner.m_props.m_cpuQPCFrequency;
-
-		return true;
+		return m_timestamp;
 	}
 
 	WASAPIAudioOutputStream::WASAPIAudioOutputStream(WASAPIAudioOutputStreamProperties &&properties)
@@ -565,6 +567,8 @@ namespace rkit::audio::wasapi
 
 		const UINT32 framesToRender = availableFrames;
 
+		const U64Fraction timestamp = m_props.m_audioDriver->GetTimestamp();
+
 		if (framesToRender != 0)
 		{
 			BYTE *frameData = nullptr;
@@ -572,16 +576,19 @@ namespace rkit::audio::wasapi
 			if (hr != S_OK)
 				return;
 
-			const bool hasData = m_props.m_renderer->Render(frameData, framesToRender, StateQuery(*this));
+			const bool hasData = m_props.m_renderer->Render(frameData, framesToRender, StateQuery(*this, timestamp));
 
 			DWORD releaseFlags = 0;
 			if (!hasData)
 				releaseFlags |= AUDCLNT_BUFFERFLAGS_SILENT;
 
 			hr = m_props.m_renderClient->ReleaseBuffer(framesToRender, releaseFlags);
-			if (hr != S_OK)
-				return;
+
+			m_props.m_renderer->RunTrailingActions();
 		}
+
+		if (hr != S_OK)
+			return;
 
 		succeeded = true;
 	}
@@ -594,6 +601,15 @@ namespace rkit::audio::wasapi
 		
 		win32::ComPtr<IMMDeviceEnumerator> deviceEnumerator;
 		RKIT_COM_CHECK(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, RKIT_COM_IID_PPV_ARGS(m_comRes.m_devEnum)));
+
+		LARGE_INTEGER qpf = {};
+		QueryPerformanceFrequency(&qpf);
+
+		LARGE_INTEGER qpcStart = {};
+		QueryPerformanceCounter(&qpcStart);
+
+		m_qpcStart = qpcStart.QuadPart;
+		m_qpf = qpf.QuadPart;
 
 		RKIT_RETURN_OK;
 	}
@@ -630,7 +646,37 @@ namespace rkit::audio::wasapi
 		if (!endpoint.IsValid())
 			RKIT_RETURN_OK;
 
-		return rkit::New<WASAPIAudioOutputEndpoint>(outEndpoint, std::move(mmDevice), std::move(endpoint), std::move(deviceID));
+		return rkit::New<WASAPIAudioOutputEndpoint>(outEndpoint, std::move(mmDevice), std::move(endpoint), std::move(deviceID), *this);
+	}
+
+	rkit::audio::U64Fraction WASAPIAudioDriver::GetTimestamp() const
+	{
+		LARGE_INTEGER qpc = {};
+		QueryPerformanceCounter(&qpc);
+
+		uint64_t denominator = m_qpf;
+		uint64_t numerator = qpc.QuadPart - m_qpcStart;
+
+		{
+			const int kMaxTimestampPrecisionBits = 11;	// Roughly half-millisecond precision
+			const int timestampDenomBits = rkit::FindHighestSetBit(denominator);
+			if (timestampDenomBits > kMaxTimestampPrecisionBits)
+			{
+				const int bitDelta = timestampDenomBits - kMaxTimestampPrecisionBits;
+
+				const uint64_t newDenominator = denominator >> bitDelta;
+				numerator = numerator * newDenominator / denominator;
+				denominator = newDenominator;
+			}
+		}
+
+		numerator++;
+
+		rkit::audio::U64Fraction result;
+		result.m_numerator = numerator + 1;
+		result.m_denominator = denominator;
+
+		return result;
 	}
 
 	AudioFormat WASAPIAudioDriver::WaveFormatToAudioFormat(const WAVEFORMATEXTENSIBLE &formatExtensible)
@@ -776,8 +822,8 @@ namespace rkit::audio::wasapi
 				return SampleType::kSInt32_24bit;
 			if (bitSize == 16)
 				return SampleType::kSInt16;
-			if (bitSize == 8)
-				return SampleType::kSInt8;
+			//if (bitSize == 8)
+			//	return SampleType::kSInt8;
 		}
 
 		return SampleType::kUnknown;

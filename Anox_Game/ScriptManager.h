@@ -19,6 +19,16 @@ namespace anox::game
 	class ScriptPackage;
 	class ScriptEnvironment;
 	struct ScriptExprValue;
+	class World;
+}
+
+namespace anox::game
+{
+	struct ScriptExternContext
+	{
+		ScriptEnvironment *m_env = nullptr;
+		World *m_world = nullptr;
+	};
 }
 
 namespace anox::game::ape
@@ -26,7 +36,7 @@ namespace anox::game::ape
 	struct ExternDispatchContext
 	{
 		const ScriptPackage *m_pkg = nullptr;
-		ScriptEnvironment *m_env = nullptr;
+		ScriptExternContext m_externContext;
 		rkit::Span<const ScriptExprValue> m_operands;
 	};
 }
@@ -40,7 +50,7 @@ namespace anox::game
 	class ScriptManager final : public rkit::Opaque<ScriptManagerImpl>
 	{
 	public:
-		typedef rkit::ResultCoroutine (*ExternDispatchFunc_t)(rkit::ICoroThread &thread, ape::ExternDispatchContext context);
+		typedef rkit::ResultCoroutine (*ExternDispatchFunc_t)(rkit::ICoroThread &thread, const ape::ExternDispatchContext &context);
 
 		enum class ScriptLayer
 		{

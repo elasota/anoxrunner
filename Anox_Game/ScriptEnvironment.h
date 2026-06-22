@@ -11,6 +11,11 @@ namespace rkit
 	class UniquePtr;
 }
 
+namespace rkit::data
+{
+	struct ContentID;
+}
+
 namespace anox
 {
 	class Label;
@@ -39,7 +44,10 @@ namespace anox::game
 		rkit::Result CreateScriptContext(rkit::UniquePtr<ScriptContext> &outScriptCtx);
 
 		bool TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const;
+		bool TryEvaluateContentIDScriptExpr(rkit::data::ContentID &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const;
 		rkit::Result TryEvaluateStringScriptExpr(bool &outSucceeded, rkit::ByteString &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const;
+
+		// SAVEGAME TODO
 
 	private:
 		ScriptEnvironment() = delete;

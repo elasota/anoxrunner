@@ -23,6 +23,14 @@ namespace anox::game::ape::externs
 		RKIT_RETURN_OK;
 	}
 
+	rkit::Result ExternDispatch::ParseFileResourceArg(rkit::data::ContentID &arg, ScriptEnvironment &env, const ScriptPackage &pkg, const ScriptExprValue &operand)
+	{
+		if (!env.TryEvaluateContentIDScriptExpr(arg, pkg, operand))
+			arg = rkit::data::ContentID();
+
+		RKIT_RETURN_OK;
+	}
+
 	ANOX_APE_EXTERN_PARSER_STUB(Bool)
 	ANOX_APE_EXTERN_PARSER_STUB(UInt32)
 	ANOX_APE_EXTERN_PARSER_STUB(Int32)
@@ -43,8 +51,6 @@ namespace anox::game::ape::externs
 	ANOX_APE_EXTERN_PARSER_STUB(ImageResource)
 	ANOX_APE_EXTERN_PARSER_STUB(SoundResource)
 	ANOX_APE_EXTERN_PARSER_STUB(FontResource)
-	ANOX_APE_EXTERN_PARSER_STUB(FileResource)
-	ANOX_APE_EXTERN_PARSER_STUB(MusicSegResource)
 	ANOX_APE_EXTERN_PARSER_STUB(SceneResource)
 	ANOX_APE_EXTERN_PARSER_STUB(ParticleResource)
 	ANOX_APE_EXTERN_PARSER_STUB(ModelResource)

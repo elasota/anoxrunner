@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rkit/Core/Endian.h"
+#include "rkit/Data/ContentID.h"
 
 namespace anox::data::ape
 {
@@ -63,6 +64,7 @@ namespace anox::data::ape
 		UIntLiteral,
 		IntLiteral,
 		TextureVariable,
+		ContentID,
 
 		Count,
 	};
@@ -71,6 +73,20 @@ namespace anox::data::ape
 	{
 		MaterialReferenceType m_refType = MaterialReferenceType::Invalid;
 		rkit::endian::LittleUInt32_t m_index;
+	};
+
+	struct ResourceRef
+	{
+		rkit::endian::LittleUInt32_t m_resNamespace;
+		rkit::endian::LittleUInt32_t m_resType;
+		rkit::endian::LittleUInt32_t m_contentIDIndex;
+	};
+
+	struct IntermediateResourceRef
+	{
+		rkit::endian::LittleUInt32_t m_nodeNamespace;
+		rkit::endian::LittleUInt32_t m_nodeType;
+		rkit::endian::LittleUInt32_t m_tempStrIndex;
 	};
 
 	struct ExpressionValue
@@ -120,6 +136,11 @@ namespace anox::data::ape
 		rkit::endian::LittleUInt32_t m_numMaterialNameLookups;
 		rkit::endian::LittleUInt32_t m_numMaterialWildcardLookups;
 
+		rkit::endian::LittleUInt32_t m_numTempStrings;
+		rkit::endian::LittleUInt32_t m_numResourceRefs;
+
+		uint8_t m_hasIntermediateResourceRefs;
+
 		// uint32_t m_stringLengths[m_numStrings]
 		// uint8_t m_stringChars[m_numStrings][m_stringLengths[i]]
 		// Expression m_exprs[m_numExprs]
@@ -134,6 +155,15 @@ namespace anox::data::ape
 		// ContentID m_materialContentIDs[m_numMaterialContentIDs]
 		// uint32_t m_numMaterialNameLookups[m_numMaterialNameLookups]
 		// MaterialWildcardLookup m_materialWildcardLookups[m_numMaterialWildcardLookups]
+
+		// uint32_t m_tempStringLengths[m_numTempStrings]
+		// uint8_t m_tempStringChars[m_numTempStrings][m_tempStringLengths[i]]
+
+		// ResourceRef m_resourceRefs[m_numResourceRefs]
+
+		// if (m_hasIntermediateResourceRefs)
+		//     IntermediateResourceRef m_intermediateResourceRefs[m_numResourceRefs]
+
 	};
 }
 

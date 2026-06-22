@@ -21,7 +21,7 @@ namespace anox::game
 	rkit::Result WorldObject::Initialize(World &world)
 	{
 		m_world = &world;
-		CORO_CHECK(GetWorld().GetScriptEnvironment().CreateScriptContext(m_scriptContext));
+		RKIT_CHECK(GetWorld().GetScriptEnvironment().CreateScriptContext(m_scriptContext));
 
 		RKIT_RETURN_OK;
 	}

@@ -162,14 +162,12 @@ operate_on_party uint(param0) stub
 PARTICLE_StartEffect obj(handle) str(name) str(desc) stub
 PARTICLE_StopAllEffects obj(handle) stub
 PARTICLE_StopEffect obj(handle) str(name) optional str(desc) stub
-PauseLevelMusic stub
 photo_findentity uint(var) uint(key) uint(value) stub
 pickup_getitem obj(target) str(target2) stub
 place_in_party uint(character) uint(pos) stub
 loopambient sceneresource(scene) stub
 playambient sceneresource(scene) optional uint(timeoffset) label(sequencecallback) str(srcrelname) str(targetrelname) obj(srcrelobject) obj(targetrelobject) bool(lerpafter) bool(hidecursor) stub
 stopambient sceneresource(scene) stub
-playlevelmusic str(music) stub
 playmusicseg musicsegresource(seg) uint(param0) stub
 playsound soundresource(sound) optional uint(handle) uint(param0) uint(param1) stub
 ProjectEntity uint(handle) uint(x) uint(y) uint(z) uint(hit) stub
@@ -179,6 +177,8 @@ RegisterPic str(pic) imageresource(image) stub
 ReleaseEntity uint(handle) stub
 RemoveShield stub
 ResetBattle uint(battle) stub
+PlayLevelMusic musicresource(music)
+PauseLevelMusic stub
 ResumeLevelMusic stub
 ScaleEntity uint(handle) uint(x) uint(y) uint(z) stub
 set_party_leader str(character) stub

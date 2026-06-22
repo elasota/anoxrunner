@@ -126,6 +126,14 @@
 			"libpng"
 		]
 	},
+	"RKit_MP3" :
+	{
+		"type": "module",
+		"configs":
+		[
+			"minimp3_export"
+		]
+	},
 	"RKit_ProgramLauncher" :
 	{
 		"type": "module",

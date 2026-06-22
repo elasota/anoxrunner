@@ -25,6 +25,7 @@ namespace anox
 	class AnoxCommandRegistryBase;
 	class AnoxKeybindManagerBase;
 	class AnoxResourceManagerBase;
+	class AudioSubsystem;
 	struct ICaptureHarness;
 
 	struct IAnoxGame
@@ -39,6 +40,7 @@ namespace anox
 		virtual rkit::utils::IThreadPool *GetThreadPool() const = 0;
 		virtual AnoxCommandRegistryBase *GetCommandRegistry() const = 0;
 		virtual AnoxKeybindManagerBase *GetKeybindManager() const = 0;
+		virtual AudioSubsystem *GetAudioSubsystem() const = 0;
 
 		virtual rkit::ResultCoroutine RestartGame(rkit::ICoroThread &thread, rkit::StringView initialMapName) = 0;
 

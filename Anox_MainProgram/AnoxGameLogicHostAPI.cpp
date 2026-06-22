@@ -1,7 +1,10 @@
 #include "anox/Sandbox/AnoxGame.host.generated.inl"
 
+#include "AnoxGameAudioManager.h"
 #include "AnoxGameResourceManager.h"
 #include "AnoxGameSandboxEnv.h"
+
+#include "anox/Game/SoundEmitterProperties.h"
 
 #include "rkit/Core/Path.h"
 #include "rkit/Core/String.h"
@@ -130,34 +133,65 @@ namespace anox::game::sandbox
 		RKIT_RETURN_OK;
 	}
 
-	::rkit::Result HostExports::SoundEmitter_Create(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, size_t &id, bool positional)
+	::rkit::Result HostExports::SoundEmitter_Create(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t &emitterID, uint32_t sourceID, ::rkit::sandbox::Address_t emitterPropertiesMem)
+	{
+		AnoxGameSandboxEnvironment &env = static_cast<AnoxGameSandboxEnvironment &>(envBase);
+
+		const SoundEmitterProperties *emitterProperties = nullptr;
+		RKIT_CHECK(env.m_sandbox->AccessMemoryValue(emitterProperties, emitterPropertiesMem));
+
+		return env.m_audioManager->CreateEmitterFromSource(emitterID, sourceID, *emitterProperties);
+	}
+
+	::rkit::Result HostExports::SoundEmitter_Play(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t emitterID)
+	{
+		AnoxGameSandboxEnvironment &env = static_cast<AnoxGameSandboxEnvironment &>(envBase);
+
+		RKIT_CHECK(env.m_audioManager->PlayEmitter(emitterID));
+
+		RKIT_RETURN_OK;
+	}
+
+	::rkit::Result HostExports::SoundEmitter_Stop(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, uint32_t id)
 	{
 		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
 
-	::rkit::Result HostExports::SoundEmitter_Play(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, size_t id)
+	::rkit::Result HostExports::SoundEmitter_Reset(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, uint32_t id)
 	{
 		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
 
-	::rkit::Result HostExports::SoundEmitter_Stop(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, size_t id)
+	::rkit::Result HostExports::SoundEmitter_AttachSoundResource(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, uint32_t id, uint32_t resID)
 	{
 		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
 
-	::rkit::Result HostExports::SoundEmitter_Reset(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, size_t id)
+	::rkit::Result HostExports::SoundEmitter_Destroy(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t id)
 	{
-		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+		AnoxGameSandboxEnvironment &env = static_cast<AnoxGameSandboxEnvironment &>(envBase);
+
+		env.m_audioManager->DestroyEmitter(id);
+
+		RKIT_RETURN_OK;
 	}
 
-	::rkit::Result HostExports::SoundEmitter_AttachSoundResource(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, size_t id, uint32_t resID)
+	::rkit::Result HostExports::SoundSource_CreateFromFileResource(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t &srcID, uint32_t resID, uint32_t containerFormat)
 	{
-		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+		AnoxGameSandboxEnvironment &env = static_cast<AnoxGameSandboxEnvironment &>(envBase);
+
+		rkit::RCPtr<AnoxResourceBase> keepalive;
+		rkit::Span<const uint8_t> contents;
+		RKIT_CHECK(env.m_resManager->GetFileResourceContents(keepalive, contents, resID));
+
+		return env.m_audioManager->CreateSoundSourceFromBytes(srcID, std::move(keepalive), contents, static_cast<rkit::audio::AudioContainerFormat>(containerFormat));
 	}
 
-	::rkit::Result HostExports::SoundEmitter_Destroy(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, size_t id)
+	::rkit::Result HostExports::SoundSource_Destroy(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t srcID)
 	{
-		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+		AnoxGameSandboxEnvironment &env = static_cast<AnoxGameSandboxEnvironment &>(envBase);
+
+		env.m_audioManager->DestroySoundSource(srcID);
 	}
 }
 

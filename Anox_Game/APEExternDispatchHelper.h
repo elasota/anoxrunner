@@ -8,6 +8,11 @@
 #define ANOX_APE_DECLARE_EXTERN_PARSER_FUNC(type)	\
 		static rkit::Result Parse ## type ## Arg(type ## Arg_t &arg, ScriptEnvironment &env, const ScriptPackage &pkg, const ScriptExprValue &operand)
 
+namespace rkit::data
+{
+	struct ContentID;
+}
+
 namespace anox::game
 {
 	class ScriptEnvironment;
@@ -39,8 +44,7 @@ namespace anox::game::ape::externs
 		typedef int ImageResourceArg_t;
 		typedef int SoundResourceArg_t;
 		typedef int FontResourceArg_t;
-		typedef int FileResourceArg_t;
-		typedef int MusicSegResourceArg_t;
+		typedef rkit::data::ContentID FileResourceArg_t;
 		typedef int SceneResourceArg_t;
 		typedef int ParticleResourceArg_t;
 		typedef int ModelResourceArg_t;
@@ -68,7 +72,6 @@ namespace anox::game::ape::externs
 		ANOX_APE_DECLARE_EXTERN_PARSER_FUNC(SoundResource);
 		ANOX_APE_DECLARE_EXTERN_PARSER_FUNC(FontResource);
 		ANOX_APE_DECLARE_EXTERN_PARSER_FUNC(FileResource);
-		ANOX_APE_DECLARE_EXTERN_PARSER_FUNC(MusicSegResource);
 		ANOX_APE_DECLARE_EXTERN_PARSER_FUNC(SceneResource);
 		ANOX_APE_DECLARE_EXTERN_PARSER_FUNC(ParticleResource);
 		ANOX_APE_DECLARE_EXTERN_PARSER_FUNC(ModelResource);

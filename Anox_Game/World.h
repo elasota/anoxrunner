@@ -33,6 +33,7 @@ namespace anox::game
 	class ScriptEnvironment;
 	class ScriptManager;
 	struct WorldObjectProxy;
+	class MusicManager;
 
 	class World final : public rkit::Opaque<WorldImpl>
 	{
@@ -40,6 +41,7 @@ namespace anox::game
 		explicit World(ScriptManager &scriptManager);
 
 		rkit::Result AddObject(rkit::RCPtr<WorldObjectProxy> &&obj);
+		void RemoveObject(WorldObject *obj);
 
 		// Include AllWorldObjects.h for these
 		AllWorldObjectsCollection GetAllObjects() const;
@@ -49,6 +51,7 @@ namespace anox::game
 
 		ScriptManager &GetScriptManager() const;
 		ScriptEnvironment &GetScriptEnvironment() const;
+		MusicManager &GetMusicManager() const;
 
 		static rkit::Result Create(rkit::UniquePtr<World> &outWorld, ScriptManager &scriptManager);
 

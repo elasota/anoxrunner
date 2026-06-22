@@ -126,7 +126,7 @@ inline rkit::Result rkit::Drivers::RegisterDriver(UniquePtr<ICustomDriver> &&dri
 	UniquePtr<ICustomDriver> driverScoped(std::move(driver));
 
 	UniquePtr<CustomDriverLink> driverLinkScoped;
-	RKIT_CHECK(rkit::NewUPtr<CustomDriverLink>(driverLinkScoped));
+	RKIT_CHECK(rkit::New<CustomDriverLink>(driverLinkScoped));
 
 	CustomDriverLink *driverLink = driverLinkScoped.Get();
 	driverLink->m_selfAllocation = driverLinkScoped.Detach();

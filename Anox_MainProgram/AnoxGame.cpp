@@ -51,6 +51,7 @@ namespace anox
 		rkit::utils::IThreadPool *GetThreadPool() const override;
 		AnoxCommandRegistryBase *GetCommandRegistry() const override;
 		AnoxKeybindManagerBase *GetKeybindManager() const override;
+		AudioSubsystem *GetAudioSubsystem() const override;
 
 		rkit::ResultCoroutine RestartGame(rkit::ICoroThread &thread, rkit::StringView mapName) override;
 
@@ -206,6 +207,11 @@ namespace anox
 	AnoxKeybindManagerBase *AnoxGame::GetKeybindManager() const
 	{
 		return m_keybindManager.Get();
+	}
+
+	AudioSubsystem *AnoxGame::GetAudioSubsystem() const
+	{
+		return m_audioSubsystem.Get();
 	}
 
 	rkit::ResultCoroutine AnoxGame::RestartGame(rkit::ICoroThread &thread, rkit::StringView mapName)

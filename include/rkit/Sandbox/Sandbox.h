@@ -141,7 +141,7 @@ namespace rkit
 	template<class TType>
 	inline bool ISandbox::TryAccessMemoryArray(TType *&outPtr, sandbox::Address_t address, size_t count)
 	{
-		const sandbox::Address_t maxCount = std::numeric_limits<sandbox::Address_t>::max() / sizeof(TType);
+		constexpr sandbox::Address_t maxCount = std::numeric_limits<sandbox::Address_t>::max() / sizeof(TType);
 		if (count > maxCount)
 			return false;
 
