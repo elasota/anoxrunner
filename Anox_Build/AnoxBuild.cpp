@@ -18,6 +18,7 @@
 #include "AnoxModelCompiler.h"
 #include "AnoxEntityDefCompiler.h"
 #include "AnoxMaterialCompiler.h"
+#include "AnoxSceneCompiler.h"
 #include "AnoxTextureCompiler.h"
 
 #include "anox/Build/NodeIDs.h"
@@ -198,6 +199,13 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 		RKIT_CHECK(buildsystem::AnoxCTCCompilerBase::Create(ctcCompiler));
 
 		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kCTCModelNodeID, std::move(ctcCompiler)));
+	}
+
+	{
+		rkit::UniquePtr<buildsystem::SceneCompilerBase> sceneCompiler;
+		RKIT_CHECK(buildsystem::SceneCompilerBase::Create(sceneCompiler));
+
+		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kSceneNodeID, std::move(sceneCompiler)));
 	}
 
 	RKIT_CHECK(instance->RegisterNodeTypeByExtension(u8"cfg", rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kCopyFileNodeID));

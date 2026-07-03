@@ -1681,9 +1681,42 @@ namespace anox::buildsystem
 						outValue.m_index = index;
 					}
 					break;
+				case ape_parse::ExternFieldType::SceneResource:
+					{
+						if (arg.EndsWith(rkit::AsciiStringView("$").RemoveEncoding()))
+						{
+							isVariable = true;
+							indexIsStr = true;
+							outValue.m_exprType = data::ape::ExprType::StringVariable;
+						}
+						else
+						{
+							const rkit::ByteStringView expectedSuffix = rkit::AsciiStringView(".s").RemoveEncoding();
+
+							outValue.m_exprType = data::ape::ExprType::ContentID;
+
+							rkit::ByteStringSliceView normalizedArg = arg;
+
+							rkit::ByteString normalizedArgStorage;
+							if (!normalizedArg.EndsWithNoCase(expectedSuffix))
+							{
+								RKIT_CHECK(normalizedArgStorage.Set(arg));
+								RKIT_CHECK(normalizedArgStorage.Append(expectedSuffix));
+								normalizedArg = normalizedArgStorage;
+							}
+
+							uint32_t index = 0;
+							RKIT_CHECK(ctx.IndexResource(index,
+								anox::kAnoxNamespaceID, anox::buildsystem::kSceneNodeID,
+								anox::kAnoxNamespaceID, anox::resloaders::kContentIDRawFileResourceTypeCode,
+								u8"scripts/", normalizedArg));
+
+							outValue.m_index = index;
+						}
+					}
+					break;
 
 				case ape_parse::ExternFieldType::SoundResource:
-				case ape_parse::ExternFieldType::SceneResource:
 				case ape_parse::ExternFieldType::ImageResource:
 				case ape_parse::ExternFieldType::FontResource:
 				case ape_parse::ExternFieldType::FileResource:
@@ -2764,7 +2797,7 @@ namespace anox::buildsystem
 
 	uint32_t APEScriptCompiler::GetVersion() const
 	{
-		return 11;
+		return 1;
 	}
 
 	rkit::Result APEScriptCompiler::FormatOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier)

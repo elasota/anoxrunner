@@ -611,14 +611,22 @@ namespace anox::game
 							ScriptWindowInstance *window = *it;
 							if (window->GetWindowID() == windowLabel)
 							{
+								const Label finishSwitchLabel = window->GetFinishSwitch();
+
 								world.RemoveObject(window);
 								m_activeWindows.RemoveAt(it);
+
+								const ScriptSwitch *finishSwitch = nullptr;
+								m_scriptManager.FindSwitch(finishSwitchLabel, finishSwitch);
+
+								if (finishSwitch)
+								{
+									CORO_CHECK(co_await ExecuteSwitchCommands(thread, finishSwitch->m_package, finishSwitch->m_commands, loopCounter, world, depth + 1));
+								}
+
 								break;
 							}
 						}
-
-
-
 					}
 
 				}

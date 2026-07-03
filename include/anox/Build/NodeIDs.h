@@ -13,4 +13,6 @@ namespace anox::buildsystem
 	static const uint32_t kWorldMaterialNodeID = RKIT_FOURCC('W', 'M', 'T', 'L');
 	static const uint32_t kModelMaterialNodeID = RKIT_FOURCC('M', 'M', 'T', 'L');
 	static const uint32_t kInterfaceMaterialNodeID = RKIT_FOURCC('I', 'M', 'T', 'L');
+
+	static const uint32_t kSceneNodeID = RKIT_FOURCC('S', 'C', 'E', 'N');
 }

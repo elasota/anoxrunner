@@ -4,6 +4,11 @@
 #include "rkit/BuildSystem/DependencyGraph.h"
 #include "rkit/Core/PathProto.h"
 
+namespace rkit::buildsystem
+{
+	struct IDependencyNodeCompilerFeedback;
+}
+
 namespace anox { namespace buildsystem
 {
 	static const uint32_t kBSPMapNodeID = RKIT_FOURCC('B', 'S', 'P', 'M');
@@ -11,8 +16,6 @@ namespace anox { namespace buildsystem
 	static const uint32_t kBSPGeometryID = RKIT_FOURCC('B', 'S', 'P', 'G');
 	static const uint32_t kBSPEntityID = RKIT_FOURCC('B', 'S', 'P', 'E');
 	static const uint32_t kBSPScriptID = RKIT_FOURCC('B', 'S', 'P', 'S');
-
-	struct IDependencyNodeCompilerFeedback;
 
 	class BSPMapCompilerBase : public rkit::buildsystem::IDependencyNodeCompiler
 	{

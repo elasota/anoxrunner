@@ -86,6 +86,12 @@ namespace rkit::utils
 	bool RKIT_CORELIB_API CharsToFloatDynamic(float &f, void *state, bool (*getOneCharCb)(void *state, int32_t &outChar), void (*unGetCharCb)(void *state));
 	bool RKIT_CORELIB_API CharsToDoubleDynamic(double &f, void *state, bool (*getOneCharCb)(void *state, int32_t &outChar), void (*unGetCharCb)(void *state));
 
+	bool RKIT_CORELIB_API CharsToUInt64(uint64_t &i, uint8_t radix, const uint8_t *chars, size_t &inOutLen);
+	bool RKIT_CORELIB_API CharsToInt64(int64_t &i, uint8_t radix, const uint8_t *chars, size_t &inOutLen);
+
+	bool RKIT_CORELIB_API CharsToInt64Dynamic(int64_t &i, uint8_t radix, void *state, bool (*getOneCharCb)(void *state, int32_t &outChar), void (*unGetCharCb)(void *state));
+	bool RKIT_CORELIB_API CharsToUInt64Dynamic(uint64_t &i, uint8_t radix, void *state, bool (*getOneCharCb)(void *state, int32_t &outChar), void (*unGetCharCb)(void *state));
+
 	Result RKIT_CORELIB_API CreateCoroThread(UniquePtr<ICoroThread> &outThread, IMallocDriver *alloc, size_t stackSize
 #ifdef NDEBUG
 		, nullptr_t assertDriver

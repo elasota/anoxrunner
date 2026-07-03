@@ -18,9 +18,13 @@ namespace rkit { namespace png
 	struct IPngDriver;
 } }
 
-namespace anox { namespace buildsystem
+namespace rkit::buildsystem
 {
 	struct IDependencyNodeCompilerFeedback;
+}
+
+namespace anox { namespace buildsystem
+{
 	struct MaterialAnalysisHeader;
 	struct MaterialAnalysisDynamicData;
 	struct MaterialAnalysisBitmapDef;
