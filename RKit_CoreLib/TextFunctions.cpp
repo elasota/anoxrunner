@@ -1280,10 +1280,10 @@ namespace rkit { namespace text {
 	}
 
 	size_t RKIT_CORELIB_API ConvertText(void *outputChars, CharacterEncoding outEncoding, size_t outMaxChars, size_t &outCharsEmitted,
-		const void *inputChars, CharacterEncoding inEncoding, size_t inCharCount, UnknownCharBehavior unknownCharBehavior, uint32_t unknownReplacementChar)
+		const void *inputChars, CharacterEncoding inEncoding, size_t inCharCount, UnknownCharBehavior unknownCharBehavior, uint32_t unknownReplacementChar, bool inputMayBeInvalid)
 	{
 		// Simple copy
-		if (IsCharacterEncodingCompatible(inEncoding, outEncoding))
+		if (IsCharacterEncodingCompatible(inEncoding, outEncoding) && !inputMayBeInvalid)
 		{
 			const size_t charsToCopy = Min(inCharCount, outMaxChars);
 			memcpy(outputChars, inputChars, CharSizeForEncoding(inEncoding) * charsToCopy);

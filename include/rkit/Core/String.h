@@ -715,7 +715,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::ConvertFromSpan(co
 	if (inChars.Count() < TStaticSize)
 	{
 		const size_t charsDigested = text::ConvertText(staticBuffer.GetBuffer(), TEncoding, TStaticSize - 1, staticCharsEmitted,
-			inChars.Ptr(), encoding, inChars.Count(), text::UnknownCharBehavior::kFail, 0);
+			inChars.Ptr(), encoding, inChars.Count(), text::UnknownCharBehavior::kFail, 0, false);
 
 		if (charsDigested == 0)
 			RKIT_THROW(ResultCode::kInvalidUnicode);
@@ -740,7 +740,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::ConvertFromSpan(co
 
 	size_t remainingCharsEmitted = 0;
 	const size_t charsDigested = text::ConvertText(nullptr, TEncoding, std::numeric_limits<size_t>::max() - staticCharsEmitted, remainingCharsEmitted,
-		inChars.Ptr(), encoding, inChars.Count(), text::UnknownCharBehavior::kFail, 0);
+		inChars.Ptr(), encoding, inChars.Count(), text::UnknownCharBehavior::kFail, 0, false);
 
 	if (charsDigested != inChars.Count())
 		RKIT_THROW(ResultCode::kOutOfMemory);
@@ -755,7 +755,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::ConvertFromSpan(co
 	// Copy remaining part
 	size_t remainingCharsEmitted2 = 0;
 	const size_t charsDigested2 = text::ConvertText(outChars.Ptr() + staticCharsEmitted, TEncoding, std::numeric_limits<size_t>::max() - staticCharsEmitted,
-		remainingCharsEmitted2, inChars.Ptr(), encoding, inChars.Count(), text::UnknownCharBehavior::kFail, 0);
+		remainingCharsEmitted2, inChars.Ptr(), encoding, inChars.Count(), text::UnknownCharBehavior::kFail, 0, false);
 
 	RKIT_ASSERT(charsDigested2 == charsDigested);
 	RKIT_ASSERT(remainingCharsEmitted2 == remainingCharsEmitted);

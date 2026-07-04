@@ -382,14 +382,18 @@ void rkit::BaseStringSliceView<TChar, TEncoding>::FormatValueConvert(IFormatStri
 	uint32_t defaultChar = text::GetDefaultUnknownCharForEncoding(encoding);
 
 	rkit::CharacterEncoding normalizedEncoding = TEncoding;
+	bool mayBeInvalid = false;
 	if (normalizedEncoding == CharacterEncoding::kByte)
+	{
 		normalizedEncoding = CharacterEncoding::kASCII;
+		mayBeInvalid = true;
+	}
 
 	Span<const TChar> inSpan = m_span;
 	while (inSpan.Count() > 0)
 	{
 		size_t charsEmitted = 0;
-		size_t charsConsumed = text::ConvertText(outputBuf, encoding, kBufferSize, charsEmitted, inSpan.Ptr(), normalizedEncoding, inSpan.Count(), text::UnknownCharBehavior::kReplaceInvalid, defaultChar);
+		size_t charsConsumed = text::ConvertText(outputBuf, encoding, kBufferSize, charsEmitted, inSpan.Ptr(), normalizedEncoding, inSpan.Count(), text::UnknownCharBehavior::kReplaceInvalid, defaultChar, mayBeInvalid);
 
 		RKIT_ASSERT(charsConsumed != 0);
 		writer.WriteChars(Span<const TOtherChar>(outputBuf, charsEmitted));

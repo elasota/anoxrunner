@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.14.36915.13
+# Visual Studio Version 18
+VisualStudioVersion = 18.7.11925.98 stable
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProjectGenerator", "ProjectGenerator\ProjectGenerator.csproj", "{A9440DB2-CC5E-15F7-89AA-A5C250ACFE87}"
 EndProject
@@ -10,6 +10,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameObjectReflector", "GameObjectReflector\GameObjectReflector.csproj", "{E27ECCD1-A196-4000-AE98-427C462C49C9}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APECommandReflector", "APECommandReflector\APECommandReflector.csproj", "{65DD8101-E73E-499D-9C45-8160690A1319}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SceneCommandReflector", "SceneCommandReflector\SceneCommandReflector.csproj", "{EBD5BD5B-21AC-43AE-9EB3-201FAE2EF646}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +35,10 @@ Global
 		{65DD8101-E73E-499D-9C45-8160690A1319}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{65DD8101-E73E-499D-9C45-8160690A1319}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{65DD8101-E73E-499D-9C45-8160690A1319}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EBD5BD5B-21AC-43AE-9EB3-201FAE2EF646}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EBD5BD5B-21AC-43AE-9EB3-201FAE2EF646}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EBD5BD5B-21AC-43AE-9EB3-201FAE2EF646}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EBD5BD5B-21AC-43AE-9EB3-201FAE2EF646}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

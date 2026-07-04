@@ -8,85 +8,33 @@
 
 #include "rkit/Utilities/NumberParser.h"
 
-#include "AnoxEntityDefCompiler.h"
 #include "anox/AnoxModule.h"
+#include "anox/Label.h"
+
+#include "AnoxEntityDefCompiler.h"
+
+#include "SceneCommandsDefs.generated.inl"
+
+#include "anox/Data/SceneCommandOpcodes.generated.h"
 
 namespace anox::buildsystem
 {
-	enum class SceneCommandType
+	union SceneCommandParam
 	{
-		kInvalid = 0,
-
-		kNewEnt,
-		kFloor,
-		kLighting,
-		kLightSrc,
-		kRotV,
-	};
-
-	enum class SceneCommandFormat
-	{
-		kNewEnt,
-
-		kUInt32,
-		kFloat3,
-		kFloat4,
-	};
-
-	struct SceneCommandDef
-	{
-		rkit::AsciiStringSliceView m_name;
-		SceneCommandType m_type;
-		SceneCommandFormat m_format;
-		uint8_t m_argDelimiter = 0;
-
-		static const SceneCommandDef ms_defs[];
-	};
-
-	namespace scenecommands
-	{
-		struct PODStringView
-		{
-			const uint8_t *m_chars;
-			size_t m_len;
-		};
-
-		struct NewEnt
-		{
-			PODStringView m_name;
-		};
-
-		struct Float3
-		{
-			float m_v0;
-			float m_v1;
-			float m_v2;
-		};
-
-		struct Float4
-		{
-			float m_v0;
-			float m_v1;
-			float m_v2;
-			float m_v3;
-		};
-	}
-
-	union SceneCommandUnion
-	{
-		scenecommands::NewEnt m_newEnt;
-		scenecommands::Float3 m_float3;
-		scenecommands::Float4 m_float4;
+		float m_float;
 		uint32_t m_uint;
+		void *m_ptr;
+		const void *m_constPtr;
+		size_t m_size;
+		bool m_bool;
 	};
 
 	struct SceneCommand
 	{
-		SceneCommandType m_commandType = SceneCommandType::kInvalid;
-		SceneCommandUnion m_union = {};
+		data::SceneCommandOpcode m_opcode;
+		size_t m_paramOffset;
 
-		static scenecommands::PODStringView WrapString(const rkit::ByteStringSliceView &str);
-		static rkit::ByteStringSliceView UnwrapString(const scenecommands::PODStringView &str);
+		static size_t ParamCountForType(SceneCommandParamType paramType);
 	};
 
 	struct ISceneParserConsumer
@@ -98,7 +46,10 @@ namespace anox::buildsystem
 		virtual rkit::Result ProcessPath(uint32_t order, rkit::ByteStringSliceView name, uint32_t type, uint32_t flags, uint32_t timeOffs, uint32_t maxLen, uint32_t color, uint32_t count) = 0;
 		virtual rkit::Result ProcessCubicNode(uint32_t flags, uint32_t timeLen, rkit::math::Vec3 position, rkit::math::Vec3 velocityVector, uint32_t relativeMode) = 0;
 		virtual rkit::Result ProcessFocusNode(uint32_t flags, uint32_t timeLen, uint32_t focusTarget, rkit::ByteStringSliceView name) = 0;
-		virtual rkit::Result ProcessCommandNode(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<SceneCommand> commands) = 0;
+		virtual rkit::Result ProcessCommandNode(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<SceneCommand> commands, rkit::ConstSpan<SceneCommandParam> params) = 0;
+		virtual rkit::Result ProcessScaleNode(uint32_t flags, uint32_t timeLen, rkit::math::Vec3 scale, rkit::math::Vec3 delta) = 0;
+		virtual rkit::Result ProcessRollNode(uint32_t flags, uint32_t timeLen, float value, float rate) = 0;
+		virtual rkit::Result ProcessFOVNode(uint32_t flags, uint32_t timeLen, float value, float rate) = 0;
 	};
 
 	class SceneParser
@@ -108,20 +59,11 @@ namespace anox::buildsystem
 
 	private:
 		typedef rkit::Result(SceneParser:: *ParseMethod_t)(rkit::ConstSpan<rkit::ByteStringSliceView> params, ISceneParserConsumer &consumer);
-		typedef rkit::Result(SceneParser:: *CommandParseMethod_t)(SceneCommand &outCommand, rkit::ConstSpan<rkit::ByteStringSliceView> params);
 
 		struct NamedLineParser
 		{
 			const rkit::AsciiStringView m_name;
 			const ParseMethod_t m_method = nullptr;
-		};
-
-		struct NamedCommandParser
-		{
-			const rkit::AsciiStringView m_name;
-			const CommandParseMethod_t m_method = nullptr;
-			const size_t m_expectedArgCount = 0;
-			const uint8_t m_argDelimiter = 0;
 		};
 
 		rkit::Result ParseLine(rkit::ConstSpan<uint8_t> tokens, ISceneParserConsumer &consumer);
@@ -140,10 +82,7 @@ namespace anox::buildsystem
 		rkit::Result ParseFOVNodeLine(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<rkit::ByteStringSliceView> params, ISceneParserConsumer &consumer);
 		rkit::Result ParseScaleNodeLine(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<rkit::ByteStringSliceView> params, ISceneParserConsumer &consumer);
 
-		rkit::Result ParseNewEntCommand(SceneCommand &outCommand, rkit::ConstSpan<rkit::ByteStringSliceView> params);
-		rkit::Result ParseUInt32Command(SceneCommand &outCommand, rkit::ConstSpan<rkit::ByteStringSliceView> params);
-		rkit::Result ParseFloat3Command(SceneCommand &outCommand, rkit::ConstSpan<rkit::ByteStringSliceView> params);
-		rkit::Result ParseFloat4Command(SceneCommand &outCommand, rkit::ConstSpan<rkit::ByteStringSliceView> params);
+		static rkit::Result TryParseCommandParams(bool &outSucceeded, rkit::Vector<SceneCommandParam> &paramList, const SceneCommandDef &cmdDef, rkit::ConstSpan<rkit::ByteStringSliceView> params);
 
 		static bool TryParseFrameTime(uint32_t &outFrameTime, rkit::ByteStringSliceView str);
 		static bool TryParseVec3(rkit::math::Vec3 &outVec, rkit::ByteStringSliceView str);
@@ -163,7 +102,10 @@ namespace anox::buildsystem
 		rkit::Result ProcessPath(uint32_t order, rkit::ByteStringSliceView name, uint32_t type, uint32_t flags, uint32_t timeOffs, uint32_t maxLen, uint32_t color, uint32_t count) override { RKIT_RETURN_OK; }
 		rkit::Result ProcessCubicNode(uint32_t flags, uint32_t timeLen, rkit::math::Vec3 position, rkit::math::Vec3 velocityVector, uint32_t relativeMode) override { RKIT_RETURN_OK; }
 		rkit::Result ProcessFocusNode(uint32_t flags, uint32_t timeLen, uint32_t focusTarget, rkit::ByteStringSliceView name) override { RKIT_RETURN_OK; }
-		rkit::Result ProcessCommandNode(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<SceneCommand> commands);
+		rkit::Result ProcessCommandNode(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<SceneCommand> commands, rkit::ConstSpan<SceneCommandParam> params) override;
+		rkit::Result ProcessScaleNode(uint32_t flags, uint32_t timeLen, rkit::math::Vec3 scale, rkit::math::Vec3 delta) override { RKIT_RETURN_OK; }
+		rkit::Result ProcessRollNode(uint32_t flags, uint32_t timeLen, float value, float rate) override { RKIT_RETURN_OK; }
+		rkit::Result ProcessFOVNode(uint32_t flags, uint32_t timeLen, float value, float rate) override { RKIT_RETURN_OK; }
 
 	private:
 		rkit::UniquePtr<UserEntityDictionaryBase> m_dict;
@@ -183,26 +125,24 @@ namespace anox::buildsystem
 		static rkit::Result ReadScriptInput(rkit::Vector<uint8_t> &outVector, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 	};
 
-	const SceneCommandDef SceneCommandDef::ms_defs[] =
-	{
-		{ "newent", SceneCommandType::kNewEnt, SceneCommandFormat::kNewEnt },
-		{ "floor", SceneCommandType::kFloor, SceneCommandFormat::kUInt32 },
-		{ "lighting", SceneCommandType::kLighting, SceneCommandFormat::kFloat4, '='},
-		{ "lightsrc", SceneCommandType::kLightSrc, SceneCommandFormat::kUInt32 },
-		{ "rotv", SceneCommandType::kRotV, SceneCommandFormat::kFloat3 },
-	};
 
-	scenecommands::PODStringView SceneCommand::WrapString(const rkit::ByteStringSliceView &str)
+	size_t SceneCommand::ParamCountForType(SceneCommandParamType paramType)
 	{
-		scenecommands::PODStringView result;
-		result.m_chars = str.GetChars();
-		result.m_len = str.Length();
-		return result;
-	}
-
-	rkit::ByteStringSliceView SceneCommand::UnwrapString(const scenecommands::PODStringView &str)
-	{
-		return rkit::ByteStringSliceView(str.m_chars, str.m_len);
+		switch (paramType)
+		{
+		case SceneCommandParamType::UInt:
+		case SceneCommandParamType::Float:
+		case SceneCommandParamType::HexUInt:
+		case SceneCommandParamType::Label:
+			return 1;
+		case SceneCommandParamType::EntityType:
+		case SceneCommandParamType::Str:
+		case SceneCommandParamType::EntityID:
+			return 2;
+		default:
+			RKIT_ASSERT(false);
+			return 0;
+		}
 	}
 
 	rkit::Result SceneParser::ParseSceneFile(rkit::ConstSpan<uint8_t> stream, ISceneParserConsumer &consumer)
@@ -311,7 +251,7 @@ namespace anox::buildsystem
 
 	rkit::Result SceneParser::ParseInterruptLine(rkit::ConstSpan<rkit::ByteStringSliceView> params, ISceneParserConsumer &consumer)
 	{
-		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+		return consumer.ProcessInterrupt();
 	}
 
 	rkit::Result SceneParser::ParseScriptLine(rkit::ConstSpan<rkit::ByteStringSliceView> params, ISceneParserConsumer &consumer)
@@ -460,22 +400,56 @@ namespace anox::buildsystem
 
 	rkit::Result SceneParser::ParseRollNodeLine(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<rkit::ByteStringSliceView> params, ISceneParserConsumer &consumer)
 	{
-		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+		if (params.Count() != 3)
+		{
+			rkit::log::Error(u8"Invalid param count for roll node");
+			RKIT_THROW(rkit::ResultCode::kDataError);
+		}
+
+		float value = 0;
+		float rate = 0;
+
+		if (!rkit::utils::TryParseFloat(value, params[0])
+			|| !rkit::utils::TryParseFloat(rate, params[1]))
+		{
+			rkit::log::Error(u8"Invalid param for roll node");
+			RKIT_THROW(rkit::ResultCode::kDataError);
+		}
+
+		return consumer.ProcessRollNode(flags, timeLen, value, rate);
 	}
 
 	rkit::Result SceneParser::ParseCommandNodeLine(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<rkit::ByteStringSliceView> params, ISceneParserConsumer &consumer)
 	{
-		if (params.Count() != 1)
+		if (params[0].Length() == 0)
+			RKIT_RETURN_OK;
+
+		rkit::ByteString recombinedStr;
 		{
-			rkit::log::Error(u8"Invalid param count for command node");
-			RKIT_THROW(rkit::ResultCode::kDataError);
+			rkit::Vector<uint8_t> recombinedParams;
+			for (size_t i = 0; i < params.Count(); i++)
+			{
+				if (i != 0)
+				{
+					RKIT_CHECK(recombinedParams.Append(':'));
+				}
+				RKIT_CHECK(recombinedParams.Append(params[i].ToSpan()));
+			}
+
+			rkit::ByteStringConstructionBuffer cbuf;
+			RKIT_CHECK(cbuf.Allocate(recombinedParams.Count()));
+
+			rkit::CopySpanNonOverlapping(cbuf.GetSpan(), recombinedParams.ToSpan());
+
+			recombinedStr = rkit::ByteString(std::move(cbuf));
 		}
 
 		rkit::Vector<SceneCommand> commands;
+		rkit::Vector<SceneCommandParam> paramList;
 
 		rkit::Vector<rkit::ByteStringSliceView> commandStrs;
 
-		RKIT_CHECK(SplitString(commandStrs, params[0], ';'));
+		RKIT_CHECK(SplitString(commandStrs, recombinedStr, ';'));
 
 		for (rkit::ByteStringSliceView commandStr : commandStrs)
 		{
@@ -489,85 +463,79 @@ namespace anox::buildsystem
 				}
 			}
 
-			if (!eqPos.IsSet())
-			{
-				rkit::log::Error(u8"Malformed command");
-				RKIT_THROW(rkit::ResultCode::kDataError);
-			}
+			const rkit::ByteStringSliceView commandName = eqPos.IsSet() ? commandStr.SubString(0, eqPos.Get()) : commandStr;
+			const rkit::ByteStringSliceView commandParamsStr = eqPos.IsSet() ? commandStr.SubString(eqPos.Get() + 1) : rkit::ByteStringSliceView();
 
-			const rkit::ByteStringSliceView commandName = commandStr.SubString(0, eqPos.Get());
-			const rkit::ByteStringSliceView commandParamsStr = commandStr.SubString(eqPos.Get() + 1);
-
+			size_t opcodeIndex = 0;
 			bool foundCommand = false;
-			for (const SceneCommandDef *def = SceneCommandDef::ms_defs; def->m_type != SceneCommandType::kInvalid; def++)
+			for (const SceneCommandDef &def : g_sceneCommands)
 			{
-				if (def->m_name.RemoveEncoding() == commandName)
+				if (rkit::AsciiStringView(def.m_name, def.m_nameLength).RemoveEncoding() == commandName)
 				{
-					CommandParseMethod_t method = nullptr;
-
-					size_t expectedArgCount = 1;
-					switch (def->m_format)
-					{
-					case SceneCommandFormat::kNewEnt:
-						method = &SceneParser::ParseNewEntCommand;
-						break;
-					case SceneCommandFormat::kFloat3:
-						method = &SceneParser::ParseFloat3Command;
-						expectedArgCount = 3;
-						break;
-					case SceneCommandFormat::kFloat4:
-						method = &SceneParser::ParseFloat4Command;
-						expectedArgCount = 4;
-						break;
-					case SceneCommandFormat::kUInt32:
-						method = &SceneParser::ParseUInt32Command;
-						break;
-					default:
-						RKIT_THROW(rkit::ResultCode::kInternalError);
-					}
-
 					rkit::Vector<rkit::ByteStringSliceView> commandParamsVector;
 					rkit::ConstSpan<rkit::ByteStringSliceView> commandParams;
 
-					if (expectedArgCount == 1)
+					if (def.m_paramCount == 0)
+					{
+						if (eqPos.IsSet())
+						{
+							rkit::log::Error(u8"Malformed command");
+							RKIT_THROW(rkit::ResultCode::kDataError);
+						}
+					}
+					else if (def.m_paramCount == 1)
 					{
 						commandParams = rkit::ConstSpan<rkit::ByteStringSliceView>(&commandParamsStr, 1);
 					}
 					else
 					{
-						uint8_t delimiter = ',';
-						if (def->m_argDelimiter != 0)
-							delimiter = def->m_argDelimiter;
-
-						RKIT_CHECK(SplitString(commandParamsVector, commandParamsStr, delimiter));
+						RKIT_CHECK(SplitString(commandParamsVector, commandParamsStr, def.m_delimiter));
 						commandParams = commandParamsVector.ToSpan();
 					}
 
-					if (commandParams.Count() != expectedArgCount)
-					{
-						rkit::log::Error(u8"Command param count was wrong");
-						RKIT_THROW(rkit::ResultCode::kDataError);
-					}
+					const size_t expectedArgCount = def.m_paramCount;
+					const size_t numOptionalArgs = def.m_numOptionalParameters;
 
 					SceneCommand cmd = {};
-					RKIT_CHECK((this->*method)(cmd, commandParams));
+					bool succeeded = false;
+					size_t paramStart = paramList.Count();
 
-					cmd.m_commandType = def->m_type;
+					if (commandParams.Count() <= expectedArgCount && commandParams.Count() >= expectedArgCount - numOptionalArgs)
+					{
+						cmd.m_opcode = static_cast<data::SceneCommandOpcode>(opcodeIndex);
+
+						RKIT_CHECK(TryParseCommandParams(succeeded, paramList, def, commandParams));
+					}
+
+					if (succeeded)
+					{
+						RKIT_CHECK(commands.Append(cmd));
+					}
+					else
+					{
+						paramList.ShrinkToSize(paramStart);
+						if (!def.m_mayFail)
+						{
+							rkit::log::Error(u8"Command was malformed");
+							RKIT_THROW(rkit::ResultCode::kDataError);
+						}
+					}
 
 					foundCommand = true;
-					RKIT_CHECK(commands.Append(cmd));
 					break;
 				}
+
+				opcodeIndex++;
 			}
 
 			if (!foundCommand)
 			{
-				rkit::log::Error(u8"Unknown command");
+				rkit::log::ErrorFmt(u8"Unknown command {}", commandName);
 				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 		}
 
-		return consumer.ProcessCommandNode(flags, timeLen, commands.ToSpan());
+		return consumer.ProcessCommandNode(flags, timeLen, commands.ToSpan(), paramList.ToSpan());
 	}
 
 	rkit::Result SceneParser::ParseFocusNodeLine(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<rkit::ByteStringSliceView> params, ISceneParserConsumer &consumer)
@@ -591,73 +559,212 @@ namespace anox::buildsystem
 
 	rkit::Result SceneParser::ParseFOVNodeLine(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<rkit::ByteStringSliceView> params, ISceneParserConsumer &consumer)
 	{
-		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+		if (params.Count() != 3)
+		{
+			rkit::log::Error(u8"Invalid param count for roll node");
+			RKIT_THROW(rkit::ResultCode::kDataError);
+		}
+
+		float value = 0;
+		float rate = 0;
+
+		if (!rkit::utils::TryParseFloat(value, params[0])
+			|| !rkit::utils::TryParseFloat(rate, params[1]))
+		{
+			rkit::log::Error(u8"Invalid param for roll node");
+			RKIT_THROW(rkit::ResultCode::kDataError);
+		}
+
+		return consumer.ProcessFOVNode(flags, timeLen, value, rate);
 	}
 
 	rkit::Result SceneParser::ParseScaleNodeLine(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<rkit::ByteStringSliceView> params, ISceneParserConsumer &consumer)
 	{
-		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
-	}
-
-	rkit::Result SceneParser::ParseNewEntCommand(SceneCommand &outCommand, rkit::ConstSpan<rkit::ByteStringSliceView> params)
-	{
-		outCommand.m_commandType = SceneCommandType::kNewEnt;
-		outCommand.m_union.m_newEnt.m_name = SceneCommand::WrapString(params[0]);
-
-		RKIT_RETURN_OK;
-	}
-
-
-	rkit::Result SceneParser::ParseUInt32Command(SceneCommand &outCommand, rkit::ConstSpan<rkit::ByteStringSliceView> params)
-	{
-		uint32_t value = 0;
-		if (!rkit::utils::TryParseInteger(value, params[0], 10))
+		if (params.Count() != 4)
 		{
-			rkit::log::Error(u8"Invalid value for 'lightsrc' command");
+			rkit::log::Error(u8"Invalid param count for scale node");
 			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
-		outCommand.m_union.m_uint = value;
+		rkit::math::Vec3 scale;
+		rkit::math::Vec3 delta;
+		uint32_t alwaysZero = 0;
 
-		RKIT_RETURN_OK;
+		if (!TryParseVec3(scale, params[0])
+			|| !TryParseVec3(delta, params[1])
+			|| !rkit::utils::TryParseInteger(alwaysZero, params[2], 10)
+			|| alwaysZero != 0)
+		{
+			rkit::log::Error(u8"Invalid param for scale node");
+			RKIT_THROW(rkit::ResultCode::kDataError);
+		}
+
+		return consumer.ProcessScaleNode(flags, timeLen, scale, delta);
 	}
 
-	rkit::Result SceneParser::ParseFloat3Command(SceneCommand &outCommand, rkit::ConstSpan<rkit::ByteStringSliceView> params)
+	rkit::Result SceneParser::TryParseCommandParams(bool &outSucceeded, rkit::Vector<SceneCommandParam> &paramList, const SceneCommandDef &cmdDef, rkit::ConstSpan<rkit::ByteStringSliceView> params)
 	{
-		rkit::StaticArray<float, 3> colorParts;
-		for (size_t i = 0; i < 3; i++)
+		const size_t numRequiredParams = cmdDef.m_paramCount - cmdDef.m_numOptionalParameters;
+
+		outSucceeded = false;
+		if (params.Count() > cmdDef.m_paramCount)
 		{
-			if (!rkit::utils::TryParseFloat(colorParts[i], params[i]))
+			RKIT_RETURN_OK;
+		}
+
+		auto parseLabel = [](rkit::Optional<Label> &outLabel, rkit::ByteStringSliceView paramStr) -> rkit::Result
 			{
-				rkit::log::Error(u8"Invalid value for float3 command");
-				RKIT_THROW(rkit::ResultCode::kDataError);
+				rkit::Vector<rkit::ByteStringSliceView> labelParts;
+				RKIT_CHECK(SplitString(labelParts, paramStr, ':'));
+				if (labelParts.Count() != 2)
+					RKIT_RETURN_OK;
+
+				uint32_t labelHigh = 0;
+				uint32_t labelLow = 0;
+				if (!rkit::utils::TryParseInteger(labelHigh, labelParts[0], 10)
+					|| !rkit::utils::TryParseInteger(labelLow, labelParts[1], 10)
+					|| !Label::IsValid(labelHigh, labelLow))
+				{
+					RKIT_RETURN_OK;
+				}
+
+				outLabel = Label(labelHigh, labelLow);
+
+				RKIT_RETURN_OK;
+			};
+
+		for (size_t paramIndex = 0; paramIndex < cmdDef.m_paramCount; paramIndex++)
+		{
+			const SceneCommandParamDef &paramDef = g_sceneCommandParamDefs[cmdDef.m_paramDefsOffset + paramIndex];
+
+			if (paramIndex >= params.Count())
+			{
+				if (paramIndex < numRequiredParams)
+				{
+					RKIT_RETURN_OK;
+				}
+
+				const size_t paramSize = SceneCommand::ParamCountForType(paramDef.m_paramType);
+
+				SceneCommandParam blankParam = {};
+				memset(&blankParam, 0, sizeof(blankParam));
+
+				for (size_t i = 0; i < paramSize; i++)
+				{
+					RKIT_CHECK(paramList.Append(blankParam));
+				}
+			}
+			else
+			{
+				const rkit::ByteStringSliceView paramStr = params[paramIndex];
+
+				switch (paramDef.m_paramType)
+				{
+				case SceneCommandParamType::UInt:
+					{
+						SceneCommandParam uintParam;
+						if (paramStr.Length() >= 3 && paramStr[0] == '0' && paramStr[1] == 'x')
+						{
+							if (!rkit::utils::TryParseInteger(uintParam.m_uint, paramStr.SubString(2), 16))
+								RKIT_RETURN_OK;
+						}
+						else
+						{
+							if (!rkit::utils::TryParseInteger(uintParam.m_uint, paramStr, 10))
+								RKIT_RETURN_OK;
+						}
+
+						RKIT_CHECK(paramList.Append(uintParam));
+					}
+					break;
+				case SceneCommandParamType::HexUInt:
+					{
+						SceneCommandParam uintParam;
+
+						if (!rkit::utils::TryParseInteger(uintParam.m_uint, paramStr, 16))
+							RKIT_RETURN_OK;
+
+						RKIT_CHECK(paramList.Append(uintParam));
+					}
+					break;
+				case SceneCommandParamType::Float:
+					{
+						SceneCommandParam floatParam;
+						if (!rkit::utils::TryParseFloat(floatParam.m_float, paramStr))
+							RKIT_RETURN_OK;
+
+						RKIT_CHECK(paramList.Append(floatParam));
+					}
+					break;
+				case SceneCommandParamType::EntityType:
+				case SceneCommandParamType::Str:
+					{
+						SceneCommandParam ptrParam;
+						SceneCommandParam sizeParam;
+
+						ptrParam.m_constPtr = paramStr.GetChars();
+						sizeParam.m_size = paramStr.Length();
+
+						RKIT_CHECK(paramList.Append(ptrParam));
+						RKIT_CHECK(paramList.Append(sizeParam));
+					}
+					break;
+				case SceneCommandParamType::Label:
+					{
+						SceneCommandParam uintParam;
+
+						rkit::Optional<Label> label;
+						RKIT_CHECK(parseLabel(label, paramStr));
+
+						if (!label.IsSet())
+							RKIT_RETURN_OK;
+
+						uintParam.m_uint = label.Get().RawValue();
+
+						RKIT_CHECK(paramList.Append(uintParam));
+					}
+					break;
+				case SceneCommandParamType::EntityID:
+					{
+						const rkit::ByteStringView prefixStr = rkit::AsciiStringView("PlayerChar").RemoveEncoding();
+
+						SceneCommandParam flagParam;
+						SceneCommandParam uintParam;
+
+						if (paramStr.StartsWith(prefixStr))
+						{
+							flagParam.m_bool = true;
+							if (!rkit::utils::TryParseInteger(uintParam.m_uint, paramStr.SubString(prefixStr.Length()), 10))
+							{
+								RKIT_RETURN_OK;
+							}
+						}
+						else
+						{
+							rkit::Optional<Label> label;
+							RKIT_CHECK(parseLabel(label, paramStr));
+
+							if (!label.IsSet())
+							{
+								RKIT_RETURN_OK;
+							}
+
+							flagParam.m_bool = false;
+							uintParam.m_uint = label.Get().RawValue();
+						}
+
+						RKIT_CHECK(paramList.Append(flagParam));
+						RKIT_CHECK(paramList.Append(uintParam));
+					}
+					break;
+				default:
+					RKIT_ASSERT(false);
+					RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+				}
 			}
 		}
 
-		outCommand.m_union.m_float3.m_v0 = colorParts[0];
-		outCommand.m_union.m_float3.m_v1 = colorParts[1];
-		outCommand.m_union.m_float3.m_v2 = colorParts[2];
-
-		RKIT_RETURN_OK;
-	}
-
-	rkit::Result SceneParser::ParseFloat4Command(SceneCommand &outCommand, rkit::ConstSpan<rkit::ByteStringSliceView> params)
-	{
-		rkit::StaticArray<float, 4> colorParts;
-		for (size_t i = 0; i < 4; i++)
-		{
-			if (!rkit::utils::TryParseFloat(colorParts[i], params[i]))
-			{
-				rkit::log::Error(u8"Invalid value for float4 command");
-				RKIT_THROW(rkit::ResultCode::kDataError);
-			}
-		}
-
-		outCommand.m_union.m_float4.m_v0 = colorParts[0];
-		outCommand.m_union.m_float4.m_v1 = colorParts[1];
-		outCommand.m_union.m_float4.m_v2 = colorParts[2];
-		outCommand.m_union.m_float4.m_v3 = colorParts[3];
-
+		outSucceeded = true;
 		RKIT_RETURN_OK;
 	}
 
@@ -741,16 +848,22 @@ namespace anox::buildsystem
 	{
 	}
 
-	rkit::Result SceneAnalyzer::ProcessCommandNode(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<SceneCommand> commands)
+	rkit::Result SceneAnalyzer::ProcessCommandNode(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<SceneCommand> commands, rkit::ConstSpan<SceneCommandParam> params)
 	{
 		for (const SceneCommand &cmd : commands)
 		{
-			switch (cmd.m_commandType)
+			size_t paramOffset = cmd.m_paramOffset;
+
+			const SceneCommandDef &cmdDef = g_sceneCommands[static_cast<size_t>(cmd.m_opcode)];
+			const rkit::ConstSpan<SceneCommandParamDef> paramDefs = rkit::ConstSpan<SceneCommandParamDef>(g_sceneCommandParamDefs + cmdDef.m_paramDefsOffset, cmdDef.m_paramCount);
+
+			for (const SceneCommandParamDef &paramDef : paramDefs)
 			{
-			case SceneCommandType::kNewEnt:
+				if (paramDef.m_paramType == SceneCommandParamType::EntityType)
 				{
-					uint32_t edefID = 0;;
-					const rkit::ByteStringSliceView entClass = SceneCommand::UnwrapString(cmd.m_union.m_newEnt.m_name);
+					uint32_t edefID = 0;
+					const rkit::ByteStringSliceView entClass(static_cast<const uint8_t *>(params[paramOffset].m_constPtr), params[paramOffset + 1].m_size);
+
 					if (!m_dict->FindEntityDef(entClass, edefID))
 					{
 						rkit::log::Error(u8"Unknown entity type");
@@ -762,9 +875,8 @@ namespace anox::buildsystem
 
 					RKIT_CHECK(m_feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kEntityDefNodeID, rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefIdentifier));
 				}
-				break;
-			default:
-				break;
+
+				paramOffset += SceneCommand::ParamCountForType(paramDef.m_paramType);
 			}
 		}
 

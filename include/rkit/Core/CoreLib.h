@@ -70,7 +70,7 @@ namespace rkit::text
 	// If decode fails, then the output contents are undefined.
 	// The output and input buffers must not overlap.
 	size_t RKIT_CORELIB_API ConvertText(void *outputChars, CharacterEncoding outEncoding, size_t outMaxChars, size_t &outCharsEmitted,
-		const void *inputChars, CharacterEncoding inEncoding, size_t inCharCount, UnknownCharBehavior unknownCharBehavior, uint32_t unknownReplacementChar);
+		const void *inputChars, CharacterEncoding inEncoding, size_t inCharCount, UnknownCharBehavior unknownCharBehavior, uint32_t unknownReplacementChar, bool inputMayBeInvalid);
 
 	void RKIT_CORELIB_API FormatUtf8String(IFormatStringWriter<Utf8Char_t> &writer, const Utf8Char_t *fmtChars, size_t numFmtChars, const FormatParameter<Utf8Char_t> *fmtParameters, size_t numFmtParameters);
 }

@@ -919,7 +919,7 @@ namespace rkit
 					if (chunk.Count() > 0)
 					{
 						const size_t amountConsumed = text::ConvertText(nullptr, TPathTraits::kEncoding, std::numeric_limits<size_t>::max(), convertedChunkSize,
-							chunk.Ptr(), kOtherEncoding, chunk.Count(), text::UnknownCharBehavior::kFail, 0);
+							chunk.Ptr(), kOtherEncoding, chunk.Count(), text::UnknownCharBehavior::kFail, 0, false);
 
 						if (!amountConsumed)
 							RKIT_THROW(ResultCode::kInvalidUnicode);
@@ -962,7 +962,7 @@ namespace rkit
 					if (chunk.Count() > 0)
 					{
 						const size_t amountConsumed = text::ConvertText(outChunkSpan.Ptr(), TPathTraits::kEncoding, outChunkSpan.Count(), convertedChunkSize,
-							chunk.Ptr(), kOtherEncoding, chunk.Count(), text::UnknownCharBehavior::kFail, 0);
+							chunk.Ptr(), kOtherEncoding, chunk.Count(), text::UnknownCharBehavior::kFail, 0, false);
 
 						if (!amountConsumed)
 							RKIT_THROW(ResultCode::kInvalidUnicode);

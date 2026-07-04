@@ -38,3 +38,5 @@ build/GameObjectReflector/obj/*
 build/GameObjectReflector/bin/*
 build/APECommandReflector/obj/*
 build/APECommandReflector/bin/*
+build/SceneCommandReflector/obj/*
+build/SceneCommandReflector/bin/*
