@@ -22,6 +22,7 @@
 #include "rkit/Core/Pair.h"
 
 #include "AnoxMaterialCompiler.h"
+#include "AnoxSceneCompiler.h"
 
 #include "APEExternMetadata.generated.inl"
 
@@ -1253,24 +1254,31 @@ namespace anox::buildsystem
 			data::ape::ResourceRef &rr = blob.m_resourceRefs[i];
 			const data::ape::IntermediateResourceRef &irr = blob.m_intermediateResourceRefs[i];
 
+			rkit::buildsystem::BuildFileLocation buildFileLocation = rkit::buildsystem::BuildFileLocation::kInvalid;
+			rkit::String pathStr = blob.m_tempStrings[irr.m_tempStrIndex.Get()];
 			if (irr.m_nodeNamespace.Get() == kAnoxNamespaceID && irr.m_nodeType.Get() == kRawFileNodeID)
 			{
 				// Raw file resource, copy directly from source
-				rkit::CIPath path;
-				RKIT_CHECK(path.Set(blob.m_tempStrings[irr.m_tempStrIndex.Get()]));
-
-				rkit::data::ContentID contentID;
-				RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kSourceDir, path, contentID));
-
-				uint32_t contentIDIndex = 0;
-				RKIT_CHECK(APECompilerHelper::IndexValue<rkit::data::ContentID>(contentIDIndex, contentIDToIndex, std::move(contentID)));
-
-				rr.m_contentIDIndex = contentIDIndex;
+				buildFileLocation = rkit::buildsystem::BuildFileLocation::kSourceDir;
+			}
+			else if (irr.m_nodeNamespace.Get() == kAnoxNamespaceID && irr.m_nodeType.Get() == kSceneNodeID)
+			{
+				buildFileLocation = rkit::buildsystem::BuildFileLocation::kIntermediateDir;
+				RKIT_CHECK(SceneCompilerBase::FormatOutputPath(pathStr, pathStr));
 			}
 			else
-			{
 				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
-			}
+
+			rkit::CIPath path;
+			RKIT_CHECK(path.Set(pathStr));
+
+			rkit::data::ContentID contentID;
+			RKIT_CHECK(feedback->IndexCAS(buildFileLocation, path, contentID));
+
+			uint32_t contentIDIndex = 0;
+			RKIT_CHECK(APECompilerHelper::IndexValue<rkit::data::ContentID>(contentIDIndex, contentIDToIndex, std::move(contentID)));
+
+			rr.m_contentIDIndex = contentIDIndex;
 		}
 
 		RKIT_CHECK(blob.m_materialContentIDs.Resize(contentIDToIndex.Count()));

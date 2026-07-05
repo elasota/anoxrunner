@@ -2863,6 +2863,7 @@ namespace rkit { namespace buildsystem
 
 		OSAbsPath contentBasePath = m_dataContentDir;
 		OSAbsPath contentPath;
+		OSAbsPath contentDebugSourcePath;
 
 		{
 			OSRelPath osRelPath;
@@ -2870,6 +2871,16 @@ namespace rkit { namespace buildsystem
 
 			contentPath = contentBasePath;
 			RKIT_CHECK(contentPath.Append(osRelPath));
+
+			{
+				rkit::String debugSourceFileName;
+				RKIT_CHECK(debugSourceFileName.Format(u8"{}.src", contentIDString.ToStringView()));
+
+				RKIT_CHECK(osRelPath.ConvertFrom(CIPathView(debugSourceFileName)));
+			}
+
+			contentDebugSourcePath = contentBasePath;
+			RKIT_CHECK(contentDebugSourcePath.Append(osRelPath));
 		}
 
 		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
@@ -2934,6 +2945,17 @@ namespace rkit { namespace buildsystem
 			inStream.Reset();
 
 			RKIT_CHECK(sysDriver.MoveFileFromAbsToAbs(succeeded_IGNORE, tempPath, contentPath, true, false));
+
+			{
+				rkit::UniquePtr<rkit::ISeekableWriteStream> debugSrcFile;
+				RKIT_CHECK(sysDriver.OpenFileWriteAbs(debugSrcFile, contentDebugSourcePath, true, false, true, true));
+
+				if (debugSrcFile.IsValid())
+				{
+					rkit::CIPathSliceView path = it.Value().m_path;
+					RKIT_CHECK(debugSrcFile->WriteAllSpan(path.ToStringSliceView().ToSpan()));
+				}
+			}
 		}
 
 		RKIT_RETURN_OK;

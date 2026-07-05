@@ -233,8 +233,6 @@ namespace anox { namespace buildsystem
 		static rkit::Result CompileMDA(rkit::CIPath &outputPath, UncompiledMDAData &mdaData, bool autoSkin, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 		static rkit::Result CompileMDASubmodels(UncompiledTriList &triList, rkit::Span<uint32_t> xyzToPointID);
 		static rkit::Result CompileMDASubmodel(bool &outEmittedAnything, UncompiledMDASubmodel &outSubmodel, UncompiledTriList &triList, rkit::Span<uint32_t> xyzToPointID, rkit::BoolVector &triEmitted);
-
-		static uint16_t CompressUV(uint32_t floatBits);
 	};
 
 	class AnoxMDACompiler final : public AnoxModelCompilerCommon, public AnoxMDACompilerBase
@@ -330,7 +328,7 @@ namespace anox { namespace buildsystem
 		struct CTCCompoundTriVert
 		{
 			uint16_t m_inPointIndex;
-			rkit::StaticArray<uint16_t, 2> m_compressedUV;
+			rkit::StaticArray<uint32_t, 2> m_uvBits;
 
 			bool operator==(const CTCCompoundTriVert &other) const;
 			bool operator!=(const CTCCompoundTriVert &other) const;
@@ -935,6 +933,8 @@ namespace anox { namespace buildsystem
 												pass.m_blendMode = data::MDABlendMode::kDisabled;
 											else if (TokenIs(token, "normal"))
 												pass.m_blendMode = data::MDABlendMode::kNormal;
+											else if (TokenIs(token, "multiply"))
+												pass.m_blendMode = data::MDABlendMode::kMultiply;
 											else
 											{
 												rkit::log::Error(u8"Unknown blendmode");
@@ -1985,7 +1985,7 @@ namespace anox { namespace buildsystem
 				triCompoundVert.m_inPointIndex = triVerts.m_verts[ptIndex].Get();
 
 				for (size_t axis = 0; axis < 2; axis++)
-					triCompoundVert.m_compressedUV[axis] = CompressUV(triTexCoords.m_texCoords[ptIndex].m_uvFloatBits[axis].GetBits());
+					triCompoundVert.m_uvBits[axis] = triTexCoords.m_texCoords[ptIndex].m_uvFloatBits[axis].GetBits();
 
 				const rkit::HashValue_t hashValue = rkit::utils::ComputeHash(0, &triCompoundVert, sizeof(triCompoundVert));
 
@@ -2021,8 +2021,8 @@ namespace anox { namespace buildsystem
 
 						data::MDAModelVert outVert = {};
 						outVert.m_pointID = inPointToOutPoint[inPointIndex];
-						outVert.m_texCoordU = compoundVert.m_compressedUV[0];
-						outVert.m_texCoordV = compoundVert.m_compressedUV[1];
+						outVert.m_texCoordU = rkit::endian::LittleFloat32_t::FromBits(compoundVert.m_uvBits[0]);
+						outVert.m_texCoordV = rkit::endian::LittleFloat32_t::FromBits(compoundVert.m_uvBits[1]);
 
 						RKIT_ASSERT(vertsEmitted < 0x10000u);
 						RKIT_CHECK(outVerts.Append(outVert));
@@ -2279,10 +2279,10 @@ namespace anox { namespace buildsystem
 		if (m_inPointIndex != other.m_inPointIndex)
 			return false;
 
-		if (m_compressedUV[0] != other.m_compressedUV[0])
+		if (m_uvBits[0] != other.m_uvBits[0])
 			return false;
 
-		if (m_compressedUV[1] != other.m_compressedUV[1])
+		if (m_uvBits[1] != other.m_uvBits[1])
 			return false;
 
 		return true;
@@ -3310,8 +3310,8 @@ namespace anox { namespace buildsystem
 					RKIT_CHECK(protoVertToVertIndex.SetPrehashed(hash, protoVert, vertIndex));
 
 					data::MDAModelVert mdaVert;
-					mdaVert.m_texCoordU = CompressUV(protoVert.m_uBits);
-					mdaVert.m_texCoordV = CompressUV(protoVert.m_vBits);
+					mdaVert.m_texCoordU = rkit::endian::LittleFloat32_t::FromBits(protoVert.m_uBits);
+					mdaVert.m_texCoordV = rkit::endian::LittleFloat32_t::FromBits(protoVert.m_vBits);
 					mdaVert.m_pointID = xyzToPointIndex[protoVert.m_xyzIndex];
 
 					RKIT_CHECK(outSubmodel.m_verts.Append(mdaVert));
@@ -3333,25 +3333,6 @@ namespace anox { namespace buildsystem
 		outEmittedAnything = emittedAnything;
 
 		RKIT_RETURN_OK;
-	}
-
-	uint16_t AnoxModelCompilerCommon::CompressUV(uint32_t floatBits)
-	{
-		float f = 0.f;
-		memcpy(&f, &floatBits, 4);
-
-		const float scale = 16384.0f;
-		const float bias = 32768.0f;
-		const float maxValue = 65535.0f;
-
-		float scaledF = f * scale + bias;
-
-		if (!(scaledF >= 0.f))
-			scaledF = 0.f;
-		else if (!(scaledF <= maxValue))
-			scaledF = maxValue;
-
-		return static_cast<uint16_t>(floorf(scaledF + 0.5f));
 	}
 
 	uint32_t AnoxMD2Compiler::GetVersion() const

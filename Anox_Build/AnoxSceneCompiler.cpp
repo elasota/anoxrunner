@@ -1,9 +1,11 @@
 #include "AnoxSceneCompiler.h"
 
 #include "rkit/Core/CoreLib.h"
+#include "rkit/Core/HashTable.h"
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/Optional.h"
 #include "rkit/Core/Stream.h"
+
 #include "rkit/Math/Vec.h"
 
 #include "rkit/Utilities/NumberParser.h"
@@ -15,7 +17,9 @@
 
 #include "SceneCommandsDefs.generated.inl"
 
+#include "anox/Data/Scene.h"
 #include "anox/Data/SceneCommandOpcodes.generated.h"
+#include "rkit/Data/ContentID.h"
 
 namespace anox::buildsystem
 {
@@ -110,6 +114,54 @@ namespace anox::buildsystem
 	private:
 		rkit::UniquePtr<UserEntityDictionaryBase> m_dict;
 		rkit::buildsystem::IDependencyNodeCompilerFeedback *m_feedback;
+	};
+
+
+	class SceneCompilerConsumer : public ISceneParserConsumer
+	{
+	public:
+		explicit SceneCompilerConsumer(rkit::UniquePtr<UserEntityDictionaryBase> dict, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+
+		rkit::Result ProcessCineID(uint32_t id) override;
+		rkit::Result ProcessInterrupt() override;
+		rkit::Result ProcessScript(rkit::ByteStringSliceView name, uint32_t version, uint32_t blockCount) override;
+		rkit::Result ProcessBlock(rkit::ByteStringSliceView name, uint32_t flags) override;
+		rkit::Result ProcessPath(uint32_t order, rkit::ByteStringSliceView name, uint32_t type, uint32_t flags, uint32_t timeOffs, uint32_t maxLen, uint32_t color, uint32_t count) override;
+		rkit::Result ProcessCubicNode(uint32_t flags, uint32_t timeLen, rkit::math::Vec3 position, rkit::math::Vec3 velocityVector, uint32_t relativeMode) override;
+		rkit::Result ProcessFocusNode(uint32_t flags, uint32_t timeLen, uint32_t focusTarget, rkit::ByteStringSliceView name) override;
+		rkit::Result ProcessCommandNode(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<SceneCommand> commands, rkit::ConstSpan<SceneCommandParam> params) override;
+		rkit::Result ProcessScaleNode(uint32_t flags, uint32_t timeLen, rkit::math::Vec3 scale, rkit::math::Vec3 delta) override;
+		rkit::Result ProcessRollNode(uint32_t flags, uint32_t timeLen, float value, float rate) override;
+		rkit::Result ProcessFOVNode(uint32_t flags, uint32_t timeLen, float value, float rate) override;
+
+		rkit::Result RunExport(rkit::IWriteStream &stream);
+
+	private:
+		static rkit::Result NormalizePathType(data::ScenePathType &outType, uint32_t inType);
+		static void CopyVec3(rkit::endian::LittleFloat32_t(&outVec)[3], rkit::math::Vec3 inVec);
+
+		rkit::Result IndexString(uint32_t &outIndex, rkit::ByteStringSliceView str);
+		rkit::Result ProcessCommand(const SceneCommand &cmd, rkit::ConstSpan<SceneCommandParam> params);
+
+		rkit::Result AddNode(data::ScenePathType type, uint32_t flags, uint32_t timeLen);
+
+		rkit::UniquePtr<UserEntityDictionaryBase> m_dict;
+		rkit::buildsystem::IDependencyNodeCompilerFeedback *m_feedback;
+
+		rkit::HashMap<rkit::ByteString, uint32_t> m_strings;
+
+		data::SceneHeader m_header = {};
+		rkit::Vector<data::SceneNodeCommon> m_common;
+		rkit::Vector<data::SceneCubicNode> m_cubic;
+		rkit::Vector<data::SceneFocusNode> m_focus;
+		rkit::Vector<data::SceneCommandNode> m_cmd;
+		rkit::Vector<data::SceneScaleNode> m_scale;
+		rkit::Vector<data::SceneRollNode> m_roll;
+		rkit::Vector<data::SceneFOVNode> m_fov;
+		rkit::Vector<data::ScenePath> m_paths;
+		rkit::Vector<data::SceneBlock> m_blocks;
+		rkit::Vector<data::SceneCommandOpcode> m_cmdOpcodes;
+		rkit::Vector<rkit::endian::LittleUInt32_t> m_cmdParamDWords;
 	};
 
 	class SceneCompiler : public SceneCompilerBase
@@ -453,6 +505,9 @@ namespace anox::buildsystem
 
 		for (rkit::ByteStringSliceView commandStr : commandStrs)
 		{
+			if (commandStr.Length() == 0)
+				continue;
+
 			rkit::Optional<uint32_t> eqPos;
 			for (size_t i = 0; i < commandStr.Length(); i++)
 			{
@@ -500,7 +555,11 @@ namespace anox::buildsystem
 					bool succeeded = false;
 					size_t paramStart = paramList.Count();
 
-					if (commandParams.Count() <= expectedArgCount && commandParams.Count() >= expectedArgCount - numOptionalArgs)
+					bool isTruncated = false;
+
+					if (commandParams.Count() > 0 && commandParams[commandParams.Count() - 1].Length() == 0)
+						isTruncated = true;
+					else if (commandParams.Count() <= expectedArgCount && commandParams.Count() >= expectedArgCount - numOptionalArgs)
 					{
 						cmd.m_opcode = static_cast<data::SceneCommandOpcode>(opcodeIndex);
 
@@ -509,12 +568,13 @@ namespace anox::buildsystem
 
 					if (succeeded)
 					{
+						cmd.m_paramOffset = paramStart;
 						RKIT_CHECK(commands.Append(cmd));
 					}
 					else
 					{
 						paramList.ShrinkToSize(paramStart);
-						if (!def.m_mayFail)
+						if (!def.m_mayFail || !isTruncated)
 						{
 							rkit::log::Error(u8"Command was malformed");
 							RKIT_THROW(rkit::ResultCode::kDataError);
@@ -731,7 +791,7 @@ namespace anox::buildsystem
 						SceneCommandParam flagParam;
 						SceneCommandParam uintParam;
 
-						if (paramStr.StartsWith(prefixStr))
+						if (paramStr.StartsWithNoCase(prefixStr))
 						{
 							flagParam.m_bool = true;
 							if (!rkit::utils::TryParseInteger(uintParam.m_uint, paramStr.SubString(prefixStr.Length()), 10))
@@ -883,6 +943,378 @@ namespace anox::buildsystem
 		RKIT_RETURN_OK;
 	}
 
+	SceneCompilerConsumer::SceneCompilerConsumer(rkit::UniquePtr<UserEntityDictionaryBase> dict, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+		: m_dict(std::move(dict))
+		, m_feedback(feedback)
+	{
+		m_header.m_magic = data::SceneHeader::kExpectedMagic;
+	}
+
+	rkit::Result SceneCompilerConsumer::ProcessCineID(uint32_t id)
+	{
+		m_header.m_cineID = id;
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SceneCompilerConsumer::ProcessInterrupt()
+	{
+		m_header.m_isInterrupt = true;
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SceneCompilerConsumer::ProcessScript(rkit::ByteStringSliceView name, uint32_t version, uint32_t blockCount)
+	{
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SceneCompilerConsumer::ProcessBlock(rkit::ByteStringSliceView name, uint32_t flags)
+	{
+		data::SceneBlock block;
+		block.m_numPaths = 0;
+		block.m_flags = flags;
+
+		RKIT_CHECK(m_blocks.Append(block));
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SceneCompilerConsumer::ProcessPath(uint32_t order, rkit::ByteStringSliceView name, uint32_t type, uint32_t flags, uint32_t timeOffs, uint32_t maxLen, uint32_t color, uint32_t count)
+	{
+		if (m_blocks.Count() == 0)
+			RKIT_THROW(rkit::ResultCode::kDataError);
+
+		data::SceneBlock &lastBlock = m_blocks[m_blocks.Count() - 1];
+		lastBlock.m_numPaths = lastBlock.m_numPaths.Get() + 1;
+
+		data::ScenePathType pathType = {};
+		RKIT_CHECK(NormalizePathType(pathType, type));
+
+		data::ScenePath path = {};
+		path.m_numNodes = 0;
+		path.m_timeOffs = timeOffs;
+		path.m_maxLen = maxLen;
+
+		RKIT_CHECK(m_paths.Append(path));
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SceneCompilerConsumer::ProcessCubicNode(uint32_t flags, uint32_t timeLen, rkit::math::Vec3 position, rkit::math::Vec3 velocityVector, uint32_t relativeMode)
+	{
+		RKIT_CHECK(AddNode(data::ScenePathType::kCubic, flags, timeLen));
+
+		data::SceneCubicNode node = {};
+		CopyVec3(node.m_position, position);
+		CopyVec3(node.m_velocity, velocityVector);
+		node.m_relativeMode = relativeMode;
+
+		RKIT_CHECK(m_cubic.Append(node));
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SceneCompilerConsumer::ProcessFocusNode(uint32_t flags, uint32_t timeLen, uint32_t focusTarget, rkit::ByteStringSliceView name)
+	{
+		RKIT_CHECK(AddNode(data::ScenePathType::kFocus, flags, timeLen));
+
+		data::SceneFocusNode node = {};
+		node.m_focusTarget = focusTarget;
+
+		RKIT_CHECK(m_focus.Append(node));
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SceneCompilerConsumer::ProcessCommandNode(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<SceneCommand> commands, rkit::ConstSpan<SceneCommandParam> params)
+	{
+		RKIT_CHECK(AddNode(data::ScenePathType::kCommand, flags, timeLen));
+
+		const size_t prevDWordCount = m_cmdParamDWords.Count();
+		const size_t prevCmds = m_cmdOpcodes.Count();
+
+		for (const SceneCommand &cmd : commands)
+		{
+			RKIT_CHECK(ProcessCommand(cmd, params));
+		}
+
+		const size_t numCmds = m_cmdOpcodes.Count() - prevCmds;
+		const size_t numParamDWords = m_cmdParamDWords.Count() - prevDWordCount;
+
+		if (numCmds > std::numeric_limits<uint32_t>::max() || numParamDWords > std::numeric_limits<uint32_t>::max())
+			RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
+
+		data::SceneCommandNode node = {};
+		node.m_numCommands = static_cast<uint32_t>(numCmds);
+		node.m_numParamDWords = static_cast<uint32_t>(numParamDWords);
+
+		RKIT_CHECK(m_cmd.Append(node));
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SceneCompilerConsumer::ProcessScaleNode(uint32_t flags, uint32_t timeLen, rkit::math::Vec3 scale, rkit::math::Vec3 delta)
+	{
+		RKIT_CHECK(AddNode(data::ScenePathType::kScale, flags, timeLen));
+
+		data::SceneScaleNode node = {};
+		CopyVec3(node.m_scale, scale);
+		CopyVec3(node.m_delta, delta);
+
+		RKIT_CHECK(m_scale.Append(node));
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SceneCompilerConsumer::ProcessRollNode(uint32_t flags, uint32_t timeLen, float value, float rate)
+	{
+		RKIT_CHECK(AddNode(data::ScenePathType::kRoll, flags, timeLen));
+
+		data::SceneRollNode node = {};
+		node.m_value = value;
+		node.m_rate = rate;
+
+		RKIT_CHECK(m_roll.Append(node));
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SceneCompilerConsumer::ProcessFOVNode(uint32_t flags, uint32_t timeLen, float value, float rate)
+	{
+		RKIT_CHECK(AddNode(data::ScenePathType::kFOV, flags, timeLen));
+
+		data::SceneFOVNode node = {};
+		node.m_rate = value;
+		node.m_rate = rate;
+
+		RKIT_CHECK(m_fov.Append(node));
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SceneCompilerConsumer::RunExport(rkit::IWriteStream &stream)
+	{
+		rkit::Vector<rkit::ByteString> strings;
+		RKIT_CHECK(strings.Resize(m_strings.Count()));
+
+		for (const rkit::HashMapKeyValueView<rkit::ByteString, const uint32_t> &kv : m_strings)
+			strings[kv.Value()] = kv.Key();
+
+		rkit::Vector<rkit::endian::LittleUInt32_t> stringLengths;
+		RKIT_CHECK(stringLengths.Resize(strings.Count()));
+
+		auto processOne = [](rkit::endian::LittleUInt32_t &outLength, const rkit::ByteString &inStr) -> rkit::Result
+			{
+				if (inStr.Length() > std::numeric_limits<uint32_t>::max())
+					RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
+
+				outLength = static_cast<uint32_t>(inStr.Length());
+
+				RKIT_RETURN_OK;
+			};
+
+		RKIT_CHECK(rkit::CheckedProcessParallelSpans(stringLengths.ToSpan(), strings.ToSpan(), processOne));
+
+		m_header.m_numStrings = static_cast<uint32_t>(strings.Count());
+
+		RKIT_CHECK(stream.WriteAllSpan(stringLengths.ToSpan()));
+
+		for (const rkit::ByteString &str : strings)
+		{
+			RKIT_CHECK(stream.WriteAllSpan(str.ToSpan()));
+		}
+
+		RKIT_CHECK(stream.WriteAllSpan(m_blocks.ToSpan()));
+		RKIT_CHECK(stream.WriteAllSpan(m_paths.ToSpan()));
+		RKIT_CHECK(stream.WriteAllSpan(m_common.ToSpan()));
+		RKIT_CHECK(stream.WriteAllSpan(m_cubic.ToSpan()));
+		RKIT_CHECK(stream.WriteAllSpan(m_focus.ToSpan()));
+		RKIT_CHECK(stream.WriteAllSpan(m_cmd.ToSpan()));
+		RKIT_CHECK(stream.WriteAllSpan(m_scale.ToSpan()));
+		RKIT_CHECK(stream.WriteAllSpan(m_roll.ToSpan()));
+		RKIT_CHECK(stream.WriteAllSpan(m_scale.ToSpan()));
+		RKIT_CHECK(stream.WriteAllSpan(m_cmdOpcodes.ToSpan()));
+		RKIT_CHECK(stream.WriteAllSpan(m_cmdParamDWords.ToSpan()));
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SceneCompilerConsumer::NormalizePathType(data::ScenePathType &outType, uint32_t inType)
+	{
+		switch (inType)
+		{
+		case 2:
+			outType = data::ScenePathType::kCubic;
+			RKIT_RETURN_OK;
+		case 3:
+			outType = data::ScenePathType::kRoll;
+			RKIT_RETURN_OK;
+		case 4:
+			outType = data::ScenePathType::kCommand;
+			RKIT_RETURN_OK;
+		case 6:
+			outType = data::ScenePathType::kFocus;
+			RKIT_RETURN_OK;
+		case 7:
+			outType = data::ScenePathType::kFOV;
+			RKIT_RETURN_OK;
+		case 8:
+			outType = data::ScenePathType::kScale;
+			RKIT_RETURN_OK;
+		default:
+			RKIT_THROW(rkit::ResultCode::kInternalError);
+		}
+	}
+
+	void SceneCompilerConsumer::CopyVec3(rkit::endian::LittleFloat32_t(&outVec)[3], rkit::math::Vec3 inVec)
+	{
+		outVec[0] = inVec[0];
+		outVec[1] = inVec[1];
+		outVec[2] = inVec[2];
+	}
+
+	rkit::Result SceneCompilerConsumer::IndexString(uint32_t &outIndex, rkit::ByteStringSliceView strView)
+	{
+		const rkit::HashValue_t hashValue = rkit::Hasher<rkit::ByteStringSliceView>::ComputeHash(0, strView);
+
+		uint32_t index = 0;
+		rkit::HashMap<rkit::ByteString, uint32_t>::ConstIterator_t it = m_strings.FindPrehashed(hashValue, strView);
+		if (it == m_strings.end())
+		{
+			if (m_strings.Count() == std::numeric_limits<uint32_t>::max())
+				RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
+
+			index = static_cast<uint32_t>(m_strings.Count());
+
+			rkit::ByteString bstr;
+			RKIT_CHECK(bstr.Set(strView));
+
+			RKIT_CHECK(m_strings.SetPrehashed(hashValue, std::move(bstr), index));
+		}
+		else
+			index = it.Value();
+
+		outIndex = index;
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SceneCompilerConsumer::ProcessCommand(const SceneCommand &cmd, rkit::ConstSpan<SceneCommandParam> params)
+	{
+		const SceneCommandDef &def = g_sceneCommands[static_cast<size_t>(cmd.m_opcode)];
+
+		const SceneCommandParamDef *paramDefs = g_sceneCommandParamDefs + def.m_paramDefsOffset;
+
+		size_t inParamIndex = cmd.m_paramOffset;
+		for (size_t i = 0; i < def.m_paramCount; i++)
+		{
+			const SceneCommandParamDef &paramDef = paramDefs[i];
+
+			switch (paramDef.m_paramType)
+			{
+			case SceneCommandParamType::UInt:
+			case SceneCommandParamType::Label:
+			case SceneCommandParamType::HexUInt:
+				RKIT_CHECK(m_cmdParamDWords.Append(rkit::endian::LittleUInt32_t(params[inParamIndex].m_uint)));
+				break;
+			case SceneCommandParamType::Float:
+				{
+					uint32_t bits = 0;
+					memcpy(&bits, &params[inParamIndex].m_float, 4);
+					RKIT_CHECK(m_cmdParamDWords.Append(rkit::endian::LittleUInt32_t(bits)));
+				}
+				break;
+			case SceneCommandParamType::Str:
+				{
+					const rkit::ByteStringSliceView strView(static_cast<const uint8_t *>(params[inParamIndex].m_constPtr), params[inParamIndex + 1].m_size);
+
+					uint32_t index = 0;
+					RKIT_CHECK(IndexString(index, strView));
+
+					RKIT_CHECK(m_cmdParamDWords.Append(rkit::endian::LittleUInt32_t(index)));
+				}
+				break;
+			case SceneCommandParamType::EntityID:
+				{
+					const bool isPlayerChar = params[inParamIndex].m_bool;
+					uint32_t eid = params[inParamIndex + 1].m_uint;
+
+					if (eid & 0x80000000u)
+						RKIT_THROW(rkit::ResultCode::kDataError);
+
+					eid <<= 1;
+					if (isPlayerChar)
+						eid |= 1;
+
+					RKIT_CHECK(m_cmdParamDWords.Append(rkit::endian::LittleUInt32_t(eid)));
+				}
+				break;
+			case SceneCommandParamType::EntityType:
+				{
+					uint32_t edefID = 0;
+					const rkit::ByteStringSliceView entClass(static_cast<const uint8_t *>(params[inParamIndex].m_constPtr), params[inParamIndex + 1].m_size);
+
+					if (!m_dict->FindEntityDef(entClass, edefID))
+					{
+						rkit::log::Error(u8"Unknown entity type");
+						RKIT_THROW(rkit::ResultCode::kDataError);
+					}
+
+					rkit::String edefIdentifier;
+					RKIT_CHECK(EntityDefCompilerBase::FormatEDef(edefIdentifier, edefID));
+
+					rkit::CIPath edefPath;
+					RKIT_CHECK(edefPath.Set(edefIdentifier));
+
+					rkit::data::ContentID contentID;
+					RKIT_CHECK(m_feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefPath, contentID));
+
+					const size_t numDWords = sizeof(contentID) / 4;
+					for (size_t i = 0; i < numDWords; i++)
+					{
+						rkit::endian::LittleUInt32_t dword;
+						memcpy(&dword, reinterpret_cast<const uint8_t *>(&contentID) + i * 4, 4);
+						RKIT_CHECK(m_cmdParamDWords.Append(dword));
+					}
+				}
+				break;
+			default:
+				RKIT_ASSERT(false);
+				RKIT_THROW(rkit::ResultCode::kInternalError);
+			}
+
+
+			inParamIndex += SceneCommand::ParamCountForType(paramDef.m_paramType);
+		}
+
+		RKIT_CHECK(m_cmdOpcodes.Append(cmd.m_opcode));
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SceneCompilerConsumer::AddNode(data::ScenePathType type, uint32_t flags, uint32_t timeLen)
+	{
+		rkit::endian::LittleUInt32_t &nodeCounter = m_header.m_nodeCounts[static_cast<size_t>(type)];
+
+		if (nodeCounter.Get() == std::numeric_limits<uint32_t>::max())
+			RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
+
+		if (m_paths.Count() == 0)
+			RKIT_THROW(rkit::ResultCode::kDataError);
+
+		data::ScenePath &lastPath = m_paths[m_paths.Count() - 1];
+		lastPath.m_numNodes = lastPath.m_numNodes.Get() + 1;
+
+		nodeCounter = nodeCounter.Get() + 1;
+
+		data::SceneNodeCommon common = {};
+		common.m_flags = flags;
+		common.m_timeLen = timeLen;
+
+		RKIT_CHECK(m_common.Append(common));
+
+		RKIT_RETURN_OK;
+	}
+
 	rkit::Result SceneCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		rkit::Vector<uint8_t> script;
@@ -901,7 +1333,29 @@ namespace anox::buildsystem
 
 	rkit::Result SceneCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
-		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+		rkit::Vector<uint8_t> script;
+		RKIT_CHECK(ReadScriptInput(script, depsNode, feedback));
+
+		rkit::UniquePtr<UserEntityDictionaryBase> dict;
+		RKIT_CHECK(EntityDefCompilerBase::LoadUserEntityDictionary(dict, feedback));
+
+		SceneCompilerConsumer compiler(std::move(dict), feedback);
+
+		SceneParser parser;
+		RKIT_CHECK(parser.ParseSceneFile(script.ToSpan(), compiler));
+
+		rkit::String outPathStr;
+		RKIT_CHECK(SceneCompilerBase::FormatOutputPath(outPathStr, depsNode->GetIdentifier()));
+
+		rkit::CIPath outPath;
+		RKIT_CHECK(outPath.Set(outPathStr));
+
+		rkit::UniquePtr<rkit::ISeekableReadWriteStream> stream;
+		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, stream));
+
+		RKIT_CHECK(compiler.RunExport(*stream));
+
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result SceneCompiler::ReadScriptInput(rkit::Vector<uint8_t> &outVector, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
@@ -926,6 +1380,11 @@ namespace anox::buildsystem
 	uint32_t SceneCompiler::GetVersion() const
 	{
 		return 1;
+	}
+
+	rkit::Result SceneCompilerBase::FormatOutputPath(rkit::String &outPath, rkit::StringSliceView identifier)
+	{
+		return outPath.Format(u8"ax_scn/{}", identifier);
 	}
 
 	rkit::Result SceneCompilerBase::Create(rkit::UniquePtr<SceneCompilerBase> &outCompiler)

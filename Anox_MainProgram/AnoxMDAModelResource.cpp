@@ -802,7 +802,7 @@ namespace anox
 
 	void AnoxMDAModelLoaderInfo::BulkConvertVerts(const rkit::Span<data::MDAModelVert> &verts, uint32_t maxPointIndex)
 	{
-		static_assert(sizeof(data::MDAModelVert) == 8, "Wrong vert size");
+		static_assert(sizeof(data::MDAModelVert) == 12, "Wrong vert size");
 		static_assert(offsetof(data::MDAModelVert, m_pointID) == 0, "Wrong point ID offset");
 		static_assert(sizeof(data::MDAModelVert::m_pointID) == 4, "Wrong tri size");
 
@@ -830,12 +830,12 @@ namespace anox
 			data::MDAModelVert &modelVert = srcVertsPtr[i];
 
 			const uint32_t pointID = rkit::Min(modelVert.m_pointID.Get(), maxPointIndex);
-			const uint16_t compressedU = modelVert.m_texCoordU.Get();
-			const uint16_t compressedV = modelVert.m_texCoordV.Get();
+			const uint32_t uBits = modelVert.m_texCoordU.GetBits();
+			const uint32_t vBits = modelVert.m_texCoordV.GetBits();
 
 			memcpy(&modelVert.m_pointID, &pointID, sizeof(pointID));
-			memcpy(&modelVert.m_texCoordU, &compressedU, sizeof(compressedU));
-			memcpy(&modelVert.m_texCoordV, &compressedV, sizeof(compressedV));
+			memcpy(&modelVert.m_texCoordU, &uBits, sizeof(uBits));
+			memcpy(&modelVert.m_texCoordV, &vBits, sizeof(vBits));
 		}
 	}
 

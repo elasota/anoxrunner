@@ -185,8 +185,8 @@ namespace anox { namespace data
 	struct MDAModelVert
 	{
 		rkit::endian::LittleUInt32_t m_pointID;
-		rkit::endian::LittleUInt16_t m_texCoordU;
-		rkit::endian::LittleUInt16_t m_texCoordV;
+		rkit::endian::LittleFloat32_t m_texCoordU;
+		rkit::endian::LittleFloat32_t m_texCoordV;
 	};
 
 	struct MDASkeletalModelBoneIndex
