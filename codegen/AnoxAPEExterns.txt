@@ -148,7 +148,7 @@ LetterBox uint(param0) uint(param1) uint(param2) stub
 light_setambientcolor uint(param0) uint(param1) uint(param2) stub
 light_setambientdir uint(param0) uint(param1) uint(param2) stub
 loadmusicseg musicsegresource(seg) stub
-loopscene sceneresource(scene) stub
+loopscene sceneresource(scene)
 playscene sceneresource(scene) optional uint(timeoffset) label(sequencecallback) str(srcrelname) str(targetrelname) obj(srcrelobject) obj(targetrelobject) bool(lerpafter) bool(hidecursor) stub
 stopscene sceneresource(scene) stub
 loopsound soundresource(sound) optional uint(handle) uint(param0) uint(param1) stub

@@ -18,6 +18,7 @@
 #include "GameObjects/GlobalSingleton.h"
 
 #include "AllWorldObjects.h"
+#include "SceneManager.h"
 #include "ScriptEnvironment.h"
 #include "ScriptManager.h"
 #include "MusicManager.h"
@@ -49,6 +50,7 @@ namespace anox::game
 		ScriptManager &m_scriptManager;
 		rkit::UniquePtr<ScriptEnvironment> m_scriptEnvironment;
 		rkit::UniquePtr<MusicManager> m_musicManager;
+		rkit::UniquePtr<SceneManager> m_sceneManager;
 
 		rkit::RCPtr<WorldObjectProxy> m_firstObj;
 		WorldObjectProxy* m_lastObject = nullptr;
@@ -71,6 +73,7 @@ namespace anox::game
 	{
 		RKIT_CHECK(m_scriptManager.CreateScriptEnvironment(m_scriptEnvironment));
 		RKIT_CHECK(MusicManager::Create(m_musicManager));
+		RKIT_CHECK(SceneManager::Create(m_sceneManager));
 
 		RKIT_RETURN_OK;
 	}
@@ -221,6 +224,11 @@ namespace anox::game
 	MusicManager &World::GetMusicManager() const
 	{
 		return *Impl().m_musicManager;
+	}
+
+	SceneManager &World::GetSceneManager() const
+	{
+		return *Impl().m_sceneManager;
 	}
 }
 

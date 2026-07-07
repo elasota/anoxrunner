@@ -17,6 +17,13 @@ namespace anox::data
 		kCount,
 	};
 
+	enum class SceneContentRefType : uint8_t
+	{
+		kEntityType,
+
+		kCount
+	};
+
 	struct SceneHeader
 	{
 		static constexpr uint32_t kExpectedMagic = RKIT_FOURCC('S', 'C', 'E', 'N');
@@ -28,6 +35,7 @@ namespace anox::data
 		rkit::endian::LittleUInt32_t m_numBlocks;
 		rkit::endian::LittleUInt32_t m_numPaths;
 		rkit::endian::LittleUInt32_t m_nodeCounts[static_cast<size_t>(ScenePathType::kCount)];
+		rkit::endian::LittleUInt32_t m_contentCounts[static_cast<size_t>(SceneContentRefType::kCount)];
 
 		// rkit::endian::LittleUInt32_t m_stringLengths[m_numStrings]
 		// uint8_t m_stringChars[sum(m_stringLengths)]
@@ -42,6 +50,7 @@ namespace anox::data
 		// data::SceneFOVNode m_scale[m_nodeCounts[ScenePathType::kFOV]]
 		// data::SceneCommandOpcode m_cmdOpcodes[sum(m_cmd[...].m_numCommands)]
 		// rkit::endian::LittleUInt32_t m_cmdParamDWords[sum(m_cmd[...].m_numParamDWords)]
+		// rkit::data::ContentID m_contentIDs[sum(m_contentCounts)]
 	};
 
 	struct SceneNodeCommon

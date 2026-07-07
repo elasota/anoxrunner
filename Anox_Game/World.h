@@ -34,6 +34,7 @@ namespace anox::game
 	class ScriptManager;
 	struct WorldObjectProxy;
 	class MusicManager;
+	class SceneManager;
 
 	class World final : public rkit::Opaque<WorldImpl>
 	{
@@ -52,6 +53,7 @@ namespace anox::game
 		ScriptManager &GetScriptManager() const;
 		ScriptEnvironment &GetScriptEnvironment() const;
 		MusicManager &GetMusicManager() const;
+		SceneManager &GetSceneManager() const;
 
 		static rkit::Result Create(rkit::UniquePtr<World> &outWorld, ScriptManager &scriptManager);
 

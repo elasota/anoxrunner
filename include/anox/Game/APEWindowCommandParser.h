@@ -26,7 +26,7 @@ namespace anox::game
 		static void ParseStatic(const uint8_t *&byteStream, uint32_t &value);
 		static void ParseStatic(const uint8_t *&byteStream, uint16_t &value);
 		static void ParseStatic(const uint8_t *&byteStream, ScriptExprValue &value);
-		static void ParseStatic(const uint8_t *&byteStream, ScriptMaterialReference &value);
+		static void ParseStatic(const uint8_t *&byteStream, ScriptResourceReference &value);
 
 		rkit::Result ParseInstanced(const uint8_t *&byteStream, rkit::ByteStringView &value);
 		rkit::Result ParseInstanced(const uint8_t *&byteStream, rkit::Optional<rkit::ByteStringView> &value);
@@ -66,10 +66,10 @@ namespace anox::game
 		value.m_index = exprValue.m_index.Get();
 	}
 
-	inline void APEWindowCommandParser::ParseStatic(const uint8_t *&byteStream, ScriptMaterialReference &value)
+	inline void APEWindowCommandParser::ParseStatic(const uint8_t *&byteStream, ScriptResourceReference &value)
 	{
-		const data::ape::MaterialReference &exprValue = *reinterpret_cast<const data::ape::MaterialReference *>(byteStream);
-		byteStream += sizeof(data::ape::MaterialReference);
+		const data::ape::ResourceReference &exprValue = *reinterpret_cast<const data::ape::ResourceReference *>(byteStream);
+		byteStream += sizeof(data::ape::ResourceReference);
 
 		value.m_refType = exprValue.m_refType;
 		value.m_index = exprValue.m_index.Get();

@@ -19,6 +19,7 @@
 
 #include "anox/Data/Scene.h"
 #include "anox/Data/SceneCommandOpcodes.generated.h"
+
 #include "rkit/Data/ContentID.h"
 
 namespace anox::buildsystem
@@ -141,6 +142,7 @@ namespace anox::buildsystem
 		static void CopyVec3(rkit::endian::LittleFloat32_t(&outVec)[3], rkit::math::Vec3 inVec);
 
 		rkit::Result IndexString(uint32_t &outIndex, rkit::ByteStringSliceView str);
+		rkit::Result IndexContentRef(uint32_t &outIndex, data::SceneContentRefType refType, const rkit::data::ContentID &cid);
 		rkit::Result ProcessCommand(const SceneCommand &cmd, rkit::ConstSpan<SceneCommandParam> params);
 
 		rkit::Result AddNode(data::ScenePathType type, uint32_t flags, uint32_t timeLen);
@@ -149,6 +151,7 @@ namespace anox::buildsystem
 		rkit::buildsystem::IDependencyNodeCompilerFeedback *m_feedback;
 
 		rkit::HashMap<rkit::ByteString, uint32_t> m_strings;
+		rkit::StaticArray<rkit::HashMap<rkit::data::ContentID, uint32_t>, static_cast<size_t>(data::SceneContentRefType::kCount)> m_contentIDs;
 
 		data::SceneHeader m_header = {};
 		rkit::Vector<data::SceneNodeCommon> m_common;
@@ -1116,6 +1119,12 @@ namespace anox::buildsystem
 
 		m_header.m_numStrings = static_cast<uint32_t>(strings.Count());
 
+		for (size_t contentTypeIndex = 0; contentTypeIndex < static_cast<size_t>(data::SceneContentRefType::kCount); contentTypeIndex++)
+			m_header.m_contentCounts[contentTypeIndex] = static_cast<uint32_t>(m_contentIDs[contentTypeIndex].Count());
+
+		// Write everything
+		RKIT_CHECK(stream.WriteOneBinary(m_header));
+
 		RKIT_CHECK(stream.WriteAllSpan(stringLengths.ToSpan()));
 
 		for (const rkit::ByteString &str : strings)
@@ -1134,6 +1143,20 @@ namespace anox::buildsystem
 		RKIT_CHECK(stream.WriteAllSpan(m_scale.ToSpan()));
 		RKIT_CHECK(stream.WriteAllSpan(m_cmdOpcodes.ToSpan()));
 		RKIT_CHECK(stream.WriteAllSpan(m_cmdParamDWords.ToSpan()));
+
+		for (size_t contentTypeIndex = 0; contentTypeIndex < static_cast<size_t>(data::SceneContentRefType::kCount); contentTypeIndex++)
+		{
+			const rkit::HashMap<rkit::data::ContentID, uint32_t> &map = m_contentIDs[contentTypeIndex];
+
+			rkit::Vector<rkit::data::ContentID> contentIDs;
+			RKIT_CHECK(contentIDs.Resize(map.Count()));
+
+			for (const rkit::HashMapKeyValueView<rkit::data::ContentID, const uint32_t> &kv : map)
+				contentIDs[kv.Value()] = kv.Key();
+
+			RKIT_CHECK(stream.WriteAllSpan(contentIDs.ToSpan()));
+		}
+
 
 		RKIT_RETURN_OK;
 	}
@@ -1189,6 +1212,30 @@ namespace anox::buildsystem
 			RKIT_CHECK(bstr.Set(strView));
 
 			RKIT_CHECK(m_strings.SetPrehashed(hashValue, std::move(bstr), index));
+		}
+		else
+			index = it.Value();
+
+		outIndex = index;
+
+		RKIT_RETURN_OK;
+	}
+
+	rkit::Result SceneCompilerConsumer::IndexContentRef(uint32_t &outIndex, data::SceneContentRefType refType, const rkit::data::ContentID &cid)
+	{
+		rkit::HashMap<rkit::data::ContentID, uint32_t> &map = m_contentIDs[static_cast<size_t>(refType)];
+
+		const rkit::HashValue_t hashValue = rkit::Hasher<rkit::data::ContentID>::ComputeHash(0, cid);
+
+		uint32_t index = 0;
+		rkit::HashMap<rkit::data::ContentID, uint32_t>::ConstIterator_t it = map.FindPrehashed(hashValue, cid);
+		if (it == map.end())
+		{
+			if (map.Count() == std::numeric_limits<uint32_t>::max())
+				RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
+
+			index = static_cast<uint32_t>(map.Count());
+			RKIT_CHECK(map.SetPrehashed(hashValue, cid, index));
 		}
 		else
 			index = it.Value();
@@ -1268,13 +1315,10 @@ namespace anox::buildsystem
 					rkit::data::ContentID contentID;
 					RKIT_CHECK(m_feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefPath, contentID));
 
-					const size_t numDWords = sizeof(contentID) / 4;
-					for (size_t i = 0; i < numDWords; i++)
-					{
-						rkit::endian::LittleUInt32_t dword;
-						memcpy(&dword, reinterpret_cast<const uint8_t *>(&contentID) + i * 4, 4);
-						RKIT_CHECK(m_cmdParamDWords.Append(dword));
-					}
+					uint32_t cidIndex = 0;
+					RKIT_CHECK(IndexContentRef(cidIndex, data::SceneContentRefType::kEntityType, contentID));
+
+					RKIT_CHECK(m_cmdParamDWords.Append(rkit::endian::LittleUInt32_t(cidIndex)));
 				}
 				break;
 			default:
@@ -1379,7 +1423,7 @@ namespace anox::buildsystem
 
 	uint32_t SceneCompiler::GetVersion() const
 	{
-		return 1;
+		return 2;
 	}
 
 	rkit::Result SceneCompilerBase::FormatOutputPath(rkit::String &outPath, rkit::StringSliceView identifier)

@@ -26,11 +26,11 @@ namespace anox::data::ape
 		StrNeq = 15,
 	};
 
-	enum class MaterialReferenceType : uint8_t
+	enum class ResourceReferenceType : uint8_t
 	{
 		Invalid,
 		WildcardString,
-		ContentID,
+		ResourceID,
 		Null,
 	};
 
@@ -64,29 +64,23 @@ namespace anox::data::ape
 		UIntLiteral,
 		IntLiteral,
 		TextureVariable,
-		ContentID,
+		ResourceID,
 
 		Count,
 	};
 
-	struct MaterialReference
+	struct ResourceReference
 	{
-		MaterialReferenceType m_refType = MaterialReferenceType::Invalid;
+		ResourceReferenceType m_refType = ResourceReferenceType::Invalid;
 		rkit::endian::LittleUInt32_t m_index;
 	};
 
-	struct ResourceRef
+	struct ResourceIdentifier
 	{
 		rkit::endian::LittleUInt32_t m_resNamespace;
 		rkit::endian::LittleUInt32_t m_resType;
-		rkit::endian::LittleUInt32_t m_contentIDIndex;
-	};
-
-	struct IntermediateResourceRef
-	{
-		rkit::endian::LittleUInt32_t m_nodeNamespace;
-		rkit::endian::LittleUInt32_t m_nodeType;
-		rkit::endian::LittleUInt32_t m_tempStrIndex;
+		rkit::endian::LittleUInt32_t m_nameIndex;
+		rkit::data::ContentID m_contentID;
 	};
 
 	struct ExpressionValue
@@ -128,18 +122,7 @@ namespace anox::data::ape
 		rkit::endian::LittleUInt32_t m_numOperandLists;
 		rkit::endian::LittleUInt32_t m_numWindows;
 		rkit::endian::LittleUInt32_t m_numSwitches;
-
-		rkit::endian::LittleUInt32_t m_numMaterialWildcards;
-		rkit::endian::LittleUInt32_t m_numMaterialNames;
-
-		rkit::endian::LittleUInt32_t m_numMaterialContentIDs;
-		rkit::endian::LittleUInt32_t m_numMaterialNameLookups;
-		rkit::endian::LittleUInt32_t m_numMaterialWildcardLookups;
-
-		rkit::endian::LittleUInt32_t m_numTempStrings;
-		rkit::endian::LittleUInt32_t m_numResourceRefs;
-
-		uint8_t m_hasIntermediateResourceRefs;
+		rkit::endian::LittleUInt32_t m_numResourceIDs;
 
 		// uint32_t m_stringLengths[m_numStrings]
 		// uint8_t m_stringChars[m_numStrings][m_stringLengths[i]]
@@ -150,20 +133,7 @@ namespace anox::data::ape
 		// uint8_t m_windowCommandStreams[m_numWindows][window.m_commandStreamLength]
 		// Switch m_switches[m_numSwitches]
 		// SwitchCommand m_switchCommands[m_numSwitches][switch.m_numCommands]
-		// ByteString m_materialWildcards[m_numMaterialWildcards] (only in temp)
-		// ByteString m_materialNames[m_numMaterialWildcards] (only in temp)
-		// ContentID m_materialContentIDs[m_numMaterialContentIDs]
-		// uint32_t m_numMaterialNameLookups[m_numMaterialNameLookups]
-		// MaterialWildcardLookup m_materialWildcardLookups[m_numMaterialWildcardLookups]
-
-		// uint32_t m_tempStringLengths[m_numTempStrings]
-		// uint8_t m_tempStringChars[m_numTempStrings][m_tempStringLengths[i]]
-
-		// ResourceRef m_resourceRefs[m_numResourceRefs]
-
-		// if (m_hasIntermediateResourceRefs)
-		//     IntermediateResourceRef m_intermediateResourceRefs[m_numResourceRefs]
-
+		// ResourceIdentifier m_resourceIDs[m_numResourceIDs]
 	};
 }
 

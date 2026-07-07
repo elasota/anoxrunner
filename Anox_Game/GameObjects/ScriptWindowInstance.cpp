@@ -180,11 +180,11 @@ namespace anox::game
 	{
 		switch (cmd.m_str.m_refType)
 		{
-		case ScriptMaterialReferenceType::Null:
+		case ScriptResourceReferenceType::Null:
 			ClearStyle();
 			RKIT_RETURN_OK;
-		case ScriptMaterialReferenceType::WildcardString:
-		case ScriptMaterialReferenceType::ContentID:
+		case ScriptResourceReferenceType::WildcardString:
+		case ScriptResourceReferenceType::ResourceID:
 			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 		default:
 			RKIT_THROW(rkit::ResultCode::kDataError);

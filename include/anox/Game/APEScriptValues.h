@@ -18,7 +18,7 @@ namespace anox::game
 	using ScriptOperator = data::ape::Operator;
 	using ScriptOperandType = data::ape::OperandType;
 	using ScriptOperandList = rkit::Span<ScriptExprValue>;
-	using ScriptMaterialReferenceType = data::ape::MaterialReferenceType;
+	using ScriptResourceReferenceType = data::ape::ResourceReferenceType;
 
 	struct ScriptExprValue
 	{
@@ -26,9 +26,9 @@ namespace anox::game
 		uint32_t m_index = 0;
 	};
 
-	struct ScriptMaterialReference
+	struct ScriptResourceReference
 	{
-		ScriptMaterialReferenceType m_refType = ScriptMaterialReferenceType::Invalid;
+		ScriptResourceReferenceType m_refType = ScriptResourceReferenceType::Invalid;
 		uint32_t m_index = 0;
 	};
 }

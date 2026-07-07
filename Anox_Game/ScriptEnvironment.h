@@ -32,6 +32,10 @@ namespace anox::game
 	class ScriptWindowInstance;
 	struct ScriptWindow;
 
+	template<uint32_t TNamespace, uint32_t TType>
+	struct ScriptNamedResourceRef;
+	struct ScriptNamedResourceRefBase;
+
 	class ScriptEnvironment final : public rkit::Opaque<ScriptEnvironmentImpl>
 	{
 	public:
@@ -44,12 +48,28 @@ namespace anox::game
 		rkit::Result CreateScriptContext(rkit::UniquePtr<ScriptContext> &outScriptCtx);
 
 		bool TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const;
-		bool TryEvaluateContentIDScriptExpr(rkit::data::ContentID &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const;
+
+		template<uint32_t TExpectedNamespace, uint32_t TExpectedType>
+		bool TryEvaluateNamedResourceRefScriptExpr(ScriptNamedResourceRef<TExpectedNamespace, TExpectedType> &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const;
+
 		rkit::Result TryEvaluateStringScriptExpr(bool &outSucceeded, rkit::ByteString &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const;
 
 		// SAVEGAME TODO
 
 	private:
+		bool PrivTryEvaluateNamedResourceRefScriptExpr(ScriptNamedResourceRefBase &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr, uint32_t expectedNamespace, uint32_t expectedType) const;
+
 		ScriptEnvironment() = delete;
 	};
+}
+
+#include "ScriptNamedResourceRef.h"
+
+namespace anox::game
+{
+	template<uint32_t TExpectedNamespace, uint32_t TExpectedType>
+	bool ScriptEnvironment::TryEvaluateNamedResourceRefScriptExpr(ScriptNamedResourceRef<TExpectedNamespace, TExpectedType> &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const
+	{
+		return PrivTryEvaluateNamedResourceRefScriptExpr(outValue, pkg, expr, TExpectedNamespace, TExpectedType);
+	}
 }

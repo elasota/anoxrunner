@@ -139,7 +139,7 @@ namespace APEWindowCommandReflector
                     return null;
                 case FieldDef.FieldType.Texture:
                 case FieldDef.FieldType.WindowStyle:
-                    return "sizeof(::anox::data::ape::MaterialReference)";
+                    return "sizeof(::anox::data::ape::ResourceReference)";
                 case FieldDef.FieldType.OptExpr:
                     return "sizeof(::anox::data::ape::ExpressionValue)";
 
@@ -310,6 +310,7 @@ namespace APEWindowCommandReflector
                 sw.NewLine = "\n";
                 sw.WriteLine("#include \"APEExternDispatch.generated.h\"");
                 sw.WriteLine("#include \"ScriptManager.h\"");
+                sw.WriteLine("#include \"ScriptNamedResourceRef.h\"");
                 sw.WriteLine("#include \"anox/Game/APEScriptValues.h\"");
                 sw.WriteLine();
                 sw.WriteLine("#include \"rkit/Core/Coroutine.h\"");
@@ -693,7 +694,7 @@ namespace APEWindowCommandReflector
                         {
                             case FieldDef.FieldType.Texture:
                             case FieldDef.FieldType.WindowStyle:
-                                fldType = "ScriptMaterialReference";
+                                fldType = "ScriptResourceReference";
                                 break;
                             case FieldDef.FieldType.UInt16:
                                 fldType = "uint16_t";

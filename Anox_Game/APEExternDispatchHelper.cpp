@@ -2,7 +2,7 @@
 
 #include "anox/Game/APEScriptValues.h"
 #include "ScriptEnvironment.h"
-
+#include "ScriptNamedResourceRef.h"
 
 #define ANOX_APE_EXTERN_PARSER_STUB(type)	\
 	rkit::Result ExternDispatch::Parse ## type ## Arg(type ## Arg_t &arg, ScriptEnvironment &env, const ScriptPackage &pkg, const ScriptExprValue &operand) \
@@ -23,12 +23,17 @@ namespace anox::game::ape::externs
 		RKIT_RETURN_OK;
 	}
 
-	rkit::Result ExternDispatch::ParseFileResourceArg(rkit::data::ContentID &arg, ScriptEnvironment &env, const ScriptPackage &pkg, const ScriptExprValue &operand)
+	rkit::Result ExternDispatch::ParseFileResourceArg(ScriptFileResourceRef &arg, ScriptEnvironment &env, const ScriptPackage &pkg, const ScriptExprValue &operand)
 	{
-		if (!env.TryEvaluateContentIDScriptExpr(arg, pkg, operand))
-			arg = rkit::data::ContentID();
+		if (!env.TryEvaluateNamedResourceRefScriptExpr(arg, pkg, operand))
+			arg = ScriptFileResourceRef();
 
 		RKIT_RETURN_OK;
+	}
+
+	rkit::Result ExternDispatch::ParseSceneResourceArg(ScriptFileResourceRef &arg, ScriptEnvironment &env, const ScriptPackage &pkg, const ScriptExprValue &operand)
+	{
+		return ParseFileResourceArg(arg, env, pkg, operand);
 	}
 
 	ANOX_APE_EXTERN_PARSER_STUB(Bool)
@@ -51,7 +56,6 @@ namespace anox::game::ape::externs
 	ANOX_APE_EXTERN_PARSER_STUB(ImageResource)
 	ANOX_APE_EXTERN_PARSER_STUB(SoundResource)
 	ANOX_APE_EXTERN_PARSER_STUB(FontResource)
-	ANOX_APE_EXTERN_PARSER_STUB(SceneResource)
 	ANOX_APE_EXTERN_PARSER_STUB(ParticleResource)
 	ANOX_APE_EXTERN_PARSER_STUB(ModelResource)
 }
