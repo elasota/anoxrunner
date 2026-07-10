@@ -73,7 +73,7 @@ namespace anox::game
 	{
 		RKIT_CHECK(m_scriptManager.CreateScriptEnvironment(m_scriptEnvironment));
 		RKIT_CHECK(MusicManager::Create(m_musicManager));
-		RKIT_CHECK(SceneManager::Create(m_sceneManager));
+		RKIT_CHECK(SceneManager::Create(m_sceneManager, this->Base()));
 
 		RKIT_RETURN_OK;
 	}

@@ -2,6 +2,8 @@
 
 #include "rkit/Core/Opaque.h"
 #include "rkit/Core/Result.h"
+#include "rkit/Core/CoroutineProtos.h"
+#include "rkit/Core/StringProto.h"
 
 namespace rkit
 {
@@ -17,11 +19,16 @@ namespace rkit::data
 namespace anox::game
 {
 	class SceneManagerImpl;
+	class World;
 
 	class SceneManager final : public rkit::Opaque<SceneManagerImpl>
 	{
 	public:
-		static rkit::Result Create(rkit::UniquePtr<SceneManager> &outManager);
+		explicit SceneManager(World &world);
+
+		static rkit::Result Create(rkit::UniquePtr<SceneManager> &outManager, World &world);
+
+		rkit::ResultCoroutine RunScene(rkit::ICoroThread &thread, const rkit::ByteStringSliceView &name, const rkit::data::ContentID &cid, bool loop);
 
 	private:
 		// SAVEGAME TODO

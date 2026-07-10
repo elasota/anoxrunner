@@ -1104,8 +1104,51 @@ namespace anox::buildsystem
 		}
 	}
 
-	rkit::Result APEScriptCompilerImpl::IndexNodeCompileResult(rkit::data::ContentID &outContentID, uint32_t &outResNamespace, uint32_t &outResType, APEIntermediateResourceType resType, const rkit::ByteStringView &pathStr, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	rkit::Result APEScriptCompilerImpl::IndexNodeCompileResult(rkit::data::ContentID &outContentID, uint32_t &outResNamespace, uint32_t &outResType, APEIntermediateResourceType resType, const rkit::ByteStringView &pathBStr, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
+		if (!rkit::CharacterEncodingValidator<rkit::CharacterEncoding::kASCII>::ValidateSpan(pathBStr.ToSpan()))
+			RKIT_THROW(rkit::ResultCode::kInvalidUnicode);
+
+		switch (resType)
+		{
+		case APEIntermediateResourceType::kRawFile:
+			{
+				rkit::CIPath path;
+				RKIT_CHECK(path.Set(pathBStr.ToUTF8Unsafe()));
+
+				RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kSourceDir, path, outContentID));
+				outResNamespace = kAnoxNamespaceID;
+				outResType = resloaders::kContentIDRawFileResourceTypeCode;
+			}
+			RKIT_RETURN_OK;
+		case APEIntermediateResourceType::kScene:
+			{
+				rkit::String pathStr;
+				RKIT_CHECK(SceneCompilerBase::FormatOutputPath(pathStr, pathBStr.ToUTF8Unsafe()));
+
+				rkit::CIPath path;
+				RKIT_CHECK(path.Set(pathStr));
+
+				RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, path, outContentID));
+				outResNamespace = kAnoxNamespaceID;
+				outResType = resloaders::kContentIDRawFileResourceTypeCode;
+			}
+			RKIT_RETURN_OK;
+		case APEIntermediateResourceType::kMaterial:
+			{
+				rkit::CIPath path;
+				RKIT_CHECK(MaterialCompiler::ConstructOutputPath(path, data::MaterialResourceType::kInterface, pathBStr.ToUTF8Unsafe()));
+
+				RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, path, outContentID));
+				outResNamespace = kAnoxNamespaceID;
+				outResType = resloaders::kInterfaceMaterialTypeCode;
+			}
+			RKIT_RETURN_OK;
+		default:
+			RKIT_THROW(rkit::ResultCode::kInternalError);
+		}
+
+
 		RKIT_THROW(rkit::ResultCode::kInternalError);
 	}
 

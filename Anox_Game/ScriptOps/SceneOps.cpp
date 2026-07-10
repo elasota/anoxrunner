@@ -1,6 +1,8 @@
 #include "APEExternDispatch.generated.h"
 
 #include "rkit/Core/Coroutine.h"
+#include "rkit/Core/LogDriver.h"
+
 #include "rkit/Data/ContentID.h"
 
 #include "SceneManager.h"
@@ -13,7 +15,13 @@ namespace anox::game::ape::externs
 {
 	rkit::ResultCoroutine loopscene::Execute(rkit::ICoroThread &thread, const ScriptExternContext &ctx, ExternDispatch::SceneResourceArg_t scene)
 	{
-		//CORO_CHECK(ctx.m_world->GetSceneManager().LoopScene(scene));
+		if (!scene.m_contentID)
+		{
+			rkit::log::ErrorFmt(u8"Failed to load scene {}", scene.m_name);
+			CORO_RETURN_OK;
+		}
+
+		CORO_CHECK(co_await ctx.m_world->GetSceneManager().RunScene(thread, scene.m_name, *scene.m_contentID, true));
 		CORO_RETURN_OK;
 	}
 }
