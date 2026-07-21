@@ -41,7 +41,6 @@ namespace anox::data
 		// uint8_t m_stringChars[sum(m_stringLengths)]
 		// data::SceneBlock m_blocks[m_numBlocks]
 		// data::ScenePath m_paths[m_numPaths]
-		// data::SceneNodeCommon m_common[sum(m_nodeCounts)]
 		// data::SceneCubicNode m_cubic[m_nodeCounts[ScenePathType::kCubic]]
 		// data::SceneFocusNode m_focus[m_nodeCounts[ScenePathType::kFocus]]
 		// data::SceneCommandNode m_cmd[m_nodeCounts[ScenePathType::kCommand]]
@@ -61,6 +60,7 @@ namespace anox::data
 
 	struct SceneCubicNode
 	{
+		data::SceneNodeCommon m_common;
 		rkit::endian::LittleFloat32_t m_position[3];
 		rkit::endian::LittleFloat32_t m_velocity[3];
 		rkit::endian::LittleUInt32_t m_relativeMode;
@@ -68,29 +68,34 @@ namespace anox::data
 
 	struct SceneFocusNode
 	{
+		data::SceneNodeCommon m_common;
 		rkit::endian::LittleUInt32_t m_focusTarget;
 	};
 
 	struct SceneCommandNode
 	{
+		data::SceneNodeCommon m_common;
 		rkit::endian::LittleUInt32_t m_numCommands;
 		rkit::endian::LittleUInt32_t m_numParamDWords;
 	};
 
 	struct SceneScaleNode
 	{
+		data::SceneNodeCommon m_common;
 		rkit::endian::LittleFloat32_t m_scale[3];
 		rkit::endian::LittleFloat32_t m_delta[3];
 	};
 
 	struct SceneRollNode
 	{
+		data::SceneNodeCommon m_common;
 		rkit::endian::LittleFloat32_t m_value;
 		rkit::endian::LittleFloat32_t m_rate;
 	};
 
 	struct SceneFOVNode
 	{
+		data::SceneNodeCommon m_common;
 		rkit::endian::LittleFloat32_t m_value;
 		rkit::endian::LittleFloat32_t m_rate;
 	};

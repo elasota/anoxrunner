@@ -44,7 +44,7 @@ namespace anox::game
 		rkit::Result AsyncStartGlobalSession();
 		rkit::Result AsyncLoadMapScriptPackage(const rkit::Span<const rkit::data::ContentID> &scriptContentIDs);
 		rkit::Result AsyncPostSpawnInitialEntities(World &world);
-		rkit::Result AsyncRunFrame(World &world);
+		rkit::Result AsyncRunFrame(World &world, uint64_t gameTime);
 		rkit::Result AsyncEnterGameSession(World &world);
 		rkit::Result WaitForMainThreadCoro(bool &outIsFinished);
 

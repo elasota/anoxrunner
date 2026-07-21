@@ -30,7 +30,6 @@
 #include <shellapi.h>
 #include <ShlObj.h>
 #include <Shlwapi.h>
-#include <timezoneapi.h>
 #include <KnownFolders.h>
 
 
@@ -345,6 +344,8 @@ namespace rkit
 
 		render::IDisplayManager *GetDisplayManager() const override;
 
+		uint64_t GetTimeUSec() const override;
+
 	private:
 		static DWORD OpenFlagsToDisposition(bool createIfNotExists, bool truncateIfExists);
 		Result OpenFileGeneral(UniquePtr<File_Win32> &outStream, const OSAbsPathView &path, bool createDirectories, bool allowFailure, DWORD access, DWORD shareMode, DWORD disposition, DWORD extraFlags);
@@ -355,12 +356,12 @@ namespace rkit
 
 		static DWORD WINAPI ThreadStartRoutine(LPVOID lpThreadParameter);
 
-		IMallocDriver *m_alloc;
+		IMallocDriver *m_alloc = nullptr;
 		Vector<Vector<Utf8Char_t> > m_commandLineCharBuffers;
 		Vector<StringView> m_commandLine;
 		UniquePtr<render::DisplayManagerBase_Win32> m_displayManager;
 		UniquePtr<AsyncIOThread_Win32> m_asioThread;
-		LPWSTR *m_argvW;
+		LPWSTR *m_argvW = nullptr;
 
 		Utf16String m_exePathStr;
 		Utf16String m_programDirStr;
@@ -368,12 +369,17 @@ namespace rkit
 		OSAbsPath m_gameDirectoryOverride;
 		OSAbsPath m_settingsDirectory;
 
-		HINSTANCE m_hInstance;
+		HINSTANCE m_hInstance = nullptr;
 
 		HMODULE m_kernelBaseModule = nullptr;
 
+		LARGE_INTEGER m_qpfFrequency = {};
+		uint64_t m_qpfUSecMultiply = 0;
+		uint64_t m_qpfUSecDivide = 0;
+		LARGE_INTEGER m_qpfBase = {};
+
 #if RKIT_IS_DEBUG
-		SetThreadDescriptionProc_Win32_t m_setThreadDescriptionProc;
+		SetThreadDescriptionProc_Win32_t m_setThreadDescriptionProc = nullptr;
 #endif
 	};
 
@@ -1237,6 +1243,22 @@ namespace rkit
 		, m_exePathStr(initParams.m_executablePath)
 		, m_programDirStr(initParams.m_programDir)
 	{
+		QueryPerformanceFrequency(&m_qpfFrequency);
+		QueryPerformanceCounter(&m_qpfBase);
+
+		m_qpfUSecDivide = m_qpfFrequency.QuadPart;
+		m_qpfUSecMultiply = 1000000;
+
+		while (m_qpfUSecDivide % 2 == 0 && m_qpfUSecMultiply % 2 == 0)
+		{
+			m_qpfUSecDivide /= 2;
+			m_qpfUSecMultiply /= 2;
+		}
+		while (m_qpfUSecDivide % 5 == 0 && m_qpfUSecMultiply % 5 == 0)
+		{
+			m_qpfUSecDivide /= 5;
+			m_qpfUSecMultiply /= 5;
+		}
 	}
 
 	SystemDriver_Win32::~SystemDriver_Win32()
@@ -1980,6 +2002,16 @@ namespace rkit
 	render::IDisplayManager *SystemDriver_Win32::GetDisplayManager() const
 	{
 		return m_displayManager.Get();
+	}
+
+	uint64_t SystemDriver_Win32::GetTimeUSec() const
+	{
+		LARGE_INTEGER qpc = {};
+		QueryPerformanceCounter(&qpc);
+
+		const uint64_t qpcOffset = (qpc.QuadPart - m_qpfBase.QuadPart);
+
+		return qpcOffset * m_qpfUSecMultiply / m_qpfUSecDivide;
 	}
 
 	HINSTANCE SystemDriver_Win32::GetHInstance() const

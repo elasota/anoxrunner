@@ -56,21 +56,21 @@ namespace rkit { namespace render
 		virtual Result OpenCopyCommandBatch(ICopyCommandBatch *&outCommandBatch, bool cpuWaitable) = 0;
 	};
 
-	struct IGraphicsCommandAllocator : public virtual ICopyCommandAllocator
+	struct IGraphicsCommandAllocator : public ICopyCommandAllocator
 	{
 		virtual ~IGraphicsCommandAllocator() {}
 
 		virtual Result OpenGraphicsCommandBatch(IGraphicsCommandBatch *&outCommandBatch, bool cpuWaitable) = 0;
 	};
 
-	struct IComputeCommandAllocator : public virtual ICopyCommandAllocator
+	struct IComputeCommandAllocator : public ICopyCommandAllocator
 	{
 		virtual ~IComputeCommandAllocator() {}
 
 		virtual Result OpenComputeCommandBatch(IComputeCommandBatch *&outCommandBatch, bool cpuWaitable) = 0;
 	};
 
-	struct IGraphicsComputeCommandAllocator : public virtual IGraphicsCommandAllocator, public virtual IComputeCommandAllocator
+	struct IGraphicsComputeCommandAllocator : public IGraphicsCommandAllocator, public IComputeCommandAllocator
 	{
 		virtual ~IGraphicsComputeCommandAllocator() {}
 

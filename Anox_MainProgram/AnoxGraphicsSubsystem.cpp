@@ -519,7 +519,8 @@ namespace anox
 			virtual rkit::Result CreateCommandAllocator(rkit::render::IRenderDevice &renderDevice, rkit::UniquePtr<rkit::render::IBaseCommandAllocator> &cmdAlloc, bool isBundle) = 0;
 		};
 
-		template<class TCommandQueueType, class TCommandAllocatorType,
+		template<class TCommandQueueType, class TDowncastQueueType,
+			class TCommandAllocatorType, class TDowncastCommandAllocatorType,
 			rkit::Result (TCommandQueueType::*TCommandAllocCreationMethod)(rkit::UniquePtr<TCommandAllocatorType>&, bool),
 			TCommandQueueType *(rkit::render::IBaseCommandQueue::*TQueueConversionMethod)()
 		>
@@ -541,7 +542,8 @@ namespace anox
 
 			rkit::render::IBaseCommandQueue *GetBaseCommandQueue() const override
 			{
-				return m_commandQueue;
+				TDowncastQueueType *downcast = m_commandQueue;
+				return downcast;
 			}
 
 			rkit::Result CreateCommandAllocator(rkit::render::IRenderDevice &renderDevice, rkit::UniquePtr<rkit::render::IBaseCommandAllocator> &cmdAlloc, bool isBundle) override
@@ -549,7 +551,8 @@ namespace anox
 				rkit::UniquePtr<TCommandAllocatorType> alloc;
 				RKIT_CHECK((m_commandQueue->*TCommandAllocCreationMethod)(alloc, isBundle));
 
-				cmdAlloc = std::move(alloc);
+				rkit::UniquePtr<TDowncastCommandAllocatorType> downcastAlloc = std::move(alloc);
+				cmdAlloc = std::move(downcastAlloc);
 
 				RKIT_RETURN_OK;
 			}
@@ -758,22 +761,26 @@ namespace anox
 		rkit::UniquePtr<rkit::render::ICPUFenceWaiter> m_fenceWaiter;
 		GraphicTimelinedResourceStack m_unsortedCondemnedResources;
 
-		LogicalQueue<rkit::render::ICopyCommandQueue, rkit::render::ICopyCommandAllocator,
+		LogicalQueue<rkit::render::ICopyCommandQueue, rkit::render::ICopyCommandQueue,
+			rkit::render::ICopyCommandAllocator, rkit::render::ICopyCommandAllocator,
 			&rkit::render::ICopyCommandQueue::CreateCopyCommandAllocator,
 			&rkit::render::IBaseCommandQueue::ToCopyCommandQueue
 		> m_dmaLogicalQueue;
 
-		LogicalQueue<rkit::render::IGraphicsComputeCommandQueue, rkit::render::IGraphicsComputeCommandAllocator,
+		LogicalQueue<rkit::render::IGraphicsComputeCommandQueue, rkit::render::IComputeCommandQueue,
+			rkit::render::IGraphicsComputeCommandAllocator, rkit::render::IComputeCommandAllocator,
 			&rkit::render::IGraphicsComputeCommandQueue::CreateGraphicsComputeCommandAllocator,
 			&rkit::render::IBaseCommandQueue::ToGraphicsComputeCommandQueue
 		> m_graphicsComputeLogicalQueue;
 
-		LogicalQueue<rkit::render::IGraphicsCommandQueue, rkit::render::IGraphicsCommandAllocator,
+		LogicalQueue<rkit::render::IGraphicsCommandQueue, rkit::render::IGraphicsCommandQueue,
+			rkit::render::IGraphicsCommandAllocator, rkit::render::IGraphicsCommandAllocator,
 			&rkit::render::IGraphicsCommandQueue::CreateGraphicsCommandAllocator,
 			&rkit::render::IBaseCommandQueue::ToGraphicsCommandQueue
 		> m_graphicsLogicalQueue;
 
-		LogicalQueue<rkit::render::IComputeCommandQueue, rkit::render::IComputeCommandAllocator,
+		LogicalQueue<rkit::render::IComputeCommandQueue, rkit::render::IComputeCommandQueue,
+			rkit::render::IComputeCommandAllocator, rkit::render::IComputeCommandAllocator,
 			&rkit::render::IComputeCommandQueue::CreateComputeCommandAllocator,
 			&rkit::render::IBaseCommandQueue::ToComputeCommandQueue
 		> m_asyncComputeLogicalQueue;

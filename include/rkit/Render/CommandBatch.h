@@ -36,12 +36,12 @@ namespace rkit { namespace render
 		virtual Result OpenCopyCommandEncoder(ICopyCommandEncoder *&outCopyCommandEncoder) = 0;
 	};
 
-	struct IComputeCommandBatch : public virtual ICopyCommandBatch
+	struct IComputeCommandBatch : public ICopyCommandBatch
 	{
 		virtual Result OpenComputeCommandEncoder(IComputeCommandEncoder *&outCopyCommandEncoder) = 0;
 	};
 
-	struct IGraphicsCommandBatch : public virtual ICopyCommandBatch
+	struct IGraphicsCommandBatch : public ICopyCommandBatch
 	{
 		virtual Result OpenGraphicsCommandEncoder(IGraphicsCommandEncoder *&outCopyCommandEncoder, IRenderPassInstance &rpi) = 0;
 	};

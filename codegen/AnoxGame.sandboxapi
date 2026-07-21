@@ -1,9 +1,9 @@
 target include/anox/Sandbox/AnoxGame
 class anox.game.sandbox
 
-import MemAlloc(size size) -> (address ptr, uint32 mmid) noexcept
+import MemAlloc(size size) -> (address ptr, uint32 mmid)
 import MemFree(uint32 mmid) noexcept
-import LogUtf8Message(uint32 severity, address ptr, size size) noexcept
+import LogUtf8Message(uint32 severity, address ptr, size size)
 
 import GetContentIDKeyedResource(uint32 resourceType, address contentID) -> (uint32 reqID)
 import GetCIPathKeyedResource(uint32 resourceType, address chars, size numChars) -> (uint32 reqID)
@@ -31,5 +31,5 @@ export MTAsync_LoadMapScriptPackage(address gameSession, address scriptPackageDa
 export MTAsync_SpawnInitialEntities(address gameSession, address entityTypes, size numEntityTypes, address spawnData, size numSpawnData, address stringLengths, size numStrings, address stringData, size numStringData, address udefValues, size numUDefs, address udefStringData, size udefStringDataSize)
 export MTAsync_PostSpawnInitialEntities(address gameSession)
 export MTAsync_EnterGameSession(address gameSession)
-export MTAsync_RunFrame(address gameSession)
+export MTAsync_RunFrame(address gameSession, uint32 timeLow, uint32 timeHigh)
 export WaitForMainThread(address gameSession) -> (bool isFinished)

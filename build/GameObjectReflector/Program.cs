@@ -41,6 +41,7 @@ namespace GameObjectReflector
     internal class Program
     {
         private static string PunctuationChars { get => "():.;/<>,[]{}"; }
+        private static Dictionary<FieldType, FieldType> UniqueFieldTypes { get; } = new Dictionary<FieldType, FieldType>();
 
         static void Main(string[] args)
         {
@@ -174,42 +175,42 @@ namespace GameObjectReflector
                             writer.Write($"\t\t\tEntityFieldType::");
 
                             string fieldTypeStr;
-                            switch (fieldInfo.FieldType)
+                            switch (fieldInfo.MainType)
                             {
-                                case FieldType.Float:
+                                case FieldMainType.Float:
                                     fieldTypeStr = "kFloat";
                                     break;
-                                case FieldType.UInt:
+                                case FieldMainType.UInt:
                                     fieldTypeStr = "kUInt";
                                     break;
-                                case FieldType.Vec2:
+                                case FieldMainType.Vec2:
                                     fieldTypeStr = "kVec2";
                                     break;
-                                case FieldType.Vec3:
+                                case FieldMainType.Vec3:
                                     fieldTypeStr = "kVec3";
                                     break;
-                                case FieldType.Vec4:
+                                case FieldMainType.Vec4:
                                     fieldTypeStr = "kVec4";
                                     break;
-                                case FieldType.Bool:
+                                case FieldMainType.Bool:
                                     if (fieldInfo.IsOnOffBool)
                                         fieldTypeStr = "kBoolOnOff";
                                     else
                                         fieldTypeStr = "kBool";
                                     break;
-                                case FieldType.ByteString:
+                                case FieldMainType.ByteString:
                                     fieldTypeStr = "kByteString";
                                     break;
-                                case FieldType.Label:
+                                case FieldMainType.Label:
                                     fieldTypeStr = "kLabel";
                                     break;
-                                case FieldType.BspModel:
+                                case FieldMainType.BspModel:
                                     fieldTypeStr = "kBSPModel";
                                     break;
-                                case FieldType.Broken:
+                                case FieldMainType.Broken:
                                     fieldTypeStr = "kIgnore";
                                     break;
-                                case FieldType.EDef:
+                                case FieldMainType.EDef:
                                     fieldTypeStr = "kEntityDef";
                                     break;
                                 default:
@@ -361,49 +362,8 @@ namespace GameObjectReflector
                         string? initValue = null;
                         string fieldType;
                         bool ignore = false;
-                        switch (fieldDef.FieldType)
-                        {
-                            case FieldType.Float:
-                                fieldType = "float";
-                                initValue = "0.f";
-                                break;
-                            case FieldType.UInt:
-                                fieldType = "uint32_t";
-                                initValue = "0";
-                                break;
-                            case FieldType.Vec2:
-                                fieldType = "::rkit::math::Vec2";
-                                break;
-                            case FieldType.Vec3:
-                                fieldType = "::rkit::math::Vec3";
-                                break;
-                            case FieldType.Vec4:
-                                fieldType = "::rkit::math::Vec4";
-                                break;
-                            case FieldType.Bool:
-                                fieldType = "bool";
-                                initValue = "false";
-                                break;
-                            case FieldType.ByteString:
-                                fieldType = "::rkit::ByteString";
-                                break;
-                            case FieldType.Label:
-                                fieldType = "::anox::Label";
-                                break;
-                            case FieldType.BspModel:
-                                fieldType = "uint32_t";
-                                initValue = "0";
-                                break;
-                            case FieldType.EDef:
-                                fieldType = "::anox::game::UserEntityDef";
-                                break;
-                            case FieldType.Broken:
-                                fieldType = "";
-                                ignore = true;
-                                break;
-                            default:
-                                throw new Exception("Unhandled field type");
-                        };
+
+                        DescribeFieldType(fieldDef.FieldType, out fieldType, out initValue, out ignore);
 
                         if (fieldDef.TryGetAttributeOfType<AliasFieldAttribute>() != null)
                             ignore = true;
@@ -537,13 +497,13 @@ namespace GameObjectReflector
 
                             foreach (FieldDef fieldDef in cdef.FieldDefs)
                             {
-                                if (fieldDef.TryGetAttributeOfType<AliasFieldAttribute>() != null || fieldDef.FieldType == FieldType.Broken)
+                                if (fieldDef.TryGetAttributeOfType<AliasFieldAttribute>() != null || fieldDef.FieldType.MainType == FieldMainType.Broken)
                                     continue;
 
                                 string fieldName = fieldDef.FieldName;
-                                string fieldTypeName = fieldDef.FieldType.ToString();
+                                string fieldTypeName = fieldDef.FieldType.MainType.ToString();
 
-                                if (FieldLoaderCanFault(fieldDef.FieldType))
+                                if (FieldLoaderCanFault(fieldDef.FieldType.MainType))
                                 {
                                     writer.WriteLine($"\t\tRKIT_CHECK(EntityLevelLoader::Load{fieldTypeName}(fields.m_{fieldName}, bytes + {fieldOffsets[fieldDef.FieldName]}, spawnParams));");
                                 }
@@ -578,6 +538,64 @@ namespace GameObjectReflector
             }
         }
 
+        private static void DescribeFieldType(FieldType fieldTypeType, out string fieldType, out string? initValue, out bool ignore)
+        {
+            fieldType = "";
+            initValue = null;
+            ignore = false;
+
+            switch (fieldTypeType.MainType)
+            {
+                case FieldMainType.Float:
+                    fieldType = "float";
+                    initValue = "0.f";
+                    break;
+                case FieldMainType.UInt:
+                    fieldType = "uint32_t";
+                    initValue = "0";
+                    break;
+                case FieldMainType.UInt64:
+                    fieldType = "uint64_t";
+                    initValue = "0";
+                    break;
+                case FieldMainType.Vec2:
+                    fieldType = "::rkit::math::Vec2";
+                    break;
+                case FieldMainType.Vec3:
+                    fieldType = "::rkit::math::Vec3";
+                    break;
+                case FieldMainType.Vec4:
+                    fieldType = "::rkit::math::Vec4";
+                    break;
+                case FieldMainType.Bool:
+                    fieldType = "bool";
+                    initValue = "false";
+                    break;
+                case FieldMainType.ByteString:
+                    fieldType = "::rkit::ByteString";
+                    break;
+                case FieldMainType.Label:
+                    fieldType = "::anox::Label";
+                    break;
+                case FieldMainType.BspModel:
+                    fieldType = "uint32_t";
+                    initValue = "0";
+                    break;
+                case FieldMainType.EDef:
+                    fieldType = "::anox::game::UserEntityDef";
+                    break;
+                case FieldMainType.Resource:
+                    fieldType = "::anox::game::ResourceRef<" + fieldTypeType.ResourceType.ToString() + "Handle>";
+                    break;
+                case FieldMainType.Broken:
+                    fieldType = "";
+                    ignore = true;
+                    break;
+                default:
+                    throw new Exception("Unhandled field type");
+            }
+        }
+
         private static void RecursiveAddUsedByLevelClass(HashSet<string> isOrIsUsedByLevelClass, EntityClassCollection ec, string className)
         {
             if (isOrIsUsedByLevelClass.Add(className))
@@ -588,21 +606,21 @@ namespace GameObjectReflector
             }
         }
 
-        private static bool FieldLoaderCanFault(FieldType fieldType)
+        private static bool FieldLoaderCanFault(FieldMainType fieldType)
         {
             switch (fieldType)
             {
-                case FieldType.Float:
-                case FieldType.UInt:
-                case FieldType.Vec2:
-                case FieldType.Vec3:
-                case FieldType.Vec4:
-                case FieldType.Bool:
-                case FieldType.Label:
-                case FieldType.BspModel:
+                case FieldMainType.Float:
+                case FieldMainType.UInt:
+                case FieldMainType.Vec2:
+                case FieldMainType.Vec3:
+                case FieldMainType.Vec4:
+                case FieldMainType.Bool:
+                case FieldMainType.Label:
+                case FieldMainType.BspModel:
                     return false;
-                case FieldType.ByteString:
-                case FieldType.EDef:
+                case FieldMainType.ByteString:
+                case FieldMainType.EDef:
                     return true;
                 default:
                     throw new Exception("Unhandled field type");
@@ -643,7 +661,7 @@ namespace GameObjectReflector
                 AliasFieldAttribute? aliasAttrib = fieldDef.TryGetAttributeOfType<AliasFieldAttribute>();
                 if (aliasAttrib == null)
                 {
-                    int fieldSize = ResolveFieldSize(fieldDef.FieldType);
+                    int fieldSize = ResolveFieldSize(fieldDef.FieldType.MainType);
                     classSize += fieldSize;
                 }
                 else
@@ -676,7 +694,7 @@ namespace GameObjectReflector
                         if (levelFieldAttrib.OverrideName != null)
                             name = levelFieldAttrib.OverrideName;
 
-                        levelFieldInfos.Add(new KeyValuePair<string, LevelFieldInfo>(name, new LevelFieldInfo(fieldDef.FieldType, fieldOffset)));
+                        levelFieldInfos.Add(new KeyValuePair<string, LevelFieldInfo>(name, new LevelFieldInfo(fieldDef.FieldType.MainType, fieldOffset)));
                     }
                     else
                     {
@@ -684,20 +702,20 @@ namespace GameObjectReflector
                             throw new ReflectorException("Field " + fieldDef.FieldName + " can't use both name and scalarized");
 
                         int expectedScalarFields = 0;
-                        FieldType scalarFieldFype;
-                        switch (fieldDef.FieldType)
+                        FieldMainType scalarFieldFype;
+                        switch (fieldDef.FieldType.MainType)
                         {
-                            case FieldType.Vec2:
+                            case FieldMainType.Vec2:
                                 expectedScalarFields = 2;
-                                scalarFieldFype = FieldType.Float;
+                                scalarFieldFype = FieldMainType.Float;
                                 break;
-                            case FieldType.Vec3:
+                            case FieldMainType.Vec3:
                                 expectedScalarFields = 3;
-                                scalarFieldFype = FieldType.Float;
+                                scalarFieldFype = FieldMainType.Float;
                                 break;
-                            case FieldType.Vec4:
+                            case FieldMainType.Vec4:
                                 expectedScalarFields = 4;
-                                scalarFieldFype = FieldType.Float;
+                                scalarFieldFype = FieldMainType.Float;
                                 break;
                             default:
                                 throw new ReflectorException("Scalarized level field " + fieldDef.FieldName + " is not a scalarizable type");
@@ -716,7 +734,7 @@ namespace GameObjectReflector
                     {
                         LevelFieldInfo lfi = levelFieldInfo.Value;
 
-                        if (lfi.IsOnOffBool && lfi.FieldType != FieldType.Bool)
+                        if (lfi.IsOnOffBool && lfi.MainType != FieldMainType.Bool)
                             throw new ReflectorException("Level field " + levelFieldInfo.Key + " is flagged as onoff but isn't bool");
 
                         if (!levelFieldOffsetsDict.TryAdd(levelFieldInfo.Key, lfi))
@@ -726,26 +744,26 @@ namespace GameObjectReflector
             }
         }
 
-        private static int ResolveFieldSize(FieldType fieldType)
+        private static int ResolveFieldSize(FieldMainType fieldType)
         {
             switch (fieldType)
             {
-                case FieldType.Bool:
+                case FieldMainType.Bool:
                     return 1;
-                case FieldType.Float:
-                case FieldType.UInt:
-                case FieldType.EDef:
-                case FieldType.ByteString:
-                case FieldType.Label:
-                case FieldType.BspModel:
+                case FieldMainType.Float:
+                case FieldMainType.UInt:
+                case FieldMainType.EDef:
+                case FieldMainType.ByteString:
+                case FieldMainType.Label:
+                case FieldMainType.BspModel:
                     return 4;
-                case FieldType.Vec2:
+                case FieldMainType.Vec2:
                     return 8;
-                case FieldType.Vec3:
+                case FieldMainType.Vec3:
                     return 12;
-                case FieldType.Vec4:
+                case FieldMainType.Vec4:
                     return 16;
-                case FieldType.Broken:
+                case FieldMainType.Broken:
                     return 0;
                 default:
                     throw new Exception("Unhandled field type");
@@ -845,6 +863,42 @@ namespace GameObjectReflector
             return new UserEntityTypeDefAttribute(edefName);
         }
 
+        private static FieldType ParseType(string line, ref int col, string firstToken, TokenType firstTokenType)
+        {
+            if (firstTokenType != TokenType.Identifier)
+                throw new ReflectorException("Expected identifier");
+
+            FieldType fieldType = DetermineFieldType(firstToken);
+
+            if (fieldType.MainType == FieldMainType.Resource)
+            {
+                ExpectToken(line, ref col, "(");
+                string subTypeToken = PullTokenOfType(line, ref col, TokenType.Identifier);
+
+                FieldResourceType resType = DetermineResourceType(subTypeToken);
+
+                fieldType = new FieldType(resType);
+
+                ExpectToken(line, ref col, ")");
+            }
+
+            FieldType? deduplicatedFieldType;
+            if (UniqueFieldTypes.TryGetValue(fieldType, out deduplicatedFieldType))
+                fieldType = deduplicatedFieldType;
+            else
+                UniqueFieldTypes[fieldType] = fieldType;
+
+            return fieldType;
+        }
+
+        private static FieldResourceType DetermineResourceType(string subTypeToken)
+        {
+            if (subTypeToken == "scene")
+                return FieldResourceType.Scene;
+
+            throw new NotImplementedException();
+        }
+
         private static ClassDef2 ParseClass(ClassType classType, TypeDefAttribute[] typeDefAttributes, IReadOnlyList<string> lines, ref int lineNum, string line, int col)
         {
             string className = PullTokenOfType(line, ref col, TokenType.Identifier);
@@ -890,10 +944,8 @@ namespace GameObjectReflector
                     token = PullToken(line, ref col, out tokenType);
                 }
 
-                if (tokenType != TokenType.Identifier)
-                    throw new ReflectorException("Expected identifier");
+                FieldType fieldType = ParseType(line, ref col, token, tokenType);
 
-                FieldType fieldType = DetermineFieldType(token);
                 string fieldName = PullToken(line, ref col, out tokenType);
 
                 fieldDefs.Add(new FieldDef(fieldAttribs.ToArray(), fieldName, fieldType));
@@ -905,27 +957,31 @@ namespace GameObjectReflector
         private static FieldType DetermineFieldType(string token)
         {
             if (token == "vec2")
-                return FieldType.Vec2;
+                return new FieldType(FieldMainType.Vec2);
             else if (token == "vec3")
-                return FieldType.Vec3;
+                return new FieldType(FieldMainType.Vec3);
             else if (token == "vec4")
-                return FieldType.Vec4;
+                return new FieldType(FieldMainType.Vec4);
             else if (token == "bool")
-                return FieldType.Bool;
+                return new FieldType(FieldMainType.Bool);
             else if (token == "bytestring")
-                return FieldType.ByteString;
+                return new FieldType(FieldMainType.ByteString);
             else if (token == "float")
-                return FieldType.Float;
+                return new FieldType(FieldMainType.Float);
             else if (token == "uint")
-                return FieldType.UInt;
+                return new FieldType(FieldMainType.UInt);
+            else if (token == "uint64")
+                return new FieldType(FieldMainType.UInt64);
             else if (token == "label")
-                return FieldType.Label;
+                return new FieldType(FieldMainType.Label);
             else if (token == "bspmodel")
-                return FieldType.BspModel;
+                return new FieldType(FieldMainType.BspModel);
             else if (token == "broken")
-                return FieldType.Broken;
+                return new FieldType(FieldMainType.Broken);
             else if (token == "edef")
-                return FieldType.EDef;
+                return new FieldType(FieldMainType.EDef);
+            else if (token == "resource")
+                return new FieldType(FieldMainType.Resource);
             else
                 throw new ReflectorException("Unknown field type " + token);
         }

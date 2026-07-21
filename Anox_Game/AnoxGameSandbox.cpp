@@ -286,10 +286,12 @@ namespace anox::game::sandbox
 		RKIT_RETURN_OK;
 	}
 
-	rkit::Result SandboxExports::MTAsync_RunFrame(void *gameSession)
+	rkit::Result SandboxExports::MTAsync_RunFrame(void *gameSession, uint32_t timeLow, uint32_t timeHigh)
 	{
+		const uint64_t gameTimeUSec = ((static_cast<uint64_t>(timeHigh) << 32) | timeLow);
+
 		Session *session = static_cast<Session *>(gameSession);
-		return session->AsyncRunFrame(session->GetWorld());
+		return session->AsyncRunFrame(session->GetWorld(), gameTimeUSec);
 	}
 
 	rkit::Result SandboxExports::MTAsync_LoadMapScriptPackage(void *gameSession, void *scriptCatalogData, size_t scriptCatalogSize)

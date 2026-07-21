@@ -14,6 +14,7 @@
 #include "anox/CoreUtils/CoreUtils.h"
 
 #include "SandboxResourceLoader.h"
+#include "anox/Sandbox/AnoxGame.sb.generated.h"
 
 #include "AllWorldObjects.h"
 #include "AnoxGameSession.h"
@@ -44,7 +45,7 @@ namespace anox::game
 		rkit::ResultCoroutine LoadMapScriptPackage(rkit::ICoroThread &thread, rkit::Span<const rkit::data::ContentID> scriptContentIDs);
 		rkit::ResultCoroutine EnterGameSession(rkit::ICoroThread &thread, World &world);
 
-		rkit::ResultCoroutine RunFrame(rkit::ICoroThread &thread, World &world);
+		rkit::ResultCoroutine RunFrame(rkit::ICoroThread &thread, World &world, uint64_t clockTimeUSec);
 
 	private:
 		rkit::ResultCoroutine LoadMultipleScripts(rkit::ICoroThread &thread, ScriptManager::ScriptLayer layer, rkit::Span<const rkit::data::ContentID> contentIDs);
@@ -52,6 +53,10 @@ namespace anox::game
 		rkit::UniquePtr<World> m_world;
 		rkit::UniquePtr<ScriptManager> m_scriptManager;
 		rkit::UniquePtr<rkit::ICoroThread> m_mainCoroThread;
+
+		// SAVEGAME TODO
+		uint64_t m_frameStartRealTimeUSec = 0;
+		uint64_t m_gameClockUSec = 0;
 	};
 }
 
@@ -160,9 +165,15 @@ namespace anox::game
 		CORO_RETURN_OK;
 	}
 
-	rkit::ResultCoroutine SessionImpl::RunFrame(rkit::ICoroThread &thread, World &world)
+	rkit::ResultCoroutine SessionImpl::RunFrame(rkit::ICoroThread &thread, World &world, uint64_t realTimeUSec)
 	{
-		CORO_CHECK(co_await world.OnRunFrame(thread));
+		const uint64_t kMaxFrameTimeUSec = 100000;
+		const uint64_t interval = rkit::Min<uint64_t>(realTimeUSec - m_frameStartRealTimeUSec, kMaxFrameTimeUSec);
+
+		m_frameStartRealTimeUSec = realTimeUSec;
+		m_gameClockUSec += interval;
+
+		CORO_CHECK(co_await world.OnRunFrame(thread, m_gameClockUSec / 1000u));
 		CORO_RETURN_OK;
 	}
 
@@ -228,10 +239,10 @@ namespace anox::game
 		return thread.EnterFunction(Impl().EnterGameSession(thread, world));
 	}
 
-	rkit::Result Session::AsyncRunFrame(World &world)
+	rkit::Result Session::AsyncRunFrame(World &world, uint64_t gameTimeUSec)
 	{
 		rkit::ICoroThread &thread = *Impl().m_mainCoroThread;
-		return thread.EnterFunction(Impl().RunFrame(thread, world));
+		return thread.EnterFunction(Impl().RunFrame(thread, world, gameTimeUSec));
 	}
 
 	World &Session::GetWorld() const

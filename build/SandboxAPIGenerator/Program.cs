@@ -676,7 +676,14 @@ namespace SandboxAPIGenerator
 
                     foreach (FunctionDef fdef in imports)
                     {
-                        sw.Write(indent + "\tstatic ::rkit::Result " + fdef.Name);
+                        sw.Write(indent + "\tstatic ");
+
+                        if (fdef.NoExcept)
+                            sw.Write("void ");
+                        else
+                            sw.Write("::rkit::Result ");
+                        
+                        sw.Write(fdef.Name);
 
                         WriteCanonicalParamList(sw, "::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread", fdef, true);
                         sw.WriteLine(";");
@@ -784,7 +791,11 @@ namespace SandboxAPIGenerator
                             }
                         }
 
-                        sw.Write(indent + "\t::rkit::PackedResultAndExtCode loc_result = RKIT_TRY_EVAL(HostExports::" + fdef.Name + "(*env, thread");
+                        sw.Write(indent + "\t");
+                        if (!fdef.NoExcept)
+                            sw.Write("::rkit::PackedResultAndExtCode loc_result = RKIT_TRY_EVAL(");
+                        
+                        sw.Write("HostExports::" + fdef.Name + "(*env, thread");
                         foreach (ParameterDef rv in returnValues)
                         {
                             sw.Write(", ");
@@ -795,7 +806,9 @@ namespace SandboxAPIGenerator
                             sw.Write(", ");
                             sw.Write(p.Name);
                         }
-                        sw.WriteLine("));");
+                        if (!fdef.NoExcept)
+                            sw.Write(")");
+                        sw.WriteLine(");");
                         sw.WriteLine();
 
                         if (returnValues.Length > 0)
@@ -814,7 +827,11 @@ namespace SandboxAPIGenerator
                             sw.WriteLine(indent + "\t}");
                         }
                         sw.WriteLine();
-                        sw.WriteLine(indent + "\treturn loc_result;");
+
+                        if (fdef.NoExcept)
+                            sw.WriteLine(indent + "\treturn ::rkit::utils::PackResult(::rkit::ResultCode::kOK);");
+                        else
+                            sw.WriteLine(indent + "\treturn loc_result;");
 
                         sw.WriteLine(indent + "}");
                         sw.WriteLine();

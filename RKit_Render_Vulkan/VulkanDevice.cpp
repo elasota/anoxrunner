@@ -381,7 +381,7 @@ namespace rkit { namespace render { namespace vulkan
 	T *VulkanDevice::QueueFamilySpanGetElement(const ConstVoidPtr_t &queueFamilyPtr, size_t index)
 	{
 		const QueueFamily *queueFamily = static_cast<const QueueFamily *>(queueFamilyPtr);
-		return queueFamily->m_queues[index].Get();
+		return rkit::DynamicDowncaster<VulkanQueueProxyBase, T>::Cast(queueFamily->m_queues[index].Get());
 	}
 
 	CallbackSpan<ICopyCommandQueue *, const void *> VulkanDevice::GetCopyQueues() const

@@ -29,6 +29,7 @@ namespace anox::game
 		static rkit::Result Create(rkit::UniquePtr<SceneManager> &outManager, World &world);
 
 		rkit::ResultCoroutine RunScene(rkit::ICoroThread &thread, const rkit::ByteStringSliceView &name, const rkit::data::ContentID &cid, bool loop);
+		rkit::ResultCoroutine OnFrame(rkit::ICoroThread &thread);
 
 	private:
 		// SAVEGAME TODO

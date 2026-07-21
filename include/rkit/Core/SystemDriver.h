@@ -133,6 +133,8 @@ namespace rkit
 		virtual uint32_t GetProcessorCount() const = 0;
 
 		virtual render::IDisplayManager *GetDisplayManager() const = 0;
+
+		virtual uint64_t GetTimeUSec() const = 0;
 	};
 }
 

@@ -8,6 +8,7 @@
 #include "rkit/Core/Job.h"
 #include "rkit/Core/Mutex.h"
 #include "rkit/Core/NewDelete.h"
+#include "rkit/Core/SystemDriver.h"
 
 #include "rkit/Utilities/ThreadPool.h"
 
@@ -29,18 +30,23 @@ namespace anox
 		rkit::Result GetCIPathKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::CIPathView &path) override;
 		rkit::Result GetStringKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::StringView &str) override;
 
+		rkit::Result GetTimeElapsedUSec(uint64_t &outTime) override;
+
 		rkit::Result TerminateSession() override;
 
 	private:
 		IAnoxGame &m_game;
 		AnoxResourceManagerBase &m_resManager;
 		rkit::UniquePtr<IConfigurationState> m_initialConfiguration;
+
+		uint64_t m_baseTimeUSec = 0;
 	};
 
 	AnoxRealTimeCaptureHarness::AnoxRealTimeCaptureHarness(IAnoxGame &game, AnoxResourceManagerBase &resManager, rkit::UniquePtr<IConfigurationState> &&initialConfiguration)
 		: m_game(game)
 		, m_resManager(resManager)
 		, m_initialConfiguration(std::move(initialConfiguration))
+		, m_baseTimeUSec(rkit::GetDrivers().m_systemDriver.Get()->GetTimeUSec())
 	{
 	}
 
@@ -73,6 +79,12 @@ namespace anox
 	rkit::Result AnoxRealTimeCaptureHarness::GetStringKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::StringView &str)
 	{
 		return m_resManager.GetStringKeyedResource(nullptr, loadFuture, resourceType, str);
+	}
+
+	rkit::Result AnoxRealTimeCaptureHarness::GetTimeElapsedUSec(uint64_t &outTime)
+	{
+		outTime = rkit::GetDrivers().m_systemDriver.Get()->GetTimeUSec() - m_baseTimeUSec;
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxRealTimeCaptureHarness::TerminateSession()

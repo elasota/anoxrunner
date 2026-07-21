@@ -274,7 +274,10 @@ namespace rkit { namespace render { namespace vulkan
 
 		{
 			bool isCompatible = false;
-			RKIT_CHECK(prototype.CheckQueueCompatibility(isCompatible, m_queue));
+			{
+				IComputeCommandQueue &downcastQueue = m_queue;
+				RKIT_CHECK(prototype.CheckQueueCompatibility(isCompatible, downcastQueue));
+			}
 
 			if (!isCompatible)
 				RKIT_THROW(ResultCode::kInternalError);

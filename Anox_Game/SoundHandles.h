@@ -20,7 +20,7 @@ namespace anox::game
 		SoundEmitterHandle& operator=(const SoundEmitterHandle &other) = delete;
 		SoundEmitterHandle &operator=(SoundEmitterHandle &&other) noexcept;
 
-		void Play() const;
+		rkit::Result Play() const;
 
 		static rkit::Result Create(SoundEmitterHandle &outHandle, SoundSourceHandle &&src, const SoundEmitterProperties &emitterProperties);
 

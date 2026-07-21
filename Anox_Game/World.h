@@ -48,7 +48,7 @@ namespace anox::game
 		AllWorldObjectsCollection GetAllObjects() const;
 
 		rkit::ResultCoroutine OnWorldStarted(rkit::ICoroThread &thread);
-		rkit::ResultCoroutine OnRunFrame(rkit::ICoroThread &thread);
+		rkit::ResultCoroutine OnRunFrame(rkit::ICoroThread &thread, uint64_t newGameTimeMSec);
 
 		ScriptManager &GetScriptManager() const;
 		ScriptEnvironment &GetScriptEnvironment() const;

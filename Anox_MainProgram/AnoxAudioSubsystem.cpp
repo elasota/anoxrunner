@@ -671,8 +671,8 @@ namespace anox
 		void AddEmitter(rkit::RCPtr<AudioMixerEmitter> emitter);
 		void RemoveEmitter(AudioMixerEmitter* emitter);
 
-		void Cmd_PlayEmitter(AudioMixerEmitter *emitter);
-		void Cmd_StopEmitter(AudioMixerEmitter *emitter);
+		rkit::Result Cmd_PlayEmitter(AudioMixerEmitter *emitter);
+		rkit::Result Cmd_StopEmitter(AudioMixerEmitter *emitter);
 
 	private:
 		struct AudioRenderThreadState;
@@ -1618,30 +1618,26 @@ namespace anox
 		m_lastRemoveEmitter = emitter;
 	}
 
-	void AudioMixer::Cmd_PlayEmitter(AudioMixerEmitter *emitter)
+	rkit::Result AudioMixer::Cmd_PlayEmitter(AudioMixerEmitter *emitter)
 	{
-		RKIT_CHECK(
-			PostAudioCommand(AudioCommandType::kPlayEmitter, 1, [emitter](AudioCommandWord *cmdWords)
-				{
-					cmdWords[0].m_emitter = WriteEmitter(emitter);
-				})
-		);
+		return PostAudioCommand(AudioCommandType::kPlayEmitter, 1, [emitter](AudioCommandWord *cmdWords)
+			{
+				cmdWords[0].m_emitter = WriteEmitter(emitter);
+			});
 	}
 
-	void AudioMixer::Cmd_StopEmitter(AudioMixerEmitter *emitter)
+	rkit::Result AudioMixer::Cmd_StopEmitter(AudioMixerEmitter *emitter)
 	{
-		RKIT_CHECK(
-			PostAudioCommand(AudioCommandType::kStopEmitter, 1, [emitter](AudioCommandWord *cmdWords)
-				{
-					cmdWords[0].m_emitter = WriteEmitter(emitter);
-				})
-		);
+		return PostAudioCommand(AudioCommandType::kStopEmitter, 1, [emitter](AudioCommandWord *cmdWords)
+			{
+				cmdWords[0].m_emitter = WriteEmitter(emitter);
+			});
 	}
 
 	template<class TFunc>
 	rkit::Result AudioMixer::PostAudioCommand(AudioCommandType cmdType, size_t numParamWords, const TFunc &func)
 	{
-		PostAudioCommandWithCallback(cmdType, numParamWords, &func, LambdaThunk<TFunc>);
+		return PostAudioCommandWithCallback(cmdType, numParamWords, &func, LambdaThunk<TFunc>);
 	}
 
 	template<class TFunc>
@@ -2142,7 +2138,7 @@ namespace anox
 		if (!audioOutputStream.IsValid())
 			RKIT_RETURN_OK;
 
-		m_mixer.SetOutputLayout(audioFormat, audioOutputStream->GetBufferCapacity());
+		RKIT_CHECK(m_mixer.SetOutputLayout(audioFormat, audioOutputStream->GetBufferCapacity()));
 
 		m_endpoint = std::move(audioOutputEndpoint);
 		m_outputStream = std::move(audioOutputStream);
@@ -2197,6 +2193,8 @@ namespace anox
 		Impl().m_mixer.AddEmitter(std::move(mixerEmitterRC));
 
 		outEmitter = mixerEmitter;
+
+		RKIT_RETURN_OK;
 	}
 
 	void AudioSubsystem::DestroyEmitter(AudioEmitter *emitter)

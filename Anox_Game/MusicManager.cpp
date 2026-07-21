@@ -67,7 +67,7 @@ namespace anox::game
 
 				RKIT_CHECK(SoundEmitterHandle::Create(m_musicEmitter, std::move(source), emitterProperties));
 
-				m_musicEmitter.Play();
+				RKIT_CHECK(m_musicEmitter.Play());
 			}
 		}
 

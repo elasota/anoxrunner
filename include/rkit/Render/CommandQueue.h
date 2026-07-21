@@ -66,12 +66,12 @@ namespace rkit { namespace render
 		virtual Result CreateCopyCommandAllocator(UniquePtr<ICopyCommandAllocator> &outCommandAllocator, bool isBundle) = 0;
 	};
 
-	struct IComputeCommandQueue : public virtual ICopyCommandQueue
+	struct IComputeCommandQueue : public ICopyCommandQueue
 	{
 		virtual Result CreateComputeCommandAllocator(UniquePtr<IComputeCommandAllocator> &outCommandAllocator, bool isBundle) = 0;
 	};
 
-	struct IGraphicsCommandQueue : public virtual ICopyCommandQueue
+	struct IGraphicsCommandQueue : public ICopyCommandQueue
 	{
 		virtual Result CreateGraphicsCommandAllocator(UniquePtr<IGraphicsCommandAllocator> &outCommandAllocator, bool isBundle) = 0;
 	};

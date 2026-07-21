@@ -664,7 +664,7 @@ namespace anox
 			CORO_CHECK(co_await thread.AwaitBlocker(mtBlocker.CreateBlocker()));
 		}
 
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(scriptPackageMO.m_mmid));
+		m_sandbox->ReleaseDynamicMemory(scriptPackageMO.m_mmid);
 
 		rkit::log::LogInfo(u8"GameLogic: Script package loaded successfully");
 
@@ -744,13 +744,13 @@ namespace anox
 			CORO_CHECK(co_await thread.AwaitBlocker(mtBlocker.CreateBlocker()));
 		}
 
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(entityTypesMO.m_mmid));
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(spawnDataMO.m_mmid));
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(stringLengthsMO.m_mmid));
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(stringDataMO.m_mmid));
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(entityDefValuesMO.m_mmid));
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(udefDescLengthsMO.m_mmid));
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(udefDescBytesMO.m_mmid));
+		m_sandbox->ReleaseDynamicMemory(entityTypesMO.m_mmid);
+		m_sandbox->ReleaseDynamicMemory(spawnDataMO.m_mmid);
+		m_sandbox->ReleaseDynamicMemory(stringLengthsMO.m_mmid);
+		m_sandbox->ReleaseDynamicMemory(stringDataMO.m_mmid);
+		m_sandbox->ReleaseDynamicMemory(entityDefValuesMO.m_mmid);
+		m_sandbox->ReleaseDynamicMemory(udefDescLengthsMO.m_mmid);
+		m_sandbox->ReleaseDynamicMemory(udefDescBytesMO.m_mmid);
 
 		CORO_CHECK(m_sandboxImports.MTAsync_PostSpawnInitialEntities(m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr));
 
@@ -872,7 +872,13 @@ namespace anox
 	{
 		if (m_sandbox.IsValid())
 		{
-			CORO_CHECK(m_sandboxImports.MTAsync_RunFrame(m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr));
+			uint64_t gameTime = 0;
+			CORO_CHECK(m_game->GetCaptureHarness()->GetTimeElapsedUSec(gameTime));
+
+			const uint32_t gameTimeLow = (gameTime & 0xffffffffu);
+			const uint32_t gameTimeHigh = ((gameTime >> 32) & 0xffffffffu);
+
+			CORO_CHECK(m_sandboxImports.MTAsync_RunFrame(m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr, gameTimeLow, gameTimeHigh));
 
 			{
 				SandboxMainThreadBlocker mtBlocker(this);

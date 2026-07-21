@@ -145,7 +145,7 @@ namespace anox::buildsystem
 		rkit::Result IndexContentRef(uint32_t &outIndex, data::SceneContentRefType refType, const rkit::data::ContentID &cid);
 		rkit::Result ProcessCommand(const SceneCommand &cmd, rkit::ConstSpan<SceneCommandParam> params);
 
-		rkit::Result AddNode(data::ScenePathType type, uint32_t flags, uint32_t timeLen);
+		rkit::Result AddNode(data::SceneNodeCommon& common, data::ScenePathType type, uint32_t flags, uint32_t timeLen);
 
 		rkit::UniquePtr<UserEntityDictionaryBase> m_dict;
 		rkit::buildsystem::IDependencyNodeCompilerFeedback *m_feedback;
@@ -154,7 +154,6 @@ namespace anox::buildsystem
 		rkit::StaticArray<rkit::HashMap<rkit::data::ContentID, uint32_t>, static_cast<size_t>(data::SceneContentRefType::kCount)> m_contentIDs;
 
 		data::SceneHeader m_header = {};
-		rkit::Vector<data::SceneNodeCommon> m_common;
 		rkit::Vector<data::SceneCubicNode> m_cubic;
 		rkit::Vector<data::SceneFocusNode> m_focus;
 		rkit::Vector<data::SceneCommandNode> m_cmd;
@@ -222,6 +221,8 @@ namespace anox::buildsystem
 			if (lineStart < stream.Count())
 				lineStart++;
 		}
+
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result SceneParser::ParseLine(rkit::ConstSpan<uint8_t> line, ISceneParserConsumer &consumer)
@@ -277,8 +278,7 @@ namespace anox::buildsystem
 			if (tokens[0] == parser.m_name.RemoveEncoding())
 			{
 				const ParseMethod_t method = parser.m_method;
-				(this->*method)(tokens.ToSpan().SubSpan(1), consumer);
-				RKIT_RETURN_OK;
+				return (this->*method)(tokens.ToSpan().SubSpan(1), consumer);
 			}
 		}
 
@@ -993,6 +993,7 @@ namespace anox::buildsystem
 		RKIT_CHECK(NormalizePathType(pathType, type));
 
 		data::ScenePath path = {};
+		path.m_pathType = pathType;
 		path.m_numNodes = 0;
 		path.m_timeOffs = timeOffs;
 		path.m_maxLen = maxLen;
@@ -1004,9 +1005,9 @@ namespace anox::buildsystem
 
 	rkit::Result SceneCompilerConsumer::ProcessCubicNode(uint32_t flags, uint32_t timeLen, rkit::math::Vec3 position, rkit::math::Vec3 velocityVector, uint32_t relativeMode)
 	{
-		RKIT_CHECK(AddNode(data::ScenePathType::kCubic, flags, timeLen));
-
 		data::SceneCubicNode node = {};
+		RKIT_CHECK(AddNode(node.m_common, data::ScenePathType::kCubic, flags, timeLen));
+
 		CopyVec3(node.m_position, position);
 		CopyVec3(node.m_velocity, velocityVector);
 		node.m_relativeMode = relativeMode;
@@ -1018,9 +1019,9 @@ namespace anox::buildsystem
 
 	rkit::Result SceneCompilerConsumer::ProcessFocusNode(uint32_t flags, uint32_t timeLen, uint32_t focusTarget, rkit::ByteStringSliceView name)
 	{
-		RKIT_CHECK(AddNode(data::ScenePathType::kFocus, flags, timeLen));
-
 		data::SceneFocusNode node = {};
+		RKIT_CHECK(AddNode(node.m_common, data::ScenePathType::kFocus, flags, timeLen));
+
 		node.m_focusTarget = focusTarget;
 
 		RKIT_CHECK(m_focus.Append(node));
@@ -1030,7 +1031,8 @@ namespace anox::buildsystem
 
 	rkit::Result SceneCompilerConsumer::ProcessCommandNode(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<SceneCommand> commands, rkit::ConstSpan<SceneCommandParam> params)
 	{
-		RKIT_CHECK(AddNode(data::ScenePathType::kCommand, flags, timeLen));
+		data::SceneCommandNode node = {};
+		RKIT_CHECK(AddNode(node.m_common, data::ScenePathType::kCommand, flags, timeLen));
 
 		const size_t prevDWordCount = m_cmdParamDWords.Count();
 		const size_t prevCmds = m_cmdOpcodes.Count();
@@ -1046,7 +1048,6 @@ namespace anox::buildsystem
 		if (numCmds > std::numeric_limits<uint32_t>::max() || numParamDWords > std::numeric_limits<uint32_t>::max())
 			RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
 
-		data::SceneCommandNode node = {};
 		node.m_numCommands = static_cast<uint32_t>(numCmds);
 		node.m_numParamDWords = static_cast<uint32_t>(numParamDWords);
 
@@ -1057,9 +1058,9 @@ namespace anox::buildsystem
 
 	rkit::Result SceneCompilerConsumer::ProcessScaleNode(uint32_t flags, uint32_t timeLen, rkit::math::Vec3 scale, rkit::math::Vec3 delta)
 	{
-		RKIT_CHECK(AddNode(data::ScenePathType::kScale, flags, timeLen));
-
 		data::SceneScaleNode node = {};
+		RKIT_CHECK(AddNode(node.m_common, data::ScenePathType::kScale, flags, timeLen));
+
 		CopyVec3(node.m_scale, scale);
 		CopyVec3(node.m_delta, delta);
 
@@ -1070,9 +1071,9 @@ namespace anox::buildsystem
 
 	rkit::Result SceneCompilerConsumer::ProcessRollNode(uint32_t flags, uint32_t timeLen, float value, float rate)
 	{
-		RKIT_CHECK(AddNode(data::ScenePathType::kRoll, flags, timeLen));
-
 		data::SceneRollNode node = {};
+		RKIT_CHECK(AddNode(node.m_common, data::ScenePathType::kRoll, flags, timeLen));
+
 		node.m_value = value;
 		node.m_rate = rate;
 
@@ -1083,10 +1084,10 @@ namespace anox::buildsystem
 
 	rkit::Result SceneCompilerConsumer::ProcessFOVNode(uint32_t flags, uint32_t timeLen, float value, float rate)
 	{
-		RKIT_CHECK(AddNode(data::ScenePathType::kFOV, flags, timeLen));
-
 		data::SceneFOVNode node = {};
-		node.m_rate = value;
+		RKIT_CHECK(AddNode(node.m_common, data::ScenePathType::kFOV, flags, timeLen));
+
+		node.m_value = value;
 		node.m_rate = rate;
 
 		RKIT_CHECK(m_fov.Append(node));
@@ -1122,6 +1123,16 @@ namespace anox::buildsystem
 		for (size_t contentTypeIndex = 0; contentTypeIndex < static_cast<size_t>(data::SceneContentRefType::kCount); contentTypeIndex++)
 			m_header.m_contentCounts[contentTypeIndex] = static_cast<uint32_t>(m_contentIDs[contentTypeIndex].Count());
 
+		if (m_paths.Count() > std::numeric_limits<uint32_t>::max())
+			RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
+
+		m_header.m_numPaths = static_cast<uint32_t>(m_paths.Count());
+
+		if (m_blocks.Count() > std::numeric_limits<uint32_t>::max())
+			RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
+
+		m_header.m_numBlocks = static_cast<uint32_t>(m_blocks.Count());
+
 		// Write everything
 		RKIT_CHECK(stream.WriteOneBinary(m_header));
 
@@ -1134,13 +1145,12 @@ namespace anox::buildsystem
 
 		RKIT_CHECK(stream.WriteAllSpan(m_blocks.ToSpan()));
 		RKIT_CHECK(stream.WriteAllSpan(m_paths.ToSpan()));
-		RKIT_CHECK(stream.WriteAllSpan(m_common.ToSpan()));
 		RKIT_CHECK(stream.WriteAllSpan(m_cubic.ToSpan()));
 		RKIT_CHECK(stream.WriteAllSpan(m_focus.ToSpan()));
 		RKIT_CHECK(stream.WriteAllSpan(m_cmd.ToSpan()));
 		RKIT_CHECK(stream.WriteAllSpan(m_scale.ToSpan()));
 		RKIT_CHECK(stream.WriteAllSpan(m_roll.ToSpan()));
-		RKIT_CHECK(stream.WriteAllSpan(m_scale.ToSpan()));
+		RKIT_CHECK(stream.WriteAllSpan(m_fov.ToSpan()));
 		RKIT_CHECK(stream.WriteAllSpan(m_cmdOpcodes.ToSpan()));
 		RKIT_CHECK(stream.WriteAllSpan(m_cmdParamDWords.ToSpan()));
 
@@ -1335,7 +1345,7 @@ namespace anox::buildsystem
 		RKIT_RETURN_OK;
 	}
 
-	rkit::Result SceneCompilerConsumer::AddNode(data::ScenePathType type, uint32_t flags, uint32_t timeLen)
+	rkit::Result SceneCompilerConsumer::AddNode(data::SceneNodeCommon& common, data::ScenePathType type, uint32_t flags, uint32_t timeLen)
 	{
 		rkit::endian::LittleUInt32_t &nodeCounter = m_header.m_nodeCounts[static_cast<size_t>(type)];
 
@@ -1350,11 +1360,8 @@ namespace anox::buildsystem
 
 		nodeCounter = nodeCounter.Get() + 1;
 
-		data::SceneNodeCommon common = {};
 		common.m_flags = flags;
 		common.m_timeLen = timeLen;
-
-		RKIT_CHECK(m_common.Append(common));
 
 		RKIT_RETURN_OK;
 	}

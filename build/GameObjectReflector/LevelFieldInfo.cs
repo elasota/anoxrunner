@@ -2,20 +2,20 @@
 {
     internal struct LevelFieldInfo
     {
-        public FieldType FieldType { get; }
+        public FieldMainType MainType { get; }
         public int Offset { get; }
         public bool IsOnOffBool { get; }
 
-        public LevelFieldInfo(FieldType fieldType, int offset)
+        public LevelFieldInfo(FieldMainType fieldType, int offset)
         {
-            FieldType = fieldType;
+            MainType = fieldType;
             Offset = offset;
             IsOnOffBool = false;
         }
 
-        public LevelFieldInfo(FieldType fieldType, int offset, bool isOnOffBool)
+        public LevelFieldInfo(FieldMainType fieldType, int offset, bool isOnOffBool)
         {
-            FieldType = fieldType;
+            MainType = fieldType;
             Offset = offset;
             IsOnOffBool = isOnOffBool;
         }

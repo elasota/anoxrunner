@@ -38,6 +38,8 @@ namespace anox
 		virtual rkit::Result GetCIPathKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::CIPathView &path) = 0;
 		virtual rkit::Result GetStringKeyedResource(rkit::Future<AnoxResourceRetrieveResult> &loadFuture, uint32_t resourceType, const rkit::StringView &str) = 0;
 
+		virtual rkit::Result GetTimeElapsedUSec(uint64_t &outTime) = 0;
+
 		virtual rkit::Result TerminateSession() = 0;
 
 		static rkit::Result CreateRealTime(rkit::UniquePtr<ICaptureHarness> &outHarness, IAnoxGame &game,

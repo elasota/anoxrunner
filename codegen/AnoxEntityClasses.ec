@@ -490,3 +490,9 @@ class ScriptWindowInstance
 	vec2 pos
 	vec2 size
 }
+
+class Scene
+{
+	resource(scene) scene
+	uint64 startTime
+}

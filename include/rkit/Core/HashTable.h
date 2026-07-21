@@ -65,8 +65,10 @@ namespace rkit
 	class DefaultElementConstructor
 	{
 	public:
-		static Result Construct(void *memory, TOriginal &&original);
-		static Result Assign(TTarget &target, TOriginal &&original);
+		static constexpr bool kMayThrow = false;
+
+		static void Construct(void *memory, TOriginal &&original) noexcept;
+		static void Assign(TTarget &target, TOriginal &&original) noexcept;
 	};
 
 	template<class TKey, class TValue>
@@ -995,15 +997,20 @@ rkit::Result rkit::HashSet<TKey, TSize>::Add(TCandidateKey &&key)
 
 	RKIT_CHECK(this->CreatePositionForNewEntry(hash, position));
 
-	RKIT_TRY_CATCH_RETHROW(TKeyConstructor::Construct(this->m_keys + position, std::forward<TKey>(key)),
-		CatchContext(
-			[this, position]
-			{
-				this->m_keys[position].~TKey();
-				this->RemoveEntryNoDestruct(position);
-			}
-		)
-	);
+	if constexpr (TKeyConstructor::kMayThrow)
+	{
+		RKIT_TRY_CATCH_RETHROW(TKeyConstructor::Construct(this->m_keys + position, std::forward<TKey>(key)),
+			CatchContext(
+				[this, position]
+				{
+					this->m_keys[position].~TKey();
+					this->RemoveEntryNoDestruct(position);
+				}
+			)
+		);
+	}
+	else
+		TKeyConstructor::Construct(this->m_keys + position, std::forward<TKey>(key));
 
 	RKIT_RETURN_OK;
 }
@@ -1103,7 +1110,14 @@ rkit::Result rkit::HashMap<TKey, TValue, TSize>::SetPrehashedInternal(Iterator_t
 			this->m_keys[position] = std::forward<TCandidateKey>(key);
 
 		TValue *valuePtr = this->m_values.GetValuePtrAt(position);
-		return TValueConstructor::Assign(*valuePtr, std::forward<TCandidateValue>(value));
+
+		if constexpr (TValueConstructor::kMayThrow)
+			return TValueConstructor::Assign(*valuePtr, std::forward<TCandidateValue>(value));
+		else
+		{
+			TValueConstructor::Assign(*valuePtr, std::forward<TCandidateValue>(value));
+			RKIT_RETURN_OK;
+		}
 	}
 
 	RKIT_CHECK(this->CreatePositionForNewEntry(hash, position));
@@ -1111,6 +1125,7 @@ rkit::Result rkit::HashMap<TKey, TValue, TSize>::SetPrehashedInternal(Iterator_t
 	if constexpr (TWriteIterator)
 		*outIterator = Iterator_t(*this, position);
 
+	if constexpr (TKeyConstructor::kMayThrow)
 	{
 		RKIT_TRY_CATCH_RETHROW(TKeyConstructor::Construct(this->m_keys + position, std::forward<TCandidateKey>(key)),
 			CatchContext(
@@ -1121,7 +1136,10 @@ rkit::Result rkit::HashMap<TKey, TValue, TSize>::SetPrehashedInternal(Iterator_t
 			)
 		);
 	}
+	else
+		TKeyConstructor::Construct(this->m_keys + position, std::forward<TCandidateKey>(key));
 
+	if constexpr (TValueConstructor::kMayThrow)
 	{
 		RKIT_TRY_CATCH_RETHROW(TValueConstructor::Construct(this->m_values.GetValuePtrAt(position), std::forward<TCandidateValue>(value)),
 			CatchContext(
@@ -1134,6 +1152,8 @@ rkit::Result rkit::HashMap<TKey, TValue, TSize>::SetPrehashedInternal(Iterator_t
 			)
 		);
 	}
+	else
+		TValueConstructor::Construct(this->m_values.GetValuePtrAt(position), std::forward<TCandidateValue>(value));
 
 	RKIT_RETURN_OK;
 }
@@ -1238,17 +1258,15 @@ void rkit::HashMap<TKey, TValue, TSize>::RemoveAtAndInvalidateIterator(const Has
 }
 
 template<class TTarget, class TOriginal>
-rkit::Result rkit::DefaultElementConstructor<TTarget, TOriginal>::Construct(void *memory, TOriginal &&original)
+void rkit::DefaultElementConstructor<TTarget, TOriginal>::Construct(void *memory, TOriginal &&original) noexcept
 {
 	new (memory) TTarget(std::forward<TOriginal>(original));
-	RKIT_RETURN_OK;
 }
 
 template<class TTarget, class TOriginal>
-rkit::Result rkit::DefaultElementConstructor<TTarget, TOriginal>::Assign(TTarget &target, TOriginal &&original)
+void rkit::DefaultElementConstructor<TTarget, TOriginal>::Assign(TTarget &target, TOriginal &&original) noexcept
 {
 	target = std::forward<TOriginal>(original);
-	RKIT_RETURN_OK;
 }
 
 template<class TKey, class TValue>

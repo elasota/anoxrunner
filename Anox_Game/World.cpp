@@ -41,7 +41,7 @@ namespace anox::game
 		AllWorldObjectsCollection GetAllObjects() const;
 
 		rkit::ResultCoroutine OnWorldStarted(rkit::ICoroThread &thread);
-		rkit::ResultCoroutine OnRunFrame(rkit::ICoroThread &thread);
+		rkit::ResultCoroutine OnRunFrame(rkit::ICoroThread &thread, uint64_t gameClockMSec);
 
 	private:
 		void CleanUpObject(WorldObjectProxy *obj);
@@ -56,6 +56,10 @@ namespace anox::game
 		WorldObjectProxy* m_lastObject = nullptr;
 
 		WorldObjectProxy *m_firstDead = nullptr;
+
+		// SAVEGAME TODO
+		uint64_t m_prevFrameGameClockMSec = 1;
+		uint64_t m_gameClockMSec = 1;
 	};
 
 	WorldImpl::WorldImpl(ScriptManager &scriptManager)
@@ -155,12 +159,20 @@ namespace anox::game
 		CORO_RETURN_OK;
 	}
 
-	rkit::ResultCoroutine WorldImpl::OnRunFrame(rkit::ICoroThread &thread)
+	rkit::ResultCoroutine WorldImpl::OnRunFrame(rkit::ICoroThread &thread, uint64_t gameClockMSec)
 	{
+		if (gameClockMSec <= m_gameClockMSec)
+			CORO_RETURN_OK;
+
+		m_prevFrameGameClockMSec = m_gameClockMSec;
+		m_gameClockMSec = gameClockMSec;
+
 		for (WorldObject &obj : GetAllObjects())
 		{
 			CORO_CHECK(co_await obj.OnFrame(thread));
 		}
+
+		CORO_CHECK(co_await m_sceneManager->OnFrame(thread));
 
 		CORO_CHECK(m_musicManager->OnFrame());
 
@@ -206,9 +218,9 @@ namespace anox::game
 		return Impl().OnWorldStarted(thread);
 	}
 
-	rkit::ResultCoroutine World::OnRunFrame(rkit::ICoroThread &thread)
+	rkit::ResultCoroutine World::OnRunFrame(rkit::ICoroThread &thread, uint64_t gameClockMSec)
 	{
-		return Impl().OnRunFrame(thread);
+		return Impl().OnRunFrame(thread, gameClockMSec);
 	}
 
 	ScriptManager &World::GetScriptManager() const

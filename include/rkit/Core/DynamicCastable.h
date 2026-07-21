@@ -5,6 +5,15 @@
 
 namespace rkit
 {
+	template<class TSrc, class TDest>
+	struct DynamicDowncaster
+	{
+		static TDest *Cast(TSrc *src);
+	};
+}
+
+namespace rkit
+{
 	namespace priv
 	{
 		typedef void *(*RecastRefFunc_t)(void *ptr);
@@ -86,6 +95,12 @@ namespace rkit
 
 namespace rkit
 {
+	template<class TSrc, class TDest>
+	inline TDest *DynamicDowncaster<TSrc, TDest>::Cast(TSrc *src)
+	{
+		return src;
+	}
+
 	template<class... TTargetTypes>
 	DynamicallyCastableRef<TTargetTypes...>::DynamicallyCastableRef()
 		: m_object(nullptr)
@@ -169,7 +184,7 @@ namespace rkit { namespace priv
 	void *DynamicCastFunctionHelper<TSourceType, TTargetType, true>::Recast(void *ptr)
 	{
 		TSourceType *src = static_cast<TSourceType *>(ptr);
-		TTargetType *target = src;
+		TTargetType *target = DynamicDowncaster<TSourceType, TTargetType>::Cast(src);
 		return static_cast<void *>(target);
 	}
 

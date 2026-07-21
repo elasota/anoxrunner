@@ -13,7 +13,7 @@
 
 #include <cstring>
 
-namespace rkit { namespace render { namespace vulkan
+namespace rkit::render::vulkan
 {
 	class VulkanQueueProxy final : public VulkanQueueProxyBase
 	{
@@ -56,7 +56,19 @@ namespace rkit { namespace render { namespace vulkan
 		uint32_t m_queueFamily;
 		const VulkanDeviceAPI &m_vkd;
 	};
+}
 
+namespace rkit
+{
+	template<>
+	struct DynamicDowncaster<render::vulkan::VulkanQueueProxy, render::ICopyCommandQueue>
+	{
+		static render::ICopyCommandQueue *Cast(render::vulkan::VulkanQueueProxy *src);
+	};
+}
+
+namespace rkit::render::vulkan
+{
 	VulkanQueueProxy::VulkanQueueProxy(IMallocDriver *alloc, CommandQueueType queueType, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI)
 		: m_alloc(alloc)
 		, m_queueType(queueType)
@@ -73,7 +85,11 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanQueueProxy::CreateCopyCommandAllocator(UniquePtr<ICopyCommandAllocator> &outCommandAllocator, bool isBundle)
 	{
-		return CreateTypedCommandAllocator(outCommandAllocator, isBundle);
+		UniquePtr<IComputeCommandAllocator> computeAlloc;
+		RKIT_CHECK(CreateTypedCommandAllocator(computeAlloc, isBundle));
+
+		outCommandAllocator = std::move(computeAlloc);
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanQueueProxy::CreateComputeCommandAllocator(UniquePtr<IComputeCommandAllocator> &outCommandAllocator, bool isBundle)
@@ -99,7 +115,10 @@ namespace rkit { namespace render { namespace vulkan
 	ICopyCommandQueue *VulkanQueueProxy::ToCopyCommandQueue()
 	{
 		if (IsQueueTypeCompatible(m_queueType, CommandQueueType::kCopy))
-			return this;
+		{
+			IComputeCommandQueue *downcast = this;
+			return downcast;
+		}
 		else
 			return nullptr;
 	}
@@ -192,4 +211,13 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_RETURN_OK;
 	}
-} } } // rkit::render::vulkan
+} // rkit::render::vulkan
+
+
+namespace rkit
+{
+	render::ICopyCommandQueue *DynamicDowncaster<render::vulkan::VulkanQueueProxy, render::ICopyCommandQueue>::Cast(render::vulkan::VulkanQueueProxy *src)
+	{
+		return DynamicDowncaster<render::vulkan::VulkanQueueProxyBase, render::ICopyCommandQueue>::Cast(src);
+	}
+}

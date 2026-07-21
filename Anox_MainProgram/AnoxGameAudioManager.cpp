@@ -83,7 +83,7 @@ namespace anox::game
 		rkit::Result CreateEmitterFromSource(uint32_t &outEmitterID, uint32_t sourceID, const SoundEmitterProperties &emitterProperties);
 		void DestroyEmitter(uint32_t emitterID);
 
-		void PlayEmitter(uint32_t emitterID);
+		rkit::Result PlayEmitter(uint32_t emitterID);
 
 	private:
 		struct AudioEmitterState
@@ -267,7 +267,7 @@ namespace anox::game
 	rkit::Result GameAudioManagerImpl::CreateSoundSourceFromBytes(uint32_t &outSourceID, rkit::TypelessRCPtr &&keepalive, rkit::Span<const uint8_t> contents, rkit::audio::AudioContainerFormat containerFormat)
 	{
 		rkit::UniquePtr<GameSoundDataSource> dataSrc;
-		rkit::New<GameSoundBytesDataSource>(dataSrc, std::move(keepalive), contents);
+		RKIT_CHECK(rkit::New<GameSoundBytesDataSource>(dataSrc, std::move(keepalive), contents));
 
 		return CreateAudioSourceFromDataSource(outSourceID, std::move(dataSrc), containerFormat);
 	}
@@ -328,7 +328,7 @@ namespace anox::game
 	{
 		AudioEmitterState *emitterState = m_emitters.TryGetObject(emitterID);
 		if (!emitterState)
-			return;
+			RKIT_RETURN_OK;
 
 		if (emitterState->m_mixerEmitter == nullptr)
 		{

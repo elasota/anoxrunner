@@ -9,7 +9,7 @@
 #include "VulkanDevice.h"
 #include "IncludeVulkan.h"
 
-namespace rkit { namespace render { namespace vulkan
+namespace rkit::render::vulkan
 {
 	class VulkanCommandAllocator final : public VulkanCommandAllocatorBase
 	{
@@ -53,7 +53,19 @@ namespace rkit { namespace render { namespace vulkan
 		Vector<VkCommandBuffer> m_cmdBuffers;
 		size_t m_activeCmdBuffers = 0;
 	};
+}
 
+namespace rkit
+{
+	template<>
+	struct DynamicDowncaster<render::vulkan::VulkanCommandAllocator, render::ICopyCommandAllocator>
+	{
+		static render::ICopyCommandAllocator *Cast(render::vulkan::VulkanCommandAllocator *src);
+	};
+}
+
+namespace rkit::render::vulkan
+{
 	VulkanCommandAllocator::VulkanCommandAllocator(VulkanDeviceBase &device, VulkanQueueProxyBase &queue, CommandQueueType queueType, bool isBundle)
 		: m_device(device)
 		, m_queue(queue)
@@ -87,7 +99,11 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanCommandAllocator::OpenCopyCommandBatch(ICopyCommandBatch *&outCommandBatch, bool cpuWaitable)
 	{
-		return TypedOpenCommandBatch(outCommandBatch, cpuWaitable);
+		IComputeCommandBatch *intermediateBatch = nullptr;
+		RKIT_CHECK(TypedOpenCommandBatch(intermediateBatch, cpuWaitable));
+
+		outCommandBatch = intermediateBatch;
+		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandAllocator::OpenGraphicsCommandBatch(IGraphicsCommandBatch *&outCommandBatch, bool cpuWaitable)
@@ -255,4 +271,14 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_RETURN_OK;
 	}
-} } } // rkit::render::vulkan
+} // rkit::render::vulkan
+
+
+namespace rkit
+{
+	inline render::ICopyCommandAllocator *DynamicDowncaster<render::vulkan::VulkanCommandAllocator, render::ICopyCommandAllocator>::Cast(render::vulkan::VulkanCommandAllocator *src)
+	{
+		render::IComputeCommandAllocator *computeAlloc = src;
+		return computeAlloc;
+	}
+} // rkit
