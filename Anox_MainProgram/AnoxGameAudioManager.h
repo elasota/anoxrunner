@@ -33,10 +33,10 @@ namespace anox::game
 		explicit GameAudioManager(AudioSubsystem &audioSubsystem);
 
 		rkit::Result CreateSoundSourceFromBytes(uint32_t &outSourceID, rkit::TypelessRCPtr &&keepalive, rkit::Span<const uint8_t> contents, rkit::audio::AudioContainerFormat containerFormat);
-		void DestroySoundSource(uint32_t sourceID);
+		rkit::Result DestroySoundSource(uint32_t sourceID);
 
 		rkit::Result CreateEmitterFromSource(uint32_t &outEmitterID, uint32_t sourceID, const SoundEmitterProperties &emitterProperties);
-		void DestroyEmitter(uint32_t emitterID);
+		rkit::Result DestroyEmitter(uint32_t emitterID);
 
 		rkit::Result PlayEmitter(uint32_t emitterID);
 

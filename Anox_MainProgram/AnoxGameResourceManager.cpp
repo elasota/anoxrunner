@@ -260,7 +260,7 @@ namespace anox::game
 		RKIT_RETURN_OK;
 	}
 
-	void GameResourceManager::DiscardRequest(uint32_t reqID)
+	rkit::Result GameResourceManager::DiscardRequest(uint32_t reqID)
 	{
 		rkit::Future<AnoxResourceRetrieveResult> reqDisposeTemp;
 
@@ -270,18 +270,12 @@ namespace anox::game
 			rkit::MutexLock lock(*impl.m_requestMutex);
 
 			if (reqID == 0 || reqID > impl.m_requests.m_items.Count())
-			{
-				RKIT_ASSERT(false);
-				return;
-			}
+				RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 
 			GameResourceManagerImpl::TypeKeyedRequest &req = impl.m_requests.m_items[reqID - 1];
 
 			if (req.m_resType == 0)
-			{
-				RKIT_ASSERT(false);
-				return;
-			}
+				RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 
 			reqDisposeTemp = std::move(req.m_future);
 			req.m_resType = 0;
@@ -289,9 +283,11 @@ namespace anox::game
 
 			impl.m_requests.m_freeIDs[impl.m_requests.m_numFreeIDs++] = reqID;
 		}
+
+		RKIT_RETURN_OK;
 	}
 
-	void GameResourceManager::DecRefResource(uint32_t resID)
+	rkit::Result GameResourceManager::DecRefResource(uint32_t resID)
 	{
 		rkit::RCPtr<AnoxResourceBase> resDisposeTemp;
 
@@ -301,18 +297,12 @@ namespace anox::game
 			rkit::MutexLock lock(*impl.m_requestMutex);
 
 			if (resID == 0 || resID > impl.m_resources.m_items.Count())
-			{
-				RKIT_ASSERT(false);
-				return;
-			}
+				RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 
 			GameResourceManagerImpl::TypeKeyedResource &res = impl.m_resources.m_items[resID - 1];
 
 			if (res.m_resType == 0)
-			{
-				RKIT_ASSERT(false);
-				return;
-			}
+				RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 
 			res.m_refCount--;
 			if (res.m_refCount == 0)
@@ -327,6 +317,8 @@ namespace anox::game
 				impl.m_resources.m_freeIDs[impl.m_resources.m_numFreeIDs++] = resID;
 			}
 		}
+
+		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GameResourceManager::GetFileResourceContents(rkit::RCPtr<AnoxResourceBase> &outKeepAlive, rkit::Span<const uint8_t> &outBytes, uint32_t resID) const

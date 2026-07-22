@@ -678,9 +678,9 @@ namespace SandboxAPIGenerator
                     {
                         sw.Write(indent + "\tstatic ");
 
-                        if (fdef.NoExcept)
-                            sw.Write("void ");
-                        else
+                        //if (fdef.NoExcept)
+                        //    sw.Write("void ");
+                        //else
                             sw.Write("::rkit::Result ");
                         
                         sw.Write(fdef.Name);
@@ -792,7 +792,7 @@ namespace SandboxAPIGenerator
                         }
 
                         sw.Write(indent + "\t");
-                        if (!fdef.NoExcept)
+                        //if (!fdef.NoExcept)
                             sw.Write("::rkit::PackedResultAndExtCode loc_result = RKIT_TRY_EVAL(");
                         
                         sw.Write("HostExports::" + fdef.Name + "(*env, thread");
@@ -806,7 +806,7 @@ namespace SandboxAPIGenerator
                             sw.Write(", ");
                             sw.Write(p.Name);
                         }
-                        if (!fdef.NoExcept)
+                        //if (!fdef.NoExcept)
                             sw.Write(")");
                         sw.WriteLine(");");
                         sw.WriteLine();
@@ -828,9 +828,9 @@ namespace SandboxAPIGenerator
                         }
                         sw.WriteLine();
 
-                        if (fdef.NoExcept)
-                            sw.WriteLine(indent + "\treturn ::rkit::utils::PackResult(::rkit::ResultCode::kOK);");
-                        else
+                        //if (fdef.NoExcept)
+                        //    sw.WriteLine(indent + "\treturn ::rkit::utils::PackResult(::rkit::ResultCode::kOK);");
+                        //else
                             sw.WriteLine(indent + "\treturn loc_result;");
 
                         sw.WriteLine(indent + "}");

@@ -47,7 +47,7 @@ namespace rkit
 		virtual Result CreateThreadContext(UniquePtr<sandbox::IThreadContext> &outThreadContext, const sandbox::ThreadCreationParameters &threadParams) = 0;
 
 		virtual Result AllocDynamicMemory(sandbox::Address_t &outAddress, uint32_t &outMMID, size_t size) = 0;
-		virtual void ReleaseDynamicMemory(uint32_t mmid) = 0;
+		virtual Result ReleaseDynamicMemory(uint32_t mmid) = 0;
 
 		virtual Result RunInitializer(sandbox::IThreadContext &threadContext) = 0;
 

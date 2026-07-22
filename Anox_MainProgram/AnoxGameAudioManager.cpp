@@ -78,10 +78,10 @@ namespace anox::game
 		rkit::Result Initialize();
 
 		rkit::Result CreateSoundSourceFromBytes(uint32_t &outSourceID, rkit::TypelessRCPtr &&keepalive, rkit::Span<const uint8_t> contents, rkit::audio::AudioContainerFormat containerFormat);
-		void DestroySoundSource(uint32_t sourceID);
+		rkit::Result DestroySoundSource(uint32_t sourceID);
 
 		rkit::Result CreateEmitterFromSource(uint32_t &outEmitterID, uint32_t sourceID, const SoundEmitterProperties &emitterProperties);
-		void DestroyEmitter(uint32_t emitterID);
+		rkit::Result DestroyEmitter(uint32_t emitterID);
 
 		rkit::Result PlayEmitter(uint32_t emitterID);
 
@@ -295,9 +295,9 @@ namespace anox::game
 		return m_sources.RegisterObject(outSourceID, std::move(src));
 	}
 
-	void GameAudioManagerImpl::DestroySoundSource(uint32_t sourceID)
+	rkit::Result GameAudioManagerImpl::DestroySoundSource(uint32_t sourceID)
 	{
-		m_sources.DestroyObject(sourceID);
+		return m_sources.DestroyObject(sourceID);
 	}
 
 	rkit::Result GameAudioManagerImpl::CreateEmitterFromSource(uint32_t &outEmitterID, uint32_t sourceID, const SoundEmitterProperties &emitterProperties)
@@ -313,15 +313,15 @@ namespace anox::game
 		RKIT_CHECK(m_emitters.RegisterObject(emitterID, std::move(emitterState)));
 
 		// If this succeeds, the source ID is invalidated, so this must only happen on complete success
-		m_sources.DestroyObject(sourceID);
+		RKIT_VERIFY(m_sources.TryDestroyObject(sourceID));
 		outEmitterID = emitterID;
 
 		RKIT_RETURN_OK;
 	}
 
-	void GameAudioManagerImpl::DestroyEmitter(uint32_t emitterID)
+	rkit::Result GameAudioManagerImpl::DestroyEmitter(uint32_t emitterID)
 	{
-		m_emitters.DestroyObject(emitterID);
+		return m_emitters.DestroyObject(emitterID);
 	}
 
 	rkit::Result GameAudioManagerImpl::PlayEmitter(uint32_t emitterID)
@@ -350,7 +350,7 @@ namespace anox::game
 		return Impl().CreateSoundSourceFromBytes(outSourceID, std::move(keepalive), contents, containerFormat);
 	}
 
-	void GameAudioManager::DestroySoundSource(uint32_t sourceID)
+	rkit::Result GameAudioManager::DestroySoundSource(uint32_t sourceID)
 	{
 		return Impl().DestroySoundSource(sourceID);
 	}
@@ -360,9 +360,9 @@ namespace anox::game
 		return Impl().CreateEmitterFromSource(outEmitterID, sourceID, emitterProperties);
 	}
 
-	void GameAudioManager::DestroyEmitter(uint32_t emitterID)
+	rkit::Result GameAudioManager::DestroyEmitter(uint32_t emitterID)
 	{
-		Impl().DestroyEmitter(emitterID);
+		return Impl().DestroyEmitter(emitterID);
 	}
 
 	rkit::Result GameAudioManager::PlayEmitter(uint32_t emitterID)

@@ -46,7 +46,6 @@ namespace anox::game::priv
 
 namespace anox::game
 {
-
 	template<class T, class TDisposer = priv::TrackedObjectDefaultDisposer<T>>
 	class TrackedObjectList : public priv::TrackedObjectListBase<T>
 	{
@@ -56,7 +55,8 @@ namespace anox::game
 		explicit TrackedObjectList(TDisposer &&disposer);
 		~TrackedObjectList();
 
-		void DestroyObject(uint32_t objectID);
+		bool TryDestroyObject(uint32_t objectID);
+		rkit::Result DestroyObject(uint32_t objectID);
 
 	private:
 		TDisposer m_disposer;
@@ -183,9 +183,12 @@ namespace anox::game
 	}
 
 	template<class T, class TDisposer>
-	void TrackedObjectList<T, TDisposer>::DestroyObject(uint32_t objectID)
+	bool TrackedObjectList<T, TDisposer>::TryDestroyObject(uint32_t objectID)
 	{
-		if (objectID > 0 && objectID <= this->m_objects.Count())
+		if (objectID == 0)
+			return false;
+
+		if (objectID <= this->m_objects.Count())
 		{
 			rkit::Optional<T> &obj = this->m_objects[objectID - 1].m_object;
 			if (obj.IsSet())
@@ -193,7 +196,20 @@ namespace anox::game
 				m_disposer.DisposeObject(obj.Get());
 				obj.Reset();
 				this->m_objects[this->m_numFreeIDs++].m_freeID = objectID;
+
+				return true;;
 			}
 		}
+
+		return false;
+	}
+
+	template<class T, class TDisposer>
+	rkit::Result TrackedObjectList<T, TDisposer>::DestroyObject(uint32_t objectID)
+	{
+		if (objectID == 0 || TryDestroyObject(objectID))
+			RKIT_RETURN_OK;
+
+		RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 	}
 }

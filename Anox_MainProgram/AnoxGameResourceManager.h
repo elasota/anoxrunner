@@ -43,8 +43,8 @@ namespace anox::game
 		rkit::Result GetCIPathKeyedResource(uint32_t &outReqID, uint32_t resourceType, const rkit::CIPathView &ciPath);
 		rkit::Result TryFinishLoadingResourceRequest(rkit::Optional<uint32_t> &outResID, uint32_t reqID);
 
-		void DiscardRequest(uint32_t reqID);
-		void DecRefResource(uint32_t resID);
+		rkit::Result DiscardRequest(uint32_t reqID);
+		rkit::Result DecRefResource(uint32_t resID);
 
 		rkit::Result GetFileResourceContents(rkit::RCPtr<AnoxResourceBase> &outKeepAlive, rkit::Span<const uint8_t> &outBytes, uint32_t resID) const;
 

@@ -27,9 +27,9 @@ namespace anox::game::sandbox
 		return static_cast<AnoxGameSandboxEnvironment &>(env).m_sandbox->AllocDynamicMemory(ptr, mmid, size);
 	}
 
-	void HostExports::MemFree(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, uint32_t mmid)
+	rkit::Result HostExports::MemFree(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, uint32_t mmid)
 	{
-		static_cast<AnoxGameSandboxEnvironment &>(env).m_sandbox->ReleaseDynamicMemory(mmid);
+		return static_cast<AnoxGameSandboxEnvironment &>(env).m_sandbox->ReleaseDynamicMemory(mmid);
 	}
 
 	::rkit::Result HostExports::LogUtf8Message(::rkit::sandbox::Environment &env, ::rkit::sandbox::IThreadContext *thread, uint32_t severity, ::rkit::sandbox::Address_t ptr, size_t size)
@@ -96,13 +96,13 @@ namespace anox::game::sandbox
 		RKIT_RETURN_OK;
 	}
 
-	void HostExports::CancelResourceRequest(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t requestID)
+	rkit::Result HostExports::CancelResourceRequest(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t requestID)
 	{
 		AnoxGameSandboxEnvironment &env = static_cast<AnoxGameSandboxEnvironment &>(envBase);
 		return env.m_resManager->DiscardRequest(requestID);
 	}
 
-	void HostExports::DecRefResource(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t resID)
+	rkit::Result HostExports::DecRefResource(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t resID)
 	{
 		AnoxGameSandboxEnvironment &env = static_cast<AnoxGameSandboxEnvironment &>(envBase);
 		return env.m_resManager->DecRefResource(resID);
@@ -167,11 +167,11 @@ namespace anox::game::sandbox
 		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
 
-	void HostExports::SoundEmitter_Destroy(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t id)
+	rkit::Result HostExports::SoundEmitter_Destroy(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t id)
 	{
 		AnoxGameSandboxEnvironment &env = static_cast<AnoxGameSandboxEnvironment &>(envBase);
 
-		env.m_audioManager->DestroyEmitter(id);
+		return env.m_audioManager->DestroyEmitter(id);
 	}
 
 	::rkit::Result HostExports::SoundSource_CreateFromFileResource(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t &srcID, uint32_t resID, uint32_t containerFormat)
@@ -185,11 +185,11 @@ namespace anox::game::sandbox
 		return env.m_audioManager->CreateSoundSourceFromBytes(srcID, std::move(keepalive), contents, static_cast<rkit::audio::AudioContainerFormat>(containerFormat));
 	}
 
-	void HostExports::SoundSource_Destroy(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t srcID)
+	rkit::Result HostExports::SoundSource_Destroy(::rkit::sandbox::Environment &envBase, ::rkit::sandbox::IThreadContext *thread, uint32_t srcID)
 	{
 		AnoxGameSandboxEnvironment &env = static_cast<AnoxGameSandboxEnvironment &>(envBase);
 
-		env.m_audioManager->DestroySoundSource(srcID);
+		return env.m_audioManager->DestroySoundSource(srcID);
 	}
 }
 

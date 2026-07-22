@@ -27,7 +27,7 @@ namespace rkit::utils
 		~ModuleSandboxImpl();
 
 		Result AllocDynamicMemory(sandbox::Address_t &outAddress, uint32_t &outMMID, size_t size);
-		void ReleaseDynamicMemory(uint32_t mmid);
+		Result ReleaseDynamicMemory(uint32_t mmid);
 
 		sandbox::Address_t GetEntryDescriptor() const;
 
@@ -127,31 +127,31 @@ namespace rkit::utils
 		RKIT_RETURN_OK;
 	}
 
-	void ModuleSandboxImpl::ReleaseDynamicMemory(uint32_t mmid)
+	rkit::Result ModuleSandboxImpl::ReleaseDynamicMemory(uint32_t mmid)
 	{
 		if (mmid == 0)
-			return;
+			RKIT_RETURN_OK;
 
 		void *mem = nullptr;
 
 		{
 			rkit::MutexLock lock(*m_memMutex);
 
-			RKIT_ASSERT(mmid <= m_memAllocList.Count());
 			if (mmid > m_memAllocList.Count())
-				return;
+				RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 
 			mem = m_memAllocList[mmid - 1].m_mem;
 
-			RKIT_ASSERT(mem != nullptr);
 			if (!mem)
-				return;
+				RKIT_THROW(rkit::ResultCode::kInvalidParameter);
 
 			m_memAllocList[m_numMemFreeIDs++].m_freeMMID = mmid;
 			m_memAllocList[mmid - 1].m_mem = nullptr;
 		}
 
 		m_alloc->Free(mem);
+
+		RKIT_RETURN_OK;
 	}
 
 	sandbox::Address_t ModuleSandboxImpl::GetEntryDescriptor() const
@@ -205,7 +205,7 @@ namespace rkit::utils
 		return Impl().AllocDynamicMemory(outAddress, outMMID, size);
 	}
 
-	void ModuleSandbox::ReleaseDynamicMemory(uint32_t mmid)
+	Result ModuleSandbox::ReleaseDynamicMemory(uint32_t mmid)
 	{
 		return Impl().ReleaseDynamicMemory(mmid);
 	}
