@@ -491,8 +491,19 @@ class ScriptWindowInstance
 	vec2 size
 }
 
+struct SceneRuntimeGroup
+{
+}
+
+struct SceneRuntimeBlock
+{
+	vector(struct(SceneRuntimeGroup)) groups
+}
+
 class Scene
 {
 	resource(scene) scene
 	uint64 startTime
+	optional(uint64) currentFrame
+	vector(struct(SceneRuntimeBlock)) blocks
 }

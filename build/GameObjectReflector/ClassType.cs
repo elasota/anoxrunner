@@ -3,6 +3,7 @@
     internal enum ClassType
     {
         Component,
-        Class
+        Class,
+        Struct,
     }
 }

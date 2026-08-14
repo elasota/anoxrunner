@@ -21,115 +21,40 @@
 
 #include "AnoxWorldObjectFactory.h"
 #include "SandboxResourceLoader.h"
+#include "ScenePackage.h"
 #include "World.h"
 
 namespace anox::game
 {
-	enum class SceneFocusType : uint8_t
+	template<class T>
+	class ObjRef;
+
+	class Scene;
+
+	class ScenePackageImpl final: public rkit::OpaqueImplementation<ScenePackage>
 	{
-		kNone,
-		kScaledSource,
-		kScaledTarget,
-		kInscribed,
-		kCircumscribed,
-		kFixedSource,
-		kFixedTarget,
-		kFixedInscribed,
+		friend class ScenePackage;
+		friend class SceneManagerImpl;
 
-		kCount,
-	};
-
-	class ScenePackage final: public rkit::RefCounted
-	{
-	public:
-		void RCTrackerZero() override;
-
-		static constexpr size_t kNumPathTypes = static_cast<size_t>(data::ScenePathType::kCount);
-		static constexpr size_t kNumContentTypes = static_cast<size_t>(data::SceneContentRefType::kCount);
-
-		struct Path
-		{
-			data::ScenePathType m_pathType = data::ScenePathType::kCount;
-
-			const void *m_firstNode = nullptr;
-
-			uint32_t m_timeOffs = 0;
-			uint32_t m_maxLen = 0;
-			size_t m_numNodes = 0;
-		};
-
-		struct Block
-		{
-			rkit::ConstSpan<Path> m_paths;
-			uint32_t m_flags = 0;
-		};
-
-		struct Resource
-		{
-			rkit::data::ContentID m_contentID;
-			SandboxResourceHandle m_resHandle;
-		};
-
-		struct NodeBase
-		{
-			uint32_t m_flags = 0;
-			uint32_t m_timeLen = 0;
-		};
-
-		struct CubicNode : public NodeBase
-		{
-			rkit::math::Vec3 m_position;
-			rkit::math::Vec3 m_velocity;
-			SceneFocusType m_relativeMode = SceneFocusType::kCount;
-		};
-
-		struct FocusNode : public NodeBase
-		{
-			uint32_t m_focusTarget = 0;
-		};
-
-		struct CommandNode : public NodeBase
-		{
-			rkit::ConstSpan<data::SceneCommandOpcode> m_commandOpcodes;
-			rkit::ConstSpan<uint32_t> m_commandParamDWords;
-		};
-
-		struct ScaleNode : public NodeBase
-		{
-			rkit::math::Vec3 m_scale;
-			rkit::math::Vec3 m_delta;
-		};
-
-		struct RollNode : public NodeBase
-		{
-			float m_value = 0.f;
-			float m_rate = 0.f;
-		};
-
-		struct FOVNode : public NodeBase
-		{
-			float m_value = 0.f;
-			float m_rate = 0.f;
-		};
-
+	private:
 		uint32_t m_cineID = 0;
 		bool m_isInterrupt = false;
 
 		rkit::Vector<rkit::ByteString> m_strings;
-		rkit::Vector<Block> m_blocks;
-		rkit::Vector<Path> m_paths;
+		rkit::Vector<ScenePackage::Block> m_blocks;
+		rkit::Vector<ScenePackage::Path> m_paths;
 
-		rkit::Vector<CubicNode> m_cubic;
-		rkit::Vector<FocusNode> m_focus;
-		rkit::Vector<CommandNode> m_command;
-		rkit::Vector<ScaleNode> m_scale;
-		rkit::Vector<RollNode> m_roll;
-		rkit::Vector<FOVNode> m_fov;
+		rkit::Vector<ScenePackage::CubicNode> m_cubic;
+		rkit::Vector<ScenePackage::FocusNode> m_focus;
+		rkit::Vector<ScenePackage::CommandNode> m_command;
+		rkit::Vector<ScenePackage::ScaleNode> m_scale;
+		rkit::Vector<ScenePackage::RollNode> m_roll;
+		rkit::Vector<ScenePackage::FOVNode> m_fov;
 
 		rkit::Vector<data::SceneCommandOpcode> m_commandOpcodes;
 		rkit::Vector<uint32_t> m_commandParamDWords;
 
-		rkit::StaticArray<rkit::Vector<Resource>, kNumContentTypes> m_content;
+		rkit::StaticArray<rkit::Vector<ScenePackage::Resource>, ScenePackage::kNumContentTypes> m_content;
 
 		size_t m_scenePackageID = 0;
 		SceneManagerImpl *m_sceneManager = nullptr;
@@ -148,12 +73,6 @@ namespace anox::game
 		void ReleaseScenePackage(size_t scenePackageID);
 
 	private:
-		struct ActiveScene : public rkit::RefCounted
-		{
-			rkit::ByteString m_name;
-			rkit::data::ContentID m_contentID;
-		};
-
 		struct SceneObjectDeserializer
 		{
 			void *m_outVector = nullptr;
@@ -170,8 +89,11 @@ namespace anox::game
 		template<class TDataType, class TVectorItem, class TFunc>
 		static SceneObjectDeserializer CreateSceneDeserializer(ScenePackage& package, rkit::Vector<TVectorItem> &outVector, const TFunc &func);
 
+		rkit::ResultCoroutine LoadScenePackageFromContentID(rkit::ICoroThread &thread, rkit::RCPtr<ScenePackage> &outPackage, rkit::data::ContentID cid);
 		static rkit::Result LoadScenePackage(rkit::RCPtr<ScenePackage> &outPackage, rkit::ConstSpan<uint8_t> data);
 		static rkit::math::Vec3 LoadVec3Data(const rkit::endian::LittleFloat32_t(&data)[3]);
+
+		static rkit::Result NormalizeName(rkit::ByteStringSliceView &view, rkit::ByteString &tempStorage);
 
 		// SAVEGAME TODO
 		struct ScenePackageRefAndFreeID
@@ -183,15 +105,17 @@ namespace anox::game
 		rkit::Vector<ScenePackageRefAndFreeID> m_scenePackageList;
 		size_t m_numFreeIDs = 0;
 
-		rkit::HashMap<rkit::data::ContentID, ScenePackage *> m_scenePackageMap;
+		rkit::HashMap<rkit::data::ContentID, size_t> m_scenePackageMap;
+
+		rkit::HashMap<rkit::ByteString, ObjRef<Scene>> m_scenes;
 
 		World &m_world;
 	};
 
 	void ScenePackage::RCTrackerZero()
 	{
-		if (m_scenePackageID != 0)
-			m_sceneManager->ReleaseScenePackage(m_scenePackageID);
+		if (Impl().m_scenePackageID != 0)
+			Impl().m_sceneManager->ReleaseScenePackage(Impl().m_scenePackageID);
 
 		RefCounted::RCTrackerZero();
 	}
@@ -201,8 +125,17 @@ namespace anox::game
 	{
 	}
 
-	rkit::ResultCoroutine SceneManagerImpl::RunScene(rkit::ICoroThread &thread, rkit::ByteStringSliceView name, rkit::data::ContentID cid, bool loop)
+	rkit::ResultCoroutine SceneManagerImpl::LoadScenePackageFromContentID(rkit::ICoroThread &thread, rkit::RCPtr<ScenePackage> &outPackage, rkit::data::ContentID cid)
 	{
+		rkit::HashValue_t cidHash = rkit::Hasher<rkit::data::ContentID>::ComputeHash(0, cid);
+
+		rkit::HashMap<rkit::data::ContentID, size_t>::ConstIterator_t it = m_scenePackageMap.FindPrehashed(cidHash, cid);
+		if (it != m_scenePackageMap.end())
+		{
+			outPackage = m_scenePackageList[it.Value()].m_package;
+			CORO_RETURN_OK;
+		}
+
 		SandboxResourceRequestHandle sceneReqHandle;
 		CORO_CHECK(SandboxResourceLoader::LoadContentKeyedResource(sceneReqHandle, resloaders::kContentIDRawFileResourceTypeCode, cid));
 
@@ -213,38 +146,59 @@ namespace anox::game
 		CORO_CHECK(SandboxResourceLoader::GetFileResourceContents(blob, sceneResHandle));
 
 		rkit::RCPtr<ScenePackage> scenePackage;
+		CORO_CHECK(LoadScenePackage(scenePackage, blob.GetContents()));
 
-		rkit::HashValue_t cidHash = rkit::Hasher<rkit::data::ContentID>::ComputeHash(0, cid);
-
-		rkit::HashMap<rkit::data::ContentID, ScenePackage *>::ConstIterator_t it = m_scenePackageMap.FindPrehashed(cidHash, cid);
-
-		if (it != m_scenePackageMap.end())
-			scenePackage = it.Value();
-		else
+		if (m_numFreeIDs == 0)
 		{
-			CORO_CHECK(LoadScenePackage(scenePackage, blob.GetContents()));
+			CORO_CHECK(m_scenePackageList.Append(ScenePackageRefAndFreeID()));
 
-			if (m_numFreeIDs == 0)
-			{
-				CORO_CHECK(m_scenePackageList.Append(ScenePackageRefAndFreeID()));
-
-				m_numFreeIDs = 1;
-				m_scenePackageList[0].m_freeID = m_scenePackageList.Count();
-			}
-
-			CORO_CHECK(m_scenePackageMap.SetPrehashed(cidHash, cid, scenePackage.Get()));
-
-
-			const size_t packageID = m_scenePackageList[--m_numFreeIDs].m_freeID;
-			m_scenePackageList[packageID - 1].m_package = scenePackage.Get();
-
-			scenePackage->m_scenePackageID = packageID;
-			scenePackage->m_sceneManager = this;
+			m_numFreeIDs = 1;
+			m_scenePackageList[0].m_freeID = m_scenePackageList.Count();
 		}
+
+		const size_t packageID = m_scenePackageList[--m_numFreeIDs].m_freeID;
+
+		CORO_CHECK(m_scenePackageMap.SetPrehashed(cidHash, cid, packageID));
+
+		m_scenePackageList[packageID - 1].m_package = scenePackage.Get();
+
+		scenePackage->Impl().m_scenePackageID = packageID;
+		scenePackage->Impl().m_sceneManager = this;
+
+		outPackage = std::move(scenePackage);
 
 		CORO_RETURN_OK;
 	}
 
+	rkit::ResultCoroutine SceneManagerImpl::RunScene(rkit::ICoroThread &thread, rkit::ByteStringSliceView name, rkit::data::ContentID cid, bool loop)
+	{
+		rkit::ByteString tempName;
+
+		CORO_CHECK(NormalizeName(name, tempName));
+
+		const rkit::HashValue_t nameHash = rkit::Hasher<rkit::ByteStringSliceView>::ComputeHash(0, name);
+		const rkit::HashMap<rkit::ByteString, ObjRef<Scene>>::ConstIterator_t sceneIt = m_scenes.FindPrehashed(nameHash, name);
+
+		if (sceneIt != m_scenes.end())
+			CORO_RETURN_OK;
+
+		rkit::RCPtr<ScenePackage> package;
+		CORO_CHECK(co_await LoadScenePackageFromContentID(thread, package, cid));
+
+		Scene *scene = nullptr;
+		CORO_CHECK((WorldObjectFactory::CreateDynamic<Scene>(m_world, scene)));
+
+		if (tempName.Length() == 0)
+		{
+			CORO_CHECK(tempName.Set(name));
+		}
+
+		CORO_CHECK(m_scenes.SetPrehashed(nameHash, std::move(tempName), ObjRef<Scene>(scene)));
+
+		scene->Initialize(SceneHandle(package));
+
+		CORO_RETURN_OK;
+	}
 
 	void SceneManagerImpl::ReleaseScenePackage(size_t scenePackageID)
 	{
@@ -308,8 +262,10 @@ namespace anox::game
 		rkit::RCPtr<ScenePackage> package;
 		RKIT_CHECK(rkit::New<ScenePackage>(package));
 
-		package->m_cineID = header.m_cineID.Get();
-		package->m_isInterrupt = (header.m_isInterrupt != 0);
+		ScenePackageImpl &packageImpl = package->Impl();
+
+		packageImpl.m_cineID = header.m_cineID.Get();
+		packageImpl.m_isInterrupt = (header.m_isInterrupt != 0);
 
 		{
 			rkit::Vector<rkit::ByteStringConstructionBuffer> stringCBufs;
@@ -328,31 +284,30 @@ namespace anox::game
 				RKIT_CHECK(stream.ReadAllSpan(cbuf.GetSpan()));
 			}
 
-			RKIT_CHECK(package->m_strings.Resize(stringCBufs.Count()));
-			rkit::ProcessParallelSpans(package->m_strings.ToSpan(), stringCBufs.ToSpan(), [](rkit::ByteString &outString, rkit::ByteStringConstructionBuffer &inString)
+			RKIT_CHECK(packageImpl.m_strings.Resize(stringCBufs.Count()));
+			rkit::ProcessParallelSpans(packageImpl.m_strings.ToSpan(), stringCBufs.ToSpan(), [](rkit::ByteString &outString, rkit::ByteStringConstructionBuffer &inString)
 				{
 					outString = rkit::ByteString(std::move(inString));
 				});
 		}
 
-		RKIT_CHECK(package->m_blocks.Resize(header.m_numBlocks.Get()));
-		RKIT_CHECK(package->m_paths.Resize(header.m_numPaths.Get()));
-
+		RKIT_CHECK(packageImpl.m_blocks.Resize(header.m_numBlocks.Get()));
+		RKIT_CHECK(packageImpl.m_paths.Resize(header.m_numPaths.Get()));
 
 		{
 			size_t pathOffset = 0;
 
-			for (ScenePackage::Block &outBlock : package->m_blocks)
+			for (ScenePackage::Block &outBlock : packageImpl.m_blocks)
 			{
 				data::SceneBlock inBlock;
 				RKIT_CHECK(stream.ReadOneBinary(inBlock));
 
 				const uint32_t numPaths = inBlock.m_numPaths.Get();
 
-				if (package->m_paths.Count() - pathOffset < numPaths)
+				if (packageImpl.m_paths.Count() - pathOffset < numPaths)
 					RKIT_THROW(rkit::ResultCode::kDataError);
 
-				outBlock.m_paths = package->m_paths.ToSpan().SubSpan(pathOffset, numPaths);
+				outBlock.m_paths = packageImpl.m_paths.ToSpan().SubSpan(pathOffset, numPaths);
 				pathOffset += numPaths;
 			}
 		}
@@ -413,12 +368,12 @@ namespace anox::game
 			};
 
 		rkit::StaticArray<SceneObjectDeserializer, kNumPathTypes> deserializers;
-		deserializers[static_cast<size_t>(data::ScenePathType::kCubic)] = CreateSceneDeserializer<data::SceneCubicNode>(*package, package->m_cubic, processOneCubic);
-		deserializers[static_cast<size_t>(data::ScenePathType::kFocus)] = CreateSceneDeserializer<data::SceneFocusNode>(*package, package->m_focus, processOneFocus);
-		deserializers[static_cast<size_t>(data::ScenePathType::kCommand)] = CreateSceneDeserializer<data::SceneCommandNode>(*package, package->m_command, processOneCommand);
-		deserializers[static_cast<size_t>(data::ScenePathType::kScale)] = CreateSceneDeserializer<data::SceneScaleNode>(*package, package->m_scale, processOneScale);
-		deserializers[static_cast<size_t>(data::ScenePathType::kRoll)] = CreateSceneDeserializer<data::SceneRollNode>(*package, package->m_roll, processOneRoll);
-		deserializers[static_cast<size_t>(data::ScenePathType::kFOV)] = CreateSceneDeserializer<data::SceneFOVNode>(*package, package->m_fov, processOneFOV);
+		deserializers[static_cast<size_t>(data::ScenePathType::kCubic)] = CreateSceneDeserializer<data::SceneCubicNode>(*package, packageImpl.m_cubic, processOneCubic);
+		deserializers[static_cast<size_t>(data::ScenePathType::kFocus)] = CreateSceneDeserializer<data::SceneFocusNode>(*package, packageImpl.m_focus, processOneFocus);
+		deserializers[static_cast<size_t>(data::ScenePathType::kCommand)] = CreateSceneDeserializer<data::SceneCommandNode>(*package, packageImpl.m_command, processOneCommand);
+		deserializers[static_cast<size_t>(data::ScenePathType::kScale)] = CreateSceneDeserializer<data::SceneScaleNode>(*package, packageImpl.m_scale, processOneScale);
+		deserializers[static_cast<size_t>(data::ScenePathType::kRoll)] = CreateSceneDeserializer<data::SceneRollNode>(*package, packageImpl.m_roll, processOneRoll);
+		deserializers[static_cast<size_t>(data::ScenePathType::kFOV)] = CreateSceneDeserializer<data::SceneFOVNode>(*package, packageImpl.m_fov, processOneFOV);
 
 		for (size_t i = 0; i < kNumPathTypes; i++)
 		{
@@ -429,7 +384,7 @@ namespace anox::game
 			RKIT_CHECK(deserializer.m_resizeOutVectorFunc(deserializer.m_outVector, header.m_nodeCounts[i].Get()));
 		}
 
-		for (ScenePackage::Path &outPath : package->m_paths)
+		for (ScenePackage::Path &outPath : packageImpl.m_paths)
 		{
 			data::ScenePath inPath;
 			RKIT_CHECK(stream.ReadOneBinary(inPath));
@@ -454,6 +409,9 @@ namespace anox::game
 			outPath.m_pathType = inPath.m_pathType;
 			outPath.m_maxLen = inPath.m_maxLen.Get();
 
+			if (!inPath.m_isGlobal)
+				outPath.m_group = 0;	// Temporary, will be reassigned later
+
 			deserializer.m_currentNodeOffset += numNodes;
 		}
 
@@ -474,47 +432,68 @@ namespace anox::game
 
 		size_t numCommandOpcodes = 0;
 		size_t numCommandParamDWords = 0;
-		for (const ScenePackage::CommandNode &cmd : package->m_command)
+		for (const ScenePackage::CommandNode &cmd : packageImpl.m_command)
 		{
 			RKIT_CHECK(rkit::SafeAdd<size_t>(numCommandOpcodes, numCommandOpcodes, cmd.m_commandOpcodes.Count()));
 			RKIT_CHECK(rkit::SafeAdd<size_t>(numCommandParamDWords, numCommandParamDWords, cmd.m_commandParamDWords.Count()));
 		}
 
-		RKIT_CHECK(package->m_commandOpcodes.Resize(numCommandOpcodes));
-		RKIT_CHECK(package->m_commandParamDWords.Resize(numCommandParamDWords));
+		RKIT_CHECK(packageImpl.m_commandOpcodes.Resize(numCommandOpcodes));
+		RKIT_CHECK(packageImpl.m_commandParamDWords.Resize(numCommandParamDWords));
 
 		{
 			size_t opcodeOffset = 0;
 			size_t paramDWordOffset = 0;
-			for (ScenePackage::CommandNode &cmd : package->m_command)
+			for (ScenePackage::CommandNode &cmd : packageImpl.m_command)
 			{
-				cmd.m_commandOpcodes = package->m_commandOpcodes.ToSpan().SubSpan(opcodeOffset, cmd.m_commandOpcodes.Count());
-				cmd.m_commandParamDWords = package->m_commandParamDWords.ToSpan().SubSpan(paramDWordOffset, cmd.m_commandParamDWords.Count());
+				cmd.m_commandOpcodes = packageImpl.m_commandOpcodes.ToSpan().SubSpan(opcodeOffset, cmd.m_commandOpcodes.Count());
+				cmd.m_commandParamDWords = packageImpl.m_commandParamDWords.ToSpan().SubSpan(paramDWordOffset, cmd.m_commandParamDWords.Count());
 				opcodeOffset += cmd.m_commandOpcodes.Count();
 				paramDWordOffset += cmd.m_commandParamDWords.Count();
 			}
 		}
 
-		RKIT_CHECK(stream.ReadAllSpan(package->m_commandOpcodes.ToSpan()));
-		RKIT_CHECK(stream.ReadAllSpan(package->m_commandParamDWords.ToSpan()));
+		RKIT_CHECK(stream.ReadAllSpan(packageImpl.m_commandOpcodes.ToSpan()));
+		RKIT_CHECK(stream.ReadAllSpan(packageImpl.m_commandParamDWords.ToSpan()));
 
-		for (uint32_t &dword : package->m_commandParamDWords)
+		for (uint32_t &dword : packageImpl.m_commandParamDWords)
 			rkit::endian::LittleUInt32_t::StaticConvertToHostOrderInPlace(dword);
 
 		{
 			size_t contentTypeIndex = 0;
 			for (const rkit::endian::LittleUInt32_t &contentCount : header.m_contentCounts)
 			{
-				RKIT_CHECK(package->m_content[contentTypeIndex++].Resize(contentCount.Get()));
+				RKIT_CHECK(packageImpl.m_content[contentTypeIndex++].Resize(contentCount.Get()));
 			}
 		}
 
-		for (rkit::Vector<ScenePackage::Resource> &resourceVector : package->m_content)
+		for (rkit::Vector<ScenePackage::Resource> &resourceVector : packageImpl.m_content)
 		{
 			for (ScenePackage::Resource &resource : resourceVector)
 			{
 				RKIT_CHECK(stream.ReadOneBinary(resource.m_contentID));
 			}
+		}
+
+		// Index groups
+		for (ScenePackage::Block &block : packageImpl.m_blocks)
+		{
+			size_t numGroups = 0;
+			for (const ScenePackage::Path &constPath : block.m_paths)
+			{
+				if (!constPath.m_group.IsSet())
+					continue;
+
+				if (constPath.m_pathType == data::ScenePathType::kCubic)
+					numGroups++;
+
+				if (numGroups == 0)
+					RKIT_THROW(rkit::ResultCode::kDataError);
+
+				const_cast<ScenePackage::Path &>(constPath).m_group = numGroups - 1;
+			}
+
+			block.m_numGroups = numGroups;
 		}
 
 		if (stream.Tell() != stream.GetSize())
@@ -532,6 +511,36 @@ namespace anox::game
 	}
 
 
+	rkit::Result SceneManagerImpl::NormalizeName(rkit::ByteStringSliceView &view, rkit::ByteString &tempStorage)
+	{
+		bool isAlreadyLowercase = true;
+		for (uint8_t ch : view)
+		{
+			if (rkit::InvariantCharCaseAdjuster<uint8_t>::ToLower(ch) != ch)
+			{
+				isAlreadyLowercase = false;
+				break;
+			}
+		}
+
+		if (isAlreadyLowercase)
+			RKIT_RETURN_OK;
+
+		rkit::ByteStringConstructionBuffer cbuf;
+		RKIT_CHECK(cbuf.Allocate(view.Length()));
+
+		rkit::ProcessParallelSpans(cbuf.GetSpan(), view.ToSpan(), [](uint8_t &outCh, uint8_t inCh)
+			{
+				outCh = rkit::InvariantCharCaseAdjuster<uint8_t>::ToLower(inCh);
+			});
+
+		tempStorage = std::move(cbuf);
+
+		view = tempStorage;
+
+		RKIT_RETURN_OK;
+	}
+
 	SceneManager::SceneManager(World &world)
 		: rkit::Opaque<SceneManagerImpl>(world)
 	{
@@ -542,7 +551,7 @@ namespace anox::game
 		return rkit::New<SceneManager>(outManager, world);
 	}
 
-	rkit::ResultCoroutine SceneManager::RunScene(rkit::ICoroThread &thread, const rkit::ByteStringSliceView &name, const rkit::data::ContentID &cid, bool loop)
+	rkit::ResultCoroutine SceneManager::RunScene(rkit::ICoroThread &thread, rkit::ByteStringSliceView name, const rkit::data::ContentID &cid, bool loop)
 	{
 		return Impl().RunScene(thread, name, cid, loop);
 	}
@@ -551,6 +560,23 @@ namespace anox::game
 	{
 		CORO_RETURN_OK;
 	}
+
+
+	uint32_t ScenePackage::GetCineID() const
+	{
+		return Impl().m_cineID;
+	}
+
+	bool ScenePackage::IsInterrupt() const
+	{
+		return Impl().m_isInterrupt;
+	}
+
+	rkit::ConstSpan<ScenePackage::Block> ScenePackage::GetBlocks() const
+	{
+		return Impl().m_blocks.ToSpan();
+	}
 }
 
 RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR(anox::game::SceneManagerImpl)
+RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR(anox::game::ScenePackageImpl)

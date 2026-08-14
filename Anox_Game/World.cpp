@@ -242,6 +242,16 @@ namespace anox::game
 	{
 		return *Impl().m_sceneManager;
 	}
+
+	uint64_t World::GetCurrentTimeMSec() const
+	{
+		return Impl().m_gameClockMSec;
+	}
+
+	uint64_t World::GetPrevTimeMSec() const
+	{
+		return Impl().m_prevFrameGameClockMSec;
+	}
 }
 
 RKIT_OPAQUE_IMPLEMENT_DESTRUCTOR(anox::game::WorldImpl)

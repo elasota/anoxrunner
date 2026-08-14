@@ -55,9 +55,26 @@ namespace anox::game
 		MusicManager &GetMusicManager() const;
 		SceneManager &GetSceneManager() const;
 
+		uint64_t GetCurrentTimeMSec() const;
+		uint64_t GetPrevTimeMSec() const;
+		uint16_t GetFrameDurationMSec() const;
+
 		static rkit::Result Create(rkit::UniquePtr<World> &outWorld, ScriptManager &scriptManager);
 
 	private:
 		World() = delete;
 	};
+}
+
+#include "rkit/Core/RKitAssert.h"
+
+namespace anox::game
+{
+	inline uint16_t World::GetFrameDurationMSec() const
+	{
+		// Frame time deltas should be at most 100ms
+		uint64_t timeDelta = this->GetCurrentTimeMSec() - this->GetPrevTimeMSec();
+		RKIT_ASSERT(timeDelta <= std::numeric_limits<uint16_t>::max());
+		return static_cast<uint16_t>(timeDelta);
+	}
 }

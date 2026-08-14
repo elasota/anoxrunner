@@ -15,6 +15,9 @@
         Broken,
         EDef,
         Resource,
+        Optional,
+        Vector,
+        Struct,
     }
 
     internal enum FieldResourceType
@@ -26,21 +29,31 @@
     internal class FieldType : IEquatable<FieldType>
     {
         public FieldMainType MainType { get; }
-        public FieldType? SubType { get; }
-        public FieldResourceType ResourceType { get; }
+        public FieldType? SubType { get; } = null;
+        public FieldResourceType ResourceType { get; } = FieldResourceType.Invalid;
+        public string? SubName { get; } = null;
 
         public FieldType(FieldMainType mainType)
         {
             MainType = mainType;
-            SubType = null;
-            ResourceType = FieldResourceType.Invalid;
         }
 
         public FieldType(FieldResourceType resType)
         {
             MainType = FieldMainType.Resource;
-            SubType = null;
             ResourceType = resType;
+        }
+
+        public FieldType(FieldMainType mainType, FieldType subType)
+        {
+            MainType = mainType;
+            SubType = subType;
+        }
+
+        public FieldType(FieldMainType mainType, string subName)
+        {
+            MainType = mainType;
+            SubName = subName;
         }
 
         public bool Equals(FieldType? other)
@@ -53,10 +66,29 @@
 
             if (SubType != null)
             {
-                if (other.SubType != null)
+                if (other.SubType == null)
                     return false;
 
                 if (!SubType.Equals(other.SubType))
+                    return false;
+            }
+            else
+            {
+                if (other.SubType != null)
+                    return false;
+            }
+
+            if (SubName != null)
+            {
+                if (other.SubName == null)
+                    return false;
+
+                if (!SubName.Equals(other.SubName))
+                    return false;
+            }
+            else
+            {
+                if (other.SubName != null)
                     return false;
             }
 

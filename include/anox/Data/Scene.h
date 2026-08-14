@@ -103,6 +103,7 @@ namespace anox::data
 	struct ScenePath
 	{
 		ScenePathType m_pathType;
+		uint8_t m_isGlobal = 0;
 		rkit::endian::LittleUInt32_t m_numNodes;
 		rkit::endian::LittleUInt32_t m_timeOffs;
 		rkit::endian::LittleUInt32_t m_maxLen;

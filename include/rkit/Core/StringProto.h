@@ -9,7 +9,9 @@
 
 namespace rkit
 {
-	template<class TChar, CharacterEncoding TEncoding, size_t TStaticSize = 16>
+	static constexpr size_t kStringDefaultStaticSize = 16;
+
+	template<class TChar, CharacterEncoding TEncoding, size_t TStaticSize = kStringDefaultStaticSize>
 	class BaseString;
 
 	template<class TChar, CharacterEncoding TEncoding>

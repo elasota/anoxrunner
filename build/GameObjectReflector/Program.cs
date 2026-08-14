@@ -1,4 +1,5 @@
 ﻿using Microsoft.VisualBasic.FileIO;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -107,6 +108,58 @@ namespace GameObjectReflector
             Directory.CreateDirectory(objectsPath);
 
             DumpLevelEntityDefs(buildPath, gamePath, objectsPath, ec, sortedClasses);
+        }
+
+        class UniqueList<T> : IEnumerable<T>
+            where T : IEquatable<T>
+        {
+            private HashSet<T> _itemSet = new HashSet<T>();
+            private List<T> _itemList = new List<T>();
+
+            public IEnumerator<T> GetEnumerator()
+            {
+                return _itemList.GetEnumerator();
+            }
+
+            public void Add(T item)
+            {
+                if (_itemSet.Add(item))
+                    _itemList.Add(item);
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
+            }
+        }
+
+        private static void FindRequiredHeaders(UniqueList<string> headersList, FieldType ftype)
+        {
+            switch (ftype.MainType)
+            {
+                case FieldMainType.Optional:
+                    headersList.Add("rkit/Core/Optional.h");
+                    FindRequiredHeaders(headersList, ftype.SubType!);
+                    break;
+                case FieldMainType.Vector:
+                    headersList.Add("rkit/Core/Vector.h");
+                    FindRequiredHeaders(headersList, ftype.SubType!);
+                    break;
+                case FieldMainType.Struct:
+                    headersList.Add(ftype.SubName + ".h");
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        private static void FindRequiredHeaders(UniqueList<string> headersList, ClassDef2 cdef)
+        {
+            foreach (string baseClass in cdef.ParentClasses)
+                headersList.Add(baseClass + ".h");
+
+            foreach (FieldDef fdef in cdef.FieldDefs)
+                FindRequiredHeaders(headersList, fdef.FieldType);
         }
 
         private static void DumpLevelEntityDefs(string buildPath, string gamePath, string objectsPath, EntityClassCollection ec, IEnumerable<string> classNames)
@@ -300,7 +353,6 @@ namespace GameObjectReflector
                 writer.WriteLine("}");
             }
 
-
             foreach (string className in classNames)
             {
                 bool needsExplicitWorldObjectBase = false;
@@ -310,6 +362,8 @@ namespace GameObjectReflector
                     writer.NewLine = "\n";
 
                     ClassDef2 cdef = ec.Classes[className];
+
+                    bool needsRTTI = ClassNeedsRTTI(cdef);
 
                     writer.WriteLine("#pragma once");
                     writer.WriteLine();
@@ -333,11 +387,14 @@ namespace GameObjectReflector
 
                     if (cdef.ClassType == ClassType.Class)
                         writer.WriteLine("#include \"WorldObject.h\"");
-                    else
+                    else if (cdef.ClassType == ClassType.Component)
                         writer.WriteLine("#include \"DynamicObject.h\"");
 
-                    foreach (string baseClass in cdef.ParentClasses)
-                        writer.WriteLine($"#include \"{baseClass}.h\"");
+                    UniqueList<string> extraHeadersList = new UniqueList<string>();
+                    FindRequiredHeaders(extraHeadersList, cdef);
+
+                    foreach (string hdr in extraHeadersList)
+                        writer.WriteLine($"#include \"{hdr}\"");
 
                     writer.WriteLine();
                     writer.WriteLine("namespace anox::game");
@@ -347,8 +404,13 @@ namespace GameObjectReflector
                     writer.WriteLine();
                     writer.WriteLine("namespace anox::game::priv");
                     writer.WriteLine("{");
-                    writer.WriteLine("\ttemplate<>");
-                    writer.WriteLine($"\tstruct ObjectRTTIImpl<::anox::game::{className}>;");
+
+                    if (needsRTTI)
+                    {
+                        writer.WriteLine("\ttemplate<>");
+                        writer.WriteLine($"\tstruct ObjectRTTIImpl<::anox::game::{className}>;");
+                    }
+
                     writer.WriteLine("\ttemplate<>");
                     writer.WriteLine($"\tstruct ObjectFieldsImpl<::anox::game::{className}>;");
                     writer.WriteLine();
@@ -385,64 +447,72 @@ namespace GameObjectReflector
                         }
                     }
                     writer.WriteLine("\t};");
-                    writer.WriteLine();
-                    writer.WriteLine("\ttemplate<>");
-                    writer.WriteLine($"\tstruct ObjectRTTIImpl<::anox::game::{className}>");
-                    writer.WriteLine($"\t\t: protected ObjectFieldsImpl<::anox::game::{className}>");
-
-                    if (needsExplicitWorldObjectBase)
-                        writer.WriteLine("\t\t, public ::anox::game::WorldObject");
-
-                    if (cdef.ParentClasses.Count == 0)
+                    if (needsRTTI)
                     {
-                        if (cdef.ClassType == ClassType.Component)
-                            writer.WriteLine("\t\t, public ::anox::game::DynamicObject");
-                        else if (cdef.ClassType == ClassType.Class)
+                        writer.WriteLine();
+                        writer.WriteLine("\ttemplate<>");
+                        writer.WriteLine($"\tstruct ObjectRTTIImpl<::anox::game::{className}>");
+                        writer.WriteLine($"\t\t: protected ObjectFieldsImpl<::anox::game::{className}>");
+
+                        if (needsExplicitWorldObjectBase)
+                            writer.WriteLine("\t\t, public ::anox::game::WorldObject");
+
+                        if (cdef.ParentClasses.Count == 0)
                         {
+                            if (cdef.ClassType == ClassType.Component)
+                                writer.WriteLine("\t\t, public ::anox::game::DynamicObject");
+                            else if (cdef.ClassType == ClassType.Class || cdef.ClassType == ClassType.Struct)
+                            {
+                            }
+                            else
+                                throw new Exception("Unhandled class type");
                         }
                         else
-                            throw new Exception("Unhandled class type");
-                    }
-                    else
-                    {
-                        foreach (string baseClass in cdef.ParentClasses)
-                            writer.WriteLine($"\t\t, public ::anox::game::{baseClass}");
-                    }
-
-                    writer.WriteLine("\t{");
-                    writer.WriteLine("\t\tfriend struct ::anox::game::priv::PrivateAccessor;");
-                    writer.WriteLine();
-
-
-
-                    {
-                        List<string> baseClassNames = new List<string>();
-                        if (needsExplicitWorldObjectBase)
-                            baseClassNames.Add("WorldObject");
-                        baseClassNames.AddRange(cdef.ParentClasses);
-
-                        writer.Write("\t\ttypedef ::rkit::TypeList<");
-                        for (int i = 0; i < baseClassNames.Count; i++)
                         {
-                            if (i != 0)
-                                writer.Write(", ");
-                            writer.Write(baseClassNames[i]);
+                            foreach (string baseClass in cdef.ParentClasses)
+                                writer.WriteLine($"\t\t, public ::anox::game::{baseClass}");
                         }
-                        writer.WriteLine("> BaseClasses_t;");
-                    }
-                    writer.WriteLine($"\t\ttypedef {className} ThisClass_t;");
-                    writer.WriteLine($"\t\ttypedef ::anox::game::priv::AutoRTTI<ThisClass_t, BaseClasses_t> RTTIType_t;");
 
-                    writer.WriteLine("\t\tconst RuntimeTypeInfo *GetMostDerivedType() override;");
-                    writer.WriteLine("\t\tvoid *GetMostDerivedObject() override;");
-                    writer.WriteLine("\t};");
+                        writer.WriteLine("\t{");
+                        writer.WriteLine("\t\tfriend struct ::anox::game::priv::PrivateAccessor;");
+                        writer.WriteLine();
+
+
+
+                        {
+                            List<string> baseClassNames = new List<string>();
+                            if (needsExplicitWorldObjectBase)
+                                baseClassNames.Add("WorldObject");
+                            baseClassNames.AddRange(cdef.ParentClasses);
+
+                            writer.Write("\t\ttypedef ::rkit::TypeList<");
+                            for (int i = 0; i < baseClassNames.Count; i++)
+                            {
+                                if (i != 0)
+                                    writer.Write(", ");
+                                writer.Write(baseClassNames[i]);
+                            }
+                            writer.WriteLine("> BaseClasses_t;");
+                        }
+                        writer.WriteLine($"\t\ttypedef {className} ThisClass_t;");
+                        writer.WriteLine($"\t\ttypedef ::anox::game::priv::AutoRTTI<ThisClass_t, BaseClasses_t> RTTIType_t;");
+
+                        writer.WriteLine("\t\tconst RuntimeTypeInfo *GetMostDerivedType() override;");
+                        writer.WriteLine("\t\tvoid *GetMostDerivedObject() override;");
+                        writer.WriteLine("\t};");
+                    }   // needsRTTI
+
                     writer.WriteLine();
                     writer.WriteLine("\ttemplate<>");
                     writer.WriteLine($"\tstruct ObjectRTTIResolver<::anox::game::{className}>");
                     writer.WriteLine("\t{");
                     writer.WriteLine($"\t\ttypedef ObjectFieldsImpl<::anox::game::{className}> FieldType_t;");
-                    writer.WriteLine($"\t\ttypedef ObjectRTTIImpl<::anox::game::{className}> RTTIType_t;");
+                    if (needsRTTI)
+                        writer.WriteLine($"\t\ttypedef ObjectRTTIImpl<::anox::game::{className}> RTTIType_t;");
+                    else
+                        writer.WriteLine($"\t\ttypedef FieldType_t RTTIType_t;");
                     writer.WriteLine("\t};");
+
                     writer.WriteLine("}");
                 }
 
@@ -451,6 +521,8 @@ namespace GameObjectReflector
                     writer.NewLine = "\n";
 
                     ClassDef2 cdef = ec.Classes[className];
+
+                    bool needsRTTI = ClassNeedsRTTI(cdef);
 
                     writer.WriteLine("#include \"" + className + ".generated.h\"");
                     writer.WriteLine("#include \"AnoxWorldObjectFactory.h\"");
@@ -522,19 +594,36 @@ namespace GameObjectReflector
 
                     writer.WriteLine("namespace anox::game::priv");
                     writer.WriteLine("{");
-                    writer.WriteLine($"\tconst RuntimeTypeInfo *ObjectRTTIImpl<::anox::game::{className}>::GetMostDerivedType()");
-                    writer.WriteLine("\t{");
 
+                    if (needsRTTI)
+                    {
+                        writer.WriteLine($"\tconst RuntimeTypeInfo *ObjectRTTIImpl<::anox::game::{className}>::GetMostDerivedType()");
+                        writer.WriteLine("\t{");
+                        writer.WriteLine($"\t\treturn &AutoRTTI<::anox::game::{className}, BaseClasses_t>::ms_instance;");
+                        writer.WriteLine("\t}");
+                        writer.WriteLine();
+                        writer.WriteLine($"\tvoid *ObjectRTTIImpl<::anox::game::{className}>::GetMostDerivedObject()");
+                        writer.WriteLine("\t{");
+                        writer.WriteLine($"\t\treturn static_cast<::anox::game::{className} *>(this);");
+                        writer.WriteLine("\t}");
+                    }
 
-                    writer.WriteLine($"\t\treturn &AutoRTTI<::anox::game::{className}, BaseClasses_t>::ms_instance;");
-                    writer.WriteLine("\t}");
-                    writer.WriteLine();
-                    writer.WriteLine($"\tvoid *ObjectRTTIImpl<::anox::game::{className}>::GetMostDerivedObject()");
-                    writer.WriteLine("\t{");
-                    writer.WriteLine($"\t\treturn static_cast<::anox::game::{className} *>(this);");
-                    writer.WriteLine("\t}");
                     writer.WriteLine("}");
                 }
+            }
+        }
+
+        private static bool ClassNeedsRTTI(ClassDef2 cdef)
+        {
+            switch (cdef.ClassType)
+            {
+                case ClassType.Class:
+                case ClassType.Component:
+                    return true;
+                case ClassType.Struct:
+                    return false;
+                default:
+                    throw new NotImplementedException();
             }
         }
 
@@ -586,6 +675,27 @@ namespace GameObjectReflector
                     break;
                 case FieldMainType.Resource:
                     fieldType = "::anox::game::ResourceRef<" + fieldTypeType.ResourceType.ToString() + "Handle>";
+                    break;
+                case FieldMainType.Optional:
+                    {
+                        string? subTypeStr = null;
+                        string? scratchInitValue = null;
+                        DescribeFieldType(fieldTypeType.SubType!, out subTypeStr, out scratchInitValue, out ignore);
+
+                        fieldType = "::rkit::Optional<" + subTypeStr + ">";
+                    }
+                    break;
+                case FieldMainType.Vector:
+                    {
+                        string? subTypeStr = null;
+                        string? scratchInitValue = null;
+                        DescribeFieldType(fieldTypeType.SubType!, out subTypeStr, out scratchInitValue, out ignore);
+
+                        fieldType = "::rkit::Vector<" + subTypeStr + ">";
+                    }
+                    break;
+                case FieldMainType.Struct:
+                    fieldType = "::anox::game::" + fieldTypeType.SubName;
                     break;
                 case FieldMainType.Broken:
                     fieldType = "";
@@ -828,6 +938,13 @@ namespace GameObjectReflector
                     ec.AddClass(ParseClass(ClassType.Component, typeDefAttribs.ToArray(), lines, ref lineNum, line, col));
                     typeDefAttribs.Clear();
                 }
+                else if (token == "struct")
+                {
+                    ec.AddClass(ParseClass(ClassType.Struct, typeDefAttribs.ToArray(), lines, ref lineNum, line, col));
+                    typeDefAttribs.Clear();
+                }
+                else
+                    throw new Exception("Unrecognized class type " + token);
             }
         }
 
@@ -880,6 +997,29 @@ namespace GameObjectReflector
                 fieldType = new FieldType(resType);
 
                 ExpectToken(line, ref col, ")");
+            }
+            else if (fieldType.MainType == FieldMainType.Optional || fieldType.MainType == FieldMainType.Vector)
+            {
+                ExpectToken(line, ref col, "(");
+
+                TokenType subTokenType;
+                string subToken = PullToken(line, ref col, out subTokenType);
+
+                FieldType subType = ParseType(line, ref col, subToken, TokenType.Identifier);
+
+                ExpectToken(line, ref col, ")");
+
+                fieldType = new FieldType(fieldType.MainType, subType);
+            }
+            else if (fieldType.MainType == FieldMainType.Struct)
+            {
+                ExpectToken(line, ref col, "(");
+
+                string structName = PullTokenOfType(line, ref col, TokenType.Identifier);
+
+                ExpectToken(line, ref col, ")");
+
+                fieldType = new FieldType(FieldMainType.Struct, structName);
             }
 
             FieldType? deduplicatedFieldType;
@@ -982,6 +1122,12 @@ namespace GameObjectReflector
                 return new FieldType(FieldMainType.EDef);
             else if (token == "resource")
                 return new FieldType(FieldMainType.Resource);
+            else if (token == "optional")
+                return new FieldType(FieldMainType.Optional);
+            else if (token == "struct")
+                return new FieldType(FieldMainType.Struct);
+            else if (token == "vector")
+                return new FieldType(FieldMainType.Vector);
             else
                 throw new ReflectorException("Unknown field type " + token);
         }

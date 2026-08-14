@@ -998,6 +998,8 @@ namespace anox::buildsystem
 		path.m_timeOffs = timeOffs;
 		path.m_maxLen = maxLen;
 
+		path.m_isGlobal = ((flags & 0x4) != 0) ? 1 : 0;
+
 		RKIT_CHECK(m_paths.Append(path));
 
 		RKIT_RETURN_OK;

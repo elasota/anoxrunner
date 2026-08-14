@@ -11,13 +11,8 @@
 
 namespace rkit
 {
-	class WeakRefTracker;
-
 	template<class T>
 	class RCPtr;
-
-	template<class T>
-	class WeakPtr;
 }
 
 namespace anox::game

@@ -22,6 +22,9 @@
 *.generated.cpp
 *.generated.inl
 *.generated.h
+*.dt.d.json
+*.dt.module.json
+*.dt.module.json.command
 launchSettings.json
 vc.nativecodeanalysis.all.xml
 CodeAnalysisResultManifest.txt

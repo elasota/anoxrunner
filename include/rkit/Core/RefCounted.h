@@ -842,7 +842,7 @@ namespace rkit
 	template<class TType, class TPtrType, class... TArgs>
 	inline Result NewWithAlloc(RCPtr<TPtrType> &objPtr, IMallocDriver *alloc, TArgs&& ...args)
 	{
-		void *mem = alloc->Alloc(sizeof(TType));
+		void *mem = alloc->Alloc(priv::NewSizeAlignResolver<TType>::GetSize());
 		if (!mem)
 			RKIT_THROW(ResultCode::kOutOfMemory);
 
@@ -872,7 +872,7 @@ namespace rkit
 	template<class TType, class TPtrType>
 	Result NewWithAlloc(RCPtr<TPtrType> &objPtr, IMallocDriver *alloc)
 	{
-		void *mem = alloc->Alloc(sizeof(TType));
+		void *mem = alloc->Alloc(priv::NewSizeAlignResolver<TType>::GetSize());
 		if (!mem)
 			RKIT_THROW(ResultCode::kOutOfMemory);
 
