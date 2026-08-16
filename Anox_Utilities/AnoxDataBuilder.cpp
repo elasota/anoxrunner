@@ -119,7 +119,7 @@ namespace anox { namespace utils
 
 			if (nodeNamespace == rkit::buildsystem::kDefaultNamespace && nodeType == rkit::buildsystem::kRenderPipelineLibraryNodeID)
 			{
-				RKIT_CHECK(rplNodes.Append(node));
+				rplNodes.Append(node);
 
 				if (node->WasCompiled())
 					rebuiltAnyPipelines = true;
@@ -132,14 +132,14 @@ namespace anox { namespace utils
 		rkit::log::LogInfo(u8"Combining pipeline libraries...");
 
 		rkit::UniquePtr<rkit::buildsystem::IPipelineLibraryCombiner> combiner;
-		RKIT_CHECK(m_bsDriver->CreatePipelineLibraryCombiner(combiner));
+		m_bsDriver->CreatePipelineLibraryCombiner(combiner);
 
 		for (rkit::buildsystem::IDependencyNode *node : rplNodes)
 		{
 			for (const rkit::buildsystem::FileStatusView &product : node->GetCompileProducts())
 			{
 				rkit::UniquePtr<rkit::ISeekableReadStream> stream;
-				RKIT_CHECK(bsi.TryOpenFileRead(product.m_location, product.m_filePath, stream));
+				bsi.TryOpenFileRead(product.m_location, product.m_filePath, stream);
 
 				if (!stream.IsValid())
 				{
@@ -147,14 +147,14 @@ namespace anox { namespace utils
 					RKIT_THROW(rkit::ResultCode::kOperationFailed);
 				}
 
-				RKIT_CHECK(combiner->AddInput(*stream));
+				combiner->AddInput(*stream);
 			}
 		}
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
-		RKIT_CHECK(bsi.OpenFileWrite(rkit::buildsystem::BuildFileLocation::kOutputFiles, u8"pipelines_vk.rkp", outStream));
+		bsi.OpenFileWrite(rkit::buildsystem::BuildFileLocation::kOutputFiles, u8"pipelines_vk.rkp", outStream);
 
-		RKIT_CHECK(combiner->WritePackage(*outStream));
+		combiner->WritePackage(*outStream);
 
 		RKIT_RETURN_OK;
 	}
@@ -171,7 +171,7 @@ namespace anox { namespace utils
 
 			if (nodeNamespace == kAnoxNamespaceID && nodeType == buildsystem::kAPEGroupNodeID)
 			{
-				RKIT_CHECK(apeGroupNodes.Append(node));
+				apeGroupNodes.Append(node);
 
 				if (node->WasCompiled())
 					rebuiltAnyScripts = true;
@@ -191,7 +191,7 @@ namespace anox { namespace utils
 			for (const rkit::buildsystem::FileStatusView &product : node->GetCompileProducts())
 			{
 				rkit::UniquePtr<rkit::ISeekableReadStream> stream;
-				RKIT_CHECK(bsi.TryOpenFileRead(product.m_location, product.m_filePath, stream));
+				bsi.TryOpenFileRead(product.m_location, product.m_filePath, stream);
 
 				if (!stream.IsValid())
 				{
@@ -206,21 +206,21 @@ namespace anox { namespace utils
 				for (size_t i = 0; i < numContentIDs; i++)
 				{
 					rkit::data::ContentID cid;
-					RKIT_CHECK(stream->ReadOneBinary(cid));
+					stream->ReadOneBinary(cid);
 
 					if (!contentIDSet.Contains(cid))
 					{
-						RKIT_CHECK(contentIDSet.Add(cid));
-						RKIT_CHECK(contentIDs.Append(cid));
+						contentIDSet.Add(cid);
+						contentIDs.Append(cid);
 					}
 				}
 			}
 		}
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
-		RKIT_CHECK(bsi.OpenFileWrite(rkit::buildsystem::BuildFileLocation::kOutputFiles, u8"globalscripts.idx", outStream));
+		bsi.OpenFileWrite(rkit::buildsystem::BuildFileLocation::kOutputFiles, u8"globalscripts.idx", outStream);
 
-		RKIT_CHECK(outStream->WriteAllSpan(contentIDs.ToSpan()));
+		outStream->WriteAllSpan(contentIDs.ToSpan());
 
 		RKIT_RETURN_OK;
 	}
@@ -249,25 +249,25 @@ namespace anox { namespace utils
 			rkit::CIPathView contentSubDir(u8"content");
 
 			rkit::OSRelPath osFilesSubDir;
-			RKIT_CHECK(osFilesSubDir.ConvertFrom(filesSubDir));
+			osFilesSubDir.ConvertFrom(filesSubDir);
 
 			rkit::OSRelPath osContentSubDir;
-			RKIT_CHECK(osContentSubDir.ConvertFrom(contentSubDir));
+			osContentSubDir.ConvertFrom(contentSubDir);
 
-			RKIT_CHECK(dataFilesDir.Set(dataDir));
-			RKIT_CHECK(dataFilesDir.Append(osFilesSubDir));
+			dataFilesDir.Set(dataDir);
+			dataFilesDir.Append(osFilesSubDir);
 
-			RKIT_CHECK(dataContentDir.Set(dataDir));
-			RKIT_CHECK(dataContentDir.Append(osContentSubDir));
+			dataContentDir.Set(dataDir);
+			dataContentDir.Append(osContentSubDir);
 		}
 
 		AnoxFileSystem fs;
-		RKIT_CHECK(fs.Load(m_utils, sourceDir, intermedDir, dataFilesDir, dataContentDir, dataSourceDir));
+		fs.Load(m_utils, sourceDir, intermedDir, dataFilesDir, dataContentDir, dataSourceDir);
 
 		rkit::UniquePtr<rkit::buildsystem::IBuildSystemInstance> instance;
-		RKIT_CHECK(m_bsDriver->CreateBuildSystemInstance(instance));
+		m_bsDriver->CreateBuildSystemInstance(instance);
 
-		RKIT_CHECK(instance->Initialize(targetName, sourceDir, intermedDir, dataFilesDir, dataContentDir));
+		instance->Initialize(targetName, sourceDir, intermedDir, dataFilesDir, dataContentDir);
 
 		rkit::StringView renderAddOnDriverName;
 		switch (backendType)
@@ -295,7 +295,7 @@ namespace anox { namespace utils
 				RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 			}
 
-			RKIT_CHECK(addOnDriver->RegisterBuildSystemAddOn(instance.Get()));
+			addOnDriver->RegisterBuildSystemAddOn(instance.Get());
 		}
 
 		// Add Anox add-on
@@ -314,25 +314,25 @@ namespace anox { namespace utils
 				RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 			}
 
-			RKIT_CHECK(addOnDriver->RegisterBuildSystemAddOn(instance.Get()));
+			addOnDriver->RegisterBuildSystemAddOn(instance.Get());
 		}
 
-		RKIT_CHECK(instance->LoadCache());
+		instance->LoadCache();
 
 		rkit::buildsystem::IDependencyGraphFactory *graphFactory = instance->GetDependencyGraphFactory();
 
 		rkit::buildsystem::IDependencyNode *rootDepsNode;
-		RKIT_CHECK(instance->FindOrCreateNamedNode(rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kDepsNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, u8"rootfiles.deps", rootDepsNode));
+		instance->FindOrCreateNamedNode(rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kDepsNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, u8"rootfiles.deps", rootDepsNode);
 
-		RKIT_CHECK(instance->AddRootNode(rootDepsNode));
+		instance->AddRootNode(rootDepsNode);
 
 		ExportPipelinesCheckRunner exportPipelinesCheck(*this, *instance);
-		RKIT_CHECK(instance->AddPostBuildAction(&exportPipelinesCheck));
+		instance->AddPostBuildAction(&exportPipelinesCheck);
 
 		ExportScriptCatalogCheckRunner exportScriptCheck(*this, *instance);
-		RKIT_CHECK(instance->AddPostBuildAction(&exportScriptCheck));
+		instance->AddPostBuildAction(&exportScriptCheck);
 
-		RKIT_CHECK(instance->Build(&fs));
+		instance->Build(&fs);
 
 		RKIT_RETURN_OK;
 	}
@@ -386,20 +386,20 @@ namespace anox { namespace utils
 			else
 			{
 				rkit::OSRelPath relPath;
-				RKIT_CHECK(relPath.ConvertFrom(path));
+				relPath.ConvertFrom(path);
 
 				rkit::OSAbsPath osPath = m_dataSourceDir;
-				RKIT_CHECK(osPath.Append(relPath));
+				osPath.Append(relPath);
 
 				bool succeeded_IGNORE = false;
-				RKIT_CHECK(sysDriver.GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, osPath, false));
+				sysDriver.GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, osPath, false);
 
 				if (!exists)
 				{
 					osPath = m_sourceDir;
-					RKIT_CHECK(osPath.Append(relPath));
+					osPath.Append(relPath);
 
-					RKIT_CHECK(sysDriver.GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, osPath, false));
+					sysDriver.GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, osPath, false);
 				}
 			}
 		}
@@ -427,13 +427,13 @@ namespace anox { namespace utils
 
 			{
 				rkit::OSRelPath relPath;
-				RKIT_CHECK(relPath.ConvertFrom(path));
+				relPath.ConvertFrom(path);
 
-				RKIT_CHECK(osPath.Append(relPath));
+				osPath.Append(relPath);
 			}
 
 			bool succeeded_IGNORE = false;
-			RKIT_CHECK(sysDriver.GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, osPath, false));
+			sysDriver.GetFileAttributesAbs(succeeded_IGNORE, exists, attribs, osPath, false);
 		}
 
 		// Try to import file from the root directory
@@ -469,18 +469,18 @@ namespace anox { namespace utils
 				return fileHandle.Open(outStream);
 
 			rkit::OSRelPath relPath;
-			RKIT_CHECK(relPath.ConvertFrom(path));
+			relPath.ConvertFrom(path);
 
 			rkit::OSAbsPath osPath = m_dataSourceDir;
-			RKIT_CHECK(osPath.Append(relPath));
+			osPath.Append(relPath);
 
-			RKIT_CHECK(sysDriver.OpenFileReadAbs(outStream, osPath, true));
+			sysDriver.OpenFileReadAbs(outStream, osPath, true);
 			if (!outStream.IsValid())
 			{
 				osPath = m_sourceDir;
-				RKIT_CHECK(osPath.Append(relPath));
+				osPath.Append(relPath);
 
-				RKIT_CHECK(sysDriver.OpenFileReadAbs(outStream, osPath, true));
+				sysDriver.OpenFileReadAbs(outStream, osPath, true);
 			}
 
 			RKIT_RETURN_OK;
@@ -503,12 +503,12 @@ namespace anox { namespace utils
 
 			{
 				rkit::OSRelPath relPath;
-				RKIT_CHECK(relPath.ConvertFrom(path));
+				relPath.ConvertFrom(path);
 
-				RKIT_CHECK(osPath.Append(relPath));
+				osPath.Append(relPath);
 			}
 
-			RKIT_CHECK(sysDriver.OpenFileReadAbs(outStream, osPath, true));
+			sysDriver.OpenFileReadAbs(outStream, osPath, true);
 		}
 
 		RKIT_RETURN_OK;
@@ -520,7 +520,7 @@ namespace anox { namespace utils
 			RKIT_RETURN_OK;
 
 		rkit::OSRelPath osRelPath;
-		RKIT_CHECK(osRelPath.ConvertFrom(path));
+		osRelPath.ConvertFrom(path);
 
 		rkit::OSAbsPath osPath;
 
@@ -532,7 +532,7 @@ namespace anox { namespace utils
 
 			for (rkit::OSAbsPath &directory : directories)
 			{
-				RKIT_CHECK(directory.Append(osRelPath));
+				directory.Append(osRelPath);
 			}
 
 			rkit::ISystemDriver &sysDriver = *rkit::GetDrivers().m_systemDriver;
@@ -544,7 +544,7 @@ namespace anox { namespace utils
 				bool directoryExists = false;
 				rkit::FileAttributes dirAttribs;
 				bool succeeded_IGNORE = false;
-				RKIT_CHECK(sysDriver.GetFileAttributesAbs(succeeded_IGNORE, directoryExists, dirAttribs, dirPath, false));
+				sysDriver.GetFileAttributesAbs(succeeded_IGNORE, directoryExists, dirAttribs, dirPath, false);
 
 				// See if this actually exists, otherwise blank it out so future scans ignore it
 				if (!directoryExists || !dirAttribs.m_isDirectory)
@@ -554,13 +554,13 @@ namespace anox { namespace utils
 				}
 
 				rkit::UniquePtr<rkit::IDirectoryScan> dirScan;
-				RKIT_CHECK(sysDriver.OpenDirectoryScanAbs(dirScan, directories[srcIndex], false));
+				sysDriver.OpenDirectoryScanAbs(dirScan, directories[srcIndex], false);
 
 				for (;;)
 				{
 					bool haveItem = false;
 					rkit::DirectoryScanItem item;
-					RKIT_CHECK(dirScan->GetNext(haveItem, item));
+					dirScan->GetNext(haveItem, item);
 
 					if (!haveItem)
 						break;
@@ -574,17 +574,17 @@ namespace anox { namespace utils
 						continue;
 
 					rkit::CIPath fileNameCI;
-					RKIT_CHECK(fileNameCI.ConvertFrom(item.m_fileName));
+					fileNameCI.ConvertFrom(item.m_fileName);
 
 					rkit::buildsystem::FileStatus fileStatus;
-					RKIT_CHECK(fileStatus.m_filePath.Set(path));
-					RKIT_CHECK(fileStatus.m_filePath.Append(fileNameCI));
+					fileStatus.m_filePath.Set(path);
+					fileStatus.m_filePath.Append(fileNameCI);
 					fileStatus.m_fileSize = item.m_attribs.m_fileSize;
 					fileStatus.m_fileTime = item.m_attribs.m_fileTime;
 					fileStatus.m_isDirectory = isDirectory;
 					fileStatus.m_location = inputFileLocation;
 
-					RKIT_CHECK(callback(userdata, fileStatus.ToView()));
+					callback(userdata, fileStatus.ToView());
 				}
 			}
 
@@ -608,7 +608,7 @@ namespace anox { namespace utils
 						if (dirHandle.IsValid() && dirHandle.IsDirectory())
 						{
 							rkit::CIPath basePath;
-							RKIT_CHECK(basePath.Set(firstComponent));
+							basePath.Set(firstComponent);
 
 							if (listFiles)
 							{
@@ -619,19 +619,19 @@ namespace anox { namespace utils
 									RKIT_ASSERT(subHandle.IsValid() && !subHandle.IsDirectory());
 
 									rkit::CIPath subPath;
-									RKIT_CHECK(subPath.Set(subHandle.GetFilePath().ToUTF8()));
+									subPath.Set(subHandle.GetFilePath().ToUTF8());
 
 									rkit::buildsystem::FileStatus fileStatus;
 
 									fileStatus.m_filePath = basePath;
-									RKIT_CHECK(fileStatus.m_filePath.Append(subPath));
+									fileStatus.m_filePath.Append(subPath);
 
 									fileStatus.m_fileSize = subHandle.GetFileSize();
 									fileStatus.m_fileTime = archive.m_fileAttribs.m_fileTime;
 									fileStatus.m_isDirectory = false;
 									fileStatus.m_location = inputFileLocation;
 
-									RKIT_CHECK(callback(userdata, fileStatus.ToView()));
+									callback(userdata, fileStatus.ToView());
 								}
 							}
 							if (listDirectories)
@@ -643,13 +643,13 @@ namespace anox { namespace utils
 									RKIT_ASSERT(subHandle.IsValid() && subHandle.IsDirectory());
 
 									rkit::buildsystem::FileStatus fileStatus;
-									RKIT_CHECK(fileStatus.m_filePath.Set(subHandle.GetFilePath().ToUTF8()));
+									fileStatus.m_filePath.Set(subHandle.GetFilePath().ToUTF8());
 									fileStatus.m_fileSize = 0;
 									fileStatus.m_fileTime = archive.m_fileAttribs.m_fileTime;
 									fileStatus.m_isDirectory = true;
 									fileStatus.m_location = inputFileLocation;
 
-									RKIT_CHECK(callback(userdata, fileStatus.ToView()));
+									callback(userdata, fileStatus.ToView());
 								}
 							}
 						}
@@ -733,7 +733,7 @@ namespace anox { namespace utils
 
 		if (numTrailingSeparators > 0)
 		{
-			RKIT_CHECK(str.Set(str.SubString(0, str.Length() - numTrailingSeparators)));
+			str.Set(str.SubString(0, str.Length() - numTrailingSeparators));
 		}
 
 		RKIT_RETURN_OK;
@@ -741,24 +741,24 @@ namespace anox { namespace utils
 
 	rkit::Result AnoxFileSystem::Load(anox::IUtilitiesDriver *utils, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataFilesDir, const rkit::OSAbsPathView &dataContentDir, const rkit::OSAbsPathView &dataSourceDir)
 	{
-		RKIT_CHECK(m_exeDir.Set(sourceDir));
+		m_exeDir.Set(sourceDir);
 
 		m_sourceDir = m_exeDir;
 
 		{
 			rkit::OSRelPath anoxdataComponent;
-			RKIT_CHECK(anoxdataComponent.SetFromUTF8(u8"anoxdata"));
-			RKIT_CHECK(m_sourceDir.Append(anoxdataComponent));
+			anoxdataComponent.SetFromUTF8(u8"anoxdata");
+			m_sourceDir.Append(anoxdataComponent);
 		}
-		RKIT_CHECK(m_intermedDir.Set(intermedDir));
-		RKIT_CHECK(m_dataFilesDir.Set(dataFilesDir));
-		RKIT_CHECK(m_dataContentDir.Set(dataContentDir));
-		RKIT_CHECK(m_dataSourceDir.Set(dataSourceDir));
+		m_intermedDir.Set(intermedDir);
+		m_dataFilesDir.Set(dataFilesDir);
+		m_dataContentDir.Set(dataContentDir);
+		m_dataSourceDir.Set(dataSourceDir);
 
 		rkit::ISystemDriver &sysDriver = *rkit::GetDrivers().m_systemDriver;
 
 		rkit::UniquePtr<rkit::IDirectoryScan> dirScan;
-		RKIT_CHECK(sysDriver.OpenDirectoryScanAbs(dirScan, m_sourceDir, false));
+		sysDriver.OpenDirectoryScanAbs(dirScan, m_sourceDir, false);
 
 		if (dirScan.Get())
 		{
@@ -766,7 +766,7 @@ namespace anox { namespace utils
 			{
 				bool haveItem = false;
 				rkit::DirectoryScanItem scanItem;
-				RKIT_CHECK(dirScan->GetNext(haveItem, scanItem));
+				dirScan->GetNext(haveItem, scanItem);
 
 				if (!haveItem)
 					break;
@@ -774,7 +774,7 @@ namespace anox { namespace utils
 				if (scanItem.m_attribs.m_isDirectory == false && scanItem.m_fileName.Length() >= 5 && scanItem.m_fileName.ToStringView().EndsWithNoCase(RKIT_OS_PATH_LITERAL(".dat")))
 				{
 					rkit::OSAbsPath archivePath = m_sourceDir;
-					RKIT_CHECK(archivePath.Append(scanItem.m_fileName));
+					archivePath.Append(scanItem.m_fileName);
 
 					rkit::UniquePtr<rkit::ISeekableReadStream> archiveStream;
 
@@ -788,16 +788,16 @@ namespace anox { namespace utils
 					);
 
 					rkit::CIPath fileNameCIPath;
-					RKIT_CHECK(fileNameCIPath.ConvertFrom(scanItem.m_fileName));
+					fileNameCIPath.ConvertFrom(scanItem.m_fileName);
 
 					const rkit::String &fileName = fileNameCIPath.ToString();
 
 					MountedArchive mountedArchive;
 					mountedArchive.m_fileAttribs = scanItem.m_attribs;
-					RKIT_CHECK(mountedArchive.m_archiveName.Set(fileName.SubString(0, fileName.Length() - 4)));
-					RKIT_CHECK(utils->OpenAFSArchive(std::move(archiveStream), mountedArchive.m_archive));
+					mountedArchive.m_archiveName.Set(fileName.SubString(0, fileName.Length() - 4));
+					utils->OpenAFSArchive(std::move(archiveStream), mountedArchive.m_archive);
 
-					RKIT_CHECK(m_afsArchives.Append(std::move(mountedArchive)));
+					m_afsArchives.Append(std::move(mountedArchive));
 				}
 			}
 		}

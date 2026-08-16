@@ -94,7 +94,7 @@ namespace rkit
 
 	struct Win32Globals
 	{
-		rkit::Drivers m_drivers;
+		rkit::Drivers m_drivers = {};
 #if RKIT_MODULE_LINKER_TYPE == RKIT_MODULE_LINKER_TYPE_STATIC
 		rkit::moduleloader::StaticModuleDriver m_moduleDriver;
 #elif RKIT_MODULE_LINKER_TYPE == RKIT_MODULE_LINKER_TYPE_DLL
@@ -391,7 +391,7 @@ namespace rkit
 
 		if (m_moduleAPI.m_initFunction)
 		{
-			RKIT_CHECK(m_moduleAPI.m_initFunction(initParams));
+			m_moduleAPI.m_initFunction(initParams);
 		}
 
 		RKIT_RETURN_OK;
@@ -556,4 +556,4 @@ namespace rkit::boot::win32
 	}
 }
 
-RKIT_IMPLEMENT_PER_MODULE_FUNCTIONS
+RKIT_IMPLEMENT_LINKER_BOUNDARY_PER_MODULE_FUNCTIONS

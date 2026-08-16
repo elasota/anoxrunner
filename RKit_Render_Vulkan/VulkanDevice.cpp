@@ -337,14 +337,14 @@ namespace rkit { namespace render { namespace vulkan
 		QueueFamily &queueFamily = m_queueFamilies[static_cast<size_t>(queueType)];
 		queueFamily.m_vkQueueFamily = queueFamilyIndex;
 
-		RKIT_CHECK(queueFamily.m_queues.Resize(numQueues));
+		queueFamily.m_queues.Resize(numQueues);
 
 		for (uint32_t i = 0; i < numQueues; i++)
 		{
 			VkQueue queue = VK_NULL_HANDLE;
 			m_vkd.vkGetDeviceQueue(m_device, queueFamilyIndex, i, &queue);
 
-			RKIT_CHECK(VulkanQueueProxyBase::Create(queueFamily.m_queues[i], alloc, queueType, *this, queue, queueFamilyIndex, m_vkd));
+			VulkanQueueProxyBase::Create(queueFamily.m_queues[i], alloc, queueType, *this, queue, queueFamilyIndex, m_vkd);
 		}
 
 		RKIT_RETURN_OK;
@@ -356,7 +356,7 @@ namespace rkit { namespace render { namespace vulkan
 		for (const QueueFamily &queueFamily : m_queueFamilies)
 			numQueues += queueFamily.m_queues.Count();
 
-		RKIT_CHECK(m_allQueues.Resize(numQueues));
+		m_allQueues.Resize(numQueues);
 
 		size_t insertIndex = 0;
 		for (const QueueFamily &queueFamily : m_queueFamilies)
@@ -412,9 +412,9 @@ namespace rkit { namespace render { namespace vulkan
 	Result VulkanDevice::CreateBinaryCPUWaitableFence(UniquePtr<IBinaryCPUWaitableFence> &outFence, bool startSignaled)
 	{
 		UniquePtr<VulkanBinaryCPUWaitableFence> fence;
-		RKIT_CHECK(New<VulkanBinaryCPUWaitableFence>(fence, *this));
+		New<VulkanBinaryCPUWaitableFence>(fence, *this);
 
-		RKIT_CHECK(fence->Initialize(startSignaled));
+		fence->Initialize(startSignaled);
 
 		outFence = std::move(fence);
 
@@ -424,9 +424,9 @@ namespace rkit { namespace render { namespace vulkan
 	Result VulkanDevice::CreateBinaryGPUWaitableFence(UniquePtr<IBinaryGPUWaitableFence> &outFence)
 	{
 		UniquePtr<VulkanBinaryGPUWaitableFence> fence;
-		RKIT_CHECK(New<VulkanBinaryGPUWaitableFence>(fence, *this));
+		New<VulkanBinaryGPUWaitableFence>(fence, *this);
 
-		RKIT_CHECK(fence->Initialize());
+		fence->Initialize();
 
 		outFence = std::move(fence);
 
@@ -436,7 +436,7 @@ namespace rkit { namespace render { namespace vulkan
 	Result VulkanDevice::CreateSwapChainSyncPoint(UniquePtr<ISwapChainSyncPoint> &outSyncPoint)
 	{
 		UniquePtr<VulkanSwapChainSyncPointBase> syncPoint;
-		RKIT_CHECK(VulkanSwapChainSyncPointBase::Create(syncPoint, *this));
+		VulkanSwapChainSyncPointBase::Create(syncPoint, *this);
 
 		outSyncPoint = std::move(syncPoint);
 
@@ -447,7 +447,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		UniquePtr<VulkanRenderPassInstanceBase> rpi;
 
-		RKIT_CHECK(VulkanRenderPassInstanceBase::Create(rpi, *this, renderPass, resources));
+		VulkanRenderPassInstanceBase::Create(rpi, *this, renderPass, resources);
 
 		outRPI = std::move(rpi);
 
@@ -458,7 +458,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		UniquePtr<VulkanCPUFenceWaiterBase> fw;
 
-		RKIT_CHECK(VulkanCPUFenceWaiterBase::Create(fw, *this));
+		VulkanCPUFenceWaiterBase::Create(fw, *this);
 
 		outFenceWaiter = std::move(fw);
 
@@ -520,8 +520,8 @@ namespace rkit { namespace render { namespace vulkan
 		UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart)
 	{
 		UniquePtr<PipelineLibraryLoaderBase> loader;
-		RKIT_CHECK(PipelineLibraryLoaderBase::Create(*this, loader, std::move(validator),
-			std::move(package), std::move(packageStream), packageBinaryContentStart));
+		PipelineLibraryLoaderBase::Create(*this, loader, std::move(validator),
+			std::move(package), std::move(packageStream), packageBinaryContentStart);
 
 		outLoader = std::move(loader);
 
@@ -641,7 +641,7 @@ namespace rkit { namespace render { namespace vulkan
 	Result VulkanDevice::CreateSwapChainPrototype(UniquePtr<ISwapChainPrototype> &outSwapChainPrototype, IDisplay &display)
 	{
 		UniquePtr<VulkanSwapChainPrototypeBase> vkSwapChainPrototype;
-		RKIT_CHECK(VulkanSwapChainPrototypeBase::Create(vkSwapChainPrototype, *this, display));
+		VulkanSwapChainPrototypeBase::Create(vkSwapChainPrototype, *this, display);
 
 		outSwapChainPrototype = std::move(vkSwapChainPrototype);
 
@@ -660,7 +660,7 @@ namespace rkit { namespace render { namespace vulkan
 		uint32_t queueFamily = queue->GetQueueFamily();
 
 		UniquePtr<VulkanSwapChainBase> vkSwapChain;
-		RKIT_CHECK(VulkanSwapChainBase::Create(vkSwapChain, *this, *static_cast<VulkanSwapChainPrototypeBase *>(prototype.Get()), numImages, fmt, writeBehavior, *queue));
+		VulkanSwapChainBase::Create(vkSwapChain, *this, *static_cast<VulkanSwapChainPrototypeBase *>(prototype.Get()), numImages, fmt, writeBehavior, *queue);
 
 		outSwapChain = std::move(vkSwapChain);
 
@@ -672,7 +672,7 @@ namespace rkit { namespace render { namespace vulkan
 		const BufferResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &concurrentQueues)
 	{
 		UniquePtr<VulkanBufferPrototype> prototype;
-		RKIT_CHECK(VulkanBufferPrototype::Create(prototype, *this, bufferSpec, resourceSpec, concurrentQueues));
+		VulkanBufferPrototype::Create(prototype, *this, bufferSpec, resourceSpec, concurrentQueues);
 
 		outBufferPrototype = std::move(prototype);
 
@@ -699,7 +699,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_CHECK(m_vkd.vkBindBufferMemory(m_device, vkBuffer, baseHeap.GetDeviceMemory(), static_cast<VkDeviceSize>(baseOffset)));
 
 		UniquePtr<VulkanBuffer> buffer;
-		RKIT_CHECK(New<VulkanBuffer>(buffer, *this, vkBuffer, baseAddress, memRegion.GetSize()));
+		New<VulkanBuffer>(buffer, *this, vkBuffer, baseAddress, memRegion.GetSize());
 
 		prototype.DetachBuffer();
 
@@ -712,7 +712,7 @@ namespace rkit { namespace render { namespace vulkan
 		const ImageResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &concurrentQueues)
 	{
 		UniquePtr<VulkanImagePrototype> prototype;
-		RKIT_CHECK(VulkanImagePrototype::Create(prototype, *this, imageSpec, resourceSpec, concurrentQueues));
+		VulkanImagePrototype::Create(prototype, *this, imageSpec, resourceSpec, concurrentQueues);
 
 		outImagePrototype = std::move(prototype);
 
@@ -739,7 +739,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(m_vkd.vkBindImageMemory(m_device, image, baseHeap.GetDeviceMemory(), static_cast<VkDeviceSize>(baseOffset)));
 
-		RKIT_CHECK(New<VulkanImage>(outImage, *this, image, prototype.GetAllAspectFlags()));
+		New<VulkanImage>(outImage, *this, image, prototype.GetAllAspectFlags());
 
 		prototype.DetachImage();
 
@@ -780,7 +780,7 @@ namespace rkit { namespace render { namespace vulkan
 		if (vkHeapKey.m_cpuAccessible)
 		{
 			RKIT_ASSERT(memFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-			RKIT_CHECK(vkHeap->MapMemory());
+			vkHeap->MapMemory();
 		}
 
 		outHeap = std::move(vkHeap);
@@ -805,16 +805,16 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanDevice::LoadDeviceAPI()
 	{
-		RKIT_CHECK(LoadVulkanAPI(m_vkd, FunctionResolver(m_vki, *this)));
-		RKIT_CHECK(LoadVulkanAPI(m_vkd_p, FunctionResolver(m_vki, *this)));
+		LoadVulkanAPI(m_vkd, FunctionResolver(m_vki, *this));
+		LoadVulkanAPI(m_vkd_p, FunctionResolver(m_vki, *this));
 
 		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::CreatePools()
 	{
-		RKIT_CHECK(CreateResourcePool<VkSemaphore>(m_semaPool, m_semaFactory, true));
-		RKIT_CHECK(CreateResourcePool<VkFence>(m_fencePool, m_fenceFactory, true));
+		CreateResourcePool<VkSemaphore>(m_semaPool, m_semaFactory, true);
+		CreateResourcePool<VkFence>(m_fencePool, m_fenceFactory, true);
 
 		RKIT_RETURN_OK;
 	}
@@ -824,13 +824,13 @@ namespace rkit { namespace render { namespace vulkan
 		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
 
 		UniquePtr<IMutex> queueMutex;
-		RKIT_CHECK(sysDriver.CreateMutex(queueMutex));
+		sysDriver.CreateMutex(queueMutex);
 
 		UniquePtr<VulkanDevice> vkDevice;
-		RKIT_CHECK(New<VulkanDevice>(vkDevice, vkg, vki, vkg_p, vki_p, inst, device, allocCallbacks, caps, reqs, physDevice, std::move(enabledExts), memProperties, std::move(queueMutex)));
+		New<VulkanDevice>(vkDevice, vkg, vki, vkg_p, vki_p, inst, device, allocCallbacks, caps, reqs, physDevice, std::move(enabledExts), memProperties, std::move(queueMutex));
 		
-		RKIT_CHECK(vkDevice->LoadDeviceAPI());
-		RKIT_CHECK(vkDevice->CreatePools());
+		vkDevice->LoadDeviceAPI();
+		vkDevice->CreatePools();
 
 		size_t numQueues = 0;
 		for (size_t i = 0; i < static_cast<size_t>(CommandQueueType::kCount); i++)
@@ -840,13 +840,13 @@ namespace rkit { namespace render { namespace vulkan
 
 			if (spec.m_numQueues > 0)
 			{
-				RKIT_CHECK(vkDevice->ResolveQueues(queueType, numQueues, spec.m_queueFamily, spec.m_numQueues));
+				vkDevice->ResolveQueues(queueType, numQueues, spec.m_queueFamily, spec.m_numQueues);
 
 				numQueues += spec.m_numQueues;
 			}
 		}
 
-		RKIT_CHECK(vkDevice->FinalizeQueueList());
+		vkDevice->FinalizeQueueList();
 
 		outDevice = std::move(vkDevice);
 

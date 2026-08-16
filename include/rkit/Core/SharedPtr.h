@@ -182,7 +182,7 @@ rkit::Result rkit::SharedPtr<T>::Create(SharedPtr<T> &outRCPtr, IMallocDriver *a
 {
 	UniquePtr<RCContainer> rcContainerPtr;
 
-	RKIT_CHECK(NewWithAlloc<RCContainer>(rcContainerPtr, alloc));
+	NewWithAlloc<RCContainer>(rcContainerPtr, alloc);
 
 	RCContainer *rcContainer = rcContainerPtr.Get();
 

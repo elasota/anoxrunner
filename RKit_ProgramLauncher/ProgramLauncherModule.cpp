@@ -62,7 +62,7 @@ namespace rkit
 
 		Result TryGetJsonObjectValueOfType(const utils::JsonValue &objValue, const StringView &key, utils::JsonElementType desiredElementType, bool &outExists, utils::JsonValue &outValue)
 		{
-			RKIT_CHECK(TryGetJsonObjectValue(objValue, key, outExists, outValue));
+			TryGetJsonObjectValue(objValue, key, outExists, outValue);
 
 			if (outValue.GetType() != desiredElementType)
 				RKIT_THROW(rkit::ResultCode::kConfigInvalid);
@@ -88,12 +88,12 @@ namespace rkit
 		Result TryGetJsonObjectValueString(const utils::JsonValue &objValue, const StringView &key, bool &outExists, StringView &outStr)
 		{
 			utils::JsonValue strValue;
-			RKIT_CHECK(TryGetJsonObjectValueOfType(objValue, key, utils::JsonElementType::kString, outExists, strValue));
+			TryGetJsonObjectValueOfType(objValue, key, utils::JsonElementType::kString, outExists, strValue);
 
 			if (!outExists)
 				RKIT_RETURN_OK;
 
-			RKIT_CHECK(strValue.ToString(outStr));
+			strValue.ToString(outStr);
 
 			outExists = true;
 
@@ -104,32 +104,32 @@ namespace rkit
 		{
 			UniquePtr<ISeekableReadStream> configStream;
 
-			RKIT_CHECK(GetDrivers().m_systemDriver->OpenFileRead(configStream, FileLocation::kProgramDirectory, u8"rkitmoduleconfig.json", false));
+			GetDrivers().m_systemDriver->OpenFileRead(configStream, FileLocation::kProgramDirectory, u8"rkitmoduleconfig.json", false);
 
 			UniquePtr<utils::IJsonDocument> configJsonDoc;
-			RKIT_CHECK(GetDrivers().m_utilitiesDriver->CreateJsonDocument(configJsonDoc, GetDrivers().m_mallocDriver.Get(), configStream.Get()));
+			GetDrivers().m_utilitiesDriver->CreateJsonDocument(configJsonDoc, GetDrivers().m_mallocDriver.Get(), configStream.Get());
 
 			utils::JsonValue docJV;
-			RKIT_CHECK(configJsonDoc->ToJsonValue(docJV));
+			configJsonDoc->ToJsonValue(docJV);
 
 			if (docJV.GetType() != utils::JsonElementType::kObject)
 				RKIT_THROW(rkit::ResultCode::kConfigInvalid);
 
 			bool has = false;
 			utils::JsonValue defaultProgramJV;
-			RKIT_CHECK(TryGetJsonObjectValueOfType(docJV, u8"DefaultProgram", utils::JsonElementType::kObject, has, defaultProgramJV));
+			TryGetJsonObjectValueOfType(docJV, u8"DefaultProgram", utils::JsonElementType::kObject, has, defaultProgramJV);
 
 			if (!has)
 				RKIT_THROW(rkit::ResultCode::kConfigInvalid);
 
 			utils::JsonValue modulesJV;
-			RKIT_CHECK(TryGetJsonObjectValueOfType(docJV, u8"Modules", utils::JsonElementType::kObject, has, modulesJV));
+			TryGetJsonObjectValueOfType(docJV, u8"Modules", utils::JsonElementType::kObject, has, modulesJV);
 
 			if (!has)
 				RKIT_THROW(rkit::ResultCode::kConfigInvalid);
 
 			utils::JsonValue programsJV;
-			RKIT_CHECK(TryGetJsonObjectValueOfType(docJV, u8"Programs", utils::JsonElementType::kObject, has, programsJV));
+			TryGetJsonObjectValueOfType(docJV, u8"Programs", utils::JsonElementType::kObject, has, programsJV);
 
 			if (!has)
 				RKIT_THROW(rkit::ResultCode::kConfigInvalid);
@@ -138,23 +138,23 @@ namespace rkit
 
 			{
 				StringView defaultProgramNamespaceSV;
-				RKIT_CHECK(TryGetJsonObjectValueString(defaultProgramJV, u8"Namespace", has, defaultProgramNamespaceSV));
+				TryGetJsonObjectValueString(defaultProgramJV, u8"Namespace", has, defaultProgramNamespaceSV);
 
 				if (!has)
 					RKIT_THROW(rkit::ResultCode::kConfigInvalid);
 
-				RKIT_CHECK(StringToNamespaceID(defaultProgramNamespaceSV, outConfig.m_defaultProgramNamespace));
+				StringToNamespaceID(defaultProgramNamespaceSV, outConfig.m_defaultProgramNamespace);
 			}
 
 			{
 				StringView defaultProgramNameSV;
-				RKIT_CHECK(TryGetJsonObjectValueString(defaultProgramJV, u8"Name", has, defaultProgramNameSV));
+				TryGetJsonObjectValueString(defaultProgramJV, u8"Name", has, defaultProgramNameSV);
 
 				if (!has)
 					RKIT_THROW(rkit::ResultCode::kConfigInvalid);
 
 				String nameStr;
-				RKIT_CHECK(nameStr.Set(defaultProgramNameSV));
+				nameStr.Set(defaultProgramNameSV);
 
 				outConfig.m_defaultProgramName = std::move(nameStr);
 			}
@@ -163,61 +163,61 @@ namespace rkit
 			{
 				uint32_t namespaceID = 0;
 
-				RKIT_CHECK(StringToNamespaceID(key, namespaceID));
+				StringToNamespaceID(key, namespaceID);
 
 				if (value.GetType() != utils::JsonElementType::kArray)
 					RKIT_THROW(rkit::ResultCode::kConfigInvalid);
 
 				size_t arraySize = 0;
-				RKIT_CHECK(value.GetArraySize(arraySize));
+				value.GetArraySize(arraySize);
 
 				for (size_t i = 0; i < arraySize; i++)
 				{
 					utils::JsonValue namespaceNameJV;
 
-					RKIT_CHECK(value.GetArrayElement(i, namespaceNameJV));
+					value.GetArrayElement(i, namespaceNameJV);
 
 					if (namespaceNameJV.GetType() != utils::JsonElementType::kString)
 						RKIT_THROW(rkit::ResultCode::kConfigInvalid);
 
 					StringView namespaceNameSV;
-					RKIT_CHECK(namespaceNameJV.ToString(namespaceNameSV));
+					namespaceNameJV.ToString(namespaceNameSV);
 
 					ProgramLauncherPrivate::ModuleDef moduleDef;
-					RKIT_CHECK(moduleDef.m_name.Set(namespaceNameSV));
+					moduleDef.m_name.Set(namespaceNameSV);
 					moduleDef.m_namespace = namespaceID;
 
-					RKIT_CHECK(outConfig.m_moduleDefs.Append(std::move(moduleDef)));
+					outConfig.m_moduleDefs.Append(std::move(moduleDef));
 				}
 
 				RKIT_RETURN_OK;
 			};
 
-			RKIT_CHECK(modulesJV.IterateObjectWithCallable(iterateModules));
+			modulesJV.IterateObjectWithCallable(iterateModules);
 
 			auto iteratePrograms = [&outConfig](const StringView &key, const utils::JsonValue &value, bool &shouldContinue) -> Result
 			{
 				uint32_t namespaceID = 0;
 
-				RKIT_CHECK(StringToNamespaceID(key, namespaceID));
+				StringToNamespaceID(key, namespaceID);
 
 				if (value.GetType() != utils::JsonElementType::kArray)
 					RKIT_THROW(rkit::ResultCode::kConfigInvalid);
 
 				size_t arraySize = 0;
-				RKIT_CHECK(value.GetArraySize(arraySize));
+				value.GetArraySize(arraySize);
 
 				for (size_t i = 0; i < arraySize; i++)
 				{
 					utils::JsonValue namespaceNameJV;
 
-					RKIT_CHECK(value.GetArrayElement(i, namespaceNameJV));
+					value.GetArrayElement(i, namespaceNameJV);
 
 					if (namespaceNameJV.GetType() != utils::JsonElementType::kString)
 						RKIT_THROW(rkit::ResultCode::kConfigInvalid);
 
 					StringView namespaceNameSV;
-					RKIT_CHECK(namespaceNameJV.ToString(namespaceNameSV));
+					namespaceNameJV.ToString(namespaceNameSV);
 
 					bool found = false;
 					for (ProgramLauncherPrivate::ModuleDef &moduleDef : outConfig.m_moduleDefs)
@@ -234,16 +234,16 @@ namespace rkit
 						RKIT_THROW(rkit::ResultCode::kConfigInvalid);
 
 					ProgramLauncherPrivate::ModuleDef moduleDef;
-					RKIT_CHECK(moduleDef.m_name.Set(namespaceNameSV));
+					moduleDef.m_name.Set(namespaceNameSV);
 					moduleDef.m_namespace = namespaceID;
 
-					RKIT_CHECK(outConfig.m_moduleDefs.Append(std::move(moduleDef)));
+					outConfig.m_moduleDefs.Append(std::move(moduleDef));
 				}
 
 				RKIT_RETURN_OK;
 			};
 
-			RKIT_CHECK(programsJV.IterateObjectWithCallable(iteratePrograms));
+			programsJV.IterateObjectWithCallable(iteratePrograms);
 
 			RKIT_RETURN_OK;
 		}
@@ -425,7 +425,7 @@ namespace rkit
 		if (m_initialized)
 			RKIT_RETURN_OK;
 
-		RKIT_CHECK(m_module->InitWithCustomDrivers(initParams, drivers));
+		m_module->InitWithCustomDrivers(initParams, drivers);
 
 		m_initialized = true;
 
@@ -437,7 +437,7 @@ namespace rkit
 		if (m_initialized)
 			RKIT_RETURN_OK;
 
-		RKIT_CHECK(m_module->Init(initParams));
+		m_module->Init(initParams);
 
 		m_initialized = true;
 
@@ -486,21 +486,21 @@ namespace rkit
 	Result ProgramModule::Init(const ModuleInitParameters *)
 	{
 		UniquePtr<ProgramLauncherPrivate::ModuleConfig> moduleConfig;
-		RKIT_CHECK(New<ProgramLauncherPrivate::ModuleConfig>(moduleConfig));
+		New<ProgramLauncherPrivate::ModuleConfig>(moduleConfig);
 
 		UniquePtr<TrackedModuleDriver> driver;
-		RKIT_CHECK(New<TrackedModuleDriver>(driver, GetDrivers().m_moduleDriver));
+		New<TrackedModuleDriver>(driver, GetDrivers().m_moduleDriver);
 		ms_trackedModuleDriver = driver.Detach();
 
 		GetMutableDrivers().m_moduleDriver = ms_trackedModuleDriver;
 
-		RKIT_CHECK(ProgramLauncherPrivate::LoadUtilitiesModule());
+		ProgramLauncherPrivate::LoadUtilitiesModule();
 
-		RKIT_CHECK(ProgramLauncherPrivate::LoadModuleConfig(*moduleConfig.Get()));
+		ProgramLauncherPrivate::LoadModuleConfig(*moduleConfig.Get());
 
 		ms_moduleConfig = moduleConfig.Detach();
 
-		RKIT_CHECK(ProgramLauncherPrivate::LoadProgramModule(*ms_moduleConfig));
+		ProgramLauncherPrivate::LoadProgramModule(*ms_moduleConfig);
 
 		return Result(ResultCode::kOK);
 	}

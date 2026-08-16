@@ -131,7 +131,7 @@ namespace anox
 		IConfigurationValueView keyView = priv::ConfigBuilderValueFuncs::CreateViewOfStringSliceView(key);
 
 		ConfigBuilderValue_t valueAsCBV;
-		RKIT_CHECK(priv::ConfigBuilderValueFuncs::SetValue(valueAsCBV, value.Read()));
+		priv::ConfigBuilderValueFuncs::SetValue(valueAsCBV, value.Read());
 
 		rkit::ConstSpan<ConfigBuilderKeyValuePair> existingValues = m_keyValueTable.GetValues();
 
@@ -165,7 +165,7 @@ namespace anox
 		}
 
 		ConfigBuilderValue_t keyAsCBV = rkit::String();
-		RKIT_CHECK(keyAsCBV.GetAs<rkit::String>().Set(key));
+		keyAsCBV.GetAs<rkit::String>().Set(key);
 
 		ConfigBuilderKeyValuePair newPair =
 		{
@@ -173,7 +173,7 @@ namespace anox
 			std::move(valueAsCBV)
 		};
 
-		RKIT_CHECK(m_keyValueTable.Modify().InsertAt(insertPosMinInclusive, std::move(newPair)));
+		m_keyValueTable.Modify().InsertAt(insertPosMinInclusive, std::move(newPair));
 
 		RKIT_RETURN_OK;
 	}
@@ -231,21 +231,21 @@ namespace anox { namespace priv {
 		case ConfigurationValueType::kString:
 			{
 				rkit::String temp;
-				RKIT_CHECK(temp.Set(view.m_getValueFuncs.m_getString(view)));
+				temp.Set(view.m_getValueFuncs.m_getString(view));
 				value = std::move(temp);
 			}
 			break;
 		case ConfigurationValueType::kArray:
 			{
 				ConfigBuilderValueList list;
-				RKIT_CHECK(SetArray(list, view.m_getValueFuncs.m_getArray(view)));
+				SetArray(list, view.m_getValueFuncs.m_getArray(view));
 				value = std::move(list);
 			}
 			break;
 		case ConfigurationValueType::kKeyValueTable:
 			{
 				ConfigBuilderKeyValueTable table;
-				RKIT_CHECK(SetKeyValueTable(table, view.m_getValueFuncs.m_keyValueTableFuncs->m_getKeyValuePairs(view)));
+				SetKeyValueTable(table, view.m_getValueFuncs.m_keyValueTableFuncs->m_getKeyValuePairs(view));
 				value = std::move(table);
 			}
 			break;
@@ -272,11 +272,11 @@ namespace anox { namespace priv {
 		
 		rkit::Vector<ConfigBuilderValue_t> &vector = list.Modify();
 
-		RKIT_CHECK(vector.Resize(count));
+		vector.Resize(count);
 
 		for (size_t i = 0; i < count; i++)
 		{
-			RKIT_CHECK(SetValue(vector[i], values[i]));
+			SetValue(vector[i], values[i]);
 		}
 
 		RKIT_RETURN_OK;
@@ -288,13 +288,13 @@ namespace anox { namespace priv {
 
 		rkit::Vector<ConfigBuilderKeyValuePair> &vector = list.Modify();
 
-		RKIT_CHECK(vector.Resize(count));
+		vector.Resize(count);
 
 		for (size_t i = 0; i < count; i++)
 		{
 			IConfigurationKeyValuePair kvp = values[i];
-			RKIT_CHECK(SetValue(vector[i].m_key, kvp.m_key));
-			RKIT_CHECK(SetValue(vector[i].m_value, kvp.m_value));
+			SetValue(vector[i].m_key, kvp.m_key);
+			SetValue(vector[i].m_value, kvp.m_value);
 		}
 
 		RKIT_RETURN_OK;

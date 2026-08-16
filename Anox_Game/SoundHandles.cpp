@@ -23,7 +23,7 @@ namespace anox::game
 		outHandle = SoundEmitterHandle();
 
 		uint32_t emitterID = 0;
-		RKIT_CHECK(anox::game::sandbox::SandboxImports::SoundEmitter_Create(emitterID, src.GetSourceID(), const_cast<SoundEmitterProperties *>(&emitterProperties)));
+		anox::game::sandbox::SandboxImports::SoundEmitter_Create(emitterID, src.GetSourceID(), const_cast<SoundEmitterProperties *>(&emitterProperties));
 		src.UnsafeRelease();
 
 		SoundEmitterHandle tempHandle;
@@ -42,7 +42,7 @@ namespace anox::game
 	rkit::Result SoundSourceHandle::CreateFromFileResource(SoundSourceHandle &outHandle, const SandboxResourceHandle &resHandle, rkit::audio::AudioContainerFormat containerFormat)
 	{
 		uint32_t srcID = 0;
-		RKIT_CHECK(anox::game::sandbox::SandboxImports::SoundSource_CreateFromFileResource(srcID, resHandle.GetResourceID(), static_cast<uint32_t>(containerFormat)));
+		anox::game::sandbox::SandboxImports::SoundSource_CreateFromFileResource(srcID, resHandle.GetResourceID(), static_cast<uint32_t>(containerFormat));
 
 		SoundSourceHandle tempHandle;
 		tempHandle.m_srcID = srcID;

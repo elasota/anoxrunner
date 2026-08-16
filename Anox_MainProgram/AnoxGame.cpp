@@ -124,28 +124,28 @@ namespace anox
 		if (m_numThreadsOverride.IsSet())
 			numWorkThreads = m_numThreadsOverride.Get() - 1;
 
-		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->CreateEvent(m_mainThreadWaitEvent, true, false));
-		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->CreateEvent(m_mainThreadTerminateEvent, true, false));
+		rkit::GetDrivers().m_systemDriver->CreateEvent(m_mainThreadWaitEvent, true, false);
+		rkit::GetDrivers().m_systemDriver->CreateEvent(m_mainThreadTerminateEvent, true, false);
 
-		RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->CreateThreadPool(m_threadPool, numWorkThreads));
+		rkit::GetDrivers().m_utilitiesDriver->CreateThreadPool(m_threadPool, numWorkThreads);
 
-		RKIT_CHECK(AnoxGameFileSystemBase::Create(m_fileSystem, *m_threadPool->GetJobQueue()));
-		RKIT_CHECK(AnoxResourceManagerBase::Create(m_resourceManager, m_fileSystem.Get(), m_threadPool->GetJobQueue()));
-		RKIT_CHECK(AnoxCommandRegistryBase::Create(m_commandRegistry));
+		AnoxGameFileSystemBase::Create(m_fileSystem, *m_threadPool->GetJobQueue());
+		AnoxResourceManagerBase::Create(m_resourceManager, m_fileSystem.Get(), m_threadPool->GetJobQueue());
+		AnoxCommandRegistryBase::Create(m_commandRegistry);
 
-		RKIT_CHECK(AnoxKeybindManagerBase::Create(m_keybindManager, *this));
-		RKIT_CHECK(m_keybindManager->Register(*m_commandRegistry));
+		AnoxKeybindManagerBase::Create(m_keybindManager, *this);
+		m_keybindManager->Register(*m_commandRegistry);
 
 		rkit::UniquePtr<IConfigurationState> emptyConfig;
-		RKIT_CHECK(ICaptureHarness::CreateRealTime(m_captureHarness, *this, *m_resourceManager, std::move(emptyConfig)));
+		ICaptureHarness::CreateRealTime(m_captureHarness, *this, *m_resourceManager, std::move(emptyConfig));
 
-		RKIT_CHECK(AudioSubsystem::Create(m_audioSubsystem, *m_threadPool->GetJobQueue()));
-		RKIT_CHECK(IGraphicsSubsystem::Create(m_graphicsSubsystem, *m_fileSystem, *m_dataDriver, *m_threadPool, anox::RenderBackend::kVulkan));
+		AudioSubsystem::Create(m_audioSubsystem, *m_threadPool->GetJobQueue());
+		IGraphicsSubsystem::Create(m_graphicsSubsystem, *m_fileSystem, *m_dataDriver, *m_threadPool, anox::RenderBackend::kVulkan);
 
 		m_resourceManager->SetGraphicsSubsystem(m_graphicsSubsystem.Get());
 
-		RKIT_CHECK(IGameLogic::Create(m_gameLogic, this));
-		RKIT_CHECK(m_gameLogic->Start());
+		IGameLogic::Create(m_gameLogic, this);
+		m_gameLogic->Start();
 
 
 		RKIT_RETURN_OK;
@@ -153,23 +153,23 @@ namespace anox
 
 	rkit::Result AnoxGame::RunFrame()
 	{
-		RKIT_CHECK(m_graphicsSubsystem->TransitionDisplayState());
+		m_graphicsSubsystem->TransitionDisplayState();
 
-		RKIT_CHECK(m_graphicsSubsystem->RetireOldestFrame());
+		m_graphicsSubsystem->RetireOldestFrame();
 
-		RKIT_CHECK(m_graphicsSubsystem->PumpAsyncUploads());
+		m_graphicsSubsystem->PumpAsyncUploads();
 
 		rkit::Optional<rkit::render::DisplayMode> displayMode = m_graphicsSubsystem->GetDisplayMode();
 		if (displayMode.IsSet() && displayMode.Get() != rkit::render::DisplayMode::kSplash)
 		{
-			RKIT_CHECK(m_gameLogic->RunFrame());
+			m_gameLogic->RunFrame();
 		}
 
-		RKIT_CHECK(m_graphicsSubsystem->StartRendering());
+		m_graphicsSubsystem->StartRendering();
 
-		RKIT_CHECK(m_graphicsSubsystem->DrawFrame());
+		m_graphicsSubsystem->DrawFrame();
 
-		RKIT_CHECK(m_graphicsSubsystem->EndFrame());
+		m_graphicsSubsystem->EndFrame();
 
 
 		for (;;)
@@ -216,15 +216,15 @@ namespace anox
 
 	rkit::ResultCoroutine AnoxGame::RestartGame(rkit::ICoroThread &thread, rkit::StringView mapName)
 	{
-		CORO_CHECK(m_captureHarness->TerminateSession());
+		m_captureHarness->TerminateSession();
 
 		m_captureHarness.Reset();
 
 		rkit::UniquePtr<IConfigurationState> newGameConfig;
-		CORO_CHECK(m_gameLogic->CreateNewGame(newGameConfig, mapName));
-		CORO_CHECK(ICaptureHarness::CreateRealTime(m_captureHarness, *this, *m_resourceManager, std::move(newGameConfig)));
+		m_gameLogic->CreateNewGame(newGameConfig, mapName);
+		ICaptureHarness::CreateRealTime(m_captureHarness, *this, *m_resourceManager, std::move(newGameConfig));
 
-		CORO_CHECK(co_await m_gameLogic->StartSession(thread));
+		co_await m_gameLogic->StartSession(thread);
 
 		CORO_RETURN_OK;
 	}

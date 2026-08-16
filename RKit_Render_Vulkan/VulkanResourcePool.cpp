@@ -86,7 +86,7 @@ namespace rkit { namespace render { namespace vulkan
 			size_t freeResIndex = elements[0].m_freeIndex;
 
 			T &resRef = elements[freeResIndex].m_resource;
-			RKIT_CHECK(m_factory.UnretireResource(resRef));
+			m_factory.UnretireResource(resRef);
 
 			elements[0].m_freeIndex = elements[--m_numFreeResources].m_freeIndex;
 
@@ -104,11 +104,11 @@ namespace rkit { namespace render { namespace vulkan
 
 				element.m_freeIndex = resIndex;
 				m_factory.EmptyInitResource(element.m_resource);
-				RKIT_CHECK(m_elements.Append(element));
+				m_elements.Append(element);
 			}
 
 			T &newResource = m_elements[resIndex].m_resource;
-			RKIT_CHECK(m_factory.InitResource(newResource));
+			m_factory.InitResource(newResource);
 
 			m_numConstructedResources = resIndex + 1;
 
@@ -140,8 +140,8 @@ namespace rkit { namespace render { namespace vulkan
 	template<class T>
 	Result MutexProtectedResourcePool<T>::Initialize()
 	{
-		RKIT_CHECK(GetDrivers().m_systemDriver->CreateMutex(m_mutex));
-		RKIT_CHECK(m_pool.Initialize());
+		GetDrivers().m_systemDriver->CreateMutex(m_mutex);
+		m_pool.Initialize();
 
 		RKIT_RETURN_OK;
 	}
@@ -166,15 +166,15 @@ namespace rkit { namespace render { namespace vulkan
 		if (mutexProtected)
 		{
 			UniquePtr<MutexProtectedResourcePool<T>> pool;
-			RKIT_CHECK(New<MutexProtectedResourcePool<T>>(pool, factory));
-			RKIT_CHECK(pool->Initialize());
+			New<MutexProtectedResourcePool<T>>(pool, factory);
+			pool->Initialize();
 			outPool = std::move(pool);
 		}
 		else
 		{
 			UniquePtr<ResourcePool<T>> pool;
-			RKIT_CHECK(New<ResourcePool<T>>(pool, factory));
-			RKIT_CHECK(pool->Initialize());
+			New<ResourcePool<T>>(pool, factory);
+			pool->Initialize();
 			outPool = std::move(pool);
 		}
 

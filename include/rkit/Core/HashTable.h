@@ -815,7 +815,7 @@ rkit::Result rkit::HashTableBase<TKey, TValue, TSize>::CreatePositionForNewEntry
 
 	if (insertPosition == m_capacity)
 	{
-		RKIT_CHECK(Rehash(m_count + 1));
+		Rehash(m_count + 1);
 		this->CreatePositionForNewEntryNoResize(newKeyHash, outPosition);
 		RKIT_RETURN_OK;
 	}
@@ -995,7 +995,7 @@ rkit::Result rkit::HashSet<TKey, TSize>::Add(TCandidateKey &&key)
 	if (this->FindKeyPosition<TCandidateKey>(hash, key, position))
 		RKIT_RETURN_OK;
 
-	RKIT_CHECK(this->CreatePositionForNewEntry(hash, position));
+	this->CreatePositionForNewEntry(hash, position);
 
 	if constexpr (TKeyConstructor::kMayThrow)
 	{
@@ -1120,7 +1120,7 @@ rkit::Result rkit::HashMap<TKey, TValue, TSize>::SetPrehashedInternal(Iterator_t
 		}
 	}
 
-	RKIT_CHECK(this->CreatePositionForNewEntry(hash, position));
+	this->CreatePositionForNewEntry(hash, position);
 
 	if constexpr (TWriteIterator)
 		*outIterator = Iterator_t(*this, position);

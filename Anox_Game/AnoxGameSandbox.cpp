@@ -200,13 +200,13 @@ namespace anox::game::sandbox
 
 		{
 			rkit::UniquePtr<InternalLogDriver> logDriver;
-			RKIT_CHECK(rkit::New<InternalLogDriver>(logDriver));
+			rkit::New<InternalLogDriver>(logDriver);
 			rkit::GetMutableDrivers().m_logDriver = logDriver.Detach();
 		}
 #endif
 
 		rkit::UniquePtr<Session> session;
-		RKIT_CHECK(Session::Create(session, rkit::GetDrivers().m_mallocDriver.Get()));
+		Session::Create(session, rkit::GetDrivers().m_mallocDriver.Get());
 
 		rkit::SimpleObjectAllocation<Session> sessionAllocation = session.Detach();
 
@@ -271,18 +271,18 @@ namespace anox::game::sandbox
 				if (udef.m_descLength > 0)
 				{
 					rkit::ByteStringConstructionBuffer cbuf;
-					RKIT_CHECK(cbuf.Allocate(udef.m_descLength));
+					cbuf.Allocate(udef.m_descLength);
 
 					rkit::CopySpanNonOverlapping(cbuf.GetSpan(), udefDescsDataSpan.SubSpan(udefDescPos, udef.m_descLength));
 
-					RKIT_CHECK(udefDescs.Append(rkit::ByteString(std::move(cbuf))));
+					udefDescs.Append(rkit::ByteString(std::move(cbuf)));
 
 					udefDescPos += udef.m_descLength;
 				}
 			}
 		}
 
-		RKIT_CHECK(session->AsyncSpawnInitialEntities(session->GetWorld(), entityTypesSpan, spawnDataSpan, std::move(spawnDataStrings), udefValuesSpan, std::move(udefDescs)));
+		session->AsyncSpawnInitialEntities(session->GetWorld(), entityTypesSpan, spawnDataSpan, std::move(spawnDataStrings), udefValuesSpan, std::move(udefDescs));
 		RKIT_RETURN_OK;
 	}
 

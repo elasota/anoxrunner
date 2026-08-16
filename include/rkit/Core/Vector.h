@@ -221,7 +221,7 @@ namespace rkit
 
 		if (m_capacity < size)
 		{
-			RKIT_CHECK(Reallocate(size));
+			Reallocate(size);
 		}
 
 		size_t count = m_count;
@@ -275,7 +275,7 @@ namespace rkit
 	{
 		if (m_capacity < size)
 		{
-			RKIT_CHECK(Reallocate(size));
+			Reallocate(size);
 		}
 
 		RKIT_RETURN_OK;
@@ -360,7 +360,7 @@ namespace rkit
 		{
 			// Inserting existing items
 			size_t srcIndex = itemsPtr - oldArr;
-			RKIT_CHECK(EnsureCapacityForMore(itemsCount));
+			EnsureCapacityForMore(itemsCount);
 
 			itemsPtr = m_arr + srcIndex;
 
@@ -369,7 +369,7 @@ namespace rkit
 		}
 		else
 		{
-			RKIT_CHECK(EnsureCapacityForMore(itemsCount));
+			EnsureCapacityForMore(itemsCount);
 		}
 
 		T *newArr = m_arr;

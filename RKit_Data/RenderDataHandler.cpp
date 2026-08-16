@@ -1363,15 +1363,15 @@ namespace rkit { namespace data
 
 		for (size_t i = 0; i < kNumIndexables; i++)
 		{
-			RKIT_CHECK(handler->ProcessIndexable(static_cast<RenderRTTIIndexableStructType>(i), &m_indexables[i], &m_objectPtrs[i], nullptr));
+			handler->ProcessIndexable(static_cast<RenderRTTIIndexableStructType>(i), &m_indexables[i], &m_objectPtrs[i], nullptr);
 		}
 
 		uint32_t identifier = 0;
 		uint32_t packageVersion = 0;
 
-		RKIT_CHECK(ReadUInt32(stream, identifier));
-		RKIT_CHECK(ReadUInt32(stream, packageVersion));
-		RKIT_CHECK(stream.ReadAll(&m_uuid, sizeof(m_uuid)));
+		ReadUInt32(stream, identifier);
+		ReadUInt32(stream, packageVersion);
+		stream.ReadAll(&m_uuid, sizeof(m_uuid));
 
 		if (identifier != handler->GetPackageIdentifier())
 		{
@@ -1389,20 +1389,20 @@ namespace rkit { namespace data
 		size_t numConfigKeys = 0;
 		size_t numBinaryContent = 0;
 
-		RKIT_CHECK(ReadCompactIndex(stream, numStrings));
-		RKIT_CHECK(ReadCompactIndex(stream, numConfigKeys));
-		RKIT_CHECK(ReadCompactIndex(stream, numBinaryContent));
+		ReadCompactIndex(stream, numStrings);
+		ReadCompactIndex(stream, numConfigKeys);
+		ReadCompactIndex(stream, numBinaryContent);
 
-		RKIT_CHECK(m_strings.Resize(numStrings));
-		RKIT_CHECK(m_configKeys.Resize(numConfigKeys));
-		RKIT_CHECK(m_binaryContentSizes.Resize(numBinaryContent));
+		m_strings.Resize(numStrings);
+		m_configKeys.Resize(numConfigKeys);
+		m_binaryContentSizes.Resize(numBinaryContent);
 
 		size_t numCharsTotal = 0;
 
 		for (size_t i = 0; i < numStrings; i++)
 		{
 			size_t stringLength = 0;
-			RKIT_CHECK(ReadCompactIndex(stream, stringLength));
+			ReadCompactIndex(stream, stringLength);
 
 			StringOffsetAndSize &str = m_strings[i];
 			str.m_offset = numCharsTotal;
@@ -1410,14 +1410,14 @@ namespace rkit { namespace data
 
 			size_t byteUsage = stringLength + 1;
 
-			RKIT_CHECK(SafeAdd(numCharsTotal, numCharsTotal, byteUsage));
+			SafeAdd(numCharsTotal, numCharsTotal, byteUsage);
 		}
 
-		RKIT_CHECK(m_stringChars.Resize(numCharsTotal));
+		m_stringChars.Resize(numCharsTotal);
 
 		if (numCharsTotal > 0)
 		{
-			RKIT_CHECK(stream.ReadAll(m_stringChars.GetBuffer(), numCharsTotal));
+			stream.ReadAll(m_stringChars.GetBuffer(), numCharsTotal);
 
 			const Utf8Char_t *stringChars = m_stringChars.GetBuffer();
 			for (const StringOffsetAndSize &str : m_strings)
@@ -1433,8 +1433,8 @@ namespace rkit { namespace data
 		for (ConfigKey &configKey : m_configKeys)
 		{
 			uint64_t mainType = 0;
-			RKIT_CHECK(ReadCompactIndex(stream, configKey.m_stringIndex));
-			RKIT_CHECK(ReadUIntForSize(stream, static_cast<uint64_t>(data::RenderRTTIMainType::Count) - 1, mainType));
+			ReadCompactIndex(stream, configKey.m_stringIndex);
+			ReadUIntForSize(stream, static_cast<uint64_t>(data::RenderRTTIMainType::Count) - 1, mainType);
 
 			if (configKey.m_stringIndex >= m_strings.Count())
 			{
@@ -1451,19 +1451,19 @@ namespace rkit { namespace data
 
 		for (size_t &bcSize : m_binaryContentSizes)
 		{
-			RKIT_CHECK(ReadCompactIndex(stream, bcSize));
+			ReadCompactIndex(stream, bcSize);
 		}
 
 		for (size_t i = 0; i < kNumIndexables; i++)
 		{
 			size_t objectSpanCount = 0;
-			RKIT_CHECK(ReadCompactIndex(stream, objectSpanCount));
+			ReadCompactIndex(stream, objectSpanCount);
 
 			size_t indexableCount = 0;
-			RKIT_CHECK(ReadCompactIndex(stream, indexableCount));
+			ReadCompactIndex(stream, indexableCount);
 
-			RKIT_CHECK(m_indexables[i]->Resize(indexableCount));
-			RKIT_CHECK(m_spanInfos[i].Resize(objectSpanCount));
+			m_indexables[i]->Resize(indexableCount);
+			m_spanInfos[i].Resize(objectSpanCount);
 		}
 
 		for (size_t i = 0; i < kNumIndexables; i++)
@@ -1475,7 +1475,7 @@ namespace rkit { namespace data
 			for (ObjectSpanInfo &spanInfo : spanInfoList)
 			{
 				size_t objectCount = 0;
-				RKIT_CHECK(ReadCompactIndex(stream, objectCount));
+				ReadCompactIndex(stream, objectCount);
 
 				spanInfo.m_start = objectPtrList.GetCount();
 				spanInfo.m_count = objectCount;
@@ -1483,10 +1483,10 @@ namespace rkit { namespace data
 				for (size_t i = 0; i < objectCount; i++)
 				{
 					size_t objectIndex = 0;
-					RKIT_CHECK(ReadCompactIndex(stream, objectIndex));
+					ReadCompactIndex(stream, objectIndex);
 					if (objectIndex == 0)
 					{
-						RKIT_CHECK(objectPtrList.Append(nullptr));
+						objectPtrList.Append(nullptr);
 					}
 					else
 					{
@@ -1497,7 +1497,7 @@ namespace rkit { namespace data
 							RKIT_THROW(ResultCode::kMalformedFile);
 						}
 
-						RKIT_CHECK(objectPtrList.Append(objectList.GetElementPtr(objectIndex)));
+						objectPtrList.Append(objectList.GetElementPtr(objectIndex));
 					}
 				}
 			}
@@ -1506,7 +1506,7 @@ namespace rkit { namespace data
 		for (size_t i = 0; i < kNumIndexables; i++)
 		{
 			const RenderRTTIStructType *structType = nullptr;
-			RKIT_CHECK(handler->ProcessIndexable(static_cast<RenderRTTIIndexableStructType>(i), nullptr, nullptr, &structType));
+			handler->ProcessIndexable(static_cast<RenderRTTIIndexableStructType>(i), nullptr, nullptr, &structType);
 
 			IRenderRTTIListBase &objectList = *m_indexables[i];
 			size_t count = objectList.GetCount();
@@ -1515,7 +1515,7 @@ namespace rkit { namespace data
 			{
 				void *elementData = objectList.GetElementPtr(j);
 
-				RKIT_CHECK(ReadStructure(elementData, structType, stream, configurator));
+				ReadStructure(elementData, structType, stream, configurator);
 			}
 		}
 
@@ -1524,7 +1524,7 @@ namespace rkit { namespace data
 		for (size_t i = 0; i < numStructs; i++)
 		{
 			size_t complexity = 0;
-			RKIT_CHECK(ValidateStructureType(static_cast<const render::StructureType *>(structList->GetElementPtr(i)), nullptr, 0, complexity));
+			ValidateStructureType(static_cast<const render::StructureType *>(structList->GetElementPtr(i)), nullptr, 0, complexity);
 		}
 
 		RKIT_RETURN_OK;
@@ -1538,7 +1538,7 @@ namespace rkit { namespace data
 	Result Package::ReadUInt16(IReadStream &stream, uint16_t &outValue)
 	{
 		uint64_t value = 0;
-		RKIT_CHECK(ReadVariableSizeUInt(stream, 2, value));
+		ReadVariableSizeUInt(stream, 2, value);
 		outValue = static_cast<uint16_t>(value);
 
 		RKIT_RETURN_OK;
@@ -1547,7 +1547,7 @@ namespace rkit { namespace data
 	Result Package::ReadUInt32(IReadStream &stream, uint32_t &outValue)
 	{
 		uint64_t value = 0;
-		RKIT_CHECK(ReadVariableSizeUInt(stream, 4, value));
+		ReadVariableSizeUInt(stream, 4, value);
 		outValue = static_cast<uint32_t>(value);
 
 		RKIT_RETURN_OK;
@@ -1566,7 +1566,7 @@ namespace rkit { namespace data
 	Result Package::ReadSInt16(IReadStream &stream, int16_t &outValue)
 	{
 		uint16_t value = 0;
-		RKIT_CHECK(ReadUInt16(stream, value));
+		ReadUInt16(stream, value);
 		memcpy(&outValue, &value, sizeof(value));
 
 		RKIT_RETURN_OK;
@@ -1575,7 +1575,7 @@ namespace rkit { namespace data
 	Result Package::ReadSInt32(IReadStream &stream, int32_t &outValue)
 	{
 		uint32_t value = 0;
-		RKIT_CHECK(ReadUInt32(stream, value));
+		ReadUInt32(stream, value);
 		memcpy(&outValue, &value, sizeof(value));
 
 		RKIT_RETURN_OK;
@@ -1584,7 +1584,7 @@ namespace rkit { namespace data
 	Result Package::ReadSInt64(IReadStream &stream, int64_t &outValue)
 	{
 		uint64_t value = 0;
-		RKIT_CHECK(ReadUInt64(stream, value));
+		ReadUInt64(stream, value);
 		memcpy(&outValue, &value, sizeof(value));
 
 		RKIT_RETURN_OK;
@@ -1593,7 +1593,7 @@ namespace rkit { namespace data
 	Result Package::ReadFloat32(IReadStream &stream, float &outValue)
 	{
 		uint32_t value = 0;
-		RKIT_CHECK(ReadUInt32(stream, value));
+		ReadUInt32(stream, value);
 		memcpy(&outValue, &value, sizeof(value));
 
 		RKIT_RETURN_OK;
@@ -1602,7 +1602,7 @@ namespace rkit { namespace data
 	Result Package::ReadFloat64(IReadStream &stream, double &outValue)
 	{
 		uint64_t value = 0;
-		RKIT_CHECK(ReadUInt64(stream, value));
+		ReadUInt64(stream, value);
 		memcpy(&outValue, &value, sizeof(value));
 
 		RKIT_RETURN_OK;
@@ -1612,7 +1612,7 @@ namespace rkit { namespace data
 	Result Package::ReadVariableSizeUInt(IReadStream &stream, uint8_t size, uint64_t &outValue)
 	{
 		uint8_t bytes[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-		RKIT_CHECK(stream.ReadAll(bytes, size));
+		stream.ReadAll(bytes, size);
 		outValue = DecodeUInt64(bytes);
 
 		RKIT_RETURN_OK;
@@ -1633,20 +1633,20 @@ namespace rkit { namespace data
 	{
 		uint8_t bytes[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
-		RKIT_CHECK(stream.ReadAll(bytes, 1));
+		stream.ReadAll(bytes, 1);
 
 		switch (bytes[0] & 3)
 		{
 		case 0:
 			break;
 		case 1:
-			RKIT_CHECK(stream.ReadAll(bytes + 1, 1));
+			stream.ReadAll(bytes + 1, 1);
 			break;
 		case 2:
-			RKIT_CHECK(stream.ReadAll(bytes + 1, 3));
+			stream.ReadAll(bytes + 1, 3);
 			break;
 		case 3:
-			RKIT_CHECK(stream.ReadAll(bytes + 1, 7));
+			stream.ReadAll(bytes + 1, 7);
 			break;
 		default:
 			RKIT_THROW(ResultCode::kInternalError);
@@ -1676,7 +1676,7 @@ namespace rkit { namespace data
 			void *memberPtr = field->m_getMemberPtrFunc(obj);
 			const data::RenderRTTITypeBase *fieldRTTI = field->m_getTypeFunc();
 
-			RKIT_CHECK(ReadObject(memberPtr, fieldRTTI, field->m_isConfigurable, field->m_isNullable, stream, configurator));
+			ReadObject(memberPtr, fieldRTTI, field->m_isConfigurable, field->m_isNullable, stream, configurator);
 		}
 
 		RKIT_RETURN_OK;
@@ -1719,7 +1719,7 @@ namespace rkit { namespace data
 		{
 			uint8_t state = 0;
 
-			RKIT_CHECK(ReadUInt8(stream, state));
+			ReadUInt8(stream, state);
 
 			switch (state)
 			{
@@ -1729,13 +1729,13 @@ namespace rkit { namespace data
 			case static_cast<uint8_t>(render::ConfigurableValueState::Configured):
 				{
 					render::ConfigStringIndex_t cfgKey;
-					RKIT_CHECK(ReadConfigurationKey(cfgKey, stream));
+					ReadConfigurationKey(cfgKey, stream);
 
 					bool isConfiguredValue = false;
 					unsigned int configuredValue = 0;
 					if (configurator)
 					{
-						RKIT_CHECK(configurator->GetEnumConfigKey(cfgKey.GetIndex(), this->GetString(m_configKeys[cfgKey.GetIndex()].m_stringIndex), rtti->m_base.m_mainType, configuredValue));
+						configurator->GetEnumConfigKey(cfgKey.GetIndex(), this->GetString(m_configKeys[cfgKey.GetIndex()].m_stringIndex), rtti->m_base.m_mainType, configuredValue);
 						rtti->m_writeConfigurableValueFunc(obj, configuredValue);
 					}
 					else
@@ -1745,7 +1745,7 @@ namespace rkit { namespace data
 			case static_cast<uint8_t>(render::ConfigurableValueState::Explicit):
 				{
 					uint64_t enumValue = 0;
-					RKIT_CHECK(ReadUIntForSize(stream, rtti->m_maxValueExclusive - 1, enumValue));
+					ReadUIntForSize(stream, rtti->m_maxValueExclusive - 1, enumValue);
 					if (enumValue >= rtti->m_maxValueExclusive)
 					{
 						rkit::log::Error(u8"Configurable enum value was out of range");
@@ -1763,7 +1763,7 @@ namespace rkit { namespace data
 		else
 		{
 			uint64_t enumValue = 0;
-			RKIT_CHECK(ReadUIntForSize(stream, rtti->m_maxValueExclusive - 1, enumValue));
+			ReadUIntForSize(stream, rtti->m_maxValueExclusive - 1, enumValue);
 			if (enumValue >= rtti->m_maxValueExclusive)
 			{
 				rkit::log::Error(u8"Enum value was out of range");
@@ -1782,7 +1782,7 @@ namespace rkit { namespace data
 		if (isConfigurable)
 		{
 			uint8_t state = 0;
-			RKIT_CHECK(ReadUInt8(stream, state));
+			ReadUInt8(stream, state);
 
 			switch (state)
 			{
@@ -1792,7 +1792,7 @@ namespace rkit { namespace data
 			case static_cast<uint8_t>(render::ConfigurableValueState::Configured):
 				{
 					render::ConfigStringIndex_t cfgKey;
-					RKIT_CHECK(ReadConfigurationKey(cfgKey, stream));
+					ReadConfigurationKey(cfgKey, stream);
 
 					if (configurator)
 					{
@@ -1803,21 +1803,21 @@ namespace rkit { namespace data
 						case data::RenderRTTINumberRepresentation::Float:
 							{
 								double value = 0;
-								RKIT_CHECK(configurator->GetFloatConfigKey(cfgKey.GetIndex(), keyName, value));
+								configurator->GetFloatConfigKey(cfgKey.GetIndex(), keyName, value);
 								rtti->m_configurableFunctions.m_writeValueFloatFunc(obj, value);
 							}
 							break;
 						case data::RenderRTTINumberRepresentation::SignedInt:
 							{
 								int64_t value = 0;
-								RKIT_CHECK(configurator->GetSIntConfigKey(cfgKey.GetIndex(), keyName, value));
+								configurator->GetSIntConfigKey(cfgKey.GetIndex(), keyName, value);
 								rtti->m_configurableFunctions.m_writeValueSIntFunc(obj, value);
 							}
 							break;
 						case data::RenderRTTINumberRepresentation::UnsignedInt:
 							{
 								uint64_t value = 0;
-								RKIT_CHECK(configurator->GetUIntConfigKey(cfgKey.GetIndex(), keyName, value));
+								configurator->GetUIntConfigKey(cfgKey.GetIndex(), keyName, value);
 								rtti->m_configurableFunctions.m_writeValueUIntFunc(obj, value);
 							}
 							break;
@@ -1845,14 +1845,14 @@ namespace rkit { namespace data
 			if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize32)
 			{
 				float f = 0.f;
-				RKIT_CHECK(ReadFloat32(stream, f));
+				ReadFloat32(stream, f);
 				ioFuncs->m_writeValueFloatFunc(obj, f);
 				RKIT_RETURN_OK;
 			}
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize64)
 			{
 				double f = 0.0;
-				RKIT_CHECK(ReadFloat64(stream, f));
+				ReadFloat64(stream, f);
 				ioFuncs->m_writeValueFloatFunc(obj, f);
 				RKIT_RETURN_OK;
 			}
@@ -1866,28 +1866,28 @@ namespace rkit { namespace data
 			if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize8)
 			{
 				int8_t v = 0;
-				RKIT_CHECK(ReadSInt8(stream, v));
+				ReadSInt8(stream, v);
 				ioFuncs->m_writeValueUIntFunc(obj, v);
 				RKIT_RETURN_OK;
 			}
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize16)
 			{
 				int16_t v = 0;
-				RKIT_CHECK(ReadSInt16(stream, v));
+				ReadSInt16(stream, v);
 				ioFuncs->m_writeValueUIntFunc(obj, v);
 				RKIT_RETURN_OK;
 			}
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize32)
 			{
 				int32_t v = 0;
-				RKIT_CHECK(ReadSInt32(stream, v));
+				ReadSInt32(stream, v);
 				ioFuncs->m_writeValueUIntFunc(obj, v);
 				RKIT_RETURN_OK;
 			}
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize64)
 			{
 				int64_t v = 0;
-				RKIT_CHECK(ReadSInt64(stream, v));
+				ReadSInt64(stream, v);
 				ioFuncs->m_writeValueUIntFunc(obj, v);
 				RKIT_RETURN_OK;
 			}
@@ -1900,7 +1900,7 @@ namespace rkit { namespace data
 			if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize1)
 			{
 				uint8_t v = 0;
-				RKIT_CHECK(ReadUInt8(stream, v));
+				ReadUInt8(stream, v);
 
 				if (v >= 2)
 				{
@@ -1914,28 +1914,28 @@ namespace rkit { namespace data
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize8)
 			{
 				uint8_t v = 0;
-				RKIT_CHECK(ReadUInt8(stream, v));
+				ReadUInt8(stream, v);
 				ioFuncs->m_writeValueUIntFunc(obj, v);
 				RKIT_RETURN_OK;
 			}
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize16)
 			{
 				uint16_t v = 0;
-				RKIT_CHECK(ReadUInt16(stream, v));
+				ReadUInt16(stream, v);
 				ioFuncs->m_writeValueUIntFunc(obj, v);
 				RKIT_RETURN_OK;
 			}
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize32)
 			{
 				uint32_t v = 0;
-				RKIT_CHECK(ReadUInt32(stream, v));
+				ReadUInt32(stream, v);
 				ioFuncs->m_writeValueUIntFunc(obj, v);
 				RKIT_RETURN_OK;
 			}
 			else if (rtti->m_bitSize == data::RenderRTTINumberBitSize::BitSize64)
 			{
 				uint64_t v = 0;
-				RKIT_CHECK(ReadUInt64(stream, v));
+				ReadUInt64(stream, v);
 				ioFuncs->m_writeValueUIntFunc(obj, v);
 				RKIT_RETURN_OK;
 			}
@@ -1952,21 +1952,21 @@ namespace rkit { namespace data
 		render::ValueType *vt = static_cast<render::ValueType *>(obj);
 
 		uint8_t type = 0;
-		RKIT_CHECK(ReadUInt8(stream, type));
+		ReadUInt8(stream, type);
 
 		switch (type)
 		{
 		case static_cast<uint8_t>(render::ValueTypeType::Numeric):
 			{
 				render::NumericType nt = render::NumericType::UInt8;
-				RKIT_CHECK(ReadEnum(&nt, reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::NumericType>::GetRTTIType()), false, stream, configurator));
+				ReadEnum(&nt, reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::NumericType>::GetRTTIType()), false, stream, configurator);
 				*vt = render::ValueType(nt);
 			}
 			RKIT_RETURN_OK;
 		case static_cast<uint8_t>(render::ValueTypeType::VectorNumeric):
 			{
 				const void *ptr = nullptr;
-				RKIT_CHECK(ReadObjectPtr(&ptr, reinterpret_cast<const RenderRTTIObjectPtrType *>(render_rtti::RTTIResolver<const render::VectorNumericType *>::GetRTTIType()), false, stream));
+				ReadObjectPtr(&ptr, reinterpret_cast<const RenderRTTIObjectPtrType *>(render_rtti::RTTIResolver<const render::VectorNumericType *>::GetRTTIType()), false, stream);
 
 				*vt = render::ValueType(static_cast<const render::VectorNumericType *>(ptr));
 			}
@@ -1974,7 +1974,7 @@ namespace rkit { namespace data
 		case static_cast<uint8_t>(render::ValueTypeType::CompoundNumeric):
 			{
 				const void *ptr = nullptr;
-				RKIT_CHECK(ReadObjectPtr(&ptr, reinterpret_cast<const RenderRTTIObjectPtrType *>(render_rtti::RTTIResolver<const render::CompoundNumericType *>::GetRTTIType()), false, stream));
+				ReadObjectPtr(&ptr, reinterpret_cast<const RenderRTTIObjectPtrType *>(render_rtti::RTTIResolver<const render::CompoundNumericType *>::GetRTTIType()), false, stream);
 
 				*vt = render::ValueType(static_cast<const render::CompoundNumericType *>(ptr));
 			}
@@ -1982,7 +1982,7 @@ namespace rkit { namespace data
 		case static_cast<uint8_t>(render::ValueTypeType::Structure):
 			{
 				const void *ptr = nullptr;
-				RKIT_CHECK(ReadObjectPtr(&ptr, reinterpret_cast<const RenderRTTIObjectPtrType *>(render_rtti::RTTIResolver<const render::StructureType *>::GetRTTIType()), false, stream));
+				ReadObjectPtr(&ptr, reinterpret_cast<const RenderRTTIObjectPtrType *>(render_rtti::RTTIResolver<const render::StructureType *>::GetRTTIType()), false, stream);
 
 				*vt = render::ValueType(static_cast<const render::StructureType *>(ptr));
 			}
@@ -2001,7 +2001,7 @@ namespace rkit { namespace data
 			RKIT_RETURN_OK;
 
 		size_t stringIndex = 0;
-		RKIT_CHECK(ReadCompactIndex(stream, stringIndex));
+		ReadCompactIndex(stream, stringIndex);
 
 		if (purpose == render::TempStringIndex_t::kPurpose || purpose == render::GlobalStringIndex_t::kPurpose)
 			rtti->m_writeStringIndexFunc(obj, stringIndex);
@@ -2014,7 +2014,7 @@ namespace rkit { namespace data
 	Result Package::ReadBinaryContent(void *obj, IReadStream &stream) const
 	{
 		size_t binaryContentIndex = 0;
-		RKIT_CHECK(ReadCompactIndex(stream, binaryContentIndex));
+		ReadCompactIndex(stream, binaryContentIndex);
 
 		static_cast<render::BinaryContent *>(obj)->m_contentIndex = binaryContentIndex;
 
@@ -2025,7 +2025,7 @@ namespace rkit { namespace data
 	{
 		size_t objectIndex = 0;
 
-		RKIT_CHECK(ReadCompactIndex(stream, objectIndex));
+		ReadCompactIndex(stream, objectIndex);
 
 		if (isNullable)
 		{
@@ -2065,7 +2065,7 @@ namespace rkit { namespace data
 			RKIT_THROW(ResultCode::kInternalError);
 
 		size_t spanIndex = 0;
-		RKIT_CHECK(ReadCompactIndex(stream, spanIndex));
+		ReadCompactIndex(stream, spanIndex);
 
 		const IRenderRTTIObjectPtrList &ptrList = *m_objectPtrs[indexableInt];
 		const Vector<ObjectSpanInfo> &spanInfos = m_spanInfos[indexableInt];
@@ -2105,7 +2105,7 @@ namespace rkit { namespace data
 	Result Package::ReadConfigurationKey(render::ConfigStringIndex_t &outCfgKey, IReadStream &stream) const
 	{
 		size_t index = 0;
-		RKIT_CHECK(ReadCompactIndex(stream, index));
+		ReadCompactIndex(stream, index);
 
 		if (index >= m_configKeys.Count())
 		{
@@ -2143,7 +2143,7 @@ namespace rkit { namespace data
 
 		for (const render::StructureMemberDesc *member : structType->m_members)
 		{
-			RKIT_CHECK(ValidateValueType(member->m_type, structType, depth + 1, complexity));
+			ValidateValueType(member->m_type, structType, depth + 1, complexity);
 		}
 
 		RKIT_RETURN_OK;
@@ -2260,26 +2260,26 @@ namespace rkit { namespace data
 	Result RenderDataHandler::LoadPackage(IReadStream &stream, bool allowTempStrings, data::IRenderDataConfigurator *configurator, UniquePtr<IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *outBinaryContent) const
 	{
 		UniquePtr<Package> package;
-		RKIT_CHECK(New<Package>(package));
+		New<Package>(package);
 
-		RKIT_CHECK(package->Load(this, allowTempStrings, configurator, stream));
+		package->Load(this, allowTempStrings, configurator, stream);
 
 		if (outBinaryContent)
 		{
 			size_t numBinaryContent = package->GetBinaryContentCount();
 
-			RKIT_CHECK(outBinaryContent->Resize(numBinaryContent));
+			outBinaryContent->Resize(numBinaryContent);
 
 			for (size_t i = 0; i < numBinaryContent; i++)
 			{
 				Vector<uint8_t> &contentInstance = (*outBinaryContent)[i];
 
 				size_t contentSize = package->GetBinaryContentSize(i);
-				RKIT_CHECK(contentInstance.Resize(contentSize));
+				contentInstance.Resize(contentSize);
 
 				if (contentSize > 0)
 				{
-					RKIT_CHECK(stream.ReadAll(&contentInstance[0], contentSize));
+					stream.ReadAll(&contentInstance[0], contentSize);
 				}
 			}
 		}
@@ -2292,11 +2292,11 @@ namespace rkit { namespace data
 	case RenderRTTIIndexableStructType::type:\
 		if (outList)\
 		{\
-			RKIT_CHECK(New<render_rtti::RenderRTTIList<render::type>>(*outList));\
+			New<render_rtti::RenderRTTIList<render::type>>(*outList);\
 		}\
 		if (outPtrList)\
 		{\
-			RKIT_CHECK(New<render_rtti::RenderRTTIObjectPtrList<render::type>>(*outPtrList));\
+			New<render_rtti::RenderRTTIObjectPtrList<render::type>>(*outPtrList);\
 		}\
 		if (outRTTI)\
 			*outRTTI = reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::type>::GetRTTIType());\

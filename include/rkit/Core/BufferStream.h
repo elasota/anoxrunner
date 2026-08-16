@@ -79,7 +79,7 @@ inline rkit::Result rkit::BufferStream::WritePartial(const void *data, size_t co
 
 	if (count > 0)
 	{
-		RKIT_CHECK(m_buffer.Append(Span<const uint8_t>(static_cast<const uint8_t *>(data), count)));
+		m_buffer.Append(Span<const uint8_t>(static_cast<const uint8_t *>(data), count));
 		outCountWritten += count;
 		m_pos += count;
 	}
@@ -172,7 +172,7 @@ inline rkit::Result rkit::BufferStream::Truncate(FilePos_t newSize)
 
 	size_t newSizeSz = static_cast<size_t>(newSize);
 
-	RKIT_CHECK(m_buffer.Resize(newSizeSz));
+	m_buffer.Resize(newSizeSz);
 
 	if (m_pos > newSizeSz)
 		m_pos = newSizeSz;

@@ -137,20 +137,20 @@ namespace anox::game
 		}
 
 		SandboxResourceRequestHandle sceneReqHandle;
-		CORO_CHECK(SandboxResourceLoader::LoadContentKeyedResource(sceneReqHandle, resloaders::kContentIDRawFileResourceTypeCode, cid));
+		SandboxResourceLoader::LoadContentKeyedResource(sceneReqHandle, resloaders::kContentIDRawFileResourceTypeCode, cid);
 
 		SandboxResourceHandle sceneResHandle;
-		CORO_CHECK(co_await sceneReqHandle.WaitForLoaded(thread, sceneResHandle));
+		co_await sceneReqHandle.WaitForLoaded(thread, sceneResHandle);
 
 		SandboxResourceDataBlob blob;
-		CORO_CHECK(SandboxResourceLoader::GetFileResourceContents(blob, sceneResHandle));
+		SandboxResourceLoader::GetFileResourceContents(blob, sceneResHandle);
 
 		rkit::RCPtr<ScenePackage> scenePackage;
-		CORO_CHECK(LoadScenePackage(scenePackage, blob.GetContents()));
+		LoadScenePackage(scenePackage, blob.GetContents());
 
 		if (m_numFreeIDs == 0)
 		{
-			CORO_CHECK(m_scenePackageList.Append(ScenePackageRefAndFreeID()));
+			m_scenePackageList.Append(ScenePackageRefAndFreeID());
 
 			m_numFreeIDs = 1;
 			m_scenePackageList[0].m_freeID = m_scenePackageList.Count();
@@ -158,7 +158,7 @@ namespace anox::game
 
 		const size_t packageID = m_scenePackageList[--m_numFreeIDs].m_freeID;
 
-		CORO_CHECK(m_scenePackageMap.SetPrehashed(cidHash, cid, packageID));
+		m_scenePackageMap.SetPrehashed(cidHash, cid, packageID);
 
 		m_scenePackageList[packageID - 1].m_package = scenePackage.Get();
 
@@ -174,7 +174,7 @@ namespace anox::game
 	{
 		rkit::ByteString tempName;
 
-		CORO_CHECK(NormalizeName(name, tempName));
+		NormalizeName(name, tempName);
 
 		const rkit::HashValue_t nameHash = rkit::Hasher<rkit::ByteStringSliceView>::ComputeHash(0, name);
 		const rkit::HashMap<rkit::ByteString, ObjRef<Scene>>::ConstIterator_t sceneIt = m_scenes.FindPrehashed(nameHash, name);
@@ -183,17 +183,17 @@ namespace anox::game
 			CORO_RETURN_OK;
 
 		rkit::RCPtr<ScenePackage> package;
-		CORO_CHECK(co_await LoadScenePackageFromContentID(thread, package, cid));
+		co_await LoadScenePackageFromContentID(thread, package, cid);
 
 		Scene *scene = nullptr;
-		CORO_CHECK((WorldObjectFactory::CreateDynamic<Scene>(m_world, scene)));
+		(WorldObjectFactory::CreateDynamic<Scene>(m_world, scene));
 
 		if (tempName.Length() == 0)
 		{
-			CORO_CHECK(tempName.Set(name));
+			tempName.Set(name);
 		}
 
-		CORO_CHECK(m_scenes.SetPrehashed(nameHash, std::move(tempName), ObjRef<Scene>(scene)));
+		m_scenes.SetPrehashed(nameHash, std::move(tempName), ObjRef<Scene>(scene));
 
 		scene->Initialize(SceneHandle(package));
 
@@ -229,7 +229,7 @@ namespace anox::game
 				TVectorItem *outItemTyped = static_cast<TVectorItem *>(outItem);
 
 				TDataType data = {};
-				RKIT_CHECK(stream.ReadOneBinary(data));
+				stream.ReadOneBinary(data);
 
 				const data::SceneNodeCommon &inCommon = data.m_common;
 				ScenePackage::NodeBase &outCommon = *outItemTyped;
@@ -237,7 +237,7 @@ namespace anox::game
 				outCommon.m_flags = inCommon.m_flags.Get();
 				outCommon.m_timeLen = inCommon.m_timeLen.Get();
 
-				RKIT_CHECK(funcRef(*outItemTyped, data));
+				funcRef(*outItemTyped, data);
 
 				RKIT_RETURN_OK;
 			};
@@ -254,13 +254,13 @@ namespace anox::game
 		rkit::ReadOnlyMemoryStream stream(data);
 
 		data::SceneHeader header;
-		RKIT_CHECK(stream.ReadOneBinary(header));
+		stream.ReadOneBinary(header);
 
 		if (header.m_magic.Get() != data::SceneHeader::kExpectedMagic)
 			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		rkit::RCPtr<ScenePackage> package;
-		RKIT_CHECK(rkit::New<ScenePackage>(package));
+		rkit::New<ScenePackage>(package);
 
 		ScenePackageImpl &packageImpl = package->Impl();
 
@@ -269,30 +269,30 @@ namespace anox::game
 
 		{
 			rkit::Vector<rkit::ByteStringConstructionBuffer> stringCBufs;
-			RKIT_CHECK(stringCBufs.Resize(header.m_numStrings.Get()));
+			stringCBufs.Resize(header.m_numStrings.Get());
 
 			for (rkit::ByteStringConstructionBuffer &cbuf : stringCBufs)
 			{
 				rkit::endian::LittleUInt32_t lengthData = {};
-				RKIT_CHECK(stream.ReadOneBinary(lengthData));
+				stream.ReadOneBinary(lengthData);
 
-				RKIT_CHECK(cbuf.Allocate(lengthData.Get()));
+				cbuf.Allocate(lengthData.Get());
 			}
 
 			for (rkit::ByteStringConstructionBuffer &cbuf : stringCBufs)
 			{
-				RKIT_CHECK(stream.ReadAllSpan(cbuf.GetSpan()));
+				stream.ReadAllSpan(cbuf.GetSpan());
 			}
 
-			RKIT_CHECK(packageImpl.m_strings.Resize(stringCBufs.Count()));
+			packageImpl.m_strings.Resize(stringCBufs.Count());
 			rkit::ProcessParallelSpans(packageImpl.m_strings.ToSpan(), stringCBufs.ToSpan(), [](rkit::ByteString &outString, rkit::ByteStringConstructionBuffer &inString)
 				{
 					outString = rkit::ByteString(std::move(inString));
 				});
 		}
 
-		RKIT_CHECK(packageImpl.m_blocks.Resize(header.m_numBlocks.Get()));
-		RKIT_CHECK(packageImpl.m_paths.Resize(header.m_numPaths.Get()));
+		packageImpl.m_blocks.Resize(header.m_numBlocks.Get());
+		packageImpl.m_paths.Resize(header.m_numPaths.Get());
 
 		{
 			size_t pathOffset = 0;
@@ -300,7 +300,7 @@ namespace anox::game
 			for (ScenePackage::Block &outBlock : packageImpl.m_blocks)
 			{
 				data::SceneBlock inBlock;
-				RKIT_CHECK(stream.ReadOneBinary(inBlock));
+				stream.ReadOneBinary(inBlock);
 
 				const uint32_t numPaths = inBlock.m_numPaths.Get();
 
@@ -381,13 +381,13 @@ namespace anox::game
 
 			RKIT_ASSERT(deserializer.m_isValid);
 
-			RKIT_CHECK(deserializer.m_resizeOutVectorFunc(deserializer.m_outVector, header.m_nodeCounts[i].Get()));
+			deserializer.m_resizeOutVectorFunc(deserializer.m_outVector, header.m_nodeCounts[i].Get());
 		}
 
 		for (ScenePackage::Path &outPath : packageImpl.m_paths)
 		{
 			data::ScenePath inPath;
-			RKIT_CHECK(stream.ReadOneBinary(inPath));
+			stream.ReadOneBinary(inPath);
 
 			const size_t typeIndex = static_cast<size_t>(inPath.m_pathType);
 
@@ -425,7 +425,7 @@ namespace anox::game
 
 			for (size_t nodeIndex = 0; nodeIndex < numNodes; nodeIndex++)
 			{
-				RKIT_CHECK(deserializer.m_deserializeOneFunc(deserializer.m_userData, currentOutNodeAddr, stream));
+				deserializer.m_deserializeOneFunc(deserializer.m_userData, currentOutNodeAddr, stream);
 				currentOutNodeAddr += deserializer.m_nodeStride;
 			}
 		}
@@ -434,12 +434,12 @@ namespace anox::game
 		size_t numCommandParamDWords = 0;
 		for (const ScenePackage::CommandNode &cmd : packageImpl.m_command)
 		{
-			RKIT_CHECK(rkit::SafeAdd<size_t>(numCommandOpcodes, numCommandOpcodes, cmd.m_commandOpcodes.Count()));
-			RKIT_CHECK(rkit::SafeAdd<size_t>(numCommandParamDWords, numCommandParamDWords, cmd.m_commandParamDWords.Count()));
+			rkit::SafeAdd<size_t>(numCommandOpcodes, numCommandOpcodes, cmd.m_commandOpcodes.Count());
+			rkit::SafeAdd<size_t>(numCommandParamDWords, numCommandParamDWords, cmd.m_commandParamDWords.Count());
 		}
 
-		RKIT_CHECK(packageImpl.m_commandOpcodes.Resize(numCommandOpcodes));
-		RKIT_CHECK(packageImpl.m_commandParamDWords.Resize(numCommandParamDWords));
+		packageImpl.m_commandOpcodes.Resize(numCommandOpcodes);
+		packageImpl.m_commandParamDWords.Resize(numCommandParamDWords);
 
 		{
 			size_t opcodeOffset = 0;
@@ -453,8 +453,8 @@ namespace anox::game
 			}
 		}
 
-		RKIT_CHECK(stream.ReadAllSpan(packageImpl.m_commandOpcodes.ToSpan()));
-		RKIT_CHECK(stream.ReadAllSpan(packageImpl.m_commandParamDWords.ToSpan()));
+		stream.ReadAllSpan(packageImpl.m_commandOpcodes.ToSpan());
+		stream.ReadAllSpan(packageImpl.m_commandParamDWords.ToSpan());
 
 		for (uint32_t &dword : packageImpl.m_commandParamDWords)
 			rkit::endian::LittleUInt32_t::StaticConvertToHostOrderInPlace(dword);
@@ -463,7 +463,7 @@ namespace anox::game
 			size_t contentTypeIndex = 0;
 			for (const rkit::endian::LittleUInt32_t &contentCount : header.m_contentCounts)
 			{
-				RKIT_CHECK(packageImpl.m_content[contentTypeIndex++].Resize(contentCount.Get()));
+				packageImpl.m_content[contentTypeIndex++].Resize(contentCount.Get());
 			}
 		}
 
@@ -471,7 +471,7 @@ namespace anox::game
 		{
 			for (ScenePackage::Resource &resource : resourceVector)
 			{
-				RKIT_CHECK(stream.ReadOneBinary(resource.m_contentID));
+				stream.ReadOneBinary(resource.m_contentID);
 			}
 		}
 
@@ -527,7 +527,7 @@ namespace anox::game
 			RKIT_RETURN_OK;
 
 		rkit::ByteStringConstructionBuffer cbuf;
-		RKIT_CHECK(cbuf.Allocate(view.Length()));
+		cbuf.Allocate(view.Length());
 
 		rkit::ProcessParallelSpans(cbuf.GetSpan(), view.ToSpan(), [](uint8_t &outCh, uint8_t inCh)
 			{

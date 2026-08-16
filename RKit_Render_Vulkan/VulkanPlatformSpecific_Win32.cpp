@@ -62,9 +62,9 @@ namespace rkit { namespace render { namespace vulkan { namespace platform
 		WindowThreadInitTaskData taskData;
 		taskData.m_surf = this;
 
-		RKIT_CHECK(GetDrivers().m_systemDriver->CreateEvent(taskData.m_doneEvent, false, false));
+		GetDrivers().m_systemDriver->CreateEvent(taskData.m_doneEvent, false, false);
 
-		RKIT_CHECK(m_display.PostWindowThreadTask(&taskData, VulkanSurface_Win32::InitTaskCallback));
+		m_display.PostWindowThreadTask(&taskData, VulkanSurface_Win32::InitTaskCallback);
 
 		taskData.m_doneEvent->Wait();
 
@@ -98,9 +98,9 @@ namespace rkit { namespace render { namespace vulkan { namespace platform
 	Result CreateSurfaceFromDisplay(UniquePtr<IVulkanSurface> &outSurface, VulkanDeviceBase &device, IDisplay &display)
 	{
 		UniquePtr<VulkanSurface_Win32> surf;
-		RKIT_CHECK(New<VulkanSurface_Win32>(surf, device, static_cast<IDisplay_Win32 &>(display)));
+		New<VulkanSurface_Win32>(surf, device, static_cast<IDisplay_Win32 &>(display));
 
-		RKIT_CHECK(surf->Initialize());
+		surf->Initialize();
 
 		outSurface = std::move(surf);
 
@@ -109,7 +109,7 @@ namespace rkit { namespace render { namespace vulkan { namespace platform
 
 	Result AddInstanceExtensions(IInstanceExtensionEnumerator &enumerator)
 	{
-		RKIT_CHECK(enumerator.AddExtension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME, true));
+		enumerator.AddExtension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME, true);
 
 		RKIT_RETURN_OK;
 	}

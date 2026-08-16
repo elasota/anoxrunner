@@ -40,7 +40,7 @@ template<class TProgram>
 rkit::Result rkit::ProgramStubDriver<TProgram>::InitDriver(const DriverInitParameters *)
 {
 	UniquePtr<ISimpleProgram> program;
-	RKIT_CHECK(New<TProgram>(program));
+	New<TProgram>(program);
 
 	ms_program = program.Detach();
 

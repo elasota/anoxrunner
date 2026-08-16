@@ -49,7 +49,7 @@ namespace anox
 
 			for (const FileInfo &file : files)
 			{
-				RKIT_CHECK(RecursiveInsertFile(rootDirectory, file, 0));
+				RecursiveInsertFile(rootDirectory, file, 0);
 			}
 
 			size_t numFiles = 0;
@@ -58,8 +58,8 @@ namespace anox
 
 			files.Reset();
 
-			RKIT_CHECK(files.Resize(numFiles));
-			RKIT_CHECK(directories.Resize(numDirectories));
+			files.Resize(numFiles);
+			directories.Resize(numDirectories);
 
 			numFiles = 0;
 			numDirectories = 1;
@@ -133,14 +133,14 @@ namespace anox
 			if (slashPos.IsSet())
 			{
 				Directory *subDirectory = nullptr;
-				RKIT_CHECK(InsertDirectory(dir, subDirectory, fullName.SubString(0, slashPos.Get()), fullName.SubString(sliceStart, slashPos.Get() - sliceStart)));
-				RKIT_CHECK(RecursiveInsertFile(*subDirectory, file, slashPos.Get() + 1));
+				InsertDirectory(dir, subDirectory, fullName.SubString(0, slashPos.Get()), fullName.SubString(sliceStart, slashPos.Get() - sliceStart));
+				RecursiveInsertFile(*subDirectory, file, slashPos.Get() + 1);
 			}
 			else
 			{
 				FileInfo filledFile = file;
 				filledFile.m_fileName = fullName.SubString(sliceStart);
-				RKIT_CHECK(InsertFile(dir, filledFile, fullName.SubString(sliceStart)));
+				InsertFile(dir, filledFile, fullName.SubString(sliceStart));
 			}
 
 			RKIT_RETURN_OK;
@@ -164,9 +164,9 @@ namespace anox
 			// New file
 			size_t fileIndex = dir.m_files.Count();
 
-			RKIT_CHECK(dir.m_files.Append(file));
+			dir.m_files.Append(file);
 
-			RKIT_CHECK(dir.m_filesByName.SetPrehashed(nameHash, nameSlice.RemoveEncoding(), fileIndex));
+			dir.m_filesByName.SetPrehashed(nameHash, nameSlice.RemoveEncoding(), fileIndex);
 
 			RKIT_RETURN_OK;
 		}
@@ -191,13 +191,13 @@ namespace anox
 
 			// New directory
 			size_t dirIndex = dir.m_subDirectories.Count();
-			RKIT_CHECK(dir.m_subDirectories.Append(Directory()));
+			dir.m_subDirectories.Append(Directory());
 
 			Directory *newDir = &dir.m_subDirectories[dirIndex];
 			newDir->m_fullDirPath = fullDirPath;
 			newDir->m_name = nameSlice;
 
-			RKIT_CHECK(dir.m_subDirectoriesByName.SetPrehashed(nameHash, nameSlice.RemoveEncoding(), dirIndex));
+			dir.m_subDirectoriesByName.SetPrehashed(nameHash, nameSlice.RemoveEncoding(), dirIndex);
 
 			outDirectory = newDir;
 			RKIT_RETURN_OK;
@@ -217,8 +217,8 @@ namespace anox
 			rkit::FilePos_t archiveSize = stream->GetSize();
 
 			anox::afs::HeaderData header;
-			RKIT_CHECK(stream->SeekStart(0));
-			RKIT_CHECK(stream->ReadAll(&header, sizeof(header)));
+			stream->SeekStart(0);
+			stream->ReadAll(&header, sizeof(header));
 
 			if (header.m_magic.Get() != anox::afs::HeaderData::kAFSMagic || header.m_version.Get() != anox::afs::HeaderData::kAFSVersion)
 			{
@@ -237,10 +237,10 @@ namespace anox
 			uint32_t numFiles = catalogSize / sizeof(afs::FileData);
 
 			rkit::Vector<afs::FileData> fileDatas(m_alloc);
-			RKIT_CHECK(fileDatas.Resize(numFiles));
+			fileDatas.Resize(numFiles);
 
-			RKIT_CHECK(stream->SeekStart(header.m_catalogLocation.Get()));
-			RKIT_CHECK(stream->ReadAll(fileDatas.GetBuffer(), catalogSize));
+			stream->SeekStart(header.m_catalogLocation.Get());
+			stream->ReadAll(fileDatas.GetBuffer(), catalogSize);
 
 			size_t numFilePathChars = 0;
 			for (const afs::FileData &fileData : fileDatas)
@@ -249,8 +249,8 @@ namespace anox
 				numFilePathChars += filePathLen + 1;
 			}
 
-			RKIT_CHECK(m_fileNameChars.Resize(numFilePathChars));
-			RKIT_CHECK(m_files.Resize(numFiles));
+			m_fileNameChars.Resize(numFilePathChars);
+			m_files.Resize(numFiles);
 
 			size_t filePathWritePos = 0;
 			for (size_t fileIndex = 0; fileIndex < numFiles; fileIndex++)
@@ -277,7 +277,7 @@ namespace anox
 
 				if (!allowBrokenFilePaths)
 				{
-					RKIT_CHECK(CheckName(fileInfo.m_fullPath.ToSpan()));
+					CheckName(fileInfo.m_fullPath.ToSpan());
 				}
 
 				fileInfo.m_filePosition = fileData.m_location.Get();
@@ -300,10 +300,10 @@ namespace anox
 					c = '/';
 			}
 
-			RKIT_CHECK(DirectoryTreeBuilder::BuildFileTree(m_files, m_directories));
+			DirectoryTreeBuilder::BuildFileTree(m_files, m_directories);
 
 			// Finally wrap stream
-			RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->CreateMutexProtectedReadStream(m_stream, std::move(stream)));
+			rkit::GetDrivers().m_utilitiesDriver->CreateMutexProtectedReadStream(m_stream, std::move(stream));
 
 			RKIT_RETURN_OK;
 		}
@@ -342,18 +342,18 @@ namespace anox
 			const FileInfo &fileInfo = m_files[fileIndex];
 
 			rkit::UniquePtr<rkit::ISeekableReadStream> mutualAccessorStream;
-			RKIT_CHECK(m_stream->CreateReadStream(mutualAccessorStream));
+			m_stream->CreateReadStream(mutualAccessorStream);
 
 			if (fileInfo.m_compressedSize > 0)
 			{
 				rkit::UniquePtr<rkit::ISeekableReadStream> sliceStream;
-				RKIT_CHECK(utils.CreateRangeLimitedReadStream(sliceStream, std::move(mutualAccessorStream), fileInfo.m_filePosition, fileInfo.m_compressedSize));
+				utils.CreateRangeLimitedReadStream(sliceStream, std::move(mutualAccessorStream), fileInfo.m_filePosition, fileInfo.m_compressedSize);
 
-				RKIT_CHECK(utils.CreateRestartableDeflateDecompressStream(outStream, std::move(sliceStream), fileInfo.m_uncompressedSize));
+				utils.CreateRestartableDeflateDecompressStream(outStream, std::move(sliceStream), fileInfo.m_uncompressedSize);
 			}
 			else
 			{
-				RKIT_CHECK(utils.CreateRangeLimitedReadStream(outStream, std::move(mutualAccessorStream), fileInfo.m_filePosition, fileInfo.m_uncompressedSize));
+				utils.CreateRangeLimitedReadStream(outStream, std::move(mutualAccessorStream), fileInfo.m_filePosition, fileInfo.m_uncompressedSize);
 			}
 
 			RKIT_RETURN_OK;
@@ -450,12 +450,12 @@ namespace anox
 			{
 				if (name[i] == '\\')
 				{
-					RKIT_CHECK(CheckSlice(name.SubSpan(sliceStart, i - sliceStart)));
+					CheckSlice(name.SubSpan(sliceStart, i - sliceStart));
 					sliceStart = i + 1;
 				}
 			}
 
-			RKIT_CHECK(CheckSlice(name.SubSpan(sliceStart, name.Count() - sliceStart)));
+			CheckSlice(name.SubSpan(sliceStart, name.Count() - sliceStart));
 
 			RKIT_RETURN_OK;
 		}

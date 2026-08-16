@@ -262,7 +262,7 @@ inline rkit::buildsystem::FileStatusView rkit::buildsystem::FileStatus::ToView()
 inline rkit::Result rkit::buildsystem::FileStatus::Set(const FileStatusView &view)
 {
 	m_location = view.m_location;
-	RKIT_CHECK(m_filePath.Set(view.m_filePath));
+	m_filePath.Set(view.m_filePath);
 	m_fileSize = view.m_fileSize;
 	m_fileTime = view.m_fileTime;
 	m_isDirectory = view.m_isDirectory;
@@ -284,7 +284,7 @@ inline rkit::Result rkit::buildsystem::FileDependencyInfo::Set(const FileDepende
 {
 	m_fileExists = view.m_fileExists;
 	m_mustBeUpToDate = view.m_mustBeUpToDate;
-	RKIT_CHECK(m_status.Set(view.m_status));
+	m_status.Set(view.m_status);
 
 	RKIT_RETURN_OK;
 }
@@ -348,15 +348,15 @@ inline rkit::Result rkit::buildsystem::DirectoryScan::Set(const DirectoryScanVie
 {
 	const size_t numPaths = view.m_paths.Count();
 
-	RKIT_CHECK(m_paths.Resize(numPaths));
+	m_paths.Resize(numPaths);
 
 	for (size_t i = 0; i < numPaths; i++)
 	{
-		RKIT_CHECK(m_paths[i].Set(view.m_paths[i]));
+		m_paths[i].Set(view.m_paths[i]);
 	}
 
 	m_directoryMode = view.m_directoryMode;
-	RKIT_CHECK(m_directoryPath.Set(view.m_directoryPath));
+	m_directoryPath.Set(view.m_directoryPath);
 	m_directoryLocation = view.m_directoryLocation;
 
 	RKIT_RETURN_OK;
@@ -374,7 +374,7 @@ inline rkit::buildsystem::DirectoryScanDependencyInfoView rkit::buildsystem::Dir
 
 inline rkit::Result rkit::buildsystem::DirectoryScanDependencyInfo::Set(const DirectoryScanDependencyInfoView &view)
 {
-	RKIT_CHECK(m_dirScan.Set(view.m_dirScan));
+	m_dirScan.Set(view.m_dirScan);
 	m_dirExists = view.m_dirExists;
 	m_mustBeUpToDate = view.m_mustBeUpToDate;
 

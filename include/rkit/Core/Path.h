@@ -750,10 +750,10 @@ namespace rkit
 			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		size_t totalChars = str.Length() + 1;
-		RKIT_CHECK(SafeAdd<size_t>(totalChars, m_path.Length(), totalChars));
+		SafeAdd<size_t>(totalChars, m_path.Length(), totalChars);
 
 		BaseStringConstructionBuffer<Char_t> scBuf;
-		RKIT_CHECK(scBuf.Allocate(totalChars));
+		scBuf.Allocate(totalChars);
 
 		Span<Char_t> chars = scBuf.GetSpan();
 		CopySpanNonOverlapping(chars.SubSpan(0, m_path.Length()), m_path.ToSpan());
@@ -788,10 +788,10 @@ namespace rkit
 			RKIT_RETURN_OK;
 
 		size_t totalChars = str.Length() + 1;
-		RKIT_CHECK(SafeAdd<size_t>(totalChars, m_path.Length(), totalChars));
+		SafeAdd<size_t>(totalChars, m_path.Length(), totalChars);
 
 		BaseStringConstructionBuffer<Char_t> scBuf;
-		RKIT_CHECK(scBuf.Allocate(totalChars));
+		scBuf.Allocate(totalChars);
 
 		Span<Char_t> chars = scBuf.GetSpan();
 		CopySpanNonOverlapping(chars.SubSpan(0, m_path.Length()), m_path.ToSpan());
@@ -867,7 +867,7 @@ namespace rkit
 		}
 
 		BaseString<Char_t, TPathTraits::kEncoding> newStr;
-		RKIT_CHECK(newStr.ConvertFrom(str));
+		newStr.ConvertFrom(str);
 
 		return Set(newStr);
 	}
@@ -937,7 +937,7 @@ namespace rkit
 
 		BaseStringConstructionBuffer<Char_t> scBuf;
 
-		RKIT_CHECK(scBuf.Allocate(newSize));
+		scBuf.Allocate(newSize);
 
 		Span<Char_t> outSpan = scBuf.GetSpan();
 
@@ -1084,7 +1084,7 @@ namespace rkit
 		}
 
 		BaseStringConstructionBuffer<Char_t> stringBuffer;
-		RKIT_CHECK(stringBuffer.Allocate(numComponents - 1 + numComponentCharacters));
+		stringBuffer.Allocate(numComponents - 1 + numComponentCharacters);
 
 		Span<Char_t> stringSpan = stringBuffer.GetSpan();
 

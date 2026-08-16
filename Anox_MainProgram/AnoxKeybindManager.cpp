@@ -294,9 +294,9 @@ namespace anox
 			rkit::ByteString storageStr;
 			rkit::ByteStringView concatenated;
 
-			RKIT_CHECK(ConcatenateArgs(args, 1, storageStr, concatenated));
+			ConcatenateArgs(args, 1, storageStr, concatenated);
 
-			RKIT_CHECK(keyBind->m_cmd.Set(concatenated));
+			keyBind->m_cmd.Set(concatenated);
 		}
 
 		RKIT_RETURN_OK;
@@ -347,7 +347,7 @@ namespace anox
 			bool setOK = false;
 			if (cvar)
 			{
-				RKIT_CHECK(cmdRegistry->TrySetCVar(*cvar, args[1], setOK));
+				cmdRegistry->TrySetCVar(*cvar, args[1], setOK);
 			}
 
 			if (!setOK)
@@ -370,9 +370,9 @@ namespace anox
 		rkit::ByteString storageStr;
 		rkit::ByteStringView aliasCommand;
 
-		RKIT_CHECK(ConcatenateArgs(args, 1, storageStr, aliasCommand));
+		ConcatenateArgs(args, 1, storageStr, aliasCommand);
 
-		RKIT_CHECK(m_game.GetCommandRegistry()->RegisterAlias(args[0], aliasCommand));
+		m_game.GetCommandRegistry()->RegisterAlias(args[0], aliasCommand);
 
 		RKIT_RETURN_OK;
 	}
@@ -394,7 +394,7 @@ namespace anox
 			{
 				if (concatenatedCmd.Count() > 0)
 				{
-					RKIT_CHECK(concatenatedCmd.Append(' '));
+					concatenatedCmd.Append(' ');
 				}
 
 				rkit::ByteString tempStr;
@@ -402,14 +402,14 @@ namespace anox
 
 				if (AnoxCommandRegistryBase::RequiresEscape(token))
 				{
-					RKIT_CHECK(AnoxCommandRegistryBase::EscapeToken(tempStr, token));
+					AnoxCommandRegistryBase::EscapeToken(tempStr, token);
 					token = tempStr;
 				}
 
-				RKIT_CHECK(concatenatedCmd.Append(token.ToSpan()));
+				concatenatedCmd.Append(token.ToSpan());
 			}
 
-			RKIT_CHECK(storageStr.Set(concatenatedCmd.ToSpan()));
+			storageStr.Set(concatenatedCmd.ToSpan());
 			outStrView = storageStr;
 		}
 
@@ -418,10 +418,10 @@ namespace anox
 
 	rkit::Result AnoxKeybindManager::Register(AnoxCommandRegistryBase &commandRegistry)
 	{
-		RKIT_CHECK(commandRegistry.RegisterMemberFuncCommand<&AnoxKeybindManager::Cmd_Bind>(u8"bind", this));
-		RKIT_CHECK(commandRegistry.RegisterMemberFuncCommand<&AnoxKeybindManager::Cmd_Unbind>(u8"unbind", this));
-		RKIT_CHECK(commandRegistry.RegisterMemberFuncCommand<&AnoxKeybindManager::Cmd_Alias>(u8"alias", this));
-		RKIT_CHECK(commandRegistry.RegisterMemberFuncCommand<&AnoxKeybindManager::Cmd_Set>(u8"set", this));
+		commandRegistry.RegisterMemberFuncCommand<&AnoxKeybindManager::Cmd_Bind>(u8"bind", this);
+		commandRegistry.RegisterMemberFuncCommand<&AnoxKeybindManager::Cmd_Unbind>(u8"unbind", this);
+		commandRegistry.RegisterMemberFuncCommand<&AnoxKeybindManager::Cmd_Alias>(u8"alias", this);
+		commandRegistry.RegisterMemberFuncCommand<&AnoxKeybindManager::Cmd_Set>(u8"set", this);
 
 		RKIT_RETURN_OK;
 	}
@@ -480,7 +480,7 @@ namespace anox
 	rkit::Result AnoxKeybindManagerBase::Create(rkit::UniquePtr<AnoxKeybindManagerBase> &outManager, IAnoxGame &game)
 	{
 		rkit::UniquePtr<AnoxKeybindManager> manager;
-		RKIT_CHECK(rkit::New<AnoxKeybindManager>(manager, game));
+		rkit::New<AnoxKeybindManager>(manager, game);
 
 		outManager = std::move(manager);
 

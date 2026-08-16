@@ -296,7 +296,7 @@ namespace rkit
 	template<class T, size_t TStaticSize>
 	Result HybridVector<T, TStaticSize>::Resize(size_t size)
 	{
-		RKIT_CHECK(Reserve(size));
+		Reserve(size);
 
 		if (IsUsingStaticStorage())
 		{
@@ -340,8 +340,8 @@ namespace rkit
 
 			Vector<T> newVector(alloc);
 
-			RKIT_CHECK(newVector.Reserve(size));
-			RKIT_CHECK(newVector.AppendMove(ToSpan()));
+			newVector.Reserve(size);
+			newVector.AppendMove(ToSpan());
 
 			m_storage.m_staticStorage.~StaticStorageBuffer();
 			new (&m_storage.m_vector) Vector<T>(std::move(newVector));
@@ -392,7 +392,7 @@ namespace rkit
 			}
 			else
 			{
-				RKIT_CHECK(Reserve(TStaticSize + 1));
+				Reserve(TStaticSize + 1);
 			}
 		}
 
@@ -426,7 +426,7 @@ namespace rkit
 				if ((kMaxSize - count) < items.Count())
 					return ResultCode::kOutOfMemory;
 
-				RKIT_CHECK(Reserve(count + items.Count()));
+				Reserve(count + items.Count());
 			}
 		}
 
@@ -448,7 +448,7 @@ namespace rkit
 			}
 			else
 			{
-				RKIT_CHECK(Reserve(TStaticSize + 1));
+				Reserve(TStaticSize + 1);
 			}
 		}
 

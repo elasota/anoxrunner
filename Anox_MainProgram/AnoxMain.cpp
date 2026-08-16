@@ -51,7 +51,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 	rkit::ISystemDriver &sysDriver = *rkit::GetDrivers().m_systemDriver;
 	rkit::IUtilitiesDriver &utilsDriver = *rkit::GetDrivers().m_utilitiesDriver;
 
-	RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->SetProgramName(u8"Anox Runner"));
+	rkit::GetDrivers().m_utilitiesDriver->SetProgramName(u8"Anox Runner");
 
 	rkit::Span<const rkit::StringView> args = sysDriver.GetCommandLine();
 
@@ -196,11 +196,11 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 
 	if (dataDirectory.Length() > 0)
 	{
-		RKIT_CHECK(sysDriver.SetGameDirectoryOverride(dataDirectory));
+		sysDriver.SetGameDirectoryOverride(dataDirectory);
 	}
 
 	// FIXME: Move this to RKit Config
-	RKIT_CHECK(sysDriver.SetSettingsDirectory(u8"AnoxRunner"));
+	sysDriver.SetSettingsDirectory(u8"AnoxRunner");
 
 	if (autoBuild)
 	{
@@ -213,7 +213,7 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 
 		IUtilitiesDriver *utilsDriver = static_cast<IUtilitiesDriver *>(rkit::GetDrivers().FindDriver(kAnoxNamespaceID, u8"Utilities"));
 
-		RKIT_CHECK(utilsDriver->RunDataBuild(buildTarget, buildSourceDirectory, buildIntermediateDirectory, dataDirectory, dataSourceDirectory, renderBackendType));
+		utilsDriver->RunDataBuild(buildTarget, buildSourceDirectory, buildIntermediateDirectory, dataDirectory, dataSourceDirectory, renderBackendType);
 	}
 
 
@@ -223,9 +223,9 @@ rkit::Result anox::MainProgramDriver::InitProgram()
 
 	if (run)
 	{
-		RKIT_CHECK(IAnoxGame::Create(m_game, numThreads));
+		IAnoxGame::Create(m_game, numThreads);
 
-		RKIT_CHECK(m_game->Start());
+		m_game->Start();
 	}
 
 	RKIT_RETURN_OK;
@@ -237,7 +237,7 @@ rkit::Result anox::MainProgramDriver::RunFrame(bool &outIsExiting)
 
 	if (IAnoxGame *game = m_game.Get())
 	{
-		RKIT_CHECK(game->RunFrame());
+		game->RunFrame();
 
 		outIsExiting = game->IsExiting();
 	}

@@ -92,7 +92,7 @@ namespace anox
 		rkit::Result BaseCreateResourceObject(rkit::UniquePtr<AnoxResourceBase> &outResource) const override
 		{
 			rkit::UniquePtr<TResourceType> resource;
-			RKIT_CHECK(this->CreateResourceObject(resource));
+			this->CreateResourceObject(resource);
 
 			outResource = std::move(resource);
 			RKIT_RETURN_OK;

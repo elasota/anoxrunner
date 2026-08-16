@@ -240,7 +240,7 @@ namespace rkit { namespace png {
 
 		int transforms = PNG_TRANSFORM_PACKING | PNG_TRANSFORM_EXPAND;
 
-		RKIT_CHECK(TrapPNGCall(png_read_info)(m_png, m_info));
+		TrapPNGCall(png_read_info)(m_png, m_info);
 
 		const png_byte channels = png_get_channels(m_png, m_info);
 		const png_byte bitDepth = png_get_bit_depth(m_png, m_info);
@@ -282,7 +282,7 @@ namespace rkit { namespace png {
 
 		int transforms = PNG_TRANSFORM_PACKING | PNG_TRANSFORM_EXPAND;
 
-		RKIT_CHECK(TrapPNGCall(png_read_png)(m_png, m_info, transforms, nullptr));
+		TrapPNGCall(png_read_png)(m_png, m_info, transforms, nullptr);
 
 		const png_bytepp rowPtrs = png_get_rows(m_png, m_info);
 		const png_byte channels = png_get_channels(m_png, m_info);
@@ -309,7 +309,7 @@ namespace rkit { namespace png {
 		imageSpec.m_numChannels = channels;
 
 		UniquePtr<utils::IImage> image;
-		RKIT_CHECK(GetDrivers().m_utilitiesDriver->CreateImage(imageSpec, image));
+		GetDrivers().m_utilitiesDriver->CreateImage(imageSpec, image);
 
 		const size_t copySize = static_cast<size_t>(image->GetPixelSizeBytes()) * imageSpec.m_width;
 
@@ -405,18 +405,18 @@ namespace rkit { namespace png {
 			RKIT_THROW(ResultCode::kDataError);
 		}
 
-		RKIT_CHECK(TrapPNGCall(png_set_IHDR)(m_png, m_info, image.GetWidth(), image.GetHeight(), bitDepth, colorType, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT));
+		TrapPNGCall(png_set_IHDR)(m_png, m_info, image.GetWidth(), image.GetHeight(), bitDepth, colorType, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
 
 		png_set_write_fn(m_png, GetIOPtr(), StaticWriteCB, StaticFlushCB);
 
-		RKIT_CHECK(TrapPNGCall(png_write_info)(m_png, m_info));
+		TrapPNGCall(png_write_info)(m_png, m_info);
 
 		for (uint32_t row = 0; row < imageSpec.m_height; row++)
 		{
-			RKIT_CHECK(TrapPNGCall(png_write_row)(m_png, static_cast<png_const_bytep>(image.GetScanline(row))));
+			TrapPNGCall(png_write_row)(m_png, static_cast<png_const_bytep>(image.GetScanline(row)));
 		}
 
-		RKIT_CHECK(TrapPNGCall(png_write_end)(m_png, m_info));
+		TrapPNGCall(png_write_end)(m_png, m_info);
 
 		RKIT_RETURN_OK;
 	}
@@ -471,3 +471,4 @@ namespace rkit { namespace png {
 
 
 RKIT_IMPLEMENT_MODULE(RKit, PNG, ::rkit::png::PngModule)
+

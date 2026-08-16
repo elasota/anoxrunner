@@ -550,9 +550,9 @@ namespace anox { namespace buildsystem
 		BSPDataCollection bsp;
 
 		rkit::Vector<LumpLoader> loaders;
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kTexInfo, bsp.m_texInfos)));
+		loaders.Append(LumpLoader(BSPLumpIndex::kTexInfo, bsp.m_texInfos));
 
-		RKIT_CHECK(LoadBSPData(depsNode, feedback, bsp, loaders));
+		LoadBSPData(depsNode, feedback, bsp, loaders);
 
 		for (const BSPTexInfo &texInfo : bsp.m_texInfos)
 		{
@@ -595,17 +595,17 @@ namespace anox { namespace buildsystem
 			}
 
 			rkit::String texPath;
-			RKIT_CHECK(texPath.Set(u8"textures/"));
-			RKIT_CHECK(texPath.Append(span));
-			RKIT_CHECK(texPath.Append(u8'.'));
-			RKIT_CHECK(texPath.Append(MaterialCompiler::GetWorldMaterialExtension()));
+			texPath.Set(u8"textures/");
+			texPath.Append(span);
+			texPath.Append(u8'.');
+			texPath.Append(MaterialCompiler::GetWorldMaterialExtension());
 
-			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kWorldMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, texPath));
+			feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kWorldMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, texPath);
 		}
 
-		RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kBSPGeometryID, rkit::buildsystem::BuildFileLocation::kSourceDir, depsNode->GetIdentifier()));
+		feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kBSPGeometryID, rkit::buildsystem::BuildFileLocation::kSourceDir, depsNode->GetIdentifier());
 
-		RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kBSPEntityID, rkit::buildsystem::BuildFileLocation::kSourceDir, depsNode->GetIdentifier()));
+		feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kBSPEntityID, rkit::buildsystem::BuildFileLocation::kSourceDir, depsNode->GetIdentifier());
 
 		RKIT_RETURN_OK;
 	}
@@ -626,35 +626,35 @@ namespace anox { namespace buildsystem
 		BSPDataCollection bsp;
 
 		rkit::Vector<LumpLoader> loaders;
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kTexInfo, bsp.m_texInfos)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kFaceEdges, bsp.m_faceEdges)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kFaces, bsp.m_faces)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kEdges, bsp.m_edges)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kVerts, bsp.m_verts)));
+		loaders.Append(LumpLoader(BSPLumpIndex::kTexInfo, bsp.m_texInfos));
+		loaders.Append(LumpLoader(BSPLumpIndex::kFaceEdges, bsp.m_faceEdges));
+		loaders.Append(LumpLoader(BSPLumpIndex::kFaces, bsp.m_faces));
+		loaders.Append(LumpLoader(BSPLumpIndex::kEdges, bsp.m_edges));
+		loaders.Append(LumpLoader(BSPLumpIndex::kVerts, bsp.m_verts));
 
-		RKIT_CHECK(LoadBSPData(depsNode, feedback, bsp, loaders));
+		LoadBSPData(depsNode, feedback, bsp, loaders);
 
 		rkit::Vector<BSPFaceStats> faceStats;
-		RKIT_CHECK(ComputeSurfaceExtents(bsp, faceStats));
+		ComputeSurfaceExtents(bsp, faceStats);
 
 		rkit::Vector<rkit::UniquePtr<priv::LightmapTree>> lightmapTrees;
-		RKIT_CHECK(BuildLightmapTrees(bsp, faceStats, lightmapTrees));
+		BuildLightmapTrees(bsp, faceStats, lightmapTrees);
 
 		FaceStatsHeader header;
 		header.m_numFaces = static_cast<uint32_t>(faceStats.Count());
 		header.m_numLightmapTrees = static_cast<uint32_t>(lightmapTrees.Count());
 
 		rkit::String faceStatsPathStr;
-		RKIT_CHECK(FormatFaceStatsPath(faceStatsPathStr, depsNode->GetIdentifier()));
+		FormatFaceStatsPath(faceStatsPathStr, depsNode->GetIdentifier());
 
 		rkit::CIPath faceStatsPath;
-		RKIT_CHECK(faceStatsPath.Set(faceStatsPathStr));
+		faceStatsPath.Set(faceStatsPathStr);
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> stream;
-		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, faceStatsPath, stream));
+		feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, faceStatsPath, stream);
 
-		RKIT_CHECK(stream->WriteAll(&header, sizeof(header)));
-		RKIT_CHECK(stream->WriteAll(faceStats.GetBuffer(), faceStats.Count() * sizeof(BSPFaceStats)));
+		stream->WriteAll(&header, sizeof(header));
+		stream->WriteAll(faceStats.GetBuffer(), faceStats.Count() * sizeof(BSPFaceStats));
 
 		for (const rkit::UniquePtr<priv::LightmapTree> &treePtr : lightmapTrees)
 		{
@@ -664,8 +664,8 @@ namespace anox { namespace buildsystem
 			serBlock.m_expansionLevel = tree.m_expansionLevel;
 			serBlock.m_numNodes = static_cast<uint32_t>(tree.m_nodes.Count());
 
-			RKIT_CHECK(stream->WriteAll(&serBlock, sizeof(serBlock)));
-			RKIT_CHECK(stream->WriteAll(tree.m_nodes.GetBuffer(), tree.m_nodes.Count() * sizeof(priv::LightmapTreeNode)));
+			stream->WriteAll(&serBlock, sizeof(serBlock));
+			stream->WriteAll(tree.m_nodes.GetBuffer(), tree.m_nodes.Count() * sizeof(priv::LightmapTreeNode));
 		}
 
 		stream.Reset();
@@ -686,7 +686,7 @@ namespace anox { namespace buildsystem
 
 	rkit::Result BSPGeometryCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
-		RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kBSPLightmapNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, depsNode->GetIdentifier()));
+		feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kBSPLightmapNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, depsNode->GetIdentifier());
 
 		RKIT_RETURN_OK;
 	}
@@ -696,31 +696,31 @@ namespace anox { namespace buildsystem
 		BSPDataCollection bsp;
 
 		rkit::Vector<LumpLoader> loaders;
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kModels, bsp.m_models)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kNodes, bsp.m_nodes)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kLeafs, bsp.m_leafs)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kLeafFaces, bsp.m_leafFaces)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kLeafBrushes, bsp.m_leafBrushes)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kTexInfo, bsp.m_texInfos)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kFaceEdges, bsp.m_faceEdges)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kFaces, bsp.m_faces)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kPlanes, bsp.m_planes)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kEdges, bsp.m_edges)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kVerts, bsp.m_verts)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kLightmaps, bsp.m_lightMapData)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kBrushes, bsp.m_brushes)));
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kBrushSides, bsp.m_brushSides)));
+		loaders.Append(LumpLoader(BSPLumpIndex::kModels, bsp.m_models));
+		loaders.Append(LumpLoader(BSPLumpIndex::kNodes, bsp.m_nodes));
+		loaders.Append(LumpLoader(BSPLumpIndex::kLeafs, bsp.m_leafs));
+		loaders.Append(LumpLoader(BSPLumpIndex::kLeafFaces, bsp.m_leafFaces));
+		loaders.Append(LumpLoader(BSPLumpIndex::kLeafBrushes, bsp.m_leafBrushes));
+		loaders.Append(LumpLoader(BSPLumpIndex::kTexInfo, bsp.m_texInfos));
+		loaders.Append(LumpLoader(BSPLumpIndex::kFaceEdges, bsp.m_faceEdges));
+		loaders.Append(LumpLoader(BSPLumpIndex::kFaces, bsp.m_faces));
+		loaders.Append(LumpLoader(BSPLumpIndex::kPlanes, bsp.m_planes));
+		loaders.Append(LumpLoader(BSPLumpIndex::kEdges, bsp.m_edges));
+		loaders.Append(LumpLoader(BSPLumpIndex::kVerts, bsp.m_verts));
+		loaders.Append(LumpLoader(BSPLumpIndex::kLightmaps, bsp.m_lightMapData));
+		loaders.Append(LumpLoader(BSPLumpIndex::kBrushes, bsp.m_brushes));
+		loaders.Append(LumpLoader(BSPLumpIndex::kBrushSides, bsp.m_brushSides));
 
-		RKIT_CHECK(LoadBSPData(depsNode, feedback, bsp, loaders));
+		LoadBSPData(depsNode, feedback, bsp, loaders);
 
 		rkit::Vector<BSPFaceStats> faceStats;
 		rkit::Vector<rkit::UniquePtr<priv::LightmapTree>> lightmapTrees;
-		RKIT_CHECK(LoadFaceStats(depsNode, feedback, faceStats, lightmapTrees));
+		LoadFaceStats(depsNode, feedback, faceStats, lightmapTrees);
 
 		rkit::Vector<size_t> texInfoToUniqueTexture;
 		rkit::Vector<rkit::CIPath> uniqueTextures;
 
-		RKIT_CHECK(texInfoToUniqueTexture.Resize(bsp.m_texInfos.Count()));
+		texInfoToUniqueTexture.Resize(bsp.m_texInfos.Count());
 
 		{
 			rkit::HashMap<rkit::CIPath, size_t> textureNameToUniqueTexture;
@@ -749,7 +749,7 @@ namespace anox { namespace buildsystem
 				fixedName[nameLength] = 0;
 
 				rkit::CIPath texName;
-				RKIT_CHECK(texName.Set(rkit::StringView(fixedName, nameLength)));
+				texName.Set(rkit::StringView(fixedName, nameLength));
 
 				const rkit::HashMap<rkit::CIPath, size_t>::ConstIterator_t it = textureNameToUniqueTexture.Find(texName);
 
@@ -758,8 +758,8 @@ namespace anox { namespace buildsystem
 				{
 					uniqueTexIndex = uniqueTextures.Count();
 
-					RKIT_CHECK(textureNameToUniqueTexture.Set(texName, uniqueTexIndex));
-					RKIT_CHECK(uniqueTextures.Append(texName));
+					textureNameToUniqueTexture.Set(texName, uniqueTexIndex);
+					uniqueTextures.Append(texName);
 				}
 				else
 					uniqueTexIndex = it.Value();
@@ -772,8 +772,8 @@ namespace anox { namespace buildsystem
 		rkit::Vector<rkit::data::ContentID> lightmapContentIDs;
 
 		{
-			RKIT_CHECK(lightmapDimensions.Resize(lightmapTrees.Count()));
-			RKIT_CHECK(lightmapContentIDs.Resize(lightmapTrees.Count()));
+			lightmapDimensions.Resize(lightmapTrees.Count());
+			lightmapContentIDs.Resize(lightmapTrees.Count());
 
 			for (size_t lightmapIndex = 0; lightmapIndex < lightmapTrees.Count(); lightmapIndex++)
 			{
@@ -793,43 +793,43 @@ namespace anox { namespace buildsystem
 				lightmapDimensions[lightmapIndex] = rkit::Pair<uint16_t, uint16_t>(tree.m_nodes[0].m_width, tree.m_nodes[0].m_height);
 			}
 
-			RKIT_CHECK(ExportLightmaps(depsNode, feedback, lightmapContentIDs, bsp, faceStats, lightmapTrees));
+			ExportLightmaps(depsNode, feedback, lightmapContentIDs, bsp, faceStats, lightmapTrees);
 
 			lightmapTrees.Reset();
 		}
 
 		rkit::Vector<size_t> faceModelIndex;
-		RKIT_CHECK(faceModelIndex.Resize(bsp.m_faces.Count()));
+		faceModelIndex.Resize(bsp.m_faces.Count());
 
 		data::BSPDataChunksVectors bspOutput;
-		RKIT_CHECK(BuildGeometry(bspOutput, bsp, faceStats.ToSpan(), faceModelIndex.ToSpan(), texInfoToUniqueTexture.ToSpan(), lightmapDimensions.ToSpan()));
+		BuildGeometry(bspOutput, bsp, faceStats.ToSpan(), faceModelIndex.ToSpan(), texInfoToUniqueTexture.ToSpan(), lightmapDimensions.ToSpan());
 
 		bspOutput.m_lightmaps = std::move(lightmapContentIDs);
 
 		{
 			rkit::String outPathStr;
-			RKIT_CHECK(FormatGeometryPath(outPathStr, depsNode->GetIdentifier()));
+			FormatGeometryPath(outPathStr, depsNode->GetIdentifier());
 
 			rkit::CIPath outPath;
-			RKIT_CHECK(outPath.Set(outPathStr));
+			outPath.Set(outPathStr);
 
 			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
-			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outStream));
+			feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outStream);
 
-			RKIT_CHECK(WriteBSPModel(bspOutput, *outStream));
+			WriteBSPModel(bspOutput, *outStream);
 		}
 
 		{
 			rkit::String outPathStr;
-			RKIT_CHECK(FormatMaterialListPath(outPathStr, depsNode->GetIdentifier()));
+			FormatMaterialListPath(outPathStr, depsNode->GetIdentifier());
 
 			rkit::CIPath outPath;
-			RKIT_CHECK(outPath.Set(outPathStr));
+			outPath.Set(outPathStr);
 
 			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
-			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outStream));
+			feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outStream);
 
-			RKIT_CHECK(WriteMaterialList(uniqueTextures.ToSpan(), *outStream));
+			WriteMaterialList(uniqueTextures.ToSpan(), *outStream);
 		}
 
 		RKIT_RETURN_OK;
@@ -854,9 +854,9 @@ namespace anox { namespace buildsystem
 	rkit::Result BSPEntityCompiler::EntityAnalysisHandler::ParseUserEntity(uint32_t edefID, const data::EntityClassDef2 &classDef, const PropertySpan_t &properties)
 	{
 		rkit::String edefIdentifier;
-		RKIT_CHECK(EntityDefCompilerBase::FormatEDef(edefIdentifier, edefID));
+		EntityDefCompilerBase::FormatEDef(edefIdentifier, edefID);
 
-		RKIT_CHECK(m_feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kEntityDefNodeID, rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefIdentifier));
+		m_feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kEntityDefNodeID, rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefIdentifier);
 
 		RKIT_RETURN_OK;
 	}
@@ -888,7 +888,7 @@ namespace anox { namespace buildsystem
 			"_cone",
 		};
 
-		RKIT_CHECK(compiledEntity.m_dataBlob.Resize(classDef.m_dataSize));
+		compiledEntity.m_dataBlob.Resize(classDef.m_dataSize);
 
 		const rkit::Span<uint8_t> blobBytes = compiledEntity.m_dataBlob.ToSpan();
 
@@ -900,7 +900,7 @@ namespace anox { namespace buildsystem
 
 			if (edefID == m_edefContentIDs.Count())
 			{
-				RKIT_CHECK(m_edefContentIDs.Append(*contentID));
+				m_edefContentIDs.Append(*contentID);
 			}
 
 			rkit::endian::LittleUInt32_t edefIDData;
@@ -947,7 +947,7 @@ namespace anox { namespace buildsystem
 				switch (dispo)
 				{
 				case PropertyDisposition::kPresent:
-					RKIT_CHECK(ParseField(blobBytes.SubSpan(offset), *fieldDef, property.Second()));
+					ParseField(blobBytes.SubSpan(offset), *fieldDef, property.Second());
 					break;
 				case PropertyDisposition::kAngleRecast:
 					RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
@@ -957,7 +957,7 @@ namespace anox { namespace buildsystem
 			}
 		}
 
-		RKIT_CHECK(m_compiledEntities.Append(std::move(compiledEntity)));
+		m_compiledEntities.Append(std::move(compiledEntity));
 
 		RKIT_RETURN_OK;
 	}
@@ -970,13 +970,13 @@ namespace anox { namespace buildsystem
 	rkit::Result BSPEntityCompiler::EntityCompileHandler::ParseUserEntity(uint32_t edefID, const data::EntityClassDef2 &classDef, const PropertySpan_t &properties)
 	{
 		rkit::String edefIdentifier;
-		RKIT_CHECK(EntityDefCompilerBase::FormatEDef(edefIdentifier, edefID));
+		EntityDefCompilerBase::FormatEDef(edefIdentifier, edefID);
 
 		rkit::CIPath edefPath;
-		RKIT_CHECK(edefPath.Set(edefIdentifier));
+		edefPath.Set(edefIdentifier);
 
 		rkit::data::ContentID contentID;
-		RKIT_CHECK(m_feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefPath, contentID));
+		m_feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefPath, contentID);
 	
 		return ParseEntityCommon(&contentID, classDef, properties);
 	}
@@ -1154,9 +1154,9 @@ namespace anox { namespace buildsystem
 		spawnDataFile.m_version = data::EntitySpawnDataFile::kVersion;
 
 		data::EntitySpawnDataChunks chunks = {};
-		RKIT_CHECK(chunks.m_entityDefContentIDs.Append(m_edefContentIDs.ToSpan()));
+		chunks.m_entityDefContentIDs.Append(m_edefContentIDs.ToSpan());
 
-		RKIT_CHECK(chunks.m_entityTypes.Resize(m_compiledEntities.Count()));
+		chunks.m_entityTypes.Resize(m_compiledEntities.Count());
 		rkit::ProcessParallelSpans(chunks.m_entityTypes.ToSpan(), m_compiledEntities.ToSpan(),
 			[](rkit::endian::LittleUInt32_t &outEntityType, const CompiledEntity &inEntity)
 			{
@@ -1165,10 +1165,10 @@ namespace anox { namespace buildsystem
 
 		for (const CompiledEntity &compiledEntity : m_compiledEntities)
 		{
-			RKIT_CHECK(chunks.m_entityData.Append(compiledEntity.m_dataBlob.ToSpan()));
+			chunks.m_entityData.Append(compiledEntity.m_dataBlob.ToSpan());
 		}
 
-		RKIT_CHECK(chunks.m_entityStringLengths.Resize(m_strings.Count()));
+		chunks.m_entityStringLengths.Resize(m_strings.Count());
 		rkit::ProcessParallelSpans(chunks.m_entityStringLengths.ToSpan(), m_strings.ToSpan(),
 			[](rkit::endian::LittleUInt32_t &outStrLength, const rkit::ByteString &inStr)
 			{
@@ -1177,13 +1177,13 @@ namespace anox { namespace buildsystem
 
 		for (const rkit::ByteString &str : m_strings)
 		{
-			RKIT_CHECK(chunks.m_entityStringData.Append(str.ToSpan()));
-			RKIT_CHECK(chunks.m_entityStringData.Append(0));
+			chunks.m_entityStringData.Append(str.ToSpan());
+			chunks.m_entityStringData.Append(0);
 		}
 
-		RKIT_CHECK(stream.WriteOneBinary(spawnDataFile));
+		stream.WriteOneBinary(spawnDataFile);
 
-		RKIT_CHECK(chunks.VisitAllChunks(VectorWriterVisitor(stream)));
+		chunks.VisitAllChunks(VectorWriterVisitor(stream));
 
 		RKIT_RETURN_OK;
 	}
@@ -1198,26 +1198,26 @@ namespace anox { namespace buildsystem
 		bool haveScripts = false;
 		rkit::String scriptsPathStr;
 
-		RKIT_CHECK(FindScriptPath(haveScripts, scriptsPathStr, depsNode->GetIdentifier(), feedback));
+		FindScriptPath(haveScripts, scriptsPathStr, depsNode->GetIdentifier(), feedback);
 
 		if (haveScripts)
 		{
-			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kAPEScriptNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, scriptsPathStr));
+			feedback->AddNodeDependency(kAnoxNamespaceID, kAPEScriptNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, scriptsPathStr);
 		}
 
 		rkit::UniquePtr<UserEntityDictionaryBase> dictionary;
-		RKIT_CHECK(EntityDefCompilerBase::LoadUserEntityDictionary(dictionary, feedback));
+		EntityDefCompilerBase::LoadUserEntityDictionary(dictionary, feedback);
 
 		BSPDataCollection bsp;
 
 		rkit::Vector<LumpLoader> loaders;
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kEntities, bsp.m_entityData)));
+		loaders.Append(LumpLoader(BSPLumpIndex::kEntities, bsp.m_entityData));
 
-		RKIT_CHECK(LoadBSPData(depsNode, feedback, bsp, loaders));
+		LoadBSPData(depsNode, feedback, bsp, loaders);
 
 		EntityAnalysisHandler handler(feedback);
 
-		RKIT_CHECK(ParseEntityData(*dictionary, bsp.m_entityData.ToSpan(), handler));
+		ParseEntityData(*dictionary, bsp.m_entityData.ToSpan(), handler);
 
 		RKIT_RETURN_OK;
 	}
@@ -1230,58 +1230,58 @@ namespace anox { namespace buildsystem
 			bool haveScripts = false;
 			rkit::String scriptsPathStr;
 
-			RKIT_CHECK(FindScriptPath(haveScripts, scriptsPathStr, depsNode->GetIdentifier(), feedback));
+			FindScriptPath(haveScripts, scriptsPathStr, depsNode->GetIdentifier(), feedback);
 
 			if (haveScripts)
 			{
 				rkit::CIPath scriptOutputPath;
-				RKIT_CHECK(APEScriptCompiler::FormatOutputPath(scriptOutputPath, scriptsPathStr));
+				APEScriptCompiler::FormatOutputPath(scriptOutputPath, scriptsPathStr);
 
-				RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, scriptOutputPath, scriptsContentID));
+				feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, scriptOutputPath, scriptsContentID);
 			}
 		}
 
 
 		rkit::UniquePtr<UserEntityDictionaryBase> dictionary;
-		RKIT_CHECK(EntityDefCompilerBase::LoadUserEntityDictionary(dictionary, feedback));
+		EntityDefCompilerBase::LoadUserEntityDictionary(dictionary, feedback);
 
 		BSPDataCollection bsp;
 
 		rkit::Vector<LumpLoader> loaders;
-		RKIT_CHECK(loaders.Append(LumpLoader(BSPLumpIndex::kEntities, bsp.m_entityData)));
+		loaders.Append(LumpLoader(BSPLumpIndex::kEntities, bsp.m_entityData));
 
-		RKIT_CHECK(LoadBSPData(depsNode, feedback, bsp, loaders));
+		LoadBSPData(depsNode, feedback, bsp, loaders);
 
 		EntityCompileHandler handler(feedback);
 
-		RKIT_CHECK(ParseEntityData(*dictionary, bsp.m_entityData.ToSpan(), handler));
+		ParseEntityData(*dictionary, bsp.m_entityData.ToSpan(), handler);
 
 		{
 			rkit::String outPathStr;
-			RKIT_CHECK(FormatObjectsPath(outPathStr, depsNode->GetIdentifier()));
+			FormatObjectsPath(outPathStr, depsNode->GetIdentifier());
 
 			rkit::CIPath outPath;
-			RKIT_CHECK(outPath.Set(outPathStr));
+			outPath.Set(outPathStr);
 
 			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
-			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, outPath, outStream));
+			feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, outPath, outStream);
 
-			RKIT_CHECK(handler.WriteEntityData(*outStream));
+			handler.WriteEntityData(*outStream);
 		}
 
 		{
 			rkit::String outPathStr;
-			RKIT_CHECK(FormatScriptPackagePath(outPathStr, depsNode->GetIdentifier()));
+			FormatScriptPackagePath(outPathStr, depsNode->GetIdentifier());
 
 			rkit::CIPath outPath;
-			RKIT_CHECK(outPath.Set(outPathStr));
+			outPath.Set(outPathStr);
 
 			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
-			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, outPath, outStream));
+			feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, outPath, outStream);
 
 			if (!scriptsContentID.IsNull())
 			{
-				RKIT_CHECK(outStream->WriteOneBinary(scriptsContentID));
+				outStream->WriteOneBinary(scriptsContentID);
 			}
 		}
 
@@ -1330,12 +1330,12 @@ namespace anox { namespace buildsystem
 				rkit::AsciiString keyString;
 				rkit::ByteString valueString;
 
-				RKIT_CHECK(ParseQuotedString(entityData, keyString));
+				ParseQuotedString(entityData, keyString);
 
 				SkipWhitespace(entityData);
-				RKIT_CHECK(ParseQuotedString(entityData, valueString));
+				ParseQuotedString(entityData, valueString);
 
-				RKIT_CHECK(keyValuePairs.Append(rkit::Pair<rkit::AsciiString, rkit::ByteString>(std::move(keyString), std::move(valueString))));
+				keyValuePairs.Append(rkit::Pair<rkit::AsciiString, rkit::ByteString>(std::move(keyString), std::move(valueString)));
 			}
 
 			rkit::Optional<rkit::ByteString> classnameOpt;
@@ -1362,7 +1362,7 @@ namespace anox { namespace buildsystem
 			{
 				if (classname.EqualsNoCase(rkit::StringView(classDef.m_name, classDef.m_nameLength).RemoveEncoding()))
 				{
-					RKIT_CHECK(handler.ParseBuiltinEntity(classDef, keyValuePairs.ToSpan()));
+					handler.ParseBuiltinEntity(classDef, keyValuePairs.ToSpan());
 
 					isUserClass = false;
 					break;
@@ -1391,8 +1391,8 @@ namespace anox { namespace buildsystem
 				rkit::ByteStringView type = dict.GetEDefType(edefID);
 
 				rkit::ByteString fullType;
-				RKIT_CHECK(fullType.Set(rkit::StringView(u8"userentity_").RemoveEncoding()));
-				RKIT_CHECK(fullType.Append(type));
+				fullType.Set(rkit::StringView(u8"userentity_").RemoveEncoding());
+				fullType.Append(type);
 
 				const data::EntityClassDef2 *userEntityClassDef = nullptr;
 				for (const anox::data::EntityClassDef2 &classDef : classDefs)
@@ -1407,7 +1407,7 @@ namespace anox { namespace buildsystem
 				if (!userEntityClassDef)
 					RKIT_THROW(rkit::ResultCode::kDataError);
 
-				RKIT_CHECK(handler.ParseUserEntity(edefID, *userEntityClassDef, keyValuePairs.ToSpan()));
+				handler.ParseUserEntity(edefID, *userEntityClassDef, keyValuePairs.ToSpan());
 			}
 		}
 
@@ -1419,12 +1419,12 @@ namespace anox { namespace buildsystem
 		if (identifier.EndsWithNoCase(u8".bsp") && identifier.StartsWithNoCase(u8"maps/"))
 		{
 			rkit::String apePathStr;
-			RKIT_CHECK(apePathStr.Format(u8"gameflow/{}.ape", identifier.SubString(5, identifier.Length() - 9)));
+			apePathStr.Format(u8"gameflow/{}.ape", identifier.SubString(5, identifier.Length() - 9));
 
 			rkit::CIPath apePath;
-			RKIT_CHECK(apePath.Set(apePathStr));
+			apePath.Set(apePathStr);
 
-			RKIT_CHECK(feedback->CheckInputExists(rkit::buildsystem::BuildFileLocation::kSourceDir, apePath, outHaveScript));
+			feedback->CheckInputExists(rkit::buildsystem::BuildFileLocation::kSourceDir, apePath, outHaveScript);
 
 			if (outHaveScript)
 				outPathStr = std::move(apePathStr);
@@ -1488,12 +1488,12 @@ namespace anox { namespace buildsystem
 			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
-		RKIT_CHECK(arr.Resize(lumpSize / structureSize));
+		arr.Resize(lumpSize / structureSize);
 
 		if (lumpSize > 0)
 		{
-			RKIT_CHECK(stream.SeekStart(lumpPos));
-			RKIT_CHECK(stream.ReadAll(arr.GetBuffer(), lumpSize));
+			stream.SeekStart(lumpPos);
+			stream.ReadAll(arr.GetBuffer(), lumpSize);
 		}
 
 		RKIT_RETURN_OK;
@@ -1503,33 +1503,33 @@ namespace anox { namespace buildsystem
 		rkit::Vector<BSPFaceStats> &faceStats, rkit::Vector<rkit::UniquePtr<priv::LightmapTree>> &lightmapTrees)
 	{
 		rkit::String pathStr;
-		RKIT_CHECK(FormatFaceStatsPath(pathStr, depsNode->GetIdentifier()));
+		FormatFaceStatsPath(pathStr, depsNode->GetIdentifier());
 
 		rkit::CIPath path;
-		RKIT_CHECK(path.Set(pathStr));
+		path.Set(pathStr);
 
 		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
-		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, path, stream));
+		feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, path, stream);
 
 		FaceStatsHeader header;
-		RKIT_CHECK(stream->ReadAll(&header, sizeof(header)));
+		stream->ReadAll(&header, sizeof(header));
 
-		RKIT_CHECK(faceStats.Resize(header.m_numFaces));
-		RKIT_CHECK(lightmapTrees.Resize(header.m_numLightmapTrees));
+		faceStats.Resize(header.m_numFaces);
+		lightmapTrees.Resize(header.m_numLightmapTrees);
 
-		RKIT_CHECK(stream->ReadAll(faceStats.GetBuffer(), faceStats.Count() * sizeof(BSPFaceStats)));
+		stream->ReadAll(faceStats.GetBuffer(), faceStats.Count() * sizeof(BSPFaceStats));
 
 		for (size_t i = 0; i < lightmapTrees.Count(); i++)
 		{
 			LightmapTreeSerializedBlock block = {};
-			RKIT_CHECK(stream->ReadAll(&block, sizeof(block)));
+			stream->ReadAll(&block, sizeof(block));
 
 			rkit::UniquePtr<priv::LightmapTree> tree;
-			RKIT_CHECK(rkit::New<priv::LightmapTree>(tree));
+			rkit::New<priv::LightmapTree>(tree);
 
-			RKIT_CHECK(tree->m_nodes.Resize(block.m_numNodes));
+			tree->m_nodes.Resize(block.m_numNodes);
 			tree->m_expansionLevel = block.m_expansionLevel;
-			RKIT_CHECK(stream->ReadAll(tree->m_nodes.GetBuffer(), tree->m_nodes.Count() * sizeof(priv::LightmapTreeNode)));
+			stream->ReadAll(tree->m_nodes.GetBuffer(), tree->m_nodes.Count() * sizeof(priv::LightmapTreeNode));
 
 			lightmapTrees[i] = std::move(tree);
 		}
@@ -1541,7 +1541,7 @@ namespace anox { namespace buildsystem
 	{
 		rkit::math::SoftFloat80 rcp16(0.0625);
 
-		RKIT_CHECK(faceStatsVector.Resize(bsp.m_faces.Count()));
+		faceStatsVector.Resize(bsp.m_faces.Count());
 
 		// Have to use emulated XPFloats to compute this exactly
 		for (size_t faceIndex = 0; faceIndex < bsp.m_faces.Count(); faceIndex++)
@@ -1720,7 +1720,7 @@ namespace anox { namespace buildsystem
 			priv::LightmapIdentifier ident = {};
 			ident.m_faceIndex = static_cast<uint32_t>(faceIndex);
 			ident.m_uniqueStyleIndex = 0;
-			RKIT_CHECK(InsertNodeIntoLightmapTreeList(ident, stats.m_lightmapDimensions[0], stats.m_lightmapDimensions[1] * stats.m_numUniqueStyles, xAxisDominant, stack, lightmapTrees));
+			InsertNodeIntoLightmapTreeList(ident, stats.m_lightmapDimensions[0], stats.m_lightmapDimensions[1] * stats.m_numUniqueStyles, xAxisDominant, stack, lightmapTrees);
 #else
 			for (uint8_t styleIndex = 0; styleIndex < 4; styleIndex++)
 			{
@@ -1730,7 +1730,7 @@ namespace anox { namespace buildsystem
 				priv::LightmapIdentifier ident = {};
 				ident.m_faceIndex = static_cast<uint32_t>(faceIndex);
 				ident.m_styleIndex = styleIndex;
-				RKIT_CHECK(InsertNodeIntoLightmapTreeList(ident, stats.m_lightmapDimensions[0], stats.m_lightmapDimensions[1], xAxisDominant, stack, lightmapTrees));
+				InsertNodeIntoLightmapTreeList(ident, stats.m_lightmapDimensions[0], stats.m_lightmapDimensions[1], xAxisDominant, stack, lightmapTrees);
 			}
 #endif
 		}
@@ -1749,7 +1749,7 @@ namespace anox { namespace buildsystem
 			{
 				priv::LightmapTree &lastTree = *lightmapTrees[lightmapTrees.Count() - 1];
 				rkit::Optional<size_t> insertedIndex;
-				RKIT_CHECK(InsertNodeIntoExpandableLightmapTree(width, height, xAxisDominant, stack, lastTree, insertedIndex));
+				InsertNodeIntoExpandableLightmapTree(width, height, xAxisDominant, stack, lastTree, insertedIndex);
 
 				if (insertedIndex.IsSet())
 				{
@@ -1761,10 +1761,10 @@ namespace anox { namespace buildsystem
 			}
 
 			rkit::UniquePtr<priv::LightmapTree> newTree;
-			RKIT_CHECK(rkit::New<priv::LightmapTree>(newTree));
-			RKIT_CHECK(InitLightmapTree(*newTree, 0, xAxisDominant));
+			rkit::New<priv::LightmapTree>(newTree);
+			InitLightmapTree(*newTree, 0, xAxisDominant);
 
-			RKIT_CHECK(lightmapTrees.Append(std::move(newTree)));
+			lightmapTrees.Append(std::move(newTree));
 		}
 
 		RKIT_THROW(rkit::ResultCode::kInternalError);
@@ -1787,7 +1787,7 @@ namespace anox { namespace buildsystem
 		rootNode.m_width = width;
 		rootNode.m_height = height;
 
-		RKIT_CHECK(tree.m_nodes.Append(rootNode));
+		tree.m_nodes.Append(rootNode);
 		tree.m_expansionLevel = expansionLevel;
 
 		RKIT_RETURN_OK;
@@ -1801,7 +1801,7 @@ namespace anox { namespace buildsystem
 				continue;
 
 			rkit::Optional<size_t> newIndex;
-			RKIT_CHECK(InsertNodeIntoLightmapTree(oldNode.m_width, oldNode.m_height, stack, newTree, newIndex));
+			InsertNodeIntoLightmapTree(oldNode.m_width, oldNode.m_height, stack, newTree, newIndex);
 			if (!newIndex.IsSet())
 			{
 				outCopiedOK = false;
@@ -1831,13 +1831,13 @@ namespace anox { namespace buildsystem
 				treeToInsertInto = &tree;
 			else
 			{
-				RKIT_CHECK(InitLightmapTree(replacementTree, tryExpansionLevel, xAxisDominant));
+				InitLightmapTree(replacementTree, tryExpansionLevel, xAxisDominant);
 
 				bool copiedOK = false;
 
 				if (replacementTree.m_nodes[0].m_width >= width && replacementTree.m_nodes[0].m_height >= height)
 				{
-					RKIT_CHECK(CopyLightmapTree(replacementTree, tree, stack, copiedOK));
+					CopyLightmapTree(replacementTree, tree, stack, copiedOK);
 
 					if (copiedOK)
 						treeToInsertInto = &replacementTree;
@@ -1846,7 +1846,7 @@ namespace anox { namespace buildsystem
 
 			if (treeToInsertInto)
 			{
-				RKIT_CHECK(InsertNodeIntoLightmapTree(width, height, stack, *treeToInsertInto, outInsertedIndex));
+				InsertNodeIntoLightmapTree(width, height, stack, *treeToInsertInto, outInsertedIndex);
 
 				if (outInsertedIndex.IsSet())
 				{
@@ -1879,7 +1879,7 @@ namespace anox { namespace buildsystem
 				{
 					if (stackDepth == stack.Count())
 					{
-						RKIT_CHECK(stack.Append(0));
+						stack.Append(0);
 					}
 
 					stack[stackDepth++] = node.m_children[1];
@@ -1936,13 +1936,13 @@ namespace anox { namespace buildsystem
 				{
 					priv::LightmapTreeNode newNode = baseNewNode;
 					newNode.m_width = width;
-					RKIT_CHECK(tree.m_nodes.Append(newNode));
+					tree.m_nodes.Append(newNode);
 				}
 				{
 					priv::LightmapTreeNode newNode = baseNewNode;
 					newNode.m_x += width;
 					newNode.m_width -= width;
-					RKIT_CHECK(tree.m_nodes.Append(newNode));
+					tree.m_nodes.Append(newNode);
 				}
 			}
 			else
@@ -1950,13 +1950,13 @@ namespace anox { namespace buildsystem
 				{
 					priv::LightmapTreeNode newNode = baseNewNode;
 					newNode.m_height = height;
-					RKIT_CHECK(tree.m_nodes.Append(newNode));
+					tree.m_nodes.Append(newNode);
 				}
 				{
 					priv::LightmapTreeNode newNode = baseNewNode;
 					newNode.m_y += height;
 					newNode.m_height -= height;
-					RKIT_CHECK(tree.m_nodes.Append(newNode));
+					tree.m_nodes.Append(newNode);
 				}
 			}
 
@@ -1982,7 +1982,7 @@ namespace anox { namespace buildsystem
 
 		leafUsedBits.Set(leafIndex, true);
 
-		RKIT_CHECK(leafOrder.Append(leafIndex));
+		leafOrder.Append(leafIndex);
 
 		RKIT_RETURN_OK;
 	}
@@ -2114,7 +2114,7 @@ namespace anox { namespace buildsystem
 		for (int pointIndex = 0; pointIndex < 3; pointIndex++)
 			bestTri[pointIndex] = winding[bestTriplet[pointIndex]];
 
-		RKIT_CHECK(outTris.Append(bestTri));
+		outTris.Append(bestTri);
 
 		// Add sub-windings
 		for (int firstPointIndex = 0; firstPointIndex < 3; firstPointIndex++)
@@ -2127,7 +2127,7 @@ namespace anox { namespace buildsystem
 			const size_t slicedWindingSize = (secondPointWrapped - firstPoint) + 1u;
 			if (slicedWindingSize >= 3)
 			{
-				RKIT_CHECK(OptimizeWinding(WrappingVertSpan(winding, firstPoint, slicedWindingSize), outTris, depth + 1));
+				OptimizeWinding(WrappingVertSpan(winding, firstPoint, slicedWindingSize), outTris, depth + 1);
 			}
 		}
 
@@ -2147,7 +2147,7 @@ namespace anox { namespace buildsystem
 				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
-			RKIT_CHECK(normalLookup.Set(normal, newIndex));
+			normalLookup.Set(normal, newIndex);
 
 			outNormalIndex = static_cast<uint32_t>(newIndex);
 		}
@@ -2159,7 +2159,7 @@ namespace anox { namespace buildsystem
 		rkit::HashMap<IndexedNormal_t, size_t> &normalLookup, const IndexedNormal_t &normal, uint32_t distBits)
 	{
 		uint32_t normalIndex = 0;
-		RKIT_CHECK(IndexNonFlippableNormal(normalIndex, normalLookup, normal));
+		IndexNonFlippableNormal(normalIndex, normalLookup, normal);
 
 		IndexedPlane_t planeKey = {};
 		planeKey.m_values[0] = normalIndex;
@@ -2177,7 +2177,7 @@ namespace anox { namespace buildsystem
 				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
-			RKIT_CHECK(planeLookup.Set(planeKey, newIndex));
+			planeLookup.Set(planeKey, newIndex);
 
 			planeIndex = static_cast<uint32_t>(newIndex);
 		}
@@ -2202,7 +2202,7 @@ namespace anox { namespace buildsystem
 		distBits = SanitizeFloatBits(distBits);
 
 		uint32_t planeIndex = 0;
-		RKIT_CHECK(IndexNonFlippablePlane(planeIndex, planeLookup, normalLookup, indexedNormal, distBits));
+		IndexNonFlippablePlane(planeIndex, planeLookup, normalLookup, indexedNormal, distBits);
 
 		planeIndex <<= 1;
 		if (isNegated)
@@ -2238,7 +2238,7 @@ namespace anox { namespace buildsystem
 		}
 
 		rkit::Vector<BSPGeometryVertex_t> windingVerts;
-		RKIT_CHECK(windingVerts.Resize(numFaceEdges));
+		windingVerts.Resize(numFaceEdges);
 
 		float rcpLightmapDimensions[2] = {0.f, 0.f};
 		if (stats.m_atlasIndex.IsSet())
@@ -2269,7 +2269,7 @@ namespace anox { namespace buildsystem
 			IndexedNormal_t compressedNormal = {};
 
 			data::CompressNormal64NoNegate(compressedNormal.m_values[0], compressedNormal.m_values[1], isFlipped, normal[0], normal[1], normal[2]);
-			RKIT_CHECK(IndexNonFlippableNormal(flippableNormalIndex, normalLookup, compressedNormal));
+			IndexNonFlippableNormal(flippableNormalIndex, normalLookup, compressedNormal);
 			flippableNormalIndex <<= 1;
 			if (isFlipped)
 				flippableNormalIndex |= 1;
@@ -2369,7 +2369,7 @@ namespace anox { namespace buildsystem
 		}
 
 		rkit::Vector<rkit::StaticArray<BSPGeometryVertex_t, 3>> tris;
-		RKIT_CHECK(OptimizeWinding(windingVerts.ToSpan().ToConstRefISpan(), tris, 0));
+		OptimizeWinding(windingVerts.ToSpan().ToConstRefISpan(), tris, 0);
 
 		size_t oldVertCount = geoCluster.m_verts.Count();
 
@@ -2389,7 +2389,7 @@ namespace anox { namespace buildsystem
 						RKIT_RETURN_OK;
 					}
 
-					RKIT_CHECK(lookups.m_vertLookup.Set(vert, lookups.m_vertLookup.Count()));
+					lookups.m_vertLookup.Set(vert, lookups.m_vertLookup.Count());
 				}
 			}
 		}
@@ -2414,7 +2414,7 @@ namespace anox { namespace buildsystem
 
 				if (vertIndex == geoCluster.m_verts.Count())
 				{
-					RKIT_CHECK(geoCluster.m_verts.Append(vertIt.Key()));
+					geoCluster.m_verts.Append(vertIt.Key());
 				}
 
 				sortedIndexes[pointIndex] = static_cast<uint16_t>(vertIndex);
@@ -2427,7 +2427,7 @@ namespace anox { namespace buildsystem
 				rkit::Swap(sortedIndexes[1], sortedIndexes[0]);
 			}
 
-			RKIT_CHECK(geoCluster.m_indexes.Append(sortedIndexes.ToSpan()));
+			geoCluster.m_indexes.Append(sortedIndexes.ToSpan());
 		}
 
 		RKIT_ASSERT(geoCluster.m_verts.Count() == lookups.m_vertLookup.Count());
@@ -2443,7 +2443,7 @@ namespace anox { namespace buildsystem
 		rface.m_originalFaceIndex = originalFaceIndex;
 		rface.m_mergeWidth = 1;
 
-		RKIT_CHECK(geoCluster.m_faces.Append(rface));
+		geoCluster.m_faces.Append(rface);
 
 		RKIT_RETURN_OK;
 	}
@@ -2468,12 +2468,12 @@ namespace anox { namespace buildsystem
 		rkit::BoolVector faceUsedBits;
 		rkit::BoolVector brushUsedBits;
 
-		RKIT_CHECK(leafUsedBits.Resize(bsp.m_leafs.Count()));
-		RKIT_CHECK(nodeUsedBits.Resize(bsp.m_nodes.Count()));
-		RKIT_CHECK(faceUsedBits.Resize(bsp.m_faces.Count()));
-		RKIT_CHECK(brushUsedBits.Resize(bsp.m_brushes.Count()));
+		leafUsedBits.Resize(bsp.m_leafs.Count());
+		nodeUsedBits.Resize(bsp.m_nodes.Count());
+		faceUsedBits.Resize(bsp.m_faces.Count());
+		brushUsedBits.Resize(bsp.m_brushes.Count());
 
-		RKIT_CHECK(leafModel.Resize(bsp.m_leafs.Count()));
+		leafModel.Resize(bsp.m_leafs.Count());
 
 		// Index axial planes first
 		for (uint32_t axis = 0; axis < 3; axis++)
@@ -2487,7 +2487,7 @@ namespace anox { namespace buildsystem
 			data::CompressNormal64NoNegate(compressedNormal.m_values[0], compressedNormal.m_values[1], negated, normal[0], normal[1], normal[2]);
 
 			uint32_t normalIndex = 0;
-			RKIT_CHECK(IndexNonFlippableNormal(normalIndex, normalLookup, compressedNormal));
+			IndexNonFlippableNormal(normalIndex, normalLookup, compressedNormal);
 
 			RKIT_ASSERT(normalIndex == axis);
 		}
@@ -2506,7 +2506,7 @@ namespace anox { namespace buildsystem
 
 			if (headNode < 0)
 			{
-				RKIT_CHECK(ScanLeaf(bsp, leafOrder, leafUsedBits, headNode));
+				ScanLeaf(bsp, leafOrder, leafUsedBits, headNode);
 			}
 			else
 			{
@@ -2521,7 +2521,7 @@ namespace anox { namespace buildsystem
 						RKIT_THROW(rkit::ResultCode::kDataError);
 					}
 
-					RKIT_CHECK(nodeOrder.Append(currentNode));
+					nodeOrder.Append(currentNode);
 
 					if (nodeUsedBits[currentNode])
 					{
@@ -2541,7 +2541,7 @@ namespace anox { namespace buildsystem
 					}
 
 					uint32_t outPlaneIndex = 0;
-					RKIT_CHECK(IndexFlippablePlane(outPlaneIndex, planeLookup, normalLookup, bsp.m_planes[inPlaneIndex]));
+					IndexFlippablePlane(outPlaneIndex, planeLookup, normalLookup, bsp.m_planes[inPlaneIndex]);
 
 					int32_t backNode = node.m_back.Get();
 					int32_t frontNode = node.m_front.Get();
@@ -2551,11 +2551,11 @@ namespace anox { namespace buildsystem
 
 					if (frontNode < 0)
 					{
-						RKIT_CHECK(ScanLeaf(bsp, leafOrder, leafUsedBits, frontNode));
+						ScanLeaf(bsp, leafOrder, leafUsedBits, frontNode);
 
 						if (backNode < 0)
 						{
-							RKIT_CHECK(ScanLeaf(bsp, leafOrder, leafUsedBits, backNode));
+							ScanLeaf(bsp, leafOrder, leafUsedBits, backNode);
 
 							bool done = (backNodeStack.Count() == 0);
 
@@ -2569,7 +2569,7 @@ namespace anox { namespace buildsystem
 
 								if (nextBackNode < 0)
 								{
-									RKIT_CHECK(ScanLeaf(bsp, leafOrder, leafUsedBits, nextBackNode));
+									ScanLeaf(bsp, leafOrder, leafUsedBits, nextBackNode);
 								}
 								else
 								{
@@ -2589,7 +2589,7 @@ namespace anox { namespace buildsystem
 					}
 					else
 					{
-						RKIT_CHECK(backNodeStack.Append(backNode));
+						backNodeStack.Append(backNode);
 						currentNode = static_cast<size_t>(frontNode);
 					}
 				}
@@ -2631,7 +2631,7 @@ namespace anox { namespace buildsystem
 				if (!brushUsedBits[brushIndex])
 				{
 					brushUsedBits.Set(brushIndex, true);
-					RKIT_CHECK(brushOrder.Append(brushIndex));
+					brushOrder.Append(brushIndex);
 				}
 			}
 		}
@@ -2663,14 +2663,14 @@ namespace anox { namespace buildsystem
 				}
 
 				uint32_t indexedPlane = 0;
-				RKIT_CHECK(IndexFlippablePlane(indexedPlane, planeLookup, normalLookup, bsp.m_planes[planeIndex]));
+				IndexFlippablePlane(indexedPlane, planeLookup, normalLookup, bsp.m_planes[planeIndex]);
 			}
 		}
 
 		// CAUTION: Keyed by input face, values are output leafs (for sorting)
 		rkit::Vector<rkit::Vector<size_t>> faceLeafs;
 
-		RKIT_CHECK(faceLeafs.Resize(bsp.m_faces.Count()));
+		faceLeafs.Resize(bsp.m_faces.Count());
 
 		// Gather leafs
 		for (size_t outLeafIndex = 0; outLeafIndex < leafOrder.Count(); outLeafIndex++)
@@ -2698,7 +2698,7 @@ namespace anox { namespace buildsystem
 					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
-				RKIT_CHECK(faceLeafs[faceIndex].Append(outLeafIndex));
+				faceLeafs[faceIndex].Append(outLeafIndex);
 
 				if (faceUsedBits[faceIndex])
 				{
@@ -2713,7 +2713,7 @@ namespace anox { namespace buildsystem
 				faceUsedBits.Set(faceIndex, true);
 				faceModelIndex[faceIndex] = modelIndex;
 
-				RKIT_CHECK(faceOrder.Append(faceIndex));
+				faceOrder.Append(faceIndex);
 			}
 		}
 
@@ -2795,17 +2795,17 @@ namespace anox { namespace buildsystem
 			bool emittedIntoLastCluster = false;
 			if (geoClusters.Count() > 0)
 			{
-				RKIT_CHECK(EmitFace(emittedIntoLastCluster, geoClusters[geoClusters.Count() - 1], lookups, normalLookup, faceIndex, stats[faceIndex],
-					faceModelIndex[faceIndex], texInfoToUniqueTexIndex[face.m_texture.Get()], bsp, lightmapDimensions));
+				EmitFace(emittedIntoLastCluster, geoClusters[geoClusters.Count() - 1], lookups, normalLookup, faceIndex, stats[faceIndex],
+					faceModelIndex[faceIndex], texInfoToUniqueTexIndex[face.m_texture.Get()], bsp, lightmapDimensions);
 			}
 
 			if (!emittedIntoLastCluster)
 			{
 				lookups.Clear();
-				RKIT_CHECK(geoClusters.Append(BSPGeometryCluster()));
+				geoClusters.Append(BSPGeometryCluster());
 
-				RKIT_CHECK(EmitFace(emittedIntoLastCluster, geoClusters[geoClusters.Count() - 1], lookups, normalLookup, faceIndex, stats[faceIndex],
-					faceModelIndex[faceIndex], texInfoToUniqueTexIndex[face.m_texture.Get()], bsp, lightmapDimensions));
+				EmitFace(emittedIntoLastCluster, geoClusters[geoClusters.Count() - 1], lookups, normalLookup, faceIndex, stats[faceIndex],
+					faceModelIndex[faceIndex], texInfoToUniqueTexIndex[face.m_texture.Get()], bsp, lightmapDimensions);
 
 				if (!emittedIntoLastCluster)
 				{
@@ -2819,10 +2819,10 @@ namespace anox { namespace buildsystem
 
 		// Key and value are both input face indexes
 		rkit::Vector<size_t> inFaceToOutFace;
-		RKIT_CHECK(inFaceToOutFace.Resize(bsp.m_faces.Count()));
+		inFaceToOutFace.Resize(bsp.m_faces.Count());
 
 		rkit::Vector<size_t> modelPostMergeFaceCount;
-		RKIT_CHECK(modelPostMergeFaceCount.Resize(bsp.m_models.Count()));
+		modelPostMergeFaceCount.Resize(bsp.m_models.Count());
 
 		size_t numFaces = 0;
 		{
@@ -2887,13 +2887,13 @@ namespace anox { namespace buildsystem
 
 		// Generate reorderings
 		rkit::Vector<size_t> inNodeToOutNode;
-		RKIT_CHECK(inNodeToOutNode.Resize(bsp.m_nodes.Count()));
+		inNodeToOutNode.Resize(bsp.m_nodes.Count());
 
 		rkit::Vector<size_t> inLeafToOutLeaf;
-		RKIT_CHECK(inLeafToOutLeaf.Resize(bsp.m_leafs.Count()));
+		inLeafToOutLeaf.Resize(bsp.m_leafs.Count());
 
 		rkit::Vector<size_t> inBrushToOutBrush;
-		RKIT_CHECK(inBrushToOutBrush.Resize(bsp.m_brushes.Count()));
+		inBrushToOutBrush.Resize(bsp.m_brushes.Count());
 
 		for (size_t i = 0; i < leafOrder.Count(); i++)
 			inLeafToOutLeaf[leafOrder[i]] = i;
@@ -2906,11 +2906,11 @@ namespace anox { namespace buildsystem
 			rkit::Vector<rkit::Vector<size_t>> leafDrawFaces;
 			rkit::BoolVector model0FaceEmitted;
 
-			RKIT_CHECK(leafDrawFaces.Resize(numModel0Leafs));
+			leafDrawFaces.Resize(numModel0Leafs);
 
 			const size_t numModel0Faces = (modelPostMergeFaceCount.Count() > 0) ? modelPostMergeFaceCount[0] : 0;
 
-			RKIT_CHECK(model0FaceEmitted.Resize(numModel0Faces));
+			model0FaceEmitted.Resize(numModel0Faces);
 
 			for (size_t inFaceIndex = 0; inFaceIndex < faceLeafs.Count(); inFaceIndex++)
 			{
@@ -2925,7 +2925,7 @@ namespace anox { namespace buildsystem
 				{
 					if (outLeafIndex < numModel0Leafs)
 					{
-						RKIT_CHECK(leafDrawFaces[outLeafIndex].Append(outFaceIndex));
+						leafDrawFaces[outLeafIndex].Append(outFaceIndex);
 					}
 				}
 			}
@@ -2947,7 +2947,7 @@ namespace anox { namespace buildsystem
 							locator.m_drawSurfChunkIndex = faceTagBits.Get().First();
 							locator.m_bits = faceTagBits.Get().Second();
 
-							RKIT_CHECK(bspOutput.m_model0LeafDrawSurfaceLocators.Append(locator));
+							bspOutput.m_model0LeafDrawSurfaceLocators.Append(locator);
 							numDrawSurfaceLocators++;
 						}
 
@@ -2959,25 +2959,25 @@ namespace anox { namespace buildsystem
 					const uint32_t faceBitsChunkIndex = static_cast<uint32_t>(outFaceIndex / 32u);
 					if (!faceTagBits.IsSet() || faceTagBits.Get().First() != faceBitsChunkIndex)
 					{
-						RKIT_CHECK(flushLocator());
+						flushLocator();
 						faceTagBits = rkit::Pair<uint32_t, uint32_t>(faceBitsChunkIndex, 0);
 					}
 
 					faceTagBits.Get().Second() |= (1u << (outFaceIndex % 32u));
 				}
 
-				RKIT_CHECK(flushLocator());
-				RKIT_CHECK(bspOutput.m_model0LeafDrawSurfaceLocatorCounts.Append(rkit::endian::LittleUInt16_t(static_cast<uint16_t>(numDrawSurfaceLocators))));
+				flushLocator();
+				bspOutput.m_model0LeafDrawSurfaceLocatorCounts.Append(rkit::endian::LittleUInt16_t(static_cast<uint16_t>(numDrawSurfaceLocators)));
 			}
 		}
 
 		// Emit all of the geometry
-		RKIT_CHECK(bspOutput.m_treeNodes.Resize(nodeOrder.Count()));
-		RKIT_CHECK(bspOutput.m_treeNodeSplitBits.Resize((nodeOrder.Count() + 3u) / 4u));
-		RKIT_CHECK(bspOutput.m_leafs.Resize(leafOrder.Count()));
-		RKIT_CHECK(bspOutput.m_planes.Resize(planeLookup.Count()));
-		RKIT_CHECK(bspOutput.m_normals.Resize(normalLookup.Count()));
-		RKIT_CHECK(bspOutput.m_brushes.Resize(brushOrder.Count()));
+		bspOutput.m_treeNodes.Resize(nodeOrder.Count());
+		bspOutput.m_treeNodeSplitBits.Resize((nodeOrder.Count() + 3u) / 4u);
+		bspOutput.m_leafs.Resize(leafOrder.Count());
+		bspOutput.m_planes.Resize(planeLookup.Count());
+		bspOutput.m_normals.Resize(normalLookup.Count());
+		bspOutput.m_brushes.Resize(brushOrder.Count());
 
 		// Emit normals
 		for (rkit::HashMapKeyValueView<IndexedNormal_t, const size_t> it : normalLookup)
@@ -3010,7 +3010,7 @@ namespace anox { namespace buildsystem
 			RKIT_ASSERT(nodeUsedBits[inNodeIndex]);
 
 			uint32_t planeIndex = 0;
-			RKIT_CHECK(IndexFlippablePlane(planeIndex, planeLookup, normalLookup, bsp.m_planes[inNode.m_plane.Get()]));
+			IndexFlippablePlane(planeIndex, planeLookup, normalLookup, bsp.m_planes[inNode.m_plane.Get()]);
 
 			for (int axis = 0; axis < 3; axis++)
 			{
@@ -3073,7 +3073,7 @@ namespace anox { namespace buildsystem
 				RKIT_ASSERT(brushUsedBits[inBrushIndex]);
 
 				const rkit::endian::LittleUInt16_t outBrushIndex(static_cast<uint16_t>(inBrushToOutBrush[inBrushIndex]));
-				RKIT_CHECK(bspOutput.m_leafBrushes.Append(outBrushIndex));
+				bspOutput.m_leafBrushes.Append(outBrushIndex);
 			}
 		}
 
@@ -3118,17 +3118,17 @@ namespace anox { namespace buildsystem
 				}
 
 				uint32_t planeIndex = 0;
-				RKIT_CHECK(IndexFlippablePlane(planeIndex, planeLookup, normalLookup, bsp.m_planes[inBrushSide.m_plane.Get()]));
+				IndexFlippablePlane(planeIndex, planeLookup, normalLookup, bsp.m_planes[inBrushSide.m_plane.Get()]);
 
 				outBrushSide.m_plane = planeIndex;
 
-				RKIT_CHECK(bspOutput.m_brushSides.Append(outBrushSide));
+				bspOutput.m_brushSides.Append(outBrushSide);
 			}
 		}
 
 		rkit::Vector<rkit::Vector<data::BSPModelDrawClusterModelGroupRef>> modelDrawClusters;
 
-		RKIT_CHECK(modelDrawClusters.Resize(bsp.m_models.Count()));
+		modelDrawClusters.Resize(bsp.m_models.Count());
 
 		// Emit geometry
 		for (size_t geoClusterIndex = 0; geoClusterIndex < geoClusters.Count(); geoClusterIndex++)
@@ -3154,10 +3154,10 @@ namespace anox { namespace buildsystem
 						modelDrawCluster.m_drawClusterIndex = static_cast<uint32_t>(geoClusterIndex);
 						modelDrawCluster.m_modelGroupIndex = drawCluster.m_numModelGroups;
 
-						RKIT_CHECK(modelDrawClusters[face.m_modelIndex].Append(modelDrawCluster));
+						modelDrawClusters[face.m_modelIndex].Append(modelDrawCluster);
 					}
 
-					RKIT_CHECK(bspOutput.m_drawModelGroups.Append(data::BSPDrawModelGroup()));
+					bspOutput.m_drawModelGroups.Append(data::BSPDrawModelGroup());
 					modelGroup = &bspOutput.m_drawModelGroups[bspOutput.m_drawModelGroups.Count() - 1];
 
 					drawCluster.m_numModelGroups = drawCluster.m_numModelGroups.Get() + 1;
@@ -3168,7 +3168,7 @@ namespace anox { namespace buildsystem
 
 				if (matGroup == nullptr || face.m_materialIndex != matGroup->m_materialIndex.Get())
 				{
-					RKIT_CHECK(bspOutput.m_materialGroups.Append(data::BSPDrawMaterialGroup()));
+					bspOutput.m_materialGroups.Append(data::BSPDrawMaterialGroup());
 					matGroup = &bspOutput.m_materialGroups[bspOutput.m_materialGroups.Count() - 1];
 					matGroup->m_materialIndex = face.m_materialIndex;
 
@@ -3179,7 +3179,7 @@ namespace anox { namespace buildsystem
 
 				if (lmGroup == nullptr || face.m_atlasIndex != lmGroup->m_atlasIndex.Get())
 				{
-					RKIT_CHECK(bspOutput.m_lightmapGroups.Append(data::BSPDrawLightmapGroup()));
+					bspOutput.m_lightmapGroups.Append(data::BSPDrawLightmapGroup());
 					lmGroup = &bspOutput.m_lightmapGroups[bspOutput.m_lightmapGroups.Count() - 1];
 					lmGroup->m_atlasIndex = face.m_atlasIndex;
 
@@ -3191,11 +3191,11 @@ namespace anox { namespace buildsystem
 				data::BSPDrawSurface drawFace = {};
 				drawFace.m_numTris = face.m_numTris;
 
-				RKIT_CHECK(bspOutput.m_drawSurfaces.Append(drawFace));
+				bspOutput.m_drawSurfaces.Append(drawFace);
 
 				for (uint16_t index : geoCluster.m_indexes.ToSpan().SubSpan(face.m_firstTri * 3, face.m_numTris * 3))
 				{
-					RKIT_CHECK(bspOutput.m_drawTriIndexes.Append(rkit::endian::LittleUInt16_t(index)));
+					bspOutput.m_drawTriIndexes.Append(rkit::endian::LittleUInt16_t(index));
 				}
 			}
 
@@ -3214,13 +3214,13 @@ namespace anox { namespace buildsystem
 				outVert.m_lightUV[1] = rkit::endian::LittleFloat32_t::FromBits(bspVert.m_values[6]);
 				outVert.m_normal = bspVert.m_values[7];
 
-				RKIT_CHECK(bspOutput.m_drawVerts.Append(outVert));
+				bspOutput.m_drawVerts.Append(outVert);
 			}
 
-			RKIT_CHECK(bspOutput.m_drawClusters.Append(drawCluster));
+			bspOutput.m_drawClusters.Append(drawCluster);
 		}
 
-		RKIT_CHECK(bspOutput.m_models.Resize(bsp.m_models.Count()));
+		bspOutput.m_models.Resize(bsp.m_models.Count());
 
 		for (size_t modelIndex = 0; modelIndex < bsp.m_models.Count(); modelIndex++)
 		{
@@ -3241,7 +3241,7 @@ namespace anox { namespace buildsystem
 			outModel.m_numModelDrawClusterModelGroups = static_cast<uint32_t>(drawClusters.Count());
 			outModel.m_rootIsLeaf = (inModel.m_headNode.Get() < 0) ? 1 : 0;
 
-			RKIT_CHECK(bspOutput.m_modelDrawClusterModelGroupRefs.Append(drawClusters.ToSpan()));
+			bspOutput.m_modelDrawClusterModelGroupRefs.Append(drawClusters.ToSpan());
 		}
 
 		RKIT_RETURN_OK;
@@ -3249,23 +3249,23 @@ namespace anox { namespace buildsystem
 
 	rkit::Result BSPMapCompilerBase2::BuildMaterials(data::BSPDataChunksVectors &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
-		RKIT_CHECK(bspOutput.m_materials.Resize(paths.Count()));
+		bspOutput.m_materials.Resize(paths.Count());
 
 		for (size_t materialIndex = 0; materialIndex < paths.Count(); materialIndex++)
 		{
 			const rkit::CIPath &path = paths[materialIndex];
 
 			rkit::String materialIdentifier;
-			RKIT_CHECK(BSPMapCompiler::FormatWorldMaterialPath(materialIdentifier, path.ToString()));
+			BSPMapCompiler::FormatWorldMaterialPath(materialIdentifier, path.ToString());
 
 			rkit::CIPath compiledMaterialPath;
-			RKIT_CHECK(MaterialCompiler::ConstructOutputPath(compiledMaterialPath, data::MaterialResourceType::kWorld, materialIdentifier));
+			MaterialCompiler::ConstructOutputPath(compiledMaterialPath, data::MaterialResourceType::kWorld, materialIdentifier);
 
 			rkit::data::ContentID contentID = {};
 
 			if (path != u8"null")
 			{
-				RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, contentID));
+				feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, contentID);
 			}
 
 			bspOutput.m_materials[materialIndex] = contentID;
@@ -3279,10 +3279,10 @@ namespace anox { namespace buildsystem
 		const rkit::StringView identifier = depsNode->GetIdentifier();
 
 		rkit::CIPath ciPath;
-		RKIT_CHECK(ciPath.Set(identifier));
+		ciPath.Set(identifier);
 
 		rkit::UniquePtr<rkit::ISeekableReadStream> bspStream;
-		RKIT_CHECK(feedback->TryOpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, ciPath, bspStream));
+		feedback->TryOpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, ciPath, bspStream);
 
 		if (!bspStream.IsValid())
 		{
@@ -3291,13 +3291,13 @@ namespace anox { namespace buildsystem
 		}
 
 		BSPHeader bspHeader;
-		RKIT_CHECK(bspStream->ReadAll(&bspHeader, sizeof(bspHeader)));
+		bspStream->ReadAll(&bspHeader, sizeof(bspHeader));
 
 		rkit::QuickSort(loaders.begin(), loaders.end(), LumpLoaderSortPred(bspHeader));
 
 		for (const LumpLoader &loader : loaders)
 		{
-			RKIT_CHECK(loader.m_loadLump(loader.m_arr, *bspStream, bspHeader, loader.m_lumpIndex));
+			loader.m_loadLump(loader.m_arr, *bspStream, bspHeader, loader.m_lumpIndex);
 		}
 
 		RKIT_RETURN_OK;
@@ -3344,11 +3344,11 @@ namespace anox { namespace buildsystem
 		bspFile.m_fourCC = data::BSPFile::kFourCC;
 		bspFile.m_version = data::BSPFile::kVersion;
 
-		RKIT_CHECK(outStream.WriteAll(&bspFile, sizeof(bspFile)));
+		outStream.WriteAll(&bspFile, sizeof(bspFile));
 
 		VectorWriterVisitor visitor(outStream);
 
-		RKIT_CHECK(data::BSPDataChunksProcessor::VisitAllChunks(bspOutput, visitor));
+		data::BSPDataChunksProcessor::VisitAllChunks(bspOutput, visitor);
 
 		RKIT_RETURN_OK;
 	}
@@ -3359,14 +3359,14 @@ namespace anox { namespace buildsystem
 		bspFile.m_fourCC = data::BSPFile::kFourCC;
 		bspFile.m_version = data::BSPFile::kVersion;
 
-		RKIT_CHECK(inStream.ReadAll(&bspFile, sizeof(bspFile)));
+		inStream.ReadAll(&bspFile, sizeof(bspFile));
 
 		if (bspFile.m_fourCC.Get() != data::BSPFile::kFourCC
 			|| bspFile.m_version.Get() != data::BSPFile::kVersion)
 			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		VectorReaderVisitor visitor(inStream);
-		RKIT_CHECK(data::BSPDataChunksProcessor::VisitAllChunks(bspData, visitor));
+		data::BSPDataChunksProcessor::VisitAllChunks(bspData, visitor);
 
 		RKIT_RETURN_OK;
 	}
@@ -3376,14 +3376,14 @@ namespace anox { namespace buildsystem
 	{
 		const uint32_t uniqueTextureCount = static_cast<uint32_t>(uniqueTextures.Count());
 
-		RKIT_CHECK(outStream.WriteAll(&uniqueTextureCount, sizeof(uniqueTextureCount)));
+		outStream.WriteAll(&uniqueTextureCount, sizeof(uniqueTextureCount));
 
 		for (const rkit::CIPath &ciPath : uniqueTextures)
 		{
 			const uint32_t nameLength = static_cast<uint32_t>(ciPath.Length());
-			RKIT_CHECK(outStream.WriteAll(&nameLength, sizeof(nameLength)));
+			outStream.WriteAll(&nameLength, sizeof(nameLength));
 
-			RKIT_CHECK(outStream.WriteAll(ciPath.CStr(), nameLength));
+			outStream.WriteAll(ciPath.CStr(), nameLength);
 		}
 
 		RKIT_RETURN_OK;
@@ -3395,26 +3395,26 @@ namespace anox { namespace buildsystem
 
 		uint32_t uniqueTextureCount = 0;
 
-		RKIT_CHECK(inStream.ReadAll(&uniqueTextureCount, sizeof(uniqueTextureCount)));
+		inStream.ReadAll(&uniqueTextureCount, sizeof(uniqueTextureCount));
 
-		RKIT_CHECK(uniqueTextures.Resize(uniqueTextureCount));
+		uniqueTextures.Resize(uniqueTextureCount);
 
 		for (rkit::CIPath &ciPath : uniqueTextures)
 		{
 			uint32_t nameLength = 0;
-			RKIT_CHECK(inStream.ReadAll(&nameLength, sizeof(nameLength)));
+			inStream.ReadAll(&nameLength, sizeof(nameLength));
 
 			if (nameLength > 0)
 			{
 				rkit::StringConstructionBuffer strBuf;
-				RKIT_CHECK(strBuf.Allocate(nameLength));
+				strBuf.Allocate(nameLength);
 
 				const rkit::Span<rkit::Utf8Char_t> strSpan = strBuf.GetSpan();
-				RKIT_CHECK(inStream.ReadAll(strSpan.Ptr(), strSpan.Count()));
+				inStream.ReadAll(strSpan.Ptr(), strSpan.Count());
 
 				rkit::String str(std::move(strBuf));
 
-				RKIT_CHECK(ciPath.Set(str));
+				ciPath.Set(str);
 			}
 		}
 
@@ -3450,13 +3450,13 @@ namespace anox { namespace buildsystem
 		const size_t count = vector.Count();
 		countData = static_cast<uint32_t>(count);
 
-		RKIT_CHECK(m_stream.WriteAll(&countData, sizeof(countData)));
+		m_stream.WriteAll(&countData, sizeof(countData));
 
 		if (vector.Count() > 0)
 		{
 			const void *dataPtr = vector.GetBuffer();
 
-			RKIT_CHECK(m_stream.WriteAll(dataPtr, count * sizeof(T)));
+			m_stream.WriteAll(dataPtr, count * sizeof(T));
 		}
 
 		RKIT_RETURN_OK;
@@ -3472,15 +3472,15 @@ namespace anox { namespace buildsystem
 	rkit::Result BSPMapCompilerBase2::VectorReaderVisitor::VisitMember(rkit::Vector<T> &vector) const
 	{
 		rkit::endian::LittleUInt32_t countData;
-		RKIT_CHECK(m_stream.ReadAll(&countData, sizeof(countData)));
+		m_stream.ReadAll(&countData, sizeof(countData));
 
 		const uint32_t count = countData.Get();
-		RKIT_CHECK(vector.Resize(count));
+		vector.Resize(count);
 
 		if (count > 0)
 		{
 			void *dataPtr = vector.GetBuffer();
-			RKIT_CHECK(m_stream.ReadAll(dataPtr, count * sizeof(T)));
+			m_stream.ReadAll(dataPtr, count * sizeof(T));
 		}
 
 		RKIT_RETURN_OK;
@@ -3494,43 +3494,43 @@ namespace anox { namespace buildsystem
 
 		{
 			rkit::String inPathStr;
-			RKIT_CHECK(FormatGeometryPath(inPathStr, depsNode->GetIdentifier()));
+			FormatGeometryPath(inPathStr, depsNode->GetIdentifier());
 
 			rkit::CIPath inPath;
-			RKIT_CHECK(inPath.Set(inPathStr));
+			inPath.Set(inPathStr);
 
 			rkit::UniquePtr<rkit::ISeekableReadStream> inStream;
-			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, inPath, inStream));
+			feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, inPath, inStream);
 
-			RKIT_CHECK(ReadBSPModel(bspData, *inStream));
+			ReadBSPModel(bspData, *inStream);
 		}
 
 		{
 			rkit::String inPathStr;
-			RKIT_CHECK(FormatMaterialListPath(inPathStr, depsNode->GetIdentifier()));
+			FormatMaterialListPath(inPathStr, depsNode->GetIdentifier());
 
 			rkit::CIPath inPath;
-			RKIT_CHECK(inPath.Set(inPathStr));
+			inPath.Set(inPathStr);
 
 			rkit::UniquePtr<rkit::ISeekableReadStream> inStream;
-			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, inPath, inStream));
+			feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, inPath, inStream);
 
-			RKIT_CHECK(ReadMaterialList(uniqueTextures, *inStream));
+			ReadMaterialList(uniqueTextures, *inStream);
 		}
 
-		RKIT_CHECK(BuildMaterials(bspData, uniqueTextures.ToSpan(), feedback));
+		BuildMaterials(bspData, uniqueTextures.ToSpan(), feedback);
 
 		{
 			rkit::String outPathStr;
-			RKIT_CHECK(FormatModelPath(outPathStr, depsNode->GetIdentifier()));
+			FormatModelPath(outPathStr, depsNode->GetIdentifier());
 
 			rkit::CIPath outPath;
-			RKIT_CHECK(outPath.Set(outPathStr));
+			outPath.Set(outPathStr);
 
 			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
-			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, outPath, outStream));
+			feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, outPath, outStream);
 
-			RKIT_CHECK(WriteBSPModel(bspData, *outStream));
+			WriteBSPModel(bspData, *outStream);
 		}
 
 		RKIT_RETURN_OK;
@@ -3552,7 +3552,7 @@ namespace anox { namespace buildsystem
 			const size_t atlasNumPixels = static_cast<size_t>(atlasWidth) * atlasHeight;
 
 			rkit::Vector<uint8_t> atlasBytes;
-			RKIT_CHECK(atlasBytes.Resize(atlasNumPixels * 4));
+			atlasBytes.Resize(atlasNumPixels * 4);
 
 			// Clear the lightmap data
 			memset(atlasBytes.GetBuffer(), 255, atlasBytes.Count());
@@ -3655,15 +3655,15 @@ namespace anox { namespace buildsystem
 			}
 
 			rkit::String outPathStr;
-			RKIT_CHECK(FormatLightmapPath(outPathStr, depsNode->GetIdentifier(), lmi));
+			FormatLightmapPath(outPathStr, depsNode->GetIdentifier(), lmi);
 
 			rkit::CIPath outPath;
-			RKIT_CHECK(outPath.Set(outPathStr));
+			outPath.Set(outPathStr);
 
 			const rkit::buildsystem::BuildFileLocation outLocation = rkit::buildsystem::BuildFileLocation::kIntermediateDir;
 
 			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
-			RKIT_CHECK(feedback->OpenOutput(outLocation, outPath, outStream));
+			feedback->OpenOutput(outLocation, outPath, outStream);
 
 			rkit::data::DDSHeader ddsHeader = {};
 
@@ -3697,12 +3697,12 @@ namespace anox { namespace buildsystem
 			ddsHeader.m_pixelFormat.m_aBitMask = 0xff000000;
 			ddsHeader.m_caps = rkit::data::DDSCaps::kTexture;
 
-			RKIT_CHECK(outStream->WriteAll(&ddsHeader, sizeof(ddsHeader)));
-			RKIT_CHECK(outStream->WriteAll(atlasBytes.GetBuffer(), atlasBytes.Count()));
+			outStream->WriteAll(&ddsHeader, sizeof(ddsHeader));
+			outStream->WriteAll(atlasBytes.GetBuffer(), atlasBytes.Count());
 
 			outStream.Reset();
 
-			RKIT_CHECK(feedback->IndexCAS(outLocation, outPath, outContentIDs[lmi]));
+			feedback->IndexCAS(outLocation, outPath, outContentIDs[lmi]);
 		}
 
 		RKIT_RETURN_OK;
@@ -3768,7 +3768,7 @@ namespace anox { namespace buildsystem
 	rkit::Result BSPMapCompilerBase::CreateMapCompiler(rkit::UniquePtr<BSPMapCompilerBase> &outCompiler)
 	{
 		rkit::UniquePtr<BSPMapCompiler> bspMapCompiler;
-		RKIT_CHECK(rkit::New<BSPMapCompiler>(bspMapCompiler));
+		rkit::New<BSPMapCompiler>(bspMapCompiler);
 
 		outCompiler = std::move(bspMapCompiler);
 
@@ -3778,7 +3778,7 @@ namespace anox { namespace buildsystem
 	rkit::Result BSPMapCompilerBase::CreateLightingCompiler(rkit::UniquePtr<BSPMapCompilerBase> &outCompiler)
 	{
 		rkit::UniquePtr<BSPLightingCompiler> bspMapCompiler;
-		RKIT_CHECK(rkit::New<BSPLightingCompiler>(bspMapCompiler));
+		rkit::New<BSPLightingCompiler>(bspMapCompiler);
 
 		outCompiler = std::move(bspMapCompiler);
 
@@ -3788,7 +3788,7 @@ namespace anox { namespace buildsystem
 	rkit::Result BSPMapCompilerBase::CreateGeometryCompiler(rkit::UniquePtr<BSPMapCompilerBase> &outCompiler)
 	{
 		rkit::UniquePtr<BSPGeometryCompiler> bspMapCompiler;
-		RKIT_CHECK(rkit::New<BSPGeometryCompiler>(bspMapCompiler));
+		rkit::New<BSPGeometryCompiler>(bspMapCompiler);
 
 		outCompiler = std::move(bspMapCompiler);
 
@@ -3798,7 +3798,7 @@ namespace anox { namespace buildsystem
 	rkit::Result BSPMapCompilerBase::CreateEntityCompiler(rkit::UniquePtr<BSPMapCompilerBase> &outCompiler)
 	{
 		rkit::UniquePtr<BSPEntityCompiler> bspMapCompiler;
-		RKIT_CHECK(rkit::New<BSPEntityCompiler>(bspMapCompiler));
+		rkit::New<BSPEntityCompiler>(bspMapCompiler);
 
 		outCompiler = std::move(bspMapCompiler);
 

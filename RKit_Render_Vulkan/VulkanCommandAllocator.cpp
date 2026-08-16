@@ -100,7 +100,7 @@ namespace rkit::render::vulkan
 	Result VulkanCommandAllocator::OpenCopyCommandBatch(ICopyCommandBatch *&outCommandBatch, bool cpuWaitable)
 	{
 		IComputeCommandBatch *intermediateBatch = nullptr;
-		RKIT_CHECK(TypedOpenCommandBatch(intermediateBatch, cpuWaitable));
+		TypedOpenCommandBatch(intermediateBatch, cpuWaitable);
 
 		outCommandBatch = intermediateBatch;
 		RKIT_RETURN_OK;
@@ -219,7 +219,7 @@ namespace rkit::render::vulkan
 	{
 		VulkanCommandBatchBase *cmdBatch = nullptr;
 
-		RKIT_CHECK(OpenCommandBatch(cmdBatch, cpuWaitable));
+		OpenCommandBatch(cmdBatch, cpuWaitable);
 
 		outCommandBatch = cmdBatch;
 
@@ -234,22 +234,22 @@ namespace rkit::render::vulkan
 		{
 			UniquePtr<VulkanCommandBatchBase> cmdBatch;
 
-			RKIT_CHECK(VulkanCommandBatchBase::Create(cmdBatch, m_device, m_queue, *this));
+			VulkanCommandBatchBase::Create(cmdBatch, m_device, m_queue, *this);
 
 			cmdBatchPtr = cmdBatch.Get();
 
-			RKIT_CHECK(cmdBatchPtr->OpenCommandBatch(cpuWaitable));
+			cmdBatchPtr->OpenCommandBatch(cpuWaitable);
 
-			RKIT_CHECK(m_commandBatches.Append(std::move(cmdBatch)));
+			m_commandBatches.Append(std::move(cmdBatch));
 			m_numAllocatedBatches++;
 		}
 		else
 		{
 			cmdBatchPtr = m_commandBatches[m_numAllocatedBatches].Get();
 
-			RKIT_CHECK(cmdBatchPtr->ResetCommandBatch());
+			cmdBatchPtr->ResetCommandBatch();
 
-			RKIT_CHECK(cmdBatchPtr->OpenCommandBatch(cpuWaitable));
+			cmdBatchPtr->OpenCommandBatch(cpuWaitable);
 
 			m_numAllocatedBatches++;
 		}
@@ -263,9 +263,9 @@ namespace rkit::render::vulkan
 	{
 		UniquePtr<VulkanCommandAllocator> cmdAllocator;
 
-		RKIT_CHECK(New<VulkanCommandAllocator>(cmdAllocator, device, queue, queueType, isBundle));
+		New<VulkanCommandAllocator>(cmdAllocator, device, queue, queueType, isBundle);
 
-		RKIT_CHECK(cmdAllocator->Initialize(queueFamily));
+		cmdAllocator->Initialize(queueFamily);
 
 		outCommandAllocator = std::move(cmdAllocator);
 

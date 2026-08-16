@@ -30,7 +30,7 @@ namespace rkit { namespace data
 
 	rkit::Result DataDriver::InitDriver(const DriverInitParameters *initParams)
 	{
-		RKIT_CHECK(New<RenderDataHandler>(m_renderDataHandler));
+		New<RenderDataHandler>(m_renderDataHandler);
 
 		RKIT_RETURN_OK;
 	}

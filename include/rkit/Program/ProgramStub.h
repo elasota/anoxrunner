@@ -23,7 +23,7 @@ template<class T>
 rkit::Result rkit::ProgramStub<T>::Init(const ModuleInitParameters *)
 {
 	UniquePtr<IProgramDriver> driver;
-	RKIT_CHECK(New<T>(driver));
+	New<T>(driver);
 	GetMutableDrivers().m_programDriver = driver.Detach();
 
 	RKIT_RETURN_OK;

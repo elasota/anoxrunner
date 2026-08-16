@@ -477,23 +477,23 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_CHECK(m_vki.vkEnumeratePhysicalDevices(m_vkInstance, &physicalDeviceCount, nullptr));
 
 		Vector<UniquePtr<IRenderAdapter>> deviceHandles;
-		RKIT_CHECK(deviceHandles.Resize(physicalDeviceCount));
+		deviceHandles.Resize(physicalDeviceCount);
 
 		Vector<VkPhysicalDevice> physDevices;
-		RKIT_CHECK(physDevices.Resize(physicalDeviceCount));
+		physDevices.Resize(physicalDeviceCount);
 
 		RKIT_VK_CHECK(m_vki.vkEnumeratePhysicalDevices(m_vkInstance, &physicalDeviceCount, physDevices.GetBuffer()));
 
-		RKIT_CHECK(adapters.Resize(physicalDeviceCount));
+		adapters.Resize(physicalDeviceCount);
 
 		for (size_t i = 0; i < physicalDeviceCount; i++)
 		{
 			RCPtr<RenderVulkanPhysicalDevice> physDevice;
-			RKIT_CHECK(NewWithAlloc<RenderVulkanPhysicalDevice>(physDevice, m_alloc, physDevices[i]));
-			RKIT_CHECK(physDevice->InitPhysicalDevice(m_vki));
+			NewWithAlloc<RenderVulkanPhysicalDevice>(physDevice, m_alloc, physDevices[i]);
+			physDevice->InitPhysicalDevice(m_vki);
 
 			UniquePtr<IRenderAdapter> adapter;
-			RKIT_CHECK(NewWithAlloc<RenderVulkanAdapter>(adapter, m_alloc, physDevice));
+			NewWithAlloc<RenderVulkanAdapter>(adapter, m_alloc, physDevice);
 
 			adapters[i] = std::move(adapter);
 		}
@@ -593,7 +593,7 @@ namespace rkit { namespace render { namespace vulkan
 				RKIT_THROW(ResultCode::kInvalidParameter);
 			}
 
-			RKIT_CHECK(queueCreateInfos.Append(queueCreateInfo));
+			queueCreateInfos.Append(queueCreateInfo);
 
 			VulkanDeviceBase::QueueFamilySpec &spec = queueFamilySpecs[queueTypeInt];
 			spec.m_queueFamily = queueFamilyIndex;
@@ -603,11 +603,11 @@ namespace rkit { namespace render { namespace vulkan
 		Vector<QueryItem> requestedDeviceExtensions;
 
 
-		RKIT_CHECK(requestedDeviceExtensions.Append(QueryItem(VK_KHR_SWAPCHAIN_EXTENSION_NAME, true)));
+		requestedDeviceExtensions.Append(QueryItem(VK_KHR_SWAPCHAIN_EXTENSION_NAME, true));
 
 		{
 			DeviceExtensionEnumerator enumerator(requestedDeviceExtensions);
-			RKIT_CHECK(platform::AddDeviceExtensions(enumerator));
+			platform::AddDeviceExtensions(enumerator);
 		}
 
 		Vector<const char *> exts;
@@ -616,7 +616,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_CHECK(m_vki.vkEnumerateDeviceExtensionProperties(physDevice, nullptr, &extCount, nullptr));
 
 		Vector<VkExtensionProperties> extProps;
-		RKIT_CHECK(extProps.Resize(extCount));
+		extProps.Resize(extCount);
 
 		RKIT_VK_CHECK(m_vki.vkEnumerateDeviceExtensionProperties(physDevice, nullptr, &extCount, extProps.GetBuffer()));
 
@@ -640,8 +640,8 @@ namespace rkit { namespace render { namespace vulkan
 		{
 			if (queryItem.m_isAvailableInBase || queryItem.m_isAvailableInLayer)
 			{
-				RKIT_CHECK(exts.Append(queryItem.m_name.GetChars()));
-				RKIT_CHECK(enabledExts.Append(queryItem.m_name));
+				exts.Append(queryItem.m_name.GetChars());
+				enabledExts.Append(queryItem.m_name);
 			}
 			else
 			{
@@ -704,12 +704,12 @@ namespace rkit { namespace render { namespace vulkan
 		};
 
 		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
-		RKIT_CHECK(sysDriver.OpenSystemLibrary(m_vkLibrary, SystemLibraryType::kVulkan));
+		sysDriver.OpenSystemLibrary(m_vkLibrary, SystemLibraryType::kVulkan);
 
 		GlobalFunctionResolver resolver(*this, *m_vkLibrary);
 
-		RKIT_CHECK(LoadVulkanAPI(m_vkg, resolver));
-		RKIT_CHECK(LoadVulkanAPI(m_vkg_p, resolver));
+		LoadVulkanAPI(m_vkg, resolver);
+		LoadVulkanAPI(m_vkg_p, resolver);
 
 		RKIT_RETURN_OK;
 	}
@@ -739,12 +739,12 @@ namespace rkit { namespace render { namespace vulkan
 		};
 
 		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
-		RKIT_CHECK(sysDriver.OpenSystemLibrary(m_vkLibrary, SystemLibraryType::kVulkan));
+		sysDriver.OpenSystemLibrary(m_vkLibrary, SystemLibraryType::kVulkan);
 
 		InstanceFunctionResolver resolver(*this, m_vkInstance);
 
-		RKIT_CHECK(LoadVulkanAPI(m_vki, resolver));
-		RKIT_CHECK(LoadVulkanAPI(m_vki_p, resolver));
+		LoadVulkanAPI(m_vki, resolver);
+		LoadVulkanAPI(m_vki_p, resolver);
 
 		RKIT_RETURN_OK;
 	}
@@ -759,14 +759,14 @@ namespace rkit { namespace render { namespace vulkan
 
 		if (propertyCount > 0)
 		{
-			RKIT_CHECK(extEnum.m_extensions.Resize(propertyCount));
+			extEnum.m_extensions.Resize(propertyCount);
 
 			if (propertyCount != 0)
 			{
 				RKIT_VK_CHECK(m_vkg.vkEnumerateInstanceExtensionProperties(layerName, &propertyCount, extEnum.m_extensions.GetBuffer()));
 			}
 
-			RKIT_CHECK(extProperties.Append(std::move(extEnum)));
+			extProperties.Append(std::move(extEnum));
 		}
 
 		RKIT_RETURN_OK;
@@ -776,7 +776,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		uint32_t layerCount = 0;
 		RKIT_VK_CHECK(m_vkg.vkEnumerateInstanceLayerProperties(&layerCount, nullptr));
-		RKIT_CHECK(layerProperties.Resize(layerCount));
+		layerProperties.Resize(layerCount);
 
 		if (layerCount != 0)
 		{
@@ -933,13 +933,13 @@ namespace rkit { namespace render { namespace vulkan
 
 		IUtilitiesDriver &utils = *GetDrivers().m_utilitiesDriver;
 
-		RKIT_CHECK(LoadVulkanGlobalAPI());
+		LoadVulkanGlobalAPI();
 
 		Vector<ExtensionEnumeration> availableExtensions;
-		RKIT_CHECK(EnumerateExtensions(nullptr, availableExtensions));
+		EnumerateExtensions(nullptr, availableExtensions);
 
 		Vector<VkLayerProperties> availableLayers;
-		RKIT_CHECK(EnumerateLayers(availableLayers));
+		EnumerateLayers(availableLayers);
 
 		Vector<QueryItem> requestedLayers;
 		Vector<QueryItem> requestedInstanceExtensions;
@@ -947,22 +947,22 @@ namespace rkit { namespace render { namespace vulkan
 		// Determine required and optional extensions
 		if (initParams->m_validationLevel >= ValidationLevel::kSimple)
 		{
-			RKIT_CHECK(requestedLayers.Append(QueryItem("VK_LAYER_KHRONOS_validation", false)));
-			RKIT_CHECK(requestedInstanceExtensions.Append(QueryItem(VK_EXT_LAYER_SETTINGS_EXTENSION_NAME, false)));
+			requestedLayers.Append(QueryItem("VK_LAYER_KHRONOS_validation", false));
+			requestedInstanceExtensions.Append(QueryItem(VK_EXT_LAYER_SETTINGS_EXTENSION_NAME, false));
 		}
 
 		if (initParams->m_enableLogging)
 		{
-			RKIT_CHECK(requestedInstanceExtensions.Append(QueryItem(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, false)));
+			requestedInstanceExtensions.Append(QueryItem(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, false));
 		}
 
-		RKIT_CHECK(requestedInstanceExtensions.Append(QueryItem(VK_KHR_SURFACE_EXTENSION_NAME, true)));
+		requestedInstanceExtensions.Append(QueryItem(VK_KHR_SURFACE_EXTENSION_NAME, true));
 
 		// Add this after since the enumerator will deduplicate
 		{
 			InstanceExtensionEnumerator enumerator(requestedLayers, requestedInstanceExtensions);
 
-			RKIT_CHECK(platform::AddInstanceExtensions(enumerator));
+			platform::AddInstanceExtensions(enumerator);
 		}
 
 		Vector<const char *> layers;
@@ -990,13 +990,13 @@ namespace rkit { namespace render { namespace vulkan
 					continue;
 			}
 
-			RKIT_CHECK(layers.Append(requestedLayer.m_name.GetChars()));
+			layers.Append(requestedLayer.m_name.GetChars());
 		}
 
 		// Enumerate layer extensions
 		for (const char *layer : layers)
 		{
-			RKIT_CHECK(EnumerateExtensions(layer, availableExtensions));
+			EnumerateExtensions(layer, availableExtensions);
 		}
 
 		// Find all extensions to actually request
@@ -1030,7 +1030,7 @@ namespace rkit { namespace render { namespace vulkan
 
 			if (requestedExtension.m_isAvailableInBase)
 			{
-				RKIT_CHECK(extensions.Append(requestedExtension.m_name.GetChars()));
+				extensions.Append(requestedExtension.m_name.GetChars());
 			}
 		}
 
@@ -1047,7 +1047,7 @@ namespace rkit { namespace render { namespace vulkan
 				{
 					if (requestedExtension.m_name == AsciiStringView::FromCString(availableExtension.extensionName))
 					{
-						RKIT_CHECK(extEnumFinal.m_extensions.Append(requestedExtension.m_name));
+						extEnumFinal.m_extensions.Append(requestedExtension.m_name);
 						break;
 					}
 				}
@@ -1055,12 +1055,12 @@ namespace rkit { namespace render { namespace vulkan
 
 			if (extEnumFinal.m_extensions.Count() > 0)
 			{
-				RKIT_CHECK(m_instanceExtensions.Append(std::move(extEnumFinal)));
+				m_instanceExtensions.Append(std::move(extEnumFinal));
 			}
 		}
 		
 
-		RKIT_CHECK(NewWithAlloc<VulkanAllocationCallbacks>(m_allocationCallbacks, m_alloc, m_alloc));
+		NewWithAlloc<VulkanAllocationCallbacks>(m_allocationCallbacks, m_alloc, m_alloc);
 
 		VkApplicationInfo appInfo = {};
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -1123,10 +1123,10 @@ namespace rkit { namespace render { namespace vulkan
 				layerSetting.pValues = &vkTrue;
 				layerSetting.valueCount = 1;
 
-				RKIT_CHECK(layerSettings.Append(layerSetting));
+				layerSettings.Append(layerSetting);
 
 				layerSetting.pSettingName = "thread_safety";
-				RKIT_CHECK(layerSettings.Append(layerSetting));
+				layerSettings.Append(layerSetting);
 			}
 
 			layerSettingsInfo.pSettings = layerSettings.GetBuffer();
@@ -1146,7 +1146,7 @@ namespace rkit { namespace render { namespace vulkan
 		m_instContext.m_api = &m_vki;
 		m_instContext.m_owner = m_vkInstance;
 
-		RKIT_CHECK(LoadVulkanInstanceAPI());
+		LoadVulkanInstanceAPI();
 
 		RKIT_RETURN_OK;
 	}

@@ -21,17 +21,17 @@ namespace rkit { namespace buildsystem
 	Result CopyFileCompiler::RunCompile(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
 	{
 		CIPath inPath;
-		RKIT_CHECK(inPath.Set(depsNode->GetIdentifier()));
+		inPath.Set(depsNode->GetIdentifier());
 
 		UniquePtr<ISeekableReadStream> inFile;
-		RKIT_CHECK(feedback->OpenInput(BuildFileLocation::kSourceDir, inPath, inFile));
+		feedback->OpenInput(BuildFileLocation::kSourceDir, inPath, inFile);
 
 		CIPath outPath;
-		RKIT_CHECK(outPath.Set(StringSliceView(u8"loose")));
-		RKIT_CHECK(outPath.Append(inPath));
+		outPath.Set(StringSliceView(u8"loose"));
+		outPath.Append(inPath);
 
 		UniquePtr<ISeekableReadWriteStream> outFile;
-		RKIT_CHECK(feedback->OpenOutput(BuildFileLocation::kOutputFiles, outPath, outFile));
+		feedback->OpenOutput(BuildFileLocation::kOutputFiles, outPath, outFile);
 
 		FilePos_t amountRemaining = inFile->GetSize();
 
@@ -42,8 +42,8 @@ namespace rkit { namespace buildsystem
 			if (amountToCopy > amountRemaining)
 				amountToCopy = static_cast<size_t>(amountRemaining);
 
-			RKIT_CHECK(inFile->ReadAll(buffer, amountToCopy));
-			RKIT_CHECK(outFile->WriteAll(buffer, amountToCopy));
+			inFile->ReadAll(buffer, amountToCopy);
+			outFile->WriteAll(buffer, amountToCopy);
 
 			amountRemaining -= static_cast<FilePos_t>(amountToCopy);
 		}

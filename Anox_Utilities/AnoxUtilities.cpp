@@ -42,9 +42,9 @@ rkit::Result anox::UtilitiesDriver::OpenAFSArchive(rkit::UniquePtr<rkit::ISeekab
 	rkit::UniquePtr<rkit::ISeekableReadStream> stream(std::move(streamSrc));
 
 	rkit::UniquePtr<anox::afs::Archive> archive;
-	RKIT_CHECK(rkit::New<anox::afs::Archive>(archive, rkit::GetDrivers().m_mallocDriver.Get()));
+	rkit::New<anox::afs::Archive>(archive, rkit::GetDrivers().m_mallocDriver.Get());
 
-	RKIT_CHECK(archive->Open(std::move(stream), true));
+	archive->Open(std::move(stream), true);
 
 	outArchive = rkit::UniquePtr<anox::afs::IArchive>(std::move(archive));
 
@@ -55,9 +55,9 @@ rkit::Result anox::UtilitiesDriver::OpenAFSArchive(rkit::UniquePtr<rkit::ISeekab
 rkit::Result anox::UtilitiesDriver::RunDataBuild(const rkit::StringView &targetName, const rkit::OSAbsPathView &sourceDir, const rkit::OSAbsPathView &intermedDir, const rkit::OSAbsPathView &dataDir, const rkit::OSAbsPathView &dataSourceDir, rkit::render::BackendType backendType)
 {
 	rkit::UniquePtr<anox::utils::IDataBuilder> dataBuilder;
-	RKIT_CHECK(anox::utils::IDataBuilder::Create(this, dataBuilder));
+	anox::utils::IDataBuilder::Create(this, dataBuilder);
 
-	RKIT_CHECK(dataBuilder->Run(targetName, sourceDir, intermedDir, dataDir, dataSourceDir, backendType));
+	dataBuilder->Run(targetName, sourceDir, intermedDir, dataDir, dataSourceDir, backendType);
 
 	RKIT_RETURN_OK;
 }

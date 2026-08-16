@@ -143,7 +143,7 @@ namespace anox::game
 
 	rkit::Result GameSoundMP3Source::Initialize(rkit::mp3::IMP3Driver &mp3Driver)
 	{
-		RKIT_CHECK(mp3Driver.CreateDecoder(m_decoder));
+		mp3Driver.CreateDecoder(m_decoder);
 
 		(void)GetCurrentAudioFrame();
 
@@ -267,7 +267,7 @@ namespace anox::game
 	rkit::Result GameAudioManagerImpl::CreateSoundSourceFromBytes(uint32_t &outSourceID, rkit::TypelessRCPtr &&keepalive, rkit::Span<const uint8_t> contents, rkit::audio::AudioContainerFormat containerFormat)
 	{
 		rkit::UniquePtr<GameSoundDataSource> dataSrc;
-		RKIT_CHECK(rkit::New<GameSoundBytesDataSource>(dataSrc, std::move(keepalive), contents));
+		rkit::New<GameSoundBytesDataSource>(dataSrc, std::move(keepalive), contents);
 
 		return CreateAudioSourceFromDataSource(outSourceID, std::move(dataSrc), containerFormat);
 	}
@@ -282,8 +282,8 @@ namespace anox::game
 		case rkit::audio::AudioContainerFormat::kMPEGLayer3:
 			{
 				rkit::RCPtr<GameSoundMP3Source> mp3Src;
-				RKIT_CHECK(rkit::New<GameSoundMP3Source>(mp3Src, std::move(dataSource)));
-				RKIT_CHECK(mp3Src->Initialize(*m_mp3Driver));
+				rkit::New<GameSoundMP3Source>(mp3Src, std::move(dataSource));
+				mp3Src->Initialize(*m_mp3Driver);
 
 				src = std::move(mp3Src);
 			}
@@ -310,7 +310,7 @@ namespace anox::game
 		emitterState.m_audioSource = *source;
 
 		uint32_t emitterID = 0;
-		RKIT_CHECK(m_emitters.RegisterObject(emitterID, std::move(emitterState)));
+		m_emitters.RegisterObject(emitterID, std::move(emitterState));
 
 		// If this succeeds, the source ID is invalidated, so this must only happen on complete success
 		RKIT_VERIFY(m_sources.TryDestroyObject(sourceID));
@@ -332,10 +332,10 @@ namespace anox::game
 
 		if (emitterState->m_mixerEmitter == nullptr)
 		{
-			RKIT_CHECK(m_audioSubsystem.CreateEmitter(emitterState->m_mixerEmitter, emitterState->m_audioSource));
+			m_audioSubsystem.CreateEmitter(emitterState->m_mixerEmitter, emitterState->m_audioSource);
 		}
 
-		RKIT_CHECK(m_audioSubsystem.PlayEmitter(emitterState->m_mixerEmitter));
+		m_audioSubsystem.PlayEmitter(emitterState->m_mixerEmitter);
 
 		RKIT_RETURN_OK;
 	}
@@ -373,9 +373,9 @@ namespace anox::game
 	rkit::Result GameAudioManager::Create(rkit::UniquePtr<GameAudioManager> &outAudioManager, AudioSubsystem& audioSubsystem)
 	{
 		rkit::UniquePtr<GameAudioManager> audioManager;
-		RKIT_CHECK(rkit::New<GameAudioManager>(audioManager, audioSubsystem));
+		rkit::New<GameAudioManager>(audioManager, audioSubsystem);
 
-		RKIT_CHECK(audioManager->Impl().Initialize());
+		audioManager->Impl().Initialize();
 
 		outAudioManager = std::move(audioManager);
 

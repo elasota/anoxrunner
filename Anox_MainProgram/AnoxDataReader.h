@@ -147,7 +147,7 @@ namespace anox
 		float floats[TSize] = {};
 		for (size_t i = 0; i < TSize; i++)
 		{
-			RKIT_CHECK(ReadCheckFloat(floats[i], inVec[i], highestExpectedExponent));
+			ReadCheckFloat(floats[i], inVec[i], highestExpectedExponent);
 		}
 
 		for (size_t i = 0; i < TSize; i++)
@@ -162,7 +162,7 @@ namespace anox
 		float floats[TSize] = {};
 		for (size_t i = 0; i < TSize; i++)
 		{
-			RKIT_CHECK(ReadCheckFloat(floats[i], inVec[i], highestExpectedExponent));
+			ReadCheckFloat(floats[i], inVec[i], highestExpectedExponent);
 		}
 
 		outVec = rkit::math::Vec<float, TSize>::FromArray(floats);
@@ -185,7 +185,7 @@ namespace anox
 	inline rkit::Result DataReader::ReadCheckBool(bool &outBool, uint8_t inBool)
 	{
 		uint8_t b = 0;
-		RKIT_CHECK(ReadCheckUInt(b, inBool, 1));
+		ReadCheckUInt(b, inBool, 1);
 		outBool = (b != 0);
 		RKIT_RETURN_OK;
 	}

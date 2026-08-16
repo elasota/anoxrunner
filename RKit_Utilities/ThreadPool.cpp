@@ -145,17 +145,17 @@ namespace rkit { namespace utils
 	{
 		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
 
-		RKIT_CHECK(m_utils.CreateJobQueue(m_jobQueue, GetDrivers().m_mallocDriver.Get()));
+		m_utils.CreateJobQueue(m_jobQueue, GetDrivers().m_mallocDriver.Get());
 
-		RKIT_CHECK(m_threads.Resize(m_numThreads));
+		m_threads.Resize(m_numThreads);
 
 		for (uint32_t i = 0; i < m_numThreads; i++)
 		{
 			Vector<JobType> jobTypes;
 			if (m_numThreads == 1)
 			{
-				RKIT_CHECK(jobTypes.Append(JobType::kIO));
-				RKIT_CHECK(jobTypes.Append(JobType::kNormalPriority));
+				jobTypes.Append(JobType::kIO);
+				jobTypes.Append(JobType::kNormalPriority);
 			}
 			else
 			{
@@ -163,7 +163,7 @@ namespace rkit { namespace utils
 				if (i == 0)
 					jobType = JobType::kIO;
 
-				RKIT_CHECK(jobTypes.Append(jobType));
+				jobTypes.Append(jobType);
 			}
 
 			ThreadData &td = m_threads[i];
@@ -171,18 +171,18 @@ namespace rkit { namespace utils
 			UniquePtr<IEvent> wakeEvent;
 			UniquePtr<IEvent> terminateEvent;
 
-			RKIT_CHECK(sysDriver.CreateEvent(wakeEvent, true, false));
-			RKIT_CHECK(sysDriver.CreateEvent(terminateEvent, true, false));
+			sysDriver.CreateEvent(wakeEvent, true, false);
+			sysDriver.CreateEvent(terminateEvent, true, false);
 
 			UniquePtr<IThreadContext> context;
-			RKIT_CHECK(New<ThreadPoolThreadContext>(context, *this, std::move(jobTypes), std::move(wakeEvent), std::move(terminateEvent)));
+			New<ThreadPoolThreadContext>(context, *this, std::move(jobTypes), std::move(wakeEvent), std::move(terminateEvent));
 
 			String threadName;
 #if RKIT_IS_DEBUG
-			RKIT_CHECK(threadName.Format(u8"Worker {}", static_cast<int>(i)));
+			threadName.Format(u8"Worker {}", static_cast<int>(i));
 #endif
 
-			RKIT_CHECK(GetDrivers().m_systemDriver->CreateThread(td.m_thread, std::move(context), threadName));
+			GetDrivers().m_systemDriver->CreateThread(td.m_thread, std::move(context), threadName);
 		}
 
 		RKIT_RETURN_OK;
@@ -216,8 +216,8 @@ namespace rkit { namespace utils
 	Result ThreadPoolBase::Create(UniquePtr<ThreadPoolBase> &outThreadPool, const IUtilitiesDriver &utils, uint32_t numThreads)
 	{
 		UniquePtr<ThreadPool> threadPool;
-		RKIT_CHECK(New<ThreadPool>(threadPool, utils, numThreads));
-		RKIT_CHECK(threadPool->Initialize());
+		New<ThreadPool>(threadPool, utils, numThreads);
+		threadPool->Initialize();
 
 		outThreadPool = std::move(threadPool);
 

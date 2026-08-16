@@ -171,9 +171,9 @@ namespace rkit { namespace render { namespace vulkan
 		HybridVector<VkBufferMemoryBarrier, 8> bufferMemoryBarriers;
 		HybridVector<VkImageMemoryBarrier, 8> imageMemoryBarriers;
 
-		RKIT_CHECK(memoryBarriers.Reserve(barrierGroup.m_globalBarriers.Count()));
-		RKIT_CHECK(bufferMemoryBarriers.Reserve(barrierGroup.m_bufferMemoryBarriers.Count()));
-		RKIT_CHECK(imageMemoryBarriers.Reserve(barrierGroup.m_imageMemoryBarriers.Count()));
+		memoryBarriers.Reserve(barrierGroup.m_globalBarriers.Count());
+		bufferMemoryBarriers.Reserve(barrierGroup.m_bufferMemoryBarriers.Count());
+		imageMemoryBarriers.Reserve(barrierGroup.m_imageMemoryBarriers.Count());
 
 		for (const GlobalBarrier &globalBarrier : barrierGroup.m_globalBarriers)
 		{
@@ -183,14 +183,14 @@ namespace rkit { namespace render { namespace vulkan
 			VkPipelineStageFlags bSrcStageMask = 0;
 			VkPipelineStageFlags bDstStageMask = 0;
 
-			RKIT_CHECK(VulkanUtils::ConvertBidirectionalPipelineStageBits(bSrcStageMask, bDstStageMask, globalBarrier.m_priorStages, globalBarrier.m_subsequentStages));
-			RKIT_CHECK(VulkanUtils::ConvertResourceAccessBits(memBarrier.srcAccessMask, globalBarrier.m_priorAccess));
-			RKIT_CHECK(VulkanUtils::ConvertResourceAccessBits(memBarrier.dstAccessMask, globalBarrier.m_subsequentAccess));
+			VulkanUtils::ConvertBidirectionalPipelineStageBits(bSrcStageMask, bDstStageMask, globalBarrier.m_priorStages, globalBarrier.m_subsequentStages);
+			VulkanUtils::ConvertResourceAccessBits(memBarrier.srcAccessMask, globalBarrier.m_priorAccess);
+			VulkanUtils::ConvertResourceAccessBits(memBarrier.dstAccessMask, globalBarrier.m_subsequentAccess);
 
 			srcStageMask |= bSrcStageMask;
 			dstStageMask |= bDstStageMask;
 
-			RKIT_CHECK(memoryBarriers.Append(memBarrier));
+			memoryBarriers.Append(memBarrier);
 		}
 
 		for (const BufferMemoryBarrier &bufferBarrier : barrierGroup.m_bufferMemoryBarriers)
@@ -201,9 +201,9 @@ namespace rkit { namespace render { namespace vulkan
 			VkPipelineStageFlags bSrcStageMask = 0;
 			VkPipelineStageFlags bDstStageMask = 0;
 
-			RKIT_CHECK(VulkanUtils::ConvertBidirectionalPipelineStageBits(bSrcStageMask, bDstStageMask, bufferBarrier.m_priorStages, bufferBarrier.m_subsequentStages));
-			RKIT_CHECK(VulkanUtils::ConvertResourceAccessBits(memBarrier.srcAccessMask, bufferBarrier.m_priorAccess));
-			RKIT_CHECK(VulkanUtils::ConvertResourceAccessBits(memBarrier.dstAccessMask, bufferBarrier.m_subsequentAccess));
+			VulkanUtils::ConvertBidirectionalPipelineStageBits(bSrcStageMask, bDstStageMask, bufferBarrier.m_priorStages, bufferBarrier.m_subsequentStages);
+			VulkanUtils::ConvertResourceAccessBits(memBarrier.srcAccessMask, bufferBarrier.m_priorAccess);
+			VulkanUtils::ConvertResourceAccessBits(memBarrier.dstAccessMask, bufferBarrier.m_subsequentAccess);
 
 			srcStageMask |= bSrcStageMask;
 			dstStageMask |= bDstStageMask;
@@ -219,7 +219,7 @@ namespace rkit { namespace render { namespace vulkan
 
 			memBarrier.buffer = static_cast<VulkanBuffer *>(bufferBarrier.m_buffer)->GetVkBuffer();
 
-			RKIT_CHECK(bufferMemoryBarriers.Append(memBarrier));
+			bufferMemoryBarriers.Append(memBarrier);
 		}
 
 		for (const ImageMemoryBarrier &imageBarrier : barrierGroup.m_imageMemoryBarriers)
@@ -230,9 +230,9 @@ namespace rkit { namespace render { namespace vulkan
 			VkPipelineStageFlags bSrcStageMask = 0;
 			VkPipelineStageFlags bDstStageMask = 0;
 
-			RKIT_CHECK(VulkanUtils::ConvertBidirectionalPipelineStageBits(bSrcStageMask, bDstStageMask, imageBarrier.m_priorStages, imageBarrier.m_subsequentStages));
-			RKIT_CHECK(VulkanUtils::ConvertResourceAccessBits(memBarrier.srcAccessMask, imageBarrier.m_priorAccess));
-			RKIT_CHECK(VulkanUtils::ConvertResourceAccessBits(memBarrier.dstAccessMask, imageBarrier.m_subsequentAccess));
+			VulkanUtils::ConvertBidirectionalPipelineStageBits(bSrcStageMask, bDstStageMask, imageBarrier.m_priorStages, imageBarrier.m_subsequentStages);
+			VulkanUtils::ConvertResourceAccessBits(memBarrier.srcAccessMask, imageBarrier.m_priorAccess);
+			VulkanUtils::ConvertResourceAccessBits(memBarrier.dstAccessMask, imageBarrier.m_subsequentAccess);
 
 			srcStageMask |= bSrcStageMask;
 			dstStageMask |= bDstStageMask;
@@ -242,7 +242,7 @@ namespace rkit { namespace render { namespace vulkan
 
 			if (imageBarrier.m_planes.IsSet())
 			{
-				RKIT_CHECK(VulkanUtils::ConvertImagePlaneBits(memBarrier.subresourceRange.aspectMask, imageBarrier.m_planes.Get()));
+				VulkanUtils::ConvertImagePlaneBits(memBarrier.subresourceRange.aspectMask, imageBarrier.m_planes.Get());
 			}
 			else
 				memBarrier.subresourceRange.aspectMask = static_cast<VulkanImageContainer *>(imageBarrier.m_image)->GetAllAspectFlags();
@@ -252,18 +252,18 @@ namespace rkit { namespace render { namespace vulkan
 			memBarrier.subresourceRange.baseArrayLayer = imageBarrier.m_firstArrayElement;
 			memBarrier.subresourceRange.layerCount = imageBarrier.m_numArrayElements.IsSet() ? imageBarrier.m_numArrayElements.Get() : VK_REMAINING_ARRAY_LAYERS;
 
-			RKIT_CHECK(VulkanUtils::ConvertImageLayout(memBarrier.oldLayout, imageBarrier.m_priorLayout));
-			RKIT_CHECK(VulkanUtils::ConvertImageLayout(memBarrier.newLayout, imageBarrier.m_subsequentLayout));
+			VulkanUtils::ConvertImageLayout(memBarrier.oldLayout, imageBarrier.m_priorLayout);
+			VulkanUtils::ConvertImageLayout(memBarrier.newLayout, imageBarrier.m_subsequentLayout);
 
 			memBarrier.image = static_cast<VulkanImageContainer *>(imageBarrier.m_image)->GetVkImage();
 
-			RKIT_CHECK(imageMemoryBarriers.Append(memBarrier));
+			imageMemoryBarriers.Append(memBarrier);
 		}
 
-		RKIT_CHECK(m_batch.CloseRenderPass());
+		m_batch.CloseRenderPass();
 
 		VkCommandBuffer cmdBuffer;
-		RKIT_CHECK(m_batch.OpenCommandBuffer(cmdBuffer));
+		m_batch.OpenCommandBuffer(cmdBuffer);
 
 		VulkanDeviceBase &device = m_batch.GetDevice();
 		m_batch.GetDevice().GetDeviceAPI().vkCmdPipelineBarrier(cmdBuffer, srcStageMask, dstStageMask, depsFlags,
@@ -297,16 +297,16 @@ namespace rkit { namespace render { namespace vulkan
 		ImageLayout imageLayout, uint32_t mipLevel, uint32_t arrayLayer, ImagePlane plane)
 	{
 		VkImageLayout vkImageLayout;
-		RKIT_CHECK(VulkanUtils::ConvertImageLayout(vkImageLayout, imageLayout));
+		VulkanUtils::ConvertImageLayout(vkImageLayout, imageLayout);
 
 		VkImageAspectFlags aspectMask = 0;
-		RKIT_CHECK(VulkanUtils::ConvertImagePlaneBits(aspectMask, ImagePlaneMask_t({ plane })));
+		VulkanUtils::ConvertImagePlaneBits(aspectMask, ImagePlaneMask_t({ plane }));
 
 		uint32_t blockSizeBytes = 0;
 		uint32_t blockWidth = 0;
 		uint32_t blockHeight = 0;
 		uint32_t blockDepth = 0;
-		RKIT_CHECK(VulkanUtils::GetTextureFormatCharacteristics(bufferFootprint.m_format, blockSizeBytes, blockWidth, blockHeight, blockDepth));
+		VulkanUtils::GetTextureFormatCharacteristics(bufferFootprint.m_format, blockSizeBytes, blockWidth, blockHeight, blockDepth);
 
 		RKIT_ASSERT(bufferFootprint.m_rowPitch % blockSizeBytes == 0);
 
@@ -326,7 +326,7 @@ namespace rkit { namespace render { namespace vulkan
 		bufferImageCopy.imageExtent.depth = destRect.m_depth;
 
 		VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
-		RKIT_CHECK(m_batch.OpenCommandBuffer(cmdBuffer));
+		m_batch.OpenCommandBuffer(cmdBuffer);
 
 		VulkanDeviceBase &device = m_batch.GetDevice();
 		device.GetDeviceAPI().vkCmdCopyBufferToImage(cmdBuffer,
@@ -343,7 +343,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_ASSERT(size != 0);
 
 		VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
-		RKIT_CHECK(m_batch.OpenCommandBuffer(cmdBuffer));
+		m_batch.OpenCommandBuffer(cmdBuffer);
 
 		const VkBuffer srcBuffer = static_cast<VulkanBuffer &>(srcResource).GetVkBuffer();
 		const VkBuffer destBuffer = static_cast<VulkanBuffer &>(destResource).GetVkBuffer();
@@ -381,7 +381,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		VkPipelineStageFlags stageFlags = 0;
 
-		RKIT_CHECK(m_batch.AddWaitForVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetAcquireSema(), subsequentStages));
+		m_batch.AddWaitForVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetAcquireSema(), subsequentStages);
 
 		RKIT_RETURN_OK;
 	}
@@ -390,7 +390,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		VkPipelineStageFlags stageFlags = 0;
 
-		RKIT_CHECK(m_batch.AddSignalVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetPresentSema()));
+		m_batch.AddSignalVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetPresentSema());
 
 		RKIT_RETURN_OK;
 	}
@@ -416,8 +416,8 @@ namespace rkit { namespace render { namespace vulkan
 		const ImageRect2D *rectsPtr = rects.Ptr();
 
 
-		RKIT_CHECK(clearRects.Resize(numRects));
-		RKIT_CHECK(clearAttachments.Resize(numRTs + numDSTs));
+		clearRects.Resize(numRects);
+		clearAttachments.Resize(numRTs + numDSTs);
 
 		for (size_t i = 0; i < numRects; i++)
 		{
@@ -457,7 +457,7 @@ namespace rkit { namespace render { namespace vulkan
 				clearAttachment.aspectMask = m_rpi->GetImageAspectFlagsForDSV();
 			else
 			{
-				RKIT_CHECK(VulkanUtils::ConvertImagePlaneBits(clearAttachment.aspectMask, depthStencilClear->m_planes.Get()));
+				VulkanUtils::ConvertImagePlaneBits(clearAttachment.aspectMask, depthStencilClear->m_planes.Get());
 			}
 
 			clearAttachment.colorAttachment = m_rpi->GetDSVAttachmentIndex();
@@ -466,7 +466,7 @@ namespace rkit { namespace render { namespace vulkan
 		}
 
 		VkCommandBuffer cmdBuffer;
-		RKIT_CHECK(m_batch.OpenRenderPass(cmdBuffer, *m_rpi));
+		m_batch.OpenRenderPass(cmdBuffer, *m_rpi);
 
 		device.GetDeviceAPI().vkCmdClearAttachments(cmdBuffer, static_cast<uint32_t>(clearAttachments.Count()), clearAttachments.GetBuffer(), static_cast<uint32_t>(clearRects.Count()), clearRects.GetBuffer());
 
@@ -542,7 +542,7 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanCommandBatch::Submit()
 	{
-		RKIT_CHECK(CloseBatch());
+		CloseBatch();
 
 		if (m_submits.Count() == 0 && m_completionFence == VK_NULL_HANDLE)
 			RKIT_RETURN_OK;
@@ -596,15 +596,15 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanCommandBatch::CloseBatch()
 	{
-		RKIT_CHECK(StartNewEncoder(EncoderType::kNone));
-		RKIT_CHECK(CheckCloseCommandList());
+		StartNewEncoder(EncoderType::kNone);
+		CheckCloseCommandList();
 
 		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandBatch::OpenCopyCommandEncoder(ICopyCommandEncoder *&outCopyCommandEncoder)
 	{
-		RKIT_CHECK(StartNewEncoder(EncoderType::kCopy));
+		StartNewEncoder(EncoderType::kCopy);
 
 		outCopyCommandEncoder = &m_copyCommandEncoder;
 
@@ -618,9 +618,9 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanCommandBatch::OpenGraphicsCommandEncoder(IGraphicsCommandEncoder *&outGraphicsCommandEncoder, IRenderPassInstance &rpi)
 	{
-		RKIT_CHECK(StartNewEncoder(EncoderType::kGraphics));
+		StartNewEncoder(EncoderType::kGraphics);
 
-		RKIT_CHECK(m_graphicsCommandEncoder.OpenEncoder(rpi));
+		m_graphicsCommandEncoder.OpenEncoder(rpi);
 
 		outGraphicsCommandEncoder = &m_graphicsCommandEncoder;
 
@@ -642,7 +642,7 @@ namespace rkit { namespace render { namespace vulkan
 		VkSubmitInfo *submitItem = nullptr;
 		if (m_submits.Count() > 0)
 		{
-			RKIT_CHECK(CheckCloseCommandList());
+			CheckCloseCommandList();
 
 			submitItem = &m_submits[m_submits.Count() - 1];
 			if (submitItem->commandBufferCount > 0 || submitItem->signalSemaphoreCount > 0)
@@ -651,13 +651,13 @@ namespace rkit { namespace render { namespace vulkan
 
 		if (!submitItem)
 		{
-			RKIT_CHECK(CreateNewSubmitItem(submitItem));
+			CreateNewSubmitItem(submitItem);
 		}
 
 		VkPipelineStageFlags stageFlagBits = 0;
-		RKIT_CHECK(VulkanUtils::ConvertPipelineStageBits(stageFlagBits, subsequentStages));
+		VulkanUtils::ConvertPipelineStageBits(stageFlagBits, subsequentStages);
 
-		RKIT_CHECK(m_semas.Append(sema));
+		m_semas.Append(sema);
 
 		RKIT_TRY_CATCH_RETHROW(m_waitDstStageMasks.Append(stageFlagBits),
 			CatchContext(
@@ -678,17 +678,17 @@ namespace rkit { namespace render { namespace vulkan
 		VkSubmitInfo *submitItem = nullptr;
 		if (m_submits.Count() > 0)
 		{
-			RKIT_CHECK(CheckCloseCommandList());
+			CheckCloseCommandList();
 
 			submitItem = &m_submits[m_submits.Count() - 1];
 		}
 
 		if (!submitItem)
 		{
-			RKIT_CHECK(CreateNewSubmitItem(submitItem));
+			CreateNewSubmitItem(submitItem);
 		}
 
-		RKIT_CHECK(m_semas.Append(sema));
+		m_semas.Append(sema);
 
 		submitItem->signalSemaphoreCount++;
 
@@ -714,11 +714,11 @@ namespace rkit { namespace render { namespace vulkan
 
 		if (!submitItem)
 		{
-			RKIT_CHECK(CreateNewSubmitItem(submitItem));
+			CreateNewSubmitItem(submitItem);
 		}
 
 		VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
-		RKIT_CHECK(m_cmdAlloc.AcquireCommandBuffer(cmdBuffer));
+		m_cmdAlloc.AcquireCommandBuffer(cmdBuffer);
 
 		VkCommandBufferBeginInfo beginInfo = {};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -726,7 +726,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkBeginCommandBuffer(cmdBuffer, &beginInfo));
 
-		RKIT_CHECK(m_cmdBuffers.Append(cmdBuffer));
+		m_cmdBuffers.Append(cmdBuffer);
 
 		outCmdBuffer = cmdBuffer;
 		m_isCommandListOpen = true;
@@ -740,7 +740,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		VkCommandBuffer cmdBuffer;
 
-		RKIT_CHECK(OpenCommandBuffer(cmdBuffer));
+		OpenCommandBuffer(cmdBuffer);
 
 		if (!m_isRenderPassOpen)
 		{
@@ -775,7 +775,7 @@ namespace rkit { namespace render { namespace vulkan
 		VkSubmitInfo submitInfo = {};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-		RKIT_CHECK(m_submits.Append(submitInfo));
+		m_submits.Append(submitInfo);
 
 		outSubmitInfo = &m_submits[m_submits.Count() - 1];
 
@@ -799,7 +799,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		if (m_isCommandListOpen)
 		{
-			RKIT_CHECK(CloseRenderPass());
+			CloseRenderPass();
 
 			RKIT_VK_CHECK(m_device.GetDeviceAPI().vkEndCommandBuffer(m_cmdBuffers[m_cmdBuffers.Count() - 1]));
 
@@ -818,7 +818,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		if (m_currentEncoderType != EncoderType::kNone)
 		{
-			RKIT_CHECK(m_encoders[static_cast<size_t>(m_currentEncoderType)]->CloseEncoder());
+			m_encoders[static_cast<size_t>(m_currentEncoderType)]->CloseEncoder();
 		}
 
 		m_currentEncoderType = encoderType;
@@ -829,9 +829,9 @@ namespace rkit { namespace render { namespace vulkan
 	Result VulkanCommandBatchBase::Create(UniquePtr<VulkanCommandBatchBase> &outCmdBatch, VulkanDeviceBase &device, VulkanQueueProxyBase &queue, VulkanCommandAllocatorBase &cmdAlloc)
 	{
 		UniquePtr<VulkanCommandBatch> cmdBatch;
-		RKIT_CHECK(New<VulkanCommandBatch>(cmdBatch, device, queue, cmdAlloc));
+		New<VulkanCommandBatch>(cmdBatch, device, queue, cmdAlloc);
 
-		RKIT_CHECK(cmdBatch->Initialize());
+		cmdBatch->Initialize();
 
 		outCmdBatch = std::move(cmdBatch);
 

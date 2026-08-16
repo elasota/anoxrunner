@@ -69,7 +69,7 @@ namespace anox::game::priv
 	rkit::Result TrackedObjectListBase<T>::RegisterObject(uint32_t &outObjectID, const T &object)
 	{
 		uint32_t oid = 0;
-		RKIT_CHECK(AcquireObjectID(oid));
+		AcquireObjectID(oid);
 
 		this->m_objects[oid - 1].m_object = object;
 
@@ -82,7 +82,7 @@ namespace anox::game::priv
 	rkit::Result TrackedObjectListBase<T>::RegisterObject(uint32_t &outObjectID, T &&object)
 	{
 		uint32_t oid = 0;
-		RKIT_CHECK(AcquireObjectID(oid));
+		AcquireObjectID(oid);
 
 		this->m_objects[oid - 1].m_object = std::move(object);
 
@@ -137,7 +137,7 @@ namespace anox::game::priv
 			if (m_objects.Count() == std::numeric_limits<uint32_t>::max())
 				RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
 
-			RKIT_CHECK(m_objects.Append(ObjectAndFreeID()));
+			m_objects.Append(ObjectAndFreeID());
 			objectID = static_cast<uint32_t>(m_objects.Count());
 		}
 		else

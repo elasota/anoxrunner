@@ -86,7 +86,7 @@ namespace rkit::render::vulkan
 	Result VulkanQueueProxy::CreateCopyCommandAllocator(UniquePtr<ICopyCommandAllocator> &outCommandAllocator, bool isBundle)
 	{
 		UniquePtr<IComputeCommandAllocator> computeAlloc;
-		RKIT_CHECK(CreateTypedCommandAllocator(computeAlloc, isBundle));
+		CreateTypedCommandAllocator(computeAlloc, isBundle);
 
 		outCommandAllocator = std::move(computeAlloc);
 		RKIT_RETURN_OK;
@@ -171,7 +171,7 @@ namespace rkit::render::vulkan
 	Result VulkanQueueProxy::CreateTypedCommandAllocator(UniquePtr<T> &outCommandAllocator, bool isBundle)
 	{
 		UniquePtr<VulkanCommandAllocatorBase> cmdAllocator;
-		RKIT_CHECK(CreateCommandAllocator(cmdAllocator, isBundle));
+		CreateCommandAllocator(cmdAllocator, isBundle);
 
 		outCommandAllocator = std::move(cmdAllocator);
 
@@ -203,9 +203,9 @@ namespace rkit::render::vulkan
 	Result VulkanQueueProxyBase::Create(UniquePtr<VulkanQueueProxyBase> &outQueueProxy, IMallocDriver *alloc, CommandQueueType queueType, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI)
 	{
 		UniquePtr<VulkanQueueProxy> queueProxy;
-		RKIT_CHECK(New<VulkanQueueProxy>(queueProxy, alloc, queueType, device, queue, queueFamily, deviceAPI));
+		New<VulkanQueueProxy>(queueProxy, alloc, queueType, device, queue, queueFamily, deviceAPI);
 
-		RKIT_CHECK(queueProxy->Initialize());
+		queueProxy->Initialize();
 
 		outQueueProxy = std::move(queueProxy);
 

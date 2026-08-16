@@ -334,14 +334,14 @@ namespace anox::buildsystem
 	rkit::Result APEWriter::Write(const rkit::Optional<ape_parse::ExpressionValue> &value)
 	{
 		data::ape::ExpressionValue expr = {};
-		RKIT_CHECK(m_context.ConvertOptionalExprValue(expr, value));
+		m_context.ConvertOptionalExprValue(expr, value);
 		return m_stream.WriteOneBinary(expr);
 	}
 
 	rkit::Result APEWriter::Write(const rkit::Optional<rkit::ByteString> &value)
 	{
 		uint32_t index = 0;
-		RKIT_CHECK(m_context.ConvertOptionalByteString(index, value));
+		m_context.ConvertOptionalByteString(index, value);
 		rkit::endian::LittleUInt32_t indexData = rkit::endian::LittleUInt32_t(index);
 
 		return m_stream.WriteOneBinary(indexData);
@@ -350,14 +350,14 @@ namespace anox::buildsystem
 	rkit::Result APEWriter::Write(const rkit::ByteString &value)
 	{
 		uint32_t index = 0;
-		RKIT_CHECK(IndexString(index, 0, value));
+		IndexString(index, 0, value);
 		return Write(index);
 	}
 
 	rkit::Result APEWriter::Write(const ape_parse::FormattingValue &value)
 	{
 		uint32_t index = 0;
-		RKIT_CHECK(m_context.ConvertFormattingValue(index, value));
+		m_context.ConvertFormattingValue(index, value);
 		rkit::endian::LittleUInt32_t indexData = rkit::endian::LittleUInt32_t(index);
 		return m_stream.WriteOneBinary(indexData);
 	}
@@ -369,18 +369,18 @@ namespace anox::buildsystem
 		rkit::ByteString bstr = value.m_str;
 		if (bstr.StartsWith(rkit::StringSliceView(u8"../").RemoveEncoding()))
 		{
-			RKIT_CHECK(bstr.Set(bstr.SubString(3, bstr.Length() - 3)));
+			bstr.Set(bstr.SubString(3, bstr.Length() - 3));
 		}
 		else
 		{
 			rkit::ByteString adjusted;
-			RKIT_CHECK(adjusted.Set(rkit::StringSliceView(u8"gameflow/").RemoveEncoding()));
-			RKIT_CHECK(adjusted.Append(bstr));
+			adjusted.Set(rkit::StringSliceView(u8"gameflow/").RemoveEncoding());
+			adjusted.Append(bstr);
 
 			bstr = std::move(adjusted);
 		}
 
-		RKIT_CHECK(m_context.ConvertMaterial(matRef, bstr));
+		m_context.ConvertMaterial(matRef, bstr);
 		return m_stream.WriteOneBinary(matRef);
 	}
 
@@ -396,10 +396,10 @@ namespace anox::buildsystem
 		else
 		{
 			rkit::ByteString adjusted;
-			RKIT_CHECK(adjusted.Set(rkit::StringSliceView(u8"graphics/interface/windows/").RemoveEncoding()));
-			RKIT_CHECK(adjusted.Append(value.m_str));
+			adjusted.Set(rkit::StringSliceView(u8"graphics/interface/windows/").RemoveEncoding());
+			adjusted.Append(value.m_str);
 
-			RKIT_CHECK(m_context.ConvertMaterial(matRef, adjusted));
+			m_context.ConvertMaterial(matRef, adjusted);
 		}
 
 		return m_stream.WriteOneBinary(matRef);
@@ -408,7 +408,7 @@ namespace anox::buildsystem
 	rkit::Result APEWriter::IndexString(uint32_t &outIndex, uint32_t baseIndex, const rkit::ByteString &value)
 	{
 		uint32_t ctxIndex = 0;
-		RKIT_CHECK(m_context.IndexString(ctxIndex, value));
+		m_context.IndexString(ctxIndex, value);
 
 		if (ctxIndex >= std::numeric_limits<uint32_t>::max() - baseIndex)
 			RKIT_THROW(rkit::ResultCode::kDataError);
@@ -432,23 +432,23 @@ namespace anox::buildsystem
 	rkit::Result APEScriptCompilerImpl::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		DynamicResourcesDictionary depsDict;
-		RKIT_CHECK(ReadDepsCatalog(depsDict, depsNode->GetIdentifier(), feedback));
+		ReadDepsCatalog(depsDict, depsNode->GetIdentifier(), feedback);
 
 		auto depsProcessFunc = [feedback](const rkit::AsciiStringSliceView &categoryName, const DynamicResourceCategory &category) -> rkit::Result
 			{
 				DepResourceType resType = DepResourceType::Invalid;
 
-				RKIT_CHECK(ResolveDepResourceType(resType, categoryName));
+				ResolveDepResourceType(resType, categoryName);
 
 				for (const DynamicResourceDef &resDef : category.m_defs)
 				{
 					rkit::AsciiString normalizedPath;
-					RKIT_CHECK(NormalizeResourcePath(normalizedPath, resType, resDef.m_path));
+					NormalizeResourcePath(normalizedPath, resType, resDef.m_path);
 
 					switch (resType)
 					{
 					case DepResourceType::Image:
-						RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kInterfaceMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, normalizedPath.ToUTF8View()));
+						feedback->AddNodeDependency(kAnoxNamespaceID, kInterfaceMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, normalizedPath.ToUTF8View());
 						break;
 					default:
 						RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
@@ -458,20 +458,20 @@ namespace anox::buildsystem
 				RKIT_RETURN_OK;
 			};
 
-		RKIT_CHECK(ForEachDependency(depsDict, depsProcessFunc));
+		ForEachDependency(depsDict, depsProcessFunc);
 
 		rkit::CIPath path;
-		RKIT_CHECK(path.Set(depsNode->GetIdentifier()));
+		path.Set(depsNode->GetIdentifier());
 
 		rkit::UniquePtr<rkit::ISeekableReadStream> inputFile;
-		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, path, inputFile));
+		feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, path, inputFile);
 
 		rkit::Vector<WindowDef> windowDefs;
 		rkit::Vector<SwitchDef> switchDefs;
 
 		{
 			rkit::endian::LittleUInt64_t header;
-			RKIT_CHECK(inputFile->ReadOneBinary(header));
+			inputFile->ReadOneBinary(header);
 
 			if (header.Get() != 0xffffffff0000013d)
 			{
@@ -483,7 +483,7 @@ namespace anox::buildsystem
 			for (;;)
 			{
 				rkit::endian::LittleUInt32_t windowID;
-				RKIT_CHECK(inputFile->ReadOneBinary(windowID));
+				inputFile->ReadOneBinary(windowID);
 
 				if (windowID.Get() == 0)
 					break;
@@ -494,35 +494,35 @@ namespace anox::buildsystem
 				for (;;)
 				{
 					uint8_t opcode = 0;
-					RKIT_CHECK(inputFile->ReadOneBinary(opcode));
+					inputFile->ReadOneBinary(opcode);
 
 					rkit::UniquePtr<ape_parse::WindowCommand> cmd;
-					RKIT_CHECK(ape_parse::CreateWindowCommand(cmd, opcode));
+					ape_parse::CreateWindowCommand(cmd, opcode);
 
 					ape_parse::APEReader reader(*inputFile);
-					RKIT_CHECK(cmd->Parse(reader));
+					cmd->Parse(reader);
 
 					if (cmd->GetCommandType() == data::WindowCommandType::End)
 						break;
 
-					RKIT_CHECK(windowDef.m_commands.Append(std::move(cmd)));
+					windowDef.m_commands.Append(std::move(cmd));
 				}
 
-				RKIT_CHECK(windowDefs.Append(std::move(windowDef)));
+				windowDefs.Append(std::move(windowDef));
 			}
 
 			// Load switches
 			{
 				ape_parse::APEReader reader(*inputFile);
 				uint32_t switchMarker = 0;
-				RKIT_CHECK(reader.Read(switchMarker));
+				reader.Read(switchMarker);
 				if (switchMarker != 0xfffffffeu)
 					RKIT_THROW(rkit::ResultCode::kDataError);
 
 				for (;;)
 				{
 					uint32_t switchLabel = 0;
-					RKIT_CHECK(reader.Read(switchLabel));
+					reader.Read(switchLabel);
 					if (switchLabel == 0)
 						break;
 
@@ -532,8 +532,8 @@ namespace anox::buildsystem
 					for (;;)
 					{
 						ape_parse::SwitchCommand cmd;
-						RKIT_CHECK(reader.Read(cmd.m_cc));
-						RKIT_CHECK(reader.Read(cmd.m_opcode));
+						reader.Read(cmd.m_cc);
+						reader.Read(cmd.m_opcode);
 
 						if (cmd.m_opcode > 21)
 						{
@@ -543,13 +543,13 @@ namespace anox::buildsystem
 							RKIT_THROW(rkit::ResultCode::kDataError);
 						}
 
-						RKIT_CHECK(reader.Read(cmd.m_str));
-						RKIT_CHECK(reader.Read(cmd.m_fmt));
-						RKIT_CHECK(reader.Read(cmd.m_expr));
-						RKIT_CHECK(switchDef.m_commands.Append(std::move(cmd)));
+						reader.Read(cmd.m_str);
+						reader.Read(cmd.m_fmt);
+						reader.Read(cmd.m_expr);
+						switchDef.m_commands.Append(std::move(cmd));
 					}
 
-					RKIT_CHECK(switchDefs.Append(std::move(switchDef)));
+					switchDefs.Append(std::move(switchDef));
 				}
 			}
 		}
@@ -558,21 +558,21 @@ namespace anox::buildsystem
 
 		APEBlob blob;
 
-		RKIT_CHECK(blob.m_windows.Resize(windowDefs.Count()));
+		blob.m_windows.Resize(windowDefs.Count());
 
 		for (size_t windowIndex = 0; windowIndex < windowDefs.Count(); windowIndex++)
 		{
-			RKIT_CHECK(CompileWindow(compilerCtx, blob.m_windows[windowIndex], windowDefs[windowIndex]));
+			CompileWindow(compilerCtx, blob.m_windows[windowIndex], windowDefs[windowIndex]);
 		}
 
-		RKIT_CHECK(blob.m_switches.Resize(switchDefs.Count()));
+		blob.m_switches.Resize(switchDefs.Count());
 
 		for (size_t switchIndex = 0; switchIndex < switchDefs.Count(); switchIndex++)
 		{
-			RKIT_CHECK(CompileSwitch(compilerCtx, blob.m_switches[switchIndex], switchDefs[switchIndex]));
+			CompileSwitch(compilerCtx, blob.m_switches[switchIndex], switchDefs[switchIndex]);
 		}
 
-		RKIT_CHECK(compilerCtx.DumpResults(blob.m_operandLists, blob.m_exprs, blob.m_strings, blob.m_resourceIDs));
+		compilerCtx.DumpResults(blob.m_operandLists, blob.m_exprs, blob.m_strings, blob.m_resourceIDs);
 
 		for (const data::ape::ResourceIdentifier &rid : blob.m_resourceIDs)
 		{
@@ -585,19 +585,19 @@ namespace anox::buildsystem
 			}
 
 			rkit::CIPath path;
-			RKIT_CHECK(path.SetFromUTF8(rkit::ByteStringView(str).ToUTF8Unsafe()));
+			path.SetFromUTF8(rkit::ByteStringView(str).ToUTF8Unsafe());
 
-			RKIT_CHECK(PostNodeCompileTask(static_cast<APEIntermediateResourceType>(rid.m_resType.Get()), path.ToString(), feedback));
+			PostNodeCompileTask(static_cast<APEIntermediateResourceType>(rid.m_resType.Get()), path.ToString(), feedback);
 		}
 
 		{
 			rkit::CIPath outPath;
-			RKIT_CHECK(FormatAnalysisPath(outPath, depsNode->GetIdentifier()));
+			FormatAnalysisPath(outPath, depsNode->GetIdentifier());
 
 			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
-			RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outFile));
+			feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outFile);
 
-			RKIT_CHECK(DumpAPEFile(*outFile, blob));
+			DumpAPEFile(*outFile, blob);
 		}
 
 		RKIT_RETURN_OK;
@@ -639,23 +639,23 @@ namespace anox::buildsystem
 			arg = arg.SubString(0, arg.Length() - 1);
 
 		rkit::String formattedPathStr;
-		RKIT_CHECK(formattedPathStr.Format(u8"{}{}", prefix, arg));
+		formattedPathStr.Format(u8"{}{}", prefix, arg);
 
 		rkit::CIPath path;
-		RKIT_CHECK(path.Set(formattedPathStr));
+		path.Set(formattedPathStr);
 
 		rkit::ByteString pathBStr;
-		RKIT_CHECK(pathBStr.Set(path.ToString().ToByteView()));
+		pathBStr.Set(path.ToString().ToByteView());
 
 		uint32_t pathIndex = 0;
-		RKIT_CHECK(APECompilerHelper::IndexValue<rkit::ByteString>(pathIndex, m_strings, std::move(pathBStr)));
+		APECompilerHelper::IndexValue<rkit::ByteString>(pathIndex, m_strings, std::move(pathBStr));
 
 		APEResourceRefKey refKey = {};
 		refKey.m_resNamespace = 0;
 		refKey.m_resType = static_cast<uint32_t>(resType);
 		refKey.m_nameStringIndex = pathIndex;
 
-		RKIT_CHECK(APECompilerHelper::IndexValue<APEResourceRefKey>(outIndex, m_resourceIDs, std::move(refKey)));
+		APECompilerHelper::IndexValue<APEResourceRefKey>(outIndex, m_resourceIDs, std::move(refKey));
 
 		RKIT_RETURN_OK;
 	}
@@ -672,7 +672,7 @@ namespace anox::buildsystem
 			uint32_t index = 0;
 			bool isString = false;
 			data::ape::OperandType operandType = data::ape::OperandType::Invalid;
-			RKIT_CHECK(ConvertExprValue(index, operandType, isString, value.Get()));
+			ConvertExprValue(index, operandType, isString, value.Get());
 
 			switch (operandType)
 			{
@@ -722,8 +722,8 @@ namespace anox::buildsystem
 		case ape_parse::ExpressionValue::Operator::Sub:
 		case ape_parse::ExpressionValue::Operator::Mul:
 		case ape_parse::ExpressionValue::Operator::Div:
-			RKIT_CHECK(ConvertOperand(leftIndex, leftOpType, leftIsString, *expr.m_left));
-			RKIT_CHECK(ConvertOperand(rightIndex, rightOpType, rightIsString, *expr.m_right));
+			ConvertOperand(leftIndex, leftOpType, leftIsString, *expr.m_left);
+			ConvertOperand(rightIndex, rightOpType, rightIsString, *expr.m_right);
 			if (leftIsString || rightIsString)
 				RKIT_THROW(rkit::ResultCode::kDataError);
 
@@ -731,8 +731,8 @@ namespace anox::buildsystem
 			break;
 		case ape_parse::ExpressionValue::Operator::Eq:
 		case ape_parse::ExpressionValue::Operator::Neq:
-			RKIT_CHECK(ConvertOperand(leftIndex, leftOpType, leftIsString, *expr.m_left));
-			RKIT_CHECK(ConvertOperand(rightIndex, rightOpType, rightIsString, *expr.m_right));
+			ConvertOperand(leftIndex, leftOpType, leftIsString, *expr.m_left);
+			ConvertOperand(rightIndex, rightOpType, rightIsString, *expr.m_right);
 			if (leftIsString && rightIsString)
 				op = (expr.m_operator == ape_parse::ExpressionValue::Operator::Eq) ? data::ape::Operator::StrEq : data::ape::Operator::StrNeq;
 			else
@@ -753,7 +753,7 @@ namespace anox::buildsystem
 		resultExpr.m_packedOperandInfo = data::ape::Expression::PackOperandInfo(op, leftOpType, rightOpType);
 
 		uint32_t exprIndex = 0;
-		RKIT_CHECK(IndexExpression(exprIndex, std::move(resultExpr)));
+		IndexExpression(exprIndex, std::move(resultExpr));
 
 		outIndex = exprIndex;
 		outIsString = false;
@@ -774,17 +774,17 @@ namespace anox::buildsystem
 			outOperandType = data::ape::OperandType::Literal;
 			break;
 		case ape_parse::OperandType::FloatVariable:
-			RKIT_CHECK(IndexString(outIndex, static_cast<const ape_parse::FloatVariableNameOperand &>(operand).m_value));
+			IndexString(outIndex, static_cast<const ape_parse::FloatVariableNameOperand &>(operand).m_value);
 			outIsString = false;
 			outOperandType = data::ape::OperandType::Variable;
 			break;
 		case ape_parse::OperandType::StringLiteral:
-			RKIT_CHECK(IndexString(outIndex, static_cast<const ape_parse::StringOperand &>(operand).m_value));
+			IndexString(outIndex, static_cast<const ape_parse::StringOperand &>(operand).m_value);
 			outIsString = true;
 			outOperandType = data::ape::OperandType::Literal;
 			break;
 		case ape_parse::OperandType::StringVariable:
-			RKIT_CHECK(IndexString(outIndex, static_cast<const ape_parse::StringVariableNameOperand &>(operand).m_value));
+			IndexString(outIndex, static_cast<const ape_parse::StringVariableNameOperand &>(operand).m_value);
 			outIsString = true;
 			outOperandType = data::ape::OperandType::Variable;
 			break;
@@ -818,7 +818,7 @@ namespace anox::buildsystem
 		{
 			uint32_t resIndex = 0;
 
-			RKIT_CHECK(IndexResource(resIndex, APEIntermediateResourceType::kMaterial, rkit::StringView(), pathBStr));
+			IndexResource(resIndex, APEIntermediateResourceType::kMaterial, rkit::StringView(), pathBStr);
 
 			outMaterialRef.m_refType = data::ape::ResourceReferenceType::ResourceID;
 			outMaterialRef.m_index = resIndex;
@@ -826,7 +826,7 @@ namespace anox::buildsystem
 		else
 		{
 			uint32_t pathStrIndex = 0;
-			RKIT_CHECK(APECompilerHelper::IndexValue<rkit::ByteString>(pathStrIndex, m_strings, rkit::ByteString(pathBStr)));
+			APECompilerHelper::IndexValue<rkit::ByteString>(pathStrIndex, m_strings, rkit::ByteString(pathBStr));
 
 			outMaterialRef.m_refType = data::ape::ResourceReferenceType::WildcardString;
 			outMaterialRef.m_index = pathStrIndex;
@@ -840,10 +840,10 @@ namespace anox::buildsystem
 		rkit::Vector<data::ape::Expression> &outExprs, rkit::Vector<rkit::ByteString> &outStrings,
 		rkit::Vector<data::ape::ResourceIdentifier> &outResourceIdentifiers) const
 	{
-		RKIT_CHECK(outOperandLists.Resize(m_operandLists.Count()));
-		RKIT_CHECK(outExprs.Resize(m_expressions.Count()));
-		RKIT_CHECK(outStrings.Resize(m_strings.Count()));
-		RKIT_CHECK(outResourceIdentifiers.Resize(m_resourceIDs.Count()));
+		outOperandLists.Resize(m_operandLists.Count());
+		outExprs.Resize(m_expressions.Count());
+		outStrings.Resize(m_strings.Count());
+		outResourceIdentifiers.Resize(m_resourceIDs.Count());
 
 
 		for (rkit::HashMapKeyValueView<ExpressionKey, const uint32_t> exprPair : m_expressions)
@@ -857,7 +857,7 @@ namespace anox::buildsystem
 			rkit::Vector<data::ape::ExpressionValue> &outOpList = outOperandLists[opListPair.Value()];
 			rkit::ConstSpan<data::ape::ExpressionValue> inOpList = opListPair.Key().GetOperands();
 
-			RKIT_CHECK(outOpList.Resize(inOpList.Count()));
+			outOpList.Resize(inOpList.Count());
 
 			rkit::CopySpan(outOpList.ToSpan(), inOpList);
 		}
@@ -884,8 +884,8 @@ namespace anox::buildsystem
 		else
 		{
 			uint32_t index = 0;
-			RKIT_CHECK(IndexString(index, value.Get()));
-			RKIT_CHECK(rkit::SafeAdd<uint32_t>(outDWord, index, 1));
+			IndexString(index, value.Get());
+			rkit::SafeAdd<uint32_t>(outDWord, index, 1);
 		}
 
 		RKIT_RETURN_OK;
@@ -920,15 +920,15 @@ namespace anox::buildsystem
 				break;
 			case ape_parse::OperandType::FloatVariable:
 				exprType = data::ape::ExprType::FloatVariable;
-				RKIT_CHECK(ConvertByteString(index, static_cast<const ape_parse::FloatVariableNameOperand &>(inOperand).m_value));
+				ConvertByteString(index, static_cast<const ape_parse::FloatVariableNameOperand &>(inOperand).m_value);
 				break;
 			case ape_parse::OperandType::StringLiteral:
 				exprType = data::ape::ExprType::StringLiteral;
-				RKIT_CHECK(ConvertByteString(index, static_cast<const ape_parse::StringOperand &>(inOperand).m_value));
+				ConvertByteString(index, static_cast<const ape_parse::StringOperand &>(inOperand).m_value);
 				break;
 			case ape_parse::OperandType::StringVariable:
 				exprType = data::ape::ExprType::StringVariable;
-				RKIT_CHECK(ConvertByteString(index, static_cast<const ape_parse::StringVariableNameOperand &>(inOperand).m_value));
+				ConvertByteString(index, static_cast<const ape_parse::StringVariableNameOperand &>(inOperand).m_value);
 				break;
 			default:
 				RKIT_THROW(rkit::ResultCode::kInternalError);
@@ -936,7 +936,7 @@ namespace anox::buildsystem
 
 			outExpr.m_exprType = exprType;
 			outExpr.m_index = index;
-			RKIT_CHECK(operands.Append(outExpr));
+			operands.Append(outExpr);
 		}
 
 		return IndexOperandList(outDWord, std::move(operands));
@@ -959,7 +959,7 @@ namespace anox::buildsystem
 			if (newIndex > std::numeric_limits<uint32_t>::max())
 				RKIT_THROW(rkit::ResultCode::kDataError);
 
-			RKIT_CHECK(hashMap.SetPrehashed(hashValue, std::move(key), static_cast<uint32_t>(newIndex)));
+			hashMap.SetPrehashed(hashValue, std::move(key), static_cast<uint32_t>(newIndex));
 			outIndex = static_cast<uint32_t>(newIndex);
 		}
 		else
@@ -1035,7 +1035,7 @@ namespace anox::buildsystem
 
 	rkit::Result APEScriptCompilerImpl::VectorMemoryStream::WritePartial(const void *data, size_t count, size_t &outCountWritten)
 	{
-		RKIT_CHECK(m_vec.Append(rkit::Span<const uint8_t>(static_cast<const uint8_t *>(data), count)));
+		m_vec.Append(rkit::Span<const uint8_t>(static_cast<const uint8_t *>(data), count));
 		outCountWritten = count;
 		RKIT_RETURN_OK;
 	}
@@ -1051,12 +1051,12 @@ namespace anox::buildsystem
 
 		{
 			rkit::CIPath analysisPath;
-			RKIT_CHECK(FormatAnalysisPath(analysisPath, depsNode->GetIdentifier()));
+			FormatAnalysisPath(analysisPath, depsNode->GetIdentifier());
 
 			rkit::UniquePtr<rkit::ISeekableReadStream> inFile;
-			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, analysisPath, inFile));
+			feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, analysisPath, inFile);
 
-			RKIT_CHECK(ReadAPEFile(*inFile, blob));
+			ReadAPEFile(*inFile, blob);
 		}
 
 		for (size_t i = 0; i < blob.m_resourceIDs.Count(); i++)
@@ -1065,7 +1065,7 @@ namespace anox::buildsystem
 
 			uint32_t realNamespace = 0;
 			uint32_t realType = 0;
-			RKIT_CHECK(IndexNodeCompileResult(rr.m_contentID, realNamespace, realType, static_cast<APEIntermediateResourceType>(rr.m_resType.Get()), blob.m_strings[rr.m_nameIndex.Get()], feedback));
+			IndexNodeCompileResult(rr.m_contentID, realNamespace, realType, static_cast<APEIntermediateResourceType>(rr.m_resType.Get()), blob.m_strings[rr.m_nameIndex.Get()], feedback);
 
 			rr.m_resNamespace = realNamespace;
 			rr.m_resType = realType;
@@ -1073,13 +1073,13 @@ namespace anox::buildsystem
 
 		{
 			rkit::CIPath outPath;
-			RKIT_CHECK(FormatOutputPath(outPath, depsNode->GetIdentifier()));
+			FormatOutputPath(outPath, depsNode->GetIdentifier());
 
 			{
 				rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
-				RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outFile));
+				feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outFile);
 
-				RKIT_CHECK(DumpAPEFile(*outFile, blob));
+				DumpAPEFile(*outFile, blob);
 			}
 		}
 
@@ -1094,10 +1094,10 @@ namespace anox::buildsystem
 			// Don't need to compile this
 			RKIT_RETURN_OK;
 		case APEIntermediateResourceType::kScene:
-			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kSceneNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, pathStr));
+			feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kSceneNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, pathStr);
 			RKIT_RETURN_OK;
 		case APEIntermediateResourceType::kMaterial:
-			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kInterfaceMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, pathStr));
+			feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kInterfaceMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, pathStr);
 			RKIT_RETURN_OK;
 		default:
 			RKIT_THROW(rkit::ResultCode::kInternalError);
@@ -1114,9 +1114,9 @@ namespace anox::buildsystem
 		case APEIntermediateResourceType::kRawFile:
 			{
 				rkit::CIPath path;
-				RKIT_CHECK(path.Set(pathBStr.ToUTF8Unsafe()));
+				path.Set(pathBStr.ToUTF8Unsafe());
 
-				RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kSourceDir, path, outContentID));
+				feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kSourceDir, path, outContentID);
 				outResNamespace = kAnoxNamespaceID;
 				outResType = resloaders::kContentIDRawFileResourceTypeCode;
 			}
@@ -1124,12 +1124,12 @@ namespace anox::buildsystem
 		case APEIntermediateResourceType::kScene:
 			{
 				rkit::String pathStr;
-				RKIT_CHECK(SceneCompilerBase::FormatOutputPath(pathStr, pathBStr.ToUTF8Unsafe()));
+				SceneCompilerBase::FormatOutputPath(pathStr, pathBStr.ToUTF8Unsafe());
 
 				rkit::CIPath path;
-				RKIT_CHECK(path.Set(pathStr));
+				path.Set(pathStr);
 
-				RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, path, outContentID));
+				feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, path, outContentID);
 				outResNamespace = kAnoxNamespaceID;
 				outResType = resloaders::kContentIDRawFileResourceTypeCode;
 			}
@@ -1137,9 +1137,9 @@ namespace anox::buildsystem
 		case APEIntermediateResourceType::kMaterial:
 			{
 				rkit::CIPath path;
-				RKIT_CHECK(MaterialCompiler::ConstructOutputPath(path, data::MaterialResourceType::kInterface, pathBStr.ToUTF8Unsafe()));
+				MaterialCompiler::ConstructOutputPath(path, data::MaterialResourceType::kInterface, pathBStr.ToUTF8Unsafe());
 
-				RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, path, outContentID));
+				feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, path, outContentID);
 				outResNamespace = kAnoxNamespaceID;
 				outResType = resloaders::kInterfaceMaterialTypeCode;
 			}
@@ -1164,8 +1164,8 @@ namespace anox::buildsystem
 		{
 			const ape_parse::WindowCommand &cmd = *cmdPtr;
 
-			RKIT_CHECK(compiledWindow.m_commandStream.Append(static_cast<uint8_t>(cmd.GetCommandType())));
-			RKIT_CHECK(cmd.Write(writer));
+			compiledWindow.m_commandStream.Append(static_cast<uint8_t>(cmd.GetCommandType()));
+			cmd.Write(writer);
 		}
 
 		RKIT_RETURN_OK;
@@ -1179,7 +1179,7 @@ namespace anox::buildsystem
 
 		for (const ape_parse::SwitchCommand &inCmd : switchDef.m_commands)
 		{
-			RKIT_CHECK(switchCmdTree.Set(inCmd.m_cc, &inCmd));
+			switchCmdTree.Set(inCmd.m_cc, &inCmd);
 		}
 
 		return CompileBasicBlock(ctx, compiledSwitch.m_commands, switchCmdTree, 1);
@@ -1211,8 +1211,8 @@ namespace anox::buildsystem
 			{
 				if (!IsTerminalCC(cc))
 				{
-					RKIT_CHECK(CompileBasicBlock(ctx, trueBB, tree, ((cc << 2) | 1u)));
-					RKIT_CHECK(CompileBasicBlock(ctx, falseBB, tree, ((cc << 2) | 2u)));
+					CompileBasicBlock(ctx, trueBB, tree, ((cc << 2) | 1u));
+					CompileBasicBlock(ctx, falseBB, tree, ((cc << 2) | 2u));
 
 					if (falseBB.Count() > std::numeric_limits<uint32_t>::max())
 						RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
@@ -1223,7 +1223,7 @@ namespace anox::buildsystem
 						skipFalseBBCmd.m_opcode = kJumpOpcode;
 						skipFalseBBCmd.m_strValue = static_cast<uint32_t>(falseBB.Count());
 
-						RKIT_CHECK(trueBB.Append(skipFalseBBCmd));
+						trueBB.Append(skipFalseBBCmd);
 					}
 
 					if (trueBB.Count() > std::numeric_limits<uint32_t>::max())
@@ -1236,13 +1236,13 @@ namespace anox::buildsystem
 			{
 				if (!IsTerminalCC(cc))
 				{
-					RKIT_CHECK(CompileBasicBlock(ctx, trueBB, tree, ((cc << 2) | 1u)));
+					CompileBasicBlock(ctx, trueBB, tree, ((cc << 2) | 1u));
 
 					data::ape::SwitchCommand repeatCmd = {};
 					repeatCmd.m_opcode = kRJumpOpcode;
 					repeatCmd.m_strValue = static_cast<uint32_t>(trueBB.Count());
 
-					RKIT_CHECK(trueBB.Append(repeatCmd));
+					trueBB.Append(repeatCmd);
 				}
 
 				outCmd.m_strValue = static_cast<uint32_t>(trueBB.Count());
@@ -1254,29 +1254,29 @@ namespace anox::buildsystem
 				if (!cmd.m_str.IsSet())
 					RKIT_THROW(rkit::ResultCode::kDataError);
 
-				RKIT_CHECK(CompileExtern(ctx, externOpcode, externArgList, cmd.m_str.Get()));
+				CompileExtern(ctx, externOpcode, externArgList, cmd.m_str.Get());
 				outCmd.m_fmtValue = externOpcode;
 				outCmd.m_strValue = externArgList;
 			}
 			else
 			{
 				uint32_t index = 0;
-				RKIT_CHECK(ctx.ConvertOptionalByteString(index, cmd.m_str));
+				ctx.ConvertOptionalByteString(index, cmd.m_str);
 				outCmd.m_strValue = index;
 			}
 
-			RKIT_CHECK(ctx.ConvertOptionalExprValue(outCmd.m_exprValue, cmd.m_expr));
+			ctx.ConvertOptionalExprValue(outCmd.m_exprValue, cmd.m_expr);
 
 			if (cmd.m_opcode != kExternOpcode)
 			{
 				uint32_t fmtValue = 0;
-				RKIT_CHECK(ctx.ConvertFormattingValue(fmtValue, cmd.m_fmt));
+				ctx.ConvertFormattingValue(fmtValue, cmd.m_fmt);
 				outCmd.m_fmtValue = fmtValue;
 			}
 
-			RKIT_CHECK(cmdStream.Append(outCmd));
-			RKIT_CHECK(cmdStream.Append(trueBB.ToSpan()));
-			RKIT_CHECK(cmdStream.Append(falseBB.ToSpan()));
+			cmdStream.Append(outCmd);
+			cmdStream.Append(trueBB.ToSpan());
+			cmdStream.Append(falseBB.ToSpan());
 
 			if (IsTerminalCC(cc))
 				break;
@@ -1408,7 +1408,7 @@ namespace anox::buildsystem
 		skipWhitespace();
 
 		rkit::ByteStringSliceView cmdName;
-		RKIT_CHECK(parseToken(cmdName));
+		parseToken(cmdName);
 
 		const rkit::ConstSpan<ape_parse::ExternOpcodeMetadata> opcodeMetadatas(ape_parse::g_externOpcodeMetadata, rkit::ArraySize(ape_parse::g_externOpcodeMetadata));
 
@@ -1431,7 +1431,7 @@ namespace anox::buildsystem
 		}
 
 		rkit::Vector<data::ape::ExpressionValue> argValues;
-		RKIT_CHECK(argValues.Resize(selectedOp->m_argCount));
+		argValues.Resize(selectedOp->m_argCount);
 
 		for (data::ape::ExpressionValue &argValue : argValues)
 		{
@@ -1525,7 +1525,7 @@ namespace anox::buildsystem
 						outValue.m_exprType = data::ape::ExprType::ResourceID;
 
 						uint32_t index = 0;
-						RKIT_CHECK(ctx.IndexResource(index, APEIntermediateResourceType::kRawFile, u8"music/", arg));
+						ctx.IndexResource(index, APEIntermediateResourceType::kRawFile, u8"music/", arg);
 
 						outValue.m_index = index;
 					}
@@ -1549,13 +1549,13 @@ namespace anox::buildsystem
 							rkit::ByteString normalizedArgStorage;
 							if (!normalizedArg.EndsWithNoCase(expectedSuffix))
 							{
-								RKIT_CHECK(normalizedArgStorage.Set(arg));
-								RKIT_CHECK(normalizedArgStorage.Append(expectedSuffix));
+								normalizedArgStorage.Set(arg);
+								normalizedArgStorage.Append(expectedSuffix);
 								normalizedArg = normalizedArgStorage;
 							}
 
 							uint32_t index = 0;
-							RKIT_CHECK(ctx.IndexResource(index, APEIntermediateResourceType::kScene, u8"scripts/", normalizedArg));
+							ctx.IndexResource(index, APEIntermediateResourceType::kScene, u8"scripts/", normalizedArg);
 
 							outValue.m_index = index;
 						}
@@ -1709,14 +1709,14 @@ namespace anox::buildsystem
 				{
 					uint32_t strIndex = 0;
 					rkit::ByteString bstr;
-					RKIT_CHECK(bstr.Set(arg));
+					bstr.Set(arg);
 
 					if (isVariable)
 					{
-						RKIT_CHECK(bstr.MakeLower());
+						bstr.MakeLower();
 					}
 
-					RKIT_CHECK(ctx.IndexString(strIndex, bstr));
+					ctx.IndexString(strIndex, bstr);
 					outValue.m_index = strIndex;
 				}
 
@@ -1748,7 +1748,7 @@ namespace anox::buildsystem
 			if (opName.EqualsNoCase(rkit::AsciiStringView("cam_set").RemoveEncoding()))
 			{
 				rkit::ByteStringSliceView argToken;
-				RKIT_CHECK(parseToken(argToken, "("));
+				parseToken(argToken, "(");
 
 				if (argToken.Length() == 0)
 				{
@@ -1757,7 +1757,7 @@ namespace anox::buildsystem
 				}
 
 				size_t argIndex = findArg("property");
-				RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken));
+				parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken);
 
 				if (argToken.EqualsNoCase(rkit::AsciiStringView("from").RemoveEncoding()) || argToken.EqualsNoCase(rkit::AsciiStringView("to").RemoveEncoding()))
 				{
@@ -1769,7 +1769,7 @@ namespace anox::buildsystem
 
 					argIndex = findArg(isStringArg ? rkit::AsciiStringView("str") : rkit::AsciiStringView("v0"));
 
-					RKIT_CHECK(parseToken(argToken));
+					parseToken(argToken);
 
 					if (argToken.Length() == 0)
 					{
@@ -1777,7 +1777,7 @@ namespace anox::buildsystem
 						RKIT_THROW(rkit::ResultCode::kDataError);
 					}
 
-					RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken));
+					parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken);
 				}
 			}
 			else if (opName.EqualsNoCase(rkit::AsciiStringView("cam_to").RemoveEncoding())
@@ -1790,7 +1790,7 @@ namespace anox::buildsystem
 
 				for (size_t i = 0; i < 3; i++)
 				{
-					RKIT_CHECK(parseToken(argTokens[i]));
+					parseToken(argTokens[i]);
 				}
 
 				rkit::ConstSpan<rkit::AsciiStringView> propertyNames;
@@ -1807,7 +1807,7 @@ namespace anox::buildsystem
 				for (size_t inArgIndex = 0; inArgIndex < propertyNames.Count(); inArgIndex++)
 				{
 					const size_t outArgIndex = findArg(propertyNames[inArgIndex]);
-					RKIT_CHECK(parseArg(argValues[outArgIndex], *selectedOp, selectedOp->m_argMetadata[outArgIndex], argTokens[inArgIndex]));
+					parseArg(argValues[outArgIndex], *selectedOp, selectedOp->m_argMetadata[outArgIndex], argTokens[inArgIndex]);
 				}
 			}
 			else if (opName.EqualsNoCase(rkit::AsciiStringView("set2dcursor").RemoveEncoding()))
@@ -1837,7 +1837,7 @@ namespace anox::buildsystem
 				size_t numNumericArgs = 0;
 
 				rkit::ByteStringSliceView argToken;
-				RKIT_CHECK(parseToken(argToken, "("));
+				parseToken(argToken, "(");
 
 				auto isNumericTokenOrEmpty = [](const rkit::ByteStringSliceView &str)
 					{
@@ -1862,7 +1862,7 @@ namespace anox::buildsystem
 					}
 
 					imageArgTokens[numImageArgs++] = argToken;
-					RKIT_CHECK(parseToken(argToken));
+					parseToken(argToken);
 				}
 
 				while (argToken.Length() > 0)
@@ -1874,7 +1874,7 @@ namespace anox::buildsystem
 					}
 
 					numericArgTokens[numNumericArgs++] = argToken;
-					RKIT_CHECK(parseToken(argToken));
+					parseToken(argToken);
 
 					if (!isNumericTokenOrEmpty(argToken))
 					{
@@ -1888,7 +1888,7 @@ namespace anox::buildsystem
 						for (size_t inputIndex = 0; inputIndex < numArgs; inputIndex++)
 						{
 							const size_t argIndex = findArg(argNames[inputIndex]);
-							RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], tokens[inputIndex]));
+							parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], tokens[inputIndex]);
 						}
 
 						RKIT_RETURN_OK;
@@ -1905,18 +1905,18 @@ namespace anox::buildsystem
 					const rkit::ByteStringSliceView defaultArgToken = rkit::AsciiStringView("true").RemoveEncoding();
 					const rkit::AsciiStringView defaultArgName = rkit::AsciiStringView("isDefault");
 
-					RKIT_CHECK(mapArgList(&defaultArgToken, &defaultArgName, 1));
+					mapArgList(&defaultArgToken, &defaultArgName, 1);
 				}
 				else
 				{
-					RKIT_CHECK(mapArgList(numericArgTokens, numericArgNames, numNumericArgs));
-					RKIT_CHECK(mapArgList(imageArgTokens, imageArgNames, numImageArgs));
+					mapArgList(numericArgTokens, numericArgNames, numNumericArgs);
+					mapArgList(imageArgTokens, imageArgNames, numImageArgs);
 				}
 			}
 			else if (opName.EqualsNoCase(rkit::AsciiStringView("adjust_stat").RemoveEncoding()))
 			{
 				rkit::ByteStringSliceView argToken;
-				RKIT_CHECK(parseToken(argToken));
+				parseToken(argToken);
 
 				if (argToken.Length() == 0)
 				{
@@ -1927,7 +1927,7 @@ namespace anox::buildsystem
 				const rkit::ConstSpan<ape_parse::ExternOpcodeArgMetadata> args(selectedOp->m_argMetadata, selectedOp->m_argCount);
 
 				const size_t targetArgIndex = (argToken.Length() > 0 && argToken[0] == '@') ? findArg("targetobj") : findArg("targetName");
-				RKIT_CHECK(parseArg(argValues[targetArgIndex], *selectedOp, args[targetArgIndex], argToken));
+				parseArg(argValues[targetArgIndex], *selectedOp, args[targetArgIndex], argToken);
 
 				const size_t statArgIndex = findArg("stat");
 				const size_t amountArgIndex = findArg("amount");
@@ -1935,7 +1935,7 @@ namespace anox::buildsystem
 				rkit::ByteStringSliceView statToken;
 				rkit::ByteStringSliceView amountToken;
 
-				RKIT_CHECK(parseToken(statToken));
+				parseToken(statToken);
 
 				if (statToken.Length() == 0)
 				{
@@ -1969,7 +1969,7 @@ namespace anox::buildsystem
 				}
 				else
 				{
-					RKIT_CHECK(parseToken(amountToken));
+					parseToken(amountToken);
 				}
 
 				if (statToken.Length() == 0)
@@ -1978,8 +1978,8 @@ namespace anox::buildsystem
 					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
-				RKIT_CHECK(parseArg(argValues[statArgIndex], *selectedOp, args[statArgIndex], statToken));
-				RKIT_CHECK(parseArg(argValues[amountArgIndex], *selectedOp, args[amountArgIndex], amountToken));
+				parseArg(argValues[statArgIndex], *selectedOp, args[statArgIndex], statToken);
+				parseArg(argValues[amountArgIndex], *selectedOp, args[amountArgIndex], amountToken);
 			}
 			else
 			{
@@ -1996,11 +1996,11 @@ namespace anox::buildsystem
 
 				if (selectedOp->m_isCombined)
 				{
-					RKIT_CHECK(parseCombinedToken(argToken));
+					parseCombinedToken(argToken);
 				}
 				else
 				{
-					RKIT_CHECK(parseToken(argToken));
+					parseToken(argToken);
 				}
 
 				if (argToken.Length() == 0)
@@ -2009,18 +2009,18 @@ namespace anox::buildsystem
 					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
-				RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken));
+				parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken);
 			}
 
 			for (size_t argIndex = selectedOp->m_numRequiredParameters; argIndex < selectedOp->m_numUnnamedParameters; argIndex++)
 			{
 				rkit::ByteStringSliceView argToken;
-				RKIT_CHECK(parseToken(argToken));
+				parseToken(argToken);
 
 				if (argToken.Length() == 0)
 					break;
 
-				RKIT_CHECK(parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken));
+				parseArg(argValues[argIndex], *selectedOp, selectedOp->m_argMetadata[argIndex], argToken);
 			}
 
 			if (selectedOp->m_numUnnamedParameters < selectedOp->m_argCount)
@@ -2028,17 +2028,17 @@ namespace anox::buildsystem
 				for (;;)
 				{
 					rkit::ByteStringSliceView nameToken;
-					RKIT_CHECK(parseToken(nameToken, "="));
+					parseToken(nameToken, "=");
 
 					if (nameToken.Length() == 0)
 						break;
 
 					rkit::ByteStringSliceView eqToken;
-					RKIT_CHECK(parseToken(eqToken, "="));
+					parseToken(eqToken, "=");
 
 
 					rkit::ByteStringSliceView valueToken;
-					RKIT_CHECK(parseToken(valueToken));
+					parseToken(valueToken);
 
 					if (eqToken != rkit::AsciiStringView("=").RemoveEncoding() || valueToken.Length() == 0)
 					{
@@ -2063,7 +2063,7 @@ namespace anox::buildsystem
 						RKIT_THROW(rkit::ResultCode::kDataError);
 					}
 
-					RKIT_CHECK(parseArg(argValues[argIndex.Get()], *selectedOp, selectedOp->m_argMetadata[argIndex.Get()], valueToken));
+					parseArg(argValues[argIndex.Get()], *selectedOp, selectedOp->m_argMetadata[argIndex.Get()], valueToken);
 				}
 			}
 		}
@@ -2071,7 +2071,7 @@ namespace anox::buildsystem
 		// Check for extra args
 		{
 			rkit::ByteStringSliceView argToken;
-			RKIT_CHECK(parseToken(argToken));
+			parseToken(argToken);
 
 			if (argToken.Length() > 0)
 			{
@@ -2080,7 +2080,7 @@ namespace anox::buildsystem
 			}
 		}
 
-		RKIT_CHECK(ctx.IndexOperandList(outArgList, std::move(argValues)));
+		ctx.IndexOperandList(outArgList, std::move(argValues));
 		outOpcode = selectedOp->m_opcode;
 
 		RKIT_RETURN_OK;
@@ -2103,31 +2103,31 @@ namespace anox::buildsystem
 			catalog.m_numSwitches = static_cast<uint32_t>(blob.m_switches.Count());
 			catalog.m_numResourceIDs = static_cast<uint32_t>(blob.m_resourceIDs.Count());
 
-			RKIT_CHECK(stream.WriteOneBinary(catalog));
+			stream.WriteOneBinary(catalog);
 		}
 
 		for (const rkit::ByteString &str : blob.m_strings)
 		{
 			rkit::endian::LittleUInt32_t strLength = rkit::endian::LittleUInt32_t(str.Length());
-			RKIT_CHECK(stream.WriteOneBinary(strLength));
+			stream.WriteOneBinary(strLength);
 		}
 
 		for (const rkit::ByteString &str : blob.m_strings)
 		{
-			RKIT_CHECK(stream.WriteAllSpan(str.ToSpan()));
+			stream.WriteAllSpan(str.ToSpan());
 		}
 
-		RKIT_CHECK(stream.WriteAllSpan(blob.m_exprs.ToSpan()));
+		stream.WriteAllSpan(blob.m_exprs.ToSpan());
 
 		for (const rkit::Vector<data::ape::ExpressionValue> &opList : blob.m_operandLists)
 		{
 			rkit::endian::LittleUInt32_t opListCount = rkit::endian::LittleUInt32_t(opList.Count());
-			RKIT_CHECK(stream.WriteOneBinary(opListCount));
+			stream.WriteOneBinary(opListCount);
 		}
 
 		for (const rkit::Vector<data::ape::ExpressionValue> &opList : blob.m_operandLists)
 		{
-			RKIT_CHECK(stream.WriteAllSpan(opList.ToSpan()));
+			stream.WriteAllSpan(opList.ToSpan());
 		}
 
 		for (size_t windowIndex = 0; windowIndex < blob.m_windows.Count(); windowIndex++)
@@ -2135,12 +2135,12 @@ namespace anox::buildsystem
 			data::ape::Window window = {};
 			window.m_commandStreamLength = static_cast<uint32_t>(blob.m_windows[windowIndex].m_commandStream.Count());
 			window.m_windowID = blob.m_windows[windowIndex].m_windowID;
-			RKIT_CHECK(stream.WriteOneBinary(window));
+			stream.WriteOneBinary(window);
 		}
 
 		for (const CompiledWindowDef &window : blob.m_windows)
 		{
-			RKIT_CHECK(stream.WriteAllSpan(window.m_commandStream.ToSpan()));
+			stream.WriteAllSpan(window.m_commandStream.ToSpan());
 		}
 
 		for (size_t switchIndex = 0; switchIndex < blob.m_switches.Count(); switchIndex++)
@@ -2148,15 +2148,15 @@ namespace anox::buildsystem
 			data::ape::Switch sw = {};
 			sw.m_numCommands = static_cast<uint32_t>(blob.m_switches[switchIndex].m_commands.Count());
 			sw.m_switchID = blob.m_switches[switchIndex].m_switchID;
-			RKIT_CHECK(stream.WriteOneBinary(sw));
+			stream.WriteOneBinary(sw);
 		}
 
 		for (const CompiledSwitchDef &sw : blob.m_switches)
 		{
-			RKIT_CHECK(stream.WriteAllSpan(sw.m_commands.ToSpan()));
+			stream.WriteAllSpan(sw.m_commands.ToSpan());
 		}
 
-		RKIT_CHECK(stream.WriteAllSpan(blob.m_resourceIDs.ToSpan()));
+		stream.WriteAllSpan(blob.m_resourceIDs.ToSpan());
 
 		RKIT_RETURN_OK;
 	}
@@ -2165,31 +2165,31 @@ namespace anox::buildsystem
 	{
 		data::ape::APEScriptCatalog catalog;
 
-		RKIT_CHECK(stream.ReadOneBinary(catalog));
+		stream.ReadOneBinary(catalog);
 
 		const size_t numStrings = catalog.m_numStrings.Get();
-		RKIT_CHECK(blob.m_strings.Resize(numStrings));
+		blob.m_strings.Resize(numStrings);
 
 		rkit::Vector<rkit::ByteStringConstructionBuffer> stringCBufs;
-		RKIT_CHECK(stringCBufs.Resize(numStrings));
+		stringCBufs.Resize(numStrings);
 
-		RKIT_CHECK(blob.m_operandLists.Resize(catalog.m_numOperandLists.Get()));
-		RKIT_CHECK(blob.m_windows.Resize(catalog.m_numWindows.Get()));
-		RKIT_CHECK(blob.m_switches.Resize(catalog.m_numSwitches.Get()));
-		RKIT_CHECK(blob.m_exprs.Resize(catalog.m_numExprs.Get()));
-		RKIT_CHECK(blob.m_resourceIDs.Resize(catalog.m_numResourceIDs.Get()));
+		blob.m_operandLists.Resize(catalog.m_numOperandLists.Get());
+		blob.m_windows.Resize(catalog.m_numWindows.Get());
+		blob.m_switches.Resize(catalog.m_numSwitches.Get());
+		blob.m_exprs.Resize(catalog.m_numExprs.Get());
+		blob.m_resourceIDs.Resize(catalog.m_numResourceIDs.Get());
 
 		for (rkit::ByteStringConstructionBuffer &strCBuf : stringCBufs)
 		{
 			rkit::endian::LittleUInt32_t strLength;
-			RKIT_CHECK(stream.ReadOneBinary(strLength));
+			stream.ReadOneBinary(strLength);
 
-			RKIT_CHECK(strCBuf.Allocate(strLength.Get()));
+			strCBuf.Allocate(strLength.Get());
 		}
 
 		for (rkit::ByteStringConstructionBuffer &strCBuf : stringCBufs)
 		{
-			RKIT_CHECK(stream.ReadAllSpan(strCBuf.GetSpan()));
+			stream.ReadAllSpan(strCBuf.GetSpan());
 		}
 
 		rkit::ProcessParallelSpans(blob.m_strings.ToSpan(), stringCBufs.ToSpan(), [](rkit::ByteString &str, rkit::ByteStringConstructionBuffer &cbuf)
@@ -2197,49 +2197,49 @@ namespace anox::buildsystem
 				str = rkit::ByteString(std::move(cbuf));
 			});
 
-		RKIT_CHECK(stream.ReadAllSpan(blob.m_exprs.ToSpan()));
+		stream.ReadAllSpan(blob.m_exprs.ToSpan());
 
 		for (rkit::Vector<data::ape::ExpressionValue> &opList : blob.m_operandLists)
 		{
 			rkit::endian::LittleUInt32_t opListCount;
-			RKIT_CHECK(stream.ReadOneBinary(opListCount));
-			RKIT_CHECK(opList.Resize(opListCount.Get()));
+			stream.ReadOneBinary(opListCount);
+			opList.Resize(opListCount.Get());
 		}
 
 		for (rkit::Vector<data::ape::ExpressionValue> &opList : blob.m_operandLists)
 		{
-			RKIT_CHECK(stream.ReadAllSpan(opList.ToSpan()));
+			stream.ReadAllSpan(opList.ToSpan());
 		}
 
 		for (size_t windowIndex = 0; windowIndex < blob.m_windows.Count(); windowIndex++)
 		{
 			data::ape::Window window = {};
-			RKIT_CHECK(stream.ReadOneBinary(window));
+			stream.ReadOneBinary(window);
 
 			blob.m_windows[windowIndex].m_windowID = window.m_windowID.Get();
-			RKIT_CHECK(blob.m_windows[windowIndex].m_commandStream.Resize(window.m_commandStreamLength.Get()));
+			blob.m_windows[windowIndex].m_commandStream.Resize(window.m_commandStreamLength.Get());
 		}
 
 		for (CompiledWindowDef &window : blob.m_windows)
 		{
-			RKIT_CHECK(stream.ReadAllSpan(window.m_commandStream.ToSpan()));
+			stream.ReadAllSpan(window.m_commandStream.ToSpan());
 		}
 
 		for (size_t switchIndex = 0; switchIndex < blob.m_switches.Count(); switchIndex++)
 		{
 			data::ape::Switch sw = {};
-			RKIT_CHECK(stream.ReadOneBinary(sw));
+			stream.ReadOneBinary(sw);
 
 			blob.m_switches[switchIndex].m_switchID = sw.m_switchID.Get();
-			RKIT_CHECK(blob.m_switches[switchIndex].m_commands.Resize(sw.m_numCommands.Get()));
+			blob.m_switches[switchIndex].m_commands.Resize(sw.m_numCommands.Get());
 		}
 
 		for (CompiledSwitchDef &sw : blob.m_switches)
 		{
-			RKIT_CHECK(stream.ReadAllSpan(sw.m_commands.ToSpan()));
+			stream.ReadAllSpan(sw.m_commands.ToSpan());
 		}
 
-		RKIT_CHECK(stream.ReadAllSpan(blob.m_resourceIDs.ToSpan()));
+		stream.ReadAllSpan(blob.m_resourceIDs.ToSpan());
 
 		RKIT_RETURN_OK;
 	}
@@ -2251,13 +2251,13 @@ namespace anox::buildsystem
 		size_t fileSize = 0;
 		{
 			rkit::String pathStr;
-			RKIT_CHECK(pathStr.Format(u8"anox/apedeps/{}deps", identifier));
+			pathStr.Format(u8"anox/apedeps/{}deps", identifier);
 
 			rkit::CIPath path;
-			RKIT_CHECK(path.Set(pathStr));
+			path.Set(pathStr);
 
 			rkit::UniquePtr<rkit::ISeekableReadStream> inputFile;
-			RKIT_CHECK(feedback->TryOpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, path, inputFile));
+			feedback->TryOpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, path, inputFile);
 
 			if (!inputFile.IsValid())
 			{
@@ -2269,8 +2269,8 @@ namespace anox::buildsystem
 				RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
 
 			fileSize = static_cast<size_t>(inputFile->GetSize());
-			RKIT_CHECK(depsFileContentsVector.Resize(fileSize));
-			RKIT_CHECK(inputFile->ReadAllSpan(depsFileContentsVector.ToSpan()));
+			depsFileContentsVector.Resize(fileSize);
+			inputFile->ReadAllSpan(depsFileContentsVector.ToSpan());
 		}
 
 		DynamicResourceCategory *category = nullptr;
@@ -2332,14 +2332,14 @@ namespace anox::buildsystem
 				}
 
 				rkit::AsciiString categoryStr;
-				RKIT_CHECK(categoryStr.Set(lineContents.SubString(1, lineContents.Length() - 2)));
+				categoryStr.Set(lineContents.SubString(1, lineContents.Length() - 2));
 
 				const rkit::HashValue_t hash = rkit::Hasher<rkit::AsciiString>::ComputeHash(0, categoryStr);
 				const rkit::HashMap<rkit::AsciiString, DynamicResourceCategory>::Iterator_t existingIt = resDict.m_resCategories.FindPrehashed(hash, categoryStr);
 				if (existingIt == resDict.m_resCategories.end())
 				{
 					rkit::HashMap<rkit::AsciiString, DynamicResourceCategory>::Iterator_t newIt;
-					RKIT_CHECK(resDict.m_resCategories.SetAndGetIterator(newIt, std::move(categoryStr), DynamicResourceCategory()));
+					resDict.m_resCategories.SetAndGetIterator(newIt, std::move(categoryStr), DynamicResourceCategory());
 
 					category = &newIt.Value();
 				}
@@ -2355,8 +2355,8 @@ namespace anox::buildsystem
 				}
 
 				DynamicResourceDef resDef;
-				RKIT_CHECK(resDef.m_path.Set(lineContents));
-				RKIT_CHECK(category->m_defs.Append(std::move(resDef)));
+				resDef.m_path.Set(lineContents);
+				category->m_defs.Append(std::move(resDef));
 			}
 		}
 
@@ -2366,21 +2366,21 @@ namespace anox::buildsystem
 	rkit::Result APEScriptCompilerImpl::FormatAnalysisPath(rkit::CIPath &outPath, const rkit::StringView &identifier)
 	{
 		rkit::String formattedPath;
-		RKIT_CHECK(formattedPath.Format(u8"ax_ape/a/{}", identifier));
+		formattedPath.Format(u8"ax_ape/a/{}", identifier);
 		return outPath.Set(formattedPath);
 	}
 
 	rkit::Result APEScriptCompilerImpl::FormatExtraDepsPath(rkit::CIPath &outPath, const rkit::StringView &identifier)
 	{
 		rkit::String formattedPath;
-		RKIT_CHECK(formattedPath.Format(u8"ax_ape/d/{}", identifier));
+		formattedPath.Format(u8"ax_ape/d/{}", identifier);
 		return outPath.Set(formattedPath);
 	}
 
 	rkit::Result APEScriptCompilerImpl::FormatOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier)
 	{
 		rkit::String formattedPath;
-		RKIT_CHECK(formattedPath.Format(u8"ax_ape/c/{}", identifier));
+		formattedPath.Format(u8"ax_ape/c/{}", identifier);
 		return outPath.Set(formattedPath);
 	}
 
@@ -2440,7 +2440,7 @@ namespace anox::buildsystem
 		}
 
 		rkit::Vector<char> resultChars;
-		RKIT_CHECK(resultChars.Append(prefixStr.ToSpan()));
+		resultChars.Append(prefixStr.ToSpan());
 
 		for (char ch : categoryStr)
 		{
@@ -2448,7 +2448,7 @@ namespace anox::buildsystem
 			{
 				if (resultChars.Count() > 0 && resultChars[resultChars.Count() - 1] != '/')
 				{
-					RKIT_CHECK(resultChars.Append('/'));
+					resultChars.Append('/');
 				}
 			}
 			else
@@ -2456,7 +2456,7 @@ namespace anox::buildsystem
 				if (ch >= 'A' && ch <= 'Z')
 					ch = ch - 'A' + 'a';
 
-				RKIT_CHECK(resultChars.Append(ch));
+				resultChars.Append(ch);
 			}
 		}
 
@@ -2489,7 +2489,7 @@ namespace anox::buildsystem
 		}
 
 		rkit::AsciiStringConstructionBuffer cbuf;
-		RKIT_CHECK(cbuf.Allocate(resultChars.Count()));
+		cbuf.Allocate(resultChars.Count());
 		rkit::CopySpanNonOverlapping(cbuf.GetSpan(), resultChars.ToSpan());
 
 		outString = rkit::AsciiString(std::move(cbuf));
@@ -2505,7 +2505,7 @@ namespace anox::buildsystem
 
 		for (const rkit::HashMapKeyValueView<rkit::AsciiString, const DynamicResourceCategory> &kvp : dict.m_resCategories)
 		{
-			RKIT_CHECK(sortedCategories.Append(KeyValuePair_t(&kvp.Key(), &kvp.Value())));
+			sortedCategories.Append(KeyValuePair_t(&kvp.Key(), &kvp.Value()));
 		}
 
 		rkit::QuickSort(sortedCategories.begin(), sortedCategories.end(), [](const KeyValuePair_t &a, const KeyValuePair_t &b)
@@ -2515,7 +2515,7 @@ namespace anox::buildsystem
 
 		for (const KeyValuePair_t &kvp : sortedCategories)
 		{
-			RKIT_CHECK(func(*kvp.First(), *kvp.Second()));
+			func(*kvp.First(), *kvp.Second());
 		}
 
 		RKIT_RETURN_OK;
@@ -2554,9 +2554,9 @@ namespace anox::buildsystem
 	rkit::Result APEGroupCompilerImpl::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		rkit::CIPath depsFilePath;
-		RKIT_CHECK(ResolvePath(depsFilePath, depsNode->GetIdentifier(), feedback));
+		ResolvePath(depsFilePath, depsNode->GetIdentifier(), feedback);
 
-		RKIT_CHECK(feedback->AddNodeDependency(rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kDepsNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, depsFilePath.ToString()));
+		feedback->AddNodeDependency(rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kDepsNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, depsFilePath.ToString());
 
 		RKIT_RETURN_OK;
 	}
@@ -2576,8 +2576,8 @@ namespace anox::buildsystem
 				for (rkit::buildsystem::FileStatusView fsView : apeScriptNode->GetCompileProducts())
 				{
 					rkit::buildsystem::FileStatus fileInfo;
-					RKIT_CHECK(fileInfo.Set(fsView));
-					RKIT_CHECK(fileList.Append(std::move(fileInfo)));
+					fileInfo.Set(fsView);
+					fileList.Append(std::move(fileInfo));
 				}
 			}
 		}
@@ -2600,20 +2600,20 @@ namespace anox::buildsystem
 		for (const rkit::buildsystem::FileStatus &fileStatus : fileList)
 		{
 			rkit::data::ContentID cid;
-			RKIT_CHECK(feedback->IndexCAS(fileStatus.m_location, fileStatus.m_filePath, cid));
-			RKIT_CHECK(contentIDs.Append(cid));
+			feedback->IndexCAS(fileStatus.m_location, fileStatus.m_filePath, cid);
+			contentIDs.Append(cid);
 		}
 
 		rkit::String outPathStr;
-		RKIT_CHECK(outPathStr.Format(u8"ax_ape/g/{}", depsNode->GetIdentifier()));
+		outPathStr.Format(u8"ax_ape/g/{}", depsNode->GetIdentifier());
 
 		rkit::CIPath outPath;
-		RKIT_CHECK(outPath.Set(outPathStr));
+		outPath.Set(outPathStr);
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
-		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outFile));
+		feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outFile);
 
-		RKIT_CHECK(outFile->WriteAllSpan(contentIDs.ToSpan()));
+		outFile->WriteAllSpan(contentIDs.ToSpan());
 
 		RKIT_RETURN_OK;
 	}
@@ -2621,10 +2621,10 @@ namespace anox::buildsystem
 	rkit::Result APEGroupCompilerImpl::ResolvePath(rkit::CIPath &depsFilePath, const rkit::StringView &groupNodeIdentifier, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		rkit::CIPath groupPath;
-		RKIT_CHECK(groupPath.Set(groupNodeIdentifier));
+		groupPath.Set(groupNodeIdentifier);
 
 		rkit::UniquePtr<rkit::ISeekableReadStream> inFile;
-		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, groupPath, inFile));
+		feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, groupPath, inFile);
 
 		const rkit::FilePos_t fileSize = inFile->GetSize();
 
@@ -2632,9 +2632,9 @@ namespace anox::buildsystem
 		if (inFile->GetSize() > std::numeric_limits<size_t>::max())
 			RKIT_THROW(rkit::ResultCode::kDataError);
 
-		RKIT_CHECK(pathBytes.Resize(static_cast<size_t>(fileSize)));
+		pathBytes.Resize(static_cast<size_t>(fileSize));
 
-		RKIT_CHECK(inFile->ReadAllSpan(pathBytes.ToSpan()));
+		inFile->ReadAllSpan(pathBytes.ToSpan());
 
 		rkit::StringSliceView slView(pathBytes.ToSpan());
 		if (!slView.Validate())

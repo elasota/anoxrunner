@@ -348,7 +348,6 @@ namespace GameObjectReflector
                 writer.WriteLine("\t\tdefault:");
                 writer.WriteLine("\t\t\tbreak;");
                 writer.WriteLine("\t\t};");
-                writer.WriteLine("\t\tRKIT_RETURN_OK;");
                 writer.WriteLine("\t}");
                 writer.WriteLine("}");
             }
@@ -537,10 +536,9 @@ namespace GameObjectReflector
                         writer.WriteLine($"\trkit::Result WorldObjectInstantiator<{className}>::CreateObject(rkit::UniquePtr<WorldObject> &outObject, ObjectFieldsBase<{className}> *&outFieldsRef)");
                         writer.WriteLine("\t{");
                         writer.WriteLine($"\t\trkit::UniquePtr<{className}> obj;");
-                        writer.WriteLine($"\t\tRKIT_CHECK(rkit::New<{className}>(obj));");
+                        writer.WriteLine($"\t\trkit::New<{className}>(obj);");
                         writer.WriteLine($"\t\toutFieldsRef = ::anox::game::priv::PrivateAccessor::ImplicitCast<ObjectFieldsBase<{className}>>(obj.Get());");
                         writer.WriteLine("\t\toutObject = std::move(obj);");
-                        writer.WriteLine("\t\tRKIT_RETURN_OK;");
                         writer.WriteLine("\t}");
                         writer.WriteLine();
                     }
@@ -561,10 +559,10 @@ namespace GameObjectReflector
 
                             foreach (string parentClass in cdef.ParentClasses)
                             {
-                                writer.WriteLine($"\t\tRKIT_CHECK(WorldObjectInstantiator<{parentClass}>::LoadObjectFromLevel(");
+                                writer.WriteLine($"\t\tWorldObjectInstantiator<{parentClass}>::LoadObjectFromLevel(");
                                 writer.WriteLine($"\t\t\t*::anox::game::priv::PrivateAccessor::ImplicitCast<ObjectFieldsBase<{parentClass}>>(");
                                 writer.WriteLine($"\t\t\t\t::anox::game::priv::PrivateAccessor::StaticCast<{className}>(&fields)");
-                                writer.WriteLine($"\t\t\t), spawnParams, bytes + {parentClassOffsets[parentClass]}));");
+                                writer.WriteLine($"\t\t\t), spawnParams, bytes + {parentClassOffsets[parentClass]});");
                             }
 
                             foreach (FieldDef fieldDef in cdef.FieldDefs)
@@ -577,7 +575,7 @@ namespace GameObjectReflector
 
                                 if (FieldLoaderCanFault(fieldDef.FieldType.MainType))
                                 {
-                                    writer.WriteLine($"\t\tRKIT_CHECK(EntityLevelLoader::Load{fieldTypeName}(fields.m_{fieldName}, bytes + {fieldOffsets[fieldDef.FieldName]}, spawnParams));");
+                                    writer.WriteLine($"\t\tEntityLevelLoader::Load{fieldTypeName}(fields.m_{fieldName}, bytes + {fieldOffsets[fieldDef.FieldName]}, spawnParams);");
                                 }
                                 else
                                 {
@@ -586,7 +584,6 @@ namespace GameObjectReflector
                             }
                         }
 
-                        writer.WriteLine("\t\tRKIT_RETURN_OK;");
                         writer.WriteLine("\t}");
                     }
                     writer.WriteLine("}");
@@ -1225,12 +1222,10 @@ namespace GameObjectReflector
 
                 foreach (PropertyDef prop in classDef.Properties)
                 {
-                    writer.Write("\tRKIT_CHECK(serializer.Serialize(this->");
+                    writer.Write("\tserializer.Serialize(this->");
                     writer.Write(prop.Name);
-                    writer.WriteLine("));");
+                    writer.WriteLine(");");
                 }
-
-                writer.WriteLine("\tRKIT_RETURN_OK;");
 
                 writer.WriteLine("}");
             }

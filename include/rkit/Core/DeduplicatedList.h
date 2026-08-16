@@ -40,7 +40,7 @@ namespace rkit
 		else
 		{
 			const size_t newIndex = m_items.Count();
-			RKIT_CHECK(m_items.Append(item));
+			m_items.Append(item);
 			RKIT_TRY_CATCH_RETHROW(m_lookup.SetPrehashed(hashValue, item, newIndex),
 				CatchContext(
 					[this, newIndex]

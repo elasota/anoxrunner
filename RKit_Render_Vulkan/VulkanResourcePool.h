@@ -118,7 +118,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		T newResource;
 		size_t newResIndex = 0;
-		RKIT_CHECK(pool.AcquireResource(newResource, newResIndex));
+		pool.AcquireResource(newResource, newResIndex);
 
 		m_resIndex = newResIndex;
 		m_resource = newResource;

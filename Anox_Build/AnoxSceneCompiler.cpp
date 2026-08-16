@@ -215,7 +215,7 @@ namespace anox::buildsystem
 			}
 
 			const rkit::ConstSpan<uint8_t> line = stream.SubSpan(lineStart, lineEnd - lineStart);
-			RKIT_CHECK(ParseLine(line, consumer));
+			ParseLine(line, consumer);
 
 			lineStart = lineEnd;
 			if (lineStart < stream.Count())
@@ -253,12 +253,12 @@ namespace anox::buildsystem
 		{
 			if (line[i] == ':')
 			{
-				RKIT_CHECK(tokens.Append(rkit::ByteStringSliceView(line.SubSpan(tokenStart, i - tokenStart))));
+				tokens.Append(rkit::ByteStringSliceView(line.SubSpan(tokenStart, i - tokenStart)));
 				tokenStart = i + 1;
 			}
 		}
 
-		RKIT_CHECK(tokens.Append(rkit::ByteStringSliceView(line.SubSpan(tokenStart, line.Count() - tokenStart))));
+		tokens.Append(rkit::ByteStringSliceView(line.SubSpan(tokenStart, line.Count() - tokenStart)));
 
 		if (tokens.Count() == 0)
 			RKIT_RETURN_OK;
@@ -486,13 +486,13 @@ namespace anox::buildsystem
 			{
 				if (i != 0)
 				{
-					RKIT_CHECK(recombinedParams.Append(':'));
+					recombinedParams.Append(':');
 				}
-				RKIT_CHECK(recombinedParams.Append(params[i].ToSpan()));
+				recombinedParams.Append(params[i].ToSpan());
 			}
 
 			rkit::ByteStringConstructionBuffer cbuf;
-			RKIT_CHECK(cbuf.Allocate(recombinedParams.Count()));
+			cbuf.Allocate(recombinedParams.Count());
 
 			rkit::CopySpanNonOverlapping(cbuf.GetSpan(), recombinedParams.ToSpan());
 
@@ -504,7 +504,7 @@ namespace anox::buildsystem
 
 		rkit::Vector<rkit::ByteStringSliceView> commandStrs;
 
-		RKIT_CHECK(SplitString(commandStrs, recombinedStr, ';'));
+		SplitString(commandStrs, recombinedStr, ';');
 
 		for (rkit::ByteStringSliceView commandStr : commandStrs)
 		{
@@ -547,7 +547,7 @@ namespace anox::buildsystem
 					}
 					else
 					{
-						RKIT_CHECK(SplitString(commandParamsVector, commandParamsStr, def.m_delimiter));
+						SplitString(commandParamsVector, commandParamsStr, def.m_delimiter);
 						commandParams = commandParamsVector.ToSpan();
 					}
 
@@ -566,13 +566,13 @@ namespace anox::buildsystem
 					{
 						cmd.m_opcode = static_cast<data::SceneCommandOpcode>(opcodeIndex);
 
-						RKIT_CHECK(TryParseCommandParams(succeeded, paramList, def, commandParams));
+						TryParseCommandParams(succeeded, paramList, def, commandParams);
 					}
 
 					if (succeeded)
 					{
 						cmd.m_paramOffset = paramStart;
-						RKIT_CHECK(commands.Append(cmd));
+						commands.Append(cmd);
 					}
 					else
 					{
@@ -678,7 +678,7 @@ namespace anox::buildsystem
 		auto parseLabel = [](rkit::Optional<Label> &outLabel, rkit::ByteStringSliceView paramStr) -> rkit::Result
 			{
 				rkit::Vector<rkit::ByteStringSliceView> labelParts;
-				RKIT_CHECK(SplitString(labelParts, paramStr, ':'));
+				SplitString(labelParts, paramStr, ':');
 				if (labelParts.Count() != 2)
 					RKIT_RETURN_OK;
 
@@ -714,7 +714,7 @@ namespace anox::buildsystem
 
 				for (size_t i = 0; i < paramSize; i++)
 				{
-					RKIT_CHECK(paramList.Append(blankParam));
+					paramList.Append(blankParam);
 				}
 			}
 			else
@@ -737,7 +737,7 @@ namespace anox::buildsystem
 								RKIT_RETURN_OK;
 						}
 
-						RKIT_CHECK(paramList.Append(uintParam));
+						paramList.Append(uintParam);
 					}
 					break;
 				case SceneCommandParamType::HexUInt:
@@ -747,7 +747,7 @@ namespace anox::buildsystem
 						if (!rkit::utils::TryParseInteger(uintParam.m_uint, paramStr, 16))
 							RKIT_RETURN_OK;
 
-						RKIT_CHECK(paramList.Append(uintParam));
+						paramList.Append(uintParam);
 					}
 					break;
 				case SceneCommandParamType::Float:
@@ -756,7 +756,7 @@ namespace anox::buildsystem
 						if (!rkit::utils::TryParseFloat(floatParam.m_float, paramStr))
 							RKIT_RETURN_OK;
 
-						RKIT_CHECK(paramList.Append(floatParam));
+						paramList.Append(floatParam);
 					}
 					break;
 				case SceneCommandParamType::EntityType:
@@ -768,8 +768,8 @@ namespace anox::buildsystem
 						ptrParam.m_constPtr = paramStr.GetChars();
 						sizeParam.m_size = paramStr.Length();
 
-						RKIT_CHECK(paramList.Append(ptrParam));
-						RKIT_CHECK(paramList.Append(sizeParam));
+						paramList.Append(ptrParam);
+						paramList.Append(sizeParam);
 					}
 					break;
 				case SceneCommandParamType::Label:
@@ -777,14 +777,14 @@ namespace anox::buildsystem
 						SceneCommandParam uintParam;
 
 						rkit::Optional<Label> label;
-						RKIT_CHECK(parseLabel(label, paramStr));
+						parseLabel(label, paramStr);
 
 						if (!label.IsSet())
 							RKIT_RETURN_OK;
 
 						uintParam.m_uint = label.Get().RawValue();
 
-						RKIT_CHECK(paramList.Append(uintParam));
+						paramList.Append(uintParam);
 					}
 					break;
 				case SceneCommandParamType::EntityID:
@@ -805,7 +805,7 @@ namespace anox::buildsystem
 						else
 						{
 							rkit::Optional<Label> label;
-							RKIT_CHECK(parseLabel(label, paramStr));
+							parseLabel(label, paramStr);
 
 							if (!label.IsSet())
 							{
@@ -816,8 +816,8 @@ namespace anox::buildsystem
 							uintParam.m_uint = label.Get().RawValue();
 						}
 
-						RKIT_CHECK(paramList.Append(flagParam));
-						RKIT_CHECK(paramList.Append(uintParam));
+						paramList.Append(flagParam);
+						paramList.Append(uintParam);
 					}
 					break;
 				default:
@@ -896,11 +896,11 @@ namespace anox::buildsystem
 		{
 			if (str[i] == ch)
 			{
-				RKIT_CHECK(outSubStrings.Append(str.SubString(start, i - start)));
+				outSubStrings.Append(str.SubString(start, i - start));
 				start = i + 1;
 			}
 		}
-		RKIT_CHECK(outSubStrings.Append(str.SubString(start, str.Length() - start)));
+		outSubStrings.Append(str.SubString(start, str.Length() - start));
 
 		RKIT_RETURN_OK;
 	}
@@ -934,9 +934,9 @@ namespace anox::buildsystem
 					}
 
 					rkit::String edefIdentifier;
-					RKIT_CHECK(EntityDefCompilerBase::FormatEDef(edefIdentifier, edefID));
+					EntityDefCompilerBase::FormatEDef(edefIdentifier, edefID);
 
-					RKIT_CHECK(m_feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kEntityDefNodeID, rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefIdentifier));
+					m_feedback->AddNodeDependency(kAnoxNamespaceID, buildsystem::kEntityDefNodeID, rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefIdentifier);
 				}
 
 				paramOffset += SceneCommand::ParamCountForType(paramDef.m_paramType);
@@ -976,7 +976,7 @@ namespace anox::buildsystem
 		block.m_numPaths = 0;
 		block.m_flags = flags;
 
-		RKIT_CHECK(m_blocks.Append(block));
+		m_blocks.Append(block);
 
 		RKIT_RETURN_OK;
 	}
@@ -990,7 +990,7 @@ namespace anox::buildsystem
 		lastBlock.m_numPaths = lastBlock.m_numPaths.Get() + 1;
 
 		data::ScenePathType pathType = {};
-		RKIT_CHECK(NormalizePathType(pathType, type));
+		NormalizePathType(pathType, type);
 
 		data::ScenePath path = {};
 		path.m_pathType = pathType;
@@ -1000,7 +1000,7 @@ namespace anox::buildsystem
 
 		path.m_isGlobal = ((flags & 0x4) != 0) ? 1 : 0;
 
-		RKIT_CHECK(m_paths.Append(path));
+		m_paths.Append(path);
 
 		RKIT_RETURN_OK;
 	}
@@ -1008,13 +1008,13 @@ namespace anox::buildsystem
 	rkit::Result SceneCompilerConsumer::ProcessCubicNode(uint32_t flags, uint32_t timeLen, rkit::math::Vec3 position, rkit::math::Vec3 velocityVector, uint32_t relativeMode)
 	{
 		data::SceneCubicNode node = {};
-		RKIT_CHECK(AddNode(node.m_common, data::ScenePathType::kCubic, flags, timeLen));
+		AddNode(node.m_common, data::ScenePathType::kCubic, flags, timeLen);
 
 		CopyVec3(node.m_position, position);
 		CopyVec3(node.m_velocity, velocityVector);
 		node.m_relativeMode = relativeMode;
 
-		RKIT_CHECK(m_cubic.Append(node));
+		m_cubic.Append(node);
 
 		RKIT_RETURN_OK;
 	}
@@ -1022,11 +1022,11 @@ namespace anox::buildsystem
 	rkit::Result SceneCompilerConsumer::ProcessFocusNode(uint32_t flags, uint32_t timeLen, uint32_t focusTarget, rkit::ByteStringSliceView name)
 	{
 		data::SceneFocusNode node = {};
-		RKIT_CHECK(AddNode(node.m_common, data::ScenePathType::kFocus, flags, timeLen));
+		AddNode(node.m_common, data::ScenePathType::kFocus, flags, timeLen);
 
 		node.m_focusTarget = focusTarget;
 
-		RKIT_CHECK(m_focus.Append(node));
+		m_focus.Append(node);
 
 		RKIT_RETURN_OK;
 	}
@@ -1034,14 +1034,14 @@ namespace anox::buildsystem
 	rkit::Result SceneCompilerConsumer::ProcessCommandNode(uint32_t flags, uint32_t timeLen, rkit::ConstSpan<SceneCommand> commands, rkit::ConstSpan<SceneCommandParam> params)
 	{
 		data::SceneCommandNode node = {};
-		RKIT_CHECK(AddNode(node.m_common, data::ScenePathType::kCommand, flags, timeLen));
+		AddNode(node.m_common, data::ScenePathType::kCommand, flags, timeLen);
 
 		const size_t prevDWordCount = m_cmdParamDWords.Count();
 		const size_t prevCmds = m_cmdOpcodes.Count();
 
 		for (const SceneCommand &cmd : commands)
 		{
-			RKIT_CHECK(ProcessCommand(cmd, params));
+			ProcessCommand(cmd, params);
 		}
 
 		const size_t numCmds = m_cmdOpcodes.Count() - prevCmds;
@@ -1053,7 +1053,7 @@ namespace anox::buildsystem
 		node.m_numCommands = static_cast<uint32_t>(numCmds);
 		node.m_numParamDWords = static_cast<uint32_t>(numParamDWords);
 
-		RKIT_CHECK(m_cmd.Append(node));
+		m_cmd.Append(node);
 
 		RKIT_RETURN_OK;
 	}
@@ -1061,12 +1061,12 @@ namespace anox::buildsystem
 	rkit::Result SceneCompilerConsumer::ProcessScaleNode(uint32_t flags, uint32_t timeLen, rkit::math::Vec3 scale, rkit::math::Vec3 delta)
 	{
 		data::SceneScaleNode node = {};
-		RKIT_CHECK(AddNode(node.m_common, data::ScenePathType::kScale, flags, timeLen));
+		AddNode(node.m_common, data::ScenePathType::kScale, flags, timeLen);
 
 		CopyVec3(node.m_scale, scale);
 		CopyVec3(node.m_delta, delta);
 
-		RKIT_CHECK(m_scale.Append(node));
+		m_scale.Append(node);
 
 		RKIT_RETURN_OK;
 	}
@@ -1074,12 +1074,12 @@ namespace anox::buildsystem
 	rkit::Result SceneCompilerConsumer::ProcessRollNode(uint32_t flags, uint32_t timeLen, float value, float rate)
 	{
 		data::SceneRollNode node = {};
-		RKIT_CHECK(AddNode(node.m_common, data::ScenePathType::kRoll, flags, timeLen));
+		AddNode(node.m_common, data::ScenePathType::kRoll, flags, timeLen);
 
 		node.m_value = value;
 		node.m_rate = rate;
 
-		RKIT_CHECK(m_roll.Append(node));
+		m_roll.Append(node);
 
 		RKIT_RETURN_OK;
 	}
@@ -1087,12 +1087,12 @@ namespace anox::buildsystem
 	rkit::Result SceneCompilerConsumer::ProcessFOVNode(uint32_t flags, uint32_t timeLen, float value, float rate)
 	{
 		data::SceneFOVNode node = {};
-		RKIT_CHECK(AddNode(node.m_common, data::ScenePathType::kFOV, flags, timeLen));
+		AddNode(node.m_common, data::ScenePathType::kFOV, flags, timeLen);
 
 		node.m_value = value;
 		node.m_rate = rate;
 
-		RKIT_CHECK(m_fov.Append(node));
+		m_fov.Append(node);
 
 		RKIT_RETURN_OK;
 	}
@@ -1100,13 +1100,13 @@ namespace anox::buildsystem
 	rkit::Result SceneCompilerConsumer::RunExport(rkit::IWriteStream &stream)
 	{
 		rkit::Vector<rkit::ByteString> strings;
-		RKIT_CHECK(strings.Resize(m_strings.Count()));
+		strings.Resize(m_strings.Count());
 
 		for (const rkit::HashMapKeyValueView<rkit::ByteString, const uint32_t> &kv : m_strings)
 			strings[kv.Value()] = kv.Key();
 
 		rkit::Vector<rkit::endian::LittleUInt32_t> stringLengths;
-		RKIT_CHECK(stringLengths.Resize(strings.Count()));
+		stringLengths.Resize(strings.Count());
 
 		auto processOne = [](rkit::endian::LittleUInt32_t &outLength, const rkit::ByteString &inStr) -> rkit::Result
 			{
@@ -1118,7 +1118,7 @@ namespace anox::buildsystem
 				RKIT_RETURN_OK;
 			};
 
-		RKIT_CHECK(rkit::CheckedProcessParallelSpans(stringLengths.ToSpan(), strings.ToSpan(), processOne));
+		rkit::CheckedProcessParallelSpans(stringLengths.ToSpan(), strings.ToSpan(), processOne);
 
 		m_header.m_numStrings = static_cast<uint32_t>(strings.Count());
 
@@ -1136,37 +1136,37 @@ namespace anox::buildsystem
 		m_header.m_numBlocks = static_cast<uint32_t>(m_blocks.Count());
 
 		// Write everything
-		RKIT_CHECK(stream.WriteOneBinary(m_header));
+		stream.WriteOneBinary(m_header);
 
-		RKIT_CHECK(stream.WriteAllSpan(stringLengths.ToSpan()));
+		stream.WriteAllSpan(stringLengths.ToSpan());
 
 		for (const rkit::ByteString &str : strings)
 		{
-			RKIT_CHECK(stream.WriteAllSpan(str.ToSpan()));
+			stream.WriteAllSpan(str.ToSpan());
 		}
 
-		RKIT_CHECK(stream.WriteAllSpan(m_blocks.ToSpan()));
-		RKIT_CHECK(stream.WriteAllSpan(m_paths.ToSpan()));
-		RKIT_CHECK(stream.WriteAllSpan(m_cubic.ToSpan()));
-		RKIT_CHECK(stream.WriteAllSpan(m_focus.ToSpan()));
-		RKIT_CHECK(stream.WriteAllSpan(m_cmd.ToSpan()));
-		RKIT_CHECK(stream.WriteAllSpan(m_scale.ToSpan()));
-		RKIT_CHECK(stream.WriteAllSpan(m_roll.ToSpan()));
-		RKIT_CHECK(stream.WriteAllSpan(m_fov.ToSpan()));
-		RKIT_CHECK(stream.WriteAllSpan(m_cmdOpcodes.ToSpan()));
-		RKIT_CHECK(stream.WriteAllSpan(m_cmdParamDWords.ToSpan()));
+		stream.WriteAllSpan(m_blocks.ToSpan());
+		stream.WriteAllSpan(m_paths.ToSpan());
+		stream.WriteAllSpan(m_cubic.ToSpan());
+		stream.WriteAllSpan(m_focus.ToSpan());
+		stream.WriteAllSpan(m_cmd.ToSpan());
+		stream.WriteAllSpan(m_scale.ToSpan());
+		stream.WriteAllSpan(m_roll.ToSpan());
+		stream.WriteAllSpan(m_fov.ToSpan());
+		stream.WriteAllSpan(m_cmdOpcodes.ToSpan());
+		stream.WriteAllSpan(m_cmdParamDWords.ToSpan());
 
 		for (size_t contentTypeIndex = 0; contentTypeIndex < static_cast<size_t>(data::SceneContentRefType::kCount); contentTypeIndex++)
 		{
 			const rkit::HashMap<rkit::data::ContentID, uint32_t> &map = m_contentIDs[contentTypeIndex];
 
 			rkit::Vector<rkit::data::ContentID> contentIDs;
-			RKIT_CHECK(contentIDs.Resize(map.Count()));
+			contentIDs.Resize(map.Count());
 
 			for (const rkit::HashMapKeyValueView<rkit::data::ContentID, const uint32_t> &kv : map)
 				contentIDs[kv.Value()] = kv.Key();
 
-			RKIT_CHECK(stream.WriteAllSpan(contentIDs.ToSpan()));
+			stream.WriteAllSpan(contentIDs.ToSpan());
 		}
 
 
@@ -1221,9 +1221,9 @@ namespace anox::buildsystem
 			index = static_cast<uint32_t>(m_strings.Count());
 
 			rkit::ByteString bstr;
-			RKIT_CHECK(bstr.Set(strView));
+			bstr.Set(strView);
 
-			RKIT_CHECK(m_strings.SetPrehashed(hashValue, std::move(bstr), index));
+			m_strings.SetPrehashed(hashValue, std::move(bstr), index);
 		}
 		else
 			index = it.Value();
@@ -1247,7 +1247,7 @@ namespace anox::buildsystem
 				RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
 
 			index = static_cast<uint32_t>(map.Count());
-			RKIT_CHECK(map.SetPrehashed(hashValue, cid, index));
+			map.SetPrehashed(hashValue, cid, index);
 		}
 		else
 			index = it.Value();
@@ -1273,13 +1273,13 @@ namespace anox::buildsystem
 			case SceneCommandParamType::UInt:
 			case SceneCommandParamType::Label:
 			case SceneCommandParamType::HexUInt:
-				RKIT_CHECK(m_cmdParamDWords.Append(rkit::endian::LittleUInt32_t(params[inParamIndex].m_uint)));
+				m_cmdParamDWords.Append(rkit::endian::LittleUInt32_t(params[inParamIndex].m_uint));
 				break;
 			case SceneCommandParamType::Float:
 				{
 					uint32_t bits = 0;
 					memcpy(&bits, &params[inParamIndex].m_float, 4);
-					RKIT_CHECK(m_cmdParamDWords.Append(rkit::endian::LittleUInt32_t(bits)));
+					m_cmdParamDWords.Append(rkit::endian::LittleUInt32_t(bits));
 				}
 				break;
 			case SceneCommandParamType::Str:
@@ -1287,9 +1287,9 @@ namespace anox::buildsystem
 					const rkit::ByteStringSliceView strView(static_cast<const uint8_t *>(params[inParamIndex].m_constPtr), params[inParamIndex + 1].m_size);
 
 					uint32_t index = 0;
-					RKIT_CHECK(IndexString(index, strView));
+					IndexString(index, strView);
 
-					RKIT_CHECK(m_cmdParamDWords.Append(rkit::endian::LittleUInt32_t(index)));
+					m_cmdParamDWords.Append(rkit::endian::LittleUInt32_t(index));
 				}
 				break;
 			case SceneCommandParamType::EntityID:
@@ -1304,7 +1304,7 @@ namespace anox::buildsystem
 					if (isPlayerChar)
 						eid |= 1;
 
-					RKIT_CHECK(m_cmdParamDWords.Append(rkit::endian::LittleUInt32_t(eid)));
+					m_cmdParamDWords.Append(rkit::endian::LittleUInt32_t(eid));
 				}
 				break;
 			case SceneCommandParamType::EntityType:
@@ -1319,18 +1319,18 @@ namespace anox::buildsystem
 					}
 
 					rkit::String edefIdentifier;
-					RKIT_CHECK(EntityDefCompilerBase::FormatEDef(edefIdentifier, edefID));
+					EntityDefCompilerBase::FormatEDef(edefIdentifier, edefID);
 
 					rkit::CIPath edefPath;
-					RKIT_CHECK(edefPath.Set(edefIdentifier));
+					edefPath.Set(edefIdentifier);
 
 					rkit::data::ContentID contentID;
-					RKIT_CHECK(m_feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefPath, contentID));
+					m_feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefPath, contentID);
 
 					uint32_t cidIndex = 0;
-					RKIT_CHECK(IndexContentRef(cidIndex, data::SceneContentRefType::kEntityType, contentID));
+					IndexContentRef(cidIndex, data::SceneContentRefType::kEntityType, contentID);
 
-					RKIT_CHECK(m_cmdParamDWords.Append(rkit::endian::LittleUInt32_t(cidIndex)));
+					m_cmdParamDWords.Append(rkit::endian::LittleUInt32_t(cidIndex));
 				}
 				break;
 			default:
@@ -1342,7 +1342,7 @@ namespace anox::buildsystem
 			inParamIndex += SceneCommand::ParamCountForType(paramDef.m_paramType);
 		}
 
-		RKIT_CHECK(m_cmdOpcodes.Append(cmd.m_opcode));
+		m_cmdOpcodes.Append(cmd.m_opcode);
 
 		RKIT_RETURN_OK;
 	}
@@ -1371,15 +1371,15 @@ namespace anox::buildsystem
 	rkit::Result SceneCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		rkit::Vector<uint8_t> script;
-		RKIT_CHECK(ReadScriptInput(script, depsNode, feedback));
+		ReadScriptInput(script, depsNode, feedback);
 
 		rkit::UniquePtr<UserEntityDictionaryBase> dict;
-		RKIT_CHECK(EntityDefCompilerBase::LoadUserEntityDictionary(dict, feedback));
+		EntityDefCompilerBase::LoadUserEntityDictionary(dict, feedback);
 
 		SceneAnalyzer analyzer(std::move(dict), feedback);
 
 		SceneParser parser;
-		RKIT_CHECK(parser.ParseSceneFile(script.ToSpan(), analyzer));
+		parser.ParseSceneFile(script.ToSpan(), analyzer);
 
 		RKIT_RETURN_OK;
 	}
@@ -1387,26 +1387,26 @@ namespace anox::buildsystem
 	rkit::Result SceneCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		rkit::Vector<uint8_t> script;
-		RKIT_CHECK(ReadScriptInput(script, depsNode, feedback));
+		ReadScriptInput(script, depsNode, feedback);
 
 		rkit::UniquePtr<UserEntityDictionaryBase> dict;
-		RKIT_CHECK(EntityDefCompilerBase::LoadUserEntityDictionary(dict, feedback));
+		EntityDefCompilerBase::LoadUserEntityDictionary(dict, feedback);
 
 		SceneCompilerConsumer compiler(std::move(dict), feedback);
 
 		SceneParser parser;
-		RKIT_CHECK(parser.ParseSceneFile(script.ToSpan(), compiler));
+		parser.ParseSceneFile(script.ToSpan(), compiler);
 
 		rkit::String outPathStr;
-		RKIT_CHECK(SceneCompilerBase::FormatOutputPath(outPathStr, depsNode->GetIdentifier()));
+		SceneCompilerBase::FormatOutputPath(outPathStr, depsNode->GetIdentifier());
 
 		rkit::CIPath outPath;
-		RKIT_CHECK(outPath.Set(outPathStr));
+		outPath.Set(outPathStr);
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> stream;
-		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, stream));
+		feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, stream);
 
-		RKIT_CHECK(compiler.RunExport(*stream));
+		compiler.RunExport(*stream);
 
 		RKIT_RETURN_OK;
 	}
@@ -1414,18 +1414,18 @@ namespace anox::buildsystem
 	rkit::Result SceneCompiler::ReadScriptInput(rkit::Vector<uint8_t> &outVector, rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		rkit::CIPath path;
-		RKIT_CHECK(path.Set(depsNode->GetIdentifier()));
+		path.Set(depsNode->GetIdentifier());
 
 		rkit::UniquePtr<rkit::ISeekableReadStream> inputFile;
-		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, path, inputFile));
+		feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, path, inputFile);
 
 		if (inputFile->GetSize() > std::numeric_limits<size_t>::max())
 			RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
 
 		const size_t size = static_cast<size_t>(inputFile->GetSize());
 
-		RKIT_CHECK(outVector.Resize(size));
-		RKIT_CHECK(inputFile->ReadAllSpan(outVector.ToSpan()));
+		outVector.Resize(size);
+		inputFile->ReadAllSpan(outVector.ToSpan());
 
 		RKIT_RETURN_OK;
 	}

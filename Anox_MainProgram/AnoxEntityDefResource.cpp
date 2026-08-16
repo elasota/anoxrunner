@@ -85,16 +85,16 @@ namespace anox
 
 		data::UserEntityDef &edef = state.m_edef;
 
-		RKIT_CHECK(stream.ReadOneBinary(edef));
+		stream.ReadOneBinary(edef);
 		state.m_edefDataPos = stream.Tell();
 
 		{
 			rkit::RCPtr<rkit::Job> job;
 			rkit::Future<AnoxResourceRetrieveResult> result;
-			RKIT_CHECK(state.m_systems.m_resManager->GetContentIDKeyedResource(&job, result, resloaders::kMDAModelResourceTypeCode, edef.m_modelContentID));
+			state.m_systems.m_resManager->GetContentIDKeyedResource(&job, result, resloaders::kMDAModelResourceTypeCode, edef.m_modelContentID);
 
 			RKIT_ASSERT(job.IsValid());
-			RKIT_CHECK(outDeps.AppendRValue(std::move(job)));
+			outDeps.AppendRValue(std::move(job));
 		}
 
 		RKIT_RETURN_OK;
@@ -106,28 +106,28 @@ namespace anox
 
 		resource.m_values.m_modelCodeFourCC = state.m_edef.m_modelCode.Get();
 
-		RKIT_CHECK(DataReader::ReadCheckFloatArray(resource.m_values.m_scale, state.m_edef.m_scale, 16));
-		RKIT_CHECK(DataReader::ReadCheckEnum(resource.m_values.m_shadowType, state.m_edef.m_shadowType));
-		RKIT_CHECK(DataReader::ReadCheckFloatArray(resource.m_values.m_bboxMin, state.m_edef.m_bboxMin, 16));
-		RKIT_CHECK(DataReader::ReadCheckFloatArray(resource.m_values.m_bboxMax, state.m_edef.m_bboxMax, 16));
-		RKIT_CHECK(DataReader::ReadCheckEnumMask(resource.m_values.m_userEntityFlags, state.m_edef.m_flags));
-		RKIT_CHECK(DataReader::ReadCheckFloat(resource.m_values.m_walkSpeed, state.m_edef.m_walkSpeed, 16));
-		RKIT_CHECK(DataReader::ReadCheckFloat(resource.m_values.m_runSpeed, state.m_edef.m_runSpeed, 16));
-		RKIT_CHECK(DataReader::ReadCheckFloat(resource.m_values.m_speed, state.m_edef.m_speed, 16));
-		RKIT_CHECK(DataReader::ReadCheckLabel(resource.m_values.m_targetSequence, state.m_edef.m_targetSequenceID));
-		RKIT_CHECK(DataReader::ReadCheckLabel(resource.m_values.m_startSequence, state.m_edef.m_startSequenceID));
+		DataReader::ReadCheckFloatArray(resource.m_values.m_scale, state.m_edef.m_scale, 16);
+		DataReader::ReadCheckEnum(resource.m_values.m_shadowType, state.m_edef.m_shadowType);
+		DataReader::ReadCheckFloatArray(resource.m_values.m_bboxMin, state.m_edef.m_bboxMin, 16);
+		DataReader::ReadCheckFloatArray(resource.m_values.m_bboxMax, state.m_edef.m_bboxMax, 16);
+		DataReader::ReadCheckEnumMask(resource.m_values.m_userEntityFlags, state.m_edef.m_flags);
+		DataReader::ReadCheckFloat(resource.m_values.m_walkSpeed, state.m_edef.m_walkSpeed, 16);
+		DataReader::ReadCheckFloat(resource.m_values.m_runSpeed, state.m_edef.m_runSpeed, 16);
+		DataReader::ReadCheckFloat(resource.m_values.m_speed, state.m_edef.m_speed, 16);
+		DataReader::ReadCheckLabel(resource.m_values.m_targetSequence, state.m_edef.m_targetSequenceID);
+		DataReader::ReadCheckLabel(resource.m_values.m_startSequence, state.m_edef.m_startSequenceID);
 		resource.m_values.m_miscValue = state.m_edef.m_miscValue.Get();
 		resource.m_values.m_descLength = state.m_edef.m_descriptionStringLength;
 
 		rkit::Vector<uint8_t> descChars;
-		RKIT_CHECK(descChars.Resize(state.m_edef.m_descriptionStringLength));
+		descChars.Resize(state.m_edef.m_descriptionStringLength);
 
 		rkit::ReadOnlyMemoryStream stream(state.m_fileContents.ToSpan());
-		RKIT_CHECK(stream.SeekStart(state.m_edefDataPos));
+		stream.SeekStart(state.m_edefDataPos);
 
-		RKIT_CHECK(stream.ReadAllSpan(descChars.ToSpan()));
+		stream.ReadAllSpan(descChars.ToSpan());
 
-		RKIT_CHECK(DataReader::ReadCheckByteString(resource.m_description, descChars.ToSpan()));
+		DataReader::ReadCheckByteString(resource.m_description, descChars.ToSpan());
 
 		RKIT_RETURN_OK;
 	}
@@ -147,7 +147,7 @@ namespace anox
 		typedef AnoxAbstractSingleFileResourceLoader<AnoxEntityDefLoaderInfo> Loader_t;
 
 		rkit::RCPtr<Loader_t> loader;
-		RKIT_CHECK(rkit::New<Loader_t>(loader));
+		rkit::New<Loader_t>(loader);
 
 		outLoader = std::move(loader);
 

@@ -71,8 +71,8 @@ namespace anox::game
 
 	rkit::Result GameResourceManagerImpl::Initialize()
 	{
-		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->CreateMutex(m_requestMutex));
-		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->CreateMutex(m_resourceMutex));
+		rkit::GetDrivers().m_systemDriver->CreateMutex(m_requestMutex);
+		rkit::GetDrivers().m_systemDriver->CreateMutex(m_resourceMutex);
 
 		RKIT_RETURN_OK;
 	}
@@ -103,13 +103,13 @@ namespace anox::game
 		{
 			if (resList.m_freeIDs.Count() <= resList.m_items.Count())
 			{
-				RKIT_CHECK(resList.m_freeIDs.Append(0));
+				resList.m_freeIDs.Append(0);
 			}
 
 			if (resList.m_items.Count() > std::numeric_limits<uint32_t>::max() - 1u)
 				RKIT_THROW(rkit::ResultCode::kOutOfMemory);
 
-			RKIT_CHECK(resList.m_items.Append(T()));
+			resList.m_items.Append(T());
 
 			resList.m_freeIDs[0] = static_cast<uint32_t>(resList.m_items.Count());
 			resList.m_numFreeIDs = 1;
@@ -134,7 +134,7 @@ namespace anox::game
 	{
 		rkit::MutexLock lock(*m_requestMutex);
 
-		RKIT_CHECK(ReserveFreeID(m_requests));
+		ReserveFreeID(m_requests);
 		const uint32_t reqID = PeekFreeID(m_requests);
 		DiscardFreeID(m_requests);
 
@@ -160,7 +160,7 @@ namespace anox::game
 		GameResourceManagerImpl &impl = Impl();
 
 		rkit::Future<AnoxResourceRetrieveResult> future;
-		RKIT_CHECK(impl.m_captureHarness->GetContentIDKeyedResource(future, resourceType, contentID));
+		impl.m_captureHarness->GetContentIDKeyedResource(future, resourceType, contentID);
 
 		return impl.AddResourceRequest(outReqID, resourceType, future);
 	}
@@ -173,7 +173,7 @@ namespace anox::game
 		GameResourceManagerImpl &impl = Impl();
 
 		rkit::Future<AnoxResourceRetrieveResult> future;
-		RKIT_CHECK(impl.m_captureHarness->GetCIPathKeyedResource(future, resourceType, ciPath));
+		impl.m_captureHarness->GetCIPathKeyedResource(future, resourceType, ciPath);
 
 		return impl.AddResourceRequest(outReqID, resourceType, future);
 	}
@@ -228,12 +228,12 @@ namespace anox::game
 
 				if (!isExistingResource)
 				{
-					RKIT_CHECK(GameResourceManagerImpl::ReserveFreeID(impl.m_resources));
+					GameResourceManagerImpl::ReserveFreeID(impl.m_resources);
 
 					// Peek the free ID in case the hash map set fails
 					resID = GameResourceManagerImpl::PeekFreeID(impl.m_resources);
 
-					RKIT_CHECK(impl.m_resourcesMap.SetPrehashed(resourcePtrHash, resourcePtr, resID));
+					impl.m_resourcesMap.SetPrehashed(resourcePtrHash, resourcePtr, resID);
 
 					GameResourceManagerImpl::DiscardFreeID(impl.m_resources);
 
@@ -327,7 +327,7 @@ namespace anox::game
 
 		rkit::RCPtr<AnoxResourceBase> res;
 		uint32_t resType = 0;
-		RKIT_CHECK(impl.AcquireResource(res, resType, resID));
+		impl.AcquireResource(res, resType, resID);
 
 		if (resType != resloaders::kCIPathRawFileResourceTypeCode && resType != resloaders::kContentIDRawFileResourceTypeCode)
 			RKIT_THROW(rkit::ResultCode::kInvalidParameter);
@@ -341,8 +341,8 @@ namespace anox::game
 	rkit::Result GameResourceManager::Create(rkit::UniquePtr<GameResourceManager> &outResManager)
 	{
 		rkit::UniquePtr<GameResourceManager> resManager;
-		RKIT_CHECK(rkit::New<GameResourceManager>(resManager));
-		RKIT_CHECK(resManager->Impl().Initialize());
+		rkit::New<GameResourceManager>(resManager);
+		resManager->Impl().Initialize();
 
 		outResManager = std::move(resManager);
 

@@ -7,7 +7,15 @@
 #include <coroutine>
 #include <cstddef>
 
+#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
+#define RKIT_COROUTINE_EXCEPTIONS_ENABLED	1
+#else
+#define RKIT_COROUTINE_EXCEPTIONS_ENABLED	0
+#endif
+
+#if !!RKIT_COROUTINE_EXCEPTIONS_ENABLED
 #include <exception>
+#endif
 
 namespace rkit::coro::priv
 {
@@ -196,7 +204,9 @@ namespace rkit::coro::priv
 
 		std::coroutine_handle<> m_continuation;
 
+#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
 		std::exception_ptr m_exception;
+#endif
 	};
 }
 
@@ -276,12 +286,14 @@ namespace rkit::coro::priv
 		{
 			Promise<TReturnType> &promise = this->m_coroHandle.promise();
 
+#if !!RKIT_COROUTINE_EXCEPTIONS_ENABLED
 			if (promise.m_exception)
 			{
 				std::exception_ptr exPtr = promise.m_exception;
 				this->m_coroHandle.destroy();
 				std::rethrow_exception(exPtr);
 			}
+#endif
 
 			Returner<TReturnType> &returner = this->m_coroHandle.promise();
 			TReturnType *storedRV = returner.GetRVStorage();
@@ -305,22 +317,18 @@ namespace rkit::coro::priv
 	TReturnType &CoroutineAwaiter<TReturnType &>::await_resume()
 	{
 		if (!this->m_coroHandle)
-		{
-#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
 			RKIT_THROW(rkit::ResultCode::kCoroStackOverflow);
-#else
-			RKIT_ASSERT(false);
-			std::terminate();
-#endif
-		}
+
 		Promise<TReturnType> &promise = this->m_coroHandle.promise();
 
+#if !!RKIT_COROUTINE_EXCEPTIONS_ENABLED
 		if (promise.m_exception)
 		{
 			std::exception_ptr exPtr = promise.m_exception;
 			this->m_coroHandle.destroy();
 			std::rethrow_exception(exPtr);
 		}
+#endif
 
 		Returner<TReturnType &> &returner = promise.GetReturnValueStorage();
 		TReturnType *temp = returner.GetRV();
@@ -340,22 +348,18 @@ namespace rkit::coro::priv
 	TReturnType &&CoroutineAwaiter<TReturnType &&>::await_resume()
 	{
 		if (!this->m_coroHandle)
-		{
-#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
 			RKIT_THROW(rkit::ResultCode::kCoroStackOverflow);
-#else
-			RKIT_ASSERT(false);
-			std::terminate();
-#endif
-		}
+
 		Promise<TReturnType> &promise = this->m_coroHandle.promise();
 
+#if !!RKIT_COROUTINE_EXCEPTIONS_ENABLED
 		if (promise.m_exception)
 		{
 			std::exception_ptr exPtr = promise.m_exception;
 			this->m_coroHandle.destroy();
 			std::rethrow_exception(exPtr);
 		}
+#endif
 
 		Returner<TReturnType &> &returner = promise.GetReturnValueStorage();
 		TReturnType *temp = returner.GetRV();
@@ -373,15 +377,9 @@ namespace rkit::coro::priv
 	inline void CoroutineAwaiter<void>::await_resume()
 	{
 		if (!this->m_coroHandle)
-		{
-#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
 			RKIT_THROW(rkit::ResultCode::kCoroStackOverflow);
-#else
-			RKIT_ASSERT(false);
-			std::terminate();
-#endif
-		}
 
+#if !!RKIT_COROUTINE_EXCEPTIONS_ENABLED
 		Promise<void> &promise = this->m_coroHandle.promise();
 
 		if (promise.m_exception)
@@ -390,6 +388,7 @@ namespace rkit::coro::priv
 			this->m_coroHandle.destroy();
 			std::rethrow_exception(exPtr);
 		}
+#endif
 
 		this->m_coroHandle.destroy();
 	}
@@ -534,7 +533,11 @@ namespace rkit::coro::priv
 	template<class TReturnType>
 	void Promise<TReturnType>::unhandled_exception()
 	{
+#if !!RKIT_COROUTINE_EXCEPTIONS_ENABLED
 		m_exception = std::current_exception();
+#else
+		RKIT_THROW(rkit::ResultCode::kCppException);
+#endif
 	}
 
 	template<class TReturnType>
@@ -571,13 +574,17 @@ namespace rkit::coro::priv
 	rkit::Result Promise<TReturnType>::FinalizerDestroyAndRethrow(std::coroutine_handle<> coroHandle, void *context)
 	{
 		Promise<TReturnType> *self = static_cast<Promise<TReturnType> *>(context);
+
+#if !!RKIT_COROUTINE_EXCEPTIONS_ENABLED
 		std::exception_ptr ex = self->m_exception;
+#endif
+
 		coroHandle.destroy();
 
+#if !!RKIT_COROUTINE_EXCEPTIONS_ENABLED
 		if (ex)
 			std::rethrow_exception(ex);
-
-		RKIT_RETURN_OK;
+#endif
 	}
 
 	template<class TReturnType>
@@ -624,24 +631,9 @@ namespace rkit::coro
 }
 
 
-#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_ENUM || RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_CLASS
-
-#define CORO_THROW(expr)	co_return (::rkit::priv::ThrowResult(expr));
-
-#define CORO_RETURN_OK co_return (static_cast<::rkit::Result>(::rkit::ResultCode::kOK))
-
-#define CORO_CHECK(expr) do {\
-	::rkit::Result RKIT_PP_CONCAT(exprResult_, __LINE__) = (expr);\
-	if (static_cast<uint64_t>(RKIT_PP_CONCAT(exprResult_, __LINE__)) != 0)\
-		co_return RKIT_PP_CONCAT(exprResult_, __LINE__);\
-} while (false)
-
-
-#elif RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
+#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION || RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_FATAL
 
 #define CORO_THROW(expr)	RKIT_THROW(expr)
-
-#define CORO_CHECK(expr) RKIT_CHECK(expr)
 
 #define CORO_RETURN_OK co_return
 

@@ -23,7 +23,7 @@ namespace rkit
 	{
 		MutexLock lock(*m_mutex);
 
-		RKIT_CHECK(m_seek->SeekStart(startPos));
+		m_seek->SeekStart(startPos);
 		return m_read->ReadPartial(data, count, outCountRead);
 	}
 
@@ -31,7 +31,7 @@ namespace rkit
 	{
 		MutexLock lock(*m_mutex);
 
-		RKIT_CHECK(m_seek->SeekStart(startPos));
+		m_seek->SeekStart(startPos);
 		return m_write->WritePartial(data, count, outCountWritten);
 	}
 
@@ -89,7 +89,7 @@ namespace rkit
 	Result MutexProtectedStream::ReadPartial(void *data, size_t count, size_t &outCountRead)
 	{
 		size_t countRead = 0;
-		RKIT_CHECK(m_baseStream->ReadPartial(m_filePos, data, count, countRead));
+		m_baseStream->ReadPartial(m_filePos, data, count, countRead);
 
 		outCountRead = countRead;
 		m_filePos += static_cast<FilePos_t>(countRead);
@@ -100,7 +100,7 @@ namespace rkit
 	Result MutexProtectedStream::WritePartial(const void *data, size_t count, size_t &outCountWritten)
 	{
 		size_t countWritten = 0;
-		RKIT_CHECK(m_baseStream->WritePartial(m_filePos, data, count, countWritten));
+		m_baseStream->WritePartial(m_filePos, data, count, countWritten);
 
 		outCountWritten = countWritten;
 		m_filePos += static_cast<FilePos_t>(countWritten);

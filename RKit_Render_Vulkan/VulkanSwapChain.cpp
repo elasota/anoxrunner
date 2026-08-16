@@ -210,7 +210,7 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanSwapChainPrototype::Initialize()
 	{
-		RKIT_CHECK(platform::CreateSurfaceFromDisplay(m_surface, m_device, m_display));
+		platform::CreateSurfaceFromDisplay(m_surface, m_device, m_display);
 
 		RKIT_RETURN_OK;
 	}
@@ -276,7 +276,7 @@ namespace rkit { namespace render { namespace vulkan
 			bool isCompatible = false;
 			{
 				IComputeCommandQueue &downcastQueue = m_queue;
-				RKIT_CHECK(prototype.CheckQueueCompatibility(isCompatible, downcastQueue));
+				prototype.CheckQueueCompatibility(isCompatible, downcastQueue);
 			}
 
 			if (!isCompatible)
@@ -309,7 +309,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		swapchainCreateInfo.surface = m_surface->GetSurface();
 		swapchainCreateInfo.minImageCount = numImages;
-		RKIT_CHECK(VulkanUtils::ResolveRenderTargetFormat(swapchainCreateInfo.imageFormat, fmt));
+		VulkanUtils::ResolveRenderTargetFormat(swapchainCreateInfo.imageFormat, fmt);
 		swapchainCreateInfo.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 		swapchainCreateInfo.imageExtent = surfaceCaps.currentExtent;
 		swapchainCreateInfo.imageArrayLayers = simultaneousImageCount;
@@ -341,29 +341,29 @@ namespace rkit { namespace render { namespace vulkan
 		uint32_t imageCount = 0;
 		RKIT_VK_CHECK(vkd.vkGetSwapchainImagesKHR(m_device.GetDevice(), m_swapChain, &imageCount, nullptr));
 
-		RKIT_CHECK(m_images.Resize(imageCount));
+		m_images.Resize(imageCount);
 		for (VkImage &img : m_images)
 			img = VK_NULL_HANDLE;
 
-		RKIT_CHECK(m_rtvs.Resize(imageCount));
-		RKIT_CHECK(m_imageResources.ResetAndResize(imageCount));
+		m_rtvs.Resize(imageCount);
+		m_imageResources.ResetAndResize(imageCount);
 
-		RKIT_CHECK(m_swapChainFrames.Resize(imageCount));
+		m_swapChainFrames.Resize(imageCount);
 
 		for (uint32_t fi = 0; fi < imageCount; fi++)
 		{
-			RKIT_CHECK(m_swapChainFrames[fi].Initialize(fi));
+			m_swapChainFrames[fi].Initialize(fi);
 		}
 
 		RKIT_VK_CHECK(vkd.vkGetSwapchainImagesKHR(m_device.GetDevice(), m_swapChain, &imageCount, m_images.GetBuffer()));
 
 		VkImageAspectFlags aspectFlags = 0;
-		RKIT_CHECK(VulkanUtils::ResolveRenderTargetFormatAspectFlags(aspectFlags, fmt));
+		VulkanUtils::ResolveRenderTargetFormatAspectFlags(aspectFlags, fmt);
 
 		for (uint32_t i = 0; i < imageCount; i++)
 		{
 			VkImageViewType imageViewType = (simultaneousImageCount == 1) ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-			RKIT_CHECK(VulkanRenderTargetViewBase::Create(m_rtvs[i], m_device, m_images[i], swapchainCreateInfo.imageFormat, aspectFlags, imageViewType, 0, ImagePlane::kColor, 0, simultaneousImageCount));
+			VulkanRenderTargetViewBase::Create(m_rtvs[i], m_device, m_images[i], swapchainCreateInfo.imageFormat, aspectFlags, imageViewType, 0, ImagePlane::kColor, 0, simultaneousImageCount);
 
 			m_imageResources[i].SetImage(m_images[i], aspectMask);
 		}
@@ -404,9 +404,9 @@ namespace rkit { namespace render { namespace vulkan
 		uint32_t queueFamily = queue.GetQueueFamily();
 
 		UniquePtr<VulkanSwapChain> swapChain;
-		RKIT_CHECK(New<VulkanSwapChain>(swapChain, device, prototype.GetDisplay(), numImages, writeBehavior, queue));
+		New<VulkanSwapChain>(swapChain, device, prototype.GetDisplay(), numImages, writeBehavior, queue);
 
-		RKIT_CHECK(swapChain->Initialize(prototype, fmt, writeBehavior, queueFamily));
+		swapChain->Initialize(prototype, fmt, writeBehavior, queueFamily);
 
 		outSwapChain = std::move(swapChain);
 
@@ -416,9 +416,9 @@ namespace rkit { namespace render { namespace vulkan
 	Result VulkanSwapChainPrototypeBase::Create(UniquePtr<VulkanSwapChainPrototypeBase> &outSwapChainPrototype, VulkanDeviceBase &device, IDisplay &display)
 	{
 		UniquePtr<VulkanSwapChainPrototype> swapChainPrototype;
-		RKIT_CHECK(New<VulkanSwapChainPrototype>(swapChainPrototype, device, display));
+		New<VulkanSwapChainPrototype>(swapChainPrototype, device, display);
 
-		RKIT_CHECK(swapChainPrototype->Initialize());
+		swapChainPrototype->Initialize();
 
 		outSwapChainPrototype = std::move(swapChainPrototype);
 
@@ -428,9 +428,9 @@ namespace rkit { namespace render { namespace vulkan
 	Result VulkanSwapChainSyncPointBase::Create(UniquePtr<VulkanSwapChainSyncPointBase> &outSyncPoint, VulkanDeviceBase &device)
 	{
 		UniquePtr<VulkanSwapChainSyncPoint> syncPoint;
-		RKIT_CHECK(New<VulkanSwapChainSyncPoint>(syncPoint, device));
+		New<VulkanSwapChainSyncPoint>(syncPoint, device);
 
-		RKIT_CHECK(syncPoint->Initialize());
+		syncPoint->Initialize();
 
 		outSyncPoint = std::move(syncPoint);
 

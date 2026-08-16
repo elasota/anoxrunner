@@ -96,9 +96,9 @@ namespace anox
 		AnoxResourceManagerBase &resManager, rkit::UniquePtr<IConfigurationState> &&initialConfiguration)
 	{
 		rkit::UniquePtr<AnoxRealTimeCaptureHarness> harness;
-		RKIT_CHECK(rkit::New<AnoxRealTimeCaptureHarness>(harness, game, resManager, std::move(initialConfiguration)));
+		rkit::New<AnoxRealTimeCaptureHarness>(harness, game, resManager, std::move(initialConfiguration));
 
-		RKIT_CHECK(harness->Initialize());
+		harness->Initialize();
 
 		outHarness = std::move(harness);
 

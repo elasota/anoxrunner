@@ -309,9 +309,9 @@ rkit::Result rkit::ResizableRingBuffer<TTraits>::Allocate(AddrOffset_t size, Add
 		}
 
 		UniquePtr<LinkedMemChunk> memChunk;
-		RKIT_CHECK(NewWithAlloc<LinkedMemChunk>(memChunk, m_alloc, this, m_chunkAllocator, newSize));
+		NewWithAlloc<LinkedMemChunk>(memChunk, m_alloc, this, m_chunkAllocator, newSize);
 
-		RKIT_CHECK(memChunk->GetMemChunk()->Initialize(newSize, TTraits::kMaxAlignment));
+		memChunk->GetMemChunk()->Initialize(newSize, TTraits::kMaxAlignment);
 
 		LinkedMemChunk *detached = memChunk.Detach().m_obj;
 		if (m_lastMemChunk)

@@ -194,7 +194,7 @@ namespace rkit
 		size_t oldChunkCount = m_chunks.Count();
 		if (m_chunks.Count() != chunksRequired)
 		{
-			RKIT_CHECK(m_chunks.Resize(chunksRequired));
+			m_chunks.Resize(chunksRequired);
 		}
 
 		if (chunksRequired > oldChunkCount)
@@ -230,7 +230,7 @@ namespace rkit
 
 		if (oldSize % kBitsPerChunk == 0)
 		{
-			RKIT_CHECK(m_chunks.Append(0));
+			m_chunks.Append(0);
 		}
 
 		++m_size;
@@ -279,7 +279,7 @@ namespace rkit
 				m_chunks.Reset();
 			else
 			{
-				RKIT_CHECK(m_chunks.Resize(other.m_chunks.Count()));
+				m_chunks.Resize(other.m_chunks.Count());
 
 				const Chunk_t *otherChunks = other.m_chunks.GetBuffer();
 				Chunk_t *thisChunks = m_chunks.GetBuffer();

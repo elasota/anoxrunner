@@ -250,12 +250,12 @@ namespace anox::game
 			}
 
 			ScriptWindowInstance *instance = nullptr;
-			CORO_CHECK(WorldObjectFactory::CreateDynamic<ScriptWindowInstance>(world, instance));
+			WorldObjectFactory::CreateDynamic<ScriptWindowInstance>(world, instance);
 
-			CORO_CHECK(m_activeWindows.Append(instance));
+			m_activeWindows.Append(instance);
 			instance->SetWindowID(label);
 
-			CORO_CHECK(co_await ExecuteWindowCommands(thread, *instance, *window));
+			co_await ExecuteWindowCommands(thread, *instance, *window);
 
 			const Label startSwitch = instance->GetStartSwitch();
 
@@ -271,7 +271,7 @@ namespace anox::game
 			const ScriptPackage &pkg = *sw->m_package;
 
 			int loopCounter = 0;
-			CORO_CHECK(co_await ExecuteSwitchCommands(thread, &pkg, cmds, loopCounter, world, 0));
+			co_await ExecuteSwitchCommands(thread, &pkg, cmds, loopCounter, world, 0);
 		}
 
 		CORO_RETURN_OK;
@@ -290,7 +290,7 @@ namespace anox::game
 			const ScriptPackage &pkg = *sw->m_package;
 
 			int loopCounter = 0;
-			CORO_CHECK(co_await ExecuteSwitchCommands(thread, &pkg, cmds, loopCounter, world, 0));
+			co_await ExecuteSwitchCommands(thread, &pkg, cmds, loopCounter, world, 0);
 		}
 
 		CORO_RETURN_OK;
@@ -488,7 +488,7 @@ namespace anox::game
 		while (cmdStream.Count() > 0)
 		{
 			size_t consumed = 0;
-			CORO_CHECK(ape::HandleCommand(cmdStream.Ptr(), cmdStream.Count(), consumed, cmdParser, windowInstance, this->Base(), pkg));
+			ape::HandleCommand(cmdStream.Ptr(), cmdStream.Count(), consumed, cmdParser, windowInstance, this->Base(), pkg);
 
 			cmdStream = cmdStream.SubSpan(consumed);
 		}
@@ -524,7 +524,7 @@ namespace anox::game
 						float v = 0.f;
 						if (cmd.m_exprValue.m_exprType == ScriptExprType::Empty || TryEvaluateFloatScriptExpr(v, *pkg, cmd.m_exprValue, 0))
 						{
-							CORO_CHECK(SetFloatVariable(std::move(varName), v));
+							SetFloatVariable(std::move(varName), v);
 						}
 					}
 				}
@@ -586,7 +586,7 @@ namespace anox::game
 						CORO_RETURN_OK;
 					}
 
-					CORO_CHECK(co_await ExecuteExtern(thread, pkg, world, externOpcode, pkg->m_operandLists[externArgList]));
+					co_await ExecuteExtern(thread, pkg, world, externOpcode, pkg->m_operandLists[externArgList]);
 				}
 				break;
 			//case 11:	// while
@@ -623,7 +623,7 @@ namespace anox::game
 
 								if (finishSwitch)
 								{
-									CORO_CHECK(co_await ExecuteSwitchCommands(thread, finishSwitch->m_package, finishSwitch->m_commands, loopCounter, world, depth + 1));
+									co_await ExecuteSwitchCommands(thread, finishSwitch->m_package, finishSwitch->m_commands, loopCounter, world, depth + 1);
 								}
 
 								break;
@@ -658,7 +658,7 @@ namespace anox::game
 		dispatchContext.m_operands = operands;
 		dispatchContext.m_externContext.m_env = &this->Base();
 
-		CORO_CHECK(co_await dispatchFunc(thread, dispatchContext));
+		co_await dispatchFunc(thread, dispatchContext);
 
 		CORO_RETURN_OK;
 	}
@@ -772,7 +772,7 @@ namespace anox::game
 		rkit::ReadOnlyMemoryStream stream(contents);
 
 		anox::data::ape::APEScriptCatalog catalog;
-		RKIT_CHECK(stream.ReadOneBinary(catalog));
+		stream.ReadOneBinary(catalog);
 
 		const uint32_t numStrings = catalog.m_numStrings.Get();
 		const uint32_t numExprs = catalog.m_numExprs.Get();
@@ -785,59 +785,59 @@ namespace anox::game
 		rkit::Vector<rkit::ByteStringConstructionBuffer> strCBufs;
 		rkit::Vector<rkit::ByteString> strings;
 
-		RKIT_CHECK(strCBufs.Resize(numStrings));
-		RKIT_CHECK(strings.Resize(numStrings));
+		strCBufs.Resize(numStrings);
+		strings.Resize(numStrings);
 
 		// Read lengths
 		for (size_t i = 0; i < numStrings; i++)
 		{
 			rkit::endian::LittleUInt32_t strLength;
-			RKIT_CHECK(stream.ReadOneBinary(strLength));
-			RKIT_CHECK(strCBufs[i].Allocate(strLength.Get()));
+			stream.ReadOneBinary(strLength);
+			strCBufs[i].Allocate(strLength.Get());
 		}
 
 		// Read strings
 		{
 			auto processOne = [&stream](rkit::ByteString &outString, rkit::ByteStringConstructionBuffer &cbuf) -> rkit::Result
 				{
-					RKIT_CHECK(stream.ReadAllSpan(cbuf.GetSpan()));
+					stream.ReadAllSpan(cbuf.GetSpan());
 					outString = rkit::ByteString(std::move(cbuf));
 					RKIT_RETURN_OK;
 				};
 
-			RKIT_CHECK(rkit::CheckedProcessParallelSpans(strings.ToSpan(), strCBufs.ToSpan(), processOne));
+			rkit::CheckedProcessParallelSpans(strings.ToSpan(), strCBufs.ToSpan(), processOne);
 		}
 
 		rkit::Vector<ScriptExpression> scriptExprs;
 		rkit::Vector<data::ape::Expression> exprData;
 
-		RKIT_CHECK(scriptExprs.Resize(numExprs));
-		RKIT_CHECK(exprData.Resize(numExprs));
+		scriptExprs.Resize(numExprs);
+		exprData.Resize(numExprs);
 
-		RKIT_CHECK(stream.ReadAllSpan(exprData.ToSpan()));
+		stream.ReadAllSpan(exprData.ToSpan());
 
-		RKIT_CHECK(rkit::CheckedProcessParallelSpans(scriptExprs.ToSpan(), exprData.ToSpan(), LoadScriptExpression));
+		rkit::CheckedProcessParallelSpans(scriptExprs.ToSpan(), exprData.ToSpan(), LoadScriptExpression);
 
 		rkit::Vector<uint32_t> operandListCounts;
-		RKIT_CHECK(operandListCounts.Resize(numOperandLists));
+		operandListCounts.Resize(numOperandLists);
 
-		RKIT_CHECK(stream.ReadAllSpan(operandListCounts.ToSpan()));
+		stream.ReadAllSpan(operandListCounts.ToSpan());
 
 		size_t totalOperands = 0;
 		for (uint32_t &operandListCount : operandListCounts)
 		{
 			rkit::endian::LittleUInt32_t::StaticConvertToHostOrderInPlace(operandListCount);
-			RKIT_CHECK(rkit::SafeAdd<size_t>(totalOperands, totalOperands, operandListCount));
+			rkit::SafeAdd<size_t>(totalOperands, totalOperands, operandListCount);
 		}
 
 		rkit::Vector<ScriptExprValue> operands;
-		RKIT_CHECK(operands.Resize(totalOperands));
+		operands.Resize(totalOperands);
 
 		{
 			rkit::Vector<data::ape::ExpressionValue> inOperands;
-			RKIT_CHECK(inOperands.Resize(totalOperands));
+			inOperands.Resize(totalOperands);
 
-			RKIT_CHECK(stream.ReadAllSpan(inOperands.ToSpan()));
+			stream.ReadAllSpan(inOperands.ToSpan());
 
 			rkit::ProcessParallelSpans(operands.ToSpan(), inOperands.ToSpan(), [](ScriptExprValue &outExprValue, const data::ape::ExpressionValue &inExprValue)
 				{
@@ -847,37 +847,36 @@ namespace anox::game
 		}
 
 		rkit::Vector<rkit::Span<ScriptExprValue>> operandLists;
-		RKIT_CHECK(operandLists.Reserve(numOperandLists));
+		operandLists.Reserve(numOperandLists);
 
 		{
 			size_t startOffset = 0;
 			for (uint32_t operandListCount : operandListCounts)
 			{
-				RKIT_CHECK(operandLists.Append(operands.ToSpan().SubSpan(startOffset, operandListCount)));
+				operandLists.Append(operands.ToSpan().SubSpan(startOffset, operandListCount));
 				startOffset += operandListCount;
 			}
 		}
 
 		rkit::Vector<anox::data::ape::Window> windowData;
-		RKIT_CHECK(windowData.Resize(numWindows));
+		windowData.Resize(numWindows);
 
 		rkit::Vector<ScriptWindow> scriptWindows;
-		RKIT_CHECK(scriptWindows.Resize(numWindows));
+		scriptWindows.Resize(numWindows);
 
-		RKIT_CHECK(stream.ReadAllSpan(windowData.ToSpan()));
+		stream.ReadAllSpan(windowData.ToSpan());
 
 		size_t totalWindowStreamBytes = 0;
-		RKIT_CHECK(rkit::CheckedProcessParallelSpans(scriptWindows.ToSpan(), windowData.ToSpan(), [&totalWindowStreamBytes](ScriptWindow &outWindow, const anox::data::ape::Window &inWindow) -> rkit::Result
+		rkit::CheckedProcessParallelSpans(scriptWindows.ToSpan(), windowData.ToSpan(), [&totalWindowStreamBytes](ScriptWindow &outWindow, const anox::data::ape::Window &inWindow) -> rkit::Result
 			{
 				outWindow.m_windowID = Label::FromRawValue(inWindow.m_windowID.Get());
 				return rkit::SafeAdd<size_t>(totalWindowStreamBytes, totalWindowStreamBytes, inWindow.m_commandStreamLength.Get());
-			})
-		);
+			});
 
 		rkit::Vector<uint8_t> windowCommandStreamBytes;
-		RKIT_CHECK(windowCommandStreamBytes.Resize(totalWindowStreamBytes));
+		windowCommandStreamBytes.Resize(totalWindowStreamBytes);
 
-		RKIT_CHECK(stream.ReadAllSpan(windowCommandStreamBytes.ToSpan()));
+		stream.ReadAllSpan(windowCommandStreamBytes.ToSpan());
 
 		{
 			size_t startOffset = 0;
@@ -891,29 +890,28 @@ namespace anox::game
 
 		// Switches
 		rkit::Vector<data::ape::Switch> switchData;
-		RKIT_CHECK(switchData.Resize(numSwitches));
+		switchData.Resize(numSwitches);
 
 		rkit::Vector<ScriptSwitch> scriptSwitches;
-		RKIT_CHECK(scriptSwitches.Resize(numSwitches));
+		scriptSwitches.Resize(numSwitches);
 
-		RKIT_CHECK(stream.ReadAllSpan(switchData.ToSpan()));
+		stream.ReadAllSpan(switchData.ToSpan());
 
 		size_t totalSwitchCommands = 0;
-		RKIT_CHECK(rkit::CheckedProcessParallelSpans(scriptSwitches.ToSpan(), switchData.ToSpan(), [&totalSwitchCommands](ScriptSwitch &outSwitch, const data::ape::Switch &inSwitch) -> rkit::Result
+		rkit::CheckedProcessParallelSpans(scriptSwitches.ToSpan(), switchData.ToSpan(), [&totalSwitchCommands](ScriptSwitch &outSwitch, const data::ape::Switch &inSwitch) -> rkit::Result
 			{
 				outSwitch.m_switchID = Label::FromRawValue(inSwitch.m_switchID.Get());
 				return rkit::SafeAdd<size_t>(totalSwitchCommands, totalSwitchCommands, inSwitch.m_numCommands.Get());
-			})
-		);
+			});
 
 		rkit::Vector<ScriptSwitchCommand> switchCommands;
 		rkit::Vector<data::ape::SwitchCommand> switchCommandData;
-		RKIT_CHECK(switchCommandData.Resize(totalSwitchCommands));
-		RKIT_CHECK(switchCommands.Resize(totalSwitchCommands));
+		switchCommandData.Resize(totalSwitchCommands);
+		switchCommands.Resize(totalSwitchCommands);
 
-		RKIT_CHECK(stream.ReadAllSpan(switchCommandData.ToSpan()));
+		stream.ReadAllSpan(switchCommandData.ToSpan());
 
-		RKIT_CHECK(rkit::CheckedProcessParallelSpans(switchCommands.ToSpan(), switchCommandData.ToSpan(), LoadScriptCommand));
+		rkit::CheckedProcessParallelSpans(switchCommands.ToSpan(), switchCommandData.ToSpan(), LoadScriptCommand);
 
 		{
 			size_t startOffset = 0;
@@ -926,13 +924,13 @@ namespace anox::game
 		}
 
 		rkit::Vector<ScriptResourceIdentifier> resourceIDs;
-		RKIT_CHECK(resourceIDs.Resize(numResourceIDs));
+		resourceIDs.Resize(numResourceIDs);
 
 		{
 			rkit::Vector<data::ape::ResourceIdentifier> dataResourceIDs;
-			RKIT_CHECK(dataResourceIDs.Resize(numResourceIDs));
+			dataResourceIDs.Resize(numResourceIDs);
 
-			RKIT_CHECK(stream.ReadAllSpan(dataResourceIDs.ToSpan()));
+			stream.ReadAllSpan(dataResourceIDs.ToSpan());
 
 			const auto processOneResourceRef = [numStrings](ScriptResourceIdentifier &outRef, const data::ape::ResourceIdentifier &inRef) -> rkit::Result
 				{
@@ -947,7 +945,7 @@ namespace anox::game
 					RKIT_RETURN_OK;
 				};
 
-			RKIT_CHECK(rkit::CheckedProcessParallelSpans(resourceIDs.ToSpan(), dataResourceIDs.ToSpan(), processOneResourceRef));
+			rkit::CheckedProcessParallelSpans(resourceIDs.ToSpan(), dataResourceIDs.ToSpan(), processOneResourceRef);
 		}
 
 		// DONE READING, there should be no trailing data
@@ -957,7 +955,7 @@ namespace anox::game
 		}
 
 		rkit::UniquePtr<ScriptPackage> package;
-		RKIT_CHECK(rkit::New<ScriptPackage>(package));
+		rkit::New<ScriptPackage>(package);
 
 		for (ScriptWindow &window : scriptWindows)
 			window.m_package = package.Get();
@@ -977,7 +975,7 @@ namespace anox::game
 
 		package->m_resourceIDs = std::move(resourceIDs);
 
-		RKIT_CHECK(GetLayer(layer).AddPackage(std::move(package)));
+		GetLayer(layer).AddPackage(std::move(package));
 
 		RKIT_RETURN_OK;
 	}
@@ -1111,16 +1109,16 @@ namespace anox::game
 	{
 		const ScriptPackage &package = *packageMoved;
 
-		RKIT_CHECK(m_packages.Append(std::move(packageMoved)));
+		m_packages.Append(std::move(packageMoved));
 
 		for (const ScriptWindow &window : package.m_windows)
 		{
-			RKIT_CHECK(m_windows.Set(window.m_windowID, &window));
+			m_windows.Set(window.m_windowID, &window);
 		}
 
 		for (const ScriptSwitch &sw : package.m_switches)
 		{
-			RKIT_CHECK(m_switches.Set(sw.m_switchID, &sw));
+			m_switches.Set(sw.m_switchID, &sw);
 		}
 
 		RKIT_RETURN_OK;
@@ -1174,7 +1172,7 @@ namespace anox::game
 	{
 		rkit::UniquePtr<ScriptEnvironment> scriptEnvironment;
 
-		RKIT_CHECK(Impl().CreateScriptEnvironment(scriptEnvironment));
+		Impl().CreateScriptEnvironment(scriptEnvironment);
 
 		outScriptEnvironment = std::move(scriptEnvironment);
 
@@ -1194,7 +1192,7 @@ namespace anox::game
 	rkit::Result ScriptManager::Create(rkit::UniquePtr<ScriptManager> &outScriptManager)
 	{
 		rkit::UniquePtr<ScriptManager> scriptManager;
-		RKIT_CHECK(rkit::New<ScriptManager>(scriptManager));
+		rkit::New<ScriptManager>(scriptManager);
 
 		scriptManager->RegisterAllExterns();
 		outScriptManager = std::move(scriptManager);

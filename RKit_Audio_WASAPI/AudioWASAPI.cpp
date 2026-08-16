@@ -353,15 +353,15 @@ namespace rkit::audio::wasapi
 	Result WASAPIAudioOutputEndpoint::TryOpenOutputStream(UniquePtr<IAudioOutputStream> &outOutputStream, const AudioFormat &preferredAudioFormat, uint32_t bufferCapacityInSamples, IAudioOutputRenderer *renderer)
 	{
 		UniquePtr<WASAPIAudioOutputThreadContext> threadContextUniquePtr;
-		RKIT_CHECK(New<WASAPIAudioOutputThreadContext>(threadContextUniquePtr));
+		New<WASAPIAudioOutputThreadContext>(threadContextUniquePtr);
 
 		WASAPIAudioOutputThreadContext &threadContext = *threadContextUniquePtr;
-		RKIT_CHECK(threadContext.Initialize());
+		threadContext.Initialize();
 
 		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
 
 		UniqueThreadRef audioThread;
-		RKIT_CHECK(sysDriver.CreateThreadWithPriority(audioThread, std::move(threadContextUniquePtr), ThreadPriority::kCritical, u8"Audio Thread"));
+		sysDriver.CreateThreadWithPriority(audioThread, std::move(threadContextUniquePtr), ThreadPriority::kCritical, u8"Audio Thread");
 
 		bool initializedOK = false;
 		ScopeExit initializeFailureCleanup([&initializedOK, &threadContext]
@@ -420,7 +420,7 @@ namespace rkit::audio::wasapi
 		streamProps.m_bufferSize = bufferSize;
 		streamProps.m_audioDriver = &m_audioDriver;
 
-		RKIT_CHECK(New<WASAPIAudioOutputStream>(outOutputStream, std::move(streamProps)));
+		New<WASAPIAudioOutputStream>(outOutputStream, std::move(streamProps));
 
 		// Once everything has been handed off to the output stream, we no longer need to auto-cleanup the audio thread
 		initializedOK = true;
@@ -637,7 +637,7 @@ namespace rkit::audio::wasapi
 		RKIT_COM_CHECK(m_comRes.m_devEnum->GetDefaultAudioEndpoint(eRender, eConsole, mmDevice.WriteTo()));
 
 		RCPtr<WASAPIAudioDeviceID> deviceID;
-		RKIT_CHECK(GetMMDeviceID(*mmDevice, deviceID));
+		GetMMDeviceID(*mmDevice, deviceID);
 
 		if (!mmDevice.IsValid())
 			RKIT_RETURN_OK;

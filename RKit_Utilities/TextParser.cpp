@@ -366,7 +366,7 @@ namespace rkit { namespace utils
 				break;
 			}
 
-			RKIT_CHECK(SkipWhitespace());
+			SkipWhitespace();
 			if (endLoc != m_charReader.GetLocation().m_pos)
 				break;
 
@@ -389,19 +389,19 @@ namespace rkit { namespace utils
 
 		if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_')
 		{
-			RKIT_CHECK(ReadCIdentifier());
+			ReadCIdentifier();
 		}
 		else if (c >= '1' && c <= '9')
 		{
-			RKIT_CHECK(ReadCDecimalNumber());
+			ReadCDecimalNumber();
 		}
 		else if (c == '0')
 		{
-			RKIT_CHECK(ReadCHexOrOctalNumber());
+			ReadCHexOrOctalNumber();
 		}
 		else if (c == '\"')
 		{
-			RKIT_CHECK(ReadCString());
+			ReadCString();
 		}
 		else
 		{
@@ -477,8 +477,8 @@ namespace rkit { namespace utils
 	Result TextParser::SetSimpleDelimiters(const Span<const uint8_t> &delimiters)
 	{
 		m_simpleDelimiters.Reset();
-		RKIT_CHECK(m_simpleDelimiters.Reserve(delimiters.Count()));
-		RKIT_CHECK(m_simpleDelimiters.Append(delimiters));
+		m_simpleDelimiters.Reserve(delimiters.Count());
+		m_simpleDelimiters.Append(delimiters);
 
 		RKIT_RETURN_OK;
 	}
@@ -490,7 +490,7 @@ namespace rkit { namespace utils
 
 	Result TextParser::ReadToken(bool &haveToken, Span<const uint8_t> &outSpan)
 	{
-		RKIT_CHECK(SkipWhitespace());
+		SkipWhitespace();
 
 		uint8_t c;
 		if (!m_charReader.PeekOne(c))
@@ -542,7 +542,7 @@ namespace rkit { namespace utils
 	Result TextParser::RequireToken(Span<const uint8_t> &outSpan)
 	{
 		bool haveToken = false;
-		RKIT_CHECK(ReadToken(haveToken, outSpan));
+		ReadToken(haveToken, outSpan);
 
 		if (!haveToken)
 		{
@@ -561,7 +561,7 @@ namespace rkit { namespace utils
 
 		Span<const uint8_t> span;
 
-		RKIT_CHECK(RequireToken(span));
+		RequireToken(span);
 
 		if (!CompareSpansEqual(span, str))
 		{
@@ -718,6 +718,6 @@ namespace rkit { namespace utils
 
 rkit::Result rkit::utils::TextParserBase::Create(const Span<const uint8_t> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<TextParserBase> &outParser)
 {
-	RKIT_CHECK(New<TextParser>(outParser, contents, commentType, lexType));
+	New<TextParser>(outParser, contents, commentType, lexType);
 	RKIT_RETURN_OK;
 }

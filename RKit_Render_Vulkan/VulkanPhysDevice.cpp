@@ -17,7 +17,7 @@ namespace rkit { namespace render { namespace vulkan
 		uint32_t propertyCount = 0;
 		instAPI.vkGetPhysicalDeviceQueueFamilyProperties(m_physDevice, &propertyCount, nullptr);
 
-		RKIT_CHECK(m_queueFamilyProps.Resize(propertyCount));
+		m_queueFamilyProps.Resize(propertyCount);
 		instAPI.vkGetPhysicalDeviceQueueFamilyProperties(m_physDevice, &propertyCount, m_queueFamilyProps.GetBuffer());
 
 		for (uint32_t i = 0; i < propertyCount; i++)
@@ -49,7 +49,7 @@ namespace rkit { namespace render { namespace vulkan
 			}
 			else
 			{
-				RKIT_CHECK(m_unknownQueueFamilies.Append(i));
+				m_unknownQueueFamilies.Append(i);
 			}
 		}
 

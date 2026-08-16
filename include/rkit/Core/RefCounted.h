@@ -911,7 +911,7 @@ namespace rkit
 		}
 
 		UniquePtr<priv::UniquePtrTracker<UPtrType>> tracker;
-		RKIT_CHECK(New<priv::UniquePtrTracker<UPtrType>>(tracker, std::move(uniquePtr)));
+		New<priv::UniquePtrTracker<UPtrType>>(tracker, std::move(uniquePtr));
 
 		SimpleObjectAllocation<priv::UniquePtrTracker<UPtrType>> trackerAllocation = tracker.Detach();
 		trackerAllocation.m_obj->SetSelf(trackerAllocation);

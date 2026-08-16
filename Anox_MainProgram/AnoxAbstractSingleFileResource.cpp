@@ -14,7 +14,7 @@ namespace anox
 	{
 		rkit::HybridVector<rkit::RCPtr<rkit::Job>, 16> dependencyJobs;
 
-		RKIT_CHECK(m_state->m_functions->m_loadPhaseCallback(*m_state, m_phase, dependencyJobs));
+		m_state->m_functions->m_loadPhaseCallback(*m_state, m_phase, dependencyJobs);
 
 		if (!dependencyJobs.Count())
 		{
@@ -28,8 +28,8 @@ namespace anox
 			rkit::IJobQueue &jobQueue = m_state->m_systems.m_fileSystem->GetJobQueue();
 
 			rkit::UniquePtr<rkit::IJobRunner> dependenciesDoneJobRunner;
-			RKIT_CHECK(jobQueue.CreateSignalJobRunner(dependenciesDoneJobRunner, m_waitForDependenciesSignaler));
-			RKIT_CHECK(jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(dependenciesDoneJobRunner), dependencyJobs.ToSpan()));
+			jobQueue.CreateSignalJobRunner(dependenciesDoneJobRunner, m_waitForDependenciesSignaler);
+			jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(dependenciesDoneJobRunner), dependencyJobs.ToSpan());
 		}
 
 		RKIT_RETURN_OK;

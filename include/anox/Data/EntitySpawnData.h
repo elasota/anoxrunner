@@ -42,11 +42,11 @@ namespace anox { namespace data {
 		template<class TSelf, class TVisitor>
 		static rkit::Result StaticVisitAllChunks(TSelf &self, const TVisitor &visitor)
 		{
-			RKIT_CHECK(visitor.VisitMember(self.m_entityDefContentIDs));
-			RKIT_CHECK(visitor.VisitMember(self.m_entityTypes));
-			RKIT_CHECK(visitor.VisitMember(self.m_entityStringLengths));
-			RKIT_CHECK(visitor.VisitMember(self.m_entityData));
-			RKIT_CHECK(visitor.VisitMember(self.m_entityStringData));
+			visitor.VisitMember(self.m_entityDefContentIDs);
+			visitor.VisitMember(self.m_entityTypes);
+			visitor.VisitMember(self.m_entityStringLengths);
+			visitor.VisitMember(self.m_entityData);
+			visitor.VisitMember(self.m_entityStringData);
 
 			RKIT_RETURN_OK;
 		}

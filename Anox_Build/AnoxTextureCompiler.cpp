@@ -403,9 +403,9 @@ namespace anox { namespace buildsystem { namespace priv
 		const size_t pitch = m_imageSpec.m_width;
 
 		size_t numElements = 0;
-		RKIT_CHECK(rkit::SafeMul<size_t>(numElements, pitch, m_imageSpec.m_height));
+		rkit::SafeMul<size_t>(numElements, pitch, m_imageSpec.m_height);
 
-		RKIT_CHECK(m_pixelData.Resize(numElements));
+		m_pixelData.Resize(numElements);
 
 		m_pitchInElements = pitch;
 
@@ -550,7 +550,7 @@ namespace anox { namespace buildsystem
 		ImageImportDisposition disposition = static_cast<ImageImportDisposition>(dispositionUInt);
 
 		rkit::String shortName;
-		RKIT_CHECK(shortName.Set(identifier.SubString(0, dotPosition)));
+		shortName.Set(identifier.SubString(0, dotPosition));
 
 		const size_t dispositionDotPos = dotPosition;
 		for (;;)
@@ -570,7 +570,7 @@ namespace anox { namespace buildsystem
 		rkit::StringSliceView extension = identifier.SubString(dotPosition, dispositionDotPos - dotPosition);
 
 		rkit::CIPath path;
-		RKIT_CHECK(path.Set(shortName));
+		path.Set(shortName);
 
 		if (extension == u8".pcx")
 			return CompilePCX(depsNode, feedback, path, disposition);
@@ -588,10 +588,10 @@ namespace anox { namespace buildsystem
 	rkit::Result TextureCompiler::GetTGAMetadata(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName)
 	{
 		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
-		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, stream));
+		feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, stream);
 
 		TGAHeader tgaHeader;
-		RKIT_CHECK(stream->ReadAll(&tgaHeader, sizeof(tgaHeader)));
+		stream->ReadAll(&tgaHeader, sizeof(tgaHeader));
 
 		if (tgaHeader.m_pixelSizeBits % 8 != 0)
 		{
@@ -611,10 +611,10 @@ namespace anox { namespace buildsystem
 	rkit::Result TextureCompiler::GetPCXMetadata(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName)
 	{
 		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
-		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, stream));
+		feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, stream);
 
 		priv::PCXHeader pcxHeader;
-		RKIT_CHECK(stream->ReadAll(&pcxHeader, sizeof(pcxHeader)));
+		stream->ReadAll(&pcxHeader, sizeof(pcxHeader));
 
 		if (pcxHeader.m_numColorPlanes != 1 && pcxHeader.m_numColorPlanes != 3 && pcxHeader.m_numColorPlanes != 4)
 		{
@@ -646,7 +646,7 @@ namespace anox { namespace buildsystem
 	rkit::Result TextureCompiler::GetPNGMetadata(rkit::utils::ImageSpec &imageSpec, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, const rkit::CIPathView &shortName)
 	{
 		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
-		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, stream));
+		feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, stream);
 
 		return pngDriver.LoadPNGMetadata(imageSpec, *stream);
 	}
@@ -654,10 +654,10 @@ namespace anox { namespace buildsystem
 	rkit::Result TextureCompiler::GetTGA(rkit::UniquePtr<rkit::utils::IImage> &outImage, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
 	{
 		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
-		RKIT_CHECK(feedback->OpenInput(buildFileLocation, shortName, stream));
+		feedback->OpenInput(buildFileLocation, shortName, stream);
 
 		TGAHeader tgaHeader;
-		RKIT_CHECK(stream->ReadAll(&tgaHeader, sizeof(tgaHeader)));
+		stream->ReadAll(&tgaHeader, sizeof(tgaHeader));
 
 		if (tgaHeader.m_identSize == 'B' && tgaHeader.m_colorMapType == 'M')
 		{
@@ -666,7 +666,7 @@ namespace anox { namespace buildsystem
 			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 		}
 
-		RKIT_CHECK(stream->SeekCurrent(tgaHeader.m_identSize));
+		stream->SeekCurrent(tgaHeader.m_identSize);
 
 		if (tgaHeader.m_colorMapLength.Get() > 0)
 		{
@@ -678,8 +678,8 @@ namespace anox { namespace buildsystem
 		uint32_t height = tgaHeader.m_imageHeight.Get();
 
 		rkit::UniquePtr<priv::TextureCompilerImage<uint8_t, 4>> image;
-		RKIT_CHECK((rkit::New<priv::TextureCompilerImage<uint8_t, 4>>(image)));
-		RKIT_CHECK(image->Initialize(width, height, rkit::utils::PixelPacking::kUInt8));
+		(rkit::New<priv::TextureCompilerImage<uint8_t, 4>>(image));
+		image->Initialize(width, height, rkit::utils::PixelPacking::kUInt8);
 
 		if (tgaHeader.m_pixelSizeBits % 8 != 0)
 		{
@@ -689,18 +689,18 @@ namespace anox { namespace buildsystem
 
 		const uint8_t pixelSizeBytes = tgaHeader.m_pixelSizeBits / 8;
 		size_t decompressedSizePixels = 0;
-		RKIT_CHECK(rkit::SafeMul<size_t>(decompressedSizePixels, width, height));
+		rkit::SafeMul<size_t>(decompressedSizePixels, width, height);
 
 		size_t decompressedSizeBytes = 0;
-		RKIT_CHECK(rkit::SafeMul<size_t>(decompressedSizeBytes, decompressedSizePixels, pixelSizeBytes));
+		rkit::SafeMul<size_t>(decompressedSizeBytes, decompressedSizePixels, pixelSizeBytes);
 
 		rkit::Vector<uint8_t> decompressedImageData;
-		RKIT_CHECK(decompressedImageData.Resize(decompressedSizeBytes));
+		decompressedImageData.Resize(decompressedSizeBytes);
 
 		{
 			if (tgaHeader.m_dataType == static_cast<uint8_t>(TGADataType::kUncompressedColor))
 			{
-				RKIT_CHECK(stream->ReadAll(decompressedImageData.GetBuffer(), decompressedImageData.Count()));
+				stream->ReadAll(decompressedImageData.GetBuffer(), decompressedImageData.Count());
 			}
 			else if (tgaHeader.m_dataType == static_cast<uint8_t>(TGADataType::kRLEColor))
 			{
@@ -710,7 +710,7 @@ namespace anox { namespace buildsystem
 				while (remainingPixelsToDecompress > 0)
 				{
 					uint8_t packetHeaderAndFirstPixel[32];
-					RKIT_CHECK(stream->ReadAll(packetHeaderAndFirstPixel, pixelSizeBytes + 1));
+					stream->ReadAll(packetHeaderAndFirstPixel, pixelSizeBytes + 1);
 
 					const uint8_t additionalPixelsToOutput = (packetHeaderAndFirstPixel[0] & 0x7f);
 
@@ -755,7 +755,7 @@ namespace anox { namespace buildsystem
 					{
 						// Raw packet
 						rkit::Span<uint8_t> rawPacketSpan = outBytes.SubSpan(0, additionalPixelsToOutput * pixelSizeBytes);
-						RKIT_CHECK(stream->ReadAll(rawPacketSpan.Ptr(), rawPacketSpan.Count()));
+						stream->ReadAll(rawPacketSpan.Ptr(), rawPacketSpan.Count());
 					}
 
 					outBytes = outBytes.SubSpan(pixelSizeBytes * additionalPixelsToOutput);
@@ -808,9 +808,9 @@ namespace anox { namespace buildsystem
 		priv::PCXHeader pcxHeader = {};
 
 		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
-		RKIT_CHECK(feedback->OpenInput(buildFileLocation, shortName, stream));
+		feedback->OpenInput(buildFileLocation, shortName, stream);
 
-		RKIT_CHECK(stream->ReadAll(&pcxHeader, sizeof(pcxHeader)));
+		stream->ReadAll(&pcxHeader, sizeof(pcxHeader));
 
 		if (pcxHeader.m_numColorPlanes != 1 && pcxHeader.m_numColorPlanes != 3 && pcxHeader.m_numColorPlanes != 4)
 		{
@@ -850,10 +850,10 @@ namespace anox { namespace buildsystem
 
 		size_t dataSize = 0;
 
-		RKIT_CHECK(rkit::SafeMul<size_t>(dataSize, height, scanLinePitch));
+		rkit::SafeMul<size_t>(dataSize, height, scanLinePitch);
 
 		rkit::Vector<uint8_t> pcxData;
-		RKIT_CHECK(pcxData.Resize(height * scanLinePitch));
+		pcxData.Resize(height * scanLinePitch);
 
 		for (size_t y = 0; y < height; y++)
 		{
@@ -865,13 +865,13 @@ namespace anox { namespace buildsystem
 			{
 				// Very slow... yikes
 				uint8_t data = 0;
-				RKIT_CHECK(stream->ReadAll(&data, 1));
+				stream->ReadAll(&data, 1);
 
 				uint8_t count = 1;
 				if ((data & 0xc0) == 0xc0)
 				{
 					count = data & 0x3f;
-					RKIT_CHECK(stream->ReadAll(&data, 1));
+					stream->ReadAll(&data, 1);
 
 					if (count > bytesRemaining)
 					{
@@ -893,8 +893,8 @@ namespace anox { namespace buildsystem
 		bool haveVGAPalette = false;
 
 		rkit::UniquePtr<priv::TextureCompilerImage<uint8_t, 4>> image;
-		RKIT_CHECK((rkit::New<priv::TextureCompilerImage<uint8_t, 4>>(image)));
-		RKIT_CHECK(image->Initialize(width, height, rkit::utils::PixelPacking::kUInt8));
+		(rkit::New<priv::TextureCompilerImage<uint8_t, 4>>(image));
+		image->Initialize(width, height, rkit::utils::PixelPacking::kUInt8);
 
 		if (pcxHeader.m_numColorPlanes == 1)
 		{
@@ -904,10 +904,10 @@ namespace anox { namespace buildsystem
 			{
 				haveVGAPalette = true;
 
-				RKIT_CHECK(stream->SeekEnd(-769));
+				stream->SeekEnd(-769);
 
 				uint8_t checkByte = 0;
-				RKIT_CHECK(stream->ReadAll(&checkByte, 1));
+				stream->ReadAll(&checkByte, 1);
 
 				if (checkByte != 12)
 				{
@@ -916,7 +916,7 @@ namespace anox { namespace buildsystem
 				}
 
 				static_assert(sizeof(vgaPalette) == 768, "VGA palette is the wrong size");
-				RKIT_CHECK(stream->ReadAll(vgaPalette, sizeof(vgaPalette)));
+				stream->ReadAll(vgaPalette, sizeof(vgaPalette));
 
 				palette = rkit::Span<RGBTriplet_t>(vgaPalette, 256);
 			}
@@ -963,7 +963,7 @@ namespace anox { namespace buildsystem
 	rkit::Result TextureCompiler::GetPNG(rkit::UniquePtr<rkit::utils::IImage> &image, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, rkit::buildsystem::BuildFileLocation buildFileLocation, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
 	{
 		rkit::UniquePtr<rkit::ISeekableReadStream> stream;
-		RKIT_CHECK(feedback->OpenInput(buildFileLocation, shortName, stream));
+		feedback->OpenInput(buildFileLocation, shortName, stream);
 
 		return pngDriver.LoadPNG(image, *stream);
 	}
@@ -971,7 +971,7 @@ namespace anox { namespace buildsystem
 	rkit::Result TextureCompiler::CompileTGA(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
 	{
 		rkit::UniquePtr<rkit::utils::IImage> image;
-		RKIT_CHECK(GetTGA(image, feedback, rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, disposition));
+		GetTGA(image, feedback, rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, disposition);
 
 		return CompileImageFromIdentifier(*image, depsNode->GetIdentifier(), feedback, disposition);
 	}
@@ -979,7 +979,7 @@ namespace anox { namespace buildsystem
 	rkit::Result TextureCompiler::CompilePCX(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
 	{
 		rkit::UniquePtr<rkit::utils::IImage> image;
-		RKIT_CHECK(GetPCX(image, feedback, rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, disposition));
+		GetPCX(image, feedback, rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, disposition);
 
 		return CompileImageFromIdentifier(*image, depsNode->GetIdentifier(), feedback, disposition);
 	}
@@ -987,7 +987,7 @@ namespace anox { namespace buildsystem
 	rkit::Result TextureCompiler::CompilePNG(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, rkit::png::IPngDriver &pngDriver, const rkit::CIPathView &shortName, ImageImportDisposition disposition)
 	{
 		rkit::UniquePtr<rkit::utils::IImage> image;
-		RKIT_CHECK(GetPNG(image, feedback, pngDriver, rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, disposition));
+		GetPNG(image, feedback, pngDriver, rkit::buildsystem::BuildFileLocation::kSourceDir, shortName, disposition);
 
 		return CompileImageFromIdentifier(*image, depsNode->GetIdentifier(), feedback, disposition);
 	}
@@ -995,10 +995,10 @@ namespace anox { namespace buildsystem
 	rkit::Result TextureCompiler::CompileImageFromIdentifier(const rkit::utils::IImage &image, const rkit::StringView &identifier, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, ImageImportDisposition disposition)
 	{
 		rkit::String pathStr;
-		RKIT_CHECK(ResolveIntermediatePath(pathStr, identifier));
+		ResolveIntermediatePath(pathStr, identifier);
 
 		rkit::CIPath path;
-		RKIT_CHECK(path.Set(pathStr));
+		path.Set(pathStr);
 
 		return CompileImage(image, path, feedback, disposition);
 	}
@@ -1012,7 +1012,7 @@ namespace anox { namespace buildsystem
 		const uint32_t height = image.GetHeight();
 
 		priv::TextureCompilerImage<uint8_t, 4> tcImage;
-		RKIT_CHECK(tcImage.Initialize(image.GetWidth(), image.GetHeight(), rkit::utils::PixelPacking::kUInt8));
+		tcImage.Initialize(image.GetWidth(), image.GetHeight(), rkit::utils::PixelPacking::kUInt8);
 
 		for (uint32_t y = 0; y < height; y++)
 		{
@@ -1053,7 +1053,7 @@ namespace anox { namespace buildsystem
 		rkit::Vector<priv::TextureCompilerImage<uint8_t, 4>> images;
 
 		size_t numLevels = 0;
-		RKIT_CHECK(TextureCompiler::GenerateMipMaps(images, rkit::Span<priv::TextureCompilerImage<uint8_t, 4>>(&tcImage, 1), numLevels, disposition));
+		TextureCompiler::GenerateMipMaps(images, rkit::Span<priv::TextureCompilerImage<uint8_t, 4>>(&tcImage, 1), numLevels, disposition);
 
 		return TextureCompiler::ExportDDS(images.ToSpan(), numLevels, 1, outPath, feedback, disposition);
 	}
@@ -1077,12 +1077,12 @@ namespace anox { namespace buildsystem
 			}
 		}
 
-		RKIT_CHECK(resultImages.Resize(sourceImages.Count() * numLevels));
+		resultImages.Resize(sourceImages.Count() * numLevels);
 
 		for (size_t i = 0; i < sourceImages.Count(); i++)
 		{
 			resultImages[i * numLevels] = std::move(sourceImages[i]);
-			RKIT_CHECK(Generate2DMipMapChain(resultImages.ToSpan().SubSpan(i * numLevels, numLevels), disposition));
+			Generate2DMipMapChain(resultImages.ToSpan().SubSpan(i * numLevels, numLevels), disposition);
 		}
 
 		outNumLevels = numLevels;
@@ -1294,12 +1294,12 @@ namespace anox { namespace buildsystem
 		}
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> stream;
-		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, stream));
+		feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, stream);
 
-		RKIT_CHECK(stream->WriteAll(&ddsHeader, sizeof(ddsHeader)));
+		stream->WriteAll(&ddsHeader, sizeof(ddsHeader));
 
 		rkit::Vector<uint8_t> packedScanline;
-		RKIT_CHECK(packedScanline.Resize(pixelSize * images[0].GetWidth()));
+		packedScanline.Resize(pixelSize * images[0].GetWidth());
 
 		for (const priv::TextureCompilerImage<TElementType, TNumElements> &image : images)
 		{
@@ -1327,7 +1327,7 @@ namespace anox { namespace buildsystem
 					scanlineOut += pixelSize;
 				}
 
-				RKIT_CHECK(stream->WriteAll(scanlineBuffer, pixelSize * width));
+				stream->WriteAll(scanlineBuffer, pixelSize * width);
 			}
 		}
 

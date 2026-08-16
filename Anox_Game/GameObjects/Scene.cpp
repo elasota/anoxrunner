@@ -17,15 +17,15 @@ namespace anox::game
 		size_t numBlocks = 0;
 		rkit::ConstSpan<ScenePackage::Block> blocks = m_scene->GetBlocks();
 
-		RKIT_CHECK(m_blocks.Resize(blocks.Count()));
+		m_blocks.Resize(blocks.Count());
 
 		auto processBlock = [](SceneRuntimeBlock &outBlock, const ScenePackage::Block &inBlock) -> rkit::Result
 			{
-				RKIT_CHECK(outBlock.m_groups.Resize(inBlock.m_numGroups));
+				outBlock.m_groups.Resize(inBlock.m_numGroups);
 				RKIT_RETURN_OK;
 			};
 
-		RKIT_CHECK(rkit::CheckedProcessParallelSpans(m_blocks.ToSpan(), blocks, processBlock));
+		rkit::CheckedProcessParallelSpans(m_blocks.ToSpan(), blocks, processBlock);
 
 		RKIT_RETURN_OK;
 	}

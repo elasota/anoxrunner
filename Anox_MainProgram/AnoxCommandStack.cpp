@@ -35,8 +35,8 @@ namespace anox
 
 	rkit::Result AnoxCommandStack::Init(size_t maxCapacity, size_t maxLines)
 	{
-		RKIT_CHECK(m_contentsBuffer.Resize(maxCapacity));
-		RKIT_CHECK(m_lines.Resize(maxLines));
+		m_contentsBuffer.Resize(maxCapacity);
+		m_lines.Resize(maxLines);
 
 		RKIT_RETURN_OK;
 	}
@@ -125,7 +125,7 @@ namespace anox
 				if (lineSpan.Count() > 0)
 				{
 					rkit::ByteStringSliceView slice(lineSpan);
-					RKIT_CHECK(lines.Append(slice));
+					lines.Append(slice);
 				}
 			}
 
@@ -142,7 +142,7 @@ namespace anox
 
 		rkit::ReverseSpanOrder(lines.ToSpan());
 
-		RKIT_CHECK(PushMultiple(lines.ToSpan().ToValueISpan()));
+		PushMultiple(lines.ToSpan().ToValueISpan());
 
 		RKIT_RETURN_OK;
 	}
@@ -227,9 +227,9 @@ namespace anox
 	rkit::Result AnoxCommandStackBase::Create(rkit::UniquePtr<AnoxCommandStackBase> &outStack, size_t maxCapacity, size_t maxLines)
 	{
 		rkit::UniquePtr<AnoxCommandStack> stack;
-		RKIT_CHECK(rkit::New<AnoxCommandStack>(stack));
+		rkit::New<AnoxCommandStack>(stack);
 
-		RKIT_CHECK(stack->Init(maxCapacity, maxLines));
+		stack->Init(maxCapacity, maxLines);
 
 		outStack = std::move(stack);
 

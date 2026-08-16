@@ -75,7 +75,7 @@ namespace rkit { namespace utils {
 	Result EncodingTextParserProxy<TChar, TEncoding>::ReadToken(bool &haveToken, Span<const TChar> &outSpan) const
 	{
 		Span<const uint8_t> bytesSpan;
-		RKIT_CHECK(m_parser.ReadToken(haveToken, bytesSpan));
+		m_parser.ReadToken(haveToken, bytesSpan);
 		outSpan = bytesSpan.template ReinterpretCast<const TChar>();
 		RKIT_RETURN_OK;
 	}
@@ -84,7 +84,7 @@ namespace rkit { namespace utils {
 	Result EncodingTextParserProxy<TChar, TEncoding>::ReadToEndOfLine(Span<const TChar> &outSpan) const
 	{
 		Span<const uint8_t> bytesSpan;
-		RKIT_CHECK(m_parser.ReadToEndOfLine(bytesSpan));
+		m_parser.ReadToEndOfLine(bytesSpan);
 		outSpan = bytesSpan.template ReinterpretCast<const TChar>();
 		RKIT_RETURN_OK;
 	}
@@ -99,7 +99,7 @@ namespace rkit { namespace utils {
 	Result EncodingTextParserProxy<TChar, TEncoding>::RequireToken(Span<const TChar> &outSpan) const
 	{
 		Span<const uint8_t> bytesSpan;
-		RKIT_CHECK(m_parser.RequireToken(bytesSpan));
+		m_parser.RequireToken(bytesSpan);
 		outSpan = bytesSpan.template ReinterpretCast<const TChar>();
 		RKIT_RETURN_OK;
 	}

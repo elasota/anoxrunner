@@ -57,9 +57,9 @@ namespace anox
 		AnoxRegisteredCommand cmd{ obj, methodStarter };
 
 		RegistryKey key;
-		RKIT_CHECK(CreateNormalizedKey(key, name));
+		CreateNormalizedKey(key, name);
 
-		RKIT_CHECK(m_commands.SetPrehashed(name.GetHash(), std::move(key), std::move(cmd)));
+		m_commands.SetPrehashed(name.GetHash(), std::move(key), std::move(cmd));
 
 		RKIT_RETURN_OK;
 	}
@@ -68,12 +68,12 @@ namespace anox
 	{
 		AnoxRegisteredAlias alias;
 
-		RKIT_CHECK(alias.m_text.Set(commandText));
+		alias.m_text.Set(commandText);
 
 		RegistryKey key;
-		RKIT_CHECK(CreateNormalizedKey(key, name));
+		CreateNormalizedKey(key, name);
 
-		RKIT_CHECK(m_aliases.SetPrehashed(name.GetHash(), std::move(key), std::move(alias)));
+		m_aliases.SetPrehashed(name.GetHash(), std::move(key), std::move(alias));
 
 		RKIT_RETURN_OK;
 	}
@@ -86,9 +86,9 @@ namespace anox
 		consoleVar.m_value = varValue;
 
 		RegistryKey key;
-		RKIT_CHECK(CreateNormalizedKey(key, name));
+		CreateNormalizedKey(key, name);
 
-		RKIT_CHECK(m_consoleVars.SetPrehashed(name.GetHash(), std::move(key), std::move(consoleVar)));
+		m_consoleVars.SetPrehashed(name.GetHash(), std::move(key), std::move(consoleVar));
 
 		RKIT_RETURN_OK;
 	}
@@ -188,7 +188,7 @@ namespace anox
 		size_t len = candidateView.Length();
 
 		rkit::ByteStringConstructionBuffer cbuf;
-		RKIT_CHECK(cbuf.Allocate(candidateView.Length()));
+		cbuf.Allocate(candidateView.Length());
 
 		uint8_t *cbufChars = cbuf.GetSpan().Ptr();
 		for (size_t i = 0; i < len; i++)
@@ -213,7 +213,7 @@ namespace anox
 	rkit::Result AnoxCommandRegistryBase::EscapeToken(rkit::ByteString &outString, const rkit::ByteStringSliceView &token)
 	{
 		rkit::ByteStringConstructionBuffer cbuf;
-		RKIT_CHECK(cbuf.Allocate(token.Length() + 2));
+		cbuf.Allocate(token.Length() + 2);
 
 		rkit::Span<uint8_t> chars = cbuf.GetSpan();
 		chars[0] = '\"';
@@ -229,7 +229,7 @@ namespace anox
 	rkit::Result AnoxCommandRegistryBase::Create(rkit::UniquePtr<AnoxCommandRegistryBase> &outRegistry)
 	{
 		rkit::UniquePtr<AnoxCommandRegistry> registry;
-		RKIT_CHECK(rkit::New<AnoxCommandRegistry>(registry));
+		rkit::New<AnoxCommandRegistry>(registry);
 
 		outRegistry = std::move(registry);
 

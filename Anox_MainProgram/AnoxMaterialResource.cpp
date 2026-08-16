@@ -90,22 +90,22 @@ namespace anox
 		rkit::IJobQueue &jobQueue = systems.m_fileSystem->GetJobQueue();
 
 		rkit::RCPtr<AnoxMaterialResourceLoaderState> state;
-		RKIT_CHECK(rkit::New<AnoxMaterialResourceLoaderState>(state));
+		rkit::New<AnoxMaterialResourceLoaderState>(state);
 
 		rkit::RCPtr<rkit::Job> loadFileJob;
-		RKIT_CHECK(CreateLoadEntireFileJob(loadFileJob, state.FieldRef(&AnoxMaterialResourceLoaderState::m_data), *systems.m_fileSystem, key));
+		CreateLoadEntireFileJob(loadFileJob, state.FieldRef(&AnoxMaterialResourceLoaderState::m_data), *systems.m_fileSystem, key);
 
 		rkit::RCPtr<rkit::Job> waitForDependenciesJob;
 		rkit::RCPtr<rkit::JobSignaler> waitForDependenciesSignaler;
-		RKIT_CHECK(jobQueue.CreateSignaledJob(waitForDependenciesSignaler, waitForDependenciesJob));
+		jobQueue.CreateSignaledJob(waitForDependenciesSignaler, waitForDependenciesJob);
 
 		rkit::UniquePtr<rkit::IJobRunner> analysisJobRunner;
-		RKIT_CHECK(rkit::New<AnoxMaterialAnalysisJobRunner>(analysisJobRunner, resource, state, jobQueue, *systems.m_resManager, waitForDependenciesSignaler));
-		RKIT_CHECK(jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(analysisJobRunner), loadFileJob));
+		rkit::New<AnoxMaterialAnalysisJobRunner>(analysisJobRunner, resource, state, jobQueue, *systems.m_resManager, waitForDependenciesSignaler);
+		jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(analysisJobRunner), loadFileJob);
 
 		rkit::UniquePtr<rkit::IJobRunner> processJobRunner;
-		RKIT_CHECK(rkit::New<AnoxMaterialProcessJobRunner>(analysisJobRunner, resource, state, jobQueue, *systems.m_resManager));
-		RKIT_CHECK(jobQueue.CreateJob(&outJob, rkit::JobType::kNormalPriority, std::move(processJobRunner), waitForDependenciesJob));
+		rkit::New<AnoxMaterialProcessJobRunner>(analysisJobRunner, resource, state, jobQueue, *systems.m_resManager);
+		jobQueue.CreateJob(&outJob, rkit::JobType::kNormalPriority, std::move(processJobRunner), waitForDependenciesJob);
 
 		RKIT_RETURN_OK;
 	}
@@ -132,7 +132,7 @@ namespace anox
 		rkit::ReadOnlyMemoryStream stream(m_state->m_data.GetBuffer(), m_state->m_data.Count());
 
 		data::MaterialHeader materialHeader = {};
-		RKIT_CHECK(stream.ReadAll(&materialHeader, sizeof(materialHeader)));
+		stream.ReadAll(&materialHeader, sizeof(materialHeader));
 
 		if (materialHeader.m_magic.Get() != data::MaterialHeader::kExpectedMagic
 			|| materialHeader.m_version.Get() != data::MaterialHeader::kExpectedVersion)
@@ -141,25 +141,25 @@ namespace anox
 		rkit::Vector<data::MaterialBitmapDef> bitmapDefs;
 		rkit::Vector<data::MaterialFrameDef> frameDefs;
 
-		RKIT_CHECK(bitmapDefs.Resize(materialHeader.m_numBitmaps.Get()));
-		RKIT_CHECK(frameDefs.Resize(materialHeader.m_numFrames.Get()));
+		bitmapDefs.Resize(materialHeader.m_numBitmaps.Get());
+		frameDefs.Resize(materialHeader.m_numFrames.Get());
 
-		RKIT_CHECK(stream.ReadAll(bitmapDefs.GetBuffer(), sizeof(data::MaterialBitmapDef) * bitmapDefs.Count()));
-		RKIT_CHECK(stream.ReadAll(frameDefs.GetBuffer(), sizeof(data::MaterialFrameDef) * frameDefs.Count()));
+		stream.ReadAll(bitmapDefs.GetBuffer(), sizeof(data::MaterialBitmapDef) * bitmapDefs.Count());
+		stream.ReadAll(frameDefs.GetBuffer(), sizeof(data::MaterialFrameDef) * frameDefs.Count());
 
 		rkit::Vector<rkit::RCPtr<rkit::Job>> bitmapJobs;
-		RKIT_CHECK(bitmapJobs.Resize(bitmapDefs.Count()));
+		bitmapJobs.Resize(bitmapDefs.Count());
 
 		for (size_t bitmapIndex = 0; bitmapIndex < bitmapDefs.Count(); bitmapIndex++)
 		{
 			rkit::Future<AnoxResourceRetrieveResult> retrieveResult;
-			RKIT_CHECK(m_resManager.GetContentIDKeyedResource(&bitmapJobs[bitmapIndex], retrieveResult, resloaders::kTextureResourceTypeCode, bitmapDefs[bitmapIndex].m_contentID));
+			m_resManager.GetContentIDKeyedResource(&bitmapJobs[bitmapIndex], retrieveResult, resloaders::kTextureResourceTypeCode, bitmapDefs[bitmapIndex].m_contentID);
 		}
 
 		rkit::UniquePtr<rkit::IJobRunner> signalJobRunner;
-		RKIT_CHECK(m_jobQueue.CreateSignalJobRunner(signalJobRunner, m_waitForDependenciesSignaler));
+		m_jobQueue.CreateSignalJobRunner(signalJobRunner, m_waitForDependenciesSignaler);
 
-		RKIT_CHECK(m_jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(signalJobRunner), bitmapJobs.ToSpan()));
+		m_jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(signalJobRunner), bitmapJobs.ToSpan());
 
 		RKIT_RETURN_OK;
 	}

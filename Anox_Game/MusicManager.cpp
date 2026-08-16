@@ -54,20 +54,20 @@ namespace anox::game
 		if (m_musicLoadState == MusicLoadState::kLoading)
 		{
 			bool isFinished = false;
-			RKIT_CHECK(m_musicRequest.TryFinishLoading(isFinished, m_musicResource));
+			m_musicRequest.TryFinishLoading(isFinished, m_musicResource);
 
 			if (isFinished)
 			{
 				m_musicLoadState = MusicLoadState::kReady;
 
 				SoundSourceHandle source;
-				RKIT_CHECK(SoundSourceHandle::CreateFromFileResource(source, m_musicResource, rkit::audio::AudioContainerFormat::kMPEGLayer3));
+				SoundSourceHandle::CreateFromFileResource(source, m_musicResource, rkit::audio::AudioContainerFormat::kMPEGLayer3);
 
 				SoundEmitterProperties emitterProperties;
 
-				RKIT_CHECK(SoundEmitterHandle::Create(m_musicEmitter, std::move(source), emitterProperties));
+				SoundEmitterHandle::Create(m_musicEmitter, std::move(source), emitterProperties);
 
-				RKIT_CHECK(m_musicEmitter.Play());
+				m_musicEmitter.Play();
 			}
 		}
 
@@ -77,7 +77,7 @@ namespace anox::game
 	rkit::Result MusicManagerImpl::SetLevelMusic(const rkit::data::ContentID &contentID)
 	{
 		m_musicLoadState = MusicLoadState::kLoading;
-		RKIT_CHECK(SandboxResourceLoader::LoadContentKeyedResource(m_musicRequest, anox::resloaders::kContentIDRawFileResourceTypeCode, contentID));
+		SandboxResourceLoader::LoadContentKeyedResource(m_musicRequest, anox::resloaders::kContentIDRawFileResourceTypeCode, contentID);
 
 		RKIT_RETURN_OK;
 	}

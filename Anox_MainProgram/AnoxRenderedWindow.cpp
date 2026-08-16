@@ -90,7 +90,7 @@ namespace anox
 	{
 		rkit::render::ISwapChainSyncPoint &syncPoint = *m_resources->m_swapChainSyncPoint;
 
-		RKIT_CHECK(m_window.m_swapChain->AcquireFrame(syncPoint));
+		m_window.m_swapChain->AcquireFrame(syncPoint);
 
 		m_resources->m_swapChainFrameIndex = syncPoint.GetFrameIndex();
 
@@ -107,7 +107,7 @@ namespace anox
 	{
 		rkit::render::ISwapChainSyncPoint &syncPoint = *m_resources->m_swapChainSyncPoint;
 
-		RKIT_CHECK(m_window.m_swapChain->Present(syncPoint));
+		m_window.m_swapChain->Present(syncPoint);
 
 		RKIT_RETURN_OK;
 	}
@@ -134,15 +134,15 @@ namespace anox
 			if (numSwapChainFrames < 2 || numSyncPoints < 1)
 				RKIT_THROW(rkit::ResultCode::kInternalError);
 
-			RKIT_CHECK(m_syncPoints.Resize(numSyncPoints));
+			m_syncPoints.Resize(numSyncPoints);
 			for (size_t i = 0; i < numSyncPoints; i++)
 			{
-				RKIT_CHECK(m_device->CreateSwapChainSyncPoint(m_syncPoints[i]));
+				m_device->CreateSwapChainSyncPoint(m_syncPoints[i]);
 			}
 
-			RKIT_CHECK(m_swapChainFrameStates.Resize(numSwapChainFrames));
+			m_swapChainFrameStates.Resize(numSwapChainFrames);
 
-			RKIT_CHECK(m_device->CreateSwapChain(m_swapChain, std::move(prototype), numSwapChainFrames, rkit::render::RenderTargetFormat::RGBA_UNorm8, rkit::render::SwapChainWriteBehavior::RenderTarget, *presentQueue));
+			m_device->CreateSwapChain(m_swapChain, std::move(prototype), numSwapChainFrames, rkit::render::RenderTargetFormat::RGBA_UNorm8, rkit::render::SwapChainWriteBehavior::RenderTarget, *presentQueue);
 
 			m_swapChain->GetExtents(m_width, m_height);
 		}
@@ -166,15 +166,15 @@ namespace anox
 			RKIT_RETURN_OK;
 
 		rkit::RCPtr<PerFramePerDisplayResources> displayResources;
-		RKIT_CHECK(rkit::New<PerFramePerDisplayResources>(displayResources));
+		rkit::New<PerFramePerDisplayResources>(displayResources);
 
 		displayResources->m_windowResources = this->m_resources.Get();
 		displayResources->m_swapChainSyncPoint = m_syncPoints[m_currentSyncPoint].Get();
 
 		rkit::UniquePtr<ISubmitJobRunner> acquireJobRunner;
-		RKIT_CHECK(rkit::New<AcquireJobRunner>(acquireJobRunner, *this, displayResources));
+		rkit::New<AcquireJobRunner>(acquireJobRunner, *this, displayResources);
 
-		RKIT_CHECK(graphicsSubsystem.CreateAndQueueSubmitJob(&displayResources->m_acquireJob, LogicalQueueType::kPresentation, std::move(acquireJobRunner), rkit::JobDependencyList()));
+		graphicsSubsystem.CreateAndQueueSubmitJob(&displayResources->m_acquireJob, LogicalQueueType::kPresentation, std::move(acquireJobRunner), rkit::JobDependencyList());
 
 		m_currentPerDisplayResources = displayResources;
 
@@ -187,10 +187,10 @@ namespace anox
 			RKIT_RETURN_OK;
 
 		rkit::UniquePtr<ISubmitJobRunner> presentJobRunner;
-		RKIT_CHECK(rkit::New<PresentJobRunner>(presentJobRunner, *this, m_currentPerDisplayResources));
+		rkit::New<PresentJobRunner>(presentJobRunner, *this, m_currentPerDisplayResources);
 
 		rkit::RCPtr<rkit::Job> presentJob;
-		RKIT_CHECK(graphicsSubsystem.CreateAndQueueSubmitJob(&presentJob, LogicalQueueType::kPresentation, std::move(presentJobRunner), rkit::JobDependencyList()));
+		graphicsSubsystem.CreateAndQueueSubmitJob(&presentJob, LogicalQueueType::kPresentation, std::move(presentJobRunner), rkit::JobDependencyList());
 
 		m_currentPerDisplayResources.Reset();
 
@@ -214,9 +214,9 @@ namespace anox
 		rkit::UniquePtr<RenderedWindowResources> resources = std::move(resourcesRef);
 
 		rkit::UniquePtr<RenderedWindow> window;
-		RKIT_CHECK(rkit::New<RenderedWindow>(window, std::move(display), std::move(resources), device));
+		rkit::New<RenderedWindow>(window, std::move(display), std::move(resources), device);
 
-		RKIT_CHECK(window->Initialize(numSwapChainFrames, numSyncPoints, std::move(prototype), swapChainQueue));
+		window->Initialize(numSwapChainFrames, numSyncPoints, std::move(prototype), swapChainQueue);
 
 		outWindow = std::move(window);
 

@@ -91,7 +91,7 @@ namespace rkit
 			if (inflateResult == Z_STREAM_END || inflateResult == Z_BUF_ERROR)
 			{
 				size_t amountCompressedRead = 0;
-				RKIT_CHECK(m_stream->ReadPartial(m_buffer, kBufferSize, amountCompressedRead));
+				m_stream->ReadPartial(m_buffer, kBufferSize, amountCompressedRead);
 
 				if (amountCompressedRead == 0)
 				{
@@ -110,7 +110,7 @@ namespace rkit
 	{
 		if (pos < m_filePos)
 		{
-			RKIT_CHECK(RestartDecompression());
+			RestartDecompression();
 		}
 
 		if (pos > m_filePos)
@@ -124,7 +124,7 @@ namespace rkit
 				if (thisChunkSize > sizeof(scrap))
 					thisChunkSize = sizeof(scrap);
 
-				RKIT_CHECK(ReadAll(scrap, static_cast<size_t>(thisChunkSize)));
+				ReadAll(scrap, static_cast<size_t>(thisChunkSize));
 
 				remaining -= thisChunkSize;
 			}
@@ -172,7 +172,7 @@ namespace rkit
 	{
 		if (m_streamInitialized)
 		{
-			RKIT_CHECK(m_seekable->SeekStart(0));
+			m_seekable->SeekStart(0);
 
 			inflateEnd(&m_zstream);
 			m_streamInitialized = false;

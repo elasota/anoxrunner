@@ -80,18 +80,18 @@ namespace rkit { namespace buildsystem
 	Result BuildVulkanDriver::RegisterBuildSystemAddOn(IBuildSystemInstance *instance)
 	{
 		UniquePtr<buildsystem::IDependencyNodeCompiler> pipelineCompiler;
-		RKIT_CHECK(rkit::buildsystem::vulkan::CreatePipelineCompiler(pipelineCompiler));
+		rkit::buildsystem::vulkan::CreatePipelineCompiler(pipelineCompiler);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kDefaultNamespace, kRenderGraphicsPipelineNodeID, std::move(pipelineCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kDefaultNamespace, kRenderGraphicsPipelineNodeID, std::move(pipelineCompiler));
 
 		for (size_t i = 0; i < static_cast<size_t>(render::vulkan::GraphicPipelineStage::Count); i++)
 		{
 			render::vulkan::GraphicPipelineStage stage = static_cast<render::vulkan::GraphicPipelineStage>(i);
 
 			UniquePtr<buildsystem::IDependencyNodeCompiler> stageCompiler;
-			RKIT_CHECK(rkit::buildsystem::vulkan::CreateGraphicsPipelineStageCompiler(m_glslc, stage, stageCompiler));
+			rkit::buildsystem::vulkan::CreateGraphicsPipelineStageCompiler(m_glslc, stage, stageCompiler);
 
-			RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kDefaultNamespace, vulkan::CreateNodeTypeIDForStage(stage), std::move(stageCompiler)));
+			instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kDefaultNamespace, vulkan::CreateNodeTypeIDForStage(stage), std::move(stageCompiler));
 		}
 
 		RKIT_RETURN_OK;

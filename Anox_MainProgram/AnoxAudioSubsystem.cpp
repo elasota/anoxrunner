@@ -1111,8 +1111,8 @@ namespace anox
 	{
 		rkit::ISystemDriver &sys = *rkit::GetDrivers().m_systemDriver;
 
-		RKIT_CHECK(sys.CreateEvent(m_disposeWakeEvent, true, false));
-		RKIT_CHECK(sys.CreateEvent(m_disposeTerminateEvent, true, false));
+		sys.CreateEvent(m_disposeWakeEvent, true, false);
+		sys.CreateEvent(m_disposeTerminateEvent, true, false);
 
 		RKIT_RETURN_OK;
 	}
@@ -1149,7 +1149,7 @@ namespace anox
 	rkit::Result AudioGarbageCollector::TryCreateGCJob(rkit::RCPtr<rkit::Job> &anOutJob)
 	{
 		rkit::UniquePtr<GCJobRunner> runner;
-		RKIT_CHECK(rkit::New<GCJobRunner>(runner));
+		rkit::New<GCJobRunner>(runner);
 
 		AudioGarbageCollectable *firstCollectable = m_first.exchange(nullptr, std::memory_order_acquire);
 		if (firstCollectable)
@@ -1177,7 +1177,7 @@ namespace anox
 	{
 		rkit::ISystemDriver &sys = *rkit::GetDrivers().m_systemDriver;
 
-		RKIT_CHECK(sys.CreateMutex(m_cmdListMutex));
+		sys.CreateMutex(m_cmdListMutex);
 
 		m_audioDriver = audioDriver;
 
@@ -1296,7 +1296,7 @@ namespace anox
 	{
 		size_t scratchBufferChannelSize = rkit::Max<size_t>(minimumCapacity, rkit::Max<size_t>(RKIT_SIMD_MAX_WIDTH_BYTES, RKIT_SIMD_ALIGNMENT));
 
-		RKIT_CHECK(rkit::SafeMul<size_t>(scratchBufferChannelSize, scratchBufferChannelSize, AudioSampleTypeSize(rkit::audio::SampleType::kLargestSampleType)));
+		rkit::SafeMul<size_t>(scratchBufferChannelSize, scratchBufferChannelSize, AudioSampleTypeSize(rkit::audio::SampleType::kLargestSampleType));
 
 		int scratchBufferChannelBits = rkit::FindHighestSetBit(scratchBufferChannelSize - 1u) + 1;
 
@@ -1592,7 +1592,7 @@ namespace anox
 
 		const size_t channelBufferBytes = bufferCapacity * audioFormat.m_speakers.CountSetBits();
 
-		RKIT_CHECK(m_renderThreadState.m_scratchBuffers.Allocate(channelBufferBytes, audioFormat.m_speakers.CountSetBits()));
+		m_renderThreadState.m_scratchBuffers.Allocate(channelBufferBytes, audioFormat.m_speakers.CountSetBits());
 
 		RKIT_RETURN_OK;
 	}
@@ -1671,7 +1671,7 @@ namespace anox
 		}
 
 		rkit::RCPtr<AudioCommandList> cmdList;
-		RKIT_CHECK(rkit::New<AudioCommandList>(cmdList, this->m_gc));
+		rkit::New<AudioCommandList>(cmdList, this->m_gc);
 		AudioCommandWord *cmdWords = cmdList->TryAllocCommandWords(numParamWords + AudioCommandList::kNumRequiredParams);
 
 		RKIT_ASSERT(cmdWords != nullptr);
@@ -2108,10 +2108,10 @@ namespace anox
 
 		m_audioDriver = static_cast<rkit::audio::IAudioDriver *>(rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, u8"Audio_WASAPI"));
 
-		RKIT_CHECK(m_mixer.Initialize(m_audioDriver));
-		RKIT_CHECK(m_gc.Initialize());
+		m_mixer.Initialize(m_audioDriver);
+		m_gc.Initialize();
 
-		RKIT_CHECK(AcquireOutput());
+		AcquireOutput();
 
 		if (HasOutput())
 			ResumeOutput();
@@ -2122,7 +2122,7 @@ namespace anox
 	rkit::Result AudioSubsystemImpl::AcquireOutput()
 	{
 		rkit::RCPtr<rkit::audio::IAudioOutputEndpoint> audioOutputEndpoint;
-		RKIT_CHECK(m_audioDriver->GetDefaultOutputEndpoint(audioOutputEndpoint));
+		m_audioDriver->GetDefaultOutputEndpoint(audioOutputEndpoint);
 
 		if (!audioOutputEndpoint.IsValid())
 			RKIT_RETURN_OK;
@@ -2134,11 +2134,11 @@ namespace anox
 		audioFormat.m_speakers.Set(rkit::audio::SpeakerPosition::kFrontRight, true);
 
 		rkit::UniquePtr<rkit::audio::IAudioOutputStream> audioOutputStream;
-		RKIT_CHECK(audioOutputEndpoint->TryOpenOutputStream(audioOutputStream, audioFormat, 1024, &m_mixer));
+		audioOutputEndpoint->TryOpenOutputStream(audioOutputStream, audioFormat, 1024, &m_mixer);
 		if (!audioOutputStream.IsValid())
 			RKIT_RETURN_OK;
 
-		RKIT_CHECK(m_mixer.SetOutputLayout(audioFormat, audioOutputStream->GetBufferCapacity()));
+		m_mixer.SetOutputLayout(audioFormat, audioOutputStream->GetBufferCapacity());
 
 		m_endpoint = std::move(audioOutputEndpoint);
 		m_outputStream = std::move(audioOutputStream);
@@ -2187,7 +2187,7 @@ namespace anox
 	rkit::Result AudioSubsystem::CreateEmitter(AudioEmitter *&outEmitter, rkit::RCPtr<IAudioSource> inSource)
 	{
 		rkit::RCPtr<AudioMixerEmitter> mixerEmitterRC;
-		RKIT_CHECK(rkit::New<AudioMixerEmitter>(mixerEmitterRC, Impl().m_gc, std::move(inSource)));
+		rkit::New<AudioMixerEmitter>(mixerEmitterRC, Impl().m_gc, std::move(inSource));
 
 		AudioMixerEmitter *mixerEmitter = mixerEmitterRC.Get();
 		Impl().m_mixer.AddEmitter(std::move(mixerEmitterRC));
@@ -2210,9 +2210,9 @@ namespace anox
 	rkit::Result AudioSubsystem::Create(rkit::UniquePtr<AudioSubsystem> &outSubsystem, rkit::IJobQueue& jobQueue)
 	{
 		rkit::UniquePtr<AudioSubsystem> subsystem;
-		RKIT_CHECK(rkit::New<AudioSubsystem>(subsystem, jobQueue));
+		rkit::New<AudioSubsystem>(subsystem, jobQueue);
 
-		RKIT_CHECK(subsystem->Impl().Initialize());
+		subsystem->Impl().Initialize();
 
 		outSubsystem = std::move(subsystem);
 		RKIT_RETURN_OK;

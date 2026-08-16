@@ -121,14 +121,14 @@ namespace anox
 		rkit::IJobQueue &jobQueue = fileSystem.GetJobQueue();
 
 		rkit::RCPtr<AnoxAbstractSingleFileResourceLoaderState> loaderState;
-		RKIT_CHECK(rkit::New<State_t>(loaderState));
+		rkit::New<State_t>(loaderState);
 
 		loaderState->m_functions = &AnoxSingleFileResourceLoaderCallbacksFor<TLoaderInfo>::ms_callbacks;
 		loaderState->m_resource = resourceBase;
 		loaderState->m_systems = systems;
 
 		rkit::RCPtr<rkit::Job> prevPhaseEndJob;
-		RKIT_CHECK(CreateLoadEntireFileJob(prevPhaseEndJob, loaderState.FieldRef(&AnoxAbstractSingleFileResourceLoaderState::m_fileContents), fileSystem, key));
+		CreateLoadEntireFileJob(prevPhaseEndJob, loaderState.FieldRef(&AnoxAbstractSingleFileResourceLoaderState::m_fileContents), fileSystem, key);
 
 		for (size_t phase = 0; phase < TLoaderInfo::kNumPhases; phase++)
 		{
@@ -138,14 +138,14 @@ namespace anox
 			rkit::RCPtr<rkit::JobSignaler> waitForDependenciesSignaler;
 			if (TLoaderInfo::PhaseHasDependencies(phase))
 			{
-				RKIT_CHECK(jobQueue.CreateSignaledJob(waitForDependenciesSignaler, waitForDependenciesJob));
+				jobQueue.CreateSignaledJob(waitForDependenciesSignaler, waitForDependenciesJob);
 			}
 
 			rkit::UniquePtr<rkit::IJobRunner> phaseJobRunner;
-			RKIT_CHECK(rkit::New<AnoxAbstractSingleFileLoaderPhaseJob>(phaseJobRunner, loaderState, phase, waitForDependenciesSignaler));
+			rkit::New<AnoxAbstractSingleFileLoaderPhaseJob>(phaseJobRunner, loaderState, phase, waitForDependenciesSignaler);
 
 			rkit::RCPtr<rkit::Job> phaseJob;
-			RKIT_CHECK(fileSystem.GetJobQueue().CreateJob(&phaseJob, rkit::JobType::kNormalPriority, std::move(phaseJobRunner), prevPhaseEndJob));
+			fileSystem.GetJobQueue().CreateJob(&phaseJob, rkit::JobType::kNormalPriority, std::move(phaseJobRunner), prevPhaseEndJob);
 
 			if (waitForDependenciesSignaler.IsValid())
 			{

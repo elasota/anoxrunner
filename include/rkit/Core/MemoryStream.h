@@ -236,7 +236,7 @@ template<class T>
 inline rkit::Result rkit::ReadOnlyMemoryStream::ExtractSpan(Span<const T> &outSpan, size_t count)
 {
 	Span<T> mutableSpan;
-	RKIT_CHECK(m_stream.ExtractSpan(mutableSpan, count));
+	m_stream.ExtractSpan(mutableSpan, count);
 	outSpan = mutableSpan;
 
 	RKIT_RETURN_OK;

@@ -151,10 +151,10 @@ template<class TType, class TPtrType, class... TArgs>
 inline rkit::Result rkit::NewInitializeWithAlloc(UniquePtr<TPtrType> &objPtr, IMallocDriver *alloc, TArgs&& ...args)
 {
 	UniquePtr<TType> obj;
-	RKIT_CHECK((NewWithAlloc<TType, TPtrType>(obj, alloc)));
+	(NewWithAlloc<TType, TPtrType>(obj, alloc));
 
 	TType *objRawPtr = obj.Get();
-	RKIT_CHECK(objRawPtr->Initialize(std::forward<TArgs>(args)...));
+	objRawPtr->Initialize(std::forward<TArgs>(args)...);
 	objPtr = std::move(obj);
 
 	RKIT_RETURN_OK;
@@ -189,10 +189,10 @@ template<class TType, class TPtrType>
 rkit::Result rkit::NewInitializeWithAlloc(UniquePtr<TPtrType> &objPtr, IMallocDriver *alloc)
 {
 	UniquePtr<TType> obj;
-	RKIT_CHECK((NewWithAlloc<TType, TPtrType>(obj, alloc)));
+	(NewWithAlloc<TType, TPtrType>(obj, alloc));
 
 	TType *objRawPtr = obj.Get();
-	RKIT_CHECK(objRawPtr->Initialize());
+	objRawPtr->Initialize();
 	objPtr = std::move(obj);
 
 	RKIT_RETURN_OK;

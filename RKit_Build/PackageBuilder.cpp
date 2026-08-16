@@ -234,7 +234,7 @@ namespace rkit { namespace buildsystem
 		const IPackageObjectWriter *writer = pkgBuilder.GetWriter();
 
 		BinaryBlobBuilder blobBuilder;
-		RKIT_CHECK(writer->WriteObject(pkgBuilder, obj, &rtti->m_base, blobBuilder));
+		writer->WriteObject(pkgBuilder, obj, &rtti->m_base, blobBuilder);
 
 		return IndexBinaryBlob(pkgBuilder, blobBuilder.Finish(), obj, cached, outIndex);
 	}
@@ -247,7 +247,7 @@ namespace rkit { namespace buildsystem
 			size_t index = blobCheckIt.Value();
 			if (cached)
 			{
-				RKIT_CHECK(m_cachedObjectToBlob.Set(obj, index));
+				m_cachedObjectToBlob.Set(obj, index);
 			}
 
 			outIndex = index;
@@ -256,13 +256,13 @@ namespace rkit { namespace buildsystem
 
 		size_t newIndex = m_blobs.Count();
 
-		RKIT_CHECK(m_blobs.Append(blob.GetBlob()));
+		m_blobs.Append(blob.GetBlob());
 
-		RKIT_CHECK(m_blobToIndex.Set(std::move(blob), newIndex));
+		m_blobToIndex.Set(std::move(blob), newIndex);
 
 		if (cached)
 		{
-			RKIT_CHECK(m_cachedObjectToBlob.Set(obj, newIndex));
+			m_cachedObjectToBlob.Set(obj, newIndex);
 		}
 
 		outIndex = newIndex;
@@ -304,10 +304,10 @@ namespace rkit { namespace buildsystem
 		}
 
 		String newStr;
-		RKIT_CHECK(newStr.Set(str));
+		newStr.Set(str);
 
 		size_t newIndex = m_stringToIndex.Count();
-		RKIT_CHECK(m_stringToIndex.Set(std::move(newStr), newIndex));
+		m_stringToIndex.Set(std::move(newStr), newIndex);
 
 		RKIT_ASSERT(m_stringToIndex.Count() == newIndex + 1);
 
@@ -345,9 +345,9 @@ namespace rkit { namespace buildsystem
 		newKey.m_globalStringIndex = globalStringIndex;
 		newKey.m_mainType = mainType;
 
-		RKIT_CHECK(m_configKeys.Append(newKey));
+		m_configKeys.Append(newKey);
 
-		RKIT_CHECK(m_stringIndexToConfigKeyIndex.Set(globalStringIndex, newIndex));
+		m_stringIndexToConfigKeyIndex.Set(globalStringIndex, newIndex);
 
 		outIndex = newIndex;
 
@@ -401,7 +401,7 @@ namespace rkit { namespace buildsystem
 			if (blob)
 			{
 				Span<const uint8_t> blobBytes = blob->GetBytes();
-				RKIT_CHECK(stream.WriteAll(blobBytes.Ptr(), blobBytes.Count()));
+				stream.WriteAll(blobBytes.Ptr(), blobBytes.Count());
 			}
 		}
 
@@ -421,38 +421,38 @@ namespace rkit { namespace buildsystem
 
 		Sha256Wrapper stream(streamBase, *calculator);
 
-		RKIT_CHECK(PackageObjectWriter::WriteUInt32(0, stream));
-		RKIT_CHECK(PackageObjectWriter::WriteUInt32(packageVersion, stream));
-		RKIT_CHECK(stream.WriteAll(&shaDigest, sizeof(shaDigest)));
+		PackageObjectWriter::WriteUInt32(0, stream);
+		PackageObjectWriter::WriteUInt32(packageVersion, stream);
+		stream.WriteAll(&shaDigest, sizeof(shaDigest));
 
 		size_t numStrings = m_stringToIndex.Count();
 		size_t numConfigKeys = m_configKeys.Count();
 		size_t numBinaryContent = m_binaryContent.GetBlobs().Count();
 
 		Vector<const String *> strings;
-		RKIT_CHECK(strings.Resize(numStrings));
+		strings.Resize(numStrings);
 
 		for (HashMapKeyValueView<String, const size_t> kv : m_stringToIndex)
 			strings[kv.Value()] = &kv.Key();
 
-		RKIT_CHECK(PackageObjectWriter::WriteCompactIndex(numStrings, stream));
-		RKIT_CHECK(PackageObjectWriter::WriteCompactIndex(numConfigKeys, stream));
-		RKIT_CHECK(PackageObjectWriter::WriteCompactIndex(numBinaryContent, stream));
+		PackageObjectWriter::WriteCompactIndex(numStrings, stream);
+		PackageObjectWriter::WriteCompactIndex(numConfigKeys, stream);
+		PackageObjectWriter::WriteCompactIndex(numBinaryContent, stream);
 
 		for (const String *str : strings)
 		{
-			RKIT_CHECK(PackageObjectWriter::WriteCompactIndex(str->Length(), stream));
+			PackageObjectWriter::WriteCompactIndex(str->Length(), stream);
 		}
 
 		for (const String *str : strings)
 		{
-			RKIT_CHECK(stream.WriteAll(str->CStr(), str->Length() + 1));
+			stream.WriteAll(str->CStr(), str->Length() + 1);
 		}
 
 		for (const ConfigKey &configKey : m_configKeys)
 		{
-			RKIT_CHECK(PackageObjectWriter::WriteCompactIndex(configKey.m_globalStringIndex, stream));
-			RKIT_CHECK(PackageObjectWriter::WriteUIntForSize(static_cast<uint64_t>(configKey.m_mainType), static_cast<uint64_t>(data::RenderRTTIMainType::Count) - 1, stream));
+			PackageObjectWriter::WriteCompactIndex(configKey.m_globalStringIndex, stream);
+			PackageObjectWriter::WriteUIntForSize(static_cast<uint64_t>(configKey.m_mainType), static_cast<uint64_t>(data::RenderRTTIMainType::Count) - 1, stream);
 		}
 
 		for (const IBinaryBlob *blob : m_binaryContent.GetBlobs())
@@ -461,37 +461,37 @@ namespace rkit { namespace buildsystem
 			if (blob)
 				contentSize = blob->GetBytes().Count();
 
-			RKIT_CHECK(PackageObjectWriter::WriteCompactIndex(contentSize, stream));
+			PackageObjectWriter::WriteCompactIndex(contentSize, stream);
 		}
 
 		for (size_t i = 0; i < kNumIndexables; i++)
 		{
-			RKIT_CHECK(PackageObjectWriter::WriteCompactIndex(m_objectSpans[i].GetBlobs().Count(), stream));
-			RKIT_CHECK(PackageObjectWriter::WriteCompactIndex(m_indexables[i].GetBlobs().Count(), stream));
+			PackageObjectWriter::WriteCompactIndex(m_objectSpans[i].GetBlobs().Count(), stream);
+			PackageObjectWriter::WriteCompactIndex(m_indexables[i].GetBlobs().Count(), stream);
 		}
 
 		for (size_t i = 0; i < kNumIndexables; i++)
 		{
-			RKIT_CHECK(WriteIndexableBlobCollection(m_objectSpans[i], stream));
+			WriteIndexableBlobCollection(m_objectSpans[i], stream);
 		}
 
 		for (size_t i = 0; i < kNumIndexables; i++)
 		{
-			RKIT_CHECK(WriteIndexableBlobCollection(m_indexables[i], stream));
+			WriteIndexableBlobCollection(m_indexables[i], stream);
 		}
 
-		RKIT_CHECK(WriteIndexableBlobCollection(m_binaryContent, stream));
+		WriteIndexableBlobCollection(m_binaryContent, stream);
 
-		RKIT_CHECK(stream.SeekStart(8));
+		stream.SeekStart(8);
 
 		stream.FinishSHA();
 		shaDigest = stream.GetDigest();
 
-		RKIT_CHECK(stream.WriteAll(&shaDigest, sizeof(shaDigest)));
+		stream.WriteAll(&shaDigest, sizeof(shaDigest));
 
-		RKIT_CHECK(stream.SeekStart(0));
-		RKIT_CHECK(stream.Flush());
-		RKIT_CHECK(PackageObjectWriter::WriteUInt32(m_dataHandler->GetPackageIdentifier(), stream));
+		stream.SeekStart(0);
+		stream.Flush();
+		PackageObjectWriter::WriteUInt32(m_dataHandler->GetPackageIdentifier(), stream);
 
 		RKIT_RETURN_OK;
 	}
@@ -538,7 +538,7 @@ namespace rkit { namespace buildsystem
 		{
 			uint8_t state = rtti->m_getConfigurableStateFunc(obj);
 
-			RKIT_CHECK(WriteUInt8(state, stream));
+			WriteUInt8(state, stream);
 
 			switch (state)
 			{
@@ -565,7 +565,7 @@ namespace rkit { namespace buildsystem
 			void *memberPtr = field->m_getMemberPtrFunc(const_cast<void *>(obj));
 			const data::RenderRTTITypeBase *fieldRTTI = field->m_getTypeFunc();
 
-			RKIT_CHECK(StaticWriteObject(pkgBuilder, memberPtr, fieldRTTI, field->m_isConfigurable, field->m_isNullable, stream));
+			StaticWriteObject(pkgBuilder, memberPtr, fieldRTTI, field->m_isConfigurable, field->m_isNullable, stream);
 		}
 
 		RKIT_RETURN_OK;
@@ -579,7 +579,7 @@ namespace rkit { namespace buildsystem
 		{
 			uint8_t state = rtti->m_getConfigurableStateFunc(obj);
 
-			RKIT_CHECK(WriteUInt8(state, stream));
+			WriteUInt8(state, stream);
 
 			switch (state)
 			{
@@ -647,7 +647,7 @@ namespace rkit { namespace buildsystem
 	{
 		const render::ValueType *valueType = static_cast<const render::ValueType *>(obj);
 
-		RKIT_CHECK(WriteUInt8(static_cast<uint8_t>(valueType->m_type), stream));
+		WriteUInt8(static_cast<uint8_t>(valueType->m_type), stream);
 
 		switch (valueType->m_type)
 		{
@@ -671,16 +671,16 @@ namespace rkit { namespace buildsystem
 		Span<const uint8_t> binaryContentData = pkgBuilder.GetStringResolver()->ResolveBinaryContent(binaryContent->m_contentIndex);
 
 		Vector<uint8_t> bytes;
-		RKIT_CHECK(bytes.Resize(binaryContentData.Count()));
+		bytes.Resize(binaryContentData.Count());
 
 		CopySpanNonOverlapping(bytes.ToSpan(), binaryContentData);
 
 		UniquePtr<IBinaryBlob> blob;
-		RKIT_CHECK(New<BinaryBlob>(blob, std::move(bytes)));
+		New<BinaryBlob>(blob, std::move(bytes));
 
 		size_t index = 0;
-		RKIT_CHECK(pkgBuilder.IndexBinaryContent(BinaryBlobRef(std::move(blob)), index));
-		RKIT_CHECK(WriteCompactIndex(index, stream));
+		pkgBuilder.IndexBinaryContent(BinaryBlobRef(std::move(blob)), index);
+		WriteCompactIndex(index, stream);
 
 		RKIT_RETURN_OK;
 	}
@@ -703,8 +703,8 @@ namespace rkit { namespace buildsystem
 		else
 			RKIT_THROW(ResultCode::kInternalError);
 
-		RKIT_CHECK(pkgBuilder.IndexString(str, index));
-		RKIT_CHECK(WriteCompactIndex(index, stream));
+		pkgBuilder.IndexString(str, index);
+		WriteCompactIndex(index, stream);
 
 		RKIT_RETURN_OK;
 	}
@@ -721,7 +721,7 @@ namespace rkit { namespace buildsystem
 		}
 		else
 		{
-			RKIT_CHECK(pkgBuilder.IndexObject(objPtr, rtti->m_getTypeFunc(), true, index));
+			pkgBuilder.IndexObject(objPtr, rtti->m_getTypeFunc(), true, index);
 
 			if (isNullable)
 				index++;
@@ -740,18 +740,18 @@ namespace rkit { namespace buildsystem
 		rtti->m_getFunc(obj, currentElement, count);
 
 		BinaryBlobBuilder spanBlobBuilder;
-		RKIT_CHECK(WriteCompactIndex(count, spanBlobBuilder));
+		WriteCompactIndex(count, spanBlobBuilder);
 
 		for (size_t i = 0; i < count; i++)
 		{
-			RKIT_CHECK(WriteObjectPtr(pkgBuilder, currentElement, ptrType, true, spanBlobBuilder));
+			WriteObjectPtr(pkgBuilder, currentElement, ptrType, true, spanBlobBuilder);
 			currentElement = static_cast<const uint8_t *>(currentElement) + ptrSize;
 		}
 
 		size_t objectListIndex = 0;
-		RKIT_CHECK(pkgBuilder.IndexObjectList(ptrType->m_getTypeFunc()->m_indexableType, spanBlobBuilder.Finish(), objectListIndex));
+		pkgBuilder.IndexObjectList(ptrType->m_getTypeFunc()->m_indexableType, spanBlobBuilder.Finish(), objectListIndex);
 
-		RKIT_CHECK(WriteCompactIndex(objectListIndex, stream));
+		WriteCompactIndex(objectListIndex, stream);
 
 		RKIT_RETURN_OK;
 	}
@@ -761,12 +761,12 @@ namespace rkit { namespace buildsystem
 		StringSliceView strSlice = pkgBuilder.GetStringResolver()->ResolveConfigKey(str.GetIndex());
 
 		size_t globalStringIndex = 0;
-		RKIT_CHECK(pkgBuilder.IndexString(strSlice, globalStringIndex));
+		pkgBuilder.IndexString(strSlice, globalStringIndex);
 
 		size_t configKeyIndex = 0;
-		RKIT_CHECK(pkgBuilder.IndexConfigKey(globalStringIndex, mainType, configKeyIndex));
+		pkgBuilder.IndexConfigKey(globalStringIndex, mainType, configKeyIndex);
 
-		RKIT_CHECK(WriteCompactIndex(configKeyIndex, stream));
+		WriteCompactIndex(configKeyIndex, stream);
 
 		RKIT_RETURN_OK;
 	}
@@ -951,10 +951,10 @@ namespace rkit { namespace buildsystem
 	{
 		if (!m_blob.Get())
 		{
-			RKIT_CHECK(New<BinaryBlob>(m_blob));
+			New<BinaryBlob>(m_blob);
 		}
 
-		RKIT_CHECK(m_blob->Append(data, count));
+		m_blob->Append(data, count);
 
 		outCountWritten = count;
 

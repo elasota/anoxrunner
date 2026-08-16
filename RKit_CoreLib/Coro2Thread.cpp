@@ -207,7 +207,7 @@ namespace rkit::utils
 			std::coroutine_handle<> coroHandle = m_rootFunction;
 			m_rootFunction = std::coroutine_handle<>();
 
-			RKIT_CHECK(m_finalizer.m_destroyAndRethrow(coroHandle, m_finalizer.m_context));
+			m_finalizer.m_destroyAndRethrow(coroHandle, m_finalizer.m_context);
 		}
 
 		RKIT_RETURN_OK;
@@ -354,7 +354,7 @@ namespace rkit::utils
 	)
 	{
 		rkit::UniquePtr<Coro2ThreadBase> thread;
-		RKIT_CHECK(Coro2ThreadBase::Create(thread, alloc, stackSize, assertDriver));
+		Coro2ThreadBase::Create(thread, alloc, stackSize, assertDriver);
 		outThread = std::move(thread);
 
 		RKIT_RETURN_OK;

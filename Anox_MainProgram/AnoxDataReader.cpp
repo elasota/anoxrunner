@@ -77,7 +77,7 @@ namespace anox
 			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		rkit::ByteStringConstructionBuffer cbuf;
-		RKIT_CHECK(cbuf.Allocate(chars.Count()));
+		cbuf.Allocate(chars.Count());
 
 		rkit::CopySpanNonOverlapping(cbuf.GetSpan(), chars);
 

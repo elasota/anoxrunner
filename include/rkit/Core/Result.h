@@ -55,93 +55,9 @@ namespace rkit { namespace utils
 	inline bool ResultIsOK(ResultCode resultCode);
 } } // rkit::utils
 
-#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_ENUM
+#if RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
 
-namespace rkit
-{
-	enum class RKIT_NODISCARD Result : uint64_t;
-}
-
-namespace rkit { namespace utils
-{
-	void FirstChanceResultFailure(PackedResultAndExtCode result);
-
-	inline Result ThrowResult(PackedResultAndExtCode packedResult)
-	{
-		return static_cast<Result>(packedResult);
-	}
-} }
-
-namespace rkit { namespace priv
-{
-	inline Result TryCatchRethrow(Result result, const CatchContext &catchContext)
-	{
-		if (result != static_cast<Result>(::rkit::ResultCode::kOK))
-			catchContext.Invoke();
-
-		return result;
-	}
-
-	inline Result TryFinallyRethrow(Result result, const FinallyContext &finallyContext)
-	{
-		finallyContext.Invoke();
-
-		return result;
-	}
-
-	inline Result TryCatchFinallyRethrow(Result result, const CatchContext &catchContext, const FinallyContext &finallyContext)
-	{
-		if (result != static_cast<Result>(::rkit::ResultCode::kOK))
-			catchContext.Invoke();
-
-		finallyContext.Invoke();
-
-		return result;
-	}
-
-	inline PackedResultAndExtCode TryCatchEval(Result result)
-	{
-		return static_cast<PackedResultAndExtCode>(result);
-	}
-
-	inline Result ThrowResult(PackedResultAndExtCode packedResult)
-	{
-#if RKIT_IS_DEBUG != 0
-		::rkit::utils::FirstChanceResultFailure(packedResult);
-#endif
-		return static_cast<Result>(packedResult);
-	}
-
-	inline Result ThrowResult(ResultCode result)
-	{
-		return ThrowResult(utils::PackResult(result));
-	}
-
-	inline Result ThrowResult(ResultCode result, uint32_t extCode)
-	{
-		return ThrowResult(utils::PackResult(result, extCode));
-	}
-} }
-
-#define RKIT_CHECK(expr) do {\
-	::rkit::Result RKIT_PP_CONCAT(exprResult_, __LINE__) = (expr);\
-	if (static_cast<uint64_t>(RKIT_PP_CONCAT(exprResult_, __LINE__)) != 0)\
-		return RKIT_PP_CONCAT(exprResult_, __LINE__);\
-} while (false)
-
-
-#define RKIT_RETURN_OK return (static_cast<::rkit::Result>(::rkit::ResultCode::kOK))
-#define RKIT_THROW(expr) return (::rkit::priv::ThrowResult(expr))
-#define RKIT_TRY_CATCH_RETHROW(expr, eh) RKIT_CHECK(::rkit::priv::TryCatchRethrow((expr), (eh)))
-#define RKIT_TRY_FINALLY_RETHROW(expr, eh) RKIT_CHECK(::rkit::priv::TryFinallyRethrow((expr), (eh)))
-#define RKIT_TRY_CATCH_FINALLY_RETHROW(expr, catchContext, finallyContext) RKIT_CHECK(::rkit::priv::TryCatchFinallyRethrow((expr), (catchContext), (finallyContext)))
-#define RKIT_TRY_EVAL(expr) (::rkit::priv::TryCatchEval((expr)))
-
-#define RKIT_CHECK_SOFT(expr) RKIT_CHECK(expr)
-
-#elif RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_EXCEPTION
-
-namespace rkit { namespace priv
+namespace rkit::priv
 {
 	template<class TTryBody>
 	void TryCatchRethrow(const TTryBody &tryBody, const ::rkit::CatchContext &catchContext)
@@ -189,7 +105,7 @@ namespace rkit { namespace priv
 
 		finallyContext.Invoke();
 	}
-} }
+}
 
 namespace rkit
 {
@@ -225,28 +141,29 @@ namespace rkit
 	}
 }
 
-namespace rkit { namespace priv {
+namespace rkit {
+	namespace priv {
 
-	template<class TTryBody>
-	PackedResultAndExtCode TryCatch(const TTryBody &tryBody)
-	{
-		try
+		template<class TTryBody>
+		PackedResultAndExtCode TryCatch(const TTryBody &tryBody)
 		{
-			tryBody();
-			return utils::PackResult(ResultCode::kOK);
-		}
-		catch (ResultException rex)
-		{
-			return rex.GetPackedResult();
-		}
-		catch (...)
-		{
-			return utils::PackResult(ResultCode::kCppException);
+			try
+			{
+				tryBody();
+				return utils::PackResult(ResultCode::kOK);
+			}
+			catch (ResultException rex)
+			{
+				return rex.GetPackedResult();
+			}
+			catch (...)
+			{
+				return utils::PackResult(ResultCode::kCppException);
+			}
 		}
 	}
-} }
+}
 
-#define RKIT_CHECK(expr) (expr)
 #define RKIT_RETURN_OK return
 #define RKIT_THROW(expr) throw (::rkit::ResultException(expr))
 #define RKIT_TRY_CATCH_RETHROW(expr, eh) (::rkit::priv::TryCatchRethrow([&] { static_cast<void>(expr); }, (eh)))
@@ -254,10 +171,43 @@ namespace rkit { namespace priv {
 #define RKIT_TRY_CATCH_FINALLY_RETHROW(expr, catchContext, finallyContext) (::rkit::priv::TryCatchFinallyRethrow([&] { static_cast<void>(expr); }, (eh), (eh)))
 #define RKIT_TRY_EVAL(expr) (::rkit::priv::TryCatch([&] { static_cast<void>(expr); }))
 
+#elif RKIT_RESULT_BEHAVIOR == RKIT_RESULT_BEHAVIOR_FATAL
+
+namespace rkit::priv
+{
+	template<class TTryBody>
+	PackedResultAndExtCode Try(const TTryBody &tryBody)
+	{
+		tryBody();
+		return utils::PackResult(ResultCode::kOK);
+	}
+
+	template<class TTryBody>
+	void TryFinally(const TTryBody &tryBody, const ::rkit::FinallyContext &finallyContext)
+	{
+		tryBody();
+		finallyContext.Invoke();
+	}
+
+	[[noreturn]] void RaiseFatalError(PackedResultAndExtCode resultAndExtCode);
+
+	[[noreturn]] inline void RaiseFatalError(ResultCode resultCode)
+	{
+		RaiseFatalError(::rkit::utils::PackResult(resultCode));
+	}
+}
+
+
+#define RKIT_RETURN_OK return
+#define RKIT_THROW(expr) (::rkit::priv::RaiseFatalError(expr))
+#define RKIT_TRY_CATCH_RETHROW(expr, eh) (::rkit::priv::Try([&] { static_cast<void>(expr); }))
+#define RKIT_TRY_FINALLY_RETHROW(expr, eh) (::rkit::priv::TryFinally([&] { static_cast<void>(expr); }))
+#define RKIT_TRY_CATCH_FINALLY_RETHROW(expr, catchContext, finallyContext) (::rkit::priv::TryFinally([&] { static_cast<void>(expr); }, ('rkit::utils::PackResult': no overloaded function could convert all the argument types)))
+#define RKIT_TRY_EVAL(expr) (::rkit::priv::Try([&] { static_cast<void>(expr); }))
+
 #endif
 
 #include <limits>
-
 
 namespace rkit { namespace utils
 {

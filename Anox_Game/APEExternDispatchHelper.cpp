@@ -16,7 +16,7 @@ namespace anox::game::ape::externs
 	rkit::Result ExternDispatch::ParseStrArg(rkit::ByteString &arg, ScriptEnvironment &env, const ScriptPackage &pkg, const ScriptExprValue &operand)
 	{
 		bool succeeded = false;
-		RKIT_CHECK(env.TryEvaluateStringScriptExpr(succeeded, arg, pkg, operand));
+		env.TryEvaluateStringScriptExpr(succeeded, arg, pkg, operand);
 		if (!succeeded)
 			arg.Clear();
 

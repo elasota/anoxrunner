@@ -455,7 +455,7 @@ namespace anox { namespace buildsystem
 	rkit::Result AnoxModelCompilerCommon::ConstructOutputPathByType(rkit::CIPath &outPath, const rkit::StringView &outputType, const rkit::StringView &identifier)
 	{
 		rkit::String str;
-		RKIT_CHECK(str.Format(u8"ax_mdl_{}/{}", outputType, identifier));
+		str.Format(u8"ax_mdl_{}/{}", outputType, identifier);
 
 		return outPath.Set(str);
 	}
@@ -464,7 +464,7 @@ namespace anox { namespace buildsystem
 	rkit::Result AnoxModelCompilerCommon::AnalyzeMD2(const rkit::CIPathView &md2Path, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		rkit::UniquePtr<rkit::ISeekableReadStream> inputFile;
-		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, md2Path, inputFile));
+		feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, md2Path, inputFile);
 
 		return AnalyzeMD2File(*inputFile, md2Path, feedback);
 	}
@@ -472,21 +472,21 @@ namespace anox { namespace buildsystem
 	rkit::Result AnoxModelCompilerCommon::AnalyzeMD2File(rkit::ISeekableReadStream &inputFile, const rkit::CIPathView &md2Path, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		MD2Header md2Header;
-		RKIT_CHECK(inputFile.ReadAll(&md2Header, sizeof(MD2Header)));
+		inputFile.ReadAll(&md2Header, sizeof(MD2Header));
 
 		size_t numTextures = md2Header.m_numTextures.Get();
 
 		rkit::Vector<MD2TextureDef> textures;
-		RKIT_CHECK(textures.Resize(numTextures));
+		textures.Resize(numTextures);
 
-		RKIT_CHECK(inputFile.ReadAll(textures.GetBuffer(), sizeof(MD2TextureDef) * numTextures));
+		inputFile.ReadAll(textures.GetBuffer(), sizeof(MD2TextureDef) * numTextures);
 
 		for (const MD2TextureDef &textureDef : textures)
 		{
 			rkit::CIPath texturePath;
-			RKIT_CHECK(ResolveTexturePath(texturePath, md2Path, textureDef, true));
+			ResolveTexturePath(texturePath, md2Path, textureDef, true);
 
-			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kModelMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, texturePath.ToString()));
+			feedback->AddNodeDependency(kAnoxNamespaceID, kModelMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, texturePath.ToString());
 		}
 
 		RKIT_RETURN_OK;
@@ -517,12 +517,12 @@ namespace anox { namespace buildsystem
 		rkit::String materialPathTemp;
 		if (constructFullMaterialPath)
 		{
-			RKIT_CHECK(materialPathTemp.Format(u8"{}.{}", materialPathView.ToUTF8(), MaterialCompiler::GetModelMaterialExtension()));
+			materialPathTemp.Format(u8"{}.{}", materialPathView.ToUTF8(), MaterialCompiler::GetModelMaterialExtension());
 			materialPathView = materialPathTemp;
 		}
 
-		RKIT_CHECK(textureDefPath.Set(md2Path.AbsSlice(md2Path.NumComponents() - 1)));
-		RKIT_CHECK(textureDefPath.AppendComponent(materialPathView.ToUTF8()));
+		textureDefPath.Set(md2Path.AbsSlice(md2Path.NumComponents() - 1));
+		textureDefPath.AppendComponent(materialPathView.ToUTF8());
 
 		RKIT_RETURN_OK;
 	}
@@ -537,20 +537,20 @@ namespace anox { namespace buildsystem
 		outIsActuallyMD2 = false;
 		outInputFile.Reset();
 
-		RKIT_CHECK(feedback->TryOpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, inOutPath, outInputFile));
+		feedback->TryOpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, inOutPath, outInputFile);
 
 		if (!outInputFile.IsValid())
 		{
 			if (inOutPath.ToString().EndsWithNoCase(u8".mda"))
 			{
 				rkit::String md2PathStr;
-				RKIT_CHECK(md2PathStr.Set(inOutPath.ToString().SubString(0, inOutPath.Length() - 4)));
-				RKIT_CHECK(md2PathStr.Append(u8".md2"));
+				md2PathStr.Set(inOutPath.ToString().SubString(0, inOutPath.Length() - 4));
+				md2PathStr.Append(u8".md2");
 
 				rkit::CIPath md2Path;
-				RKIT_CHECK(md2Path.Set(md2PathStr));
+				md2Path.Set(md2PathStr);
 
-				RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, md2Path, outInputFile));
+				feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, md2Path, outInputFile);
 
 				inOutPath = md2Path;
 				outIsActuallyMD2 = true;
@@ -569,18 +569,18 @@ namespace anox { namespace buildsystem
 
 		{
 			rkit::CIPath mdaPath;
-			RKIT_CHECK(mdaPath.Set(depsNode->GetIdentifier()));
+			mdaPath.Set(depsNode->GetIdentifier());
 
 			rkit::UniquePtr<rkit::ISeekableReadStream> inputFile;
-			RKIT_CHECK(feedback->TryOpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, mdaPath, inputFile));
+			feedback->TryOpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, mdaPath, inputFile);
 
 			bool isActuallyMD2 = false;
-			RKIT_CHECK(OpenMDAPath(inputFile, isActuallyMD2, mdaPath, feedback));
+			OpenMDAPath(inputFile, isActuallyMD2, mdaPath, feedback);
 
 			if (isActuallyMD2)
 				return AnalyzeMD2File(*inputFile, mdaPath, feedback);
 
-			RKIT_CHECK(rkit::GetDrivers().m_utilitiesDriver->ReadEntireFile(*inputFile, mdaBytes));
+			rkit::GetDrivers().m_utilitiesDriver->ReadEntireFile(*inputFile, mdaBytes);
 		}
 
 		rkit::ConstSpan<char> fileSpan(reinterpret_cast<const char *>(mdaBytes.GetBuffer()), mdaBytes.Count());
@@ -605,9 +605,9 @@ namespace anox { namespace buildsystem
 					if (ParseToken(token, line))
 					{
 						rkit::CIPath fixedPath;
-						RKIT_CHECK(ExtractPath(fixedPath, token, false));
+						ExtractPath(fixedPath, token, false);
 
-						RKIT_CHECK(AnalyzeMD2(fixedPath, feedback));
+						AnalyzeMD2(fixedPath, feedback);
 					}
 				}
 				else if (TokenIs(token, "map") || TokenIs(token, "clampmap"))
@@ -615,12 +615,12 @@ namespace anox { namespace buildsystem
 					if (ParseToken(token, line))
 					{
 						rkit::CIPath fixedPath;
-						RKIT_CHECK(ExtractPath(fixedPath, token, true));
+						ExtractPath(fixedPath, token, true);
 
 						rkit::String materialPath;
-						RKIT_CHECK(materialPath.Format(u8"{}.{}", fixedPath.ToString(), MaterialCompiler::GetModelMaterialExtension()));
+						materialPath.Format(u8"{}.{}", fixedPath.ToString(), MaterialCompiler::GetModelMaterialExtension());
 
-						RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kModelMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, materialPath));
+						feedback->AddNodeDependency(kAnoxNamespaceID, kModelMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, materialPath);
 					}
 				}
 			}
@@ -640,10 +640,10 @@ namespace anox { namespace buildsystem
 
 		{
 			rkit::CIPath path;
-			RKIT_CHECK(path.Set(depsNode->GetIdentifier()));
+			path.Set(depsNode->GetIdentifier());
 
 			bool isActuallyMD2 = false;
-			RKIT_CHECK(OpenMDAPath(inputFile, isActuallyMD2, path, feedback));
+			OpenMDAPath(inputFile, isActuallyMD2, path, feedback);
 
 			if (isActuallyMD2)
 			{
@@ -653,14 +653,14 @@ namespace anox { namespace buildsystem
 				// Construct from the identifier since path is changed at this point,
 				// we want to keep the original suffix
 				rkit::CIPath outputPath;
-				RKIT_CHECK(ConstructOutputPath(outputPath, depsNode->GetIdentifier()));
+				ConstructOutputPath(outputPath, depsNode->GetIdentifier());
 
 				return CompileMDA(outputPath, mdaData, true, depsNode, feedback);
 			}
 
-			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, path, inputFile));
+			feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, path, inputFile);
 
-			RKIT_CHECK(utils.ReadEntireFile(*inputFile, mdaBytes));
+			utils.ReadEntireFile(*inputFile, mdaBytes);
 		}
 
 		rkit::ConstSpan<char> fileSpan = mdaBytes.ToSpan().ReinterpretCast<char>();
@@ -727,7 +727,7 @@ namespace anox { namespace buildsystem
 				base64Chunk.m_paddedSize = dwords[1];
 				base64Chunk.m_adler32Checksum = dwords[2];
 
-				RKIT_CHECK(base64Chunks.Append(std::move(base64Chunk)));
+				base64Chunks.Append(std::move(base64Chunk));
 
 				continue;
 			}
@@ -739,7 +739,7 @@ namespace anox { namespace buildsystem
 					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
-				RKIT_CHECK(base64Chunks[base64Chunks.Count() - 1].m_base64Chars.Append(line.SubSpan(1)));
+				base64Chunks[base64Chunks.Count() - 1].m_base64Chars.Append(line.SubSpan(1));
 
 				continue;
 			}
@@ -752,7 +752,7 @@ namespace anox { namespace buildsystem
 					if (ParseToken(token, line))
 					{
 						rkit::CIPath fixedPath;
-						RKIT_CHECK(ExtractPath(fixedPath, token, false));
+						ExtractPath(fixedPath, token, false);
 
 						mdaData.m_baseModel = fixedPath;
 					}
@@ -796,29 +796,29 @@ namespace anox { namespace buildsystem
 						profileFourCC = rkit::utils::ComputeFourCC(token[0], token[1], token[2], token[3]);
 					}
 
-					RKIT_CHECK(ExpectLine(line, fileSpan));
-					RKIT_CHECK(ExpectTokenIs(line, "{"));
+					ExpectLine(line, fileSpan);
+					ExpectTokenIs(line, "{");
 
 					for (;;)
 					{
-						RKIT_CHECK(ExpectLine(line, fileSpan));
+						ExpectLine(line, fileSpan);
 
 						if (TokenIs(line, "}"))
 							break;
 
-						RKIT_CHECK(ExpectToken(token, line));
+						ExpectToken(token, line);
 
 						if (TokenIs(token, "skin"))
 						{
 							UncompiledMDASkin skin = {};
 
-							RKIT_CHECK(ExpectLine(line, fileSpan));
-							RKIT_CHECK(ExpectTokenIs(line, "{"));
+							ExpectLine(line, fileSpan);
+							ExpectTokenIs(line, "{");
 
 							for (;;)
 							{
-								RKIT_CHECK(ExpectLine(line, fileSpan));
-								RKIT_CHECK(ExpectToken(token, line));
+								ExpectLine(line, fileSpan);
+								ExpectToken(token, line);
 
 								if (TokenIs(token, "}"))
 									break;
@@ -827,14 +827,14 @@ namespace anox { namespace buildsystem
 								{
 									UncompiledMDAPass pass = {};
 
-									RKIT_CHECK(ExpectLine(line, fileSpan));
-									RKIT_CHECK(ExpectTokenIs(line, "{"));
+									ExpectLine(line, fileSpan);
+									ExpectTokenIs(line, "{");
 
 									bool haveMap = false;
 									for (;;)
 									{
-										RKIT_CHECK(ExpectLine(line, fileSpan));
-										RKIT_CHECK(ExpectToken(token, line));
+										ExpectLine(line, fileSpan);
+										ExpectToken(token, line);
 
 										if (TokenIs(token, "}"))
 											break;
@@ -844,16 +844,16 @@ namespace anox { namespace buildsystem
 
 										if (isMap || isClampMap)
 										{
-											RKIT_CHECK(ExpectToken(token, line));
+											ExpectToken(token, line);
 
-											RKIT_CHECK(ExtractPath(pass.m_map, token, true));
+											ExtractPath(pass.m_map, token, true);
 											pass.m_clamp = isClampMap;
 
 											haveMap = true;
 										}
 										else if (TokenIs(token, "alphafunc"))
 										{
-											RKIT_CHECK(ExpectToken(token, line));
+											ExpectToken(token, line);
 
 											if (TokenIs(token, "ge128"))
 												pass.m_alphaTestMode = data::MDAAlphaTestMode::kGE128;
@@ -869,7 +869,7 @@ namespace anox { namespace buildsystem
 										}
 										else if (TokenIs(token, "depthwrite"))
 										{
-											RKIT_CHECK(ExpectToken(token, line));
+											ExpectToken(token, line);
 
 											uint32_t depthWriteFlag = 0;
 											if (!utils.ParseUInt32(rkit::AsciiStringSliceView(token).RemoveEncoding(), 10, depthWriteFlag))
@@ -882,7 +882,7 @@ namespace anox { namespace buildsystem
 										}
 										else if (TokenIs(token, "uvgen"))
 										{
-											RKIT_CHECK(ExpectToken(token, line));
+											ExpectToken(token, line);
 
 											if (TokenIs(token, "sphere"))
 												pass.m_uvGenMode = data::MDAUVGenMode::kSphere;
@@ -894,7 +894,7 @@ namespace anox { namespace buildsystem
 										}
 										else if (TokenIs(token, "uvmod"))
 										{
-											RKIT_CHECK(ExpectToken(token, line));
+											ExpectToken(token, line);
 
 											if (TokenIs(token, "scroll"))
 											{
@@ -902,10 +902,10 @@ namespace anox { namespace buildsystem
 
 												for (size_t axis = 0; axis < 2; axis++)
 												{
-													RKIT_CHECK(ExpectToken(token, line));
+													ExpectToken(token, line);
 
 													rkit::AsciiString tokenStr;
-													RKIT_CHECK(tokenStr.Set(token));
+													tokenStr.Set(token);
 
 													if (!utils.ParseDouble(tokenStr.ToByteView(), uvScroll[axis]))
 													{
@@ -925,7 +925,7 @@ namespace anox { namespace buildsystem
 										}
 										else if (TokenIs(token, "blendmode"))
 										{
-											RKIT_CHECK(ExpectToken(token, line));
+											ExpectToken(token, line);
 
 											if (TokenIs(token, "add"))
 												pass.m_blendMode = data::MDABlendMode::kAdd;
@@ -943,7 +943,7 @@ namespace anox { namespace buildsystem
 										}
 										else if (TokenIs(token, "depthfunc"))
 										{
-											RKIT_CHECK(ExpectToken(token, line));
+											ExpectToken(token, line);
 
 											if (TokenIs(token, "equal"))
 												pass.m_depthFunc = data::MDADepthFunc::kEqual;
@@ -957,7 +957,7 @@ namespace anox { namespace buildsystem
 										}
 										else if (TokenIs(token, "cull"))
 										{
-											RKIT_CHECK(ExpectToken(token, line));
+											ExpectToken(token, line);
 
 											if (TokenIs(token, "back"))
 												pass.m_cullType = data::MDACullType::kBack;
@@ -973,7 +973,7 @@ namespace anox { namespace buildsystem
 										}
 										else if (TokenIs(token, "rgbgen"))
 										{
-											RKIT_CHECK(ExpectToken(token, line));
+											ExpectToken(token, line);
 
 											if (TokenIs(token, "diffusezero"))
 												pass.m_rgbGenMode = data::MDARGBGenMode::kDiffuseZero;
@@ -998,11 +998,11 @@ namespace anox { namespace buildsystem
 										RKIT_THROW(rkit::ResultCode::kDataError);
 									}
 
-									RKIT_CHECK(skin.m_passes.Append(std::move(pass)));
+									skin.m_passes.Append(std::move(pass));
 								}
 								else if (TokenIs(token, "sort"))
 								{
-									RKIT_CHECK(ExpectToken(token, line));
+									ExpectToken(token, line);
 
 									if (TokenIs(token, "blend"))
 										skin.m_sortMode = data::MDASortMode::kBlend;
@@ -1021,11 +1021,11 @@ namespace anox { namespace buildsystem
 								}
 							}
 
-							RKIT_CHECK(profile.m_skins.Append(std::move(skin)));
+							profile.m_skins.Append(std::move(skin));
 						}
 						else if (TokenIs(token, "evaluate"))
 						{
-							RKIT_CHECK(ExpectToken(token, line));
+							ExpectToken(token, line);
 
 							if (token.Count() < 2 || token[0] != '\"' || token[token.Count() - 1] != '\"')
 							{
@@ -1033,7 +1033,7 @@ namespace anox { namespace buildsystem
 								RKIT_THROW(rkit::ResultCode::kDataError);
 							}
 
-							RKIT_CHECK(profile.m_evaluate.Set(token.SubSpan(1, token.Count() - 2)));
+							profile.m_evaluate.Set(token.SubSpan(1, token.Count() - 2));
 						}
 						else
 						{
@@ -1043,7 +1043,7 @@ namespace anox { namespace buildsystem
 					}
 
 
-					RKIT_CHECK(mdaData.m_profiles.Append(std::move(profile)));
+					mdaData.m_profiles.Append(std::move(profile));
 				}
 				else
 				{
@@ -1064,7 +1064,7 @@ namespace anox { namespace buildsystem
 			}
 
 			rkit::Vector<uint8_t> decoded;
-			RKIT_CHECK(decoded.Resize(base64Chunk.m_paddedSize));
+			decoded.Resize(base64Chunk.m_paddedSize);
 
 			const rkit::ConstSpan<char> base64Data = base64Chunk.m_base64Chars.ToSpan();
 			const rkit::Span<uint8_t> byteData = decoded.ToSpan();
@@ -1122,7 +1122,7 @@ namespace anox { namespace buildsystem
 		}
 
 		rkit::CIPath outputPath;
-		RKIT_CHECK(ConstructOutputPath(outputPath, depsNode->GetIdentifier()));
+		ConstructOutputPath(outputPath, depsNode->GetIdentifier());
 
 		return CompileMDA(outputPath, mdaData, false, depsNode, feedback);
 	}
@@ -1295,7 +1295,7 @@ namespace anox { namespace buildsystem
 			RKIT_THROW(rkit::ResultCode::kDataError);
 
 		rkit::StringConstructionBuffer strBuf;
-		RKIT_CHECK(strBuf.Allocate(token.Count()));
+		strBuf.Allocate(token.Count());
 
 		const rkit::Span<rkit::Utf8Char_t> strBufChars = strBuf.GetSpan();
 
@@ -1324,7 +1324,7 @@ namespace anox { namespace buildsystem
 	rkit::Result AnoxMD2Compiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		rkit::CIPath md2Path;
-		RKIT_CHECK(md2Path.Set(depsNode->GetIdentifier()));
+		md2Path.Set(depsNode->GetIdentifier());
 
 		return AnoxModelCompilerCommon::AnalyzeMD2(md2Path, feedback);
 	}
@@ -1332,10 +1332,10 @@ namespace anox { namespace buildsystem
 	rkit::Result AnoxMD2Compiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		UncompiledMDAData mdaData;
-		RKIT_CHECK(mdaData.m_baseModel.Set(depsNode->GetIdentifier()));
+		mdaData.m_baseModel.Set(depsNode->GetIdentifier());
 
 		rkit::CIPath outputPath;
-		RKIT_CHECK(ConstructOutputPath(outputPath, depsNode->GetIdentifier()));
+		ConstructOutputPath(outputPath, depsNode->GetIdentifier());
 
 		return CompileMDA(outputPath, mdaData, true, depsNode, feedback);
 	}
@@ -1348,13 +1348,13 @@ namespace anox { namespace buildsystem
 	rkit::Result AnoxCTCCompiler::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		rkit::CIPath ctcPath;
-		RKIT_CHECK(ctcPath.Set(depsNode->GetIdentifier()));
+		ctcPath.Set(depsNode->GetIdentifier());
 
 		rkit::UniquePtr<rkit::ISeekableReadStream> inputFile;
-		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, ctcPath, inputFile));
+		feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, ctcPath, inputFile);
 
 		CTCHeader header;
-		RKIT_CHECK(inputFile->ReadOneBinary(header));
+		inputFile->ReadOneBinary(header);
 
 		if (header.m_version.Get() != CTCHeader::kExpectedVersion || header.m_magic.Get() != CTCHeader::kExpectedMagic)
 			RKIT_THROW(rkit::ResultCode::kDataError);
@@ -1364,17 +1364,17 @@ namespace anox { namespace buildsystem
 		if (numTextures == 0)
 			RKIT_THROW(rkit::ResultCode::kDataError);
 
-		RKIT_CHECK(inputFile->SeekStart(header.m_texturesPos.Get()));
+		inputFile->SeekStart(header.m_texturesPos.Get());
 
 		for (size_t i = 0; i < numTextures; i++)
 		{
 			MD2TextureDef textureDef;
-			RKIT_CHECK(inputFile->ReadOneBinary(textureDef));
+			inputFile->ReadOneBinary(textureDef);
 
 			rkit::CIPath texturePath;
-			RKIT_CHECK(ResolveTexturePath(texturePath, ctcPath, textureDef, true));
+			ResolveTexturePath(texturePath, ctcPath, textureDef, true);
 
-			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kModelMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, texturePath.ToString()));
+			feedback->AddNodeDependency(kAnoxNamespaceID, kModelMaterialNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, texturePath.ToString());
 		}
 
 		RKIT_RETURN_OK;
@@ -1385,13 +1385,13 @@ namespace anox { namespace buildsystem
 		rkit::DeduplicatedList<rkit::data::ContentID> materialContentIDs;
 
 		rkit::CIPath ctcPath;
-		RKIT_CHECK(ctcPath.Set(depsNode->GetIdentifier()));
+		ctcPath.Set(depsNode->GetIdentifier());
 
 		rkit::UniquePtr<rkit::ISeekableReadStream> inputFile;
-		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, ctcPath, inputFile));
+		feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, ctcPath, inputFile);
 
 		CTCHeader header;
-		RKIT_CHECK(inputFile->ReadOneBinary(header));
+		inputFile->ReadOneBinary(header);
 
 		const uint32_t numPoints = header.m_numPoints.Get();
 		const uint32_t numTotalTris = header.m_numTris.Get();
@@ -1399,23 +1399,23 @@ namespace anox { namespace buildsystem
 		const uint32_t numMorphs = header.m_numMorphs.Get();
 
 		rkit::Vector<rkit::endian::LittleUInt32_t> textureTriListSizes;
-		RKIT_CHECK(textureTriListSizes.Resize(numTextures));
+		textureTriListSizes.Resize(numTextures);
 
-		RKIT_CHECK(inputFile->SeekStart(header.m_triListSizesPos.Get()));
-		RKIT_CHECK(inputFile->ReadAllSpan(textureTriListSizes.ToSpan()));
+		inputFile->SeekStart(header.m_triListSizesPos.Get());
+		inputFile->ReadAllSpan(textureTriListSizes.ToSpan());
 
 		rkit::Vector<Morph> morphs;
 
-		RKIT_CHECK(morphs.Resize(numMorphs));
+		morphs.Resize(numMorphs);
 
-		RKIT_CHECK(inputFile->SeekStart(header.m_morphsPos.Get()));
+		inputFile->SeekStart(header.m_morphsPos.Get());
 
 		for (uint32_t mi = 0; mi < numMorphs; mi++)
 		{
 			Morph &outMorph = morphs[mi];
 
 			CTCMorph ctcMorph;
-			RKIT_CHECK(inputFile->ReadOneBinary(ctcMorph));
+			inputFile->ReadOneBinary(ctcMorph);
 
 			rkit::CopySpanNonOverlapping(rkit::Span<char>(outMorph.m_name).SubSpan(0, 16), rkit::ConstSpan<char>(ctcMorph.m_name));
 
@@ -1423,33 +1423,33 @@ namespace anox { namespace buildsystem
 
 			const uint32_t numVertMorphs = ctcMorph.m_numVertMorphs.Get();
 
-			RKIT_CHECK(outMorph.m_vertMorphs.Resize(numVertMorphs));
+			outMorph.m_vertMorphs.Resize(numVertMorphs);
 		}
 
 		for (uint32_t mi = 0; mi < numMorphs; mi++)
 		{
 			for (VertMorph &vertMorph : morphs[mi].m_vertMorphs)
 			{
-				RKIT_CHECK(inputFile->ReadOneBinary(vertMorph.m_pointIndex));
+				inputFile->ReadOneBinary(vertMorph.m_pointIndex);
 
 				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 			}
 			for (VertMorph &vertMorph : morphs[mi].m_vertMorphs)
 			{
-				RKIT_CHECK(inputFile->ReadOneBinary(vertMorph.m_targetPosition));
+				inputFile->ReadOneBinary(vertMorph.m_targetPosition);
 			}
 		}
 
 		rkit::Vector<CTCTriVerts> triVerts;
 		rkit::Vector<CTCTriTexCoords> triTexCoords;
 
-		RKIT_CHECK(triVerts.Resize(numTotalTris));
-		RKIT_CHECK(inputFile->SeekStart(header.m_triVertIndexesPos.Get()));
-		RKIT_CHECK(inputFile->ReadAllSpan(triVerts.ToSpan()));
+		triVerts.Resize(numTotalTris);
+		inputFile->SeekStart(header.m_triVertIndexesPos.Get());
+		inputFile->ReadAllSpan(triVerts.ToSpan());
 
-		RKIT_CHECK(triTexCoords.Resize(numTotalTris));
-		RKIT_CHECK(inputFile->SeekStart(header.m_triTexCoordsPos.Get()));
-		RKIT_CHECK(inputFile->ReadAllSpan(triTexCoords.ToSpan()));
+		triTexCoords.Resize(numTotalTris);
+		inputFile->SeekStart(header.m_triTexCoordsPos.Get());
+		inputFile->ReadAllSpan(triTexCoords.ToSpan());
 
 		data::MDAProfile outProfile = {};
 
@@ -1475,7 +1475,7 @@ namespace anox { namespace buildsystem
 		uint32_t numMorphedPoints = 0;
 
 		rkit::BoolVector pointHasMorph;
-		RKIT_CHECK(pointHasMorph.Resize(numPoints));
+		pointHasMorph.Resize(numPoints);
 
 		for (const Morph &morph : morphs)
 		{
@@ -1494,7 +1494,7 @@ namespace anox { namespace buildsystem
 
 		rkit::Vector<uint32_t> inPointToOutPoint;
 
-		RKIT_CHECK(inPointToOutPoint.Resize(numPoints));
+		inPointToOutPoint.Resize(numPoints);
 
 		{
 			uint32_t numUnmorphedPoints = 0;
@@ -1523,17 +1523,17 @@ namespace anox { namespace buildsystem
 				const rkit::ConstSpan<CTCTriVerts> textureTriVerts = triVerts.ToSpan().SubSpan(firstTri, numTrisForTexture);
 				const rkit::ConstSpan<CTCTriTexCoords> textureTriTexCoords = triTexCoords.ToSpan().SubSpan(firstTri, numTrisForTexture);
 
-				RKIT_CHECK(AddTriClusters(outSubModels, outTris, outVerts, textureIndex, inPointToOutPoint.ToSpan(), textureTriVerts, textureTriTexCoords, numTrisForTexture));
+				AddTriClusters(outSubModels, outTris, outVerts, textureIndex, inPointToOutPoint.ToSpan(), textureTriVerts, textureTriTexCoords, numTrisForTexture);
 
 				firstTri += numTrisForTexture;
 			}
 		}
 
 		rkit::Vector<CTCAnimation> inAnimations;
-		RKIT_CHECK(inAnimations.Resize(header.m_numAnimations_Size24.Get()));
+		inAnimations.Resize(header.m_numAnimations_Size24.Get());
 
-		RKIT_CHECK(inputFile->SeekStart(header.m_animationPos.Get()));
-		RKIT_CHECK(inputFile->ReadAllSpan(inAnimations.ToSpan()));
+		inputFile->SeekStart(header.m_animationPos.Get());
+		inputFile->ReadAllSpan(inAnimations.ToSpan());
 
 		const uint32_t numFrames = header.m_numFrames.Get();
 
@@ -1551,7 +1551,7 @@ namespace anox { namespace buildsystem
 
 				rkit::AsciiString animName;
 				const uint8_t animNameLength = static_cast<uint8_t>(strlen(animNameChars));
-				RKIT_CHECK(animName.Set(rkit::ConstSpan<char>(animNameChars, strlen(animNameChars))));
+				animName.Set(rkit::ConstSpan<char>(animNameChars, strlen(animNameChars)));
 
 				const uint32_t availableFrames = numFrames - startFrame;
 				const uint32_t numFramesForAnim = inAnim.m_frameCount.Get();
@@ -1567,8 +1567,8 @@ namespace anox { namespace buildsystem
 				outAnim.m_numFrames = numFramesForAnim;
 				outAnim.m_categoryLength = animNameLength;
 
-				RKIT_CHECK(outAnimationNames.Append(std::move(animName)));
-				RKIT_CHECK(outAnimations.Append(std::move(outAnim)));
+				outAnimationNames.Append(std::move(animName));
+				outAnimations.Append(std::move(outAnim));
 
 				animNumber++;
 				startFrame += numFramesForAnim;
@@ -1578,10 +1578,10 @@ namespace anox { namespace buildsystem
 		// Convert bones
 		rkit::Vector<CTCBone> bones;
 		const uint32_t numBones = header.m_numBones.Get();
-		RKIT_CHECK(bones.Resize(numBones));
+		bones.Resize(numBones);
 
-		RKIT_CHECK(inputFile->SeekStart(header.m_bonesPos.Get()));
-		RKIT_CHECK(inputFile->ReadAllSpan(bones.ToSpan()));
+		inputFile->SeekStart(header.m_bonesPos.Get());
+		inputFile->ReadAllSpan(bones.ToSpan());
 
 		for (size_t boneIndex = 0; boneIndex < numBones; boneIndex++)
 		{
@@ -1604,15 +1604,15 @@ namespace anox { namespace buildsystem
 
 			outBone.m_parentIndexPlusOne = static_cast<uint16_t>(inBone.m_parentIndexPlusOne.Get());
 
-			RKIT_CHECK(outBones.Append(outBone));
+			outBones.Append(outBone);
 		}
 
 		rkit::Vector<MD2TextureDef> inTextures;
 
-		RKIT_CHECK(inTextures.Resize(numTextures));
+		inTextures.Resize(numTextures);
 
-		RKIT_CHECK(inputFile->SeekStart(header.m_texturesPos.Get()));
-		RKIT_CHECK(inputFile->ReadAllSpan(inTextures.ToSpan()));
+		inputFile->SeekStart(header.m_texturesPos.Get());
+		inputFile->ReadAllSpan(inTextures.ToSpan());
 
 		for (const MD2TextureDef &inTexture : inTextures)
 		{
@@ -1629,16 +1629,16 @@ namespace anox { namespace buildsystem
 			data::MDASkinPass skinPass = {};
 
 			rkit::CIPath materialPath;
-			RKIT_CHECK(ResolveTexturePath(materialPath, ctcPath, inTexture, true));
+			ResolveTexturePath(materialPath, ctcPath, inTexture, true);
 
 			rkit::CIPath compiledMaterialPath;
-			RKIT_CHECK(MaterialCompiler::ConstructOutputPath(compiledMaterialPath, data::MaterialResourceType::kModel, materialPath.ToString()));
+			MaterialCompiler::ConstructOutputPath(compiledMaterialPath, data::MaterialResourceType::kModel, materialPath.ToString());
 
 			rkit::data::ContentID materialContentID;
-			RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, materialContentID));
+			feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, materialContentID);
 
 			size_t materialIndex = 0;
-			RKIT_CHECK(materialContentIDs.AddAndGetIndex(materialIndex, materialContentID));
+			materialContentIDs.AddAndGetIndex(materialIndex, materialContentID);
 
 			typedef uint16_t StoredMaterialIndex_t;
 			if (materialIndex > std::numeric_limits<StoredMaterialIndex_t>::max())
@@ -1646,8 +1646,8 @@ namespace anox { namespace buildsystem
 
 			skinPass.m_materialIndex = static_cast<StoredMaterialIndex_t>(materialIndex);
 
-			RKIT_CHECK(outSkins.Append(skin));
-			RKIT_CHECK(outSkinPasses.Append(skinPass));
+			outSkins.Append(skin);
+			outSkinPasses.Append(skinPass);
 		}
 
 		if (numMorphedPoints > 0)
@@ -1655,15 +1655,15 @@ namespace anox { namespace buildsystem
 			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 		}
 
-		RKIT_CHECK(outPoints.Resize(numPoints));
-		RKIT_CHECK(outBoneIndexes.Resize(numPoints));
+		outPoints.Resize(numPoints);
+		outBoneIndexes.Resize(numPoints);
 
 		{
 			rkit::Vector<CTCPoint> inPoints;
-			RKIT_CHECK(inPoints.Resize(numPoints));
+			inPoints.Resize(numPoints);
 
-			RKIT_CHECK(inputFile->SeekStart(header.m_pointsPos.Get()));
-			RKIT_CHECK(inputFile->ReadAllSpan(inPoints.ToSpan()));
+			inputFile->SeekStart(header.m_pointsPos.Get());
+			inputFile->ReadAllSpan(inPoints.ToSpan());
 
 			for (uint32_t inPointIndex = 0; inPointIndex < numPoints; inPointIndex++)
 			{
@@ -1689,10 +1689,10 @@ namespace anox { namespace buildsystem
 
 		// Process skeletal data
 		{
-			RKIT_CHECK(inputFile->SeekStart(header.m_skeletalDataPos.Get()));
+			inputFile->SeekStart(header.m_skeletalDataPos.Get());
 
 			rkit::endian::BigUInt32_t skeletalDataFourCC;
-			RKIT_CHECK(inputFile->ReadOneBinary(skeletalDataFourCC));
+			inputFile->ReadOneBinary(skeletalDataFourCC);
 
 			if (skeletalDataFourCC.Get() != RKIT_FOURCC('S', 'T', 'G', 'W'))
 			{
@@ -1703,7 +1703,7 @@ namespace anox { namespace buildsystem
 			for (uint32_t inPointIndex = 0; inPointIndex < numPoints; inPointIndex++)
 			{
 				rkit::endian::LittleUInt32_t numBonesForPointData;
-				RKIT_CHECK(inputFile->ReadOneBinary(numBonesForPointData));
+				inputFile->ReadOneBinary(numBonesForPointData);
 
 				const uint32_t numBonesForPoint = numBonesForPointData.Get();
 
@@ -1716,7 +1716,7 @@ namespace anox { namespace buildsystem
 				for (uint32_t bpi = 0; bpi < numBonesForPoint; bpi++)
 				{
 					CTCBoneAndWeight boneAndWeightData;
-					RKIT_CHECK(inputFile->ReadOneBinary(boneAndWeightData));
+					inputFile->ReadOneBinary(boneAndWeightData);
 
 					const uint32_t boneIndex = boneAndWeightData.m_boneIndex.Get();
 					const float weight = boneAndWeightData.m_weight.Get();
@@ -1737,20 +1737,20 @@ namespace anox { namespace buildsystem
 
 		// Process frames
 		{
-			RKIT_CHECK(inputFile->SeekStart(header.m_frameDataPos.Get()));
+			inputFile->SeekStart(header.m_frameDataPos.Get());
 
 			rkit::Vector<Matrix3x4> absMatrixes;
-			RKIT_CHECK(absMatrixes.Resize(numBones));
+			absMatrixes.Resize(numBones);
 
-			RKIT_CHECK(outFrames.Resize(numFrames));
+			outFrames.Resize(numFrames);
 
 			for (uint32_t frameIndex = 0; frameIndex < numFrames; frameIndex++)
 			{
 				rkit::Vector<data::MDAModelSkeletalBoneFrame> &frameBones = outFrames[frameIndex];
-				RKIT_CHECK(frameBones.Resize(numBones));
+				frameBones.Resize(numBones);
 
 				CTCBoneKey baseKey;
-				RKIT_CHECK(inputFile->ReadOneBinary(baseKey));
+				inputFile->ReadOneBinary(baseKey);
 
 				const Matrix3x4 baseMatrix = BoneKeyToMatrix(baseKey);
 
@@ -1765,7 +1765,7 @@ namespace anox { namespace buildsystem
 						parentMatrixPtr = &absMatrixes[parentIndexPlusOne - 1];
 
 					CTCBoneKey boneKey;
-					RKIT_CHECK(inputFile->ReadOneBinary(boneKey));
+					inputFile->ReadOneBinary(boneKey);
 
 					const Matrix3x4 relMatrix = BoneKeyToMatrix(baseKey);
 					absMatrixes[boneIndex] = OrthoMatrixMul(*parentMatrixPtr, relMatrix);
@@ -1875,42 +1875,42 @@ namespace anox { namespace buildsystem
 		outHeader.m_numMorphedPoints = static_cast<uint32_t>(numMorphedPoints);
 
 		rkit::CIPath outputPath;
-		RKIT_CHECK(ConstructOutputPath(outputPath, depsNode->GetIdentifier()));
+		ConstructOutputPath(outputPath, depsNode->GetIdentifier());
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
-		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outputPath, outFile));
+		feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outputPath, outFile);
 
 		// Start writing the file
-		RKIT_CHECK(outFile->WriteOneBinary(outHeader));
+		outFile->WriteOneBinary(outHeader);
 
-		RKIT_CHECK(outFile->WriteAllSpan(outMaterials));
+		outFile->WriteAllSpan(outMaterials);
 
-		RKIT_CHECK(outFile->WriteOneBinary(outProfile));
+		outFile->WriteOneBinary(outProfile);
 
 		// No conditions to write
-		RKIT_CHECK(outFile->WriteAllSpan(outSkins.ToSpan()));
-		RKIT_CHECK(outFile->WriteAllSpan(outSkinPasses.ToSpan()));
-		RKIT_CHECK(outFile->WriteAllSpan(outAnimations.ToSpan()));
+		outFile->WriteAllSpan(outSkins.ToSpan());
+		outFile->WriteAllSpan(outSkinPasses.ToSpan());
+		outFile->WriteAllSpan(outAnimations.ToSpan());
 
 		for (const rkit::AsciiString &animName : outAnimationNames)
 		{
-			RKIT_CHECK(outFile->WriteAllSpan(animName.ToSpan()));
+			outFile->WriteAllSpan(animName.ToSpan());
 		}
 
-		RKIT_CHECK(outFile->WriteAllSpan(outMorphKeys.ToSpan()));
-		RKIT_CHECK(outFile->WriteAllSpan(outBones.ToSpan()));
+		outFile->WriteAllSpan(outMorphKeys.ToSpan());
+		outFile->WriteAllSpan(outBones.ToSpan());
 
 		for (const rkit::Vector<data::MDAModelSkeletalBoneFrame> &frame : outFrames)
 		{
-			RKIT_CHECK(outFile->WriteAllSpan(frame.ToSpan()));
+			outFile->WriteAllSpan(frame.ToSpan());
 		}
 
-		RKIT_CHECK(outFile->WriteAllSpan(outSubModels.ToSpan()));
-		RKIT_CHECK(outFile->WriteAllSpan(outTris.ToSpan()));
-		RKIT_CHECK(outFile->WriteAllSpan(outVerts.ToSpan()));
-		RKIT_CHECK(outFile->WriteAllSpan(outPoints.ToSpan()));
-		RKIT_CHECK(outFile->WriteAllSpan(outBoneIndexes.ToSpan()));
-		RKIT_CHECK(outFile->WriteAllSpan(outVertMorphs.ToSpan()));
+		outFile->WriteAllSpan(outSubModels.ToSpan());
+		outFile->WriteAllSpan(outTris.ToSpan());
+		outFile->WriteAllSpan(outVerts.ToSpan());
+		outFile->WriteAllSpan(outPoints.ToSpan());
+		outFile->WriteAllSpan(outBoneIndexes.ToSpan());
+		outFile->WriteAllSpan(outVertMorphs.ToSpan());
 
 		RKIT_RETURN_OK;
 	}
@@ -1923,7 +1923,7 @@ namespace anox { namespace buildsystem
 		rkit::ConstSpan<CTCTriVerts> triVerts, rkit::ConstSpan<CTCTriTexCoords> triTexCoords, size_t numTris)
 	{
 		rkit::BoolVector triAdded;
-		RKIT_CHECK(triAdded.Resize(numTris));
+		triAdded.Resize(numTris);
 
 		for (;;)
 		{
@@ -1933,7 +1933,7 @@ namespace anox { namespace buildsystem
 			data::MDAModelSubModel subModel = {};
 			subModel.m_materialIndex = static_cast<uint16_t>(materialID);
 
-			RKIT_CHECK(AddOneTriCluster(outTris, outVerts, inVertToOutVert, triVerts, triTexCoords, numTris, triAdded.ToSpan()));
+			AddOneTriCluster(outTris, outVerts, inVertToOutVert, triVerts, triTexCoords, numTris, triAdded.ToSpan());
 
 			if (firstTri != outTris.Count())
 			{
@@ -1948,7 +1948,7 @@ namespace anox { namespace buildsystem
 				break;
 			}
 
-			RKIT_CHECK(outSubModels.Append(subModel));
+			outSubModels.Append(subModel);
 		}
 
 		RKIT_RETURN_OK;
@@ -2025,9 +2025,9 @@ namespace anox { namespace buildsystem
 						outVert.m_texCoordV = rkit::endian::LittleFloat32_t::FromBits(compoundVert.m_uvBits[1]);
 
 						RKIT_ASSERT(vertsEmitted < 0x10000u);
-						RKIT_CHECK(outVerts.Append(outVert));
+						outVerts.Append(outVert);
 
-						RKIT_CHECK(compoundVertToVertIndex.SetPrehashed(hashValue, compoundVert, static_cast<uint16_t>(vertsEmitted)));
+						compoundVertToVertIndex.SetPrehashed(hashValue, compoundVert, static_cast<uint16_t>(vertsEmitted));
 
 						vertsEmitted++;
 					}
@@ -2037,7 +2037,7 @@ namespace anox { namespace buildsystem
 					outTri.m_verts[ptIndex] = submodelVertIndex;
 				}
 
-				RKIT_CHECK(outTris.Append(outTri));
+				outTris.Append(outTri);
 
 				triAdded.SetAt(triIndex, true);
 			}
@@ -2300,18 +2300,18 @@ namespace anox { namespace buildsystem
 		rkit::DeduplicatedList<rkit::data::ContentID> materialContentIDs;
 
 		rkit::UniquePtr<rkit::ISeekableReadStream> inputFile;
-		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, mdaData.m_baseModel, inputFile));
+		feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, mdaData.m_baseModel, inputFile);
 
 		static const size_t kNumHardCodedNormals = 2048;
 
 		rkit::Vector<rkit::endian::LittleFloat32_t> normalFloats;
-		RKIT_CHECK(normalFloats.Resize(kNumHardCodedNormals * 3));
+		normalFloats.Resize(kNumHardCodedNormals * 3);
 
 		{
 			rkit::Vector<uint8_t> anoxGfxContents;
 
 			rkit::UniquePtr<rkit::ISeekableReadStream> anoxGfxDll;
-			RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kAuxDir0, u8"anoxgfx.dll", anoxGfxDll));
+			feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kAuxDir0, u8"anoxgfx.dll", anoxGfxDll);
 
 			const rkit::FilePos_t fileSize = anoxGfxDll->GetSize();
 			if (anoxGfxDll->GetSize() > std::numeric_limits<size_t>::max())
@@ -2320,8 +2320,8 @@ namespace anox { namespace buildsystem
 				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
-			RKIT_CHECK(anoxGfxContents.Resize(static_cast<size_t>(fileSize)));
-			RKIT_CHECK(anoxGfxDll->ReadAll(anoxGfxContents.GetBuffer(), static_cast<size_t>(fileSize)));
+			anoxGfxContents.Resize(static_cast<size_t>(fileSize));
+			anoxGfxDll->ReadAll(anoxGfxContents.GetBuffer(), static_cast<size_t>(fileSize));
 
 			const size_t kNormalBlobSize = 2048 * 3 * 4;
 
@@ -2355,7 +2355,7 @@ namespace anox { namespace buildsystem
 		}
 
 		MD2Header header;
-		RKIT_CHECK(inputFile->ReadAll(&header, sizeof(MD2Header)));
+		inputFile->ReadAll(&header, sizeof(MD2Header));
 
 		if (header.m_numTextureBlocks.Get() != header.m_numTextures.Get())
 		{
@@ -2420,19 +2420,19 @@ namespace anox { namespace buildsystem
 		}
 
 		rkit::Vector<rkit::endian::LittleUInt32_t> glCommandsArray;
-		RKIT_CHECK(glCommandsArray.Resize(header.m_numGLCalls.Get()));
+		glCommandsArray.Resize(header.m_numGLCalls.Get());
 
 		rkit::Vector<rkit::endian::LittleUInt16_t> textureBlockSizes;
-		RKIT_CHECK(textureBlockSizes.Resize(header.m_numTextureBlocks.Get()));
+		textureBlockSizes.Resize(header.m_numTextureBlocks.Get());
 
-		RKIT_CHECK(inputFile->SeekStart(header.m_glCommandPos.Get()));
-		RKIT_CHECK(inputFile->ReadAll(glCommandsArray.GetBuffer(), glCommandsArray.Count() * 4u));
+		inputFile->SeekStart(header.m_glCommandPos.Get());
+		inputFile->ReadAll(glCommandsArray.GetBuffer(), glCommandsArray.Count() * 4u);
 
-		RKIT_CHECK(inputFile->SeekStart(header.m_textureBlockPos.Get()));
-		RKIT_CHECK(inputFile->ReadAll(textureBlockSizes.GetBuffer(), textureBlockSizes.Count() * 2u));
+		inputFile->SeekStart(header.m_textureBlockPos.Get());
+		inputFile->ReadAll(textureBlockSizes.GetBuffer(), textureBlockSizes.Count() * 2u);
 
 		rkit::Vector<UncompiledTriList> triLists;
-		RKIT_CHECK(triLists.Resize(numTextures));
+		triLists.Resize(numTextures);
 
 		size_t currentTextureBlock = 0;
 		rkit::ConstSpan<rkit::endian::LittleUInt32_t> glCommands = glCommandsArray.ToSpan();
@@ -2499,26 +2499,26 @@ namespace anox { namespace buildsystem
 				{
 					if (isTriFan)
 					{
-						RKIT_CHECK(vertList.Append(vertList[firstOutVert]));
-						RKIT_CHECK(vertList.Append(vertList[vertList.Count() - 2]));
+						vertList.Append(vertList[firstOutVert]);
+						vertList.Append(vertList[vertList.Count() - 2]);
 					}
 					else
 					{
 						// Tristrip
 						if ((i & 1) != 0)
 						{
-							RKIT_CHECK(vertList.Append(vertList[vertList.Count() - 1]));
-							RKIT_CHECK(vertList.Append(vertList[vertList.Count() - 3]));
+							vertList.Append(vertList[vertList.Count() - 1]);
+							vertList.Append(vertList[vertList.Count() - 3]);
 						}
 						else
 						{
-							RKIT_CHECK(vertList.Append(vertList[vertList.Count() - 3]));
-							RKIT_CHECK(vertList.Append(vertList[vertList.Count() - 2]));
+							vertList.Append(vertList[vertList.Count() - 3]);
+							vertList.Append(vertList[vertList.Count() - 2]);
 						}
 					}
 				}
 
-				RKIT_CHECK(vertList.Append(vert));
+				vertList.Append(vert);
 			}
 		}
 
@@ -2529,7 +2529,7 @@ namespace anox { namespace buildsystem
 		rkit::Vector<UncompiledMDAMorph> morphs;
 
 		rkit::BoolVector xyzHasMorph;
-		RKIT_CHECK(xyzHasMorph.Resize(numXYZ));
+		xyzHasMorph.Resize(numXYZ);
 
 		if (mdaData.m_animChunk.Count() > 0)
 		{
@@ -2585,8 +2585,8 @@ namespace anox { namespace buildsystem
 				outAnim.m_numFrames = animNumFrames;
 				outAnim.m_categoryLength = nameLength;
 
-				RKIT_CHECK(animations.Append(std::move(outAnim)));
-				RKIT_CHECK(animNameChars.Append(rkit::ConstSpan<char>(inAnim.m_animCategory, nameLength)));
+				animations.Append(std::move(outAnim));
+				animNameChars.Append(rkit::ConstSpan<char>(inAnim.m_animCategory, nameLength));
 
 				animDataBytes = animDataBytes.SubSpan(sizeof(inAnim));
 			}
@@ -2616,8 +2616,8 @@ namespace anox { namespace buildsystem
 				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
-			RKIT_CHECK(morphKeys.Resize(numKeys));
-			RKIT_CHECK(morphs.Resize(numKeys));
+			morphKeys.Resize(numKeys);
+			morphs.Resize(numKeys);
 
 			for (uint32_t keyIndex = 0; keyIndex < numKeys; keyIndex++)
 			{
@@ -2638,7 +2638,7 @@ namespace anox { namespace buildsystem
 					RKIT_THROW(rkit::ResultCode::kDataError);
 				}
 
-				RKIT_CHECK(vertMorphs.Resize(numVertMorphs));
+				vertMorphs.Resize(numVertMorphs);
 				for (uint32_t vertMorphIndex = 0; vertMorphIndex < numVertMorphs; vertMorphIndex++)
 				{
 					UncompiledMDAVertMorph &outVertMorph = vertMorphs[vertMorphIndex];
@@ -2674,10 +2674,10 @@ namespace anox { namespace buildsystem
 		}
 
 		rkit::Vector<uint32_t> xyzToPointIndex;
-		RKIT_CHECK(xyzToPointIndex.Resize(numXYZ));
+		xyzToPointIndex.Resize(numXYZ);
 
 		rkit::Vector<uint32_t> pointToXYZIndex;
-		RKIT_CHECK(pointToXYZIndex.Resize(numXYZ));
+		pointToXYZIndex.Resize(numXYZ);
 
 		for (uint32_t i = 0; i < numXYZ; i++)
 			pointToXYZIndex[i] = i;
@@ -2720,14 +2720,14 @@ namespace anox { namespace buildsystem
 				RKIT_THROW(rkit::ResultCode::kDataError);
 			}
 
-			RKIT_CHECK(vertexBones.Resize(1));
-			RKIT_CHECK(boneFrames.Resize(1));
+			vertexBones.Resize(1);
+			boneFrames.Resize(1);
 
 			vertexBones[0].m_boneIDFourCC = boneData.m_boneID.Get();
 
 			rkit::Vector<data::MDAModelTagBoneFrame> &outFrames = boneFrames[0];
 
-			RKIT_CHECK(outFrames.Resize(numFrames));
+			outFrames.Resize(numFrames);
 			for (uint32_t frameIndex = 0; frameIndex < numFrames; frameIndex++)
 			{
 				MDABoneFrame inFrame = {};
@@ -2752,20 +2752,20 @@ namespace anox { namespace buildsystem
 
 		for (UncompiledTriList &triList : triLists)
 		{
-			RKIT_CHECK(CompileMDASubmodels(triList, xyzToPointIndex.ToSpan()));
+			CompileMDASubmodels(triList, xyzToPointIndex.ToSpan());
 		}
 
 		rkit::Vector<data::MDAModelPoint> points;
-		RKIT_CHECK(points.Resize(static_cast<size_t>(numXYZ) * numFrames));
+		points.Resize(static_cast<size_t>(numXYZ) * numFrames);
 
 		rkit::Vector<uint8_t> frameData;
-		RKIT_CHECK(frameData.Resize(frameSizeBytes));
+		frameData.Resize(frameSizeBytes);
 
-		RKIT_CHECK(inputFile->SeekStart(header.m_framePos.Get()));
+		inputFile->SeekStart(header.m_framePos.Get());
 
 		for (size_t frameIndex = 0; frameIndex < numFrames; frameIndex++)
 		{
-			RKIT_CHECK(inputFile->ReadAll(frameData.GetBuffer(), frameSizeBytes));
+			inputFile->ReadAll(frameData.GetBuffer(), frameSizeBytes);
 
 			MD2FrameHeader frameHeader;
 			rkit::CopySpanNonOverlapping(rkit::Span<MD2FrameHeader>(&frameHeader, 1).ReinterpretCast<uint8_t>(), frameData.ToSpan().SubSpan(0, sizeof(MD2FrameHeader)));
@@ -2842,9 +2842,9 @@ namespace anox { namespace buildsystem
 
 		{
 			size_t morphKeyListSize = 0;
-			RKIT_CHECK(rkit::SafeMul<size_t>(morphKeyListSize, morphs.Count(), numMorphedPoints));
+			rkit::SafeMul<size_t>(morphKeyListSize, morphs.Count(), numMorphedPoints);
 
-			RKIT_CHECK(compiledVertMorphs.Resize(morphKeyListSize));
+			compiledVertMorphs.Resize(morphKeyListSize);
 		}
 
 		if (numMorphedPoints > 0)
@@ -2885,24 +2885,24 @@ namespace anox { namespace buildsystem
 		if (autoSkin)
 		{
 			rkit::Vector<MD2TextureDef> md2Textures;
-			RKIT_CHECK(md2Textures.Resize(numTextures));
+			md2Textures.Resize(numTextures);
 
-			RKIT_CHECK(inputFile->SeekStart(header.m_texturePos.Get()));
-			RKIT_CHECK(inputFile->ReadAll(md2Textures.GetBuffer(), sizeof(MD2TextureDef) * numTextures));
+			inputFile->SeekStart(header.m_texturePos.Get());
+			inputFile->ReadAll(md2Textures.GetBuffer(), sizeof(MD2TextureDef) * numTextures);
 
 			autoSkinProfile.m_fourCC = RKIT_FOURCC('D', 'F', 'L', 'T');
-			RKIT_CHECK(autoSkinProfile.m_skins.Resize(numTextures));
+			autoSkinProfile.m_skins.Resize(numTextures);
 
 			for (size_t texIndex = 0; texIndex < numTextures; texIndex++)
 			{
 				const MD2TextureDef &textureDef = md2Textures[texIndex];
 
 				UncompiledMDASkin &skin = autoSkinProfile.m_skins[texIndex];
-				RKIT_CHECK(skin.m_passes.Resize(1));
+				skin.m_passes.Resize(1);
 
 				UncompiledMDAPass &pass = skin.m_passes[0];
 
-				RKIT_CHECK(ResolveTexturePath(pass.m_map, mdaData.m_baseModel, textureDef, false));
+				ResolveTexturePath(pass.m_map, mdaData.m_baseModel, textureDef, false);
 			}
 
 			mdaProfiles = rkit::ConstSpan<UncompiledMDAProfile>(&autoSkinProfile, 1);
@@ -2913,9 +2913,9 @@ namespace anox { namespace buildsystem
 		{
 			const size_t numProfiles = mdaProfiles.Count();
 
-			RKIT_CHECK(profiles.Resize(numProfiles));
-			RKIT_CHECK(profileSkins.Resize(numProfiles));
-			RKIT_CHECK(profileSkinPasses.Resize(numProfiles));
+			profiles.Resize(numProfiles);
+			profileSkins.Resize(numProfiles);
+			profileSkinPasses.Resize(numProfiles);
 
 			for (size_t profileIndex = 0; profileIndex < numProfiles; profileIndex++)
 			{
@@ -2932,13 +2932,13 @@ namespace anox { namespace buildsystem
 				outProfile.m_fourCC = inProfile.m_fourCC;
 				outProfile.m_conditionLength = static_cast<uint32_t>(inProfile.m_evaluate.Length());
 
-				RKIT_CHECK(profileConditionStrings.Append(inProfile.m_evaluate.ToSpan()));
+				profileConditionStrings.Append(inProfile.m_evaluate.ToSpan());
 
 				rkit::Vector<data::MDASkin> &outSkins = profileSkins[profileIndex];
 				rkit::Vector<rkit::Vector<data::MDASkinPass>> &outSkinPasses = profileSkinPasses[profileIndex];
 
-				RKIT_CHECK(outSkins.Resize(numTextures));
-				RKIT_CHECK(outSkinPasses.Resize(numTextures));
+				outSkins.Resize(numTextures);
+				outSkinPasses.Resize(numTextures);
 
 				for (size_t skinIndex = 0; skinIndex < numTextures; skinIndex++)
 				{
@@ -2954,7 +2954,7 @@ namespace anox { namespace buildsystem
 						RKIT_THROW(rkit::ResultCode::kDataError);
 					}
 
-					RKIT_CHECK(outPasses.Resize(numPasses));
+					outPasses.Resize(numPasses);
 
 					outSkin.m_numPasses = static_cast<uint8_t>(numPasses);
 
@@ -2968,17 +2968,17 @@ namespace anox { namespace buildsystem
 						const UncompiledMDAPass &inPass = inSkin.m_passes[passIndex];
 
 						rkit::String materialPath;
-						RKIT_CHECK(materialPath.Format(u8"{}.{}", inPass.m_map.ToString(), MaterialCompiler::GetModelMaterialExtension()));
+						materialPath.Format(u8"{}.{}", inPass.m_map.ToString(), MaterialCompiler::GetModelMaterialExtension());
 
 						rkit::CIPath compiledMaterialPath;
-						RKIT_CHECK(MaterialCompiler::ConstructOutputPath(compiledMaterialPath, data::MaterialResourceType::kModel, materialPath));
+						MaterialCompiler::ConstructOutputPath(compiledMaterialPath, data::MaterialResourceType::kModel, materialPath);
 
 						rkit::data::ContentID materialContentID;
-						RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, materialContentID));
+						feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, materialContentID);
 
 						typedef uint16_t StoredMaterialIndex_t;
 						size_t materialIndex = 0;
-						RKIT_CHECK(materialContentIDs.AddAndGetIndex(materialIndex, materialContentID));
+						materialContentIDs.AddAndGetIndex(materialIndex, materialContentID);
 
 						if (materialIndex > std::numeric_limits<uint16_t>::max())
 							RKIT_THROW(rkit::ResultCode::kIntegerOverflow);
@@ -3020,10 +3020,10 @@ namespace anox { namespace buildsystem
 						if (needMaterialData)
 						{
 							rkit::UniquePtr<rkit::ISeekableReadStream> materialStream;
-							RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, materialStream));
+							feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, materialStream);
 
 							data::MaterialHeader matHeader;
-							RKIT_CHECK(materialStream->ReadAll(&matHeader, sizeof(matHeader)));
+							materialStream->ReadAll(&matHeader, sizeof(matHeader));
 
 							const data::MaterialColorType colorType = static_cast<data::MaterialColorType>(matHeader.m_colorType);
 
@@ -3137,24 +3137,24 @@ namespace anox { namespace buildsystem
 		outHeader.m_numMaterials = static_cast<uint16_t>(materials.Count());
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
-		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outputPath, outFile));
+		feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outputPath, outFile);
 
 		// Write header
-		RKIT_CHECK(outFile->WriteOneBinary(outHeader));
+		outFile->WriteOneBinary(outHeader);
 
 		// Write materials
-		RKIT_CHECK(outFile->WriteAllSpan(materials));
+		outFile->WriteAllSpan(materials);
 
 		// Write profiles
-		RKIT_CHECK(outFile->WriteAllSpan(profiles.ToSpan()));
+		outFile->WriteAllSpan(profiles.ToSpan());
 
 		// Write profile condition chars
-		RKIT_CHECK(outFile->WriteAllSpan(profileConditionStrings.ToSpan()));
+		outFile->WriteAllSpan(profileConditionStrings.ToSpan());
 
 		// Write profile skins
 		for (const rkit::Vector<data::MDASkin> &skinList : profileSkins)
 		{
-			RKIT_CHECK(outFile->WriteAllSpan(skinList.ToSpan()));
+			outFile->WriteAllSpan(skinList.ToSpan());
 		}
 
 		// Write profile skin passes
@@ -3162,26 +3162,26 @@ namespace anox { namespace buildsystem
 		{
 			for (const rkit::Vector<data::MDASkinPass> &passesList : skinPassesList)
 			{
-				RKIT_CHECK(outFile->WriteAllSpan(passesList.ToSpan()));
+				outFile->WriteAllSpan(passesList.ToSpan());
 			}
 		}
 
 		// Write animations
-		RKIT_CHECK(outFile->WriteAllSpan(animations.ToSpan()));
+		outFile->WriteAllSpan(animations.ToSpan());
 
 		// Write animation names
-		RKIT_CHECK(outFile->WriteAllSpan(animNameChars.ToSpan()));
+		outFile->WriteAllSpan(animNameChars.ToSpan());
 
 		// Write morph keys
-		RKIT_CHECK(outFile->WriteAllSpan(morphKeys.ToSpan()));
+		outFile->WriteAllSpan(morphKeys.ToSpan());
 
 		// Write bones
-		RKIT_CHECK(outFile->WriteAllSpan(vertexBones.ToSpan()));
+		outFile->WriteAllSpan(vertexBones.ToSpan());
 
 		// Write bone frames
 		for (const rkit::Vector<data::MDAModelTagBoneFrame> &boneFramesList : boneFrames)
 		{
-			RKIT_CHECK(outFile->WriteAllSpan(boneFramesList.ToSpan()));
+			outFile->WriteAllSpan(boneFramesList.ToSpan());
 		}
 
 		// Write submodels
@@ -3202,7 +3202,7 @@ namespace anox { namespace buildsystem
 				outSubModel.m_numTris = static_cast<uint32_t>(subModel.m_tris.Count());
 				outSubModel.m_numVertsMinusOne = static_cast<uint16_t>(subModel.m_verts.Count() - 1);
 
-				RKIT_CHECK(outFile->WriteOneBinary(outSubModel));
+				outFile->WriteOneBinary(outSubModel);
 			}
 		}
 
@@ -3211,7 +3211,7 @@ namespace anox { namespace buildsystem
 		{
 			for (const UncompiledMDASubmodel &subModel : triList.m_submodels)
 			{
-				RKIT_CHECK(outFile->WriteAllSpan(subModel.m_tris.ToSpan()));
+				outFile->WriteAllSpan(subModel.m_tris.ToSpan());
 			}
 		}
 
@@ -3220,15 +3220,15 @@ namespace anox { namespace buildsystem
 		{
 			for (const UncompiledMDASubmodel &subModel : triList.m_submodels)
 			{
-				RKIT_CHECK(outFile->WriteAllSpan(subModel.m_verts.ToSpan()));
+				outFile->WriteAllSpan(subModel.m_verts.ToSpan());
 			}
 		}
 
 		// Write points
-		RKIT_CHECK(outFile->WriteAllSpan(points.ToSpan()));
+		outFile->WriteAllSpan(points.ToSpan());
 
 		// Write vert morphs
-		RKIT_CHECK(outFile->WriteAllSpan(compiledVertMorphs.ToSpan()));
+		outFile->WriteAllSpan(compiledVertMorphs.ToSpan());
 
 		RKIT_RETURN_OK;
 	}
@@ -3238,7 +3238,7 @@ namespace anox { namespace buildsystem
 		RKIT_ASSERT(triList.m_verts.Count() % 3 == 0);
 
 		rkit::BoolVector triEmitted;
-		RKIT_CHECK(triEmitted.Resize(triList.m_verts.Count() / 3));
+		triEmitted.Resize(triList.m_verts.Count() / 3);
 
 		bool compiledAnything = true;
 		while (compiledAnything)
@@ -3246,11 +3246,11 @@ namespace anox { namespace buildsystem
 			compiledAnything = false;
 
 			UncompiledMDASubmodel submodel;
-			RKIT_CHECK(CompileMDASubmodel(compiledAnything, submodel, triList, xyzToPointIndex, triEmitted));
+			CompileMDASubmodel(compiledAnything, submodel, triList, xyzToPointIndex, triEmitted);
 
 			if (compiledAnything)
 			{
-				RKIT_CHECK(triList.m_submodels.Append(std::move(submodel)));
+				triList.m_submodels.Append(std::move(submodel));
 			}
 		}
 
@@ -3306,15 +3306,15 @@ namespace anox { namespace buildsystem
 				size_t vertIndex = protoVertToVertIndex.Count();
 				if (it == protoVertToVertIndex.end())
 				{
-					RKIT_CHECK(uncompiledPoints.Append(vertIndex));
-					RKIT_CHECK(protoVertToVertIndex.SetPrehashed(hash, protoVert, vertIndex));
+					uncompiledPoints.Append(vertIndex);
+					protoVertToVertIndex.SetPrehashed(hash, protoVert, vertIndex);
 
 					data::MDAModelVert mdaVert;
 					mdaVert.m_texCoordU = rkit::endian::LittleFloat32_t::FromBits(protoVert.m_uBits);
 					mdaVert.m_texCoordV = rkit::endian::LittleFloat32_t::FromBits(protoVert.m_vBits);
 					mdaVert.m_pointID = xyzToPointIndex[protoVert.m_xyzIndex];
 
-					RKIT_CHECK(outSubmodel.m_verts.Append(mdaVert));
+					outSubmodel.m_verts.Append(mdaVert);
 				}
 				else
 					vertIndex = it.Value();
@@ -3322,7 +3322,7 @@ namespace anox { namespace buildsystem
 				tri.m_verts[triVert] = static_cast<uint16_t>(vertIndex);
 			}
 
-			RKIT_CHECK(outSubmodel.m_tris.Append(tri));
+			outSubmodel.m_tris.Append(tri);
 
 			triEmitted[i] = true;
 			emittedAnything = true;

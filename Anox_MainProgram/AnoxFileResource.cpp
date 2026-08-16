@@ -74,7 +74,7 @@ namespace anox
 	rkit::Result AnoxPathFileResourceLoaderBase::Create(rkit::RCPtr<AnoxPathFileResourceLoaderBase> &outFactory)
 	{
 		rkit::RCPtr<AnoxPathFileResourceLoader> resLoaderFactory;
-		RKIT_CHECK(rkit::New<AnoxPathFileResourceLoader>(resLoaderFactory));
+		rkit::New<AnoxPathFileResourceLoader>(resLoaderFactory);
 
 		outFactory = std::move(resLoaderFactory);
 
@@ -98,7 +98,7 @@ namespace anox
 	rkit::Result AnoxContentFileResourceLoaderBase::Create(rkit::RCPtr<AnoxContentFileResourceLoaderBase> &outFactory)
 	{
 		rkit::RCPtr<AnoxContentFileResourceLoader> resLoaderFactory;
-		RKIT_CHECK(rkit::New<AnoxContentFileResourceLoader>(resLoaderFactory));
+		rkit::New<AnoxContentFileResourceLoader>(resLoaderFactory);
 
 		outFactory = std::move(resLoaderFactory);
 

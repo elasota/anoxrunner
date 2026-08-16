@@ -75,140 +75,140 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 {
 	{
 		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler;
-		RKIT_CHECK(rkit::New<buildsystem::MaterialCompiler>(matCompiler, *m_pngDriver));
+		rkit::New<buildsystem::MaterialCompiler>(matCompiler, *m_pngDriver);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kFontMaterialNodeID, std::move(matCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kFontMaterialNodeID, std::move(matCompiler));
 
-		RKIT_CHECK(instance->RegisterNodeTypeByExtension(buildsystem::MaterialCompiler::GetFontMaterialExtension(), kAnoxNamespaceID, buildsystem::kFontMaterialNodeID));
+		instance->RegisterNodeTypeByExtension(buildsystem::MaterialCompiler::GetFontMaterialExtension(), kAnoxNamespaceID, buildsystem::kFontMaterialNodeID);
 	}
 
 	{
 		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler;
-		RKIT_CHECK(rkit::New<buildsystem::MaterialCompiler>(matCompiler, *m_pngDriver));
+		rkit::New<buildsystem::MaterialCompiler>(matCompiler, *m_pngDriver);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kWorldMaterialNodeID, std::move(matCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kWorldMaterialNodeID, std::move(matCompiler));
 
-		RKIT_CHECK(instance->RegisterNodeTypeByExtension(buildsystem::MaterialCompiler::GetWorldMaterialExtension(), kAnoxNamespaceID, buildsystem::kWorldMaterialNodeID));
+		instance->RegisterNodeTypeByExtension(buildsystem::MaterialCompiler::GetWorldMaterialExtension(), kAnoxNamespaceID, buildsystem::kWorldMaterialNodeID);
 	}
 
 	{
 		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler;
-		RKIT_CHECK(rkit::New<buildsystem::MaterialCompiler>(matCompiler, *m_pngDriver));
+		rkit::New<buildsystem::MaterialCompiler>(matCompiler, *m_pngDriver);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kModelMaterialNodeID, std::move(matCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kModelMaterialNodeID, std::move(matCompiler));
 
-		RKIT_CHECK(instance->RegisterNodeTypeByExtension(buildsystem::MaterialCompiler::GetModelMaterialExtension(), kAnoxNamespaceID, buildsystem::kModelMaterialNodeID));
+		instance->RegisterNodeTypeByExtension(buildsystem::MaterialCompiler::GetModelMaterialExtension(), kAnoxNamespaceID, buildsystem::kModelMaterialNodeID);
 	}
 
 	{
 		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler;
-		RKIT_CHECK(rkit::New<buildsystem::MaterialCompiler>(matCompiler, *m_pngDriver));
+		rkit::New<buildsystem::MaterialCompiler>(matCompiler, *m_pngDriver);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kInterfaceMaterialNodeID, std::move(matCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kInterfaceMaterialNodeID, std::move(matCompiler));
 
-		RKIT_CHECK(instance->RegisterNodeTypeByExtension(buildsystem::MaterialCompiler::GetInterfaceMaterialExtension(), kAnoxNamespaceID, buildsystem::kInterfaceMaterialNodeID));
+		instance->RegisterNodeTypeByExtension(buildsystem::MaterialCompiler::GetInterfaceMaterialExtension(), kAnoxNamespaceID, buildsystem::kInterfaceMaterialNodeID);
 	}
 
 	{
 		rkit::UniquePtr<buildsystem::TextureCompilerBase> texCompiler;
-		RKIT_CHECK(buildsystem::TextureCompilerBase::Create(texCompiler, *m_pngDriver));
+		buildsystem::TextureCompilerBase::Create(texCompiler, *m_pngDriver);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kTextureNodeID, std::move(texCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kTextureNodeID, std::move(texCompiler));
 	}
 
 	{
 		rkit::UniquePtr<buildsystem::BSPMapCompilerBase> mapCompiler;
-		RKIT_CHECK(buildsystem::BSPMapCompilerBase::CreateMapCompiler(mapCompiler));
+		buildsystem::BSPMapCompilerBase::CreateMapCompiler(mapCompiler);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kBSPMapNodeID, std::move(mapCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kBSPMapNodeID, std::move(mapCompiler));
 
-		RKIT_CHECK(instance->RegisterNodeTypeByExtension(u8"bsp", kAnoxNamespaceID, buildsystem::kBSPMapNodeID));
+		instance->RegisterNodeTypeByExtension(u8"bsp", kAnoxNamespaceID, buildsystem::kBSPMapNodeID);
 	}
 
 	{
 		rkit::UniquePtr<buildsystem::BSPMapCompilerBase> lightingCompiler;
-		RKIT_CHECK(buildsystem::BSPMapCompilerBase::CreateLightingCompiler(lightingCompiler));
+		buildsystem::BSPMapCompilerBase::CreateLightingCompiler(lightingCompiler);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kBSPLightmapNodeID, std::move(lightingCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kBSPLightmapNodeID, std::move(lightingCompiler));
 	}
 
 	{
 		rkit::UniquePtr<buildsystem::BSPMapCompilerBase> bspGeoCompiler;
-		RKIT_CHECK(buildsystem::BSPMapCompilerBase::CreateGeometryCompiler(bspGeoCompiler));
+		buildsystem::BSPMapCompilerBase::CreateGeometryCompiler(bspGeoCompiler);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kBSPGeometryID, std::move(bspGeoCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kBSPGeometryID, std::move(bspGeoCompiler));
 	}
 
 	{
 		rkit::UniquePtr<buildsystem::BSPMapCompilerBase> bspEntCompiler;
-		RKIT_CHECK(buildsystem::BSPMapCompilerBase::CreateEntityCompiler(bspEntCompiler));
+		buildsystem::BSPMapCompilerBase::CreateEntityCompiler(bspEntCompiler);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kBSPEntityID, std::move(bspEntCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kBSPEntityID, std::move(bspEntCompiler));
 	}
 
 	{
 		rkit::UniquePtr<buildsystem::APEDepsCompiler> apeDepsCompiler;
-		RKIT_CHECK(buildsystem::APEDepsCompiler::Create(apeDepsCompiler));
+		buildsystem::APEDepsCompiler::Create(apeDepsCompiler);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kAPEDepsNodeID, std::move(apeDepsCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kAPEDepsNodeID, std::move(apeDepsCompiler));
 
-		RKIT_CHECK(instance->RegisterNodeTypeByExtension(u8"apedeps", kAnoxNamespaceID, buildsystem::kAPEDepsNodeID));
+		instance->RegisterNodeTypeByExtension(u8"apedeps", kAnoxNamespaceID, buildsystem::kAPEDepsNodeID);
 	}
 
 	{
 		rkit::UniquePtr<buildsystem::APEScriptCompiler> apeCompiler;
-		RKIT_CHECK(buildsystem::APEScriptCompiler::Create(apeCompiler));
+		buildsystem::APEScriptCompiler::Create(apeCompiler);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kAPEScriptNodeID, std::move(apeCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kAPEScriptNodeID, std::move(apeCompiler));
 
-		RKIT_CHECK(instance->RegisterNodeTypeByExtension(u8"ape", kAnoxNamespaceID, buildsystem::kAPEScriptNodeID));
+		instance->RegisterNodeTypeByExtension(u8"ape", kAnoxNamespaceID, buildsystem::kAPEScriptNodeID);
 	}
 
 	{
 		rkit::UniquePtr<buildsystem::APEGroupCompiler> apeGroupCompiler;
-		RKIT_CHECK(buildsystem::APEGroupCompiler::Create(apeGroupCompiler));
+		buildsystem::APEGroupCompiler::Create(apeGroupCompiler);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kAPEGroupNodeID, std::move(apeGroupCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kAPEGroupNodeID, std::move(apeGroupCompiler));
 
-		RKIT_CHECK(instance->RegisterNodeTypeByExtension(u8"apegroup", kAnoxNamespaceID, buildsystem::kAPEGroupNodeID));
+		instance->RegisterNodeTypeByExtension(u8"apegroup", kAnoxNamespaceID, buildsystem::kAPEGroupNodeID);
 	}
 
 	{
 		rkit::UniquePtr<buildsystem::EntityDefCompilerBase> entityDefCompiler;
-		RKIT_CHECK(buildsystem::EntityDefCompilerBase::Create(entityDefCompiler));
+		buildsystem::EntityDefCompilerBase::Create(entityDefCompiler);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kEntityDefNodeID, std::move(entityDefCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kEntityDefNodeID, std::move(entityDefCompiler));
 	}
 
 	{
 		rkit::UniquePtr<buildsystem::AnoxMD2CompilerBase> md2Compiler;
-		RKIT_CHECK(buildsystem::AnoxMD2CompilerBase::Create(md2Compiler));
+		buildsystem::AnoxMD2CompilerBase::Create(md2Compiler);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kMD2ModelNodeID, std::move(md2Compiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kMD2ModelNodeID, std::move(md2Compiler));
 	}
 
 	{
 		rkit::UniquePtr<buildsystem::AnoxMDACompilerBase> mdaCompiler;
-		RKIT_CHECK(buildsystem::AnoxMDACompilerBase::Create(mdaCompiler));
+		buildsystem::AnoxMDACompilerBase::Create(mdaCompiler);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kMDAModelNodeID, std::move(mdaCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kMDAModelNodeID, std::move(mdaCompiler));
 	}
 
 	{
 		rkit::UniquePtr<buildsystem::AnoxCTCCompilerBase> ctcCompiler;
-		RKIT_CHECK(buildsystem::AnoxCTCCompilerBase::Create(ctcCompiler));
+		buildsystem::AnoxCTCCompilerBase::Create(ctcCompiler);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kCTCModelNodeID, std::move(ctcCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kCTCModelNodeID, std::move(ctcCompiler));
 	}
 
 	{
 		rkit::UniquePtr<buildsystem::SceneCompilerBase> sceneCompiler;
-		RKIT_CHECK(buildsystem::SceneCompilerBase::Create(sceneCompiler));
+		buildsystem::SceneCompilerBase::Create(sceneCompiler);
 
-		RKIT_CHECK(instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kSceneNodeID, std::move(sceneCompiler)));
+		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kSceneNodeID, std::move(sceneCompiler));
 	}
 
-	RKIT_CHECK(instance->RegisterNodeTypeByExtension(u8"cfg", rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kCopyFileNodeID));
+	instance->RegisterNodeTypeByExtension(u8"cfg", rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kCopyFileNodeID);
 
 	RKIT_RETURN_OK;
 }

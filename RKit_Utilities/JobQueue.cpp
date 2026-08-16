@@ -508,7 +508,7 @@ namespace rkit { namespace utils
 		size_t numDependencies = dependencies.GetSpan().Count();
 
 		RCPtr<JobImpl> resultJob;
-		RKIT_CHECK(NewWithAlloc<JobImpl>(resultJob, m_alloc, *this, std::move(jobRunnerTemp), numDependencies, jobType));
+		NewWithAlloc<JobImpl>(resultJob, m_alloc, *this, std::move(jobRunnerTemp), numDependencies, jobType);
 
 		PendingJobList &ci = m_pendingJobLists[static_cast<size_t>(jobType)];
 
@@ -537,7 +537,7 @@ namespace rkit { namespace utils
 				for (Job *job : dependencies.GetSpan())
 				{
 					if (!static_cast<JobImpl *>(job)->m_dgJobCompleted)
-						RKIT_CHECK(static_cast<JobImpl *>(job)->ReserveDownstreamDependency());
+						static_cast<JobImpl *>(job)->ReserveDownstreamDependency();
 				}
 
 				for (Job *job : dependencies.GetSpan())
@@ -567,10 +567,10 @@ namespace rkit { namespace utils
 	Result JobQueue::CreateSignaledJob(RCPtr<JobSignaler> &outSignaler, RCPtr<Job> &outJob)
 	{
 		RCPtr<JobImpl> resultJob;
-		RKIT_CHECK(NewWithAlloc<JobImpl>(resultJob, m_alloc, *this, UniquePtr<IJobRunner>(), 0, JobType::kNormalPriority));
+		NewWithAlloc<JobImpl>(resultJob, m_alloc, *this, UniquePtr<IJobRunner>(), 0, JobType::kNormalPriority);
 
 		RCPtr<JobSignalerImpl> signaller;
-		RKIT_CHECK(New<JobSignalerImpl>(signaller, *this, resultJob));
+		New<JobSignalerImpl>(signaller, *this, resultJob);
 
 		outSignaler = std::move(signaller);
 		outJob = std::move(resultJob);
@@ -1042,9 +1042,9 @@ namespace rkit { namespace utils
 	{
 		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
 
-		RKIT_CHECK(sysDriver.CreateMutex(m_depGraphMutex));
-		RKIT_CHECK(sysDriver.CreateMutex(m_resultMutex));
-		RKIT_CHECK(sysDriver.CreateMutex(m_distributorMutex));
+		sysDriver.CreateMutex(m_depGraphMutex);
+		sysDriver.CreateMutex(m_resultMutex);
+		sysDriver.CreateMutex(m_distributorMutex);
 
 		m_isInitialized = true;
 
@@ -1055,8 +1055,8 @@ namespace rkit { namespace utils
 rkit::Result rkit::utils::CreateJobQueue(UniquePtr<IJobQueue> &outJobQueue, IMallocDriver *alloc)
 {
 	UniquePtr<JobQueue> jobQueue;
-	RKIT_CHECK(NewWithAlloc<JobQueue>(jobQueue, alloc, alloc));
-	RKIT_CHECK(jobQueue->Init());
+	NewWithAlloc<JobQueue>(jobQueue, alloc, alloc);
+	jobQueue->Init();
 
 	outJobQueue = std::move(jobQueue);
 

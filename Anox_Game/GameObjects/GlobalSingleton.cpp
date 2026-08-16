@@ -11,7 +11,7 @@ namespace anox::game
 {
 	rkit::ResultCoroutine GlobalSingleton::OnSpawnedFromLevel(rkit::ICoroThread &thread)
 	{
-		CORO_CHECK(co_await GetWorld().GetScriptEnvironment().StartSequence(thread, GetScriptContext(), m_sequence, GetWorld()));
+		co_await GetWorld().GetScriptEnvironment().StartSequence(thread, GetScriptContext(), m_sequence, GetWorld());
 
 		CORO_RETURN_OK;
 	}

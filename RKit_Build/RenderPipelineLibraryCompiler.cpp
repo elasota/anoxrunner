@@ -460,7 +460,7 @@ namespace rkit { namespace buildsystem { namespace rpc_common
 	Result LibraryCompilerBase::FormatGraphicPipelinePath(CIPath &path, const StringView &identifier, size_t pipelineIndex)
 	{
 		String str;
-		RKIT_CHECK(str.Format(u8"rpll/g_{}/{}", pipelineIndex, identifier));
+		str.Format(u8"rpll/g_{}/{}", pipelineIndex, identifier);
 
 		return path.Set(str);
 	}
@@ -468,7 +468,7 @@ namespace rkit { namespace buildsystem { namespace rpc_common
 	Result LibraryCompilerBase::FormatGlobalsPath(CIPath &path, const StringView &identifier)
 	{
 		String str;
-		RKIT_CHECK(str.Format(u8"rpll/globs/{}", identifier));
+		str.Format(u8"rpll/globs/{}", identifier);
 
 		return path.Set(str);
 	}
@@ -476,7 +476,7 @@ namespace rkit { namespace buildsystem { namespace rpc_common
 	Result LibraryCompilerBase::FormatIndexPath(CIPath &path, const StringView &identifier)
 	{
 		String str;
-		RKIT_CHECK(str.Format(u8"rpll/idx/{}", identifier));
+		str.Format(u8"rpll/idx/{}", identifier);
 
 		return path.Set(str);
 	}
@@ -484,7 +484,7 @@ namespace rkit { namespace buildsystem { namespace rpc_common
 	Result LibraryCompilerBase::FormatCombinedOutputPath(CIPath &path, const StringView &identifier)
 	{
 		String str;
-		RKIT_CHECK(str.Format(u8"rpll/out/{}", identifier));
+		str.Format(u8"rpll/out/{}", identifier);
 
 		return path.Set(str);
 	}
@@ -528,7 +528,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			memcpy(m_staticBuffer, span.Ptr(), span.Count());
 		else
 		{
-			RKIT_CHECK(m_chars.Append(span));
+			m_chars.Append(span);
 		}
 
 		m_length = span.Count();
@@ -571,34 +571,34 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 	{
 		if (m_numericTypeResolutions.Count() == 0)
 		{
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"float", render::NumericType::Float32)));
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"half", render::NumericType::Float16)));
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"int", render::NumericType::SInt32)));
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"uint", render::NumericType::UInt32)));
+			m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"float", render::NumericType::Float32));
+			m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"half", render::NumericType::Float16));
+			m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"int", render::NumericType::SInt32));
+			m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"uint", render::NumericType::UInt32));
 
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"double", render::NumericType::Float64)));
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"ulong", render::NumericType::UInt64)));
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"long", render::NumericType::SInt64)));
+			m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"double", render::NumericType::Float64));
+			m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"ulong", render::NumericType::UInt64));
+			m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"long", render::NumericType::SInt64));
 
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"bool", render::NumericType::Bool)));
+			m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"bool", render::NumericType::Bool));
 
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"byte", render::NumericType::UInt8)));
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"sbyte", render::NumericType::SInt8)));
+			m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"byte", render::NumericType::UInt8));
+			m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"sbyte", render::NumericType::SInt8));
 
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"short", render::NumericType::SInt16)));
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"ushort", render::NumericType::UInt16)));
+			m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"short", render::NumericType::SInt16));
+			m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"ushort", render::NumericType::UInt16));
 
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"nbyte", render::NumericType::UNorm8)));
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"nushort", render::NumericType::UNorm16)));
+			m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"nbyte", render::NumericType::UNorm8));
+			m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"nushort", render::NumericType::UNorm16));
 
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"nsbyte", render::NumericType::SNorm8)));
-			RKIT_CHECK(m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"nshort", render::NumericType::SNorm16)));
+			m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"nsbyte", render::NumericType::SNorm8));
+			m_numericTypeResolutions.Append(SimpleNumericTypeResolution(u8"nshort", render::NumericType::SNorm16));
 		}
 
 		CIPath path;
-		RKIT_CHECK(path.Set(depsNode->GetIdentifier()));
+		path.Set(depsNode->GetIdentifier());
 
-		RKIT_CHECK(m_includeStack.Append(AnalyzerIncludeStack(depsNode->GetInputFileLocation(), path, false)));
+		m_includeStack.Append(AnalyzerIncludeStack(depsNode->GetInputFileLocation(), path, false));
 
 		while (m_includeStack.Count() > 0)
 		{
@@ -606,15 +606,15 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 			if (topItem.m_isScanning)
 			{
-				RKIT_CHECK(ScanTopStackItem(topItem));
+				ScanTopStackItem(topItem);
 			}
 			else
 			{
-				RKIT_CHECK(ParseTopStackItem(topItem));
+				ParseTopStackItem(topItem);
 			}
 		}
 
-		RKIT_CHECK(ExportPackages(depsNode));
+		ExportPackages(depsNode);
 
 		// Generate graphics pipeline shader jobs
 
@@ -654,10 +654,10 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			RKIT_RETURN_OK;
 		}
 
-		RKIT_CHECK(m_includedFiles.Add(fKey));
+		m_includedFiles.Add(fKey);
 
 		UniquePtr<ISeekableReadStream> stream;
-		RKIT_CHECK(m_feedback->TryOpenInput(item.m_location, item.m_path, stream));
+		m_feedback->TryOpenInput(item.m_location, item.m_path, stream);
 
 		if (!stream.IsValid())
 		{
@@ -677,7 +677,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		IUtilitiesDriver &utils = *GetDrivers().m_utilitiesDriver;
 
 		Vector<uint8_t> streamBytes;
-		RKIT_CHECK(utils.ReadEntireFile(*stream, streamBytes));
+		utils.ReadEntireFile(*stream, streamBytes);
 
 		item.m_fileContents = std::move(streamBytes);
 
@@ -687,7 +687,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			RKIT_THROW(ResultCode::kInvalidUnicode);
 		}
 
-		RKIT_CHECK(utils.CreateTextParser(item.m_fileContents.ToSpan(), utils::TextParserCommentType::kC, utils::TextParserLexerType::kC, item.m_textParser));
+		utils.CreateTextParser(item.m_fileContents.ToSpan(), utils::TextParserCommentType::kC, utils::TextParserLexerType::kC, item.m_textParser);
 		item.m_isScanning = false;
 
 		RKIT_RETURN_OK;
@@ -699,7 +699,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		TextParser_t parser(*parserBase);
 
-		RKIT_CHECK(parser.SkipWhitespace());
+		parser.SkipWhitespace();
 
 		bool haveMore = true;
 		while (haveMore)
@@ -707,7 +707,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			haveMore = false;
 
 			size_t oldStackCount = m_includeStack.Count();
-			RKIT_CHECK(ParseDirective(item.m_path.CStr(), parser, haveMore));
+			ParseDirective(item.m_path.CStr(), parser, haveMore);
 
 			if (oldStackCount != m_includeStack.Count())
 				RKIT_RETURN_OK;
@@ -727,7 +727,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		bool haveToken = false;
 		rkit::Span<const Utf8Char_t> directiveToken;
-		RKIT_CHECK(parser.ReadToken(haveToken, directiveToken));
+		parser.ReadToken(haveToken, directiveToken);
 
 		if (!haveToken)
 		{
@@ -783,10 +783,10 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		parser.GetLocation(line, col);
 
 		Span<const Utf8Char_t> entityNameSpan;
-		RKIT_CHECK(ExpectIdentifier(blamePath, entityNameSpan, parser));
+		ExpectIdentifier(blamePath, entityNameSpan, parser);
 
 		String entityName;
-		RKIT_CHECK(entityName.Set(entityNameSpan));
+		entityName.Set(entityNameSpan);
 
 		if (m_entities.Find(entityName) != m_entities.end())
 		{
@@ -795,15 +795,15 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		}
 
 		UniquePtr<rpc_interchange::Entity> entity;
-		RKIT_CHECK(New<T>(entity));
+		New<T>(entity);
 
-		RKIT_CHECK(entity->SetName(entityName));
+		entity->SetName(entityName);
 
 		T *obj = static_cast<T *>(entity.Get());
 
-		RKIT_CHECK((this->*parseFunc)(blamePath, parser, *obj));
+		(this->*parseFunc)(blamePath, parser, *obj);
 
-		RKIT_CHECK(m_entities.Set(entityName, std::move(entity)));
+		m_entities.Set(entityName, std::move(entity));
 
 		RKIT_RETURN_OK;
 	}
@@ -812,17 +812,17 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 	{
 		const data::RenderRTTIStructType *rtti = m_dataDriver->GetRenderDataHandler()->GetSamplerDescRTTI();
 
-		RKIT_CHECK(parser.ExpectToken(u8"{"));
+		parser.ExpectToken(u8"{");
 
 		for (;;)
 		{
 			Span<const Utf8Char_t> token;
-			RKIT_CHECK(parser.RequireToken(token));
+			parser.RequireToken(token);
 
 			if (IsToken(token, u8"}"))
 				break;
 
-			RKIT_CHECK(ParseDynamicStructMember(blamePath, token, rtti, ss.GetDesc(), parser));
+			ParseDynamicStructMember(blamePath, token, rtti, ss.GetDesc(), parser);
 		}
 
 		RKIT_RETURN_OK;
@@ -832,7 +832,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 	{
 		const data::RenderRTTIStructType *rtti = m_dataDriver->GetRenderDataHandler()->GetPushConstantDescRTTI();
 
-		RKIT_CHECK(parser.ExpectToken(u8"{"));
+		parser.ExpectToken(u8"{");
 
 		for (;;)
 		{
@@ -842,13 +842,13 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			size_t col = 0;
 			parser.GetLocation(line, col);
 
-			RKIT_CHECK(parser.RequireToken(nameToken));
+			parser.RequireToken(nameToken);
 
 			if (IsToken(nameToken, u8"}"))
 				break;
 
 			render::TempStringIndex_t tsi;
-			RKIT_CHECK(IndexString(nameToken, tsi));
+			IndexString(nameToken, tsi);
 
 			for (const render::PushConstantDesc *pcDesc : pc.GetPushConstantsVector())
 			{
@@ -859,17 +859,17 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				}
 			}
 
-			RKIT_CHECK(CheckValidIdentifier(blamePath, nameToken, parser));
+			CheckValidIdentifier(blamePath, nameToken, parser);
 
-			RKIT_CHECK(parser.ExpectToken(u8"="));
+			parser.ExpectToken(u8"=");
 
 			UniquePtr<render::PushConstantDesc> pcDesc;
-			RKIT_CHECK(New<render::PushConstantDesc>(pcDesc));
+			New<render::PushConstantDesc>(pcDesc);
 
-			RKIT_CHECK(ParseValue(blamePath, &rtti->m_base, pcDesc.Get(), false, parser));
+			ParseValue(blamePath, &rtti->m_base, pcDesc.Get(), false, parser);
 
-			RKIT_CHECK(pc.GetPushConstantsVector().Append(pcDesc.Get()));
-			RKIT_CHECK(this->m_pcDescs.Append(std::move(pcDesc)));
+			pc.GetPushConstantsVector().Append(pcDesc.Get());
+			this->m_pcDescs.Append(std::move(pcDesc));
 		}
 
 		pc.GetDesc().m_pushConstants = pc.GetPushConstantsVector().ToSpan();
@@ -879,7 +879,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 	Result LibraryAnalyzer::ParseStructDef(const Utf8Char_t *blamePath, TextParser_t &parser, rpc_interchange::StructDefEntity &sd)
 	{
-		RKIT_CHECK(parser.ExpectToken(u8"{"));
+		parser.ExpectToken(u8"{");
 
 		for (;;)
 		{
@@ -890,20 +890,20 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			size_t col = 0;
 			parser.GetLocation(line, col);
 
-			RKIT_CHECK(parser.RequireToken(typeToken));
+			parser.RequireToken(typeToken);
 
 			if (IsToken(typeToken, u8"}"))
 				break;
 
-			RKIT_CHECK(CheckValidIdentifier(blamePath, typeToken, parser));
+			CheckValidIdentifier(blamePath, typeToken, parser);
 
 			render::ValueType valueType;
-			RKIT_CHECK(ParseValueType(blamePath, valueType, typeToken, parser));
+			ParseValueType(blamePath, valueType, typeToken, parser);
 
-			RKIT_CHECK(ExpectIdentifier(blamePath, nameToken, parser));
+			ExpectIdentifier(blamePath, nameToken, parser);
 
 			render::TempStringIndex_t tsi;
-			RKIT_CHECK(IndexString(nameToken, tsi));
+			IndexString(nameToken, tsi);
 
 			for (const render::StructureMemberDesc *smDesc : sd.GetStructMembersVector())
 			{
@@ -918,13 +918,13 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				break;
 
 			UniquePtr<render::StructureMemberDesc> smDesc;
-			RKIT_CHECK(New<render::StructureMemberDesc>(smDesc));
+			New<render::StructureMemberDesc>(smDesc);
 
-			RKIT_CHECK(IndexString(nameToken, smDesc->m_name));
+			IndexString(nameToken, smDesc->m_name);
 			smDesc->m_type = valueType;
 
-			RKIT_CHECK(sd.GetStructMembersVector().Append(smDesc.Get()));
-			RKIT_CHECK(this->m_smDescs.Append(std::move(smDesc)));
+			sd.GetStructMembersVector().Append(smDesc.Get());
+			this->m_smDescs.Append(std::move(smDesc));
 		}
 
 		sd.GetDesc().m_members = sd.GetStructMembersVector().ToSpan();
@@ -934,7 +934,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 	Result LibraryAnalyzer::ParseInputLayout(const Utf8Char_t *blamePath, TextParser_t &parser, rpc_interchange::InputLayoutEntity &il)
 	{
-		RKIT_CHECK(parser.ExpectToken(u8"{"));
+		parser.ExpectToken(u8"{");
 
 		Vector<VertexInputFeedMapping> feedMappings;
 
@@ -946,7 +946,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		for (;;)
 		{
 			Span<const Utf8Char_t> token;
-			RKIT_CHECK(parser.RequireToken(token));
+			parser.RequireToken(token);
 
 			parser.GetLocation(line, col);
 
@@ -955,11 +955,11 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 			if (IsToken(token, u8"VertexInputFeeds"))
 			{
-				RKIT_CHECK(parser.ExpectToken(u8"="));
-				RKIT_CHECK(parser.ExpectToken(u8"{"));
+				parser.ExpectToken(u8"=");
+				parser.ExpectToken(u8"{");
 
 				parser.GetLocation(line, col);
-				RKIT_CHECK(parser.RequireToken(token));
+				parser.RequireToken(token);
 
 				uint32_t slotIndex = 0;
 
@@ -969,57 +969,57 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 						break;
 
 					VertexInputFeedMapping feedMapping;
-					RKIT_CHECK(feedMapping.m_name.Set(token));
+					feedMapping.m_name.Set(token);
 
 					UniquePtr<render::InputLayoutVertexFeedDesc> feedDesc;
-					RKIT_CHECK(New<render::InputLayoutVertexFeedDesc>(feedDesc));
+					New<render::InputLayoutVertexFeedDesc>(feedDesc);
 
 					feedMapping.m_feedDesc = feedDesc.Get();
-					RKIT_CHECK(m_vertexFeedDescs.Append(std::move(feedDesc)));
+					m_vertexFeedDescs.Append(std::move(feedDesc));
 
 
 
 					parser.GetLocation(line, col);
-					RKIT_CHECK(parser.RequireToken(token));
+					parser.RequireToken(token);
 
 					bool isExplicitlyNumbered = false;
 					if (IsToken(token, u8"="))
 					{
-						RKIT_CHECK(parser.ExpectToken(u8"{"));
+						parser.ExpectToken(u8"{");
 
 						for (;;)
 						{
 							parser.GetLocation(line, col);
-							RKIT_CHECK(parser.RequireToken(token));
+							parser.RequireToken(token);
 
 							if (IsToken(token, u8"InputSlot"))
 							{
-								RKIT_CHECK(parser.ExpectToken(u8"="));
-								RKIT_CHECK(parser.RequireToken(token));
+								parser.ExpectToken(u8"=");
+								parser.RequireToken(token);
 
 								uint64_t value = 0;
-								RKIT_CHECK(ParseUIntConstant(blamePath, line, col, token, std::numeric_limits<uint32_t>::max(), value));
+								ParseUIntConstant(blamePath, line, col, token, std::numeric_limits<uint32_t>::max(), value);
 
 								isExplicitlyNumbered = true;
 								feedMapping.m_feedDesc->m_inputSlot = static_cast<uint32_t>(value);
 							}
 							else if (IsToken(token, u8"Stride"))
 							{
-								RKIT_CHECK(parser.ExpectToken(u8"="));
-								RKIT_CHECK(parser.RequireToken(token));
+								parser.ExpectToken(u8"=");
+								parser.RequireToken(token);
 
 								uint64_t value = 0;
-								RKIT_CHECK(ParseUIntConstant(blamePath, line, col, token, std::numeric_limits<uint32_t>::max(), value));
+								ParseUIntConstant(blamePath, line, col, token, std::numeric_limits<uint32_t>::max(), value);
 
 								feedMapping.m_strideIsSet = true;
 								feedMapping.m_feedDesc->m_byteStride.Set(static_cast<uint32_t>(value));
 							}
 							else if (IsToken(token, u8"Stepping"))
 							{
-								RKIT_CHECK(parser.ExpectToken(u8"="));
+								parser.ExpectToken(u8"=");
 
 								const data::RenderRTTIEnumType *enumType = m_dataDriver->GetRenderDataHandler()->GetInputLayoutVertexInputSteppingRTTI();
-								RKIT_CHECK(ParseEnum(blamePath, enumType, &feedMapping.m_feedDesc->m_stepping, true, parser));
+								ParseEnum(blamePath, enumType, &feedMapping.m_feedDesc->m_stepping, true, parser);
 							}
 							else if (IsToken(token, u8"}"))
 								break;
@@ -1031,7 +1031,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 						}
 
 						parser.GetLocation(line, col);
-						RKIT_CHECK(parser.RequireToken(token));
+						parser.RequireToken(token);
 					}
 
 					if (isExplicitlyNumbered)
@@ -1072,30 +1072,30 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 						feedMapping.m_feedDesc->m_inputSlot = slotIndex++;
 					}
 
-					RKIT_CHECK(IndexString(feedMapping.m_name.ToSpan(), feedMapping.m_feedDesc->m_feedName));
+					IndexString(feedMapping.m_name.ToSpan(), feedMapping.m_feedDesc->m_feedName);
 
-					RKIT_CHECK(feedMappings.Append(std::move(feedMapping)));
+					feedMappings.Append(std::move(feedMapping));
 				}
 			}
 			else if (IsToken(token, u8"VertexInputs"))
 			{
-				RKIT_CHECK(parser.ExpectToken(u8"="));
-				RKIT_CHECK(parser.ExpectToken(u8"{"));
+				parser.ExpectToken(u8"=");
+				parser.ExpectToken(u8"{");
 
 				for (;;)
 				{
-					RKIT_CHECK(parser.RequireToken(token));
+					parser.RequireToken(token);
 
 					if (IsToken(token, u8"}"))
 						break;
 
-					RKIT_CHECK(CheckValidIdentifier(blamePath, token, parser));
+					CheckValidIdentifier(blamePath, token, parser);
 
 					render::TempStringIndex_t inputNameStr;
-					RKIT_CHECK(IndexString(token, inputNameStr));
+					IndexString(token, inputNameStr);
 
-					RKIT_CHECK(parser.ExpectToken(u8"="));
-					RKIT_CHECK(parser.ExpectToken(u8"{"));
+					parser.ExpectToken(u8"=");
+					parser.ExpectToken(u8"{");
 
 					uint32_t baseOffset = 0;
 
@@ -1111,17 +1111,17 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					for (;;)
 					{
 						parser.GetLocation(line, col);
-						RKIT_CHECK(parser.RequireToken(token));
+						parser.RequireToken(token);
 
 						if (IsToken(token, u8"}"))
 							break;
 
 						if (IsToken(token, u8"InputFeed"))
 						{
-							RKIT_CHECK(parser.ExpectToken(u8"="));
+							parser.ExpectToken(u8"=");
 
 							parser.GetLocation(line, col);
-							RKIT_CHECK(parser.RequireToken(token));
+							parser.RequireToken(token);
 
 							for (VertexInputFeedMapping &feedMapping : feedMappings)
 							{
@@ -1140,22 +1140,22 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 						}
 						else if (IsToken(token, u8"InputSources"))
 						{
-							RKIT_CHECK(parser.ExpectToken(u8"="));
+							parser.ExpectToken(u8"=");
 
-							RKIT_CHECK(parser.RequireToken(token));
+							parser.RequireToken(token);
 
-							RKIT_CHECK(ParseValueType(blamePath, inputSourcesType, token, parser));
+							ParseValueType(blamePath, inputSourcesType, token, parser);
 							haveInputSourcesType = true;
 						}
 						else if (IsToken(token, u8"BaseOffset"))
 						{
-							RKIT_CHECK(parser.ExpectToken(u8"="));
+							parser.ExpectToken(u8"=");
 
 							parser.GetLocation(line, col);
-							RKIT_CHECK(parser.RequireToken(token));
+							parser.RequireToken(token);
 
 							uint64_t baseOffsetValue = 0;
-							RKIT_CHECK(ParseUIntConstant(blamePath, line, col, token, std::numeric_limits<uint32_t>::max(), baseOffsetValue));
+							ParseUIntConstant(blamePath, line, col, token, std::numeric_limits<uint32_t>::max(), baseOffsetValue);
 
 							baseOffset = static_cast<uint32_t>(baseOffsetValue);
 						}
@@ -1178,7 +1178,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 						RKIT_THROW(ResultCode::kMalformedFile);
 					}
 
-					RKIT_CHECK(ResolveInputLayoutVertexInputs(blamePath, defStartLine, defStartCol, inputNameStr, Span<const Utf8Char_t>(), il.GetVertexInputs(), baseOffset, inputSourcesType, inputFeedMapping->m_feedDesc));
+					ResolveInputLayoutVertexInputs(blamePath, defStartLine, defStartCol, inputNameStr, Span<const Utf8Char_t>(), il.GetVertexInputs(), baseOffset, inputSourcesType, inputFeedMapping->m_feedDesc);
 
 					if (!inputFeedMapping->m_strideIsSet || inputFeedMapping->m_strideIsSetAutomatically)
 					{
@@ -1223,14 +1223,14 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 	Result LibraryAnalyzer::ParseDescriptorLayout(const Utf8Char_t *filePath, TextParser_t &parser, rpc_interchange::DescriptorLayoutEntity &dl)
 	{
-		RKIT_CHECK(parser.ExpectToken(u8"{"));
+		parser.ExpectToken(u8"{");
 
 		const data::RenderRTTIStructType *descRTTI = m_dataDriver->GetRenderDataHandler()->GetDescriptorDescRTTI();
 
 		for (;;)
 		{
 			Span<const Utf8Char_t> token;
-			RKIT_CHECK(parser.RequireToken(token));
+			parser.RequireToken(token);
 
 			size_t line = 0;
 			size_t col = 0;
@@ -1240,7 +1240,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				break;
 
 			render::TempStringIndex_t descNameIndex;
-			RKIT_CHECK(IndexString(token, descNameIndex));
+			IndexString(token, descNameIndex);
 
 			for (const render::DescriptorDesc *existingDesc : dl.GetDescriptorDescs())
 			{
@@ -1251,14 +1251,14 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				}
 			}
 
-			RKIT_CHECK(parser.ExpectToken(u8"="));
+			parser.ExpectToken(u8"=");
 
 			UniquePtr<render::DescriptorDesc> descDesc;
-			RKIT_CHECK(New<render::DescriptorDesc>(descDesc));
+			New<render::DescriptorDesc>(descDesc);
 
-			RKIT_CHECK(parser.ExpectToken(u8"{"));
+			parser.ExpectToken(u8"{");
 
-			RKIT_CHECK(parser.RequireToken(token));
+			parser.RequireToken(token);
 
 			bool typeWasSpecified = false;
 			for (;;)
@@ -1278,10 +1278,10 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 					typeWasSpecified = true;
 
-					RKIT_CHECK(parser.ExpectToken(u8"="));
+					parser.ExpectToken(u8"=");
 
 					parser.GetLocation(line, col);
-					RKIT_CHECK(parser.RequireToken(token));
+					parser.RequireToken(token);
 
 					const data::RenderRTTIEnumType *typeEnumType = m_dataDriver->GetRenderDataHandler()->GetDescriptorTypeRTTI();
 					render::DescriptorType descType = render::DescriptorType::Count;
@@ -1310,14 +1310,14 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					{
 					case DescriptorTypeClassification::Texture:
 					case DescriptorTypeClassification::RWTexture:
-						RKIT_CHECK(parser.RequireToken(token));
+						parser.RequireToken(token);
 						if (IsToken(token, u8"<"))
 						{
 							parser.GetLocation(line, col);
 
-							RKIT_CHECK(parser.RequireToken(token));
-							RKIT_CHECK(ParseValueType(filePath, descDesc->m_valueType, token, parser));
-							RKIT_CHECK(parser.ExpectToken(u8">"));
+							parser.RequireToken(token);
+							ParseValueType(filePath, descDesc->m_valueType, token, parser);
+							parser.ExpectToken(u8">");
 
 							if (descDesc->m_valueType.m_type != render::ValueTypeType::Numeric && descDesc->m_valueType.m_type != render::ValueTypeType::VectorNumeric)
 							{
@@ -1325,24 +1325,24 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 								RKIT_THROW(ResultCode::kMalformedFile);
 							}
 
-							RKIT_CHECK(parser.RequireToken(token));
+							parser.RequireToken(token);
 						}
 						break;
 					case DescriptorTypeClassification::Buffer:
 					case DescriptorTypeClassification::ConstantBuffer:
-						RKIT_CHECK(parser.ExpectToken(u8"<"));
+						parser.ExpectToken(u8"<");
 
 						parser.GetLocation(line, col);
 
-						RKIT_CHECK(parser.RequireToken(token));
-						RKIT_CHECK(ParseValueType(filePath, descDesc->m_valueType, token, parser));
-						RKIT_CHECK(parser.ExpectToken(u8">"));
+						parser.RequireToken(token);
+						ParseValueType(filePath, descDesc->m_valueType, token, parser);
+						parser.ExpectToken(u8">");
 
-						RKIT_CHECK(parser.RequireToken(token));
+						parser.RequireToken(token);
 						break;
 					case DescriptorTypeClassification::ByteAddressBuffer:
 					case DescriptorTypeClassification::Sampler:
-						RKIT_CHECK(parser.RequireToken(token));
+						parser.RequireToken(token);
 						break;
 
 					default:
@@ -1352,14 +1352,14 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					if (IsToken(token, u8"["))
 					{
 						parser.GetLocation(line, col);
-						RKIT_CHECK(parser.RequireToken(token));
+						parser.RequireToken(token);
 
 						if (IsToken(token, u8"]"))
 							descDesc->m_arraySize = 0;
 						else
 						{
 							uint64_t arraySize = 0;
-							RKIT_CHECK(ParseUIntConstant(filePath, line, col, token, std::numeric_limits<uint32_t>::max(), arraySize));
+							ParseUIntConstant(filePath, line, col, token, std::numeric_limits<uint32_t>::max(), arraySize);
 
 							if (arraySize < 2)
 							{
@@ -1369,7 +1369,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 							descDesc->m_arraySize = static_cast<uint32_t>(arraySize);
 
-							RKIT_CHECK(parser.RequireToken(token));
+							parser.RequireToken(token);
 						}
 					}
 				}
@@ -1388,11 +1388,11 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 						RKIT_THROW(ResultCode::kMalformedFile);
 					}
 
-					RKIT_CHECK(parser.ExpectToken(u8"="));
+					parser.ExpectToken(u8"=");
 
 					parser.GetLocation(line, col);
 
-					RKIT_CHECK(parser.RequireToken(token));
+					parser.RequireToken(token);
 
 					HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(StringSliceView(token));
 					if (it == m_entities.end())
@@ -1409,7 +1409,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 					descDesc->m_staticSamplerDesc = &static_cast<const rpc_interchange::StaticSamplerEntity *>(it.Value().Get())->GetDesc();
 
-					RKIT_CHECK(parser.RequireToken(token));
+					parser.RequireToken(token);
 				}
 				else
 				{
@@ -1426,9 +1426,9 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 			descDesc->m_name = descNameIndex;
 
-			RKIT_CHECK(dl.GetDescriptorDescs().Append(descDesc.Get()));
+			dl.GetDescriptorDescs().Append(descDesc.Get());
 
-			RKIT_CHECK(m_dDescs.Append(std::move(descDesc)));
+			m_dDescs.Append(std::move(descDesc));
 		}
 
 		dl.GetDesc().m_descriptors = dl.GetDescriptorDescs().ToSpan();
@@ -1438,7 +1438,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 	Result LibraryAnalyzer::ParseGraphicsPipeline(const Utf8Char_t *filePath, TextParser_t &parser, rpc_interchange::GraphicsPipelineEntity &gp)
 	{
-		RKIT_CHECK(parser.ExpectToken(u8"{"));
+		parser.ExpectToken(u8"{");
 
 		const data::RenderRTTIStructType *pipelineRTTI = m_dataDriver->GetRenderDataHandler()->GetGraphicsPipelineDescRTTI();
 		const data::RenderRTTIStructType *shaderDescRTTI = m_dataDriver->GetRenderDataHandler()->GetShaderDescRTTI();
@@ -1449,7 +1449,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		for (;;)
 		{
 			Span<const Utf8Char_t> token;
-			RKIT_CHECK(parser.RequireToken(token));
+			parser.RequireToken(token);
 
 			size_t line = 0;
 			size_t col = 0;
@@ -1460,14 +1460,14 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 			if (IsToken(token, u8"DescriptorLayouts"))
 			{
-				RKIT_CHECK(parser.ExpectToken(u8"="));
-				RKIT_CHECK(parser.ExpectToken(u8"{"));
+				parser.ExpectToken(u8"=");
+				parser.ExpectToken(u8"{");
 
 				for (;;)
 				{
 					parser.GetLocation(line, col);
 
-					RKIT_CHECK(parser.RequireToken(token));
+					parser.RequireToken(token);
 
 					if (IsToken(token, u8"}"))
 						break;
@@ -1486,32 +1486,32 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 						RKIT_THROW(ResultCode::kMalformedFile);
 					}
 
-					RKIT_CHECK(gp.GetDescriptorLayouts().Append(&static_cast<rpc_interchange::DescriptorLayoutEntity *>(it.Value().Get())->GetDesc()));
+					gp.GetDescriptorLayouts().Append(&static_cast<rpc_interchange::DescriptorLayoutEntity *>(it.Value().Get())->GetDesc());
 				}
 			}
 			else if (IsToken(token, u8"RenderTargets"))
 			{
-				RKIT_CHECK(parser.ExpectToken(u8"="));
-				RKIT_CHECK(parser.ExpectToken(u8"{"));
+				parser.ExpectToken(u8"=");
+				parser.ExpectToken(u8"{");
 
 				for (;;)
 				{
 					parser.GetLocation(line, col);
 
-					RKIT_CHECK(parser.RequireToken(token));
+					parser.RequireToken(token);
 
 					if (IsToken(token, u8"}"))
 						break;
 
-					RKIT_CHECK(CheckValidIdentifier(filePath, token, parser));
+					CheckValidIdentifier(filePath, token, parser);
 
 					String rtName;
-					RKIT_CHECK(rtName.Set(token));
+					rtName.Set(token);
 
 					UniquePtr<render::RenderOperationDesc> roDesc;
-					RKIT_CHECK(New<render::RenderOperationDesc>(roDesc));
+					New<render::RenderOperationDesc>(roDesc);
 
-					RKIT_CHECK(parser.ExpectToken(u8"="));
+					parser.ExpectToken(u8"=");
 
 					if (nameToRODesc.Find(rtName) != nameToRODesc.end())
 					{
@@ -1519,11 +1519,11 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 						RKIT_THROW(ResultCode::kMalformedFile);
 					}
 
-					RKIT_CHECK(ParseStruct(filePath, m_dataDriver->GetRenderDataHandler()->GetRenderOperationDescRTTI(), roDesc.Get(), parser));
+					ParseStruct(filePath, m_dataDriver->GetRenderDataHandler()->GetRenderOperationDescRTTI(), roDesc.Get(), parser);
 
-					RKIT_CHECK(nameToRODesc.Set(std::move(rtName), roDesc.Get()));
+					nameToRODesc.Set(std::move(rtName), roDesc.Get());
 
-					RKIT_CHECK(m_roDescs.Append(std::move(roDesc)));
+					m_roDescs.Append(std::move(roDesc));
 				}
 			}
 			else if (IsToken(token, u8"PushConstants"))
@@ -1536,10 +1536,10 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			}
 			else if (IsToken(token, u8"InputLayout"))
 			{
-				RKIT_CHECK(parser.ExpectToken(u8"="));
+				parser.ExpectToken(u8"=");
 
 				parser.GetLocation(line, col);
-				RKIT_CHECK(parser.RequireToken(token));
+				parser.RequireToken(token);
 
 				HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(StringSliceView(token));
 				if (it == m_entities.end())
@@ -1561,12 +1561,12 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				bool isVS = IsToken(token, u8"VertexShader");
 				bool isPS = IsToken(token, u8"PixelShader");
 
-				RKIT_CHECK(parser.ExpectToken(u8"="));
+				parser.ExpectToken(u8"=");
 
 				UniquePtr<render::ShaderDesc> shaderDesc;
-				RKIT_CHECK(New<render::ShaderDesc>(shaderDesc));
+				New<render::ShaderDesc>(shaderDesc);
 
-				RKIT_CHECK(ParseStruct(filePath, shaderDescRTTI, shaderDesc.Get(), parser));
+				ParseStruct(filePath, shaderDescRTTI, shaderDesc.Get(), parser);
 
 				if (isVS)
 					gp.GetDesc().m_vertexShader = shaderDesc.Get();
@@ -1574,27 +1574,27 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				if (isPS)
 					gp.GetDesc().m_pixelShader = shaderDesc.Get();
 
-				RKIT_CHECK(m_shaderDescs.Append(std::move(shaderDesc)));
+				m_shaderDescs.Append(std::move(shaderDesc));
 			}
 			else if (IsToken(token, u8"DepthStencil"))
 			{
-				RKIT_CHECK(parser.ExpectToken(u8"="));
+				parser.ExpectToken(u8"=");
 
 				UniquePtr<render::DepthStencilOperationDesc> depthStencil;
-				RKIT_CHECK(New<render::DepthStencilOperationDesc>(depthStencil));
+				New<render::DepthStencilOperationDesc>(depthStencil);
 
-				RKIT_CHECK(ParseStruct(filePath, depthStencilOperationDescRTTI, depthStencil.Get(), parser));
+				ParseStruct(filePath, depthStencilOperationDescRTTI, depthStencil.Get(), parser);
 
 				gp.GetDesc().m_depthStencil = depthStencil.Get();
 
-				RKIT_CHECK(m_depthStencilOperationDescs.Append(std::move(depthStencil)));
+				m_depthStencilOperationDescs.Append(std::move(depthStencil));
 			}
 			else if (IsToken(token, u8"ExecuteInPass"))
 			{
-				RKIT_CHECK(parser.ExpectToken(u8"="));
+				parser.ExpectToken(u8"=");
 
 				parser.GetLocation(line, col);
-				RKIT_CHECK(parser.RequireToken(token));
+				parser.RequireToken(token);
 
 				HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(StringSliceView(token));
 				if (it == m_entities.end())
@@ -1613,7 +1613,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			}
 			else
 			{
-				RKIT_CHECK(ParseStructMember(filePath, token, pipelineRTTI, &gp.GetDesc(), parser));
+				ParseStructMember(filePath, token, pipelineRTTI, &gp.GetDesc(), parser);
 			}
 		}
 
@@ -1644,14 +1644,14 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		if ((renderPass->m_depthStencilTarget != nullptr) && (gp.GetDesc().m_depthStencil == nullptr))
 		{
 			UniquePtr<render::DepthStencilOperationDesc> depthStencilDesc;
-			RKIT_CHECK(New<render::DepthStencilOperationDesc>(depthStencilDesc));
+			New<render::DepthStencilOperationDesc>(depthStencilDesc);
 
 			depthStencilDesc->m_depthTest.Set(false);
 			depthStencilDesc->m_depthWrite.Set(false);
 
 			gp.GetDesc().m_depthStencil = depthStencilDesc.Get();
 
-			RKIT_CHECK(m_depthStencilOperationDescs.Append(std::move(depthStencilDesc)));
+			m_depthStencilOperationDescs.Append(std::move(depthStencilDesc));
 		}
 
 		{
@@ -1660,17 +1660,17 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			size_t numRenderTargets = renderTargets.Count();
 
 			Vector<bool> rtUsed;
-			RKIT_CHECK(rtUsed.Resize(numRenderTargets));
+			rtUsed.Resize(numRenderTargets);
 
 			for (bool &b : rtUsed)
 				b = false;
 
-			RKIT_CHECK(gp.GetRenderOperations().Resize(numRenderTargets));
+			gp.GetRenderOperations().Resize(numRenderTargets);
 
 			for (HashMapKeyValueView<String, const render::RenderOperationDesc *> kv : nameToRODesc)
 			{
 				render::TempStringIndex_t nameStr;
-				RKIT_CHECK(IndexString(kv.Key().ToSpan(), nameStr));
+				IndexString(kv.Key().ToSpan(), nameStr);
 
 				bool matched = false;
 				for (size_t rti = 0; rti < numRenderTargets; rti++)
@@ -1702,7 +1702,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					if (!defaultRODesc)
 					{
 						UniquePtr<render::RenderOperationDesc> defaultRODescNew;
-						RKIT_CHECK(New<render::RenderOperationDesc>(defaultRODescNew));
+						New<render::RenderOperationDesc>(defaultRODescNew);
 
 						defaultRODescNew->m_access = render::ReadWriteAccess::Read;	// FIXME: None?
 						defaultRODescNew->m_srcBlend = render::ColorBlendFactor::Zero;
@@ -1716,7 +1716,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 						defaultRODesc = defaultRODescNew.Get();
 
-						RKIT_CHECK(this->m_roDescs.Append(std::move(defaultRODescNew)));
+						this->m_roDescs.Append(std::move(defaultRODescNew));
 					}
 
 					gp.GetRenderOperations()[i] = defaultRODesc;
@@ -1727,17 +1727,17 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		gp.GetDesc().m_renderTargets = gp.GetRenderOperations().ToSpan();
 
 		render::GraphicsPipelineNameLookup nameLookup;
-		RKIT_CHECK(IndexString(gp.GetName().ToSpan(), nameLookup.m_name));
+		IndexString(gp.GetName().ToSpan(), nameLookup.m_name);
 		nameLookup.m_pipeline = &gp.GetDesc();
 
-		RKIT_CHECK(m_graphicsPipelines.Append(nameLookup));
+		m_graphicsPipelines.Append(nameLookup);
 
 		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseRenderPass(const Utf8Char_t *filePath, TextParser_t &parser, rpc_interchange::RenderPassEntity &rp)
 	{
-		RKIT_CHECK(parser.ExpectToken(u8"{"));
+		parser.ExpectToken(u8"{");
 
 		const data::RenderRTTIStructType *renderPassDescRTTI = m_dataDriver->GetRenderDataHandler()->GetRenderPassDescRTTI();
 		const data::RenderRTTIStructType *renderTargetDescRTTI = m_dataDriver->GetRenderDataHandler()->GetRenderTargetDescRTTI();
@@ -1746,7 +1746,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		for (;;)
 		{
 			Span<const Utf8Char_t> token;
-			RKIT_CHECK(parser.RequireToken(token));
+			parser.RequireToken(token);
 
 			size_t line = 0;
 			size_t col = 0;
@@ -1757,60 +1757,60 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 			if (IsToken(token, u8"RenderTargets"))
 			{
-				RKIT_CHECK(parser.ExpectToken(u8"="));
-				RKIT_CHECK(parser.ExpectToken(u8"{"));
+				parser.ExpectToken(u8"=");
+				parser.ExpectToken(u8"{");
 
 				for (;;)
 				{
 					parser.GetLocation(line, col);
 
-					RKIT_CHECK(parser.RequireToken(token));
+					parser.RequireToken(token);
 
 					if (IsToken(token, u8"}"))
 						break;
 
-					RKIT_CHECK(CheckValidIdentifier(filePath, token, parser));
+					CheckValidIdentifier(filePath, token, parser);
 
 					UniquePtr<render::RenderTargetDesc> rtDesc;
-					RKIT_CHECK(New<render::RenderTargetDesc>(rtDesc));
+					New<render::RenderTargetDesc>(rtDesc);
 
-					RKIT_CHECK(IndexString(token, rtDesc->m_name));
+					IndexString(token, rtDesc->m_name);
 
-					RKIT_CHECK(parser.ExpectToken(u8"="));
+					parser.ExpectToken(u8"=");
 
-					RKIT_CHECK(ParseStruct(filePath, renderTargetDescRTTI, rtDesc.Get(), parser));
+					ParseStruct(filePath, renderTargetDescRTTI, rtDesc.Get(), parser);
 
-					RKIT_CHECK(rp.GetRenderTargetDescs().Append(rtDesc.Get()));
+					rp.GetRenderTargetDescs().Append(rtDesc.Get());
 
-					RKIT_CHECK(m_rtDescs.Append(std::move(rtDesc)));
+					m_rtDescs.Append(std::move(rtDesc));
 				}
 			}
 			else if (IsToken(token, u8"DepthStencil"))
 			{
-				RKIT_CHECK(parser.ExpectToken(u8"="));
+				parser.ExpectToken(u8"=");
 
 				UniquePtr<render::DepthStencilTargetDesc> depthStencil;
-				RKIT_CHECK(New<render::DepthStencilTargetDesc>(depthStencil));
+				New<render::DepthStencilTargetDesc>(depthStencil);
 
-				RKIT_CHECK(ParseStruct(filePath, depthStencilTargetDescRTTI, depthStencil.Get(), parser));
+				ParseStruct(filePath, depthStencilTargetDescRTTI, depthStencil.Get(), parser);
 
 				rp.GetDesc().m_depthStencilTarget = depthStencil.Get();
 
-				RKIT_CHECK(m_depthStencilTargetDescs.Append(std::move(depthStencil)));
+				m_depthStencilTargetDescs.Append(std::move(depthStencil));
 			}
 			else
 			{
-				RKIT_CHECK(ParseStructMember(filePath, token, renderPassDescRTTI, &rp.GetDesc(), parser));
+				ParseStructMember(filePath, token, renderPassDescRTTI, &rp.GetDesc(), parser);
 			}
 		}
 
 		rp.GetDesc().m_renderTargets = rp.GetRenderTargetDescs().ToSpan();
 
 		render::RenderPassNameLookup nameLookup;
-		RKIT_CHECK(IndexString(rp.GetName().ToSpan(), nameLookup.m_name));
+		IndexString(rp.GetName().ToSpan(), nameLookup.m_name);
 		nameLookup.m_renderPass = &rp.GetDesc();
 
-		RKIT_CHECK(m_renderPasses.Append(nameLookup));
+		m_renderPasses.Append(nameLookup);
 
 		RKIT_RETURN_OK;
 	}
@@ -1824,9 +1824,9 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		ShortTempToken path;
 
 		Span<const Utf8Char_t> token;
-		RKIT_CHECK(parser.RequireToken(token));
+		parser.RequireToken(token);
 
-		RKIT_CHECK(ResolveQuotedString(path, token));
+		ResolveQuotedString(path, token);
 
 		IUtilitiesDriver &utils = *GetDrivers().m_utilitiesDriver;
 
@@ -1840,22 +1840,22 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		BuildFileLocation loc = m_includeStack[m_includeStack.Count() - 1].m_location;
 
 		String str;
-		RKIT_CHECK(str.Set(path.GetChars()));
+		str.Set(path.GetChars());
 
 		CIPath ciPath;
-		RKIT_CHECK(ciPath.Set(str));
+		ciPath.Set(str);
 
-		RKIT_CHECK(m_includeStack.Append(AnalyzerIncludeStack(loc, ciPath, true)));
+		m_includeStack.Append(AnalyzerIncludeStack(loc, ciPath, true));
 
 		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ResolveQuotedString(ShortTempToken &outToken, const Span<const Utf8Char_t> &inToken)
 	{
-		RKIT_CHECK(outToken.Set(inToken));
+		outToken.Set(inToken);
 
 		size_t newLength = 0;
-		RKIT_CHECK(GetDrivers().m_utilitiesDriver->EscapeCStringInPlace(outToken.GetChars(), newLength));
+		GetDrivers().m_utilitiesDriver->EscapeCStringInPlace(outToken.GetChars(), newLength);
 
 		outToken.Truncate(newLength);
 
@@ -1869,26 +1869,26 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		render::TempStringIndex_t memberName;
 		if (nameBase.Count() == 0)
 		{
-			RKIT_CHECK(IndexString(StringView(u8"Value").ToSpan(), memberName));
+			IndexString(StringView(u8"Value").ToSpan(), memberName);
 		}
 		else
 		{
-			RKIT_CHECK(IndexString(nameBase, memberName));
+			IndexString(nameBase, memberName);
 		}
 
 		const render::VectorOrScalarNumericType *deduplicated = nullptr;
-		RKIT_CHECK(Deduplicate(m_vectorOrScalarTypes, inputSourcesType, deduplicated));
+		Deduplicate(m_vectorOrScalarTypes, inputSourcesType, deduplicated);
 
 		UniquePtr<render::InputLayoutVertexInputDesc> vid;
-		RKIT_CHECK(New<render::InputLayoutVertexInputDesc>(vid));
+		New<render::InputLayoutVertexInputDesc>(vid);
 		vid->m_byteOffset = inOutOffset;
 		vid->m_inputFeed = inputFeed;
 		vid->m_memberName = memberName;
 		vid->m_numericType = deduplicated;
 
-		RKIT_CHECK(descsVector.Append(vid.Get()));
+		descsVector.Append(vid.Get());
 
-		RKIT_CHECK(m_vertexInputDescs.Append(std::move(vid)));
+		m_vertexInputDescs.Append(std::move(vid));
 
 		inOutOffset += sz;
 
@@ -1935,17 +1935,17 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					{
 						Vector<Utf8Char_t> memberNameBaseChars;
 						// FIXME: This line is wrong (appends itself) but I don't remember what it was supposed to be
-						RKIT_CHECK(memberNameBaseChars.Append(memberNameBaseChars.ToSpan()));
-						RKIT_CHECK(memberNameBaseChars.Append('_'));
+						memberNameBaseChars.Append(memberNameBaseChars.ToSpan());
+						memberNameBaseChars.Append('_');
 
-						RKIT_CHECK(ResolveInputLayoutVertexInputs(blamePath, line, col, feedName, memberNameBaseChars.ToSpan(), descsVector, inOutOffset, memberType, inputFeed));
+						ResolveInputLayoutVertexInputs(blamePath, line, col, feedName, memberNameBaseChars.ToSpan(), descsVector, inOutOffset, memberType, inputFeed);
 
 						// Fix this!
 						RKIT_THROW(ResultCode::kNotYetImplemented);
 					}
 					else
 					{
-						RKIT_CHECK(ResolveInputLayoutVertexInputs(blamePath, line, col, feedName, memberName.ToSpan(), descsVector, inOutOffset, memberType, inputFeed));
+						ResolveInputLayoutVertexInputs(blamePath, line, col, feedName, memberName.ToSpan(), descsVector, inOutOffset, memberType, inputFeed);
 					}
 				}
 			}
@@ -2063,7 +2063,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 	Result LibraryAnalyzer::ExpectIdentifier(const Utf8Char_t *blamePath, Span<const Utf8Char_t> &outToken, TextParser_t &parser)
 	{
-		RKIT_CHECK(parser.RequireToken(outToken));
+		parser.RequireToken(outToken);
 
 		return CheckValidIdentifier(blamePath, outToken, parser);
 	}
@@ -2113,7 +2113,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				RKIT_ASSERT(!isConfigurable);
 
 				Span<const Utf8Char_t> token;
-				RKIT_CHECK(ExpectIdentifier(blamePath, token, parser));
+				ExpectIdentifier(blamePath, token, parser);
 
 				return ParseValueType(blamePath, *static_cast<render::ValueType *>(obj), token, parser);
 			}
@@ -2158,7 +2158,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					vectorType.m_numericType = ntr.m_numericType;
 
 					const render::VectorNumericType *deduplicated = nullptr;
-					RKIT_CHECK(Deduplicate(m_vectorTypes, vectorType, deduplicated));
+					Deduplicate(m_vectorTypes, vectorType, deduplicated);
 
 					valueType = render::ValueType(deduplicated);
 					RKIT_RETURN_OK;
@@ -2177,7 +2177,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					compoundType.m_numericType = ntr.m_numericType;
 
 					const render::CompoundNumericType *deduplicated = nullptr;
-					RKIT_CHECK(Deduplicate(m_compoundTypes, compoundType, deduplicated));
+					Deduplicate(m_compoundTypes, compoundType, deduplicated);
 
 					valueType = render::ValueType(deduplicated);
 					RKIT_RETURN_OK;
@@ -2215,17 +2215,17 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 	{
 		Span<const Utf8Char_t> configName;
 
-		RKIT_CHECK(parser.ExpectToken(u8"("));
+		parser.ExpectToken(u8"(");
 
 		size_t line = 0;
 		size_t col = 0;
 		parser.GetLocation(line, col);
 
-		RKIT_CHECK(ExpectIdentifier(blamePath, configName, parser));
-		RKIT_CHECK(parser.ExpectToken(u8")"));
+		ExpectIdentifier(blamePath, configName, parser);
+		parser.ExpectToken(u8")");
 
 		render::GlobalStringIndex_t configNameSI;
-		RKIT_CHECK(IndexString(configName, configNameSI));
+		IndexString(configName, configNameSI);
 
 		HashMap<render::GlobalStringIndex_t, render::ConfigStringIndex_t>::ConstIterator_t keyIt = m_configNameToKey.Find(configNameSI);
 		if (keyIt != m_configNameToKey.end())
@@ -2248,8 +2248,8 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		render::ConfigStringIndex_t configSI(m_configKeys.Count());
 
-		RKIT_CHECK(m_configNameToKey.Set(configNameSI, configSI));
-		RKIT_CHECK(m_configKeys.Append(std::move(configKey)));
+		m_configNameToKey.Set(configNameSI, configSI);
+		m_configKeys.Append(std::move(configKey));
 
 		writeNameFunc(obj, configSI);
 
@@ -2336,7 +2336,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		parser.GetLocation(line, col);
 
 		Span<const Utf8Char_t> token;
-		RKIT_CHECK(parser.RequireToken(token));
+		parser.RequireToken(token);
 
 		if (token.Count() == 0 || token[0] != '\"')
 		{
@@ -2347,15 +2347,15 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		IUtilitiesDriver &utils = *GetDrivers().m_utilitiesDriver;
 
 		Vector<Utf8Char_t> escapedStr;
-		RKIT_CHECK(escapedStr.Append(token));
+		escapedStr.Append(token);
 
 		size_t newLength = 0;
-		RKIT_CHECK(utils.EscapeCStringInPlace(escapedStr.ToSpan(), newLength));
+		utils.EscapeCStringInPlace(escapedStr.ToSpan(), newLength);
 
-		RKIT_CHECK(escapedStr.Resize(newLength));
+		escapedStr.Resize(newLength);
 
 		render::GlobalStringIndex_t globalIndex;
-		RKIT_CHECK(IndexString(escapedStr.ToSpan(), globalIndex));
+		IndexString(escapedStr.ToSpan(), globalIndex);
 
 		int purpose = rtti->m_getPurposeFunc();
 
@@ -2364,7 +2364,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		else if (purpose == render::TempStringIndex_t::kPurpose)
 		{
 			render::TempStringIndex_t tempIndex;
-			RKIT_CHECK(IndexString(globalIndex, tempIndex));
+			IndexString(globalIndex, tempIndex);
 
 			rtti->m_writeStringIndexFunc(obj, tempIndex.GetIndex());
 		}
@@ -2381,7 +2381,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		parser.GetLocation(line, col);
 
 		Span<const Utf8Char_t> option;
-		RKIT_CHECK(parser.RequireToken(option));
+		parser.RequireToken(option);
 
 		if (IsToken(option, u8"Config"))
 		{
@@ -2419,7 +2419,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		parser.GetLocation(line, col);
 
 		Span<const Utf8Char_t> numberToken;
-		RKIT_CHECK(parser.RequireToken(numberToken));
+		parser.RequireToken(numberToken);
 
 		switch (rtti->m_representation)
 		{
@@ -2479,20 +2479,20 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		size_t col = 0;
 		parser.GetLocation(line, col);
 
-		RKIT_CHECK(parser.ExpectToken(u8"{"));
+		parser.ExpectToken(u8"{");
 
 		for (;;)
 		{
 			Span<const Utf8Char_t> nameToken;
 
-			RKIT_CHECK(parser.RequireToken(nameToken));
+			parser.RequireToken(nameToken);
 
 			if (IsToken(nameToken, u8"}"))
 				break;
 
-			RKIT_CHECK(CheckValidIdentifier(blamePath, nameToken, parser));
+			CheckValidIdentifier(blamePath, nameToken, parser);
 
-			RKIT_CHECK(ParseStructMember(blamePath, nameToken, rtti, obj, parser));
+			ParseStructMember(blamePath, nameToken, rtti, obj, parser);
 		}
 
 		RKIT_RETURN_OK;
@@ -2552,9 +2552,9 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		void *fieldPtr = resolvedField->m_getMemberPtrFunc(obj);
 
-		RKIT_CHECK(parser.ExpectToken(u8"="));
+		parser.ExpectToken(u8"=");
 
-		RKIT_CHECK(ParseValue(blamePath, resolvedField->m_getTypeFunc(), fieldPtr, resolvedField->m_isConfigurable, parser));
+		ParseValue(blamePath, resolvedField->m_getTypeFunc(), fieldPtr, resolvedField->m_isConfigurable, parser);
 
 		RKIT_RETURN_OK;
 	}
@@ -2591,11 +2591,11 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		}
 
 		UniquePtr<T> newInst;
-		RKIT_CHECK(New<T>(newInst, instance));
+		New<T>(newInst, instance);
 
 		outDeduplicated = newInst.Get();
 
-		RKIT_CHECK(instVector.Append(std::move(newInst)));
+		instVector.Append(std::move(newInst));
 
 		RKIT_RETURN_OK;
 	}
@@ -2655,10 +2655,10 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		for (const render::GraphicsPipelineNameLookup &graphicsPipeline : m_graphicsPipelines)
 		{
 			UniquePtr<IPackageObjectWriter> writer;
-			RKIT_CHECK(bsDriver->CreatePackageObjectWriter(writer));
+			bsDriver->CreatePackageObjectWriter(writer);
 
 			UniquePtr<IPackageBuilder> pkgBuilder;
-			RKIT_CHECK(bsDriver->CreatePackageBuilder(dataHandler, writer.Get(), true, pkgBuilder));
+			bsDriver->CreatePackageBuilder(dataHandler, writer.Get(), true, pkgBuilder);
 
 			const data::RenderRTTIStructType *pipelineType = dataHandler->GetGraphicsPipelineNameLookupRTTI();
 
@@ -2667,19 +2667,19 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			pkgBuilder->BeginSource(this);
 
 			size_t index = 0;
-			RKIT_CHECK(pkgBuilder->IndexObject(&graphicsPipeline, pipelineType, true, index));
+			pkgBuilder->IndexObject(&graphicsPipeline, pipelineType, true, index);
 
 			CIPath outPath;
-			RKIT_CHECK(FormatGraphicPipelinePath(outPath, depsNode->GetIdentifier(), pipelineIndex));
+			FormatGraphicPipelinePath(outPath, depsNode->GetIdentifier(), pipelineIndex);
 
 			{
 				UniquePtr<ISeekableReadWriteStream> stream;
-				RKIT_CHECK(m_feedback->OpenOutput(BuildFileLocation::kIntermediateDir, outPath, stream));
+				m_feedback->OpenOutput(BuildFileLocation::kIntermediateDir, outPath, stream);
 
-				RKIT_CHECK(pkgBuilder->WritePackage(*stream));
+				pkgBuilder->WritePackage(*stream);
 			}
 
-			RKIT_CHECK(m_feedback->AddNodeDependency(IModuleDriver::kDefaultNamespace, kRenderGraphicsPipelineNodeID, BuildFileLocation::kIntermediateDir, outPath.ToString()));
+			m_feedback->AddNodeDependency(IModuleDriver::kDefaultNamespace, kRenderGraphicsPipelineNodeID, BuildFileLocation::kIntermediateDir, outPath.ToString());
 
 			pipelineIndex++;
 		}
@@ -2687,10 +2687,10 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		// Write globals
 		{
 			UniquePtr<IPackageObjectWriter> writer;
-			RKIT_CHECK(bsDriver->CreatePackageObjectWriter(writer));
+			bsDriver->CreatePackageObjectWriter(writer);
 
 			UniquePtr<IPackageBuilder> pkgBuilder;
-			RKIT_CHECK(bsDriver->CreatePackageBuilder(dataHandler, writer.Get(), false, pkgBuilder));
+			bsDriver->CreatePackageBuilder(dataHandler, writer.Get(), false, pkgBuilder);
 
 			const data::RenderRTTIStructType *renderPassType = dataHandler->GetRenderPassNameLookupRTTI();
 
@@ -2701,32 +2701,32 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			for (const render::RenderPassNameLookup &renderPass : m_renderPasses)
 			{
 				size_t index = 0;
-				RKIT_CHECK(pkgBuilder->IndexObject(&renderPass, renderPassType, true, index));
+				pkgBuilder->IndexObject(&renderPass, renderPassType, true, index);
 			}
 
 			CIPath outPath;
-			RKIT_CHECK(FormatGlobalsPath(outPath, depsNode->GetIdentifier()));
+			FormatGlobalsPath(outPath, depsNode->GetIdentifier());
 
 			{
 				UniquePtr<ISeekableReadWriteStream> stream;
-				RKIT_CHECK(m_feedback->OpenOutput(BuildFileLocation::kIntermediateDir, outPath, stream));
+				m_feedback->OpenOutput(BuildFileLocation::kIntermediateDir, outPath, stream);
 
-				RKIT_CHECK(pkgBuilder->WritePackage(*stream));
+				pkgBuilder->WritePackage(*stream);
 			}
 		}
 
 
 		CIPath indexPath;
-		RKIT_CHECK(FormatIndexPath(indexPath, depsNode->GetIdentifier()));
+		FormatIndexPath(indexPath, depsNode->GetIdentifier());
 
 		UniquePtr<ISeekableReadWriteStream> indexStream;
-		RKIT_CHECK(m_feedback->OpenOutput(BuildFileLocation::kIntermediateDir, indexPath, indexStream));
+		m_feedback->OpenOutput(BuildFileLocation::kIntermediateDir, indexPath, indexStream);
 
-		RKIT_CHECK(indexStream->WriteAll(&rpc_common::kLibraryIndexID, sizeof(rpc_common::kLibraryIndexID)));
-		RKIT_CHECK(indexStream->WriteAll(&rpc_common::kLibraryIndexVersion, sizeof(rpc_common::kLibraryIndexVersion)));
+		indexStream->WriteAll(&rpc_common::kLibraryIndexID, sizeof(rpc_common::kLibraryIndexID));
+		indexStream->WriteAll(&rpc_common::kLibraryIndexVersion, sizeof(rpc_common::kLibraryIndexVersion));
 
 		uint64_t numGraphicsPipelines = m_graphicsPipelines.Count();
-		RKIT_CHECK(indexStream->WriteAll(&numGraphicsPipelines, sizeof(numGraphicsPipelines)));
+		indexStream->WriteAll(&numGraphicsPipelines, sizeof(numGraphicsPipelines));
 
 		RKIT_RETURN_OK;
 	}
@@ -2734,10 +2734,10 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 	Result LibraryAnalyzer::IndexString(const Span<const Utf8Char_t> &span, render::GlobalStringIndex_t &outStringIndex)
 	{
 		String str;
-		RKIT_CHECK(str.Set(span));
+		str.Set(span);
 
 		size_t index = 0;
-		RKIT_CHECK(m_globalStringPool.IndexString(str, index));
+		m_globalStringPool.IndexString(str, index);
 
 		outStringIndex = render::GlobalStringIndex_t(index);
 
@@ -2748,7 +2748,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 	{
 		render::GlobalStringIndex_t gsi;
 
-		RKIT_CHECK(IndexString(span, gsi));
+		IndexString(span, gsi);
 
 		return IndexString(gsi, outStringIndex);
 	}
@@ -2764,8 +2764,8 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		}
 
 		render::TempStringIndex_t tsi(m_tempStrings.Count());
-		RKIT_CHECK(m_tempStrings.Append(globalIndex));
-		RKIT_CHECK(m_globalStringToTempString.Set(globalIndex, tsi));
+		m_tempStrings.Append(globalIndex);
+		m_globalStringToTempString.Set(globalIndex, tsi);
 
 		outStringIndex = tsi;
 
@@ -2782,12 +2782,12 @@ namespace rkit { namespace buildsystem { namespace rpc_combiner
 
 	Result LibraryCombiner::AddInput(IReadStream &stream)
 	{
-		RKIT_CHECK(CheckInitObjects());
+		CheckInitObjects();
 
 		UniquePtr<data::IRenderDataPackage> pkg;
 		Vector<Vector<uint8_t>> binaryContent;
 
-		RKIT_CHECK(m_dataDriver->GetRenderDataHandler()->LoadPackage(stream, false, nullptr, pkg, &binaryContent));
+		m_dataDriver->GetRenderDataHandler()->LoadPackage(stream, false, nullptr, pkg, &binaryContent);
 
 		PackageInputResolver resolver(*pkg, binaryContent.ToSpan());
 		m_pkgBuilder->BeginSource(&resolver);
@@ -2811,13 +2811,13 @@ namespace rkit { namespace buildsystem { namespace rpc_combiner
 				else
 				{
 					String nameStr;
-					RKIT_CHECK(nameStr.Set(nameStrView));
+					nameStr.Set(nameStrView);
 
-					RKIT_CHECK(m_graphicPipelineNames.Add(std::move(nameStr)));
+					m_graphicPipelineNames.Add(std::move(nameStr));
 				}
 
 				size_t index = 0;
-				RKIT_CHECK(m_pkgBuilder->IndexObject(nameLookup, m_dataDriver->GetRenderDataHandler()->GetGraphicsPipelineNameLookupRTTI(), true, index));
+				m_pkgBuilder->IndexObject(nameLookup, m_dataDriver->GetRenderDataHandler()->GetGraphicsPipelineNameLookupRTTI(), true, index);
 			}
 		}
 
@@ -2831,7 +2831,7 @@ namespace rkit { namespace buildsystem { namespace rpc_combiner
 				const render::RenderPassNameLookup *nameLookup = static_cast<const render::RenderPassNameLookup *>(renderPassLookups->GetElementPtr(i));
 
 				size_t index = 0;
-				RKIT_CHECK(m_pkgBuilder->IndexObject(nameLookup, m_dataDriver->GetRenderDataHandler()->GetRenderPassNameLookupRTTI(), true, index));
+				m_pkgBuilder->IndexObject(nameLookup, m_dataDriver->GetRenderDataHandler()->GetRenderPassNameLookupRTTI(), true, index);
 			}
 		}
 
@@ -2840,7 +2840,7 @@ namespace rkit { namespace buildsystem { namespace rpc_combiner
 
 	Result LibraryCombiner::WritePackage(ISeekableWriteStream &stream)
 	{
-		RKIT_CHECK(CheckInitObjects());
+		CheckInitObjects();
 
 		return m_pkgBuilder->WritePackage(stream);
 	}
@@ -2850,8 +2850,8 @@ namespace rkit { namespace buildsystem { namespace rpc_combiner
 		if (!m_pkgObjectWriter.IsValid())
 		{
 			rkit::buildsystem::IBuildSystemDriver *bsDriver = static_cast<rkit::buildsystem::IBuildSystemDriver *>(rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, u8"BuildSystem"));
-			RKIT_CHECK(bsDriver->CreatePackageObjectWriter(m_pkgObjectWriter));
-			RKIT_CHECK(bsDriver->CreatePackageBuilder(m_dataDriver->GetRenderDataHandler(), m_pkgObjectWriter.Get(), false, m_pkgBuilder));
+			bsDriver->CreatePackageObjectWriter(m_pkgObjectWriter);
+			bsDriver->CreatePackageBuilder(m_dataDriver->GetRenderDataHandler(), m_pkgObjectWriter.Get(), false, m_pkgBuilder);
 		}
 
 		RKIT_RETURN_OK;
@@ -2896,16 +2896,16 @@ namespace rkit { namespace buildsystem { namespace rpc_compiler
 	Result LibraryCompiler::Run(IDependencyNode *depsNode)
 	{
 		CIPath indexPath;
-		RKIT_CHECK(FormatIndexPath(indexPath, depsNode->GetIdentifier()));
+		FormatIndexPath(indexPath, depsNode->GetIdentifier());
 
 		size_t numGraphicsPipelines = 0;
 
 		{
 			UniquePtr<ISeekableReadStream> indexFile;
-			RKIT_CHECK(m_feedback->OpenInput(BuildFileLocation::kIntermediateDir, indexPath, indexFile));
+			m_feedback->OpenInput(BuildFileLocation::kIntermediateDir, indexPath, indexFile);
 
 			uint32_t header[2];
-			RKIT_CHECK(indexFile->ReadAll(header, sizeof(header)));
+			indexFile->ReadAll(header, sizeof(header));
 
 			if (header[0] != rpc_common::kLibraryIndexID || header[1] != rpc_common::kLibraryIndexVersion)
 			{
@@ -2914,7 +2914,7 @@ namespace rkit { namespace buildsystem { namespace rpc_compiler
 			}
 
 			uint64_t pipelineCounts[1];
-			RKIT_CHECK(indexFile->ReadAll(pipelineCounts, sizeof(pipelineCounts)));
+			indexFile->ReadAll(pipelineCounts, sizeof(pipelineCounts));
 
 			for (uint64_t pipelineCount : pipelineCounts)
 			{
@@ -2929,36 +2929,36 @@ namespace rkit { namespace buildsystem { namespace rpc_compiler
 		for (size_t i = 0; i < numGraphicsPipelines; i++)
 		{
 			CIPath pipelinePath;
-			RKIT_CHECK(FormatGraphicPipelinePath(pipelinePath, depsNode->GetIdentifier(), i));
+			FormatGraphicPipelinePath(pipelinePath, depsNode->GetIdentifier(), i);
 
 			CIPath compiledPipelinePath;
-			RKIT_CHECK(compiledPipelinePath.Set(GetCompiledPipelineIntermediateBasePath()));
-			RKIT_CHECK(compiledPipelinePath.Append(pipelinePath));
+			compiledPipelinePath.Set(GetCompiledPipelineIntermediateBasePath());
+			compiledPipelinePath.Append(pipelinePath);
 
 			UniquePtr<ISeekableReadStream> inStream;
-			RKIT_CHECK(m_feedback->OpenInput(BuildFileLocation::kIntermediateDir, compiledPipelinePath, inStream));
+			m_feedback->OpenInput(BuildFileLocation::kIntermediateDir, compiledPipelinePath, inStream);
 
-			RKIT_CHECK(m_combiner.AddInput(*inStream));
+			m_combiner.AddInput(*inStream);
 		}
 
 		// Add globals
 		{
 			CIPath globalsPath;
-			RKIT_CHECK(FormatGlobalsPath(globalsPath, depsNode->GetIdentifier()));
+			FormatGlobalsPath(globalsPath, depsNode->GetIdentifier());
 
 			UniquePtr<ISeekableReadStream> inStream;
-			RKIT_CHECK(m_feedback->OpenInput(BuildFileLocation::kIntermediateDir, globalsPath, inStream));
+			m_feedback->OpenInput(BuildFileLocation::kIntermediateDir, globalsPath, inStream);
 
-			RKIT_CHECK(m_combiner.AddInput(*inStream));
+			m_combiner.AddInput(*inStream);
 		}
 
 		CIPath outPath;
-		RKIT_CHECK(FormatCombinedOutputPath(outPath, depsNode->GetIdentifier()));
+		FormatCombinedOutputPath(outPath, depsNode->GetIdentifier());
 
 		UniquePtr<ISeekableReadWriteStream> outStream;
-		RKIT_CHECK(m_feedback->OpenOutput(BuildFileLocation::kIntermediateDir, outPath, outStream));
+		m_feedback->OpenOutput(BuildFileLocation::kIntermediateDir, outPath, outStream);
 
-		RKIT_CHECK(m_combiner.WritePackage(*outStream));
+		m_combiner.WritePackage(*outStream);
 
 		RKIT_RETURN_OK;
 	}
@@ -2987,11 +2987,11 @@ namespace rkit { namespace buildsystem
 		data::IDataDriver *dataDriver = static_cast<data::IDataDriver *>(rkit::GetDrivers().FindDriver(IModuleDriver::kDefaultNamespace, u8"Data"));
 
 		UniquePtr<rpc_analyzer::LibraryAnalyzer> analyzer;
-		RKIT_CHECK(New<rpc_analyzer::LibraryAnalyzer>(analyzer, dataDriver, feedback));
+		New<rpc_analyzer::LibraryAnalyzer>(analyzer, dataDriver, feedback);
 
-		RKIT_CHECK(analyzer->Run(depsNode));
+		analyzer->Run(depsNode);
 
-		RKIT_CHECK(feedback->CheckFault());
+		feedback->CheckFault();
 
 		RKIT_RETURN_OK;
 	}
@@ -3009,11 +3009,11 @@ namespace rkit { namespace buildsystem
 
 
 		UniquePtr<rpc_compiler::LibraryCompiler> compiler;
-		RKIT_CHECK(New<rpc_compiler::LibraryCompiler>(compiler, dataDriver, feedback));
+		New<rpc_compiler::LibraryCompiler>(compiler, dataDriver, feedback);
 
-		RKIT_CHECK(compiler->Run(depsNode));
+		compiler->Run(depsNode);
 
-		RKIT_CHECK(feedback->CheckFault());
+		feedback->CheckFault();
 
 		RKIT_RETURN_OK;
 	}

@@ -41,17 +41,17 @@ namespace rkit { namespace utils {
 			RKIT_THROW(ResultCode::kInvalidParameter);
 
 		size_t pitchInBytes = sizeof(TElement) * m_spec.m_numChannels;
-		RKIT_CHECK(SafeMul<size_t>(pitchInBytes, pitchInBytes, m_spec.m_width));
+		SafeMul<size_t>(pitchInBytes, pitchInBytes, m_spec.m_width);
 
-		RKIT_CHECK(SafeAdd<size_t>(pitchInBytes, pitchInBytes, RKIT_SIMD_ALIGNMENT - 1));
+		SafeAdd<size_t>(pitchInBytes, pitchInBytes, RKIT_SIMD_ALIGNMENT - 1);
 		pitchInBytes -= pitchInBytes % RKIT_SIMD_ALIGNMENT;
 
 		m_pitchInElements = pitchInBytes / sizeof(TElement);
 
 		size_t bufferSize = m_pitchInElements;
-		RKIT_CHECK(SafeMul<size_t>(bufferSize, m_pitchInElements, m_spec.m_height));
+		SafeMul<size_t>(bufferSize, m_pitchInElements, m_spec.m_height);
 
-		RKIT_CHECK(m_image.Resize(bufferSize));
+		m_image.Resize(bufferSize);
 
 		memset(m_image.GetBuffer(), 0, sizeof(TElement) * bufferSize);
 
@@ -90,13 +90,13 @@ namespace rkit { namespace utils {
 		switch (spec.m_pixelPacking)
 		{
 		case PixelPacking::kUInt8:
-			RKIT_CHECK(New<Image<uint8_t>>(image, spec));
+			New<Image<uint8_t>>(image, spec);
 			break;
 
 		default:
 			RKIT_THROW(ResultCode::kInvalidParameter);
 		}
-		RKIT_CHECK(image->Initialize());
+		image->Initialize();
 
 		outImage = std::move(image);
 

@@ -21,7 +21,7 @@ namespace anox::game::ape::externs
 			CORO_RETURN_OK;
 		}
 
-		CORO_CHECK(co_await ctx.m_world->GetSceneManager().RunScene(thread, scene.m_name, *scene.m_contentID, true));
+		co_await ctx.m_world->GetSceneManager().RunScene(thread, scene.m_name, *scene.m_contentID, true);
 		CORO_RETURN_OK;
 	}
 }

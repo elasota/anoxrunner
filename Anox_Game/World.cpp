@@ -75,9 +75,9 @@ namespace anox::game
 
 	rkit::Result WorldImpl::Initialize()
 	{
-		RKIT_CHECK(m_scriptManager.CreateScriptEnvironment(m_scriptEnvironment));
-		RKIT_CHECK(MusicManager::Create(m_musicManager));
-		RKIT_CHECK(SceneManager::Create(m_sceneManager, this->Base()));
+		m_scriptManager.CreateScriptEnvironment(m_scriptEnvironment);
+		MusicManager::Create(m_musicManager);
+		SceneManager::Create(m_sceneManager, this->Base());
 
 		RKIT_RETURN_OK;
 	}
@@ -153,7 +153,7 @@ namespace anox::game
 
 		for (WorldObject &obj : GetAllObjects())
 		{
-			CORO_CHECK(co_await obj.OnSpawnedFromLevel(thread));
+			co_await obj.OnSpawnedFromLevel(thread);
 		}
 
 		CORO_RETURN_OK;
@@ -169,12 +169,12 @@ namespace anox::game
 
 		for (WorldObject &obj : GetAllObjects())
 		{
-			CORO_CHECK(co_await obj.OnFrame(thread));
+			co_await obj.OnFrame(thread);
 		}
 
-		CORO_CHECK(co_await m_sceneManager->OnFrame(thread));
+		co_await m_sceneManager->OnFrame(thread);
 
-		CORO_CHECK(m_musicManager->OnFrame());
+		m_musicManager->OnFrame();
 
 		CORO_RETURN_OK;
 	}
@@ -189,8 +189,8 @@ namespace anox::game
 	rkit::Result World::Create(rkit::UniquePtr<World> &outWorld, ScriptManager &scriptManager)
 	{
 		rkit::UniquePtr<World> world;
-		RKIT_CHECK(rkit::New<World>(world, scriptManager));
-		RKIT_CHECK(world->Impl().Initialize());
+		rkit::New<World>(world, scriptManager);
+		world->Impl().Initialize();
 
 		outWorld = std::move(world);
 

@@ -427,12 +427,12 @@ namespace rkit { namespace render { namespace vulkan
 		ISystemDriver &sysDriver = *GetDrivers().m_systemDriver;
 		IUtilitiesDriver &utilsDriver = *GetDrivers().m_utilitiesDriver;
 
-		RKIT_CHECK(sysDriver.CreateMutex(m_packageStreamMutex));
-		RKIT_CHECK(sysDriver.CreateMutex(m_cacheStreamMutex));
-		RKIT_CHECK(sysDriver.CreateMutex(m_shaderModuleMutex));
+		sysDriver.CreateMutex(m_packageStreamMutex);
+		sysDriver.CreateMutex(m_cacheStreamMutex);
+		sysDriver.CreateMutex(m_shaderModuleMutex);
 
 		ConfigHashComputer hashComputer(utilsDriver.GetSha256Calculator());
-		RKIT_CHECK(m_validator->WriteConfig(hashComputer));
+		m_validator->WriteConfig(hashComputer);
 
 		m_configHashBytes = hashComputer.FinishSHA();
 
@@ -450,7 +450,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		const size_t numAllPipelines = numGraphicsPipelines;
 
-		RKIT_CHECK(m_data.m_graphicPipelinePermutationStarts.Resize(numAllPipelines));
+		m_data.m_graphicPipelinePermutationStarts.Resize(numAllPipelines);
 
 		for (size_t i = 0; i < numGraphicsPipelines; i++)
 		{
@@ -471,22 +471,22 @@ namespace rkit { namespace render { namespace vulkan
 					else
 						branchWidth = branch->m_subTree->m_width;
 
-					RKIT_CHECK(SafeAdd(treeWidth, treeWidth, branchWidth));
+					SafeAdd(treeWidth, treeWidth, branchWidth);
 				}
 			}
 
 			m_data.m_graphicPipelinePermutationStarts[i] = totalPermutations;
 
-			RKIT_CHECK(SafeAdd(totalPermutations, totalPermutations, treeWidth));
+			SafeAdd(totalPermutations, totalPermutations, treeWidth);
 		}
 
-		RKIT_CHECK(m_data.m_allPipelines.Resize(totalPermutations));
+		m_data.m_allPipelines.Resize(totalPermutations);
 
 		for (VkPipeline &pipeline : m_data.m_allPipelines)
 			pipeline = VK_NULL_HANDLE;
 
 		size_t numBinaryContents = m_data.m_package->GetBinaryContentCount();
-		RKIT_CHECK(m_binaryContents.Resize(numBinaryContents));
+		m_binaryContents.Resize(numBinaryContents);
 
 		FilePos_t binaryContentStart = m_packageBinaryContentStart;
 		for (size_t i = 0; i < numBinaryContents; i++)
@@ -498,7 +498,7 @@ namespace rkit { namespace render { namespace vulkan
 
 			m_binaryContents[i].m_filePos = binaryContentStart;
 
-			RKIT_CHECK(SafeAdd(binaryContentStart, binaryContentStart, static_cast<FilePos_t>(binaryContentSize)));
+			SafeAdd(binaryContentStart, binaryContentStart, static_cast<FilePos_t>(binaryContentSize));
 		}
 
 		// Samplers
@@ -506,7 +506,7 @@ namespace rkit { namespace render { namespace vulkan
 			data::IRenderRTTIListBase *samplers = m_data.m_package->GetIndexable(rkit::data::RenderRTTIIndexableStructType::SamplerDesc);
 			const size_t numSamplers = samplers->GetCount();
 
-			RKIT_CHECK(m_data.m_samplers.Resize(numSamplers));
+			m_data.m_samplers.Resize(numSamplers);
 
 			for (VkSampler &s : m_data.m_samplers)
 				s = VK_NULL_HANDLE;
@@ -517,12 +517,12 @@ namespace rkit { namespace render { namespace vulkan
 
 				VkSamplerCreateInfo samplerCreateInfo = {};
 				samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-				RKIT_CHECK(ResolveFilter(samplerCreateInfo.magFilter, ResolveConfigurable(sampler->m_magFilter)));
-				RKIT_CHECK(ResolveFilter(samplerCreateInfo.minFilter, ResolveConfigurable(sampler->m_minFilter)));
-				RKIT_CHECK(ResolveSamplerMipMapMode(samplerCreateInfo.mipmapMode, ResolveConfigurable(sampler->m_mipMapMode)));
-				RKIT_CHECK(ResolveSamplerAddressMode(samplerCreateInfo.addressModeU, ResolveConfigurable(sampler->m_addressModeU)));
-				RKIT_CHECK(ResolveSamplerAddressMode(samplerCreateInfo.addressModeV, ResolveConfigurable(sampler->m_addressModeV)));
-				RKIT_CHECK(ResolveSamplerAddressMode(samplerCreateInfo.addressModeW, ResolveConfigurable(sampler->m_addressModeW)));
+				ResolveFilter(samplerCreateInfo.magFilter, ResolveConfigurable(sampler->m_magFilter));
+				ResolveFilter(samplerCreateInfo.minFilter, ResolveConfigurable(sampler->m_minFilter));
+				ResolveSamplerMipMapMode(samplerCreateInfo.mipmapMode, ResolveConfigurable(sampler->m_mipMapMode));
+				ResolveSamplerAddressMode(samplerCreateInfo.addressModeU, ResolveConfigurable(sampler->m_addressModeU));
+				ResolveSamplerAddressMode(samplerCreateInfo.addressModeV, ResolveConfigurable(sampler->m_addressModeV));
+				ResolveSamplerAddressMode(samplerCreateInfo.addressModeW, ResolveConfigurable(sampler->m_addressModeW));
 				samplerCreateInfo.mipLodBias = ResolveConfigurable(sampler->m_mipLodBias);
 				samplerCreateInfo.minLod = ResolveConfigurable(sampler->m_minLod);
 
@@ -536,14 +536,14 @@ namespace rkit { namespace render { namespace vulkan
 				if (cmpFunction != ComparisonFunction::Disabled)
 				{
 					samplerCreateInfo.compareEnable = VK_TRUE;
-					RKIT_CHECK(ResolveCompareOp(samplerCreateInfo.compareOp, cmpFunction));
+					ResolveCompareOp(samplerCreateInfo.compareOp, cmpFunction);
 				}
 
 				AnisotropicFiltering anisoFiltering = ResolveConfigurable(sampler->m_anisotropy);
 				if (anisoFiltering != AnisotropicFiltering::Disabled)
 				{
 					samplerCreateInfo.anisotropyEnable = VK_TRUE;
-					RKIT_CHECK(ResolveAnisotropy(samplerCreateInfo.maxAnisotropy, anisoFiltering));
+					ResolveAnisotropy(samplerCreateInfo.maxAnisotropy, anisoFiltering);
 				}
 
 				RKIT_VK_CHECK(vkd.vkCreateSampler(m_device.GetDevice(), &samplerCreateInfo, m_device.GetAllocCallbacks(), &m_data.m_samplers[i]));
@@ -555,7 +555,7 @@ namespace rkit { namespace render { namespace vulkan
 			data::IRenderRTTIListBase *descriptorLayouts = m_data.m_package->GetIndexable(rkit::data::RenderRTTIIndexableStructType::DescriptorLayoutDesc);
 			const size_t numDescriptorLayouts = descriptorLayouts->GetCount();
 
-			RKIT_CHECK(m_data.m_descriptorSetLayouts.Resize(numDescriptorLayouts));
+			m_data.m_descriptorSetLayouts.Resize(numDescriptorLayouts);
 
 			for (VkDescriptorSetLayout &dsl : m_data.m_descriptorSetLayouts)
 				dsl = VK_NULL_HANDLE;
@@ -565,10 +565,10 @@ namespace rkit { namespace render { namespace vulkan
 				const render::DescriptorLayoutDesc *dslDesc = static_cast<const render::DescriptorLayoutDesc *>(descriptorLayouts->GetElementPtr(dli));
 
 				Vector<VkDescriptorSetLayoutBinding> bindings;
-				RKIT_CHECK(bindings.Resize(dslDesc->m_descriptors.Count()));
+				bindings.Resize(dslDesc->m_descriptors.Count());
 
 				Vector<Vector<VkSampler>> immutableSamplers;
-				RKIT_CHECK(immutableSamplers.Resize(dslDesc->m_descriptors.Count()));
+				immutableSamplers.Resize(dslDesc->m_descriptors.Count());
 
 				for (size_t di = 0; di < dslDesc->m_descriptors.Count(); di++)
 				{
@@ -577,8 +577,8 @@ namespace rkit { namespace render { namespace vulkan
 					const DescriptorDesc *descriptorDesc = dslDesc->m_descriptors[di];
 
 					vkBinding = {};
-					RKIT_CHECK(ResolveGraphicsStageFlags(vkBinding.stageFlags, descriptorDesc->m_visibility));
-					RKIT_CHECK(ResolveDescriptorType(vkBinding.descriptorType, descriptorDesc->m_descriptorType));
+					ResolveGraphicsStageFlags(vkBinding.stageFlags, descriptorDesc->m_visibility);
+					ResolveDescriptorType(vkBinding.descriptorType, descriptorDesc->m_descriptorType);
 
 					if (descriptorDesc->m_arraySize == 0)
 					{
@@ -600,9 +600,9 @@ namespace rkit { namespace render { namespace vulkan
 						}
 
 						VkSampler sampler = VK_NULL_HANDLE;
-						RKIT_CHECK(FindSampler(sampler, descriptorDesc->m_staticSamplerDesc));
+						FindSampler(sampler, descriptorDesc->m_staticSamplerDesc);
 
-						RKIT_CHECK(bindingImmutableSamplers.Resize(descriptorDesc->m_arraySize));
+						bindingImmutableSamplers.Resize(descriptorDesc->m_arraySize);
 
 						for (VkSampler &samplerRef : bindingImmutableSamplers)
 							samplerRef = sampler;
@@ -629,7 +629,7 @@ namespace rkit { namespace render { namespace vulkan
 			data::IRenderRTTIListBase *pipelineLayouts = m_data.m_package->GetIndexable(rkit::data::RenderRTTIIndexableStructType::PipelineLayoutDesc);
 			const size_t numPipelineLayouts = pipelineLayouts->GetCount();
 
-			RKIT_CHECK(m_data.m_pipelineLayouts.Resize(numPipelineLayouts));
+			m_data.m_pipelineLayouts.Resize(numPipelineLayouts);
 
 			for (VkPipelineLayout &pl : m_data.m_pipelineLayouts)
 				pl = VK_NULL_HANDLE;
@@ -642,11 +642,11 @@ namespace rkit { namespace render { namespace vulkan
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
 				Vector<VkDescriptorSetLayout> setLayouts;
-				RKIT_CHECK(setLayouts.Resize(plDesc->m_descriptorLayouts.Count()));
+				setLayouts.Resize(plDesc->m_descriptorLayouts.Count());
 
 				for (size_t dli = 0; dli < plDesc->m_descriptorLayouts.Count(); dli++)
 				{
-					RKIT_CHECK(FindDescriptorSetLayout(setLayouts[dli], plDesc->m_descriptorLayouts[dli]));
+					FindDescriptorSetLayout(setLayouts[dli], plDesc->m_descriptorLayouts[dli]);
 				}
 
 				pipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.Count());
@@ -659,9 +659,9 @@ namespace rkit { namespace render { namespace vulkan
 					for (const PushConstantDesc *pcDesc : plDesc->m_pushConstantList->m_pushConstants)
 					{
 						VkPushConstantRange pcRange = {};
-						RKIT_CHECK(ResolveAnyStageFlags(pcRange.stageFlags, pcDesc->m_stageVisibility));
+						ResolveAnyStageFlags(pcRange.stageFlags, pcDesc->m_stageVisibility);
 						pcRange.offset = 0;
-						RKIT_CHECK(ResolvePushConstantSize(pcRange.size, pcDesc->m_type));
+						ResolvePushConstantSize(pcRange.size, pcDesc->m_type);
 
 						if (pcRange.size == 0)
 							continue;
@@ -674,12 +674,12 @@ namespace rkit { namespace render { namespace vulkan
 							else
 							{
 								pcRange.offset += prevRange.offset;
-								RKIT_CHECK(pcRanges.Append(pcRange));
+								pcRanges.Append(pcRange);
 							}
 						}
 						else
 						{
-							RKIT_CHECK(pcRanges.Append(pcRange));
+							pcRanges.Append(pcRange);
 						}
 					}
 				}
@@ -696,12 +696,12 @@ namespace rkit { namespace render { namespace vulkan
 			data::IRenderRTTIListBase *renderPasses = m_data.m_package->GetIndexable(rkit::data::RenderRTTIIndexableStructType::RenderPassDesc);
 			const size_t numRenderPasses = renderPasses->GetCount();
 
-			RKIT_CHECK(m_data.m_renderPasses.Resize(numRenderPasses));
+			m_data.m_renderPasses.Resize(numRenderPasses);
 
 			for (size_t rpi = 0; rpi < numRenderPasses; rpi++)
 			{
 				VkRenderPass renderPass = VK_NULL_HANDLE;
-				RKIT_CHECK(CreateRenderPass(renderPass, *static_cast<const render::RenderPassDesc *>(renderPasses->GetElementPtr(rpi))));
+				CreateRenderPass(renderPass, *static_cast<const render::RenderPassDesc *>(renderPasses->GetElementPtr(rpi)));
 
 				m_data.m_renderPasses[rpi].SetRenderPass(renderPass);
 			}
@@ -720,7 +720,7 @@ namespace rkit { namespace render { namespace vulkan
 
 				StringView name = m_data.m_package->GetString(nameLookup.m_name.GetIndex());
 
-				RKIT_CHECK(m_data.m_nameToRenderPass.Set(name, nameLookup.m_renderPass));
+				m_data.m_nameToRenderPass.Set(name, nameLookup.m_renderPass);
 			}
 		}
 
@@ -742,8 +742,8 @@ namespace rkit { namespace render { namespace vulkan
 
 		PipelineCacheHeader header = {};
 
-		RKIT_CHECK(m_cacheReadStream->SeekStart(0));
-		RKIT_CHECK(m_cacheReadStream->ReadAll(&header, sizeof(header)));
+		m_cacheReadStream->SeekStart(0);
+		m_cacheReadStream->ReadAll(&header, sizeof(header));
 
 		if (header.m_identifier != PipelineCacheHeader::kExpectedIdentifier
 			|| header.m_version != PipelineCacheHeader::kExpectedVersion
@@ -767,9 +767,9 @@ namespace rkit { namespace render { namespace vulkan
 		}
 
 		Vector<uint8_t> mergedData;
-		RKIT_CHECK(mergedData.Resize(static_cast<size_t>(cacheSize)));
+		mergedData.Resize(static_cast<size_t>(cacheSize));
 
-		RKIT_CHECK(m_cacheReadStream->ReadAll(mergedData.GetBuffer(), mergedData.Count()));
+		m_cacheReadStream->ReadAll(mergedData.GetBuffer(), mergedData.Count());
 
 		rkit::endian::LittleUInt32_t headerFields[4];
 		memcpy(&headerFields, mergedData.GetBuffer(), 16);
@@ -816,7 +816,7 @@ namespace rkit { namespace render { namespace vulkan
 			RKIT_THROW(ResultCode::kInternalError);
 
 		CompiledPipeline compiledPipeline;
-		RKIT_CHECK(CheckedCreateGraphicsPipeline(m_data.m_mergedCache, compiledPipeline, pipelineIndex, permutationIndex));
+		CheckedCreateGraphicsPipeline(m_data.m_mergedCache, compiledPipeline, pipelineIndex, permutationIndex);
 
 		outPipelineRef = compiledPipeline.m_pipeline;
 
@@ -1289,10 +1289,10 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanPipelineLibraryLoader::ResolveStencilOps(VkStencilOpState &outOpState, const StencilOpDesc &stencilOpDesc, const DepthStencilOperationDesc &depthStencilDesc)
 	{
-		RKIT_CHECK(ResolveStencilOp(outOpState.failOp, ResolveConfigurable(stencilOpDesc.m_failOp)));
-		RKIT_CHECK(ResolveStencilOp(outOpState.passOp, ResolveConfigurable(stencilOpDesc.m_passOp)));
-		RKIT_CHECK(ResolveStencilOp(outOpState.depthFailOp, ResolveConfigurable(stencilOpDesc.m_depthFailOp)));
-		RKIT_CHECK(ResolveCompareOp(outOpState.compareOp, ResolveConfigurable(stencilOpDesc.m_compareFunc)));
+		ResolveStencilOp(outOpState.failOp, ResolveConfigurable(stencilOpDesc.m_failOp));
+		ResolveStencilOp(outOpState.passOp, ResolveConfigurable(stencilOpDesc.m_passOp));
+		ResolveStencilOp(outOpState.depthFailOp, ResolveConfigurable(stencilOpDesc.m_depthFailOp));
+		ResolveCompareOp(outOpState.compareOp, ResolveConfigurable(stencilOpDesc.m_compareFunc));
 
 		outOpState.compareMask = ResolveConfigurable(depthStencilDesc.m_stencilCompareMask);
 
@@ -1572,9 +1572,9 @@ namespace rkit { namespace render { namespace vulkan
 		uint32_t numElements = rowsInt * colsInt;
 
 		uint32_t numberSize = 0;
-		RKIT_CHECK(ResolvePushConstantSize(numberSize, valueType.m_numericType));
+		ResolvePushConstantSize(numberSize, valueType.m_numericType);
 
-		RKIT_CHECK(SafeMul(size, numberSize, numElements));
+		SafeMul(size, numberSize, numElements);
 
 		RKIT_RETURN_OK;
 	}
@@ -1584,9 +1584,9 @@ namespace rkit { namespace render { namespace vulkan
 		uint32_t colsInt  = static_cast<size_t>(static_cast<int>(valueType.m_cols) - static_cast<int>(VectorDimension::Dimension2) + 2);
 
 		uint32_t numberSize = 0;
-		RKIT_CHECK(ResolvePushConstantSize(numberSize, valueType.m_numericType));
+		ResolvePushConstantSize(numberSize, valueType.m_numericType);
 
-		RKIT_CHECK(SafeMul(size, numberSize, colsInt));
+		SafeMul(size, numberSize, colsInt);
 
 		RKIT_RETURN_OK;
 	}
@@ -1710,7 +1710,7 @@ namespace rkit { namespace render { namespace vulkan
 		size_t totalAttachments = numColorAttachments + numDepthStencilAttachments;
 
 		Vector<VkAttachmentDescription> attachmentDescs;
-		RKIT_CHECK(attachmentDescs.Resize(totalAttachments));
+		attachmentDescs.Resize(totalAttachments);
 
 		const size_t firstDepthStencilAttachment = 0;
 		const size_t firstColorAttachment = numDepthStencilAttachments;
@@ -1718,25 +1718,25 @@ namespace rkit { namespace render { namespace vulkan
 		Vector<VkAttachmentReference> colorAttachmentRefs;
 		VkAttachmentReference depthStencilAttachmentRef = {};
 
-		RKIT_CHECK(colorAttachmentRefs.Resize(numColorAttachments));
+		colorAttachmentRefs.Resize(numColorAttachments);
 
 		if (numDepthStencilAttachments > 0)
 		{
 			VkAttachmentDescription dsDesc = {};
-			RKIT_CHECK(ResolveDepthStencilFormat(dsDesc.format, ResolveConfigurable(depthStencil->m_format)));
-			RKIT_CHECK(ResolveLoadOp(dsDesc.loadOp, depthStencil->m_depthLoadOp));
-			RKIT_CHECK(ResolveStoreOp(dsDesc.storeOp, depthStencil->m_depthStoreOp));
+			ResolveDepthStencilFormat(dsDesc.format, ResolveConfigurable(depthStencil->m_format));
+			ResolveLoadOp(dsDesc.loadOp, depthStencil->m_depthLoadOp);
+			ResolveStoreOp(dsDesc.storeOp, depthStencil->m_depthStoreOp);
 
 			dsDesc.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 			dsDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
 			bool haveStencil = false;
-			RKIT_CHECK(ResolveDepthStencilFormatHasStencil(haveStencil, ResolveConfigurable(depthStencil->m_format)));
+			ResolveDepthStencilFormatHasStencil(haveStencil, ResolveConfigurable(depthStencil->m_format));
 
 			if (haveStencil)
 			{
-				RKIT_CHECK(ResolveLoadOp(dsDesc.stencilLoadOp, depthStencil->m_stencilLoadOp));
-				RKIT_CHECK(ResolveStoreOp(dsDesc.stencilStoreOp, depthStencil->m_stencilStoreOp));
+				ResolveLoadOp(dsDesc.stencilLoadOp, depthStencil->m_stencilLoadOp);
+				ResolveStoreOp(dsDesc.stencilStoreOp, depthStencil->m_stencilStoreOp);
 			}
 			else
 			{
@@ -1760,11 +1760,11 @@ namespace rkit { namespace render { namespace vulkan
 			VkAttachmentDescription caDesc = {};
 			const RenderTargetDesc *rtDesc = renderPassDesc.m_renderTargets[cai];
 
-			RKIT_CHECK(VulkanUtils::ResolveRenderTargetFormat(caDesc.format, ResolveConfigurable(rtDesc->m_format)));
+			VulkanUtils::ResolveRenderTargetFormat(caDesc.format, ResolveConfigurable(rtDesc->m_format));
 			caDesc.samples = VK_SAMPLE_COUNT_1_BIT;
 
-			RKIT_CHECK(ResolveLoadOp(caDesc.loadOp, rtDesc->m_loadOp));
-			RKIT_CHECK(ResolveStoreOp(caDesc.storeOp, rtDesc->m_storeOp));
+			ResolveLoadOp(caDesc.loadOp, rtDesc->m_loadOp);
+			ResolveStoreOp(caDesc.storeOp, rtDesc->m_storeOp);
 
 			caDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 			caDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -1826,8 +1826,8 @@ namespace rkit { namespace render { namespace vulkan
 			RKIT_THROW(ResultCode::kMalformedFile);
 
 		Vector<VkDynamicState> dynamicStates;
-		RKIT_CHECK(dynamicStates.Append(VK_DYNAMIC_STATE_VIEWPORT));
-		RKIT_CHECK(dynamicStates.Append(VK_DYNAMIC_STATE_SCISSOR));
+		dynamicStates.Append(VK_DYNAMIC_STATE_VIEWPORT);
+		dynamicStates.Append(VK_DYNAMIC_STATE_SCISSOR);
 
 		const InputLayoutDesc *inputLayoutDesc = pipelineDesc->m_inputLayout;
 
@@ -1835,7 +1835,7 @@ namespace rkit { namespace render { namespace vulkan
 		Vector<VkVertexInputBindingDescription> vertexInputBindingDescs;
 
 		Vector<VkVertexInputAttributeDescription> vertexAttributeDescs;
-		RKIT_CHECK(vertexAttributeDescs.Resize(inputLayoutDesc->m_vertexInputs.Count()));
+		vertexAttributeDescs.Resize(inputLayoutDesc->m_vertexInputs.Count());
 
 		for (size_t i = 0; i < inputLayoutDesc->m_vertexInputs.Count(); i++)
 		{
@@ -1845,7 +1845,7 @@ namespace rkit { namespace render { namespace vulkan
 			attribDesc = {};
 			attribDesc.location = static_cast<uint32_t>(i);
 			attribDesc.binding = vertexInput->m_inputFeed->m_inputSlot;
-			RKIT_CHECK(ResolveVertexInputAttributeFormat(attribDesc.format, *vertexInput->m_numericType));
+			ResolveVertexInputAttributeFormat(attribDesc.format, *vertexInput->m_numericType);
 			attribDesc.offset = vertexInput->m_byteOffset;
 
 			const InputLayoutVertexFeedDesc *feed = vertexInput->m_inputFeed;
@@ -1862,7 +1862,7 @@ namespace rkit { namespace render { namespace vulkan
 
 			if (!foundFeed)
 			{
-				RKIT_CHECK(feedRefs.Append(feed));
+				feedRefs.Append(feed);
 
 				VkVertexInputBindingDescription bindingDesc = {};
 				bindingDesc.binding = feed->m_inputSlot;
@@ -1881,7 +1881,7 @@ namespace rkit { namespace render { namespace vulkan
 
 				bindingDesc.stride = ResolveConfigurable(feed->m_byteStride);
 
-				RKIT_CHECK(vertexInputBindingDescs.Append(bindingDesc));
+				vertexInputBindingDescs.Append(bindingDesc);
 			}
 		}
 
@@ -1979,19 +1979,19 @@ namespace rkit { namespace render { namespace vulkan
 			depthStencilCreateInfo.depthTestEnable = VK_FALSE;
 		else
 		{
-			RKIT_CHECK(ResolveCompareOp(depthStencilCreateInfo.depthCompareOp, ResolveConfigurable(depthStencilDesc.m_depthCompareOp)));
+			ResolveCompareOp(depthStencilCreateInfo.depthCompareOp, ResolveConfigurable(depthStencilDesc.m_depthCompareOp));
 		}
 
 
 		if (ResolveConfigurable(depthStencilDesc.m_stencilTest))
 			depthStencilCreateInfo.stencilTestEnable = VK_TRUE;
 
-		RKIT_CHECK(ResolveStencilOps(depthStencilCreateInfo.front, depthStencilDesc.m_stencilFrontOps, depthStencilDesc));
-		RKIT_CHECK(ResolveStencilOps(depthStencilCreateInfo.back, depthStencilDesc.m_stencilBackOps, depthStencilDesc));
+		ResolveStencilOps(depthStencilCreateInfo.front, depthStencilDesc.m_stencilFrontOps, depthStencilDesc);
+		ResolveStencilOps(depthStencilCreateInfo.back, depthStencilDesc.m_stencilBackOps, depthStencilDesc);
 
 		if (ResolveConfigurable(depthStencilDesc.m_dynamicStencilReference))
 		{
-			RKIT_CHECK(dynamicStates.Append(VK_DYNAMIC_STATE_STENCIL_REFERENCE));
+			dynamicStates.Append(VK_DYNAMIC_STATE_STENCIL_REFERENCE);
 		}
 
 		if (renderPassDesc->m_renderTargets.Count() != pipelineDesc->m_renderTargets.Count())
@@ -2001,7 +2001,7 @@ namespace rkit { namespace render { namespace vulkan
 		}
 
 		Vector<VkPipelineColorBlendAttachmentState> blendAttachments;
-		RKIT_CHECK(blendAttachments.Resize(pipelineDesc->m_renderTargets.Count()));
+		blendAttachments.Resize(pipelineDesc->m_renderTargets.Count());
 
 		for (size_t rti = 0; rti < pipelineDesc->m_renderTargets.Count(); rti++)
 		{
@@ -2015,13 +2015,13 @@ namespace rkit { namespace render { namespace vulkan
 			{
 				vkba.blendEnable = VK_TRUE;
 
-				RKIT_CHECK(ResolveColorBlendFactor(vkba.srcColorBlendFactor, rtDesc.m_srcBlend));
-				RKIT_CHECK(ResolveColorBlendFactor(vkba.dstColorBlendFactor, rtDesc.m_dstBlend));
-				RKIT_CHECK(ResolveBlendOp(vkba.colorBlendOp, rtDesc.m_colorBlendOp));
+				ResolveColorBlendFactor(vkba.srcColorBlendFactor, rtDesc.m_srcBlend);
+				ResolveColorBlendFactor(vkba.dstColorBlendFactor, rtDesc.m_dstBlend);
+				ResolveBlendOp(vkba.colorBlendOp, rtDesc.m_colorBlendOp);
 
-				RKIT_CHECK(ResolveAlphaBlendFactor(vkba.srcAlphaBlendFactor, rtDesc.m_srcAlphaBlend));
-				RKIT_CHECK(ResolveAlphaBlendFactor(vkba.dstAlphaBlendFactor, rtDesc.m_dstAlphaBlend));
-				RKIT_CHECK(ResolveBlendOp(vkba.alphaBlendOp, rtDesc.m_alphaBlendOp));
+				ResolveAlphaBlendFactor(vkba.srcAlphaBlendFactor, rtDesc.m_srcAlphaBlend);
+				ResolveAlphaBlendFactor(vkba.dstAlphaBlendFactor, rtDesc.m_dstAlphaBlend);
+				ResolveBlendOp(vkba.alphaBlendOp, rtDesc.m_alphaBlendOp);
 
 				if (rtDesc.m_writeAlpha)
 					vkba.colorWriteMask |= VK_COLOR_COMPONENT_A_BIT;
@@ -2036,7 +2036,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		if (pipelineDesc->m_dynamicBlendConstants)
 		{
-			RKIT_CHECK(dynamicStates.Append(VK_DYNAMIC_STATE_BLEND_CONSTANTS));
+			dynamicStates.Append(VK_DYNAMIC_STATE_BLEND_CONSTANTS);
 		}
 
 		VkPipelineColorBlendStateCreateInfo blendStateCreateInfo = {};
@@ -2066,8 +2066,8 @@ namespace rkit { namespace render { namespace vulkan
 		pipelineCreateInfo.pMultisampleState = &multisampleStateCreateInfo;
 		pipelineCreateInfo.pDepthStencilState = &depthStencilCreateInfo;
 		pipelineCreateInfo.pColorBlendState = &blendStateCreateInfo;
-		RKIT_CHECK(FindPipelineLayout(pipelineCreateInfo.layout, pipelineDesc->m_pipelineLayout));
-		RKIT_CHECK(FindRenderPass(pipelineCreateInfo.renderPass, renderPassDesc));
+		FindPipelineLayout(pipelineCreateInfo.layout, pipelineDesc->m_pipelineLayout);
+		FindRenderPass(pipelineCreateInfo.renderPass, renderPassDesc);
 		pipelineCreateInfo.subpass = 0;
 
 		StaticArray<VkPipelineShaderStageCreateInfo, kMaxGraphicsStages> stageCreateInfos;
@@ -2098,7 +2098,7 @@ namespace rkit { namespace render { namespace vulkan
 				}
 
 				const size_t bcIndex = contentKey->m_content.m_contentIndex;
-				RKIT_CHECK(LoadShaderModule(contentKey->m_content.m_contentIndex));
+				LoadShaderModule(contentKey->m_content.m_contentIndex);
 
 				stageCreateInfo.module = m_binaryContents[bcIndex].m_shaderModule;
 				stageCreateInfo.pName = "main";
@@ -2124,7 +2124,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(vkd.vkCreatePipelineCache(m_device.GetDevice(), &pipelineCacheCreateInfo, m_device.GetAllocCallbacks(), &pipelineCache));
 
-		RKIT_CHECK(CheckedCreateGraphicsPipeline(pipelineCache, pipeline, pipelineIndex, permutationIndex));
+		CheckedCreateGraphicsPipeline(pipelineCache, pipeline, pipelineIndex, permutationIndex);
 
 		if (pipeline.m_pipeline != VK_NULL_HANDLE)
 		{
@@ -2136,7 +2136,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_CHECK(vkd.vkGetPipelineCacheData(m_device.GetDevice(), pipelineCache, &dataSize, nullptr));
 
 		Vector<uint8_t> pipelineCacheDataBuffer;
-		RKIT_CHECK(pipelineCacheDataBuffer.Resize(dataSize));
+		pipelineCacheDataBuffer.Resize(dataSize);
 		RKIT_VK_CHECK(vkd.vkGetPipelineCacheData(m_device.GetDevice(), pipelineCache, &dataSize, pipelineCacheDataBuffer.GetBuffer()));
 
 		// CAUTION: dataSize is overwritten at this point!
@@ -2149,14 +2149,14 @@ namespace rkit { namespace render { namespace vulkan
 
 		// Write out to shadowfile
 		String path;
-		RKIT_CHECK(GetUnmergedCachePath(path, m_configHashBytes, pipelineIndex, permutationIndex));
+		GetUnmergedCachePath(path, m_configHashBytes, pipelineIndex, permutationIndex);
 
 		{
 			MutexLock lock(*m_cacheStreamMutex);
 
 			if (m_individualPipelineLocators.Count() == 0)
 			{
-				RKIT_CHECK(m_cacheWriteStream->SeekStart(0));
+				m_cacheWriteStream->SeekStart(0);
 
 				PipelineCacheHeader header = {};
 				header.m_identifier = PipelineCacheHeader::kExpectedIdentifier;
@@ -2165,8 +2165,8 @@ namespace rkit { namespace render { namespace vulkan
 				header.m_packageUUID = m_data.m_package->GetPackageUUID();
 				header.m_configHashBytes = m_configHashBytes;
 
-				RKIT_CHECK(m_cacheWriteStream->WriteAll(&header, sizeof(header)));
-				RKIT_CHECK(m_cacheWriteStream->Flush());
+				m_cacheWriteStream->WriteAll(&header, sizeof(header));
+				m_cacheWriteStream->Flush();
 			}
 
 			CompiledPipelineKey plKey;
@@ -2177,9 +2177,9 @@ namespace rkit { namespace render { namespace vulkan
 			locator.m_filePos = m_cacheWriteStream->Tell();
 			locator.m_size = dataSize;
 
-			RKIT_CHECK((m_individualPipelineLocators.Set<CompiledPipelineKey, CompiledPipelineFileLocator, CompiledPipelineKeyHasher>(std::move(plKey), std::move(locator))));
+			(m_individualPipelineLocators.Set<CompiledPipelineKey, CompiledPipelineFileLocator, CompiledPipelineKeyHasher>(std::move(plKey), std::move(locator)));
 
-			RKIT_CHECK(m_cacheWriteStream->WriteAll(pipelineCacheDataBuffer.GetBuffer(), dataSize));
+			m_cacheWriteStream->WriteAll(pipelineCacheDataBuffer.GetBuffer(), dataSize);
 		}
 
 		RKIT_RETURN_OK;
@@ -2202,17 +2202,17 @@ namespace rkit { namespace render { namespace vulkan
 			RKIT_THROW(ResultCode::kMalformedFile);
 
 		Vector<uint8_t> content;
-		RKIT_CHECK(content.Resize(binaryContentSize));
+		content.Resize(binaryContentSize);
 
 		{
 			MutexLock lock(*m_packageStreamMutex);
 
-			RKIT_CHECK(m_packageStream->SeekStart(bcd.m_filePos));
-			RKIT_CHECK(m_packageStream->ReadAll(content.GetBuffer(), binaryContentSize));
+			m_packageStream->SeekStart(bcd.m_filePos);
+			m_packageStream->ReadAll(content.GetBuffer(), binaryContentSize);
 		}
 
 		Vector<uint32_t> decoded;
-		RKIT_CHECK(decoded.Resize(binaryContentSize / 4));
+		decoded.Resize(binaryContentSize / 4);
 
 		uint32_t *outDWords = decoded.GetBuffer();
 		const uint8_t *inBytes = content.GetBuffer();
@@ -2315,18 +2315,18 @@ namespace rkit { namespace render { namespace vulkan
 			RKIT_THROW(ResultCode::kInternalError);
 
 		Vector<uint8_t> pipelineCacheData;
-		RKIT_CHECK(pipelineCacheData.Resize(it.Value().m_size));
+		pipelineCacheData.Resize(it.Value().m_size);
 
 		{
 			MutexLock lock(*m_cacheStreamMutex);
 
-			RKIT_CHECK(m_cacheWriteStream->SeekStart(it.Value().m_filePos));
-			RKIT_CHECK(m_cacheWriteStream->ReadAll(pipelineCacheData.GetBuffer(), pipelineCacheData.Count()));
+			m_cacheWriteStream->SeekStart(it.Value().m_filePos);
+			m_cacheWriteStream->ReadAll(pipelineCacheData.GetBuffer(), pipelineCacheData.Count());
 		}
 
 		const VulkanDeviceAPI &vkd = m_device.GetDeviceAPI();
 
-		RKIT_CHECK(m_individualCaches.Append(VK_NULL_HANDLE));
+		m_individualCaches.Append(VK_NULL_HANDLE);
 
 		VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
 		pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
@@ -2362,7 +2362,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_CHECK(vkd.vkGetPipelineCacheData(m_device.GetDevice(), m_data.m_mergedCache, &dataSize, nullptr));
 
 		Vector<uint8_t> pipelineCacheDataBuffer;
-		RKIT_CHECK(pipelineCacheDataBuffer.Resize(dataSize));
+		pipelineCacheDataBuffer.Resize(dataSize);
 		RKIT_VK_CHECK(vkd.vkGetPipelineCacheData(m_device.GetDevice(), m_data.m_mergedCache, &dataSize, pipelineCacheDataBuffer.GetBuffer()));
 
 		PipelineCacheHeader header = {};
@@ -2374,18 +2374,18 @@ namespace rkit { namespace render { namespace vulkan
 
 		{
 			MutexLock lock(*m_cacheStreamMutex);
-			RKIT_CHECK(m_cacheWriteStream->SeekStart(0));
-			RKIT_CHECK(m_cacheWriteStream->WriteAll(&header, sizeof(header)));
-			RKIT_CHECK(m_cacheWriteStream->Flush());
+			m_cacheWriteStream->SeekStart(0);
+			m_cacheWriteStream->WriteAll(&header, sizeof(header));
+			m_cacheWriteStream->Flush();
 
-			RKIT_CHECK(m_cacheWriteStream->WriteAll(pipelineCacheDataBuffer.GetBuffer(), pipelineCacheDataBuffer.Count()));
-			RKIT_CHECK(m_cacheWriteStream->Truncate(m_cacheWriteStream->Tell()));
+			m_cacheWriteStream->WriteAll(pipelineCacheDataBuffer.GetBuffer(), pipelineCacheDataBuffer.Count());
+			m_cacheWriteStream->Truncate(m_cacheWriteStream->Tell());
 
 			header.m_phase = PipelineCacheHeader::Phase::kMerged;
 
-			RKIT_CHECK(m_cacheWriteStream->SeekStart(0));
-			RKIT_CHECK(m_cacheWriteStream->WriteAll(&header, sizeof(header)));
-			RKIT_CHECK(m_cacheWriteStream->Flush());
+			m_cacheWriteStream->SeekStart(0);
+			m_cacheWriteStream->WriteAll(&header, sizeof(header));
+			m_cacheWriteStream->Flush();
 		}
 
 		RKIT_RETURN_OK;
@@ -2399,7 +2399,7 @@ namespace rkit { namespace render { namespace vulkan
 		m_isFinished = true;
 
 		UniquePtr<VulkanPipelineLibrary> pipelineLibrary;
-		RKIT_CHECK(New<VulkanPipelineLibrary>(pipelineLibrary, std::move(m_data)));
+		New<VulkanPipelineLibrary>(pipelineLibrary, std::move(m_data));
 
 		outPipelineLibrary = std::move(pipelineLibrary);
 
@@ -2411,9 +2411,9 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		UniquePtr<VulkanPipelineLibraryLoader> loader;
 
-		RKIT_CHECK(New<VulkanPipelineLibraryLoader>(loader, device, std::move(validator), std::move(package), std::move(packageStream), packageBinaryContentStart));
+		New<VulkanPipelineLibraryLoader>(loader, device, std::move(validator), std::move(package), std::move(packageStream), packageBinaryContentStart);
 
-		RKIT_CHECK(loader->Initialize());
+		loader->Initialize();
 
 		outLoader = std::move(loader);
 

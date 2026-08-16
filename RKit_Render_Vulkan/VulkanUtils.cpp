@@ -56,8 +56,8 @@ namespace rkit { namespace render { namespace vulkan
 			srcStagesCopy = (srcStagesCopy | dstStagesCopy);
 		}
 
-		RKIT_CHECK(ConvertPipelineStageBits(outSrcFlags, srcStagesCopy));
-		RKIT_CHECK(ConvertPipelineStageBits(outDstFlags, dstStagesCopy));
+		ConvertPipelineStageBits(outSrcFlags, srcStagesCopy);
+		ConvertPipelineStageBits(outDstFlags, dstStagesCopy);
 
 		RKIT_RETURN_OK;
 	}

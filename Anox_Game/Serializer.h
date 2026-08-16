@@ -90,7 +90,7 @@ namespace anox::game
 		else
 		{
 			TUnderlying underlying = static_cast<TUnderlying>(0);
-			RKIT_CHECK(this->Serialize(underlying));
+			this->Serialize(underlying);
 			value = static_cast<TEnum>(underlying);
 			RKIT_RETURN_OK;
 		}
@@ -101,7 +101,7 @@ namespace anox::game
 	{
 		for (auto &subValue : value.AsBoolVector().Chunks())
 		{
-			RKIT_CHECK(this->SerializeInternal(subValue));
+			this->SerializeInternal(subValue);
 		}
 		RKIT_RETURN_OK;
 	}

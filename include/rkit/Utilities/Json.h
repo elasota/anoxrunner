@@ -144,7 +144,7 @@ inline rkit::Result rkit::utils::JsonValue::ToString(StringView &outStrView) con
 {
 	const Utf8Char_t *charPtr = nullptr;
 	size_t length = 0;
-	RKIT_CHECK(m_vptr->m_toString(m_jsonValuePtr, charPtr, length));
+	m_vptr->m_toString(m_jsonValuePtr, charPtr, length);
 
 	outStrView = StringView(charPtr, length);
 
@@ -181,7 +181,7 @@ inline rkit::Result rkit::utils::JsonValue::ObjectHasElement(const StringView &k
 inline rkit::Result rkit::utils::JsonValue::GetObjectElement(const StringView &key, JsonValue &outJsonValue) const
 {
 	bool exists = false;
-	RKIT_CHECK(m_vptr->m_tryGetObjectElement(m_jsonValuePtr, key.GetChars(), key.Length(), exists, outJsonValue));
+	m_vptr->m_tryGetObjectElement(m_jsonValuePtr, key.GetChars(), key.Length(), exists, outJsonValue);
 	if (!exists)
 		RKIT_THROW(ResultCode::kInvalidParameter);
 	RKIT_RETURN_OK;

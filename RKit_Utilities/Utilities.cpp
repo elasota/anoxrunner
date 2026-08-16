@@ -189,13 +189,13 @@ namespace rkit
 		ISeekableWriteStream *seekableWrite = stream.Get();
 
 		UniquePtr<IMutex> mutex;
-		RKIT_CHECK(GetDrivers().m_systemDriver->CreateMutex(mutex));
+		GetDrivers().m_systemDriver->CreateMutex(mutex);
 
 		UniquePtr<MutexProtectedStreamWrapper> mpsWrapper;
-		RKIT_CHECK(New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write, seekableWrite));
+		New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write, seekableWrite);
 
 		SharedPtr<MutexProtectedStreamWrapper> sharedWrapper;
-		RKIT_CHECK(MakeShared(sharedWrapper, std::move(mpsWrapper)));
+		MakeShared(sharedWrapper, std::move(mpsWrapper));
 
 		sharedWrapper->SetTracker(sharedWrapper.GetTracker());
 
@@ -212,13 +212,13 @@ namespace rkit
 		ISeekableWriteStream *seekableWrite = nullptr;
 
 		UniquePtr<IMutex> mutex;
-		RKIT_CHECK(GetDrivers().m_systemDriver->CreateMutex(mutex));
+		GetDrivers().m_systemDriver->CreateMutex(mutex);
 
 		UniquePtr<MutexProtectedStreamWrapper> mpsWrapper;
-		RKIT_CHECK(New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write, seekableWrite));
+		New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write, seekableWrite);
 
 		SharedPtr<MutexProtectedStreamWrapper> sharedWrapper;
-		RKIT_CHECK(MakeShared(sharedWrapper, std::move(mpsWrapper)));
+		MakeShared(sharedWrapper, std::move(mpsWrapper));
 
 		sharedWrapper->SetTracker(sharedWrapper.GetTracker());
 
@@ -235,13 +235,13 @@ namespace rkit
 		ISeekableWriteStream *seekableWrite = stream.Get();
 
 		UniquePtr<IMutex> mutex;
-		RKIT_CHECK(GetDrivers().m_systemDriver->CreateMutex(mutex));
+		GetDrivers().m_systemDriver->CreateMutex(mutex);
 
 		UniquePtr<MutexProtectedStreamWrapper> mpsWrapper;
-		RKIT_CHECK(New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write, seekableWrite));
+		New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write, seekableWrite);
 
 		SharedPtr<MutexProtectedStreamWrapper> sharedWrapper;
-		RKIT_CHECK(MakeShared(sharedWrapper, std::move(mpsWrapper)));
+		MakeShared(sharedWrapper, std::move(mpsWrapper));
 
 		sharedWrapper->SetTracker(sharedWrapper.GetTracker());
 
@@ -258,7 +258,7 @@ namespace rkit
 		UniquePtr<IReadStream> streamMoved(std::move(compressedStream));
 
 		UniquePtr<DeflateDecompressStream> createdStream;
-		RKIT_CHECK(NewWithAlloc<DeflateDecompressStream>(createdStream, alloc, std::move(streamMoved), seekable, decompressedSize, alloc));
+		NewWithAlloc<DeflateDecompressStream>(createdStream, alloc, std::move(streamMoved), seekable, decompressedSize, alloc);
 
 		outStream = std::move(createdStream);
 
@@ -272,7 +272,7 @@ namespace rkit
 		UniquePtr<IReadStream> streamMoved(std::move(compressedStream));
 
 		UniquePtr<DeflateDecompressStream> createdStream;
-		RKIT_CHECK(NewWithAlloc<DeflateDecompressStream>(createdStream, alloc, std::move(streamMoved), nullptr, rkit::Optional<FilePos_t>(), alloc));
+		NewWithAlloc<DeflateDecompressStream>(createdStream, alloc, std::move(streamMoved), nullptr, rkit::Optional<FilePos_t>(), alloc);
 
 		outStream = UniquePtr<IReadStream>(std::move(createdStream));
 
@@ -291,7 +291,7 @@ namespace rkit
 	Result UtilitiesDriver::CreateThreadPool(UniquePtr<utils::IThreadPool> &outThreadPool, uint32_t numThreads) const
 	{
 		UniquePtr<utils::ThreadPoolBase> threadPool;
-		RKIT_CHECK(utils::ThreadPoolBase::Create(threadPool, *this, numThreads));
+		utils::ThreadPoolBase::Create(threadPool, *this, numThreads);
 
 		outThreadPool = std::move(threadPool);
 
@@ -301,7 +301,7 @@ namespace rkit
 	Result UtilitiesDriver::CreateTextParser(const Span<const uint8_t> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<utils::ITextParser> &outParser) const
 	{
 		UniquePtr<utils::TextParserBase> parser;
-		RKIT_CHECK(utils::TextParserBase::Create(contents, commentType, lexType, parser));
+		utils::TextParserBase::Create(contents, commentType, lexType, parser);
 
 		outParser = std::move(parser);
 
@@ -319,9 +319,9 @@ namespace rkit
 			if (fileSizeRemaining > std::numeric_limits<size_t>::max())
 				RKIT_THROW(ResultCode::kOutOfMemory);
 
-			RKIT_CHECK(outBytes.Resize(static_cast<size_t>(fileSizeRemaining)));
+			outBytes.Resize(static_cast<size_t>(fileSizeRemaining));
 
-			RKIT_CHECK(stream.ReadAll(outBytes.GetBuffer(), static_cast<size_t>(fileSizeRemaining)));
+			stream.ReadAll(outBytes.GetBuffer(), static_cast<size_t>(fileSizeRemaining));
 		}
 
 		RKIT_RETURN_OK;
@@ -2279,7 +2279,7 @@ namespace rkit
 	Result UtilitiesDriver::CreateImage(const utils::ImageSpec &spec, UniquePtr<utils::IImage> &image) const
 	{
 		UniquePtr<utils::ImageBase> imageBase;
-		RKIT_CHECK(utils::ImageBase::Create(imageBase, spec));
+		utils::ImageBase::Create(imageBase, spec);
 		image = std::move(imageBase);
 		RKIT_RETURN_OK;
 	}
@@ -2287,9 +2287,9 @@ namespace rkit
 	Result UtilitiesDriver::CloneImage(UniquePtr<utils::IImage> &outImage, const utils::IImage &image) const
 	{
 		UniquePtr<utils::ImageBase> imageBase;
-		RKIT_CHECK(utils::ImageBase::Create(imageBase, image.GetImageSpec()));
+		utils::ImageBase::Create(imageBase, image.GetImageSpec());
 
-		RKIT_CHECK(BlitImage(*imageBase, image, 0, 0, 0, 0, image.GetWidth(), image.GetHeight()));
+		BlitImage(*imageBase, image, 0, 0, 0, 0, image.GetWidth(), image.GetHeight());
 
 		outImage = std::move(imageBase);
 		RKIT_RETURN_OK;
@@ -2493,7 +2493,7 @@ namespace rkit
 	Result UtilitiesDriver::CreateModuleSandbox(UniquePtr<ISandbox> &outSandbox, uint32_t moduleNamespace, const Utf8Char_t *moduleName, const sandbox::SysCallCatalog &sysCalls, sandbox::Environment &env) const
 	{
 		UniquePtr<utils::ModuleSandbox> sandbox;
-		RKIT_CHECK(utils::ModuleSandbox::Create(sandbox, GetDrivers().m_moduleDriver.Get(), moduleNamespace, moduleName, sysCalls, env));
+		utils::ModuleSandbox::Create(sandbox, GetDrivers().m_moduleDriver.Get(), moduleNamespace, moduleName, sysCalls, env);
 		outSandbox = std::move(sandbox);
 
 		RKIT_RETURN_OK;
@@ -2504,7 +2504,7 @@ namespace rkit
 		sandbox::Address_t entryDescAddr = sandbox.GetEntryDescriptor();
 
 		sandbox::BaseEntryDescriptor *entryDesc = nullptr;
-		RKIT_CHECK(sandbox.AccessMemoryValue(entryDesc, entryDescAddr));
+		sandbox.AccessMemoryValue(entryDesc, entryDescAddr);
 
 		const uint16_t dataAddrSize = entryDesc->m_dataAddressSize;
 		const uint16_t funcPtrSize = entryDesc->m_functionPtrSize;
@@ -2531,7 +2531,7 @@ namespace rkit
 		if (dataAddrSize == 4)
 		{
 			const uint32_t *baseAddrIn = nullptr;
-			RKIT_CHECK(sandbox.AccessMemoryArray(baseAddrIn, entryDescAddr + sizeof(sandbox::BaseEntryDescriptor), kNumBaseAddrs));
+			sandbox.AccessMemoryArray(baseAddrIn, entryDescAddr + sizeof(sandbox::BaseEntryDescriptor), kNumBaseAddrs);
 			for (size_t i = 0; i < kNumBaseAddrs; i++)
 				baseAddresses[i] = baseAddrIn[i];
 		}
@@ -2539,7 +2539,7 @@ namespace rkit
 		{
 			RKIT_ASSERT(dataAddrSize == 8);
 			const uint64_t *baseAddrIn = nullptr;
-			RKIT_CHECK(sandbox.AccessMemoryArray(baseAddrIn, entryDescAddr + sizeof(sandbox::BaseEntryDescriptor), kNumBaseAddrs));
+			sandbox.AccessMemoryArray(baseAddrIn, entryDescAddr + sizeof(sandbox::BaseEntryDescriptor), kNumBaseAddrs);
 			for (size_t i = 0; i < kNumBaseAddrs; i++)
 				baseAddresses[i] = baseAddrIn[i];
 		}
@@ -2573,7 +2573,7 @@ namespace rkit
 				if (dataAddrSize == 4u)
 				{
 					const uint32_t *sysCallDataAddrs = nullptr;
-					RKIT_CHECK(sandbox.AccessMemoryArray(sysCallDataAddrs, currentDescAddress, 2));
+					sandbox.AccessMemoryArray(sysCallDataAddrs, currentDescAddress, 2);
 					charsAddr = sysCallDataAddrs[0];
 					charsLength = sysCallDataAddrs[1];
 
@@ -2584,7 +2584,7 @@ namespace rkit
 					RKIT_ASSERT(dataAddrSize == 8u);
 
 					const uint64_t *sysCallDataAddrs = nullptr;
-					RKIT_CHECK(sandbox.AccessMemoryArray(sysCallDataAddrs, currentDescAddress, 2));
+					sandbox.AccessMemoryArray(sysCallDataAddrs, currentDescAddress, 2);
 					charsAddr = sysCallDataAddrs[0];
 					charsLength = sysCallDataAddrs[1];
 
@@ -2592,7 +2592,7 @@ namespace rkit
 				}
 
 				void *importNameVoidPtr = nullptr;
-				RKIT_CHECK(sandbox.AccessMemoryRange(importNameVoidPtr, charsAddr, charsLength));
+				sandbox.AccessMemoryRange(importNameVoidPtr, charsAddr, charsLength);
 
 				const Utf8Char_t *importNameCharsPtr = static_cast<const Utf8Char_t *>(importNameVoidPtr);
 
@@ -2615,7 +2615,7 @@ namespace rkit
 					RKIT_THROW(ResultCode::kSandboxAPIError);
 
 				sandbox::SysCallStub *stubPtr = nullptr;
-				RKIT_CHECK(sandbox.AccessMemoryValue(stubPtr, currentStubAddress));
+				sandbox.AccessMemoryValue(stubPtr, currentStubAddress);
 				stubPtr->m_sysCallID = sysCallID.Get();
 
 				currentStubAddress += sizeof(sandbox::SysCallStub);
@@ -2640,7 +2640,7 @@ namespace rkit
 				if (dataAddrSize == 4u)
 				{
 					const uint32_t *exportDataAddrs = nullptr;
-					RKIT_CHECK(sandbox.AccessMemoryArray(exportDataAddrs, currentTableAddress, 2));
+					sandbox.AccessMemoryArray(exportDataAddrs, currentTableAddress, 2);
 					charsAddr = exportDataAddrs[0];
 					charsLength = exportDataAddrs[1];
 				}
@@ -2649,13 +2649,13 @@ namespace rkit
 					RKIT_ASSERT(dataAddrSize == 8u);
 
 					const uint64_t *exportDataAddrs = nullptr;
-					RKIT_CHECK(sandbox.AccessMemoryArray(exportDataAddrs, currentTableAddress, 2));
+					sandbox.AccessMemoryArray(exportDataAddrs, currentTableAddress, 2);
 					charsAddr = exportDataAddrs[0];
 					charsLength = exportDataAddrs[1];
 				}
 
 				void *importNameVoidPtr = nullptr;
-				RKIT_CHECK(sandbox.AccessMemoryRange(importNameVoidPtr, charsAddr, charsLength));
+				sandbox.AccessMemoryRange(importNameVoidPtr, charsAddr, charsLength);
 
 				const Utf8Char_t *importNameCharsPtr = static_cast<const Utf8Char_t *>(importNameVoidPtr);
 
@@ -2682,14 +2682,14 @@ namespace rkit
 				if (funcPtrSize == 4)
 				{
 					const uint32_t *funcAddressPtr = nullptr;
-					RKIT_CHECK(sandbox.AccessMemoryValue(funcAddressPtr, currentFPtrAddress));
+					sandbox.AccessMemoryValue(funcAddressPtr, currentFPtrAddress);
 					imports[importIndex.Get()] = *funcAddressPtr;
 				}
 				else
 				{
 					RKIT_ASSERT(funcPtrSize == 8);
 					const uint64_t *funcAddressPtr = nullptr;
-					RKIT_CHECK(sandbox.AccessMemoryValue(funcAddressPtr, currentFPtrAddress));
+					sandbox.AccessMemoryValue(funcAddressPtr, currentFPtrAddress);
 					imports[importIndex.Get()] = *funcAddressPtr;
 				}
 

@@ -8,7 +8,7 @@ namespace anox { namespace game {
 	public:
 		static rkit::Result SerializeGlobals(GlobalVars &vars, IConfigKeyValueTableSerializer &serializer)
 		{
-			RKIT_CHECK(serializer.SerializeField(u8"mapName", vars.m_mapName));
+			serializer.SerializeField(u8"mapName", vars.m_mapName);
 
 			RKIT_RETURN_OK;
 		}
@@ -20,13 +20,13 @@ namespace anox { namespace game {
 		ConfigBuilderKeyValueTable kvt;
 		ConfigBuilderKeyValueTableWriter writer(kvt);
 
-		RKIT_CHECK(GlobalVarsSerializer::SerializeGlobals(const_cast<GlobalVars &>(*this), writer));
+		GlobalVarsSerializer::SerializeGlobals(const_cast<GlobalVars &>(*this), writer);
 
 		ConfigBuilderValue_t root;
 		root = std::move(kvt);
 
 		rkit::UniquePtr<ConfigurationValueRootState> rootState;
-		RKIT_CHECK(rkit::New<ConfigurationValueRootState>(rootState, std::move(root)));
+		rkit::New<ConfigurationValueRootState>(rootState, std::move(root));
 
 		state = std::move(rootState);
 

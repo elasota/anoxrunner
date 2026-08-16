@@ -97,7 +97,7 @@ namespace rkit { namespace mem {
 		if (initParams->m_mmapDriver)
 		{
 			UniquePtr<IMallocDriver> mmapMallocDriver;
-			RKIT_CHECK(New<MemMapMallocDriver>(mmapMallocDriver, *initParams->m_mmapDriver));
+			New<MemMapMallocDriver>(mmapMallocDriver, *initParams->m_mmapDriver);
 
 			ms_mmapPrevDriver = GetDrivers().m_mallocDriver;
 			GetMutableDrivers().m_mallocDriver = mmapMallocDriver.Detach();

@@ -48,13 +48,13 @@ namespace rkit { namespace render { namespace vulkan {
 		HybridVector<VkSemaphore, 16> semaphores;
 		HybridVector<uint64_t, 16> values;
 
-		RKIT_CHECK(semaphores.Reserve(numSemaphores));
-		RKIT_CHECK(values.Reserve(numSemaphores));
+		semaphores.Reserve(numSemaphores);
+		values.Reserve(numSemaphores);
 
 		for (const Pair<ICPUVisibleTimelineFence *, TimelinePoint_t> &tw : timelineWaits)
 		{
-			RKIT_CHECK(semaphores.Append(static_cast<VulkanTimelineFence *>(tw.First())->GetSemaphore()));
-			RKIT_CHECK(values.Append(tw.Second()));
+			semaphores.Append(static_cast<VulkanTimelineFence *>(tw.First())->GetSemaphore());
+			values.Append(tw.Second());
 		}
 
 		VkSemaphoreWaitInfoKHR semaWaitInfo = {};
@@ -98,11 +98,11 @@ namespace rkit { namespace render { namespace vulkan {
 
 		HybridVector<VkFence, 16> fences;
 
-		RKIT_CHECK(fences.Reserve(numFences));
+		fences.Reserve(numFences);
 
 		for (IBinaryCPUWaitableFence *fence : binaryWaits)
 		{
-			RKIT_CHECK(fences.Append(static_cast<VulkanBinaryCPUWaitableFence *>(fence)->GetFence()));
+			fences.Append(static_cast<VulkanBinaryCPUWaitableFence *>(fence)->GetFence());
 		}
 
 		const VkResult result = m_device.GetDeviceAPI().vkWaitForFences(m_device.GetDevice(), static_cast<uint32_t>(numFences), fences.GetBuffer(), waitAll ? 1 : 0, timeoutNSec);
@@ -154,7 +154,7 @@ namespace rkit { namespace render { namespace vulkan {
 	{
 		UniquePtr<VulkanCPUFenceWaiter> fenceWaiter;
 
-		RKIT_CHECK(New<VulkanCPUFenceWaiter>(fenceWaiter, device));
+		New<VulkanCPUFenceWaiter>(fenceWaiter, device);
 
 		outInstance = std::move(fenceWaiter);
 

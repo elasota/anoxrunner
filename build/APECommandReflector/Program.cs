@@ -335,16 +335,16 @@ namespace APEWindowCommandReflector
 
                         sw.WriteLine("\t\tExternDispatch::" + argTypeName + "Arg_t " + fieldName + ";");
 
-                        sw.WriteLine("\t\tCORO_CHECK(ExternDispatch::Parse" + argTypeName + "Arg(" + fieldName + ", *dispatchContext.m_externContext.m_env, *dispatchContext.m_pkg, dispatchContext.m_operands[" + i.ToString() + "]));");
+                        sw.WriteLine("\t\tExternDispatch::Parse" + argTypeName + "Arg(" + fieldName + ", *dispatchContext.m_externContext.m_env, *dispatchContext.m_pkg, dispatchContext.m_operands[" + i.ToString() + "]);");
                     }
 
-                    sw.Write("\t\tCORO_CHECK(co_await Execute(thread, dispatchContext.m_externContext");
+                    sw.Write("\t\tco_await Execute(thread, dispatchContext.m_externContext");
                     for (int i = 0; i < def.Fields.Count; i++)
                         sw.Write(", field" + i.ToString());
 
-                    sw.WriteLine("));");
+                    sw.WriteLine(");");
                     sw.WriteLine();
-                    sw.WriteLine("\t\tCORO_RETURN_OK;");
+                    sw.WriteLine("\t\tco_return;");
                     sw.WriteLine("\t}");
                     sw.WriteLine();
                 }
@@ -519,7 +519,7 @@ namespace APEWindowCommandReflector
                         switch (fieldDef.Type)
                         {
                             case FieldDef.FieldType.Padding:
-                                sw.WriteLine(indent + "RKIT_CHECK(reader.SkipPadding(" + fieldDef.Name + "));");
+                                sw.WriteLine(indent + "reader.SkipPadding(" + fieldDef.Name + ");");
                                 break;
                             case FieldDef.FieldType.Bits32:
                                 {
@@ -529,7 +529,7 @@ namespace APEWindowCommandReflector
                                     foreach (KeyValuePair<string, int> bits in fieldDef.Bits!)
                                         bitMask |= (uint)(1 << bits.Value);
 
-                                    sw.WriteLine(indent + "\tRKIT_CHECK(reader.ReadBits(tempBits, " + bitMask.ToString() + "u));");
+                                    sw.WriteLine(indent + "\treader.ReadBits(tempBits, " + bitMask.ToString() + "u);");
                                     foreach (KeyValuePair<string, int> bits in fieldDef.Bits!)
                                     {
                                         uint singleBitMask = (uint)(1 << bits.Value);
@@ -540,13 +540,11 @@ namespace APEWindowCommandReflector
                                 }
                                 break;
                             default:
-                                sw.WriteLine(indent + "RKIT_CHECK(reader.Read(this->m_" + fieldDef.Name + "));");
+                                sw.WriteLine(indent + "reader.Read(this->m_" + fieldDef.Name + ");");
                                 break;
                         }
                     }
 
-
-                    sw.WriteLine("\t\t\tRKIT_RETURN_OK;");
                     sw.WriteLine("\t\t}");
                     sw.WriteLine();
                     sw.WriteLine("\t\t::rkit::Result Write(IAPEWriter &writer) const override");
@@ -572,18 +570,17 @@ namespace APEWindowCommandReflector
                                         sw.WriteLine(indent + "\t\ttempBits |= " + singleBitMask.ToString() + "u;");
                                     }
 
-                                    sw.WriteLine(indent + "\tRKIT_CHECK(writer.Write(tempBits));");
+                                    sw.WriteLine(indent + "\twriter.Write(tempBits);");
                                     sw.WriteLine(indent + "}");
                                 }
                                 break;
                             default:
-                                sw.WriteLine(indent + "RKIT_CHECK(writer.Write(this->m_" + fieldDef.Name + "));");
+                                sw.WriteLine(indent + "writer.Write(this->m_" + fieldDef.Name + ");");
                                 break;
                         }
                     }
 
 
-                    sw.WriteLine("\t\t\tRKIT_RETURN_OK;");
                     sw.WriteLine("\t\t}");
                     sw.WriteLine("\t};");
                     sw.WriteLine();
@@ -788,7 +785,7 @@ namespace APEWindowCommandReflector
                             case FieldDef.FieldType.Str:
                             case FieldDef.FieldType.OptStr:
                             case FieldDef.FieldType.Format:
-                                sw.WriteLine("\t\t\t\tRKIT_CHECK(parser.ParseInstanced(byteStream, cmd.m_" + fDef.Name + "));");
+                                sw.WriteLine("\t\t\t\tparser.ParseInstanced(byteStream, cmd.m_" + fDef.Name + ");");
                                 break;
                             case FieldDef.FieldType.Bits32:
                                 sw.WriteLine("\t\t\t\t{");

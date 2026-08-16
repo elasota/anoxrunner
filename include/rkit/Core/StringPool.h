@@ -45,15 +45,15 @@ inline rkit::Result rkit::BaseStringPoolBuilder<TChar, TEncoding>::IndexString(c
 	if (it == m_stringToIndex.end())
 	{
 		StringType_t strInstance;
-		RKIT_CHECK(strInstance.Set(str));
+		strInstance.Set(str);
 
 		UniquePtr<StringType_t> strPtr;
-		RKIT_CHECK(New<StringType_t>(strPtr, std::move(strInstance)));
+		New<StringType_t>(strPtr, std::move(strInstance));
 
 		BaseStringView<TChar, TEncoding> strPtrView = *strPtr.Get();
 
 		size_t index = m_strings.Count();
-		RKIT_CHECK(m_strings.Append(std::move(strPtr)));
+		m_strings.Append(std::move(strPtr));
 
 		RKIT_TRY_CATCH_RETHROW(m_stringToIndex.Set(GetStringByIndex(index), index),
 			CatchContext

@@ -173,7 +173,7 @@ namespace anox
 	rkit::Result AnoxGameLogic::SandboxMainThreadBlocker::StaticConsume(void *selfPtr)
 	{
 		SandboxMainThreadBlocker *self = static_cast<SandboxMainThreadBlocker *>(selfPtr);
-		RKIT_CHECK(rkit::ThrowIfError(self->m_result.Get()));
+		rkit::ThrowIfError(self->m_result.Get());
 		RKIT_RETURN_OK;
 	}
 
@@ -188,13 +188,13 @@ namespace anox
 
 	rkit::Result AnoxGameLogic::Start()
 	{
-		RKIT_CHECK(m_game->GetCommandRegistry()->RegisterMemberFuncCommand<&AnoxGameLogic::Cmd_Exec>(u8"exec", this));
-		RKIT_CHECK(m_game->GetCommandRegistry()->RegisterMemberFuncCommand<&AnoxGameLogic::Cmd_Map>(u8"map", this));
+		m_game->GetCommandRegistry()->RegisterMemberFuncCommand<&AnoxGameLogic::Cmd_Exec>(u8"exec", this);
+		m_game->GetCommandRegistry()->RegisterMemberFuncCommand<&AnoxGameLogic::Cmd_Map>(u8"map", this);
 
-		RKIT_CHECK(AnoxCommandStackBase::Create(m_commandStack, 64 * 1024, 1024));
+		AnoxCommandStackBase::Create(m_commandStack, 64 * 1024, 1024);
 
-		RKIT_CHECK(rkit::utils::CreateCoroThread(m_mainCoroThread, rkit::GetDrivers().m_mallocDriver.Get(), 1 * 1024 * 1024, rkit::GetDrivers().GetAssertDriver()));
-		RKIT_CHECK(m_mainCoroThread->EnterFunction(StartUp(*m_mainCoroThread)));
+		rkit::utils::CreateCoroThread(m_mainCoroThread, rkit::GetDrivers().m_mallocDriver.Get(), 1 * 1024 * 1024, rkit::GetDrivers().GetAssertDriver());
+		m_mainCoroThread->EnterFunction(StartUp(*m_mainCoroThread));
 
 		RKIT_RETURN_OK;
 	}
@@ -212,14 +212,14 @@ namespace anox
 			case rkit::CoroThreadState::kInactive:
 				if (!haveKickedOffRunFrame)
 				{
-					RKIT_CHECK(m_mainCoroThread->EnterFunction(AsyncRunFrame(*m_mainCoroThread)));
+					m_mainCoroThread->EnterFunction(AsyncRunFrame(*m_mainCoroThread));
 					haveMainThreadWork = true;
 
 					haveKickedOffRunFrame = true;
 				}
 				break;
 			case rkit::CoroThreadState::kSuspended:
-				RKIT_CHECK(m_mainCoroThread->Resume());
+				m_mainCoroThread->Resume();
 				haveMainThreadWork = true;
 				break;
 			case rkit::CoroThreadState::kBlocked:
@@ -237,12 +237,12 @@ namespace anox
 	rkit::Result AnoxGameLogic::CreateNewGame(rkit::UniquePtr<IConfigurationState> &outConfig, const rkit::StringSliceView &mapName)
 	{
 		rkit::UniquePtr<game::GlobalVars> globalVars;
-		RKIT_CHECK(rkit::New<game::GlobalVars>(globalVars));
+		rkit::New<game::GlobalVars>(globalVars);
 
-		RKIT_CHECK(globalVars->m_mapName.Set(mapName));
+		globalVars->m_mapName.Set(mapName);
 
 		rkit::UniquePtr<IConfigurationState> globalVarsConfig;
-		RKIT_CHECK(globalVars->Save(globalVarsConfig));
+		globalVars->Save(globalVarsConfig);
 
 		outConfig = std::move(globalVarsConfig);
 
@@ -389,7 +389,7 @@ namespace anox
 			{
 				rkit::ByteStringSliceView slice = alias.m_text.SubString(startPos, endPos - startPos);
 
-				RKIT_CHECK(commandStack.PushBStr(slice));
+				commandStack.PushBStr(slice);
 				endPos = startPos;
 			}
 		}
@@ -404,9 +404,9 @@ namespace anox
 
 	rkit::ResultCoroutine AnoxGameLogic::StartUp(rkit::ICoroThread &thread)
 	{
-		CORO_CHECK(co_await ExecCommandFile(thread, *m_commandStack, rkit::CIPathView(u8"configs/default.cfg")));
-		CORO_CHECK(m_commandStack->Push(u8"d1"));
-		CORO_CHECK(co_await RunCommands(thread, *m_commandStack));
+		co_await ExecCommandFile(thread, *m_commandStack, rkit::CIPathView(u8"configs/default.cfg"));
+		m_commandStack->Push(u8"d1");
+		co_await RunCommands(thread, *m_commandStack);
 
 		CORO_RETURN_OK;
 	}
@@ -416,13 +416,13 @@ namespace anox
 		AnoxResourceRetrieveResult resLoadResult;
 
 		rkit::CIPath loosePath;
-		CORO_CHECK(loosePath.AppendComponent(u8"loose"));
-		CORO_CHECK(loosePath.Append(path));
+		loosePath.AppendComponent(u8"loose");
+		loosePath.Append(path);
 
-		CORO_CHECK(co_await LoadCIPathKeyedResource(thread, resLoadResult, anox::resloaders::kCIPathRawFileResourceTypeCode, loosePath));
+		co_await LoadCIPathKeyedResource(thread, resLoadResult, anox::resloaders::kCIPathRawFileResourceTypeCode, loosePath);
 
-		CORO_CHECK(commandStack.Parse(resLoadResult.m_resourceHandle.StaticCast<AnoxFileResourceBase>()->GetContents()));
-		CORO_CHECK(co_await RunCommands(thread, commandStack));
+		commandStack.Parse(resLoadResult.m_resourceHandle.StaticCast<AnoxFileResourceBase>()->GetContents());
+		co_await RunCommands(thread, commandStack);
 
 		CORO_RETURN_OK;
 	}
@@ -434,7 +434,7 @@ namespace anox
 
 		while (commandStack.Pop(line))
 		{
-			CORO_CHECK(co_await RunCommand(thread, commandStack, line));
+			co_await RunCommand(thread, commandStack, line);
 		}
 
 		CORO_RETURN_OK;
@@ -457,7 +457,7 @@ namespace anox
 
 		if (cmd != nullptr)
 		{
-			CORO_CHECK(co_await cmd->m_methodStarter(cmd->m_obj, thread, commandStack, parser));
+			co_await cmd->m_methodStarter(cmd->m_obj, thread, commandStack, parser);
 			CORO_RETURN_OK;
 		}
 
@@ -465,7 +465,7 @@ namespace anox
 
 		if (alias != nullptr)
 		{
-			CORO_CHECK(InsertAlias(commandStack, *alias));
+			InsertAlias(commandStack, *alias);
 			CORO_RETURN_OK;
 		}
 
@@ -473,7 +473,7 @@ namespace anox
 
 		if (consoleVar != nullptr)
 		{
-			CORO_CHECK(ApplyConsoleVar(*consoleVar, parser));
+			ApplyConsoleVar(*consoleVar, parser);
 			CORO_RETURN_OK;
 		}
 
@@ -491,7 +491,7 @@ namespace anox
 		}
 
 		rkit::CIPath path;
-		CORO_CHECK(path.Set(rkit::CIPathView(u8"configs")));
+		path.Set(rkit::CIPathView(u8"configs"));
 
 		rkit::ByteStringView configPathBStr = args[0];
 
@@ -511,7 +511,7 @@ namespace anox
 			configRelPath = rkit::CIPathView(configPathStr);
 		else if (validationResult == rkit::PathValidationResult::kConvertible)
 		{
-			CORO_CHECK(relPath.Set(configPathStr));
+			relPath.Set(configPathStr);
 			configRelPath = relPath;
 		}
 		else
@@ -520,9 +520,9 @@ namespace anox
 			CORO_RETURN_OK;
 		}
 
-		CORO_CHECK(path.Append(configRelPath));
+		path.Append(configRelPath);
 
-		CORO_CHECK(co_await ExecCommandFile(thread, cmdStack, path));
+		co_await ExecCommandFile(thread, cmdStack, path);
 
 		CORO_RETURN_OK;
 	}
@@ -554,7 +554,7 @@ namespace anox
 
 		rkit::StringView unicodeStrView(reinterpret_cast<const rkit::Utf8Char_t *>(mapNameStr.GetChars()), mapNameStr.Length());
 
-		CORO_CHECK(co_await m_game->RestartGame(thread,  unicodeStrView));
+		co_await m_game->RestartGame(thread,  unicodeStrView);
 
 		CORO_RETURN_OK;
 	}
@@ -564,8 +564,8 @@ namespace anox
 	{
 		rkit::Future<AnoxResourceRetrieveResult> resLoadResult;
 
-		CORO_CHECK(m_game->GetCaptureHarness()->GetCIPathKeyedResource(resLoadResult, resourceType, path));
-		CORO_CHECK(co_await thread.AwaitFuture(resLoadResult));
+		m_game->GetCaptureHarness()->GetCIPathKeyedResource(resLoadResult, resourceType, path);
+		co_await thread.AwaitFuture(resLoadResult);
 
 		loadResult = resLoadResult.GetResult();
 
@@ -576,8 +576,8 @@ namespace anox
 		uint32_t resourceType, const rkit::StringView &str)
 	{
 		rkit::Future<AnoxResourceRetrieveResult> resLoadResult;
-		CORO_CHECK(m_game->GetCaptureHarness()->GetStringKeyedResource(resLoadResult, resourceType, str));
-		CORO_CHECK(co_await thread.AwaitFuture(resLoadResult));
+		m_game->GetCaptureHarness()->GetStringKeyedResource(resLoadResult, resourceType, str);
+		co_await thread.AwaitFuture(resLoadResult);
 
 		loadResult = resLoadResult.GetResult();
 		CORO_RETURN_OK;
@@ -588,8 +588,8 @@ namespace anox
 	{
 		rkit::Future<AnoxResourceRetrieveResult> resLoadResult;
 
-		CORO_CHECK(m_game->GetCaptureHarness()->GetContentIDKeyedResource(resLoadResult, resourceType, cid));
-		CORO_CHECK(co_await thread.AwaitFuture(resLoadResult));
+		m_game->GetCaptureHarness()->GetContentIDKeyedResource(resLoadResult, resourceType, cid);
+		co_await thread.AwaitFuture(resLoadResult);
 
 		loadResult = resLoadResult.GetResult();
 		CORO_RETURN_OK;
@@ -597,12 +597,12 @@ namespace anox
 
 	rkit::ResultCoroutine AnoxGameLogic::LoadGlobalScripts(rkit::ICoroThread &thread)
 	{
-		CORO_CHECK(m_sandboxImports.MTAsync_StartGlobalSession(
-			m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr));
+		m_sandboxImports.MTAsync_StartGlobalSession(
+			m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr);
 
 		{
 			SandboxMainThreadBlocker mtBlocker(this);
-			CORO_CHECK(co_await thread.AwaitBlocker(mtBlocker.CreateBlocker()));
+			co_await thread.AwaitBlocker(mtBlocker.CreateBlocker());
 		}
 
 		CORO_RETURN_OK;
@@ -617,14 +617,14 @@ namespace anox
 
 		{
 			rkit::String fullPathStr;
-			CORO_CHECK(fullPathStr.Format(u8"ax_bsp/maps/{}.bsp.bspmodel", mapName));
+			fullPathStr.Format(u8"ax_bsp/maps/{}.bsp.bspmodel", mapName);
 
-			CORO_CHECK(path.Set(fullPathStr));
+			path.Set(fullPathStr);
 		}
 
 		rkit::log::LogInfo(u8"GameLogic: Loading map");
 
-		CORO_CHECK(co_await LoadCIPathKeyedResource(thread, modelLoadResult, anox::resloaders::kBSPModelResourceTypeCode, path));
+		co_await LoadCIPathKeyedResource(thread, modelLoadResult, anox::resloaders::kBSPModelResourceTypeCode, path);
 
 		m_bspModel = modelLoadResult.m_resourceHandle.StaticCast<AnoxBSPModelResourceBase>();
 
@@ -640,31 +640,31 @@ namespace anox
 
 		{
 			rkit::String fullPathStr;
-			CORO_CHECK(fullPathStr.Format(u8"ax_bsp/maps/{}.bsp.scripts", mapName));
+			fullPathStr.Format(u8"ax_bsp/maps/{}.bsp.scripts", mapName);
 
-			CORO_CHECK(path.Set(fullPathStr));
+			path.Set(fullPathStr);
 		}
 
 		rkit::log::LogInfo(u8"GameLogic: Loading script package");
 
-		CORO_CHECK(co_await LoadCIPathKeyedResource(thread, scriptLoadResult, anox::resloaders::kCIPathRawFileResourceTypeCode, path));
+		co_await LoadCIPathKeyedResource(thread, scriptLoadResult, anox::resloaders::kCIPathRawFileResourceTypeCode, path);
 
 		rkit::RCPtr<AnoxFileResourceBase> fileResource = scriptLoadResult.m_resourceHandle.StaticCast<AnoxFileResourceBase>();
 
 
 		SandboxMemObject scriptPackageMO = {};
-		CORO_CHECK(CopySpanToSandbox(scriptPackageMO, fileResource->GetContents()));
+		CopySpanToSandbox(scriptPackageMO, fileResource->GetContents());
 
-		CORO_CHECK(m_sandboxImports.MTAsync_LoadMapScriptPackage(
+		m_sandboxImports.MTAsync_LoadMapScriptPackage(
 			m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr,
-			scriptPackageMO.m_addr, scriptPackageMO.m_size));
+			scriptPackageMO.m_addr, scriptPackageMO.m_size);
 
 		{
 			SandboxMainThreadBlocker mtBlocker(this);
-			CORO_CHECK(co_await thread.AwaitBlocker(mtBlocker.CreateBlocker()));
+			co_await thread.AwaitBlocker(mtBlocker.CreateBlocker());
 		}
 
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(scriptPackageMO.m_mmid));
+		m_sandbox->ReleaseDynamicMemory(scriptPackageMO.m_mmid);
 
 		rkit::log::LogInfo(u8"GameLogic: Script package loaded successfully");
 
@@ -677,13 +677,13 @@ namespace anox
 		rkit::CIPath path;
 
 		rkit::String fullPathStr;
-		CORO_CHECK(fullPathStr.Format(u8"ax_bsp/maps/{}.bsp.objects", mapName));
+		fullPathStr.Format(u8"ax_bsp/maps/{}.bsp.objects", mapName);
 
-		CORO_CHECK(path.Set(fullPathStr));
+		path.Set(fullPathStr);
 
 		rkit::log::LogInfo(u8"GameLogic: Loading spawn objects");
 
-		CORO_CHECK(co_await LoadCIPathKeyedResource(thread, objectsLoadResult, anox::resloaders::kSpawnDefsResourceTypeCode, path));
+		co_await LoadCIPathKeyedResource(thread, objectsLoadResult, anox::resloaders::kSpawnDefsResourceTypeCode, path);
 
 		rkit::log::LogInfo(u8"GameLogic: Spawning objects");
 
@@ -705,31 +705,31 @@ namespace anox
 		{
 			const rkit::CallbackSpan<AnoxEntityDefResourceBase *, const AnoxSpawnDefsResourceBase *> inUserEntityDefsSpan = spawnDefs->GetUserEntityDefs();
 
-			CORO_CHECK(udefValues.Reserve(inUserEntityDefsSpan.Count()));
+			udefValues.Reserve(inUserEntityDefsSpan.Count());
 
 			for (AnoxEntityDefResourceBase *edef : inUserEntityDefsSpan)
 			{
-				CORO_CHECK(udefValues.Append(edef->GetValues()));
+				udefValues.Append(edef->GetValues());
 
 				const rkit::ByteString &desc = edef->GetDescription();
 				const size_t descLength = desc.Length();
 				if (descLength > std::numeric_limits<uint32_t>::max())
 					CORO_THROW(rkit::ResultCode::kIntegerOverflow);
 
-				CORO_CHECK(udefDescBytes.Append(desc.ToSpan()));
+				udefDescBytes.Append(desc.ToSpan());
 			}
 		}
 
 		const data::EntitySpawnDataChunks &chunks = spawnDefs->GetChunks();
-		CORO_CHECK(CopySpanToSandbox(entityTypesMO, chunks.m_entityTypes.ToSpan()));
-		CORO_CHECK(CopySpanToSandbox(spawnDataMO, chunks.m_entityData.ToSpan()));
-		CORO_CHECK(CopySpanToSandbox(stringLengthsMO, chunks.m_entityStringLengths.ToSpan()));
-		CORO_CHECK(CopySpanToSandbox(stringDataMO, chunks.m_entityStringData.ToSpan()));
+		CopySpanToSandbox(entityTypesMO, chunks.m_entityTypes.ToSpan());
+		CopySpanToSandbox(spawnDataMO, chunks.m_entityData.ToSpan());
+		CopySpanToSandbox(stringLengthsMO, chunks.m_entityStringLengths.ToSpan());
+		CopySpanToSandbox(stringDataMO, chunks.m_entityStringData.ToSpan());
 
-		CORO_CHECK(CopySpanToSandbox(entityDefValuesMO, udefValues.ToSpan()));
-		CORO_CHECK(CopySpanToSandbox(udefDescBytesMO, udefDescBytes.ToSpan()));
+		CopySpanToSandbox(entityDefValuesMO, udefValues.ToSpan());
+		CopySpanToSandbox(udefDescBytesMO, udefDescBytes.ToSpan());
 
-		CORO_CHECK(m_sandboxImports.MTAsync_SpawnInitialEntities(
+		m_sandboxImports.MTAsync_SpawnInitialEntities(
 			m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr,
 			entityTypesMO.m_addr, entityTypesMO.m_size / sizeof(uint32_t),
 			spawnDataMO.m_addr, spawnDataMO.m_size / sizeof(uint8_t),
@@ -737,26 +737,26 @@ namespace anox
 			stringDataMO.m_addr, stringDataMO.m_size / sizeof(uint8_t),
 			entityDefValuesMO.m_addr, entityDefValuesMO.m_size / sizeof(game::UserEntityDefValues),
 			udefDescBytesMO.m_addr, udefDescBytesMO.m_size / sizeof(uint8_t)
-		));
+		);
 
 		{
 			SandboxMainThreadBlocker mtBlocker(this);
-			CORO_CHECK(co_await thread.AwaitBlocker(mtBlocker.CreateBlocker()));
+			co_await thread.AwaitBlocker(mtBlocker.CreateBlocker());
 		}
 
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(entityTypesMO.m_mmid));
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(spawnDataMO.m_mmid));
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(stringLengthsMO.m_mmid));
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(stringDataMO.m_mmid));
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(entityDefValuesMO.m_mmid));
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(udefDescLengthsMO.m_mmid));
-		CORO_CHECK(m_sandbox->ReleaseDynamicMemory(udefDescBytesMO.m_mmid));
+		m_sandbox->ReleaseDynamicMemory(entityTypesMO.m_mmid);
+		m_sandbox->ReleaseDynamicMemory(spawnDataMO.m_mmid);
+		m_sandbox->ReleaseDynamicMemory(stringLengthsMO.m_mmid);
+		m_sandbox->ReleaseDynamicMemory(stringDataMO.m_mmid);
+		m_sandbox->ReleaseDynamicMemory(entityDefValuesMO.m_mmid);
+		m_sandbox->ReleaseDynamicMemory(udefDescLengthsMO.m_mmid);
+		m_sandbox->ReleaseDynamicMemory(udefDescBytesMO.m_mmid);
 
-		CORO_CHECK(m_sandboxImports.MTAsync_PostSpawnInitialEntities(m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr));
+		m_sandboxImports.MTAsync_PostSpawnInitialEntities(m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr);
 
 		{
 			SandboxMainThreadBlocker mtBlocker(this);
-			CORO_CHECK(co_await thread.AwaitBlocker(mtBlocker.CreateBlocker()));
+			co_await thread.AwaitBlocker(mtBlocker.CreateBlocker());
 		}
 
 		CORO_RETURN_OK;
@@ -769,10 +769,10 @@ namespace anox
 		m_audioManager.Reset();
 		m_resManager.Reset();
 
-		CORO_CHECK(game::GameResourceManager::Create(m_resManager));
+		game::GameResourceManager::Create(m_resManager);
 		m_resManager->SetCaptureHarness(m_game->GetCaptureHarness());
 
-		CORO_CHECK(game::GameAudioManager::Create(m_audioManager, *m_game->GetAudioSubsystem()));
+		game::GameAudioManager::Create(m_audioManager, *m_game->GetAudioSubsystem());
 
 		RKIT_ASSERT(!m_sandbox.IsValid());
 
@@ -782,20 +782,20 @@ namespace anox
 
 			rkit::log::LogInfo(u8"Loading game module");
 
-			CORO_CHECK(rkit::GetDrivers().m_utilitiesDriver->CreateModuleSandbox(sandbox, kAnoxNamespaceID, u8"Game", m_sandboxImports.GetHostAPIDescriptor().m_sysCallCatalog, m_sandboxEnv));
+			rkit::GetDrivers().m_utilitiesDriver->CreateModuleSandbox(sandbox, kAnoxNamespaceID, u8"Game", m_sandboxImports.GetHostAPIDescriptor().m_sysCallCatalog, m_sandboxEnv);
 
 			m_sandboxEnv.m_sandbox = sandbox.Get();
 			m_sandboxEnv.m_resManager = m_resManager.Get();
 			m_sandboxEnv.m_audioManager = m_audioManager.Get();
 
-			CORO_CHECK(rkit::GetDrivers().m_utilitiesDriver->LinkSandbox(*sandbox, m_sandboxImports.GetHostAPIDescriptor()));
+			rkit::GetDrivers().m_utilitiesDriver->LinkSandbox(*sandbox, m_sandboxImports.GetHostAPIDescriptor());
 
 			rkit::sandbox::ThreadCreationParameters threadParams = {};
-			CORO_CHECK(sandbox->CreateThreadContext(mainThreadContext, threadParams));
+			sandbox->CreateThreadContext(mainThreadContext, threadParams);
 
-			CORO_CHECK(sandbox->RunInitializer(*mainThreadContext));
+			sandbox->RunInitializer(*mainThreadContext);
 
-			CORO_CHECK(m_sandboxImports.Initialize(mainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr, m_sandboxEnv.m_gameSessionMemAddr));
+			m_sandboxImports.Initialize(mainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr, m_sandboxEnv.m_gameSessionMemAddr);
 
 			m_sandbox = std::move(sandbox);
 			m_sandboxMainThreadContext = std::move(mainThreadContext);
@@ -803,18 +803,18 @@ namespace anox
 
 		rkit::log::LogInfo(u8"GameLogic: Starting session");
 
-		CORO_CHECK(m_game->GetCaptureHarness()->GetConfigurationState(configState));
+		m_game->GetCaptureHarness()->GetConfigurationState(configState);
 
 		IConfigurationValueView root = configState->GetRoot();
 
 		IConfigurationKeyValueTableView kvt;
-		CORO_CHECK(root.Get(kvt));
+		root.Get(kvt);
 
 		IConfigurationValueView mapNameValue;
-		CORO_CHECK(kvt.GetValueFromKey(u8"mapName", mapNameValue));
+		kvt.GetValueFromKey(u8"mapName", mapNameValue);
 
 		rkit::StringSliceView mapName;
-		CORO_CHECK(mapNameValue.Get(mapName));
+		mapNameValue.Get(mapName);
 
 		for (char c : mapName)
 		{
@@ -827,18 +827,18 @@ namespace anox
 			CORO_THROW(rkit::ResultCode::kDataError);
 		}
 
-		CORO_CHECK(co_await LoadGlobalScripts(thread));
-		CORO_CHECK(co_await LoadMap(thread, mapName));
-		CORO_CHECK(co_await LoadMapScripts(thread, mapName));
-		CORO_CHECK(co_await SpawnMapInitialObjects(thread, mapName));
+		co_await LoadGlobalScripts(thread);
+		co_await LoadMap(thread, mapName);
+		co_await LoadMapScripts(thread, mapName);
+		co_await SpawnMapInitialObjects(thread, mapName);
 
 		rkit::log::LogInfo(u8"GameLogic: Entering game session");
 
-		CORO_CHECK(m_sandboxImports.MTAsync_EnterGameSession(m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr));
+		m_sandboxImports.MTAsync_EnterGameSession(m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr);
 
 		{
 			SandboxMainThreadBlocker mtBlocker(this);
-			CORO_CHECK(co_await thread.AwaitBlocker(mtBlocker.CreateBlocker()));
+			co_await thread.AwaitBlocker(mtBlocker.CreateBlocker());
 		}
 
 		CORO_RETURN_OK;
@@ -855,10 +855,10 @@ namespace anox
 	{
 		rkit::sandbox::Address_t addr = 0;
 		uint32_t mmid = 0;
-		RKIT_CHECK(m_sandbox->AllocDynamicMemory(addr, mmid, size));
+		m_sandbox->AllocDynamicMemory(addr, mmid, size);
 
 		void *ptr = nullptr;
-		RKIT_CHECK(m_sandbox->AccessMemoryRange(ptr, addr, size));
+		m_sandbox->AccessMemoryRange(ptr, addr, size);
 
 		memcpy(ptr, data, size);
 
@@ -873,16 +873,16 @@ namespace anox
 		if (m_sandbox.IsValid())
 		{
 			uint64_t gameTime = 0;
-			CORO_CHECK(m_game->GetCaptureHarness()->GetTimeElapsedUSec(gameTime));
+			m_game->GetCaptureHarness()->GetTimeElapsedUSec(gameTime);
 
 			const uint32_t gameTimeLow = (gameTime & 0xffffffffu);
 			const uint32_t gameTimeHigh = ((gameTime >> 32) & 0xffffffffu);
 
-			CORO_CHECK(m_sandboxImports.MTAsync_RunFrame(m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr, gameTimeLow, gameTimeHigh));
+			m_sandboxImports.MTAsync_RunFrame(m_sandboxMainThreadContext.Get(), m_sandboxEnv.m_gameSessionObjAddr, gameTimeLow, gameTimeHigh);
 
 			{
 				SandboxMainThreadBlocker mtBlocker(this);
-				CORO_CHECK(co_await thread.AwaitBlocker(mtBlocker.CreateBlocker()));
+				co_await thread.AwaitBlocker(mtBlocker.CreateBlocker());
 			}
 		}
 

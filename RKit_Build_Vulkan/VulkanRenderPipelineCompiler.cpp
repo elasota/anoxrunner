@@ -218,10 +218,10 @@ namespace rkit { namespace buildsystem { namespace vulkan
 	Result RenderPipelineCompiler::RunAnalysis(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
 	{
 		CIPath depsPath;
-		RKIT_CHECK(depsPath.Set(depsNode->GetIdentifier()));
+		depsPath.Set(depsNode->GetIdentifier());
 
 		UniquePtr<data::IRenderDataPackage> package;
-		RKIT_CHECK(LoadPackage(BuildFileLocation::kIntermediateDir, depsPath, true, feedback, package, nullptr));
+		LoadPackage(BuildFileLocation::kIntermediateDir, depsPath, true, feedback, package, nullptr);
 
 		Vector<uint32_t> stages;
 
@@ -241,13 +241,13 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				render::vulkan::GraphicPipelineStage stage = static_cast<render::vulkan::GraphicPipelineStage>(stageUInt);
 
 				GraphicsPipelineShaderField_t field;
-				RKIT_CHECK(GetGraphicsShaderPipelineShaderFieldForStage(stage, field));
+				GetGraphicsShaderPipelineShaderFieldForStage(stage, field);
 
 				const render::ShaderDesc *shaderPtr = (pipelineDesc->*field);
 
 				if (shaderPtr)
 				{
-					RKIT_CHECK(AddGraphicsAnalysisStage(depsNode, feedback, stage));
+					AddGraphicsAnalysisStage(depsNode, feedback, stage);
 				}
 			}
 		}
@@ -260,12 +260,12 @@ namespace rkit { namespace buildsystem { namespace vulkan
 	Result RenderPipelineCompiler::RunCompile(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback)
 	{
 		CIPath depsPath;
-		RKIT_CHECK(depsPath.Set(depsNode->GetIdentifier()));
+		depsPath.Set(depsNode->GetIdentifier());
 
 		Vector<Vector<uint8_t>> binaryContent;
 
 		UniquePtr<data::IRenderDataPackage> package;
-		RKIT_CHECK(LoadPackage(BuildFileLocation::kIntermediateDir, depsPath, true, feedback, package, &binaryContent));
+		LoadPackage(BuildFileLocation::kIntermediateDir, depsPath, true, feedback, package, &binaryContent);
 
 		if (m_pipelineType == PipelineType::Graphics)
 		{
@@ -278,14 +278,14 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 			const render::GraphicsPipelineNameLookup *nameLookupDesc = static_cast<const render::GraphicsPipelineNameLookup *>(nameLookupList->GetElementPtr(0));
 
-			RKIT_CHECK(CompileGraphicsPipeline(depsNode, feedback, package.Get(), binaryContent.ToSpan(), nameLookupDesc));
+			CompileGraphicsPipeline(depsNode, feedback, package.Get(), binaryContent.ToSpan(), nameLookupDesc);
 		}
 		else
 			RKIT_THROW(ResultCode::kInternalError);
 
-		RKIT_CHECK(ClearUnusedValues(*package.Get()));
+		ClearUnusedValues(*package.Get());
 
-		RKIT_CHECK(feedback->CheckFault());
+		feedback->CheckFault();
 
 		RKIT_RETURN_OK;
 	}
@@ -306,10 +306,10 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		Vector<render::ContentKey> contentKeys;
 		Vector<const render::ContentKey *> contentKeyPtrs;
 
-		RKIT_CHECK(contentKeys.Resize(numVKStages));
-		RKIT_CHECK(contentKeyPtrs.Resize(numVKStages));
-		RKIT_CHECK(binaryContent.Resize(numVKStages));
-		RKIT_CHECK(binaryContentData.Resize(numVKStages));
+		contentKeys.Resize(numVKStages);
+		contentKeyPtrs.Resize(numVKStages);
+		binaryContent.Resize(numVKStages);
+		binaryContentData.Resize(numVKStages);
 
 		size_t baseContentIndex = package->GetBinaryContentCount();
 
@@ -318,7 +318,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			render::vulkan::GraphicPipelineStage stage = static_cast<render::vulkan::GraphicPipelineStage>(i);
 
 			GraphicsPipelineShaderField_t field;
-			RKIT_CHECK(GetGraphicsShaderPipelineShaderFieldForStage(stage, field));
+			GetGraphicsShaderPipelineShaderFieldForStage(stage, field);
 
 			const render::ShaderDesc *shader = (pipeline->*field);
 			if (!shader)
@@ -330,13 +330,13 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				Vector<uint8_t> &stageBinaryData = binaryContentData[i];
 
 				CIPath nodePath;
-				RKIT_CHECK(nodePath.Set(depsNode->GetIdentifier()));
+				nodePath.Set(depsNode->GetIdentifier());
 
 				CIPath spvPath;
-				RKIT_CHECK(FormatGraphicsPipelineStageFilePath(spvPath, nodePath, stage));
+				FormatGraphicsPipelineStageFilePath(spvPath, nodePath, stage);
 
 				UniquePtr<ISeekableReadStream> stream;
-				RKIT_CHECK(feedback->TryOpenInput(BuildFileLocation::kIntermediateDir, spvPath, stream));
+				feedback->TryOpenInput(BuildFileLocation::kIntermediateDir, spvPath, stream);
 
 				if (!stream.IsValid())
 				{
@@ -348,10 +348,10 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				if (size > std::numeric_limits<size_t>::max())
 					RKIT_THROW(ResultCode::kOutOfMemory);
 
-				RKIT_CHECK(stageBinaryData.Resize(static_cast<size_t>(size)));
+				stageBinaryData.Resize(static_cast<size_t>(size));
 				if (size > 0)
 				{
-					RKIT_CHECK(stream->ReadAll(&stageBinaryData[0], static_cast<size_t>(size)));
+					stream->ReadAll(&stageBinaryData[0], static_cast<size_t>(size));
 				}
 
 
@@ -366,34 +366,34 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		rkit::buildsystem::IBuildSystemDriver *bsDriver = static_cast<rkit::buildsystem::IBuildSystemDriver *>(rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, u8"BuildSystem"));
 
 		data::IDataDriver *dataDriver = nullptr;
-		RKIT_CHECK(LoadDataDriver(&dataDriver));
+		LoadDataDriver(&dataDriver);
 
 		UniquePtr<IPackageObjectWriter> objectWriter;
-		RKIT_CHECK(bsDriver->CreatePackageObjectWriter(objectWriter));
+		bsDriver->CreatePackageObjectWriter(objectWriter);
 
 		UniquePtr<IPackageBuilder> packageBuilder;
-		RKIT_CHECK(bsDriver->CreatePackageBuilder(dataDriver->GetRenderDataHandler(), objectWriter.Get(), false, packageBuilder));
+		bsDriver->CreatePackageBuilder(dataDriver->GetRenderDataHandler(), objectWriter.Get(), false, packageBuilder);
 
 		CIPath outPath;
-		RKIT_CHECK(outPath.Set(GetCompiledPipelineIntermediateBasePath()));
+		outPath.Set(GetCompiledPipelineIntermediateBasePath());
 
 		{
 			CIPath pipelinePath;
-			RKIT_CHECK(pipelinePath.Set(depsNode->GetIdentifier()));
+			pipelinePath.Set(depsNode->GetIdentifier());
 
-			RKIT_CHECK(outPath.Append(pipelinePath));
+			outPath.Append(pipelinePath);
 		}
 
 		UniquePtr<ISeekableReadWriteStream> stream;
-		RKIT_CHECK(feedback->OpenOutput(BuildFileLocation::kIntermediateDir, outPath, stream));
+		feedback->OpenOutput(BuildFileLocation::kIntermediateDir, outPath, stream);
 
 		BinaryInclusionIndexer indexer(package, pkgBinaryContent, binaryContentData);
 		packageBuilder->BeginSource(&indexer);
 
 		size_t index = 0;
-		RKIT_CHECK(packageBuilder->IndexObject(nameLookup, dataDriver->GetRenderDataHandler()->GetGraphicsPipelineNameLookupRTTI(), false, index));
+		packageBuilder->IndexObject(nameLookup, dataDriver->GetRenderDataHandler()->GetGraphicsPipelineNameLookupRTTI(), false, index);
 
-		RKIT_CHECK(packageBuilder->WritePackage(*stream));
+		packageBuilder->WritePackage(*stream);
 
 		RKIT_RETURN_OK;
 	}
@@ -483,27 +483,27 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		}
 
 		GraphicsPipelineShaderField_t field;
-		RKIT_CHECK(GetGraphicsShaderPipelineShaderFieldForStage(stage, field));
+		GetGraphicsShaderPipelineShaderFieldForStage(stage, field);
 
 		const render::ShaderDesc *shaderDesc = (pipeline->*field);
 		render::TempStringIndex_t sourceFileIndex = shaderDesc->m_source;
 
 		const render::RenderPassDesc *rpDesc = pipeline->m_executeInPass;
 
-		RKIT_CHECK(m_shaderSourcePath.Set(package->GetString(sourceFileIndex.GetIndex())));
+		m_shaderSourcePath.Set(package->GetString(sourceFileIndex.GetIndex()));
 
-		RKIT_CHECK(WriteString(m_prefixStream, u8"#define float2 vec2\n"));
-		RKIT_CHECK(WriteString(m_prefixStream, u8"#define float3 vec3\n"));
-		RKIT_CHECK(WriteString(m_prefixStream, u8"#define float4 vec4\n"));
-		RKIT_CHECK(WriteString(m_prefixStream, u8"#define float2x2 mat2x2\n"));
-		RKIT_CHECK(WriteString(m_prefixStream, u8"#define float2x3 mat2x3\n"));
-		RKIT_CHECK(WriteString(m_prefixStream, u8"#define float2x4 mat2x4\n"));
-		RKIT_CHECK(WriteString(m_prefixStream, u8"#define float3x2 mat3x2\n"));
-		RKIT_CHECK(WriteString(m_prefixStream, u8"#define float3x3 mat3x3\n"));
-		RKIT_CHECK(WriteString(m_prefixStream, u8"#define float3x4 mat3x4\n"));
-		RKIT_CHECK(WriteString(m_prefixStream, u8"#define float4x2 mat4x2\n"));
-		RKIT_CHECK(WriteString(m_prefixStream, u8"#define float4x3 mat4x3\n"));
-		RKIT_CHECK(WriteString(m_prefixStream, u8"#define float4x4 mat4x4\n"));
+		WriteString(m_prefixStream, u8"#define float2 vec2\n");
+		WriteString(m_prefixStream, u8"#define float3 vec3\n");
+		WriteString(m_prefixStream, u8"#define float4 vec4\n");
+		WriteString(m_prefixStream, u8"#define float2x2 mat2x2\n");
+		WriteString(m_prefixStream, u8"#define float2x3 mat2x3\n");
+		WriteString(m_prefixStream, u8"#define float2x4 mat2x4\n");
+		WriteString(m_prefixStream, u8"#define float3x2 mat3x2\n");
+		WriteString(m_prefixStream, u8"#define float3x3 mat3x3\n");
+		WriteString(m_prefixStream, u8"#define float3x4 mat3x4\n");
+		WriteString(m_prefixStream, u8"#define float4x2 mat4x2\n");
+		WriteString(m_prefixStream, u8"#define float4x3 mat4x3\n");
+		WriteString(m_prefixStream, u8"#define float4x4 mat4x4\n");
 
 		if (pipeline->m_pipelineLayout->m_pushConstantList)
 		{
@@ -515,25 +515,25 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			size_t inputIndex = 0;
 			for (const render::InputLayoutVertexInputDesc *vertexInput : pipeline->m_inputLayout->m_vertexInputs)
 			{
-				RKIT_CHECK(WriteString(m_prefixStream, u8"layout(location = "));
-				RKIT_CHECK(WriteUIntString(m_prefixStream, inputIndex));
-				RKIT_CHECK(WriteString(m_prefixStream, u8") in "));
-				RKIT_CHECK(WriteVectorOrScalarNumericType(m_prefixStream, *vertexInput->m_numericType));
-				RKIT_CHECK(WriteString(m_prefixStream, u8" _vs_in_F"));
-				RKIT_CHECK(WriteUIntString(m_prefixStream, inputIndex));
-				RKIT_CHECK(WriteString(m_prefixStream, u8";\n"));
+				WriteString(m_prefixStream, u8"layout(location = ");
+				WriteUIntString(m_prefixStream, inputIndex);
+				WriteString(m_prefixStream, u8") in ");
+				WriteVectorOrScalarNumericType(m_prefixStream, *vertexInput->m_numericType);
+				WriteString(m_prefixStream, u8" _vs_in_F");
+				WriteUIntString(m_prefixStream, inputIndex);
+				WriteString(m_prefixStream, u8";\n");
 
-				RKIT_CHECK(WriteVectorOrScalarNumericType(m_prefixStream, *vertexInput->m_numericType));
-				RKIT_CHECK(WriteString(m_prefixStream, u8" VertexInput_Load_"));
-				RKIT_CHECK(WriteString(m_prefixStream, package->GetString(vertexInput->m_inputFeed->m_feedName.GetIndex())));
-				RKIT_CHECK(WriteString(m_prefixStream, u8"_"));
-				RKIT_CHECK(WriteString(m_prefixStream, package->GetString(vertexInput->m_memberName.GetIndex())));
-				RKIT_CHECK(WriteString(m_prefixStream, u8"()\n"));
-				RKIT_CHECK(WriteString(m_prefixStream, u8"{\n"));
-				RKIT_CHECK(WriteString(m_prefixStream, u8"    return _vs_in_F"));
-				RKIT_CHECK(WriteUIntString(m_prefixStream, inputIndex));
-				RKIT_CHECK(WriteString(m_prefixStream, u8";\n"));
-				RKIT_CHECK(WriteString(m_prefixStream, u8"}\n"));
+				WriteVectorOrScalarNumericType(m_prefixStream, *vertexInput->m_numericType);
+				WriteString(m_prefixStream, u8" VertexInput_Load_");
+				WriteString(m_prefixStream, package->GetString(vertexInput->m_inputFeed->m_feedName.GetIndex()));
+				WriteString(m_prefixStream, u8"_");
+				WriteString(m_prefixStream, package->GetString(vertexInput->m_memberName.GetIndex()));
+				WriteString(m_prefixStream, u8"()\n");
+				WriteString(m_prefixStream, u8"{\n");
+				WriteString(m_prefixStream, u8"    return _vs_in_F");
+				WriteUIntString(m_prefixStream, inputIndex);
+				WriteString(m_prefixStream, u8";\n");
+				WriteString(m_prefixStream, u8"}\n");
 
 				inputIndex++;
 			}
@@ -550,32 +550,32 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			{
 				const render::RenderTargetDesc *rtDesc = rpDesc->m_renderTargets[rtIndex];
 
-				RKIT_CHECK(WriteString(m_prefixStream, u8"layout(location = "));
-				RKIT_CHECK(WriteUIntString(m_prefixStream, rtIndex));
-				RKIT_CHECK(WriteString(m_prefixStream, u8") out "));
+				WriteString(m_prefixStream, u8"layout(location = ");
+				WriteUIntString(m_prefixStream, rtIndex);
+				WriteString(m_prefixStream, u8") out ");
 
-				RKIT_CHECK(WriteConfigurableRTFormat(m_prefixStream, rtDesc->m_format));
+				WriteConfigurableRTFormat(m_prefixStream, rtDesc->m_format);
 
-				RKIT_CHECK(WriteString(m_prefixStream, u8" _ps_out_RT"));
-				RKIT_CHECK(WriteUIntString(m_prefixStream, rtIndex));
-				RKIT_CHECK(WriteString(m_prefixStream, u8";\n"));
+				WriteString(m_prefixStream, u8" _ps_out_RT");
+				WriteUIntString(m_prefixStream, rtIndex);
+				WriteString(m_prefixStream, u8";\n");
 			}
 
-			RKIT_CHECK(WriteString(m_prefixStream, u8"struct PixelShaderOutput\n"));
-			RKIT_CHECK(WriteString(m_prefixStream, u8"{\n"));
+			WriteString(m_prefixStream, u8"struct PixelShaderOutput\n");
+			WriteString(m_prefixStream, u8"{\n");
 
 			for (size_t rtIndex = 0; rtIndex < rpDesc->m_renderTargets.Count(); rtIndex++)
 			{
 				const render::RenderTargetDesc *rtDesc = rpDesc->m_renderTargets[rtIndex];
 
-				RKIT_CHECK(WriteString(m_prefixStream, u8"    "));
-				RKIT_CHECK(WriteConfigurableRTFormat(m_prefixStream, rtDesc->m_format));
-				RKIT_CHECK(WriteString(m_prefixStream, u8" "));
-				RKIT_CHECK(WriteString(m_prefixStream, package->GetString(rtDesc->m_name.GetIndex())));
-				RKIT_CHECK(WriteString(m_prefixStream, u8";\n"));
+				WriteString(m_prefixStream, u8"    ");
+				WriteConfigurableRTFormat(m_prefixStream, rtDesc->m_format);
+				WriteString(m_prefixStream, u8" ");
+				WriteString(m_prefixStream, package->GetString(rtDesc->m_name.GetIndex()));
+				WriteString(m_prefixStream, u8";\n");
 			}
 
-			RKIT_CHECK(WriteString(m_prefixStream, u8"};\n"));
+			WriteString(m_prefixStream, u8"};\n");
 		}
 
 		ConstSpan<const render::DescriptorLayoutDesc *> descriptorLayouts = pipeline->m_pipelineLayout->m_descriptorLayouts;
@@ -590,42 +590,42 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				if (descriptor->m_visibility != render::StageVisibility::All && descriptor->m_visibility != requiredVisibility)
 					continue;
 
-				RKIT_CHECK(WriteString(m_prefixStream, u8"layout(set = "));
-				RKIT_CHECK(WriteUIntString(m_prefixStream, dlSlot));
-				RKIT_CHECK(WriteString(m_prefixStream, u8", binding = "));
-				RKIT_CHECK(WriteUIntString(m_prefixStream, descSlot));
+				WriteString(m_prefixStream, u8"layout(set = ");
+				WriteUIntString(m_prefixStream, dlSlot);
+				WriteString(m_prefixStream, u8", binding = ");
+				WriteUIntString(m_prefixStream, descSlot);
 
 				switch (descriptor->m_descriptorType)
 				{
 				case render::DescriptorType::StaticConstantBuffer:
 				case render::DescriptorType::DynamicConstantBuffer:
-					RKIT_CHECK(WriteString(m_prefixStream, u8", std140"));
+					WriteString(m_prefixStream, u8", std140");
 					break;
 				default:
 					break;
 				}
 
-				RKIT_CHECK(WriteString(m_prefixStream, u8") "));
+				WriteString(m_prefixStream, u8") ");
 
 				switch (descriptor->m_descriptorType)
 				{
 				case render::DescriptorType::Sampler:
-					RKIT_CHECK(WriteString(m_prefixStream, u8"sampler "));
+					WriteString(m_prefixStream, u8"sampler ");
 					break;
 
 				case render::DescriptorType::StaticConstantBuffer:
 				case render::DescriptorType::DynamicConstantBuffer:
-					RKIT_CHECK(WriteString(m_prefixStream, u8"uniform "));
+					WriteString(m_prefixStream, u8"uniform ");
 					break;
 
 				case render::DescriptorType::Buffer:
 				case render::DescriptorType::ByteAddressBuffer:
-					RKIT_CHECK(WriteString(m_prefixStream, u8"readonly buffer "));
+					WriteString(m_prefixStream, u8"readonly buffer ");
 					break;
 
 				case render::DescriptorType::RWBuffer:
 				case render::DescriptorType::RWByteAddressBuffer:
-					RKIT_CHECK(WriteString(m_prefixStream, u8"buffer "));
+					WriteString(m_prefixStream, u8"buffer ");
 					break;
 
 				case render::DescriptorType::Texture1D:
@@ -641,51 +641,51 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				case render::DescriptorType::RWTexture2D:
 				case render::DescriptorType::RWTexture2DArray:
 				case render::DescriptorType::RWTexture3D:
-					RKIT_CHECK(WriteString(m_prefixStream, u8"uniform "));
-					RKIT_CHECK(WriteTextureDescriptorType(m_prefixStream, descriptor->m_descriptorType, descriptor->m_valueType));
-					RKIT_CHECK(WriteString(m_prefixStream, u8" "));
+					WriteString(m_prefixStream, u8"uniform ");
+					WriteTextureDescriptorType(m_prefixStream, descriptor->m_descriptorType, descriptor->m_valueType);
+					WriteString(m_prefixStream, u8" ");
 					break;
 				}
 
-				RKIT_CHECK(WriteString(m_prefixStream, package->GetString(descriptor->m_name.GetIndex())));
-				RKIT_CHECK(WriteString(m_prefixStream, u8";\n"));
+				WriteString(m_prefixStream, package->GetString(descriptor->m_name.GetIndex()));
+				WriteString(m_prefixStream, u8";\n");
 			}
 		}
 
-		RKIT_CHECK(WriteString(m_suffixStream, u8"void main()\n"));
-		RKIT_CHECK(WriteString(m_suffixStream, u8"{\n"));
+		WriteString(m_suffixStream, u8"void main()\n");
+		WriteString(m_suffixStream, u8"{\n");
 
 		if (stage == render::vulkan::GraphicPipelineStage::Vertex)
 		{
-			RKIT_CHECK(WriteString(m_suffixStream, u8"    vec4 vPosition;\n"));
+			WriteString(m_suffixStream, u8"    vec4 vPosition;\n");
 		}
 
 		if (stage == render::vulkan::GraphicPipelineStage::Pixel)
 		{
-			RKIT_CHECK(WriteString(m_prefixStream, u8"PixelShaderOutput pOutput;\n"));
+			WriteString(m_prefixStream, u8"PixelShaderOutput pOutput;\n");
 		}
 
 		// Call entry point
-		RKIT_CHECK(WriteString(m_suffixStream, u8"    "));
-		RKIT_CHECK(WriteString(m_suffixStream, package->GetString(shaderDesc->m_entryPoint.GetIndex())));
-		RKIT_CHECK(WriteString(m_suffixStream, u8"("));
+		WriteString(m_suffixStream, u8"    ");
+		WriteString(m_suffixStream, package->GetString(shaderDesc->m_entryPoint.GetIndex()));
+		WriteString(m_suffixStream, u8"(");
 
 		if (stage == render::vulkan::GraphicPipelineStage::Vertex)
 		{
-			RKIT_CHECK(WriteString(m_suffixStream, u8"vPosition"));
+			WriteString(m_suffixStream, u8"vPosition");
 		}
 
 		if (stage == render::vulkan::GraphicPipelineStage::Pixel)
 		{
-			RKIT_CHECK(WriteString(m_suffixStream, u8"pOutput"));
+			WriteString(m_suffixStream, u8"pOutput");
 		}
 
-		RKIT_CHECK(WriteString(m_suffixStream, u8");\n"));
+		WriteString(m_suffixStream, u8");\n");
 
 		// Suffixes
 		if (stage == render::vulkan::GraphicPipelineStage::Vertex)
 		{
-			RKIT_CHECK(WriteString(m_suffixStream, u8"    gl_Position = vPosition;\n"));
+			WriteString(m_suffixStream, u8"    gl_Position = vPosition;\n");
 		}
 
 		if (stage == render::vulkan::GraphicPipelineStage::Pixel)
@@ -694,15 +694,15 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			{
 				const render::RenderTargetDesc *rtDesc = rpDesc->m_renderTargets[rtIndex];
 
-				RKIT_CHECK(WriteString(m_suffixStream, u8"    _ps_out_RT"));
-				RKIT_CHECK(WriteUIntString(m_suffixStream, rtIndex));
-				RKIT_CHECK(WriteString(m_suffixStream, u8" = pOutput."));
-				RKIT_CHECK(WriteString(m_suffixStream, package->GetString(rtDesc->m_name.GetIndex())));
-				RKIT_CHECK(WriteString(m_suffixStream, u8";\n"));
+				WriteString(m_suffixStream, u8"    _ps_out_RT");
+				WriteUIntString(m_suffixStream, rtIndex);
+				WriteString(m_suffixStream, u8" = pOutput.");
+				WriteString(m_suffixStream, package->GetString(rtDesc->m_name.GetIndex()));
+				WriteString(m_suffixStream, u8";\n");
 			}
 		}
 
-		RKIT_CHECK(WriteString(m_suffixStream, u8"}\n"));
+		WriteString(m_suffixStream, u8"}\n");
 
 		if (rpDesc->m_renderTargets.Count() > static_cast<size_t>(std::numeric_limits<int>::max()))
 			RKIT_THROW(ResultCode::kIntegerOverflow);
@@ -715,12 +715,12 @@ namespace rkit { namespace buildsystem { namespace vulkan
 	Result RenderPipelineStageBuildJob::Compile()
 	{
 		String mainShaderContent;
-		RKIT_CHECK(mainShaderContent.Append(u8"#extension GL_ARB_shading_language_include : enable\n"
+		mainShaderContent.Append(u8"#extension GL_ARB_shading_language_include : enable\n"
 			u8"#include <GlslShaderPrefix>\n"
-			u8"#include \"./"));
-		RKIT_CHECK(mainShaderContent.Append(m_shaderSourcePath));
-		RKIT_CHECK(mainShaderContent.Append(u8"\"\n"
-			u8"#include <GlslShaderSuffix>\n"));
+			u8"#include \"./");
+		mainShaderContent.Append(m_shaderSourcePath);
+		mainShaderContent.Append(u8"\"\n"
+			u8"#include <GlslShaderSuffix>\n");
 
 		glslang_input_t input = {};
 		input.language = GLSLANG_SOURCE_GLSL;
@@ -787,7 +787,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 		size_t spvSize = m_glslc->glslang_program_SPIRV_get_size(program);
 
-		RKIT_CHECK(m_resultSPV.Resize(spvSize));
+		m_resultSPV.Resize(spvSize);
 		if (spvSize > 0)
 			m_glslc->glslang_program_SPIRV_get(program, &m_resultSPV[0]);
 
@@ -804,7 +804,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 	Result RenderPipelineStageBuildJob::WriteToFile(IWriteStream &stream)
 	{
 		Vector<uint8_t> leDWords;
-		RKIT_CHECK(leDWords.Resize(m_resultSPV.Count() * 4));
+		leDWords.Resize(m_resultSPV.Count() * 4);
 
 		uint8_t *bytes = leDWords.GetBuffer();
 
@@ -855,16 +855,16 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 	Result RenderPipelineStageBuildJob::WriteVectorOrScalarNumericType(IWriteStream &stream, const render::VectorOrScalarNumericType &format)
 	{
-		RKIT_CHECK(WriteNumericType(stream, format.m_numericType));
-		RKIT_CHECK(WriteVectorOrScalarDimension(stream, format.m_cols));
+		WriteNumericType(stream, format.m_numericType);
+		WriteVectorOrScalarDimension(stream, format.m_cols);
 
 		RKIT_RETURN_OK;
 	}
 
 	Result RenderPipelineStageBuildJob::WriteVectorNumericType(IWriteStream &stream, const render::VectorNumericType &format)
 	{
-		RKIT_CHECK(WriteNumericType(stream, format.m_numericType));
-		RKIT_CHECK(WriteVectorDimension(stream, format.m_cols));
+		WriteNumericType(stream, format.m_numericType);
+		WriteVectorDimension(stream, format.m_cols);
 
 		RKIT_RETURN_OK;
 	}
@@ -962,21 +962,21 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		case render::NumericType::SInt16:
 		case render::NumericType::SInt32:
 		case render::NumericType::SInt64:
-			RKIT_CHECK(WriteString(stream, u8"i"));
+			WriteString(stream, u8"i");
 			break;
 
 		case render::NumericType::UInt8:
 		case render::NumericType::UInt16:
 		case render::NumericType::UInt32:
 		case render::NumericType::UInt64:
-			RKIT_CHECK(WriteString(stream, u8"u"));
+			WriteString(stream, u8"u");
 			break;
 
 		default:
 			break;
 		}
 
-		RKIT_CHECK(WriteString(stream, u8"texture"));
+		WriteString(stream, u8"texture");
 
 		switch (descriptorType)
 		{
@@ -984,7 +984,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		case render::DescriptorType::Texture1DArray:
 		case render::DescriptorType::RWTexture1D:
 		case render::DescriptorType::RWTexture1DArray:
-			RKIT_CHECK(WriteString(stream, u8"1D"));
+			WriteString(stream, u8"1D");
 			break;
 
 		case render::DescriptorType::Texture2D:
@@ -993,17 +993,17 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		case render::DescriptorType::Texture2DMSArray:
 		case render::DescriptorType::RWTexture2D:
 		case render::DescriptorType::RWTexture2DArray:
-			RKIT_CHECK(WriteString(stream, u8"2D"));
+			WriteString(stream, u8"2D");
 			break;
 
 		case render::DescriptorType::Texture3D:
 		case render::DescriptorType::RWTexture3D:
-			RKIT_CHECK(WriteString(stream, u8"3D"));
+			WriteString(stream, u8"3D");
 			break;
 
 		case render::DescriptorType::TextureCube:
 		case render::DescriptorType::TextureCubeArray:
-			RKIT_CHECK(WriteString(stream, u8"Cube"));
+			WriteString(stream, u8"Cube");
 			break;
 
 		default:
@@ -1016,16 +1016,16 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		case render::DescriptorType::RWTexture1DArray:
 		case render::DescriptorType::Texture2DArray:
 		case render::DescriptorType::TextureCubeArray:
-			RKIT_CHECK(WriteString(stream, u8"Array"));
+			WriteString(stream, u8"Array");
 			break;
 
 		case render::DescriptorType::Texture2DMSArray:
 		case render::DescriptorType::RWTexture2DArray:
-			RKIT_CHECK(WriteString(stream, u8"MSArray"));
+			WriteString(stream, u8"MSArray");
 			break;
 
 		case render::DescriptorType::Texture2DMS:
-			RKIT_CHECK(WriteString(stream, u8"MS"));
+			WriteString(stream, u8"MS");
 			break;
 
 		case render::DescriptorType::Texture1D:
@@ -1081,15 +1081,15 @@ namespace rkit { namespace buildsystem { namespace vulkan
 					if (lastSlashPos == 0)
 						RKIT_THROW(ResultCode::kOperationFailed);
 
-					RKIT_CHECK(fullPath.Set(fullPath.SubString(0, lastSlashPos + 1)));
+					fullPath.Set(fullPath.SubString(0, lastSlashPos + 1));
 				}
 				else
 				{
 					if (fullPath.Length() > 0)
 					{
-						RKIT_CHECK(fullPath.Append(u8"/"));
+						fullPath.Append(u8"/");
 					}
-					RKIT_CHECK(fullPath.Append(slice));
+					fullPath.Append(slice);
 				}
 			}
 		}
@@ -1107,11 +1107,11 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		outIncludeResult.Reset();
 
 		CIPath fullPath;
-		RKIT_CHECK(fullPath.Set(buildsystem::GetShaderSourceBasePath()));
-		RKIT_CHECK(fullPath.Append(path));
+		fullPath.Set(buildsystem::GetShaderSourceBasePath());
+		fullPath.Append(path);
 
 		UniquePtr<ISeekableReadStream> stream;
-		RKIT_CHECK(m_feedback->TryOpenInput(BuildFileLocation::kSourceDir, fullPath, stream));
+		m_feedback->TryOpenInput(BuildFileLocation::kSourceDir, fullPath, stream);
 
 		if (!stream.IsValid())
 			RKIT_RETURN_OK;
@@ -1121,16 +1121,16 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		Vector<uint8_t> contents;
-		RKIT_CHECK(contents.Resize(static_cast<size_t>(size)));
+		contents.Resize(static_cast<size_t>(size));
 
 		if (size > 0)
 		{
-			RKIT_CHECK(stream->ReadAll(&contents[0], static_cast<size_t>(size)));
+			stream->ReadAll(&contents[0], static_cast<size_t>(size));
 		}
 
 		stream.Reset();
 
-		RKIT_CHECK(New<DynamicIncludeResult>(outIncludeResult, std::move(path), std::move(contents)));
+		New<DynamicIncludeResult>(outIncludeResult, std::move(path), std::move(contents));
 
 		outSucceeded = true;
 		RKIT_RETURN_OK;
@@ -1145,7 +1145,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				const Vector<uint8_t> &prefixVector = m_prefixStream.GetBuffer();
 
 				String headerNameStr;
-				RKIT_CHECK(headerNameStr.Set(headerName));
+				headerNameStr.Set(headerName);
 
 				return New<StaticIncludeResult>(outIncludeResult, std::move(headerNameStr), prefixVector.GetBuffer(), prefixVector.Count());
 			}
@@ -1154,7 +1154,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				const Vector<uint8_t> &prefixVector = m_suffixStream.GetBuffer();
 
 				String headerNameStr;
-				RKIT_CHECK(headerNameStr.Set(headerName));
+				headerNameStr.Set(headerName);
 
 				return New<StaticIncludeResult>(outIncludeResult, std::move(headerNameStr), prefixVector.GetBuffer(), prefixVector.Count());
 			}
@@ -1198,14 +1198,14 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 			// FIXME: Use Path stuff
 			String normalizedPathStr;
-			RKIT_CHECK(normalizedPathStr.Set(headerAbsPathStr));
-			RKIT_CHECK(NormalizePath(normalizedPathStr));
+			normalizedPathStr.Set(headerAbsPathStr);
+			NormalizePath(normalizedPathStr);
 
 			CIPath normalizedPath;
-			RKIT_CHECK(normalizedPath.Set(normalizedPathStr));
+			normalizedPath.Set(normalizedPathStr);
 
 			bool succeeded = false;
-			RKIT_CHECK(TryInclude(std::move(normalizedPath), succeeded, outIncludeResult));
+			TryInclude(std::move(normalizedPath), succeeded, outIncludeResult);
 
 			if (succeeded)
 				RKIT_RETURN_OK;
@@ -1222,15 +1222,15 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				}
 
 				String pathStr;
-				RKIT_CHECK(pathStr.Set(includerName.SubString(0, basePathLength)));
-				RKIT_CHECK(pathStr.Append(headerName));
-				RKIT_CHECK(NormalizePath(pathStr));
+				pathStr.Set(includerName.SubString(0, basePathLength));
+				pathStr.Append(headerName);
+				NormalizePath(pathStr);
 
 				CIPath path;
-				RKIT_CHECK(path.Set(pathStr));
+				path.Set(pathStr);
 
 				bool succeeded = false;
-				RKIT_CHECK(TryInclude(std::move(path), succeeded, outIncludeResult));
+				TryInclude(std::move(path), succeeded, outIncludeResult);
 
 				if (succeeded)
 					RKIT_RETURN_OK;
@@ -1239,19 +1239,19 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			if (shouldTryIncludePaths)
 			{
 				String normalizedHeaderName;
-				RKIT_CHECK(normalizedHeaderName.Set(headerName));
-				RKIT_CHECK(NormalizePath(normalizedHeaderName));
+				normalizedHeaderName.Set(headerName);
+				NormalizePath(normalizedHeaderName);
 
 				for (const String &includePath : m_includePaths)
 				{
 					String fullPathStr = includePath;
-					RKIT_CHECK(fullPathStr.Append(normalizedHeaderName));
+					fullPathStr.Append(normalizedHeaderName);
 
 					CIPath fullPath;
-					RKIT_CHECK(fullPath.Set(fullPathStr));
+					fullPath.Set(fullPathStr);
 
 					bool succeeded = false;
-					RKIT_CHECK(TryInclude(std::move(fullPath), succeeded, outIncludeResult));
+					TryInclude(std::move(fullPath), succeeded, outIncludeResult);
 
 					if (succeeded)
 						RKIT_RETURN_OK;
@@ -1376,10 +1376,10 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		if (m_pipelineType == PipelineType::Graphics)
 		{
 			CIPath nodePath;
-			RKIT_CHECK(nodePath.Set(depsNode->GetIdentifier()));
+			nodePath.Set(depsNode->GetIdentifier());
 
 			UniquePtr<data::IRenderDataPackage> package;
-			RKIT_CHECK(LoadPackage(BuildFileLocation::kIntermediateDir, nodePath, true, feedback, package, nullptr));
+			LoadPackage(BuildFileLocation::kIntermediateDir, nodePath, true, feedback, package, nullptr);
 
 			data::IRenderRTTIListBase *list = package->GetIndexable(data::RenderRTTIIndexableStructType::GraphicsPipelineDesc);
 			if (list->GetCount() != 1)
@@ -1393,15 +1393,15 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			render::vulkan::GraphicPipelineStage stage = static_cast<render::vulkan::GraphicPipelineStage>(m_stageUInt);
 
 			RenderPipelineStageBuildJob buildJob(depsNode, feedback, m_glslc, m_pipelineType);
-			RKIT_CHECK(buildJob.RunGraphics(package.Get(), pipelineDesc, stage));
+			buildJob.RunGraphics(package.Get(), pipelineDesc, stage);
 
 			CIPath outPath;
-			RKIT_CHECK(FormatGraphicsPipelineStageFilePath(outPath, nodePath, stage));
+			FormatGraphicsPipelineStageFilePath(outPath, nodePath, stage);
 
 			UniquePtr<ISeekableReadWriteStream> outStream;
-			RKIT_CHECK(feedback->OpenOutput(BuildFileLocation::kIntermediateDir, outPath, outStream));
+			feedback->OpenOutput(BuildFileLocation::kIntermediateDir, outPath, outStream);
 
-			RKIT_CHECK(buildJob.WriteToFile(*outStream));
+			buildJob.WriteToFile(*outStream);
 
 			RKIT_RETURN_OK;
 		}
@@ -1417,7 +1417,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 	Result PipelineCompilerBase::LoadPackage(BuildFileLocation location, const CIPathView &path, bool allowTempStrings, IDependencyNodeCompilerFeedback *feedback, UniquePtr<data::IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *binaryContent)
 	{
 		UniquePtr<ISeekableReadStream> packageStream;
-		RKIT_CHECK(feedback->TryOpenInput(location, path, packageStream));
+		feedback->TryOpenInput(location, path, packageStream);
 
 		if (!packageStream.IsValid())
 		{
@@ -1426,11 +1426,11 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		}
 
 		data::IDataDriver *dataDriver = nullptr;
-		RKIT_CHECK(LoadDataDriver(&dataDriver));
+		LoadDataDriver(&dataDriver);
 
 		data::IRenderDataHandler *dataHandler = dataDriver->GetRenderDataHandler();
 
-		RKIT_CHECK(dataHandler->LoadPackage(*packageStream, allowTempStrings, nullptr, outPackage, binaryContent));
+		dataHandler->LoadPackage(*packageStream, allowTempStrings, nullptr, outPackage, binaryContent);
 
 		RKIT_RETURN_OK;
 	}
@@ -1456,9 +1456,9 @@ namespace rkit { namespace buildsystem { namespace vulkan
 	Result PipelineCompilerBase::FormatGraphicsPipelineStageFilePath(CIPath &path, const CIPathView &inPath, render::vulkan::GraphicPipelineStage stage)
 	{
 		String str;
-		RKIT_CHECK(str.Format(u8"vk_pl_g_{}/{}", static_cast<int>(stage), inPath.GetChars()));
+		str.Format(u8"vk_pl_g_{}/{}", static_cast<int>(stage), inPath.GetChars());
 
-		RKIT_CHECK(path.Set(str));
+		path.Set(str);
 
 		RKIT_RETURN_OK;
 	}

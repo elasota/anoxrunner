@@ -212,7 +212,7 @@ namespace rkit { namespace utils
 
 	Result JsonDocument::ToJsonValue(JsonValue &outValue)
 	{
-		RKIT_CHECK(CheckInit());
+		CheckInit();
 
 		GenericValue_t &docValue = m_document;
 		GenericValueToJsonValue(docValue, outValue);
@@ -347,7 +347,7 @@ namespace rkit { namespace utils
 			bool shouldContinue = true;
 			JsonValue jsonValue;
 			GenericValueToJsonValue(it->value, jsonValue);
-			RKIT_CHECK(callback(userdata, it->name.GetString(), it->name.GetStringLength(), jsonValue, shouldContinue));
+			callback(userdata, it->name.GetString(), it->name.GetStringLength(), jsonValue, shouldContinue);
 
 			if (!shouldContinue)
 				break;

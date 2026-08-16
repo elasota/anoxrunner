@@ -489,15 +489,12 @@ namespace SandboxAPIGenerator
                             sw.WriteLine(indent + "\t\t::rkit::sandbox::io::CriticalError(SandboxAPI::ms_sandboxPtr, SandboxAPI::ms_sandboxEnvPtr, SandboxAPI::ms_criticalError);");
                         }
                         else
-                            sw.WriteLine(indent + "\tRKIT_CHECK(::rkit::ThrowIfError(loc_resultCode));");
+                            sw.WriteLine(indent + "\t::rkit::ThrowIfError(loc_resultCode);");
 
                         for (int i = 0; i < returnValues.Length; i++)
                         {
                             sw.WriteLine(indent + "\t::rkit::sandbox::io::StoreValue(" + returnValues[i].Name + ", loc_ioContext[" + i.ToString() + "]);");
                         }
-
-                        if (!fdef.NoExcept)
-                            sw.WriteLine(indent + "\tRKIT_RETURN_OK;");
 
                         sw.WriteLine(indent + "}");
                         sw.WriteLine();
@@ -860,14 +857,13 @@ namespace SandboxAPIGenerator
                         for (int parameterIndex = 0;  parameterIndex < parameters.Length; parameterIndex++)
                             sw.WriteLine(indent + "\tloc_ioValues[" + (returnValues.Length + 1 + parameterIndex) + "] = ::rkit::sandbox::io::LoadValue(" + parameters[parameterIndex].Name + ");");
 
-                        sw.Write(indent + "\tRKIT_CHECK(this->m_hostAPI.m_sandbox->CallFunction(this->m_importAddresses[" + exportIndex.ToString() + "], loc_ioValues, ");
-                        sw.WriteLine(returnValues.Length.ToString() + ", " + parameters.Length.ToString() + "));");
+                        sw.Write(indent + "\tthis->m_hostAPI.m_sandbox->CallFunction(this->m_importAddresses[" + exportIndex.ToString() + "], loc_ioValues, ");
+                        sw.WriteLine(returnValues.Length.ToString() + ", " + parameters.Length.ToString() + ");");
 
                         for (int rvIndex = 0; rvIndex < returnValues.Length; rvIndex++)
                             sw.WriteLine(indent + "\t::rkit::sandbox::io::StoreValue(" + returnValues[rvIndex].Name + ", loc_ioValues[" + (returnValues.Length - 1 - rvIndex) + "]);");
 
 
-                        sw.WriteLine(indent + "\tRKIT_RETURN_OK;");
                         sw.WriteLine(indent + "}");
                         sw.WriteLine();
                     }

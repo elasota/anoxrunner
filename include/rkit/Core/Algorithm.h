@@ -1069,7 +1069,7 @@ rkit::Result rkit::CheckedProcessParallelSpans(const Span<TDest> &dest, const Sp
 
 	for (size_t i = 0; i < count; i++)
 	{
-		RKIT_CHECK(processor(destPtr[i], srcPtr[i]));
+		processor(destPtr[i], srcPtr[i]);
 	}
 
 	RKIT_RETURN_OK;

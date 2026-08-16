@@ -190,7 +190,7 @@ namespace rkit::utils
 		exportFunc(ioValues + numReturnValues + 1);
 
 		PackedResultAndExtCode packedResult = static_cast<PackedResultAndExtCode>(ioValues[numReturnValues]);
-		RKIT_CHECK(rkit::ThrowIfError(packedResult));
+		rkit::ThrowIfError(packedResult);
 
 		RKIT_RETURN_OK;
 	}
@@ -240,7 +240,7 @@ namespace rkit::utils
 			RKIT_THROW(rkit::ResultCode::kModuleLoadFailed);
 
 		UniquePtr<IMutex> memMutex;
-		RKIT_CHECK(GetDrivers().m_systemDriver->CreateMutex(memMutex));
+		GetDrivers().m_systemDriver->CreateMutex(memMutex);
 
 		UniquePtr<ModuleSandbox> sandbox;
 

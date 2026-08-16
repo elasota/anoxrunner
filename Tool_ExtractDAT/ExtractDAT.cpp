@@ -46,7 +46,7 @@ rkit::Result anox::ExtractDATProgram::Run()
 	}
 
 	rkit::OSAbsPath inPath;
-	RKIT_CHECK(inPath.SetFromEncodedString(args[0]));
+	inPath.SetFromEncodedString(args[0]);
 
 	rkit::UniquePtr<rkit::ISeekableReadStream> datFileStream;
 	RKIT_TRY_CATCH_RETHROW(rkit::GetDrivers().m_systemDriver->OpenFileReadAbs(datFileStream, inPath, false),
@@ -63,30 +63,30 @@ rkit::Result anox::ExtractDATProgram::Run()
 	RKIT_ASSERT(anoxUtils);
 
 	rkit::UniquePtr<anox::afs::IArchive> archive;
-	RKIT_CHECK(anoxUtils->OpenAFSArchive(std::move(datFileStream), archive));
+	anoxUtils->OpenAFSArchive(std::move(datFileStream), archive);
 
 	for (anox::afs::FileHandle fh : archive->GetFiles())
 	{
 		rkit::UniquePtr<rkit::ISeekableReadStream> fileStream;
-		RKIT_CHECK(fh.Open(fileStream));
+		fh.Open(fileStream);
 
 		uint32_t fileSize = fh.GetFileSize();
 		rkit::AsciiStringView filePath = fh.GetFilePath();
 
 
 		rkit::OSAbsPath outPath;
-		RKIT_CHECK(outPath.SetFromEncodedString(args[1]));
+		outPath.SetFromEncodedString(args[1]);
 
 		if (true)
 			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);	// fix path handling here
 
 		rkit::OSRelPath fpath;
-		RKIT_CHECK(fpath.SetFromEncodedString(filePath.ToUTF8()));
+		fpath.SetFromEncodedString(filePath.ToUTF8());
 
-		RKIT_CHECK(outPath.Append(fpath));
+		outPath.Append(fpath);
 
 		rkit::UniquePtr<rkit::ISeekableWriteStream> writeStream;
-		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->OpenFileWriteAbs(writeStream, outPath, true, true, true, false));
+		rkit::GetDrivers().m_systemDriver->OpenFileWriteAbs(writeStream, outPath, true, true, true, false);
 
 		uint8_t buffer[1024];
 
@@ -98,8 +98,8 @@ rkit::Result anox::ExtractDATProgram::Run()
 			if (chunkSize > sizeRemaining)
 				chunkSize = sizeRemaining;
 
-			RKIT_CHECK(fileStream->ReadAll(buffer, chunkSize));
-			RKIT_CHECK(writeStream->WriteAll(buffer, chunkSize));
+			fileStream->ReadAll(buffer, chunkSize);
+			writeStream->WriteAll(buffer, chunkSize);
 
 			sizeRemaining -= chunkSize;
 		}

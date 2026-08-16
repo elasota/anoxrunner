@@ -44,7 +44,7 @@ template<class TDriver, class TDriverInterface, ::rkit::SimpleObjectAllocation<T
 rkit::Result rkit::DriverModuleStub<TDriver, TDriverInterface, TDriverMember>::Init(const ModuleInitParameters *initParams)
 {
 	UniquePtr<TDriver> driver;
-	RKIT_CHECK(New<TDriver>(driver));
+	New<TDriver>(driver);
 
 	ms_driver = driver.Detach();
 	GetMutableDrivers().*TDriverMember = ms_driver;
@@ -83,11 +83,11 @@ template<class TDriver>
 rkit::Result rkit::CustomDriverModuleStub<TDriver>::Init(const ModuleInitParameters *initParams)
 {
 	UniquePtr<ICustomDriver> driver;
-	RKIT_CHECK(New<TDriver>(driver));
+	New<TDriver>(driver);
 
 	ICustomDriver *driverPtr = driver.Get();
 
-	RKIT_CHECK(GetMutableDrivers().RegisterDriver(std::move(driver)));
+	GetMutableDrivers().RegisterDriver(std::move(driver));
 
 	const DriverInitParameters *driverInitParams = nullptr;
 	if (initParams)

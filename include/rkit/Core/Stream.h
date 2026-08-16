@@ -110,7 +110,7 @@ namespace rkit
 inline rkit::Result rkit::IReadStream::ReadAll(void *data, size_t count)
 {
 	size_t countRead = 0;
-	RKIT_CHECK(this->ReadPartial(data, count, countRead));
+	this->ReadPartial(data, count, countRead);
 
 	if (countRead != count)
 		RKIT_THROW(ResultCode::kIOReadError);
@@ -121,7 +121,7 @@ inline rkit::Result rkit::IReadStream::ReadAll(void *data, size_t count)
 inline rkit::Result rkit::IWriteStream::WriteAll(const void *data, size_t count)
 {
 	size_t countWritten = 0;
-	RKIT_CHECK(this->WritePartial(data, count, countWritten));
+	this->WritePartial(data, count, countWritten);
 
 	if (countWritten != count)
 		RKIT_THROW(ResultCode::kIOReadError);

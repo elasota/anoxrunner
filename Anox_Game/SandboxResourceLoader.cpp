@@ -78,7 +78,7 @@ namespace anox::game
 	rkit::Result SandboxResourceLoader::LoadCIPathKeyedResource(SandboxResourceRequestHandle &outRequest, uint32_t resourceType, const rkit::StringSliceView &path)
 	{
 		uint32_t reqID = 0;
-		RKIT_CHECK(sandbox::SandboxImports::GetCIPathKeyedResource(reqID, resourceType, const_cast<rkit::Utf8Char_t *>(path.GetChars()), path.Length()));
+		sandbox::SandboxImports::GetCIPathKeyedResource(reqID, resourceType, const_cast<rkit::Utf8Char_t *>(path.GetChars()), path.Length());
 
 		outRequest = SandboxResourceRequestHandle(reqID);
 
@@ -88,7 +88,7 @@ namespace anox::game
 	rkit::Result SandboxResourceLoader::LoadContentKeyedResource(SandboxResourceRequestHandle &outRequest, uint32_t resourceType, const rkit::data::ContentID &cid)
 	{
 		uint32_t reqID = 0;
-		RKIT_CHECK(sandbox::SandboxImports::GetContentIDKeyedResource(reqID, resourceType, const_cast<rkit::data::ContentID *>(&cid)));
+		sandbox::SandboxImports::GetContentIDKeyedResource(reqID, resourceType, const_cast<rkit::data::ContentID *>(&cid));
 
 		outRequest = SandboxResourceRequestHandle(reqID);
 
@@ -100,7 +100,7 @@ namespace anox::game
 		void *ptr = nullptr;
 		uint32_t mmid = 0;
 		size_t size = 0;
-		RKIT_CHECK(sandbox::SandboxImports::GetFileResourceContents(ptr, size, mmid, res.GetResourceID()));
+		sandbox::SandboxImports::GetFileResourceContents(ptr, size, mmid, res.GetResourceID());
 
 		outBlob = SandboxResourceDataBlob(mmid, ptr, size);
 
@@ -110,10 +110,10 @@ namespace anox::game
 	rkit::ResultCoroutine SandboxResourceLoader::BlockingLoadCIPathKeyedFileResource(rkit::ICoroThread &thread, SandboxResourceDataBlob &outBlob, const rkit::StringSliceView &path)
 	{
 		SandboxResourceRequestHandle req;
-		CORO_CHECK(LoadCIPathKeyedResource(req, resloaders::kCIPathRawFileResourceTypeCode, path));
+		LoadCIPathKeyedResource(req, resloaders::kCIPathRawFileResourceTypeCode, path);
 
 		SandboxResourceHandle res;
-		CORO_CHECK(co_await req.WaitForLoaded(thread, res));
+		co_await req.WaitForLoaded(thread, res);
 
 		co_return SandboxResourceLoader::GetFileResourceContents(outBlob, res);
 	}
@@ -132,7 +132,7 @@ namespace anox::game
 	{
 		bool finished = false;
 		uint32_t resID = 0;
-		RKIT_CHECK(sandbox::SandboxImports::FinishLoadingResourceRequest(finished, resID, m_requestID));
+		sandbox::SandboxImports::FinishLoadingResourceRequest(finished, resID, m_requestID);
 
 		if (finished)
 		{
@@ -149,7 +149,7 @@ namespace anox::game
 	{
 		SandboxResourceBlockerContext blockerContext(*this, outResHandle);
 		rkit::CoroThreadBlocker blocker = blockerContext.CreateBlocker();
-		CORO_CHECK(co_await thread.AwaitBlocker(blocker));
+		co_await thread.AwaitBlocker(blocker);
 		CORO_RETURN_OK;
 	}
 }

@@ -15,7 +15,7 @@ namespace anox::buildsystem::ape_parse
 	rkit::Result APEReader::Read(float &value)
 	{
 		rkit::endian::LittleFloat32_t temp;
-		RKIT_CHECK(m_stream.ReadOneBinary(temp));
+		m_stream.ReadOneBinary(temp);
 		value = temp.Get();
 		RKIT_RETURN_OK;
 	}
@@ -28,7 +28,7 @@ namespace anox::buildsystem::ape_parse
 	rkit::Result APEReader::Read(uint16_t &value)
 	{
 		rkit::endian::LittleUInt16_t temp;
-		RKIT_CHECK(m_stream.ReadOneBinary(temp));
+		m_stream.ReadOneBinary(temp);
 		value = temp.Get();
 		RKIT_RETURN_OK;
 	}
@@ -36,7 +36,7 @@ namespace anox::buildsystem::ape_parse
 	rkit::Result APEReader::Read(uint32_t &value)
 	{
 		rkit::endian::LittleUInt32_t temp;
-		RKIT_CHECK(m_stream.ReadOneBinary(temp));
+		m_stream.ReadOneBinary(temp);
 		value = temp.Get();
 		RKIT_RETURN_OK;
 	}
@@ -44,14 +44,14 @@ namespace anox::buildsystem::ape_parse
 	rkit::Result APEReader::Read(uint64_t &value)
 	{
 		rkit::endian::LittleUInt64_t temp;
-		RKIT_CHECK(m_stream.ReadOneBinary(temp));
+		m_stream.ReadOneBinary(temp);
 		value = temp.Get();
 		RKIT_RETURN_OK;
 	}
 
 	rkit::Result APEReader::ReadBits(uint32_t &value, uint32_t allowedMask)
 	{
-		RKIT_CHECK(Read(value));
+		Read(value);
 		if ((value & allowedMask) != value)
 			RKIT_THROW(rkit::ResultCode::kDataError);
 		RKIT_RETURN_OK;
@@ -60,17 +60,17 @@ namespace anox::buildsystem::ape_parse
 	rkit::Result APEReader::Read(rkit::Optional<ExpressionValue> &value)
 	{
 		rkit::endian::LittleUInt64_t exprFlag;
-		RKIT_CHECK(m_stream.ReadOneBinary(exprFlag));
+		m_stream.ReadOneBinary(exprFlag);
 
 		if (exprFlag.Get() == 0)
 			value.Reset();
 		else if (exprFlag.Get() == 1)
 		{
 			ExpressionValue expr;
-			RKIT_CHECK(expr.Read(*this));
+			expr.Read(*this);
 
 			rkit::endian::LittleUInt64_t zeroCheck;
-			RKIT_CHECK(m_stream.ReadOneBinary(zeroCheck));
+			m_stream.ReadOneBinary(zeroCheck);
 			if (zeroCheck.Get() != 0)
 				RKIT_THROW(rkit::ResultCode::kDataError);
 
@@ -85,19 +85,19 @@ namespace anox::buildsystem::ape_parse
 	rkit::Result APEReader::Read(rkit::Optional<rkit::ByteString> &value)
 	{
 		uint32_t length = 0;
-		RKIT_CHECK(Read(length));
+		Read(length);
 
 		if (length == 0)
 			value.Reset();
 		else
 		{
 			rkit::ByteStringConstructionBuffer cbuf;
-			RKIT_CHECK(cbuf.Allocate(length - 1));
+			cbuf.Allocate(length - 1);
 
-			RKIT_CHECK(m_stream.ReadAllSpan(cbuf.GetSpan()));
+			m_stream.ReadAllSpan(cbuf.GetSpan());
 
 			uint8_t terminator = 0;
-			RKIT_CHECK(m_stream.ReadOneBinary(terminator));
+			m_stream.ReadOneBinary(terminator);
 			if (terminator != 0)
 				RKIT_THROW(rkit::ResultCode::kDataError);
 
@@ -110,7 +110,7 @@ namespace anox::buildsystem::ape_parse
 	rkit::Result APEReader::Read(rkit::ByteString &value)
 	{
 		rkit::Optional<rkit::ByteString> bstr;
-		RKIT_CHECK(Read(bstr));
+		Read(bstr);
 
 		if (!bstr.IsSet())
 			RKIT_THROW(rkit::ResultCode::kDataError);
@@ -125,22 +125,22 @@ namespace anox::buildsystem::ape_parse
 		uint8_t doneByte = 0;
 		for (;;)
 		{
-			RKIT_CHECK(m_stream.ReadOneBinary(doneByte));
+			m_stream.ReadOneBinary(doneByte);
 
 			if (doneByte != 0)
 				break;
 
 			uint8_t typeByte = 0;
-			RKIT_CHECK(m_stream.ReadOneBinary(typeByte));
+			m_stream.ReadOneBinary(typeByte);
 
 			rkit::UniquePtr<Operand> operand;
-			RKIT_CHECK(Operand::CreateFromType(operand, typeByte));
+			Operand::CreateFromType(operand, typeByte);
 
-			RKIT_CHECK(operand->Read(*this));
+			operand->Read(*this);
 		}
 
 		uint8_t extraByte = 0;
-		RKIT_CHECK(m_stream.ReadOneBinary(extraByte));
+		m_stream.ReadOneBinary(extraByte);
 
 		if (doneByte != 0xff || extraByte != 0xff)
 			RKIT_THROW(rkit::ResultCode::kDataError);
@@ -166,7 +166,7 @@ namespace anox::buildsystem::ape_parse
 		while (count > 0)
 		{
 			const size_t sizeToRead = rkit::Min<size_t>(count, sizeof(padding));
-			RKIT_CHECK(m_stream.ReadAll(&padding, sizeToRead));
+			m_stream.ReadAll(&padding, sizeToRead);
 
 			if (padding.Get() != 0)
 				RKIT_THROW(rkit::ResultCode::kDataError);
@@ -180,7 +180,7 @@ namespace anox::buildsystem::ape_parse
 	rkit::Result ExpressionValue::Read(APEReader &reader)
 	{
 		uint16_t operatorAndFlags = 0;
-		RKIT_CHECK(reader.Read(operatorAndFlags));
+		reader.Read(operatorAndFlags);
 
 		const uint8_t flags = ((operatorAndFlags >> 8) & 0xff);
 		const uint8_t op = (operatorAndFlags & 0xff);
@@ -201,13 +201,13 @@ namespace anox::buildsystem::ape_parse
 			const uint8_t operandType = ((flags >> operandIndex) & 0x15u);
 
 			rkit::UniquePtr<Operand> operand;
-			RKIT_CHECK(Operand::CreateFromType(operand, operandType));
+			Operand::CreateFromType(operand, operandType);
 
 			uint32_t prefix1 = 0;
 			uint32_t prefix2 = 0;
-			RKIT_CHECK(reader.Read(prefix1));
-			RKIT_CHECK(reader.Read(prefix2));
-			RKIT_CHECK(operand->Read(reader));
+			reader.Read(prefix1);
+			reader.Read(prefix2);
+			operand->Read(reader);
 
 			*(operandPtrs[operandIndex]) = std::move(operand);
 		}

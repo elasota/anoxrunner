@@ -23,7 +23,7 @@ namespace anox::game::ape::externs
 			CORO_RETURN_OK;
 		}
 
-		CORO_CHECK(ctx.m_world->GetMusicManager().SetLevelMusic(*music.m_contentID));
+		ctx.m_world->GetMusicManager().SetLevelMusic(*music.m_contentID);
 		CORO_RETURN_OK;
 	}
 }

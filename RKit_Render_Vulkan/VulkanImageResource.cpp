@@ -147,7 +147,7 @@ namespace rkit { namespace render { namespace vulkan {
 
 				if (isNewQueue)
 				{
-					RKIT_CHECK(restrictedQueueFamilies.Append(queueFamily));
+					restrictedQueueFamilies.Append(queueFamily);
 				}
 			}
 

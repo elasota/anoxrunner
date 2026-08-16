@@ -121,14 +121,14 @@ namespace anox
 	rkit::Result AnoxSpawnDefsLoaderInfo::SpawnDataChunkVisitor::VisitMember(rkit::Vector<T> &array) const
 	{
 		rkit::endian::LittleUInt32_t countData;
-		RKIT_CHECK(m_stream.ReadOneBinary(countData));
+		m_stream.ReadOneBinary(countData);
 
 		const uint32_t count = countData.Get();
-		RKIT_CHECK(array.Resize(count));
+		array.Resize(count);
 
 		if (count > 0)
 		{
-			RKIT_CHECK(m_stream.ReadAllSpan(array.ToSpan()));
+			m_stream.ReadAllSpan(array.ToSpan());
 		}
 
 		RKIT_RETURN_OK;
@@ -140,31 +140,31 @@ namespace anox
 			rkit::ReadOnlyMemoryStream stream(state.m_fileContents.ToSpan());
 
 			data::EntitySpawnDataFile spawnDataFile;
-			RKIT_CHECK(stream.ReadOneBinary(spawnDataFile));
+			stream.ReadOneBinary(spawnDataFile);
 
 			if (spawnDataFile.m_fourCC.Get() != data::EntitySpawnDataFile::kFourCC || spawnDataFile.m_version.Get() != data::EntitySpawnDataFile::kVersion)
 				RKIT_THROW(rkit::ResultCode::kDataError);
 
-			RKIT_CHECK(resource.m_chunks.VisitAllChunks(SpawnDataChunkVisitor(stream, state)));
+			resource.m_chunks.VisitAllChunks(SpawnDataChunkVisitor(stream, state));
 		}
 
 		state.m_fileContents.Reset();
 
-		RKIT_CHECK(state.m_edefResources.Resize(resource.m_chunks.m_entityDefContentIDs.Count()));
+		state.m_edefResources.Resize(resource.m_chunks.m_entityDefContentIDs.Count());
 
 		AnoxResourceManagerBase *resManager = state.m_systems.m_resManager;
 
-		RKIT_CHECK((rkit::CheckedProcessParallelSpans(state.m_edefResources.ToSpan(), resource.m_chunks.m_entityDefContentIDs.ToSpan(),
+		(rkit::CheckedProcessParallelSpans(state.m_edefResources.ToSpan(), resource.m_chunks.m_entityDefContentIDs.ToSpan(),
 			[resManager, &outDeps]
 			(rkit::Future<AnoxResourceRetrieveResult> &outResourceFuture, const rkit::data::ContentID &inContentID)
 			-> rkit::Result
 			{
 				rkit::RCPtr<rkit::Job> depsJob;
-				RKIT_CHECK(resManager->GetContentIDKeyedResource(&depsJob, outResourceFuture, resloaders::kEntityDefTypeCode, inContentID));
-				RKIT_CHECK(outDeps.AppendRValue(std::move(depsJob)));
+				resManager->GetContentIDKeyedResource(&depsJob, outResourceFuture, resloaders::kEntityDefTypeCode, inContentID);
+				outDeps.AppendRValue(std::move(depsJob));
 
 				RKIT_RETURN_OK;
-			})));
+			}));
 
 		RKIT_RETURN_OK;
 	}
@@ -172,7 +172,7 @@ namespace anox
 	rkit::Result AnoxSpawnDefsLoaderInfo::LoadContents(State_t &state, Resource_t &resource)
 	{
 		const size_t numEntityDefs = state.m_edefResources.Count();
-		RKIT_CHECK(resource.m_userEntityDefs.Resize(numEntityDefs));
+		resource.m_userEntityDefs.Resize(numEntityDefs);
 		rkit::ProcessParallelSpans(resource.m_userEntityDefs.ToSpan(), state.m_edefResources.ToSpan(),
 			[](rkit::RCPtr<AnoxEntityDefResourceBase> &outEDef, const rkit::Future<AnoxResourceRetrieveResult> &inFuture)
 			{
@@ -188,7 +188,7 @@ namespace anox
 
 		if (parent)
 		{
-			RKIT_CHECK(ParseEntity(data, resource, entityData.SubSpan(0, parent->m_dataSize), parent));
+			ParseEntity(data, resource, entityData.SubSpan(0, parent->m_dataSize), parent);
 		}
 
 		const rkit::ConstSpan<data::EntityFieldDef> fieldDefs(eclass->m_fields, eclass->m_numFields);
@@ -251,7 +251,7 @@ namespace anox
 				{
 					const data::EntityClassDef *componentClass = fieldDef.m_classDef;
 					RKIT_ASSERT(componentClass != nullptr);
-					RKIT_CHECK(ParseEntity(fieldDataPos, resource, entityData.SubSpan(fieldDef.m_dataOffset, componentClass->m_dataSize), componentClass));
+					ParseEntity(fieldDataPos, resource, entityData.SubSpan(fieldDef.m_dataOffset, componentClass->m_dataSize), componentClass);
 				}
 				break;
 			default:
@@ -278,7 +278,7 @@ namespace anox
 		typedef AnoxAbstractSingleFileResourceLoader<AnoxSpawnDefsLoaderInfo> Loader_t;
 
 		rkit::RCPtr<Loader_t> loader;
-		RKIT_CHECK(rkit::New<Loader_t>(loader));
+		rkit::New<Loader_t>(loader);
 
 		outLoader = std::move(loader);
 

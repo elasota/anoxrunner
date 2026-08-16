@@ -398,7 +398,7 @@ namespace rkit { namespace render
 	Result SplashWindow_Win32::SetText(const StringView &text)
 	{
 		Vector<wchar_t> wtext(m_alloc);
-		RKIT_CHECK(ConvUtil_Win32::UTF8ToUTF16(text.GetChars(), wtext));
+		ConvUtil_Win32::UTF8ToUTF16(text.GetChars(), wtext);
 
 		::SendMessageW(m_label, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(wtext.GetBuffer()));
 
@@ -626,15 +626,15 @@ namespace rkit { namespace render
 		m_defaultHeight = height;
 
 		UniquePtr<ThreadContext> ctx;
-		RKIT_CHECK(NewWithAlloc<ThreadContext>(ctx, m_alloc, *this));
+		NewWithAlloc<ThreadContext>(ctx, m_alloc, *this);
 
-		RKIT_CHECK(sysDriver->CreateEvent(m_startEvent, false, false));
-		RKIT_CHECK(sysDriver->CreateEvent(m_exitEvent, true, false));
-		RKIT_CHECK(sysDriver->CreateEvent(m_destroyWindowEvent, false, false));
-		RKIT_CHECK(sysDriver->CreateEvent(m_changeDisplayModeEvent, true, false));
-		RKIT_CHECK(sysDriver->CreateMutex(m_actionsMutex));
+		sysDriver->CreateEvent(m_startEvent, false, false);
+		sysDriver->CreateEvent(m_exitEvent, true, false);
+		sysDriver->CreateEvent(m_destroyWindowEvent, false, false);
+		sysDriver->CreateEvent(m_changeDisplayModeEvent, true, false);
+		sysDriver->CreateMutex(m_actionsMutex);
 
-		RKIT_CHECK(sysDriver->CreateThread(m_thread, std::move(ctx), u8"RenderWindow"));
+		sysDriver->CreateThread(m_thread, std::move(ctx), u8"RenderWindow");
 
 		m_startEvent->Wait();
 		m_startEvent.Reset();
@@ -798,7 +798,7 @@ namespace rkit { namespace render
 
 		{
 			MutexLock lock(*m_actionsMutex);
-			RKIT_CHECK(m_actions.Allocate(totalSize, alignment, allocHandle, memChunk, offset));
+			m_actions.Allocate(totalSize, alignment, allocHandle, memChunk, offset);
 		}
 
 		uint8_t *placementMem = static_cast<uint8_t *>(memChunk->GetDataAtPosition(offset));
@@ -991,7 +991,7 @@ namespace rkit { namespace render
 		cdmParams.m_outWidth = &newWidth;
 		cdmParams.m_outHeight = &newHeight;
 
-		RKIT_CHECK((QueueAction<ChangeDisplayModeParams, &RenderWindow_Win32::Action_ChangeDisplayMode>(std::move(cdmParams))));
+		(QueueAction<ChangeDisplayModeParams, &RenderWindow_Win32::Action_ChangeDisplayMode>(std::move(cdmParams)));
 
 		m_changeDisplayModeEvent->Wait();
 
@@ -1163,8 +1163,8 @@ namespace rkit { namespace render
 
 	Result DisplayManager_Win32::Initialize()
 	{
-		RKIT_CHECK(SplashWindow_Win32::RegisterWndClass(m_splashWCAtom, m_hInst));
-		RKIT_CHECK(RenderWindow_Win32::RegisterWndClass(m_renderWCAtom, m_hInst));
+		SplashWindow_Win32::RegisterWndClass(m_splashWCAtom, m_hInst);
+		RenderWindow_Win32::RegisterWndClass(m_renderWCAtom, m_hInst);
 
 		RKIT_RETURN_OK;
 	}
@@ -1200,9 +1200,9 @@ namespace rkit { namespace render
 	Result DisplayManager_Win32::CreateSplash(UniquePtr<IDisplay> &display, DisplayMode displayMode)
 	{
 		UniquePtr<SplashWindow_Win32> splashWindow;
-		RKIT_CHECK(NewWithAlloc<SplashWindow_Win32>(splashWindow, m_alloc, m_alloc, m_hInst));
+		NewWithAlloc<SplashWindow_Win32>(splashWindow, m_alloc, m_alloc, m_hInst);
 
-		RKIT_CHECK(splashWindow->Initialize(m_splashWCAtom));
+		splashWindow->Initialize(m_splashWCAtom);
 
 		display = std::move(splashWindow);
 
@@ -1212,15 +1212,15 @@ namespace rkit { namespace render
 	Result DisplayManager_Win32::CreateRenderWindow(UniquePtr<IDisplay> &display, DisplayMode displayMode, uint32_t width, uint32_t height)
 	{
 		UniquePtr<RenderWindow_Win32> renderWindow;
-		RKIT_CHECK(NewWithAlloc<RenderWindow_Win32>(renderWindow, m_alloc, m_alloc, m_hInst));
+		NewWithAlloc<RenderWindow_Win32>(renderWindow, m_alloc, m_alloc, m_hInst);
 
-		RKIT_CHECK(renderWindow->Initialize(GetDrivers().m_systemDriver.Get(), m_renderWCAtom, width, height));
+		renderWindow->Initialize(GetDrivers().m_systemDriver.Get(), m_renderWCAtom, width, height);
 
 		if (renderWindow->GetDisplayMode() != displayMode)
 		{
 			if (renderWindow->CanChangeToDisplayMode(displayMode))
 			{
-				RKIT_CHECK(renderWindow->ChangeToDisplayMode(displayMode));
+				renderWindow->ChangeToDisplayMode(displayMode);
 			}
 			else
 			{
@@ -1242,8 +1242,8 @@ namespace rkit { namespace render
 	Result DisplayManagerBase_Win32::Create(UniquePtr<DisplayManagerBase_Win32> &outDisplayManager, IMallocDriver *alloc, HINSTANCE hInst)
 	{
 		UniquePtr<DisplayManager_Win32> displayManager;
-		RKIT_CHECK(NewWithAlloc<DisplayManager_Win32>(displayManager, alloc, alloc, hInst));
-		RKIT_CHECK(displayManager->Initialize());
+		NewWithAlloc<DisplayManager_Win32>(displayManager, alloc, alloc, hInst);
+		displayManager->Initialize();
 
 		outDisplayManager = std::move(displayManager);
 

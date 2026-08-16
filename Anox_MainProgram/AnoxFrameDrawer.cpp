@@ -66,7 +66,7 @@ namespace anox
 
 	rkit::Result FrameDrawer::RecordTestCommandsJobRunner::RunRecord(rkit::render::IGraphicsCommandAllocator &commandAllocator)
 	{
-		RKIT_CHECK(commandAllocator.OpenGraphicsCommandBatch(*m_cmdBatchRef, false));
+		commandAllocator.OpenGraphicsCommandBatch(*m_cmdBatchRef, false);
 
 		rkit::render::IGraphicsCommandBatch &cmdBatch = **m_cmdBatchRef;
 
@@ -77,9 +77,9 @@ namespace anox
 		GameWindowSwapChainFrameResources &scFrameResources = resources->m_swapChainFrameResources[m_perDisplayResources->m_swapChainFrameIndex];
 
 		rkit::render::IGraphicsCommandEncoder *encoder = nullptr;
-		RKIT_CHECK(cmdBatch.OpenGraphicsCommandEncoder(encoder, *scFrameResources.m_simpleColorTargetRPI));
+		cmdBatch.OpenGraphicsCommandEncoder(encoder, *scFrameResources.m_simpleColorTargetRPI);
 
-		RKIT_CHECK(encoder->WaitForSwapChainAcquire(*m_perDisplayResources->m_swapChainSyncPoint, pipelineStages));
+		encoder->WaitForSwapChainAcquire(*m_perDisplayResources->m_swapChainSyncPoint, pipelineStages);
 
 		{
 			rkit::render::ImageMemoryBarrier barrier;
@@ -94,7 +94,7 @@ namespace anox
 			rkit::render::BarrierGroup barrierGroup;
 			barrierGroup.m_imageMemoryBarriers = rkit::Span<rkit::render::ImageMemoryBarrier>(&barrier, 1);
 
-			RKIT_CHECK(encoder->PipelineBarrier(barrierGroup));
+			encoder->PipelineBarrier(barrierGroup);
 		}
 
 		{
@@ -108,7 +108,7 @@ namespace anox
 
 			rkit::render::ImageRect2D imgRect = { 0, 0, 50, 50 };
 
-			RKIT_CHECK(encoder->ClearTargets(rkit::ConstSpan<rkit::render::RenderTargetClear>(&rtClear, 1), nullptr, rkit::ConstSpan<rkit::render::ImageRect2D>(&imgRect, 1)));
+			encoder->ClearTargets(rkit::ConstSpan<rkit::render::RenderTargetClear>(&rtClear, 1), nullptr, rkit::ConstSpan<rkit::render::ImageRect2D>(&imgRect, 1));
 		}
 
 		{
@@ -125,19 +125,19 @@ namespace anox
 			rkit::render::BarrierGroup barrierGroup;
 			barrierGroup.m_imageMemoryBarriers = rkit::Span<rkit::render::ImageMemoryBarrier>(&barrier, 1);
 
-			RKIT_CHECK(encoder->PipelineBarrier(barrierGroup));
+			encoder->PipelineBarrier(barrierGroup);
 		}
 
-		RKIT_CHECK(encoder->SignalSwapChainPresentReady(*m_perDisplayResources->m_swapChainSyncPoint, pipelineStages));
+		encoder->SignalSwapChainPresentReady(*m_perDisplayResources->m_swapChainSyncPoint, pipelineStages);
 
-		RKIT_CHECK(cmdBatch.CloseBatch());
+		cmdBatch.CloseBatch();
 
 		RKIT_RETURN_OK;
 	}
 
 	rkit::Result FrameDrawer::SubmitTestCommandsJobRunner::RunSubmit(rkit::render::IGraphicsCommandQueue &commandQueue)
 	{
-		RKIT_CHECK(m_cmdBatch->Submit());
+		m_cmdBatch->Submit();
 
 		RKIT_RETURN_OK;
 	}
@@ -154,15 +154,15 @@ namespace anox
 
 		rkit::RCPtr<rkit::Job> submitJob;
 		rkit::UniquePtr<SubmitTestCommandsJobRunner> submitJobRunner;
-		RKIT_CHECK(rkit::New<SubmitTestCommandsJobRunner>(submitJobRunner));
+		rkit::New<SubmitTestCommandsJobRunner>(submitJobRunner);
 
 		rkit::RCPtr<rkit::Job> recordJob;
 		rkit::UniquePtr<RecordTestCommandsJobRunner> recordJobRunner;
-		RKIT_CHECK(rkit::New<RecordTestCommandsJobRunner>(recordJobRunner, submitJobRunner->GetCmdBatchRef(), perDisplayResources));
+		rkit::New<RecordTestCommandsJobRunner>(recordJobRunner, submitJobRunner->GetCmdBatchRef(), perDisplayResources);
 
-		RKIT_CHECK(graphicsSubsystem.CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kGraphics, std::move(recordJobRunner), rkit::Span<rkit::RCPtr<rkit::Job>>(&perDisplayResources->m_acquireJob, 1)));
+		graphicsSubsystem.CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kGraphics, std::move(recordJobRunner), rkit::Span<rkit::RCPtr<rkit::Job>>(&perDisplayResources->m_acquireJob, 1));
 
-		RKIT_CHECK(graphicsSubsystem.CreateAndQueueSubmitJob(&submitJob, LogicalQueueType::kGraphics, std::move(submitJobRunner), recordJob));
+		graphicsSubsystem.CreateAndQueueSubmitJob(&submitJob, LogicalQueueType::kGraphics, std::move(submitJobRunner), recordJob);
 
 		RKIT_RETURN_OK;
 	}
@@ -175,9 +175,9 @@ namespace anox
 	rkit::Result IFrameDrawer::Create(rkit::UniquePtr<IFrameDrawer> &outFrameDrawer)
 	{
 		rkit::UniquePtr<FrameDrawer> frameDrawer;
-		RKIT_CHECK(rkit::New<FrameDrawer>(frameDrawer));
+		rkit::New<FrameDrawer>(frameDrawer);
 
-		RKIT_CHECK(frameDrawer->Initialize());
+		frameDrawer->Initialize();
 
 		outFrameDrawer = std::move(frameDrawer);
 

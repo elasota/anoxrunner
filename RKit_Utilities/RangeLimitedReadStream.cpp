@@ -21,8 +21,8 @@ namespace rkit
 	Result RangeLimitedReadStream::ReadPartial(void *data, size_t count, size_t &outCountRead)
 	{
 		size_t countRead = 0;
-		RKIT_CHECK(SeekStart(m_filePos));
-		RKIT_CHECK(m_stream->ReadPartial(data, count, countRead));
+		SeekStart(m_filePos);
+		m_stream->ReadPartial(data, count, countRead);
 
 		outCountRead = countRead;
 		m_filePos += static_cast<FilePos_t>(countRead);
@@ -35,7 +35,7 @@ namespace rkit
 		if (pos > m_fileSize)
 			RKIT_THROW(ResultCode::kIOSeekOutOfRange);
 
-		RKIT_CHECK(m_stream->SeekStart(pos + m_baseStreamStart));
+		m_stream->SeekStart(pos + m_baseStreamStart);
 
 		m_filePos = pos;
 

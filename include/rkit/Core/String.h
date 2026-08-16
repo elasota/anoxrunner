@@ -254,8 +254,8 @@ template<class TChar>
 rkit::Result rkit::StringStorage<TChar>::ComputeSize(size_t sizeInChars, size_t &outSizeInBytes)
 {
 	size_t sz = sizeInChars;
-	RKIT_CHECK(rkit::SafeMul(sz, sz, sizeof(TChar)));
-	RKIT_CHECK(rkit::SafeAdd(sz, sz, ComputePaddedBaseSize()));
+	rkit::SafeMul(sz, sz, sizeof(TChar));
+	rkit::SafeAdd(sz, sz, ComputePaddedBaseSize());
 
 	outSizeInBytes = sz;
 	RKIT_RETURN_OK;
@@ -305,7 +305,7 @@ rkit::Result rkit::BaseStringConstructionBuffer<TChar>::Allocate(size_t numChars
 		RKIT_THROW(ResultCode::kOutOfMemory);
 
 	size_t stringStorageObjSize = 0;
-	RKIT_CHECK(StringStorage<TChar>::ComputeSize(numChars + 1, stringStorageObjSize));
+	StringStorage<TChar>::ComputeSize(numChars + 1, stringStorageObjSize);
 
 	void *stringStorageMem = alloc->Alloc(stringStorageObjSize);
 	if (!stringStorageMem)
@@ -563,7 +563,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::VFormat(const Base
 	}
 
 	BaseStringConstructionBuffer<TChar> constructionBuffer;
-	RKIT_CHECK(constructionBuffer.Allocate(charsRequired));
+	constructionBuffer.Allocate(charsRequired);
 
 	{
 		priv::StringFormatHelper<TChar, TEncoding> formatHelper;
@@ -677,7 +677,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::Set(const Span<con
 	BaseString<TChar, TEncoding, TStaticSize> newString;
 
 	Span<TChar> uninitSpan;
-	RKIT_CHECK(CreateAndReturnUninitializedSpan(newString, strSpan.Count(), uninitSpan));
+	CreateAndReturnUninitializedSpan(newString, strSpan.Count(), uninitSpan);
 
 	CopySpanNonOverlapping(uninitSpan, strSpan);
 
@@ -745,7 +745,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::ConvertFromSpan(co
 	if (charsDigested != inChars.Count())
 		RKIT_THROW(ResultCode::kOutOfMemory);
 
-	RKIT_CHECK(cbuf.Allocate(staticCharsEmitted + remainingCharsEmitted));
+	cbuf.Allocate(staticCharsEmitted + remainingCharsEmitted);
 	Span<TChar> outChars = cbuf.GetSpan();
 
 	// Copy static part
@@ -789,7 +789,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::Append(const Span<
 		BaseString<TChar, TEncoding, TStaticSize> newString;
 
 		Span<TChar> uninitSpan;
-		RKIT_CHECK(CreateAndReturnUninitializedSpan(newString, combinedLength, uninitSpan));
+		CreateAndReturnUninitializedSpan(newString, combinedLength, uninitSpan);
 
 		CopySpanNonOverlapping(Span<TChar>(uninitSpan.Ptr(), m_length), Span<const TChar>(m_chars, m_length));
 		CopySpanNonOverlapping(Span<TChar>(uninitSpan.Ptr() + m_length, span.Count()), span);
@@ -831,7 +831,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::ChangeCase(const T
 	BaseString<TChar, TEncoding, TStaticSize> newString;
 
 	Span<TChar> uninitSpan;
-	RKIT_CHECK(CreateAndReturnUninitializedSpan(newString, length, uninitSpan));
+	CreateAndReturnUninitializedSpan(newString, length, uninitSpan);
 
 	TChar *chars = uninitSpan.Ptr();
 	const TChar *inChars = m_chars;
@@ -971,7 +971,7 @@ rkit::Result rkit::BaseString<TChar, TEncoding, TStaticSize>::CreateAndReturnUni
 	}
 
 	BaseStringConstructionBuffer<TChar> constructionBuffer;
-	RKIT_CHECK(constructionBuffer.Allocate(numChars));
+	constructionBuffer.Allocate(numChars);
 
 	Span<TChar> constructedSpan = constructionBuffer.GetSpan();
 	constructionBuffer.Detach();

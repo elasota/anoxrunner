@@ -198,17 +198,17 @@ namespace rkit
 		if (!m_kickEvent)
 			RKIT_THROW(ResultCode::kOperationFailed);
 
-		RKIT_CHECK(m_sysDriver.CreateMutex(m_pendingQueueMutex));
-		RKIT_CHECK(m_sysDriver.CreateMutex(m_inProgressQueueMutex));
+		m_sysDriver.CreateMutex(m_pendingQueueMutex);
+		m_sysDriver.CreateMutex(m_inProgressQueueMutex);
 
-		RKIT_CHECK(m_sysDriver.CreateEvent(m_startAndTerminateEvent, true, false));
+		m_sysDriver.CreateEvent(m_startAndTerminateEvent, true, false);
 
 		UniquePtr<AsyncIOThreadContext_Win32> threadContext;
-		RKIT_CHECK(New<AsyncIOThreadContext_Win32>(threadContext, *m_startAndTerminateEvent, *m_pendingQueueMutex, *m_inProgressQueueMutex, m_kickEvent));
+		New<AsyncIOThreadContext_Win32>(threadContext, *m_startAndTerminateEvent, *m_pendingQueueMutex, *m_inProgressQueueMutex, m_kickEvent);
 
 		m_threadContext = threadContext.Get();
 
-		RKIT_CHECK(m_sysDriver.CreateThread(m_thread, std::move(threadContext), u8"AsyncIO"));
+		m_sysDriver.CreateThread(m_thread, std::move(threadContext), u8"AsyncIO");
 
 		m_startAndTerminateEvent->Wait();
 

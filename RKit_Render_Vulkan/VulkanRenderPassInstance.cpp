@@ -92,7 +92,7 @@ namespace rkit { namespace render { namespace vulkan
 			attachments = staticAttachmentsStorage.ToSpan().SubSpan(0, createInfo.attachmentCount);
 		else
 		{
-			RKIT_CHECK(dynamicAttachmentsStorage.Resize(createInfo.attachmentCount));
+			dynamicAttachmentsStorage.Resize(createInfo.attachmentCount);
 			attachments = dynamicAttachmentsStorage.ToSpan();
 		}
 
@@ -102,7 +102,7 @@ namespace rkit { namespace render { namespace vulkan
 		if ((desc->m_depthStencilTarget == nullptr) != (resources.m_depthStencilView == nullptr))
 			RKIT_THROW(ResultCode::kInvalidParameter);
 
-		RKIT_CHECK(m_rtvAspectFlags.Resize(resources.m_renderTargetViews.Count()));
+		m_rtvAspectFlags.Resize(resources.m_renderTargetViews.Count());
 
 		size_t attachmentIndex = 0;
 		for (const IRenderTargetView *rtv : resources.m_renderTargetViews)
@@ -160,9 +160,9 @@ namespace rkit { namespace render { namespace vulkan
 	Result VulkanRenderPassInstanceBase::Create(UniquePtr<VulkanRenderPassInstanceBase> &renderPassInstance, VulkanDeviceBase &device, const RenderPassRef_t &renderPassRef, const RenderPassResources &resources)
 	{
 		UniquePtr<VulkanRenderPassInstance> instance;
-		RKIT_CHECK(New<VulkanRenderPassInstance>(instance, device));
+		New<VulkanRenderPassInstance>(instance, device);
 
-		RKIT_CHECK(instance->Initialize(renderPassRef, resources));
+		instance->Initialize(renderPassRef, resources);
 
 		renderPassInstance = std::move(instance);
 

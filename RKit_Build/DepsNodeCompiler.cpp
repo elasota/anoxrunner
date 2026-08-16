@@ -27,10 +27,10 @@ namespace rkit { namespace buildsystem
 		GetDrivers().m_moduleDriver->LoadModule(rkit::IModuleDriver::kDefaultNamespace, u8"Data");
 
 		CIPath nodePath;
-		RKIT_CHECK(nodePath.Set(depsNode->GetIdentifier()));
+		nodePath.Set(depsNode->GetIdentifier());
 
 		rkit::UniquePtr<ISeekableReadStream> stream;
-		RKIT_CHECK(feedback->TryOpenInput(depsNode->GetInputFileLocation(), nodePath, stream));
+		feedback->TryOpenInput(depsNode->GetInputFileLocation(), nodePath, stream);
 
 		if (!stream.Get())
 		{
@@ -41,25 +41,25 @@ namespace rkit { namespace buildsystem
 		IUtilitiesDriver &utils = *GetDrivers().m_utilitiesDriver;
 
 		Vector<uint8_t> fileContents;
-		RKIT_CHECK(utils.ReadEntireFile(*stream, fileContents));
+		utils.ReadEntireFile(*stream, fileContents);
 
 		stream.Reset();
 
 		UniquePtr<utils::ITextParser> parser;
-		RKIT_CHECK(utils.CreateTextParser(fileContents.ToSpan(), utils::TextParserCommentType::kBash, utils::TextParserLexerType::kSimple, parser));
+		utils.CreateTextParser(fileContents.ToSpan(), utils::TextParserCommentType::kBash, utils::TextParserLexerType::kSimple, parser);
 
 		for (;;)
 		{
 			Span<const uint8_t> token;
 
-			RKIT_CHECK(parser->SkipWhitespace());
+			parser->SkipWhitespace();
 
 			size_t line = 0;
 			size_t col = 0;
 			parser->GetLocation(line, col);
 
 			bool haveToken = false;
-			RKIT_CHECK(parser->ReadToken(haveToken, token));
+			parser->ReadToken(haveToken, token);
 
 			if (!haveToken)
 				break;
@@ -73,7 +73,7 @@ namespace rkit { namespace buildsystem
 				coercedType = rkit::utils::ComputeFourCC(token[6], token[7], token[8], token[9]);
 
 				parser->GetLocation(line, col);
-				RKIT_CHECK(parser->ReadToken(haveToken, token));
+				parser->ReadToken(haveToken, token);
 
 				if (!haveToken)
 				{
@@ -84,7 +84,7 @@ namespace rkit { namespace buildsystem
 
 			Vector<CIPath> pathScans;
 
-			RKIT_CHECK(pathScans.Resize(1));
+			pathScans.Resize(1);
 
 			size_t numPathChunks = 0;
 			size_t chunkStart = 0;
@@ -127,7 +127,7 @@ namespace rkit { namespace buildsystem
 					}
 
 					RKIT_ASSERT(pathScans.Count() == 1);
-					RKIT_CHECK(pathScans[0].Set(nodePath.AbsSlice(nodePath.NumComponents() - 1)));
+					pathScans[0].Set(nodePath.AbsSlice(nodePath.NumComponents() - 1));
 				}
 				else
 				{
@@ -165,9 +165,9 @@ namespace rkit { namespace buildsystem
 						for (const CIPath &path : pathScans)
 						{
 							CIPath newPath = path;
-							RKIT_CHECK(newPath.AppendComponent(chunkSlice));
+							newPath.AppendComponent(chunkSlice);
 
-							RKIT_CHECK(newPaths.Append(std::move(newPath)));
+							newPaths.Append(std::move(newPath));
 						}
 
 						pathScans = std::move(newPaths);
@@ -192,8 +192,8 @@ namespace rkit { namespace buildsystem
 								if (m_utils->MatchesWildcard(lastComponent, m_wildcard))
 								{
 									CIPath path;
-									RKIT_CHECK(path.Set(pathView));
-									RKIT_CHECK(m_newPaths.Append(std::move(path)));
+									path.Set(pathView);
+									m_newPaths.Append(std::move(path));
 								}
 
 								RKIT_RETURN_OK;
@@ -221,11 +221,11 @@ namespace rkit { namespace buildsystem
 
 							if (isLast)
 							{
-								RKIT_CHECK(feedback->EnumerateFiles(BuildFileLocation::kSourceDir, path, &enumerator, PathEnumerator::StaticApplyResult));
+								feedback->EnumerateFiles(BuildFileLocation::kSourceDir, path, &enumerator, PathEnumerator::StaticApplyResult);
 							}
 							else
 							{
-								RKIT_CHECK(feedback->EnumerateDirectories(BuildFileLocation::kSourceDir, path, &enumerator, PathEnumerator::StaticApplyResult));
+								feedback->EnumerateDirectories(BuildFileLocation::kSourceDir, path, &enumerator, PathEnumerator::StaticApplyResult);
 							}
 						}
 
@@ -239,7 +239,7 @@ namespace rkit { namespace buildsystem
 			for (const CIPath &path : pathScans)
 			{
 				bool exists = false;
-				RKIT_CHECK(feedback->CheckInputExists(BuildFileLocation::kSourceDir, path, exists));
+				feedback->CheckInputExists(BuildFileLocation::kSourceDir, path, exists);
 
 				if (haveAnyWildcards && !exists)
 				{
@@ -271,7 +271,7 @@ namespace rkit { namespace buildsystem
 					}
 				}
 
-				RKIT_CHECK(feedback->AddNodeDependency(nodeNamespace, nodeType, BuildFileLocation::kSourceDir, path.ToString()));
+				feedback->AddNodeDependency(nodeNamespace, nodeType, BuildFileLocation::kSourceDir, path.ToString());
 			}
 		}
 
@@ -303,7 +303,7 @@ namespace rkit { namespace buildsystem
 			}
 
 			constructedPath.Reset();
-			RKIT_CHECK(constructedPath.Append(identifier.SubString(0, baseDirEnd).ToSpan()));
+			constructedPath.Append(identifier.SubString(0, baseDirEnd).ToSpan());
 
 			outOK = true;
 			RKIT_RETURN_OK;
@@ -324,7 +324,7 @@ namespace rkit { namespace buildsystem
 				RKIT_RETURN_OK;
 			}
 
-			RKIT_CHECK(constructedPath.Resize(parentDirEnd));
+			constructedPath.Resize(parentDirEnd);
 
 			outOK = true;
 			RKIT_RETURN_OK;
@@ -332,10 +332,10 @@ namespace rkit { namespace buildsystem
 
 		if (constructedPath.Count() != 0)
 		{
-			RKIT_CHECK(constructedPath.Append('/'));
+			constructedPath.Append('/');
 		}
 
-		RKIT_CHECK(constructedPath.Append(chunk));
+		constructedPath.Append(chunk);
 
 		outOK = true;
 		RKIT_RETURN_OK;

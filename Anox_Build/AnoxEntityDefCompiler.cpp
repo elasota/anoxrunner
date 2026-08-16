@@ -145,7 +145,7 @@ namespace anox { namespace buildsystem {
 			RKIT_THROW(rkit::ResultCode::kInternalError);
 
 		rkit::UniquePtr<UserEntityDictionaryBase> dictionary;
-		RKIT_CHECK(EntityDefCompilerBase::LoadUserEntityDictionary(dictionary, feedback));
+		EntityDefCompilerBase::LoadUserEntityDictionary(dictionary, feedback);
 
 		const uint32_t numEDefs = dictionary->GetEDefCount();
 
@@ -156,20 +156,20 @@ namespace anox { namespace buildsystem {
 		const rkit::AsciiStringView modelPath = edef.m_modelPath;
 
 		rkit::String modelPathStr;
-		RKIT_CHECK(modelPathStr.ConvertFrom(modelPath));
-		RKIT_CHECK(modelPathStr.MakeLower());
+		modelPathStr.ConvertFrom(modelPath);
+		modelPathStr.MakeLower();
 
 		if (modelPath.EndsWithNoCase(".md2"))
 		{
-			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kMD2ModelNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, modelPathStr));
+			feedback->AddNodeDependency(kAnoxNamespaceID, kMD2ModelNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, modelPathStr);
 		}
 		else if (modelPath.EndsWithNoCase(".mda"))
 		{
-			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kMDAModelNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, modelPathStr));
+			feedback->AddNodeDependency(kAnoxNamespaceID, kMDAModelNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, modelPathStr);
 		}
 		else if (modelPath.EndsWithNoCase(".ctc"))
 		{
-			RKIT_CHECK(feedback->AddNodeDependency(kAnoxNamespaceID, kCTCModelNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, modelPathStr));
+			feedback->AddNodeDependency(kAnoxNamespaceID, kCTCModelNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, modelPathStr);
 		}
 		else
 			RKIT_THROW(rkit::ResultCode::kDataError);
@@ -191,7 +191,7 @@ namespace anox { namespace buildsystem {
 			RKIT_THROW(rkit::ResultCode::kInternalError);
 
 		rkit::UniquePtr<UserEntityDictionaryBase> dictionary;
-		RKIT_CHECK(EntityDefCompilerBase::LoadUserEntityDictionary(dictionary, feedback));
+		EntityDefCompilerBase::LoadUserEntityDictionary(dictionary, feedback);
 
 		const uint32_t numEDefs = dictionary->GetEDefCount();
 
@@ -213,8 +213,8 @@ namespace anox { namespace buildsystem {
 			const data::EntityDefsSchema &schema = anox::utils::GetEntityDefs();
 
 			rkit::ByteString fullType;
-			RKIT_CHECK(fullType.Set(rkit::StringView(u8"userentity_").RemoveEncoding()));
-			RKIT_CHECK(fullType.Append(edef.m_type));
+			fullType.Set(rkit::StringView(u8"userentity_").RemoveEncoding());
+			fullType.Append(edef.m_type);
 
 			for (size_t i = 0; i < schema.m_numClassDefs; i++)
 			{
@@ -250,27 +250,27 @@ namespace anox { namespace buildsystem {
 			const rkit::AsciiStringView modelPath = edef.m_modelPath;
 
 			rkit::String modelPathStr;
-			RKIT_CHECK(modelPathStr.ConvertFrom(modelPath));
-			RKIT_CHECK(modelPathStr.MakeLower());
+			modelPathStr.ConvertFrom(modelPath);
+			modelPathStr.MakeLower();
 
 			rkit::CIPath outputModelPath;
 
 			if (modelPath.EndsWithNoCase(".md2"))
 			{
-				RKIT_CHECK(AnoxMD2CompilerBase::ConstructOutputPath(outputModelPath, modelPathStr));
+				AnoxMD2CompilerBase::ConstructOutputPath(outputModelPath, modelPathStr);
 			}
 			else if (modelPath.EndsWithNoCase(".mda"))
 			{
-				RKIT_CHECK(AnoxMDACompilerBase::ConstructOutputPath(outputModelPath, modelPathStr));
+				AnoxMDACompilerBase::ConstructOutputPath(outputModelPath, modelPathStr);
 			}
 			else if (modelPath.EndsWithNoCase(".ctc"))
 			{
-				RKIT_CHECK(AnoxCTCCompilerBase::ConstructOutputPath(outputModelPath, modelPathStr));
+				AnoxCTCCompilerBase::ConstructOutputPath(outputModelPath, modelPathStr);
 			}
 			else
 				RKIT_THROW(rkit::ResultCode::kDataError);
 
-			RKIT_CHECK(feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outputModelPath, outDef.m_modelContentID));
+			feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outputModelPath, outDef.m_modelContentID);
 		}
 
 		outDef.m_entityType = static_cast<uint32_t>(classDefIndex.Get());
@@ -285,13 +285,13 @@ namespace anox { namespace buildsystem {
 		outDef.m_descriptionStringLength = static_cast<uint8_t>(edef.m_description.Length());
 
 		rkit::CIPath edefPath;
-		RKIT_CHECK(edefPath.Set(depsNode->GetIdentifier()));
+		edefPath.Set(depsNode->GetIdentifier());
 
 		rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
-		RKIT_CHECK(feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefPath, outFile));
+		feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, edefPath, outFile);
 
-		RKIT_CHECK(outFile->WriteAll(&outDef, sizeof(outDef)));
-		RKIT_CHECK(outFile->WriteAllSpan(edef.m_description.ToSpan()));
+		outFile->WriteAll(&outDef, sizeof(outDef));
+		outFile->WriteAllSpan(edef.m_description.ToSpan());
 
 		RKIT_RETURN_OK;
 	}
@@ -310,8 +310,8 @@ namespace anox { namespace buildsystem {
 			if (stringIndex == std::numeric_limits<uint16_t>::max())
 				RKIT_THROW(rkit::ResultCode::kDataError);
 
-			RKIT_CHECK(strings.Append(str));
-			RKIT_CHECK(stringToIndex.SetPrehashed(hash, str, stringIndex));
+			strings.Append(str);
+			stringToIndex.SetPrehashed(hash, str, stringIndex);
 
 			outIndex = stringIndex;
 		}
@@ -384,7 +384,7 @@ namespace anox { namespace buildsystem {
 	rkit::Result EntityDefCompilerBase::LoadUserEntityDictionary(rkit::UniquePtr<UserEntityDictionaryBase> &outDictionary, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		rkit::UniquePtr<rkit::ISeekableReadStream> inFile;
-		RKIT_CHECK(feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, u8"models/entity.dat", inFile));
+		feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kSourceDir, u8"models/entity.dat", inFile);
 
 		if (inFile->GetSize() >= std::numeric_limits<size_t>::max())
 			RKIT_THROW(rkit::ResultCode::kOutOfMemory);
@@ -392,9 +392,9 @@ namespace anox { namespace buildsystem {
 		const size_t fileSize = static_cast<size_t>(inFile->GetSize());
 
 		rkit::Vector<uint8_t> edefCharsArray;
-		RKIT_CHECK(edefCharsArray.Resize(fileSize));
+		edefCharsArray.Resize(fileSize);
 
-		RKIT_CHECK(inFile->ReadAllSpan(edefCharsArray.ToSpan()));
+		inFile->ReadAllSpan(edefCharsArray.ToSpan());
 
 		rkit::ConstSpan<uint8_t> fileChars = edefCharsArray.ToSpan();
 
@@ -489,18 +489,18 @@ namespace anox { namespace buildsystem {
 
 						if (fragmentIndex == 0)
 						{
-							RKIT_CHECK(edef.m_className.Set(fragment));
+							edef.m_className.Set(fragment);
 						}
 						else if (fragmentIndex == 1)
 						{
 							if (!rkit::CharacterEncodingValidator<rkit::CharacterEncoding::kASCII>::ValidateSpan(fragment))
 								RKIT_THROW(rkit::ResultCode::kDataError);
 
-							RKIT_CHECK(edef.m_modelPath.Set(rkit::AsciiStringSliceView(fragment.ReinterpretCast<const char>())));
+							edef.m_modelPath.Set(rkit::AsciiStringSliceView(fragment.ReinterpretCast<const char>()));
 						}
 						else if (fragmentIndex == 23)
 						{
-							RKIT_CHECK(edef.m_description.Set(fragment));
+							edef.m_description.Set(fragment);
 						}
 					}
 					break;
@@ -548,7 +548,7 @@ namespace anox { namespace buildsystem {
 					}
 					break;
 				case 5:
-					RKIT_CHECK(edef.m_type.Set(fragment));
+					edef.m_type.Set(fragment);
 					break;
 				case 12:
 					{
@@ -598,7 +598,7 @@ namespace anox { namespace buildsystem {
 				case 19:
 					{
 						Label label;
-						RKIT_CHECK(EntityDefCompiler::ParseLabel(fragment, edef.m_targetSequence));
+						EntityDefCompiler::ParseLabel(fragment, edef.m_targetSequence);
 					}
 					break;
 				case 20:
@@ -614,7 +614,7 @@ namespace anox { namespace buildsystem {
 						if (slice != rkit::AsciiStringView("none").RemoveEncoding())
 						{
 							Label label;
-							RKIT_CHECK(EntityDefCompiler::ParseLabel(fragment, edef.m_startSequence));
+							EntityDefCompiler::ParseLabel(fragment, edef.m_startSequence);
 						}
 					}
 					break;
@@ -623,10 +623,10 @@ namespace anox { namespace buildsystem {
 				}
 			}
 
-			RKIT_CHECK(edefs.Append(edef));
+			edefs.Append(edef);
 		}
 
-		RKIT_CHECK(rkit::New<UserEntityDictionary>(outDictionary, std::move(edefs)));
+		rkit::New<UserEntityDictionary>(outDictionary, std::move(edefs));
 
 		RKIT_RETURN_OK;
 	}

@@ -16,7 +16,7 @@ namespace anox::game
 
 	rkit::Result ScriptWindowInstance::Initialize(World &world)
 	{
-		RKIT_CHECK(WorldObject::Initialize(world));
+		WorldObject::Initialize(world);
 
 		RKIT_RETURN_OK;
 	}
@@ -205,7 +205,7 @@ namespace anox::game
 		if (m_thinkSwitch != Label())
 		{
 			World &world = GetWorld();
-			CORO_CHECK(co_await GetWorld().GetScriptEnvironment().RunSwitch(thread, this->GetScriptContext(), m_thinkSwitch, GetWorld()));
+			co_await GetWorld().GetScriptEnvironment().RunSwitch(thread, this->GetScriptContext(), m_thinkSwitch, GetWorld());
 		}
 
 		CORO_RETURN_OK;

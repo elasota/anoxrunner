@@ -37,7 +37,7 @@ namespace anox::game::sandbox
 		if (rkit::ILogDriver *logDriver = rkit::GetDrivers().m_logDriver.Get())
 		{
 			void *charsMemory = nullptr;
-			RKIT_CHECK(static_cast<AnoxGameSandboxEnvironment &>(env).m_sandbox->AccessMemoryRange(charsMemory, ptr, size));
+			static_cast<AnoxGameSandboxEnvironment &>(env).m_sandbox->AccessMemoryRange(charsMemory, ptr, size);
 
 			logDriver->LogMessage(static_cast<rkit::LogSeverity>(severity), rkit::StringSliceView(static_cast<const rkit::Utf8Char_t *>(charsMemory), size));
 		}
@@ -50,7 +50,7 @@ namespace anox::game::sandbox
 		AnoxGameSandboxEnvironment &env = static_cast<AnoxGameSandboxEnvironment &>(envBase);
 
 		void *cidPtr = nullptr;
-		RKIT_CHECK(env.m_sandbox->AccessMemoryRange(cidPtr, contentIDAddr, sizeof(rkit::data::ContentID)));
+		env.m_sandbox->AccessMemoryRange(cidPtr, contentIDAddr, sizeof(rkit::data::ContentID));
 
 		rkit::data::ContentID cid = *static_cast<const rkit::data::ContentID *>(cidPtr);
 
@@ -62,14 +62,14 @@ namespace anox::game::sandbox
 		AnoxGameSandboxEnvironment &env = static_cast<AnoxGameSandboxEnvironment &>(envBase);
 
 		void *charsPtr = nullptr;
-		RKIT_CHECK(env.m_sandbox->AccessMemoryRange(charsPtr, charsAddr, charsSize));
+		env.m_sandbox->AccessMemoryRange(charsPtr, charsAddr, charsSize);
 
 		rkit::Span<const rkit::Utf8Char_t> charsSpan(static_cast<const rkit::Utf8Char_t *>(charsPtr), charsSize);
 		if (!rkit::CharacterEncodingValidator<rkit::CharacterEncoding::kUTF8>::ValidateSpan(charsSpan))
 			RKIT_THROW(rkit::ResultCode::kInvalidUnicode);
 
 		rkit::CIPath path;
-		RKIT_CHECK(path.SetFromUTF8(rkit::StringSliceView(charsSpan)));
+		path.SetFromUTF8(rkit::StringSliceView(charsSpan));
 
 		return env.m_resManager->GetCIPathKeyedResource(reqID, resourceType, path);
 	}
@@ -80,7 +80,7 @@ namespace anox::game::sandbox
 		AnoxGameSandboxEnvironment &env = static_cast<AnoxGameSandboxEnvironment &>(envBase);
 
 		rkit::Optional<uint32_t> resultResID;
-		RKIT_CHECK(env.m_resManager->TryFinishLoadingResourceRequest(resultResID, requestID));
+		env.m_resManager->TryFinishLoadingResourceRequest(resultResID, requestID);
 
 		if (resultResID.IsSet())
 		{
@@ -115,15 +115,15 @@ namespace anox::game::sandbox
 		rkit::RCPtr<AnoxResourceBase> keepAlive;
 		rkit::Span<const uint8_t> contentsSpan;
 
-		RKIT_CHECK(env.m_resManager->GetFileResourceContents(keepAlive, contentsSpan, resID));
+		env.m_resManager->GetFileResourceContents(keepAlive, contentsSpan, resID);
 
 		rkit::sandbox::Address_t memAddr = 0;
 		uint32_t tempMMID = 0;
-		RKIT_CHECK(env.m_sandbox->AllocDynamicMemory(memAddr, tempMMID, contentsSpan.Count()));
+		env.m_sandbox->AllocDynamicMemory(memAddr, tempMMID, contentsSpan.Count());
 
 		void *outputMem = nullptr;
 
-		RKIT_CHECK(env.m_sandbox->AccessMemoryRange(outputMem, memAddr, contentsSpan.Count()));
+		env.m_sandbox->AccessMemoryRange(outputMem, memAddr, contentsSpan.Count());
 
 		rkit::CopySpanNonOverlapping(rkit::Span<uint8_t>(static_cast<uint8_t *>(outputMem), contentsSpan.Count()), contentsSpan);
 		ptr = memAddr;
@@ -138,7 +138,7 @@ namespace anox::game::sandbox
 		AnoxGameSandboxEnvironment &env = static_cast<AnoxGameSandboxEnvironment &>(envBase);
 
 		const SoundEmitterProperties *emitterProperties = nullptr;
-		RKIT_CHECK(env.m_sandbox->AccessMemoryValue(emitterProperties, emitterPropertiesMem));
+		env.m_sandbox->AccessMemoryValue(emitterProperties, emitterPropertiesMem);
 
 		return env.m_audioManager->CreateEmitterFromSource(emitterID, sourceID, *emitterProperties);
 	}
@@ -147,7 +147,7 @@ namespace anox::game::sandbox
 	{
 		AnoxGameSandboxEnvironment &env = static_cast<AnoxGameSandboxEnvironment &>(envBase);
 
-		RKIT_CHECK(env.m_audioManager->PlayEmitter(emitterID));
+		env.m_audioManager->PlayEmitter(emitterID);
 
 		RKIT_RETURN_OK;
 	}
@@ -180,7 +180,7 @@ namespace anox::game::sandbox
 
 		rkit::RCPtr<AnoxResourceBase> keepalive;
 		rkit::Span<const uint8_t> contents;
-		RKIT_CHECK(env.m_resManager->GetFileResourceContents(keepalive, contents, resID));
+		env.m_resManager->GetFileResourceContents(keepalive, contents, resID);
 
 		return env.m_audioManager->CreateSoundSourceFromBytes(srcID, std::move(keepalive), contents, static_cast<rkit::audio::AudioContainerFormat>(containerFormat));
 	}

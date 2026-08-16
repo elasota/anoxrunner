@@ -69,10 +69,10 @@ namespace anox::game
 	rkit::Result SessionImpl::Initialize()
 	{
 		rkit::IMallocDriver &alloc = *rkit::GetDrivers().m_mallocDriver;
-		RKIT_CHECK(rkit::utils::CreateCoroThread(m_mainCoroThread, &alloc, 1 * 1024 * 1024, rkit::GetDrivers().GetAssertDriver()));
+		rkit::utils::CreateCoroThread(m_mainCoroThread, &alloc, 1 * 1024 * 1024, rkit::GetDrivers().GetAssertDriver());
 
-		RKIT_CHECK(ScriptManager::Create(m_scriptManager));
-		RKIT_CHECK(World::Create(m_world, *m_scriptManager));
+		ScriptManager::Create(m_scriptManager);
+		World::Create(m_world, *m_scriptManager);
 
 		RKIT_RETURN_OK;
 	}
@@ -91,7 +91,7 @@ namespace anox::game
 			void *fieldsRef = nullptr;
 			SerializeFromLevelFunction_t deserializeFunc = nullptr;
 
-			CORO_CHECK(WorldObjectFactory::CreateLevelObject(entityTypeID, spawnDataSize, objProxy, fieldsRef, deserializeFunc));
+			WorldObjectFactory::CreateLevelObject(entityTypeID, spawnDataSize, objProxy, fieldsRef, deserializeFunc);
 
 			if (!objProxy.IsValid())
 			{
@@ -99,7 +99,7 @@ namespace anox::game
 				CORO_THROW(rkit::ResultCode::kDataError);
 			}
 
-			CORO_CHECK(objProxy->m_object->Initialize(world));
+			objProxy->m_object->Initialize(world);
 
 			if (spawnDataSize > spawnData.Count())
 			{
@@ -114,10 +114,10 @@ namespace anox::game
 				udefDescriptions.ToSpan()
 			};
 
-			CORO_CHECK(deserializeFunc(fieldsRef, spawnParams, spawnData.Ptr()));
+			deserializeFunc(fieldsRef, spawnParams, spawnData.Ptr());
 			spawnData = spawnData.SubSpan(spawnDataSize);
 
-			CORO_CHECK(world.AddObject(std::move(objProxy)));
+			world.AddObject(std::move(objProxy));
 		}
 
 		if (spawnData.Count() > 0)
@@ -133,7 +133,7 @@ namespace anox::game
 	{
 		SandboxResourceDataBlob globalScriptsIndexBlob;
 
-		CORO_CHECK(co_await SandboxResourceLoader::BlockingLoadCIPathKeyedFileResource(thread, globalScriptsIndexBlob, u8"globalscripts.idx"));
+		co_await SandboxResourceLoader::BlockingLoadCIPathKeyedFileResource(thread, globalScriptsIndexBlob, u8"globalscripts.idx");
 
 		const rkit::ConstSpan<uint8_t> indexBytes = globalScriptsIndexBlob.GetContents();
 
@@ -142,7 +142,7 @@ namespace anox::game
 
 		const rkit::ConstSpan<rkit::data::ContentID> contentIDs = indexBytes.ReinterpretCast<const rkit::data::ContentID>();
 
-		CORO_CHECK(co_await SessionImpl::LoadMultipleScripts(thread, ScriptManager::ScriptLayer::kGlobal, contentIDs));
+		co_await SessionImpl::LoadMultipleScripts(thread, ScriptManager::ScriptLayer::kGlobal, contentIDs);
 
 		CORO_RETURN_OK;
 	}
@@ -155,7 +155,7 @@ namespace anox::game
 
 	rkit::ResultCoroutine SessionImpl::PostSpawnInitialEntities(rkit::ICoroThread &thread, World &world)
 	{
-		CORO_CHECK(co_await world.OnWorldStarted(thread));
+		co_await world.OnWorldStarted(thread);
 
 		CORO_RETURN_OK;
 	}
@@ -173,7 +173,7 @@ namespace anox::game
 		m_frameStartRealTimeUSec = realTimeUSec;
 		m_gameClockUSec += interval;
 
-		CORO_CHECK(co_await world.OnRunFrame(thread, m_gameClockUSec / 1000u));
+		co_await world.OnRunFrame(thread, m_gameClockUSec / 1000u);
 		CORO_RETURN_OK;
 	}
 
@@ -183,22 +183,22 @@ namespace anox::game
 
 		rkit::Vector<SandboxResourceRequestHandle> requestHandles;
 
-		CORO_CHECK(requestHandles.Resize(numScripts));
+		requestHandles.Resize(numScripts);
 
 		for (size_t i = 0; i < numScripts; i++)
 		{
-			CORO_CHECK(SandboxResourceLoader::LoadContentKeyedResource(requestHandles[i], resloaders::kContentIDRawFileResourceTypeCode, contentIDs[i]));
+			SandboxResourceLoader::LoadContentKeyedResource(requestHandles[i], resloaders::kContentIDRawFileResourceTypeCode, contentIDs[i]);
 		}
 
 		for (size_t i = 0; i < numScripts; i++)
 		{
 			SandboxResourceHandle resHandle;
-			CORO_CHECK(co_await requestHandles[i].WaitForLoaded(thread, resHandle));
+			co_await requestHandles[i].WaitForLoaded(thread, resHandle);
 
 			SandboxResourceDataBlob blob;
-			CORO_CHECK(SandboxResourceLoader::GetFileResourceContents(blob, resHandle));
+			SandboxResourceLoader::GetFileResourceContents(blob, resHandle);
 
-			CORO_CHECK(m_scriptManager->LoadScriptPackage(layer, blob.GetContents()));
+			m_scriptManager->LoadScriptPackage(layer, blob.GetContents());
 		}
 
 		CORO_RETURN_OK;
@@ -265,7 +265,7 @@ namespace anox::game
 				outIsFinished = false;
 				RKIT_RETURN_OK;
 			case rkit::CoroThreadState::kSuspended:
-				RKIT_CHECK(mainCoroThread.Resume());
+				mainCoroThread.Resume();
 				break;
 			default:
 				RKIT_THROW(rkit::ResultCode::kInternalError);
@@ -276,9 +276,9 @@ namespace anox::game
 	rkit::Result Session::Create(rkit::UniquePtr<Session> &outSession, rkit::IMallocDriver *alloc)
 	{
 		rkit::UniquePtr<Session> session;
-		RKIT_CHECK(rkit::NewWithAlloc<Session>(session, alloc));
+		rkit::NewWithAlloc<Session>(session, alloc);
 
-		RKIT_CHECK(session->Impl().Initialize());
+		session->Impl().Initialize();
 
 		outSession = std::move(session);
 

@@ -135,6 +135,8 @@ namespace rkit
 		virtual render::IDisplayManager *GetDisplayManager() const = 0;
 
 		virtual uint64_t GetTimeUSec() const = 0;
+
+		[[noreturn]] virtual void FatalError(PackedResultAndExtCode) const = 0;
 	};
 }
 

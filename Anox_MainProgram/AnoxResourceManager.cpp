@@ -232,7 +232,7 @@ namespace anox
 
 	rkit::Result AnoxResourceLoaderSynchronizer::Init()
 	{
-		RKIT_CHECK(rkit::GetDrivers().m_systemDriver->CreateMutex(m_resourcesMutex));
+		rkit::GetDrivers().m_systemDriver->CreateMutex(m_resourcesMutex);
 
 		RKIT_RETURN_OK;
 	}
@@ -347,7 +347,7 @@ namespace anox
 
 	rkit::Result CIPathKeyedResourceTracker::SetKey(const rkit::CIPathView &path)
 	{
-		RKIT_CHECK(m_key.Set(path));
+		m_key.Set(path);
 		m_keyView = m_key;
 
 		RKIT_RETURN_OK;
@@ -381,7 +381,7 @@ namespace anox
 
 	rkit::Result StringKeyedResourceTracker::SetKey(const rkit::StringView &str)
 	{
-		RKIT_CHECK(m_key.Set(str));
+		m_key.Set(str);
 		m_keyView = m_key;
 
 		RKIT_RETURN_OK;
@@ -428,72 +428,72 @@ namespace anox
 	{
 		rkit::ISystemDriver &sysDriver = *rkit::GetDrivers().m_systemDriver;
 
-		RKIT_CHECK(rkit::New<AnoxResourceLoaderSynchronizer>(m_sync, this));
-		RKIT_CHECK(sysDriver.CreateMutex(m_loaderMutex));
+		rkit::New<AnoxResourceLoaderSynchronizer>(m_sync, this);
+		sysDriver.CreateMutex(m_loaderMutex);
 
-		RKIT_CHECK(m_sync->Init());
+		m_sync->Init();
 
 		{
 			rkit::RCPtr<AnoxPathFileResourceLoaderBase> fileLoaderFactory;
-			RKIT_CHECK(AnoxPathFileResourceLoaderBase::Create(fileLoaderFactory));
+			AnoxPathFileResourceLoaderBase::Create(fileLoaderFactory);
 
-			RKIT_CHECK(RegisterCIPathKeyedLoader(resloaders::kCIPathRawFileResourceTypeCode, std::move(fileLoaderFactory)));
+			RegisterCIPathKeyedLoader(resloaders::kCIPathRawFileResourceTypeCode, std::move(fileLoaderFactory));
 		}
 
 		{
 			rkit::RCPtr<AnoxContentFileResourceLoaderBase> fileLoaderFactory;
-			RKIT_CHECK(AnoxContentFileResourceLoaderBase::Create(fileLoaderFactory));
+			AnoxContentFileResourceLoaderBase::Create(fileLoaderFactory);
 
-			RKIT_CHECK(RegisterContentKeyedLoader(resloaders::kContentIDRawFileResourceTypeCode, std::move(fileLoaderFactory)));
+			RegisterContentKeyedLoader(resloaders::kContentIDRawFileResourceTypeCode, std::move(fileLoaderFactory));
 		}
 
 		{
 			rkit::RCPtr<AnoxBSPModelResourceLoaderBase> bspLoaderFactory;
-			RKIT_CHECK(AnoxBSPModelResourceLoaderBase::Create(bspLoaderFactory));
+			AnoxBSPModelResourceLoaderBase::Create(bspLoaderFactory);
 
-			RKIT_CHECK(RegisterCIPathKeyedLoader(resloaders::kBSPModelResourceTypeCode, std::move(bspLoaderFactory)));
+			RegisterCIPathKeyedLoader(resloaders::kBSPModelResourceTypeCode, std::move(bspLoaderFactory));
 		}
 
 		{
 			rkit::RCPtr<AnoxSpawnDefsResourceLoaderBase> spawnDefsLoaderFactory;
-			RKIT_CHECK(AnoxSpawnDefsResourceLoaderBase::Create(spawnDefsLoaderFactory));
+			AnoxSpawnDefsResourceLoaderBase::Create(spawnDefsLoaderFactory);
 
-			RKIT_CHECK(RegisterCIPathKeyedLoader(resloaders::kSpawnDefsResourceTypeCode, std::move(spawnDefsLoaderFactory)));
+			RegisterCIPathKeyedLoader(resloaders::kSpawnDefsResourceTypeCode, std::move(spawnDefsLoaderFactory));
 		}
 
 		{
 			rkit::RCPtr<AnoxTextureResourceLoaderBase> texLoader;
-			RKIT_CHECK(AnoxTextureResourceLoaderBase::Create(texLoader));
+			AnoxTextureResourceLoaderBase::Create(texLoader);
 
-			RKIT_CHECK(RegisterContentKeyedLoader(resloaders::kTextureResourceTypeCode, std::move(texLoader)));
+			RegisterContentKeyedLoader(resloaders::kTextureResourceTypeCode, std::move(texLoader));
 		}
 
 		{
 			rkit::RCPtr<AnoxMaterialResourceLoaderBase> worldMaterialLoader;
-			RKIT_CHECK(AnoxMaterialResourceLoaderBase::Create(worldMaterialLoader, data::MaterialResourceType::kWorld));
+			AnoxMaterialResourceLoaderBase::Create(worldMaterialLoader, data::MaterialResourceType::kWorld);
 
-			RKIT_CHECK(RegisterContentKeyedLoader(resloaders::kWorldMaterialTypeCode, std::move(worldMaterialLoader)));
+			RegisterContentKeyedLoader(resloaders::kWorldMaterialTypeCode, std::move(worldMaterialLoader));
 		}
 
 		{
 			rkit::RCPtr<AnoxMaterialResourceLoaderBase> modelMaterialLoader;
-			RKIT_CHECK(AnoxMaterialResourceLoaderBase::Create(modelMaterialLoader, data::MaterialResourceType::kModel));
+			AnoxMaterialResourceLoaderBase::Create(modelMaterialLoader, data::MaterialResourceType::kModel);
 
-			RKIT_CHECK(RegisterContentKeyedLoader(resloaders::kModelMaterialTypeCode, std::move(modelMaterialLoader)));
+			RegisterContentKeyedLoader(resloaders::kModelMaterialTypeCode, std::move(modelMaterialLoader));
 		}
 
 		{
 			rkit::RCPtr<AnoxEntityDefResourceLoaderBase> edefLoader;
-			RKIT_CHECK(AnoxEntityDefResourceLoaderBase::Create(edefLoader));
+			AnoxEntityDefResourceLoaderBase::Create(edefLoader);
 
-			RKIT_CHECK(RegisterContentKeyedLoader(resloaders::kEntityDefTypeCode, std::move(edefLoader)));
+			RegisterContentKeyedLoader(resloaders::kEntityDefTypeCode, std::move(edefLoader));
 		}
 
 		{
 			rkit::RCPtr<AnoxMDAModelResourceLoaderBase> mdaLoader;
-			RKIT_CHECK(AnoxMDAModelResourceLoaderBase::Create(mdaLoader));
+			AnoxMDAModelResourceLoaderBase::Create(mdaLoader);
 
-			RKIT_CHECK(RegisterContentKeyedLoader(resloaders::kMDAModelResourceTypeCode, std::move(mdaLoader)));
+			RegisterContentKeyedLoader(resloaders::kMDAModelResourceTypeCode, std::move(mdaLoader));
 		}
 
 		RKIT_RETURN_OK;
@@ -522,7 +522,7 @@ namespace anox
 		keyedFactory.m_keyType = keyType;
 		keyedFactory.m_loader = std::move(loader);
 
-		RKIT_CHECK(m_loaders.Set(resourceType, std::move(keyedFactory)));
+		m_loaders.Set(resourceType, std::move(keyedFactory));
 
 		RKIT_RETURN_OK;
 	}
@@ -562,7 +562,7 @@ namespace anox
 					// the same resource
 					if (!tracker->m_loadCompletionSignaler.IsValid())
 					{
-						RKIT_CHECK(m_jobQueue->CreateSignaledJob(tracker->m_loadCompletionSignaler, tracker->m_loadCompletionJob));
+						m_jobQueue->CreateSignaledJob(tracker->m_loadCompletionSignaler, tracker->m_loadCompletionJob);
 					}
 
 					*outJob = tracker->m_loadCompletionJob;
@@ -586,7 +586,7 @@ namespace anox
 				resLock.Unlock();
 
 				rkit::RCPtr<rkit::FutureContainer<AnoxResourceRetrieveResult>> futureContainer;
-				RKIT_CHECK(rkit::New<rkit::FutureContainer<AnoxResourceRetrieveResult>>(futureContainer));
+				rkit::New<rkit::FutureContainer<AnoxResourceRetrieveResult>>(futureContainer);
 
 				if (trackerPtr.IsValid())
 				{
@@ -615,7 +615,7 @@ namespace anox
 
 		// Create the resource
 		rkit::UniquePtr<AnoxResourceBase> resourceUPtr;
-		RKIT_CHECK(loader->BaseCreateResourceObject(resourceUPtr));
+		loader->BaseCreateResourceObject(resourceUPtr);
 
 		AnoxResourceBase *resource = resourceUPtr.Get();
 
@@ -624,9 +624,9 @@ namespace anox
 		// not the AnoxResourceTracker destructor.  However, unregistration ONLY happens if the resource
 		// has been linked.
 		rkit::UniquePtr<TKeyedTracker> keyedTrackerUPtr;
-		RKIT_CHECK(rkit::New<TKeyedTracker>(keyedTrackerUPtr, m_sync, key.GetResourceType(), std::move(resourceUPtr)));
+		rkit::New<TKeyedTracker>(keyedTrackerUPtr, m_sync, key.GetResourceType(), std::move(resourceUPtr));
 
-		RKIT_CHECK(keyedTrackerUPtr->SetKey(key.GetResourceKey()));
+		keyedTrackerUPtr->SetKey(key.GetResourceKey());
 
 		TKeyedTracker *keyedTracker = keyedTrackerUPtr.Get();
 		AnoxResourceTracker *tracker = keyedTracker;
@@ -637,21 +637,21 @@ namespace anox
 		// Now that resourceRCPtr is set, failure will cause the mutex to be unlocked, followed by
 		// re-lock and unregistration of the resource by resourceRCPtr
 		rkit::RCPtr<rkit::FutureContainer<AnoxResourceRetrieveResult>> pendingFutureContainer;
-		RKIT_CHECK(rkit::New<rkit::FutureContainer<AnoxResourceRetrieveResult>>(pendingFutureContainer));
+		rkit::New<rkit::FutureContainer<AnoxResourceRetrieveResult>>(pendingFutureContainer);
 
 		tracker->m_pendingFutureContainer = pendingFutureContainer;
 
 		// Create the completion notifier
 		rkit::RCPtr<AnoxResourceTracker> trackerRCPtr = rkit::RCPtr<AnoxResourceTracker>(tracker, tracker);
 
-		RKIT_CHECK(rkit::New<AnoxResourceLoadCompletionNotifier>(loadCompleter, trackerRCPtr));
+		rkit::New<AnoxResourceLoadCompletionNotifier>(loadCompleter, trackerRCPtr);
 
 		rkit::RCPtr<rkit::FutureContainer<AnoxResourceRetrieveResult>> recastContainer;
 
 		// Add to the resource map and link.  Both operations must be done together atomically,
 		// since UnsyncedUnregisterResource will check if the resource is linked to determine
 		// if it needs to be removed from the resource map.
-		RKIT_CHECK(resourceMap->SetPrehashed(hash, ResourceKey<TKeyViewType>(key.GetResourceType(), keyedTracker->GetKey()), tracker));
+		resourceMap->SetPrehashed(hash, ResourceKey<TKeyViewType>(key.GetResourceType(), keyedTracker->GetKey()), tracker);
 
 		// With the load completion notifier set up, any further failures in this function
 		// will trigger a load failure, and the resource is registered now, so we can add it
@@ -680,7 +680,7 @@ namespace anox
 			m_graphicsSubsystem
 		};
 
-		RKIT_CHECK(loader->BaseCreateLoadJob(resourceRCPtr, systems, keyPtr, loadJob));
+		loader->BaseCreateLoadJob(resourceRCPtr, systems, keyPtr, loadJob);
 
 		{
 			rkit::ConstSpan<rkit::RCPtr<rkit::Job>> completeJobDepSpan;
@@ -688,8 +688,8 @@ namespace anox
 				completeJobDepSpan = rkit::Span<rkit::RCPtr<rkit::Job>>(&loadJob, 1);
 
 			rkit::UniquePtr<rkit::IJobRunner> completeJobRunner;
-			RKIT_CHECK(rkit::New<AnoxCompleteResourceLoadJobRunner>(completeJobRunner, loadCompleter));
-			RKIT_CHECK(m_jobQueue->CreateJob(outJob, rkit::JobType::kNormalPriority, std::move(completeJobRunner), completeJobDepSpan));
+			rkit::New<AnoxCompleteResourceLoadJobRunner>(completeJobRunner, loadCompleter);
+			m_jobQueue->CreateJob(outJob, rkit::JobType::kNormalPriority, std::move(completeJobRunner), completeJobDepSpan);
 		}
 
 		loadFuture = rkit::Future<AnoxResourceRetrieveResult>(std::move(pendingFutureContainer));
@@ -801,8 +801,8 @@ namespace anox
 	{
 		rkit::UniquePtr<AnoxResourceManager> resLoader;
 
-		RKIT_CHECK(rkit::New<AnoxResourceManager>(resLoader, fileSystem, jobQueue));
-		RKIT_CHECK(resLoader->Initialize());
+		rkit::New<AnoxResourceManager>(resLoader, fileSystem, jobQueue);
+		resLoader->Initialize();
 
 		outResLoader = std::move(resLoader);
 
