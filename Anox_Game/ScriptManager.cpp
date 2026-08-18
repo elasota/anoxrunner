@@ -954,8 +954,7 @@ namespace anox::game
 			RKIT_THROW(rkit::ResultCode::kDataError);
 		}
 
-		rkit::UniquePtr<ScriptPackage> package;
-		rkit::New<ScriptPackage>(package);
+		rkit::UniquePtr<ScriptPackage> package = rkit::New<ScriptPackage>();
 
 		for (ScriptWindow &window : scriptWindows)
 			window.m_package = package.Get();
@@ -1089,7 +1088,7 @@ namespace anox::game
 
 	rkit::Result ScriptManagerImpl::CreateScriptEnvironment(rkit::UniquePtr<ScriptEnvironment> &outScriptEnvironment)
 	{
-		return rkit::New<ScriptEnvironment>(outScriptEnvironment, *this);
+		outScriptEnvironment = rkit::New<ScriptEnvironment>(*this);
 	}
 
 	void ScriptManagerImpl::RegisterExtern(size_t slot, ScriptManager::ExternDispatchFunc_t dispatchFunc)
@@ -1191,8 +1190,7 @@ namespace anox::game
 
 	rkit::Result ScriptManager::Create(rkit::UniquePtr<ScriptManager> &outScriptManager)
 	{
-		rkit::UniquePtr<ScriptManager> scriptManager;
-		rkit::New<ScriptManager>(scriptManager);
+		rkit::UniquePtr<ScriptManager> scriptManager = rkit::New<ScriptManager>();
 
 		scriptManager->RegisterAllExterns();
 		outScriptManager = std::move(scriptManager);
@@ -1202,7 +1200,7 @@ namespace anox::game
 
 	rkit::Result ScriptEnvironment::CreateScriptContext(rkit::UniquePtr<ScriptContext> &outScriptCtx)
 	{
-		return rkit::New<ScriptContext>(outScriptCtx);
+		outScriptCtx = rkit::New<ScriptContext>();
 	}
 
 	bool ScriptEnvironment::TryEvaluateFloatScriptExpr(float &outValue, const ScriptPackage &pkg, const ScriptExprValue &expr) const

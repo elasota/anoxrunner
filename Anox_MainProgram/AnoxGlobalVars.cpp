@@ -25,8 +25,7 @@ namespace anox { namespace game {
 		ConfigBuilderValue_t root;
 		root = std::move(kvt);
 
-		rkit::UniquePtr<ConfigurationValueRootState> rootState;
-		rkit::New<ConfigurationValueRootState>(rootState, std::move(root));
+		rkit::UniquePtr<ConfigurationValueRootState> rootState = rkit::New<ConfigurationValueRootState>(std::move(root));
 
 		state = std::move(rootState);
 

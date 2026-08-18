@@ -39,12 +39,9 @@ namespace rkit
 template<class TProgram>
 rkit::Result rkit::ProgramStubDriver<TProgram>::InitDriver(const DriverInitParameters *)
 {
-	UniquePtr<ISimpleProgram> program;
-	New<TProgram>(program);
+	UniquePtr<ISimpleProgram> program = New<TProgram>();
 
 	ms_program = program.Detach();
-
-	RKIT_RETURN_OK;
 }
 
 template<class TProgram>

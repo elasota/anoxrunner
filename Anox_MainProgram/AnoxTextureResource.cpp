@@ -32,24 +32,21 @@ namespace anox
 
 	rkit::Result AnoxTextureResourceLoader::CreateLoadJob(const rkit::RCPtr<AnoxTextureResourceBase> &resource, const AnoxResourceLoaderSystems &systems, const rkit::data::ContentID &key, rkit::RCPtr<rkit::Job> &outJob) const
 	{
-		rkit::RCPtr<AnoxTextureResourceLoaderState> state;
-		rkit::New<AnoxTextureResourceLoaderState>(state);
+		rkit::RCPtr<AnoxTextureResourceLoaderState> state = rkit::NewRC<AnoxTextureResourceLoaderState>();
 
 		rkit::RCPtr<rkit::Job> loadJob;
 		CreateLoadEntireFileJob(loadJob, state.FieldRef(&AnoxTextureResourceLoaderState::m_data), *systems.m_fileSystem, key);
 
 		systems.m_graphicsSystem->CreateAsyncCreateTextureJob(&outJob, resource.StaticCast<AnoxTextureResource>()->m_texture, state.FieldRef(&AnoxTextureResourceLoaderState::m_data), loadJob);
-
-		RKIT_RETURN_OK;
 	}
 
 	rkit::Result AnoxTextureResourceLoader::CreateResourceObject(rkit::UniquePtr<AnoxTextureResourceBase> &outResource) const
 	{
-		return rkit::New<AnoxTextureResource>(outResource);
+		outResource = rkit::New<AnoxTextureResource>();
 	}
 
 	rkit::Result AnoxTextureResourceLoaderBase::Create(rkit::RCPtr<AnoxTextureResourceLoaderBase> &outLoader)
 	{
-		return rkit::New<AnoxTextureResourceLoader>(outLoader);
+		outLoader = rkit::NewRC<AnoxTextureResourceLoader>();
 	}
 }

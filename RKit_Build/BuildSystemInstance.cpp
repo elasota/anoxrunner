@@ -1538,9 +1538,7 @@ namespace rkit { namespace buildsystem
 		CIPath pathCopy;
 		pathCopy.Set(path);
 
-		New<FeedbackWrapperStream>(outputFile, *this, productIndex, location, std::move(pathCopy), std::move(realFile));
-
-		RKIT_RETURN_OK;
+		outputFile = New<FeedbackWrapperStream>(*this, productIndex, location, std::move(pathCopy), std::move(realFile));
 	}
 
 	Result DependencyNode::DependencyNodeCompilerFeedback::AddAnonymousDeployableContent(BuildFileLocation location, const CIPathView &path)
@@ -1813,7 +1811,7 @@ namespace rkit { namespace buildsystem
 
 	Result IBaseBuildSystemInstance::Create(UniquePtr<IBuildSystemInstance> &outInstance)
 	{
-		return rkit::New<BuildSystemInstance>(outInstance);
+		outInstance = rkit::New<BuildSystemInstance>();
 	}
 
 	Result BuildSystemInstance::Initialize(const rkit::StringView &targetName, const OSAbsPathView &srcDir, const OSAbsPathView &intermediateDir, const OSAbsPathView &dataFilesDir, const OSAbsPathView &dataContentDir)
@@ -1824,14 +1822,9 @@ namespace rkit { namespace buildsystem
 		m_dataFilesDir.Set(dataFilesDir);
 		m_dataContentDir.Set(dataContentDir);
 
-		UniquePtr<IDependencyNodeCompiler> depsCompiler;
-		New<DepsNodeCompiler>(depsCompiler);
-
-		UniquePtr<IDependencyNodeCompiler> pipelineLibraryCompiler;
-		New<RenderPipelineLibraryCompiler>(pipelineLibraryCompiler);
-
-		UniquePtr<IDependencyNodeCompiler> copyFileCompiler;
-		New<CopyFileCompiler>(copyFileCompiler);
+		UniquePtr<IDependencyNodeCompiler> depsCompiler = New<DepsNodeCompiler>();
+		UniquePtr<IDependencyNodeCompiler> pipelineLibraryCompiler = New<RenderPipelineLibraryCompiler>();
+		UniquePtr<IDependencyNodeCompiler> copyFileCompiler = New<CopyFileCompiler>();
 
 		RegisterNodeCompiler(kDefaultNamespace, kDepsNodeID, std::move(depsCompiler));
 		RegisterNodeCompiler(kDefaultNamespace, kRenderPipelineLibraryNodeID, std::move(pipelineLibraryCompiler));
@@ -1896,7 +1889,7 @@ namespace rkit { namespace buildsystem
 
 			IDependencyNodeCompiler *compiler = it.Value().Get();
 
-			New<DependencyNode>(nodesVector[i], compiler, nodeNamespace, nodeType, std::move(content), inputLocation);
+			nodesVector[i] = New<DependencyNode>(compiler, nodeNamespace, nodeType, std::move(content), inputLocation);
 		}
 
 		serializer::DeserializeResolver resolver(nodes, strings);
@@ -2274,8 +2267,7 @@ namespace rkit { namespace buildsystem
 			RKIT_THROW(ResultCode::kInvalidParameter);
 		}
 
-		UniquePtr<DependencyNode> depNode;
-		New<DependencyNode>(depNode, compilerIt.Value().Get(), nodeNamespace, nodeType, std::move(content), buildFileLocation);
+		UniquePtr<DependencyNode> depNode = New<DependencyNode>(compilerIt.Value().Get(), nodeNamespace, nodeType, std::move(content), buildFileLocation);
 
 		depNode->Initialize(identifier);
 
@@ -2651,8 +2643,7 @@ namespace rkit { namespace buildsystem
 			}
 		}
 
-		UniquePtr<CachedDirScan> dirScan;
-		New<CachedDirScan>(dirScan);
+		UniquePtr<CachedDirScan> dirScan = New<CachedDirScan>();
 
 		dirScan->m_scan.m_directoryPath.Set(path);
 		dirScan->m_scan.m_directoryLocation = location;
@@ -2765,8 +2756,7 @@ namespace rkit { namespace buildsystem
 			}
 		}
 
-		UniquePtr<CachedFileStatus> fileStatus;
-		New<CachedFileStatus>(fileStatus);
+		UniquePtr<CachedFileStatus> fileStatus = New<CachedFileStatus>();
 
 		fileStatus->m_exists = false;
 		m_fs->ResolveFileStatusIfExists(location, path, allowDirectories, fileStatus.Get(), ResolveCachedFileStatusCallback);

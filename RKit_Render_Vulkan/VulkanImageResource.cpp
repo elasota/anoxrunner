@@ -162,7 +162,7 @@ namespace rkit { namespace render { namespace vulkan {
 
 		VkImageAspectFlags allAspects = VK_IMAGE_ASPECT_COLOR_BIT;
 
-		RKIT_TRY_CATCH_RETHROW(rkit::New<VulkanImagePrototype>(outImagePrototype, device, image, allAspects),
+		RKIT_TRY_CATCH_RETHROW(outImagePrototype = rkit::New<VulkanImagePrototype>(device, image, allAspects),
 			CatchContext(
 				[&device, image]
 				{

@@ -266,8 +266,7 @@ namespace anox::game
 
 	rkit::Result GameAudioManagerImpl::CreateSoundSourceFromBytes(uint32_t &outSourceID, rkit::TypelessRCPtr &&keepalive, rkit::Span<const uint8_t> contents, rkit::audio::AudioContainerFormat containerFormat)
 	{
-		rkit::UniquePtr<GameSoundDataSource> dataSrc;
-		rkit::New<GameSoundBytesDataSource>(dataSrc, std::move(keepalive), contents);
+		rkit::UniquePtr<GameSoundDataSource> dataSrc = rkit::New<GameSoundBytesDataSource>(std::move(keepalive), contents);
 
 		return CreateAudioSourceFromDataSource(outSourceID, std::move(dataSrc), containerFormat);
 	}
@@ -281,8 +280,7 @@ namespace anox::game
 		{
 		case rkit::audio::AudioContainerFormat::kMPEGLayer3:
 			{
-				rkit::RCPtr<GameSoundMP3Source> mp3Src;
-				rkit::New<GameSoundMP3Source>(mp3Src, std::move(dataSource));
+				rkit::RCPtr<GameSoundMP3Source> mp3Src = rkit::NewRC<GameSoundMP3Source>(std::move(dataSource));
 				mp3Src->Initialize(*m_mp3Driver);
 
 				src = std::move(mp3Src);
@@ -372,8 +370,7 @@ namespace anox::game
 
 	rkit::Result GameAudioManager::Create(rkit::UniquePtr<GameAudioManager> &outAudioManager, AudioSubsystem& audioSubsystem)
 	{
-		rkit::UniquePtr<GameAudioManager> audioManager;
-		rkit::New<GameAudioManager>(audioManager, audioSubsystem);
+		rkit::UniquePtr<GameAudioManager> audioManager = rkit::New<GameAudioManager>(audioSubsystem);
 
 		audioManager->Impl().Initialize();
 

@@ -485,11 +485,9 @@ namespace rkit
 
 	Result ProgramModule::Init(const ModuleInitParameters *)
 	{
-		UniquePtr<ProgramLauncherPrivate::ModuleConfig> moduleConfig;
-		New<ProgramLauncherPrivate::ModuleConfig>(moduleConfig);
+		UniquePtr<ProgramLauncherPrivate::ModuleConfig> moduleConfig = New<ProgramLauncherPrivate::ModuleConfig>();
 
-		UniquePtr<TrackedModuleDriver> driver;
-		New<TrackedModuleDriver>(driver, GetDrivers().m_moduleDriver);
+		UniquePtr<TrackedModuleDriver> driver = New<TrackedModuleDriver>(GetDrivers().m_moduleDriver);
 		ms_trackedModuleDriver = driver.Detach();
 
 		GetMutableDrivers().m_moduleDriver = ms_trackedModuleDriver;

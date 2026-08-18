@@ -153,12 +153,10 @@ namespace anox
 		rkit::RCPtr<PerFramePerDisplayResources> perDisplayResources = renderedWindow.GetCurrentFrameResources();
 
 		rkit::RCPtr<rkit::Job> submitJob;
-		rkit::UniquePtr<SubmitTestCommandsJobRunner> submitJobRunner;
-		rkit::New<SubmitTestCommandsJobRunner>(submitJobRunner);
+		rkit::UniquePtr<SubmitTestCommandsJobRunner> submitJobRunner = rkit::New<SubmitTestCommandsJobRunner>();
 
 		rkit::RCPtr<rkit::Job> recordJob;
-		rkit::UniquePtr<RecordTestCommandsJobRunner> recordJobRunner;
-		rkit::New<RecordTestCommandsJobRunner>(recordJobRunner, submitJobRunner->GetCmdBatchRef(), perDisplayResources);
+		rkit::UniquePtr<RecordTestCommandsJobRunner> recordJobRunner = rkit::New<RecordTestCommandsJobRunner>(submitJobRunner->GetCmdBatchRef(), perDisplayResources);
 
 		graphicsSubsystem.CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kGraphics, std::move(recordJobRunner), rkit::Span<rkit::RCPtr<rkit::Job>>(&perDisplayResources->m_acquireJob, 1));
 
@@ -174,13 +172,10 @@ namespace anox
 
 	rkit::Result IFrameDrawer::Create(rkit::UniquePtr<IFrameDrawer> &outFrameDrawer)
 	{
-		rkit::UniquePtr<FrameDrawer> frameDrawer;
-		rkit::New<FrameDrawer>(frameDrawer);
+		rkit::UniquePtr<FrameDrawer> frameDrawer = rkit::New<FrameDrawer>();
 
 		frameDrawer->Initialize();
 
 		outFrameDrawer = std::move(frameDrawer);
-
-		RKIT_RETURN_OK;
 	}
 }

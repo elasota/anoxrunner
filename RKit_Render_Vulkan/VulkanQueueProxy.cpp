@@ -202,14 +202,11 @@ namespace rkit::render::vulkan
 
 	Result VulkanQueueProxyBase::Create(UniquePtr<VulkanQueueProxyBase> &outQueueProxy, IMallocDriver *alloc, CommandQueueType queueType, VulkanDeviceBase &device, VkQueue queue, uint32_t queueFamily, const VulkanDeviceAPI &deviceAPI)
 	{
-		UniquePtr<VulkanQueueProxy> queueProxy;
-		New<VulkanQueueProxy>(queueProxy, alloc, queueType, device, queue, queueFamily, deviceAPI);
+		UniquePtr<VulkanQueueProxy> queueProxy = New<VulkanQueueProxy>(alloc, queueType, device, queue, queueFamily, deviceAPI);
 
 		queueProxy->Initialize();
 
 		outQueueProxy = std::move(queueProxy);
-
-		RKIT_RETURN_OK;
 	}
 } // rkit::render::vulkan
 

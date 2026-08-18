@@ -870,8 +870,7 @@ namespace anox
 	{
 		typedef AnoxAbstractSingleFileResourceLoader<AnoxMDAModelLoaderInfo> Loader_t;
 
-		rkit::RCPtr<Loader_t> loader;
-		rkit::New<Loader_t>(loader);
+		rkit::RCPtr<Loader_t> loader = rkit::NewRC<Loader_t>();
 
 		outLoader = std::move(loader);
 

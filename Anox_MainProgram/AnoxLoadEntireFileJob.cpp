@@ -72,8 +72,7 @@ namespace anox
 		rkit::UniquePtr<rkit::IAsyncReadRequester> requester;
 		m_openFileFuture.GetResult().m_file->CreateReadRequester(requester);
 
-		rkit::UniquePtr<AnoxFileResourceIOCompleter> completer;
-		rkit::New<AnoxFileResourceIOCompleter>(completer, m_signaller, m_fileBlob, size);
+		rkit::UniquePtr<AnoxFileResourceIOCompleter> completer = rkit::New<AnoxFileResourceIOCompleter>(m_signaller, m_fileBlob, size);
 
 		AnoxFileResourceIOCompleter *completerPtr = completer.Get();
 		completer->SetSelf(std::move(completer));
@@ -119,10 +118,9 @@ namespace anox
 		rkit::RCPtr<rkit::Job> ioRequestJob;
 		jobQueue.CreateSignaledJob(signaller, ioRequestJob);
 
-		rkit::UniquePtr<rkit::IJobRunner> postIOJobRunner;
-		rkit::RCPtr<rkit::Job> postIOJob;
+		rkit::UniquePtr<rkit::IJobRunner> postIOJobRunner = rkit::New<AnoxFileResourcePostIOLoadJobRunner>(jobQueue, blob, openFileFuture, std::move(signaller));
 
-		rkit::New<AnoxFileResourcePostIOLoadJobRunner>(postIOJobRunner, jobQueue, blob, openFileFuture, std::move(signaller));
+		rkit::RCPtr<rkit::Job> postIOJob;
 
 		jobQueue.CreateJob(&postIOJob, rkit::JobType::kIO, std::move(postIOJobRunner), openJob);
 
@@ -135,8 +133,7 @@ namespace anox
 	{
 		rkit::RCPtr<rkit::Job> openJob;
 
-		rkit::FutureContainerPtr<rkit::AsyncFileOpenReadResult> openFileFutureContainer;
-		rkit::New<rkit::FutureContainer<rkit::AsyncFileOpenReadResult>>(openFileFutureContainer);
+		rkit::FutureContainerPtr<rkit::AsyncFileOpenReadResult> openFileFutureContainer = rkit::NewRC<rkit::FutureContainer<rkit::AsyncFileOpenReadResult>>();
 
 		fileSystem.OpenNamedFileAsync(openJob, openFileFutureContainer, path);
 
@@ -147,8 +144,7 @@ namespace anox
 	{
 		rkit::RCPtr<rkit::Job> openJob;
 
-		rkit::FutureContainerPtr<rkit::AsyncFileOpenReadResult> openFileFutureContainer;
-		rkit::New<rkit::FutureContainer<rkit::AsyncFileOpenReadResult>>(openFileFutureContainer);
+		rkit::FutureContainerPtr<rkit::AsyncFileOpenReadResult> openFileFutureContainer = rkit::NewRC<rkit::FutureContainer<rkit::AsyncFileOpenReadResult>>();
 
 		fileSystem.OpenContentFileAsync(openJob, openFileFutureContainer, contentID);
 

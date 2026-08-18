@@ -58,17 +58,17 @@ namespace rkit
 
 	Result MutexProtectedStreamWrapper::CreateReadStream(UniquePtr<ISeekableReadStream> &outStream)
 	{
-		return New<MutexProtectedStream>(outStream, SharedPtr<MutexProtectedStreamWrapper>(this, m_rcTracker));
+		outStream = New<MutexProtectedStream>(SharedPtr<MutexProtectedStreamWrapper>(this, m_rcTracker));
 	}
 
 	Result MutexProtectedStreamWrapper::CreateWriteStream(UniquePtr<ISeekableWriteStream> &outStream)
 	{
-		return New<MutexProtectedStream>(outStream, SharedPtr<MutexProtectedStreamWrapper>(this, m_rcTracker));
+		outStream = New<MutexProtectedStream>(SharedPtr<MutexProtectedStreamWrapper>(this, m_rcTracker));
 	}
 
 	Result MutexProtectedStreamWrapper::CreateReadWriteStream(UniquePtr<ISeekableReadWriteStream> &outStream)
 	{
-		return New<MutexProtectedStream>(outStream, SharedPtr<MutexProtectedStreamWrapper>(this, m_rcTracker));
+		outStream = New<MutexProtectedStream>(SharedPtr<MutexProtectedStreamWrapper>(this, m_rcTracker));
 	}
 
 	void MutexProtectedStreamWrapper::SetTracker(BaseRefCountTracker *tracker)

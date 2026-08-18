@@ -867,15 +867,13 @@ namespace anox
 
 		rkit::data::IRenderDataHandler *rdh = dataDriver->GetRenderDataHandler();
 
-		rkit::UniquePtr<RenderDataConfigurator> configurator;
-		rkit::New<RenderDataConfigurator>(configurator, m_graphicsSubsystem.GetGraphicsSettings().m_restartRequired);
+		rkit::UniquePtr<RenderDataConfigurator> configurator = rkit::New<RenderDataConfigurator>(m_graphicsSubsystem.GetGraphicsSettings().m_restartRequired);
 
 		rkit::UniquePtr<rkit::data::IRenderDataPackage> package;
 		rdh->LoadPackage(*pipelinesFile, false, configurator.Get(), package, nullptr);
 
-		rkit::UniquePtr<LivePipelineSets> pipelineSets;
+		rkit::UniquePtr<LivePipelineSets> pipelineSets = rkit::New<LivePipelineSets>();
 
-		rkit::New<LivePipelineSets>(pipelineSets);
 		EvaluateLivePipelineSets(*package, *configurator, *pipelineSets);
 
 		rkit::UniquePtr<rkit::ISeekableReadStream> cacheReadStream;
@@ -1071,8 +1069,7 @@ namespace anox
 			RKIT_RETURN_OK;
 		}
 
-		rkit::UniquePtr<rkit::IJobRunner> jobRunner;
-		rkit::New<LoadOneGraphicsPipelineJob>(jobRunner, m_graphicsSubsystem, m_index + 1);
+		rkit::UniquePtr<rkit::IJobRunner> jobRunner = rkit::New<LoadOneGraphicsPipelineJob>(m_graphicsSubsystem, m_index + 1);
 
 		m_graphicsSubsystem.m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kIO, std::move(jobRunner), nullptr);
 		RKIT_RETURN_OK;
@@ -1246,8 +1243,7 @@ namespace anox
 		}
 		else
 		{
-			rkit::RCPtr<BufferUploadTask> bufferUploadTask;
-			rkit::New<BufferUploadTask>(bufferUploadTask);
+			rkit::RCPtr<BufferUploadTask> bufferUploadTask = rkit::NewRC<BufferUploadTask>();
 
 			rkit::RCPtr<rkit::JobSignaler> m_doneSignaler;
 
@@ -1513,8 +1509,7 @@ namespace anox
 		}
 		else
 		{
-			rkit::RCPtr<TextureUploadTask> textureUploadTask;
-			rkit::New<TextureUploadTask>(textureUploadTask);
+			rkit::RCPtr<TextureUploadTask> textureUploadTask = rkit::NewRC<TextureUploadTask>();
 
 			textureUploadTask->m_doneSignaler = m_doneCopyingSignaler;
 			textureUploadTask->m_texture = m_texture;
@@ -2358,15 +2353,13 @@ namespace anox
 
 		rkit::RCPtr<rkit::Job> openPipelineCacheJob;
 
-		rkit::FutureContainerPtr<rkit::UniquePtr<rkit::ISeekableReadStream>> pipelineStreamFutureContainer;
-		rkit::New<rkit::FutureContainer<rkit::UniquePtr<rkit::ISeekableReadStream>>>(pipelineStreamFutureContainer);
+		rkit::FutureContainerPtr<rkit::UniquePtr<rkit::ISeekableReadStream>> pipelineStreamFutureContainer = rkit::NewRC<rkit::FutureContainer<rkit::UniquePtr<rkit::ISeekableReadStream>>>();
 
 		m_fileSystem.OpenNamedFileBlocking(openPipelineCacheJob, pipelineStreamFutureContainer, pipelinesFile);
 
 		rkit::Future<rkit::UniquePtr<rkit::ISeekableReadStream>> pipelineStreamFuture(pipelineStreamFutureContainer);
 
-		rkit::UniquePtr<rkit::IJobRunner> jobRunner;
-		rkit::New<CheckPipelinesJob>(jobRunner, *this, pipelineStreamFuture, pipelinesCacheFile);
+		rkit::UniquePtr<rkit::IJobRunner> jobRunner = rkit::New<CheckPipelinesJob>(*this, pipelineStreamFuture, pipelinesCacheFile);
 
 		m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kIO, std::move(jobRunner), openPipelineCacheJob);
 
@@ -2637,8 +2630,7 @@ namespace anox
 
 		presentationLogicalQueueRef = graphicsLogicalQueue;
 
-		rkit::UniquePtr<GameWindowResources> gameWindowResourcesUniquePtr;
-		rkit::New<GameWindowResources>(gameWindowResourcesUniquePtr);
+		rkit::UniquePtr<GameWindowResources> gameWindowResourcesUniquePtr = rkit::New<GameWindowResources>();
 
 		GameWindowResources &gameWindowResources = *gameWindowResourcesUniquePtr.Get();
 
@@ -2737,8 +2729,7 @@ namespace anox
 			m_setupProgress = 0;
 		}
 
-		rkit::UniquePtr<rkit::IJobRunner> jobRunner;
-		rkit::New<LoadOneGraphicsPipelineJob>(jobRunner, *this, 0);
+		rkit::UniquePtr<rkit::IJobRunner> jobRunner = rkit::New<LoadOneGraphicsPipelineJob>(*this, 0);
 
 		m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kIO, std::move(jobRunner), nullptr);
 
@@ -2781,8 +2772,7 @@ namespace anox
 				rkit::RCPtr<rkit::Job> initJobRC;
 
 				{
-					rkit::UniquePtr<rkit::IJobRunner> jobRunner;
-					rkit::New<CreateNewIndividualCacheJob>(jobRunner, *this, m_pipelinesCacheFileName);
+					rkit::UniquePtr<rkit::IJobRunner> jobRunner = rkit::New<CreateNewIndividualCacheJob>(*this, m_pipelinesCacheFileName);
 
 					m_threadPool.GetJobQueue()->CreateJob(&initJobRC, rkit::JobType::kNormalPriority, std::move(jobRunner), nullptr);
 				}
@@ -2791,8 +2781,7 @@ namespace anox
 
 				for (size_t i = 0; i < m_livePipelineSets->m_graphicsPipelines.Count(); i++)
 				{
-					rkit::UniquePtr<rkit::IJobRunner> jobRunner;
-					rkit::New<CompileOneGraphicsPipelineJob>(jobRunner, *this, i);
+					rkit::UniquePtr<rkit::IJobRunner> jobRunner = rkit::New<CompileOneGraphicsPipelineJob>(*this, i);
 
 					// FIXME: Change these to low-priority
 					rkit::RCPtr<rkit::Job> job;
@@ -2801,8 +2790,7 @@ namespace anox
 					jobs.Append(std::move(job));
 				}
 
-				rkit::UniquePtr<rkit::IJobRunner> finishedJobRunner;
-				rkit::New<DoneCompilingPipelinesJob>(finishedJobRunner, *this);
+				rkit::UniquePtr<rkit::IJobRunner> finishedJobRunner = rkit::New<DoneCompilingPipelinesJob>(*this);
 
 				m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(finishedJobRunner), jobs.ToSpan().ToValueISpan());
 
@@ -2832,8 +2820,7 @@ namespace anox
 				progressMonitor->SetRange(0, numTotalPipelines);
 			}
 
-			rkit::UniquePtr<rkit::IJobRunner> jobRunner;
-			rkit::New<MergePipelineLibraryJob>(jobRunner, *this);
+			rkit::UniquePtr<rkit::IJobRunner> jobRunner = rkit::New<MergePipelineLibraryJob>(*this);
 
 			m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(jobRunner), nullptr);
 
@@ -3002,8 +2989,7 @@ namespace anox
 
 			if (!disposeNow.IsEmptyUnsafe())
 			{
-				rkit::UniquePtr<AsyncDisposeResourceJobRunner> disposeRunner;
-				rkit::New<AsyncDisposeResourceJobRunner>(disposeRunner, std::move(disposeNow));
+				rkit::UniquePtr<AsyncDisposeResourceJobRunner> disposeRunner = rkit::New<AsyncDisposeResourceJobRunner>(std::move(disposeNow));
 
 				m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(disposeRunner), rkit::JobDependencyList());
 			}
@@ -3037,8 +3023,7 @@ namespace anox
 			if (!cmdQueueReset.Get(static_cast<size_t>(queueType)))
 			{
 				// Queue a command allocator reset on each record queue
-				rkit::UniquePtr<rkit::IJobRunner> resetJobRunner;
-				rkit::New<ResetCommandAllocatorJob>(resetJobRunner, cmdListHandler);
+				rkit::UniquePtr<rkit::IJobRunner> resetJobRunner = rkit::New<ResetCommandAllocatorJob>(cmdListHandler);
 
 				CreateAndQueueJob(nullptr, logicalQueueType, std::move(resetJobRunner), rkit::Span<rkit::Job *>().ToValueISpan(), &LogicalQueueBase::m_lastRecordJob);
 			}
@@ -3096,11 +3081,9 @@ namespace anox
 		// - Buffer-to-image copy jobs
 		if (actionSet.m_prepareImageForTransfer.Count() > 0 || actionSet.m_prepareBufferForTransfer.Count() > 0)
 		{
-			rkit::UniquePtr<AsyncUploadPrepareTargetsSubmitRunner> prepareSubmitRunner;
-			rkit::New< AsyncUploadPrepareTargetsSubmitRunner>(prepareSubmitRunner);
+			rkit::UniquePtr<AsyncUploadPrepareTargetsSubmitRunner> prepareSubmitRunner = rkit::New<AsyncUploadPrepareTargetsSubmitRunner>();
 
-			rkit::UniquePtr<AsyncUploadPrepareTargetsRecordRunner> prepareRecordRunner;
-			rkit::New<AsyncUploadPrepareTargetsRecordRunner>(prepareRecordRunner, prepareSubmitRunner->GetCmdBatchRef(), syncPoint);
+			rkit::UniquePtr<AsyncUploadPrepareTargetsRecordRunner> prepareRecordRunner = rkit::New<AsyncUploadPrepareTargetsRecordRunner>(prepareSubmitRunner->GetCmdBatchRef(), syncPoint);
 
 			rkit::RCPtr<rkit::Job> recordJob;
 			CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kDMA, std::move(prepareRecordRunner), rkit::JobDependencyList());
@@ -3110,16 +3093,14 @@ namespace anox
 
 		if (actionSet.m_stripedMemCpy.Count() > 0)
 		{
-			rkit::UniquePtr<StripedMemCopyJobRunner> copyJobRunner;
-			rkit::New<StripedMemCopyJobRunner>(copyJobRunner, *this, m_currentSyncPoint);
+			rkit::UniquePtr<StripedMemCopyJobRunner> copyJobRunner = rkit::New<StripedMemCopyJobRunner>(*this, m_currentSyncPoint);
 
 			rkit::RCPtr<rkit::Job> memCopyJob;
 			m_threadPool.GetJobQueue()->CreateJob(&memCopyJob, rkit::JobType::kNormalPriority, std::move(copyJobRunner), rkit::JobDependencyList());
 
 			m_syncPoints[m_currentSyncPoint].m_asyncUploadActionSet.m_memCopyJob = memCopyJob;
 
-			rkit::UniquePtr<StripedMemCopyCleanupJobRunner> cleanupJobRunner;
-			rkit::New<StripedMemCopyCleanupJobRunner>(cleanupJobRunner, *this, m_currentSyncPoint);
+			rkit::UniquePtr<StripedMemCopyCleanupJobRunner> cleanupJobRunner = rkit::New<StripedMemCopyCleanupJobRunner>(*this, m_currentSyncPoint);
 
 			rkit::RCPtr<rkit::Job> cleanupJob;
 			m_threadPool.GetJobQueue()->CreateJob(&cleanupJob, rkit::JobType::kNormalPriority, std::move(cleanupJobRunner), memCopyJob);
@@ -3134,7 +3115,7 @@ namespace anox
 	{
 		FrameSyncPoint &syncPoint = m_syncPoints[m_currentSyncPoint];
 
-		rkit::New<PerFrameResources>(m_currentFrameResources);
+		m_currentFrameResources = rkit::NewRC<PerFrameResources>();
 
 		m_currentFrameResources->m_frameEndBatchPtr = &syncPoint.m_frameEndBatch;
 		m_currentFrameResources->m_frameEndJobPtr = &syncPoint.m_frameEndJob;
@@ -3177,11 +3158,8 @@ namespace anox
 			fenceFactory.CreateFence(asyncUploadGPUFence);
 
 			// Post async upload submits to the end of the frame
-			rkit::UniquePtr<CopyAsyncUploadsSubmitRunner> submitRunner;
-			rkit::New<CopyAsyncUploadsSubmitRunner>(submitRunner, syncPoint);
-
-			rkit::UniquePtr<CopyAsyncUploadsRecordRunner> recordRunner;
-			rkit::New<CopyAsyncUploadsRecordRunner>(recordRunner, submitRunner->GetCmdBatchRef(), syncPoint, m_currentGlobalSyncPoint, asyncUploadGPUFence);
+			rkit::UniquePtr<CopyAsyncUploadsSubmitRunner> submitRunner = rkit::New<CopyAsyncUploadsSubmitRunner>(syncPoint);
+			rkit::UniquePtr<CopyAsyncUploadsRecordRunner> recordRunner = rkit::New<CopyAsyncUploadsRecordRunner>(submitRunner->GetCmdBatchRef(), syncPoint, m_currentGlobalSyncPoint, asyncUploadGPUFence);
 
 			rkit::RCPtr<rkit::Job> recordJob;
 			CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kDMA, std::move(recordRunner), asyncUploadMemCopyJob);
@@ -3192,11 +3170,9 @@ namespace anox
 			frameEndRecordDeps[numFrameEndRecordDeps++] = submitJob;
 		}
 
-		rkit::UniquePtr<CloseFrameSubmitRunner> closeFrameSubmitRunner;
-		rkit::New<CloseFrameSubmitRunner>(closeFrameSubmitRunner, *m_currentFrameResources->m_frameEndBatchPtr);
+		rkit::UniquePtr<CloseFrameSubmitRunner> closeFrameSubmitRunner = rkit::New<CloseFrameSubmitRunner>(*m_currentFrameResources->m_frameEndBatchPtr);
 
-		rkit::UniquePtr<CloseFrameRecordRunner> closeFrameRecordRunner;
-		rkit::New<CloseFrameRecordRunner>(closeFrameRecordRunner, *closeFrameSubmitRunner->GetLastBatchRef(), asyncUploadGPUFence);
+		rkit::UniquePtr<CloseFrameRecordRunner> closeFrameRecordRunner = rkit::New<CloseFrameRecordRunner>(*closeFrameSubmitRunner->GetLastBatchRef(), asyncUploadGPUFence);
 
 		rkit::RCPtr<rkit::Job> closeFrameRecordJob;
 		CreateAndQueueRecordJob(&closeFrameRecordJob, LogicalQueueType::kGraphics, std::move(closeFrameRecordRunner),
@@ -3272,8 +3248,7 @@ namespace anox
 
 		rkit::render::IBaseCommandAllocator *cmdAllocator = cmdListHandler.m_commandAllocator.Get();
 
-		rkit::UniquePtr<RunRecordJobRunner> runRecordJobRunner;
-		rkit::New<RunRecordJobRunner>(runRecordJobRunner, std::move(jobRunner), *cmdAllocator);
+		rkit::UniquePtr<RunRecordJobRunner> runRecordJobRunner = rkit::New<RunRecordJobRunner>(std::move(jobRunner), *cmdAllocator);
 
 		return this->CreateAndQueueJob(outJob, queueType, std::move(runRecordJobRunner), dependencies, &LogicalQueueBase::m_lastRecordJob);
 	}
@@ -3286,16 +3261,14 @@ namespace anox
 
 		FrameSyncPointCommandListHandler &cmdListHandler = syncPoint.m_commandListHandlers[static_cast<size_t>(cmdQueueType)];
 
-		rkit::UniquePtr<RunSubmitJobRunner> runSubmitJobRunner;
-		rkit::New<RunSubmitJobRunner>(runSubmitJobRunner, std::move(jobRunner), *cmdListHandler.m_commandQueue);
+		rkit::UniquePtr<RunSubmitJobRunner> runSubmitJobRunner = rkit::New<RunSubmitJobRunner>(std::move(jobRunner), *cmdListHandler.m_commandQueue);
 
 		return this->CreateAndQueueJob(outJob, queueType, std::move(runSubmitJobRunner), dependencies, &LogicalQueueBase::m_lastSubmitJob);
 	}
 
 	rkit::Result GraphicsSubsystem::CreateAsyncCreateTextureJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<ITexture> &outTexture, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData, const rkit::JobDependencyList &dependencies)
 	{
-		rkit::RCPtr<Texture> texture;
-		rkit::New<Texture>(texture, *this);
+		rkit::RCPtr<Texture> texture = rkit::NewRC<Texture>(*this);
 
 		rkit::IJobQueue &jobQueue = *m_threadPool.GetJobQueue();
 
@@ -3308,18 +3281,16 @@ namespace anox
 			*outJob = doneCopyingJob;
 		}
 
-		rkit::UniquePtr<AllocateTextureStorageAndPostCopyJobRunner> allocStorageJobRunner;
-		rkit::New<AllocateTextureStorageAndPostCopyJobRunner>(allocStorageJobRunner, *this, texture, textureData, doneCopyingSignaler);
+		rkit::UniquePtr<AllocateTextureStorageAndPostCopyJobRunner> allocStorageJobRunner = rkit::New<AllocateTextureStorageAndPostCopyJobRunner>(*this, texture, textureData, doneCopyingSignaler);
 
 		jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(allocStorageJobRunner), dependencies);
 
-		RKIT_RETURN_OK;
+		outTexture = texture;
 	}
 
 	rkit::Result GraphicsSubsystem::CreateAsyncCreateAndFillBufferJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<IBuffer> &outBuffer, const rkit::RCPtr<BufferInitializer> &bufferInitializer, const rkit::JobDependencyList &dependencies)
 	{
-		rkit::RCPtr<Buffer> buffer;
-		rkit::New<Buffer>(buffer, *this);
+		rkit::RCPtr<Buffer> buffer = rkit::NewRC<Buffer>(*this);
 
 		rkit::IJobQueue &jobQueue = *m_threadPool.GetJobQueue();
 
@@ -3332,8 +3303,7 @@ namespace anox
 			*outJob = doneCopyingJob;
 		}
 
-		rkit::UniquePtr<AllocateBufferStorageAndPostCopyJobRunner> allocStorageJobRunner;
-		rkit::New<AllocateBufferStorageAndPostCopyJobRunner>(allocStorageJobRunner, *this, buffer, bufferInitializer, doneCopyingSignaler);
+		rkit::UniquePtr<AllocateBufferStorageAndPostCopyJobRunner> allocStorageJobRunner = rkit::New<AllocateBufferStorageAndPostCopyJobRunner>(*this, buffer, bufferInitializer, doneCopyingSignaler);
 
 		jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(allocStorageJobRunner), dependencies);
 
@@ -3362,8 +3332,7 @@ namespace anox
 
 rkit::Result anox::IGraphicsSubsystem::Create(rkit::UniquePtr<IGraphicsSubsystem> &outSubsystem, IGameDataFileSystem &fileSystem, rkit::data::IDataDriver &dataDriver, rkit::utils::IThreadPool &threadPool, anox::RenderBackend defaultBackend)
 {
-	rkit::UniquePtr<anox::GraphicsSubsystem> subsystem;
-	rkit::New<anox::GraphicsSubsystem>(subsystem, fileSystem, dataDriver, threadPool, defaultBackend);
+	rkit::UniquePtr<anox::GraphicsSubsystem> subsystem = rkit::New<anox::GraphicsSubsystem>(fileSystem, dataDriver, threadPool, defaultBackend);
 
 	subsystem->Initialize();
 

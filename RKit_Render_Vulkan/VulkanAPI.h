@@ -2,7 +2,7 @@
 
 #include "VulkanAPI_Common.h"
 
-namespace rkit { namespace render { namespace vulkan
+namespace rkit::render::vulkan
 {
 	struct VulkanGlobalAPI : public IVulkanAPI
 	{
@@ -104,4 +104,4 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_API_EXT(vkSignalSemaphoreKHR, VK_KHR_timeline_semaphore);
 		RKIT_VK_API_END;
 	};
-} } } // rkit::render::vulkan
+} // rkit::render::vulkan

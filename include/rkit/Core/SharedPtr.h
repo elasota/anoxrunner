@@ -180,9 +180,7 @@ rkit::SharedPtr<T> &rkit::SharedPtr<T>::operator=(SharedPtr<T> &&other) noexcept
 template<class T>
 rkit::Result rkit::SharedPtr<T>::Create(SharedPtr<T> &outRCPtr, IMallocDriver *alloc, UniquePtr<T> &&original)
 {
-	UniquePtr<RCContainer> rcContainerPtr;
-
-	NewWithAlloc<RCContainer>(rcContainerPtr, alloc);
+	UniquePtr<RCContainer> rcContainerPtr = NewWithAlloc<RCContainer>(alloc);
 
 	RCContainer *rcContainer = rcContainerPtr.Get();
 
@@ -192,8 +190,6 @@ rkit::Result rkit::SharedPtr<T>::Create(SharedPtr<T> &outRCPtr, IMallocDriver *a
 	rcContainer->m_selfDestructFunc = RCContainer::SelfDestruct;
 
 	outRCPtr = SharedPtr<T>(rcContainer);
-
-	RKIT_RETURN_OK;
 }
 
 template<class T>

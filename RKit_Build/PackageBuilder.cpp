@@ -675,8 +675,7 @@ namespace rkit { namespace buildsystem
 
 		CopySpanNonOverlapping(bytes.ToSpan(), binaryContentData);
 
-		UniquePtr<IBinaryBlob> blob;
-		New<BinaryBlob>(blob, std::move(bytes));
+		UniquePtr<IBinaryBlob> blob = New<BinaryBlob>(std::move(bytes));
 
 		size_t index = 0;
 		pkgBuilder.IndexBinaryContent(BinaryBlobRef(std::move(blob)), index);
@@ -950,20 +949,15 @@ namespace rkit { namespace buildsystem
 	Result BinaryBlobBuilder::WritePartial(const void *data, size_t count, size_t &outCountWritten)
 	{
 		if (!m_blob.Get())
-		{
-			New<BinaryBlob>(m_blob);
-		}
+			m_blob = New<BinaryBlob>();
 
 		m_blob->Append(data, count);
 
 		outCountWritten = count;
-
-		RKIT_RETURN_OK;
 	}
 
 	Result BinaryBlobBuilder::Flush()
 	{
-		RKIT_RETURN_OK;
 	}
 
 	BinaryBlobRef BinaryBlobBuilder::Finish()
@@ -973,11 +967,11 @@ namespace rkit { namespace buildsystem
 
 	Result PackageBuilderBase::Create(data::IRenderDataHandler *dataHandler, IPackageObjectWriter *objWriter, bool allowTempStrings, UniquePtr<IPackageBuilder> &outPackageBuilder)
 	{
-		return New<PackageBuilder>(outPackageBuilder, dataHandler, objWriter, allowTempStrings);
+		outPackageBuilder = New<PackageBuilder>(dataHandler, objWriter, allowTempStrings);
 	}
 
 	Result PackageObjectWriterBase::Create(UniquePtr<IPackageObjectWriter> &outPackageObjectWriter)
 	{
-		return New<PackageObjectWriter>(outPackageObjectWriter);
+		outPackageObjectWriter = New<PackageObjectWriter>();
 	}
 } } // rkit::buildsystem

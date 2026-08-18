@@ -259,8 +259,7 @@ namespace anox::game
 		if (header.m_magic.Get() != data::SceneHeader::kExpectedMagic)
 			RKIT_THROW(rkit::ResultCode::kDataError);
 
-		rkit::RCPtr<ScenePackage> package;
-		rkit::New<ScenePackage>(package);
+		rkit::RCPtr<ScenePackage> package = rkit::NewRC<ScenePackage>();
 
 		ScenePackageImpl &packageImpl = package->Impl();
 
@@ -548,7 +547,7 @@ namespace anox::game
 
 	rkit::Result SceneManager::Create(rkit::UniquePtr<SceneManager> &outManager, World &world)
 	{
-		return rkit::New<SceneManager>(outManager, world);
+		outManager = rkit::New<SceneManager>(world);
 	}
 
 	rkit::ResultCoroutine SceneManager::RunScene(rkit::ICoroThread &thread, rkit::ByteStringSliceView name, const rkit::data::ContentID &cid, bool loop)

@@ -236,8 +236,7 @@ namespace anox
 
 	rkit::Result AnoxGameLogic::CreateNewGame(rkit::UniquePtr<IConfigurationState> &outConfig, const rkit::StringSliceView &mapName)
 	{
-		rkit::UniquePtr<game::GlobalVars> globalVars;
-		rkit::New<game::GlobalVars>(globalVars);
+		rkit::UniquePtr<game::GlobalVars> globalVars = rkit::New<game::GlobalVars>();
 
 		globalVars->m_mapName.Set(mapName);
 
@@ -891,6 +890,6 @@ namespace anox
 
 	rkit::Result IGameLogic::Create(rkit::UniquePtr<IGameLogic> &outGameLoop, IAnoxGame *game)
 	{
-		return rkit::New<AnoxGameLogic>(outGameLoop, game);
+		outGameLoop = rkit::New<AnoxGameLogic>(game);
 	}
 }

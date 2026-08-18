@@ -19,19 +19,14 @@ namespace anox::game
 
 		m_blocks.Resize(blocks.Count());
 
-		auto processBlock = [](SceneRuntimeBlock &outBlock, const ScenePackage::Block &inBlock) -> rkit::Result
+		rkit::ProcessParallelSpans(m_blocks.ToSpan(), blocks, [](SceneRuntimeBlock &outBlock, const ScenePackage::Block &inBlock)
 			{
 				outBlock.m_groups.Resize(inBlock.m_numGroups);
-				RKIT_RETURN_OK;
-			};
-
-		rkit::CheckedProcessParallelSpans(m_blocks.ToSpan(), blocks, processBlock);
-
-		RKIT_RETURN_OK;
+			});
 	}
 
 	rkit::ResultCoroutine Scene::OnFrame(rkit::ICoroThread &thread)
 	{
-		CORO_RETURN_OK;
+		co_return;
 	}
 }

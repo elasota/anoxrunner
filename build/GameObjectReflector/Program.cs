@@ -535,8 +535,7 @@ namespace GameObjectReflector
                         writer.WriteLine("\ttemplate<>");
                         writer.WriteLine($"\trkit::Result WorldObjectInstantiator<{className}>::CreateObject(rkit::UniquePtr<WorldObject> &outObject, ObjectFieldsBase<{className}> *&outFieldsRef)");
                         writer.WriteLine("\t{");
-                        writer.WriteLine($"\t\trkit::UniquePtr<{className}> obj;");
-                        writer.WriteLine($"\t\trkit::New<{className}>(obj);");
+                        writer.WriteLine($"\t\trkit::UniquePtr<{className}> obj = rkit::New<{className}>();");
                         writer.WriteLine($"\t\toutFieldsRef = ::anox::game::priv::PrivateAccessor::ImplicitCast<ObjectFieldsBase<{className}>>(obj.Get());");
                         writer.WriteLine("\t\toutObject = std::move(obj);");
                         writer.WriteLine("\t}");

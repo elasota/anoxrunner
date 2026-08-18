@@ -64,7 +64,7 @@ namespace rkit::mp3
 
 	rkit::Result MP3Driver::CreateDecoder(rkit::UniquePtr<IMP3Decoder> &outDecoder)
 	{
-		return rkit::New<MP3Decoder>(outDecoder);
+		outDecoder = rkit::New<MP3Decoder>();
 	}
 
 	rkit::Result MP3Driver::InitDriver(const rkit::DriverInitParameters *)

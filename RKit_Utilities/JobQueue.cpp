@@ -37,7 +37,7 @@ namespace rkit { namespace utils
 	public:
 		friend class JobQueue;
 
-		explicit JobImpl(JobQueue &jobQueue, UniquePtr<IJobRunner> &&jobRunner, size_t numDependencies, JobType jobType);
+		explicit JobImpl(JobQueue &jobQueue, UniquePtr<IJobRunner> &&jobRunner, size_t numDependencies, JobType jobType, DebugString trace);
 		~JobImpl();
 
 		Result ReserveDownstreamDependency();
@@ -74,6 +74,8 @@ namespace rkit { namespace utils
 		bool m_distJobWasQueued = false;
 		bool m_distJobWasStarted = false;
 		JobQueueWaitRingEntry m_distWaitingThreadsRing;
+
+		DebugString m_trace;
 	};
 
 	class JobSignalerImpl final : public JobSignaler
@@ -152,10 +154,10 @@ namespace rkit { namespace utils
 		explicit JobQueue(IMallocDriver *alloc);
 		~JobQueue();
 
-		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const JobDependencyList &dependencies) override;
+		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const JobDependencyList &dependencies, DebugString trace) override;
 
-		Result CreateSignaledJob(RCPtr<JobSignaler> &outSignaler, RCPtr<Job> &outJob) override;
-		Result CreateSignalJobRunner(UniquePtr<IJobRunner> &outJobRunner, const RCPtr<JobSignaler> &signaller) override;
+		Result CreateSignaledJob(RCPtr<JobSignaler> &outSignaler, RCPtr<Job> &outJob, DebugString trace) override;
+		Result CreateSignalJobRunner(UniquePtr<IJobRunner> &outJobRunner, RCPtr<JobSignaler> signaller) override;
 
 		// Wait for work or for a specific job.
 		// wakeEvent: Event to use for waking up the thread (should be auto-reset)
@@ -231,12 +233,13 @@ namespace rkit { namespace utils
 		bool m_isClosing = false;
 	};
 
-	JobImpl::JobImpl(JobQueue &jobQueue, UniquePtr<IJobRunner> &&jobRunner, size_t numDependencies, JobType jobType)
+	JobImpl::JobImpl(JobQueue &jobQueue, UniquePtr<IJobRunner> &&jobRunner, size_t numDependencies, JobType jobType, DebugString trace)
 		: m_jobQueue(jobQueue)
 		, m_jobRunner(std::move(jobRunner))
 		, m_numWaitingDependencies(numDependencies)
 		, m_numStaticDownstream(0)
 		, m_jobType(jobType)
+		, m_trace(std::move(trace))
 	{
 	}
 
@@ -281,7 +284,17 @@ namespace rkit { namespace utils
 		{
 			if (m_jobRunner.IsValid())
 			{
+#if RKIT_IS_DEBUG != 0
+				if (!m_trace.IsEmpty())
+					fprintf(stdout, "Job %s started\n", m_trace.GetString());
+#endif
+
 				PackedResultAndExtCode result = RKIT_TRY_EVAL(m_jobRunner->Run());
+
+#if RKIT_IS_DEBUG != 0
+				if (!m_trace.IsEmpty())
+					fprintf(stdout, "Job %s completed\n", m_trace.GetString());
+#endif
 
 				jobSucceeded = utils::ResultIsOK(result);
 				if (!jobSucceeded)
@@ -290,7 +303,13 @@ namespace rkit { namespace utils
 				m_jobRunner.Reset();
 			}
 			else
+			{
+#if RKIT_IS_DEBUG != 0
+				if (!m_trace.IsEmpty())
+					fprintf(stdout, "Job %s completed with no actions\n", m_trace.GetString());
+#endif
 				jobSucceeded = true;
+			}
 		}
 
 		m_jobQueue.JobDone(this, jobSucceeded);
@@ -501,14 +520,13 @@ namespace rkit { namespace utils
 		wti.m_jobWait.Unlink();
 	}
 
-	Result JobQueue::CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const JobDependencyList &dependencies)
+	Result JobQueue::CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const JobDependencyList &dependencies, DebugString trace)
 	{
 		UniquePtr<IJobRunner> jobRunnerTemp(std::move(jobRunner));
 
 		size_t numDependencies = dependencies.GetSpan().Count();
 
-		RCPtr<JobImpl> resultJob;
-		NewWithAlloc<JobImpl>(resultJob, m_alloc, *this, std::move(jobRunnerTemp), numDependencies, jobType);
+		RCPtr<JobImpl> resultJob = NewRCWithAlloc<JobImpl>(m_alloc, *this, std::move(jobRunnerTemp), numDependencies, jobType, std::move(trace));
 
 		PendingJobList &ci = m_pendingJobLists[static_cast<size_t>(jobType)];
 
@@ -564,27 +582,28 @@ namespace rkit { namespace utils
 		RKIT_RETURN_OK;
 	}
 
-	Result JobQueue::CreateSignaledJob(RCPtr<JobSignaler> &outSignaler, RCPtr<Job> &outJob)
+	Result JobQueue::CreateSignaledJob(RCPtr<JobSignaler> &outSignaler, RCPtr<Job> &outJob, DebugString trace)
 	{
-		RCPtr<JobImpl> resultJob;
-		NewWithAlloc<JobImpl>(resultJob, m_alloc, *this, UniquePtr<IJobRunner>(), 0, JobType::kNormalPriority);
+		RCPtr<JobImpl> resultJob = NewRCWithAlloc<JobImpl>(m_alloc, *this, UniquePtr<IJobRunner>(), 0, JobType::kNormalPriority, trace);
 
-		RCPtr<JobSignalerImpl> signaller;
-		New<JobSignalerImpl>(signaller, *this, resultJob);
+		RCPtr<JobSignalerImpl> signaller = NewRC<JobSignalerImpl>(*this, resultJob);
 
 		outSignaler = std::move(signaller);
 		outJob = std::move(resultJob);
-
-		RKIT_RETURN_OK;
 	}
 
-	Result JobQueue::CreateSignalJobRunner(UniquePtr<IJobRunner> &outJobRunner, const RCPtr<JobSignaler> &signaller)
+	Result JobQueue::CreateSignalJobRunner(UniquePtr<IJobRunner> &outJobRunner, RCPtr<JobSignaler> signaller)
 	{
-		return New<SignalJobRunner>(outJobRunner, signaller);
+		outJobRunner = New<SignalJobRunner>(std::move(signaller));
 	}
 
 	void JobQueue::AddRunnableJob(const RCPtr<JobImpl> &job, JobType jobType)
 	{
+#if RKIT_IS_DEBUG != 0
+		if (!job->m_trace.IsEmpty())
+			fprintf(stdout, "Job %s become runnable\n", job->m_trace.GetString());
+#endif
+
 		const size_t jobTypeIndex = static_cast<size_t>(jobType);
 
 		CategoryThreadWaitList *ciWaitListToKick = nullptr;
@@ -681,6 +700,11 @@ namespace rkit { namespace utils
 
 	void JobQueue::JobDone(JobImpl *job, bool succeeded)
 	{
+#if RKIT_IS_DEBUG != 0
+		if (!job->m_trace.IsEmpty())
+			fprintf(stdout, "Job %s done\n", job->m_trace.GetString());
+#endif
+
 		RCPtr<JobImpl> newlyRunnableJobsPtr;
 
 		{
@@ -1054,11 +1078,8 @@ namespace rkit { namespace utils
 
 rkit::Result rkit::utils::CreateJobQueue(UniquePtr<IJobQueue> &outJobQueue, IMallocDriver *alloc)
 {
-	UniquePtr<JobQueue> jobQueue;
-	NewWithAlloc<JobQueue>(jobQueue, alloc, alloc);
+	UniquePtr<JobQueue> jobQueue = NewWithAlloc<JobQueue>(alloc, alloc);
 	jobQueue->Init();
 
 	outJobQueue = std::move(jobQueue);
-
-	RKIT_RETURN_OK;
 }

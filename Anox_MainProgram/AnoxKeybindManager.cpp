@@ -479,8 +479,7 @@ namespace anox
 
 	rkit::Result AnoxKeybindManagerBase::Create(rkit::UniquePtr<AnoxKeybindManagerBase> &outManager, IAnoxGame &game)
 	{
-		rkit::UniquePtr<AnoxKeybindManager> manager;
-		rkit::New<AnoxKeybindManager>(manager, game);
+		rkit::UniquePtr<AnoxKeybindManager> manager = rkit::New<AnoxKeybindManager>(game);
 
 		outManager = std::move(manager);
 

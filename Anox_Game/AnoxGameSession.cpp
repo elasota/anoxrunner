@@ -275,14 +275,11 @@ namespace anox::game
 
 	rkit::Result Session::Create(rkit::UniquePtr<Session> &outSession, rkit::IMallocDriver *alloc)
 	{
-		rkit::UniquePtr<Session> session;
-		rkit::NewWithAlloc<Session>(session, alloc);
+		rkit::UniquePtr<Session> session = rkit::NewWithAlloc<Session>(alloc);
 
 		session->Impl().Initialize();
 
 		outSession = std::move(session);
-
-		RKIT_RETURN_OK;
 	}
 }
 

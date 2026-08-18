@@ -340,8 +340,7 @@ namespace anox::game
 
 	rkit::Result GameResourceManager::Create(rkit::UniquePtr<GameResourceManager> &outResManager)
 	{
-		rkit::UniquePtr<GameResourceManager> resManager;
-		rkit::New<GameResourceManager>(resManager);
+		rkit::UniquePtr<GameResourceManager> resManager = rkit::New<GameResourceManager>();
 		resManager->Impl().Initialize();
 
 		outResManager = std::move(resManager);

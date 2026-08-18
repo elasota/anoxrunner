@@ -9,7 +9,8 @@
 #include "VulkanAPI.h"
 #include "VulkanFence.h"
 
-namespace rkit { namespace render { namespace vulkan {
+namespace rkit::render::vulkan
+{
 	class VulkanCPUFenceWaiter final : public VulkanCPUFenceWaiterBase
 	{
 	public:
@@ -152,13 +153,9 @@ namespace rkit { namespace render { namespace vulkan {
 
 	Result VulkanCPUFenceWaiterBase::Create(UniquePtr<VulkanCPUFenceWaiterBase> &outInstance, VulkanDeviceBase &device)
 	{
-		UniquePtr<VulkanCPUFenceWaiter> fenceWaiter;
-
-		New<VulkanCPUFenceWaiter>(fenceWaiter, device);
+		UniquePtr<VulkanCPUFenceWaiter> fenceWaiter = New<VulkanCPUFenceWaiter>(device);
 
 		outInstance = std::move(fenceWaiter);
-
-		RKIT_RETURN_OK;
 	}
 
-} } }
+}

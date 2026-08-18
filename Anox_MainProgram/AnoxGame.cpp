@@ -231,6 +231,6 @@ namespace anox
 
 	rkit::Result anox::IAnoxGame::Create(rkit::UniquePtr<IAnoxGame> &outGame, const rkit::Optional<uint16_t> &numThreads)
 	{
-		return rkit::New<AnoxGame>(outGame, numThreads);
+		outGame = rkit::New<AnoxGame>(numThreads);
 	}
 }

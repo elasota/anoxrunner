@@ -47,8 +47,7 @@ inline rkit::Result rkit::BaseStringPoolBuilder<TChar, TEncoding>::IndexString(c
 		StringType_t strInstance;
 		strInstance.Set(str);
 
-		UniquePtr<StringType_t> strPtr;
-		New<StringType_t>(strPtr, std::move(strInstance));
+		UniquePtr<StringType_t> strPtr = New<StringType_t>(std::move(strInstance));
 
 		BaseStringView<TChar, TEncoding> strPtrView = *strPtr.Get();
 

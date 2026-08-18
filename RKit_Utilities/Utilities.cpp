@@ -191,8 +191,7 @@ namespace rkit
 		UniquePtr<IMutex> mutex;
 		GetDrivers().m_systemDriver->CreateMutex(mutex);
 
-		UniquePtr<MutexProtectedStreamWrapper> mpsWrapper;
-		New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write, seekableWrite);
+		UniquePtr<MutexProtectedStreamWrapper> mpsWrapper = New<MutexProtectedStreamWrapper>(std::move(stream), std::move(mutex), seek, read, write, seekableWrite);
 
 		SharedPtr<MutexProtectedStreamWrapper> sharedWrapper;
 		MakeShared(sharedWrapper, std::move(mpsWrapper));
@@ -214,8 +213,7 @@ namespace rkit
 		UniquePtr<IMutex> mutex;
 		GetDrivers().m_systemDriver->CreateMutex(mutex);
 
-		UniquePtr<MutexProtectedStreamWrapper> mpsWrapper;
-		New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write, seekableWrite);
+		UniquePtr<MutexProtectedStreamWrapper> mpsWrapper = New<MutexProtectedStreamWrapper>(std::move(stream), std::move(mutex), seek, read, write, seekableWrite);
 
 		SharedPtr<MutexProtectedStreamWrapper> sharedWrapper;
 		MakeShared(sharedWrapper, std::move(mpsWrapper));
@@ -237,8 +235,7 @@ namespace rkit
 		UniquePtr<IMutex> mutex;
 		GetDrivers().m_systemDriver->CreateMutex(mutex);
 
-		UniquePtr<MutexProtectedStreamWrapper> mpsWrapper;
-		New<MutexProtectedStreamWrapper>(mpsWrapper, std::move(stream), std::move(mutex), seek, read, write, seekableWrite);
+		UniquePtr<MutexProtectedStreamWrapper> mpsWrapper = New<MutexProtectedStreamWrapper>(std::move(stream), std::move(mutex), seek, read, write, seekableWrite);
 
 		SharedPtr<MutexProtectedStreamWrapper> sharedWrapper;
 		MakeShared(sharedWrapper, std::move(mpsWrapper));
@@ -257,8 +254,7 @@ namespace rkit
 		ISeekableStream *seekable = compressedStream.Get();
 		UniquePtr<IReadStream> streamMoved(std::move(compressedStream));
 
-		UniquePtr<DeflateDecompressStream> createdStream;
-		NewWithAlloc<DeflateDecompressStream>(createdStream, alloc, std::move(streamMoved), seekable, decompressedSize, alloc);
+		UniquePtr<DeflateDecompressStream> createdStream = NewWithAlloc<DeflateDecompressStream>(alloc, std::move(streamMoved), seekable, decompressedSize, alloc);
 
 		outStream = std::move(createdStream);
 
@@ -271,12 +267,9 @@ namespace rkit
 
 		UniquePtr<IReadStream> streamMoved(std::move(compressedStream));
 
-		UniquePtr<DeflateDecompressStream> createdStream;
-		NewWithAlloc<DeflateDecompressStream>(createdStream, alloc, std::move(streamMoved), nullptr, rkit::Optional<FilePos_t>(), alloc);
+		UniquePtr<DeflateDecompressStream> createdStream = NewWithAlloc<DeflateDecompressStream>(alloc, std::move(streamMoved), nullptr, rkit::Optional<FilePos_t>(), alloc);
 
 		outStream = UniquePtr<IReadStream>(std::move(createdStream));
-
-		RKIT_RETURN_OK;
 	}
 
 	Result UtilitiesDriver::CreateRangeLimitedReadStream(UniquePtr<ISeekableReadStream> &outStream, UniquePtr<ISeekableReadStream> &&streamSrc, FilePos_t startPos, FilePos_t size) const
@@ -285,7 +278,7 @@ namespace rkit
 
 		UniquePtr<ISeekableReadStream> stream(std::move(streamSrc));
 
-		return NewWithAlloc<RangeLimitedReadStream>(outStream, alloc, std::move(stream), startPos, size);
+		outStream = NewWithAlloc<RangeLimitedReadStream>(alloc, std::move(stream), startPos, size);
 	}
 
 	Result UtilitiesDriver::CreateThreadPool(UniquePtr<utils::IThreadPool> &outThreadPool, uint32_t numThreads) const
@@ -294,8 +287,6 @@ namespace rkit
 		utils::ThreadPoolBase::Create(threadPool, *this, numThreads);
 
 		outThreadPool = std::move(threadPool);
-
-		RKIT_RETURN_OK;
 	}
 
 	Result UtilitiesDriver::CreateTextParser(const Span<const uint8_t> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<utils::ITextParser> &outParser) const

@@ -226,13 +226,10 @@ namespace anox
 
 	rkit::Result AnoxCommandStackBase::Create(rkit::UniquePtr<AnoxCommandStackBase> &outStack, size_t maxCapacity, size_t maxLines)
 	{
-		rkit::UniquePtr<AnoxCommandStack> stack;
-		rkit::New<AnoxCommandStack>(stack);
+		rkit::UniquePtr<AnoxCommandStack> stack = rkit::New<AnoxCommandStack>();
 
 		stack->Init(maxCapacity, maxLines);
 
 		outStack = std::move(stack);
-
-		RKIT_RETURN_OK;
 	}
 }

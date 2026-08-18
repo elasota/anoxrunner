@@ -1524,8 +1524,7 @@ namespace anox { namespace buildsystem
 			LightmapTreeSerializedBlock block = {};
 			stream->ReadAll(&block, sizeof(block));
 
-			rkit::UniquePtr<priv::LightmapTree> tree;
-			rkit::New<priv::LightmapTree>(tree);
+			rkit::UniquePtr<priv::LightmapTree> tree = rkit::New<priv::LightmapTree>();
 
 			tree->m_nodes.Resize(block.m_numNodes);
 			tree->m_expansionLevel = block.m_expansionLevel;
@@ -1760,8 +1759,7 @@ namespace anox { namespace buildsystem
 				}
 			}
 
-			rkit::UniquePtr<priv::LightmapTree> newTree;
-			rkit::New<priv::LightmapTree>(newTree);
+			rkit::UniquePtr<priv::LightmapTree> newTree = rkit::New<priv::LightmapTree>();
 			InitLightmapTree(*newTree, 0, xAxisDominant);
 
 			lightmapTrees.Append(std::move(newTree));
@@ -3767,42 +3765,30 @@ namespace anox { namespace buildsystem
 
 	rkit::Result BSPMapCompilerBase::CreateMapCompiler(rkit::UniquePtr<BSPMapCompilerBase> &outCompiler)
 	{
-		rkit::UniquePtr<BSPMapCompiler> bspMapCompiler;
-		rkit::New<BSPMapCompiler>(bspMapCompiler);
+		rkit::UniquePtr<BSPMapCompiler> bspMapCompiler = rkit::New<BSPMapCompiler>();
 
 		outCompiler = std::move(bspMapCompiler);
-
-		RKIT_RETURN_OK;
 	}
 
 	rkit::Result BSPMapCompilerBase::CreateLightingCompiler(rkit::UniquePtr<BSPMapCompilerBase> &outCompiler)
 	{
-		rkit::UniquePtr<BSPLightingCompiler> bspMapCompiler;
-		rkit::New<BSPLightingCompiler>(bspMapCompiler);
+		rkit::UniquePtr<BSPLightingCompiler> bspMapCompiler = rkit::New<BSPLightingCompiler>();
 
 		outCompiler = std::move(bspMapCompiler);
-
-		RKIT_RETURN_OK;
 	}
 
 	rkit::Result BSPMapCompilerBase::CreateGeometryCompiler(rkit::UniquePtr<BSPMapCompilerBase> &outCompiler)
 	{
-		rkit::UniquePtr<BSPGeometryCompiler> bspMapCompiler;
-		rkit::New<BSPGeometryCompiler>(bspMapCompiler);
+		rkit::UniquePtr<BSPGeometryCompiler> bspMapCompiler = rkit::New<BSPGeometryCompiler>();
 
 		outCompiler = std::move(bspMapCompiler);
-
-		RKIT_RETURN_OK;
 	}
 
 	rkit::Result BSPMapCompilerBase::CreateEntityCompiler(rkit::UniquePtr<BSPMapCompilerBase> &outCompiler)
 	{
-		rkit::UniquePtr<BSPEntityCompiler> bspMapCompiler;
-		rkit::New<BSPEntityCompiler>(bspMapCompiler);
+		rkit::UniquePtr<BSPEntityCompiler> bspMapCompiler = rkit::New<BSPEntityCompiler>();
 
 		outCompiler = std::move(bspMapCompiler);
-
-		RKIT_RETURN_OK;
 	}
 } } // anox::buildsystem
 

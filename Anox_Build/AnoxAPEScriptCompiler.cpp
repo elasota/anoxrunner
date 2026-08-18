@@ -2548,7 +2548,7 @@ namespace anox::buildsystem
 
 	rkit::Result APEScriptCompiler::Create(rkit::UniquePtr<APEScriptCompiler> &outCompiler)
 	{
-		return rkit::New<APEScriptCompiler>(outCompiler);
+		outCompiler = rkit::New<APEScriptCompiler>();
 	}
 
 	rkit::Result APEGroupCompilerImpl::RunAnalysis(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
@@ -2557,8 +2557,6 @@ namespace anox::buildsystem
 		ResolvePath(depsFilePath, depsNode->GetIdentifier(), feedback);
 
 		feedback->AddNodeDependency(rkit::buildsystem::kDefaultNamespace, rkit::buildsystem::kDepsNodeID, rkit::buildsystem::BuildFileLocation::kSourceDir, depsFilePath.ToString());
-
-		RKIT_RETURN_OK;
 	}
 
 	rkit::Result APEGroupCompilerImpl::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
@@ -2665,7 +2663,7 @@ namespace anox::buildsystem
 
 	rkit::Result APEGroupCompiler::Create(rkit::UniquePtr<APEGroupCompiler> &outCompiler)
 	{
-		return rkit::New<APEGroupCompiler>(outCompiler);
+		outCompiler = rkit::New<APEGroupCompiler>();
 	}
 	
 	bool APEDepsCompiler::HasAnalysisStage() const
@@ -2690,7 +2688,7 @@ namespace anox::buildsystem
 
 	rkit::Result APEDepsCompiler::Create(rkit::UniquePtr<APEDepsCompiler> &outCompiler)
 	{
-		return rkit::New<APEDepsCompiler>(outCompiler);
+		outCompiler = rkit::New<APEDepsCompiler>();
 	}
 }
 

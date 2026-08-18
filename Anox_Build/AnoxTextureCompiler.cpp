@@ -677,8 +677,7 @@ namespace anox { namespace buildsystem
 		uint32_t width = tgaHeader.m_imageWidth.Get();
 		uint32_t height = tgaHeader.m_imageHeight.Get();
 
-		rkit::UniquePtr<priv::TextureCompilerImage<uint8_t, 4>> image;
-		(rkit::New<priv::TextureCompilerImage<uint8_t, 4>>(image));
+		rkit::UniquePtr<priv::TextureCompilerImage<uint8_t, 4>> image = rkit::New<priv::TextureCompilerImage<uint8_t, 4>>();
 		image->Initialize(width, height, rkit::utils::PixelPacking::kUInt8);
 
 		if (tgaHeader.m_pixelSizeBits % 8 != 0)
@@ -892,8 +891,7 @@ namespace anox { namespace buildsystem
 		uint8_t vgaPalette[256][3];
 		bool haveVGAPalette = false;
 
-		rkit::UniquePtr<priv::TextureCompilerImage<uint8_t, 4>> image;
-		(rkit::New<priv::TextureCompilerImage<uint8_t, 4>>(image));
+		rkit::UniquePtr<priv::TextureCompilerImage<uint8_t, 4>> image = rkit::New<priv::TextureCompilerImage<uint8_t, 4>>();
 		image->Initialize(width, height, rkit::utils::PixelPacking::kUInt8);
 
 		if (pcxHeader.m_numColorPlanes == 1)
@@ -1460,7 +1458,7 @@ namespace anox { namespace buildsystem
 
 	rkit::Result TextureCompilerBase::Create(rkit::UniquePtr<TextureCompilerBase> &outCompiler, rkit::png::IPngDriver &pngDriver)
 	{
-		return rkit::New<TextureCompiler>(outCompiler, pngDriver);
+		outCompiler = rkit::New<TextureCompiler>(pngDriver);
 	}
 } } // anox::buildsystem
 

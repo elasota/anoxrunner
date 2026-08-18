@@ -626,14 +626,12 @@ namespace anox { namespace buildsystem {
 			edefs.Append(edef);
 		}
 
-		rkit::New<UserEntityDictionary>(outDictionary, std::move(edefs));
-
-		RKIT_RETURN_OK;
+		outDictionary = rkit::New<UserEntityDictionary>(std::move(edefs));
 	}
 
 	rkit::Result EntityDefCompilerBase::Create(rkit::UniquePtr<EntityDefCompilerBase> &outCompiler)
 	{
-		return rkit::New<EntityDefCompiler>(outCompiler);
+		outCompiler = rkit::New<EntityDefCompiler>();
 	}
 } }
 

@@ -261,15 +261,11 @@ namespace rkit::render::vulkan
 
 	Result VulkanCommandAllocatorBase::Create(UniquePtr<VulkanCommandAllocatorBase> &outCommandAllocator, VulkanDeviceBase &device, VulkanQueueProxyBase &queue, CommandQueueType queueType, bool isBundle, uint32_t queueFamily)
 	{
-		UniquePtr<VulkanCommandAllocator> cmdAllocator;
-
-		New<VulkanCommandAllocator>(cmdAllocator, device, queue, queueType, isBundle);
+		UniquePtr<VulkanCommandAllocator> cmdAllocator = New<VulkanCommandAllocator>(device, queue, queueType, isBundle);
 
 		cmdAllocator->Initialize(queueFamily);
 
 		outCommandAllocator = std::move(cmdAllocator);
-
-		RKIT_RETURN_OK;
 	}
 } // rkit::render::vulkan
 

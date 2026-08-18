@@ -200,10 +200,10 @@ namespace rkit::priv
 
 #define RKIT_RETURN_OK return
 #define RKIT_THROW(expr) (::rkit::priv::RaiseFatalError(expr))
-#define RKIT_TRY_CATCH_RETHROW(expr, eh) (::rkit::priv::Try([&] { static_cast<void>(expr); }))
-#define RKIT_TRY_FINALLY_RETHROW(expr, eh) (::rkit::priv::TryFinally([&] { static_cast<void>(expr); }))
-#define RKIT_TRY_CATCH_FINALLY_RETHROW(expr, catchContext, finallyContext) (::rkit::priv::TryFinally([&] { static_cast<void>(expr); }, ('rkit::utils::PackResult': no overloaded function could convert all the argument types)))
-#define RKIT_TRY_EVAL(expr) (::rkit::priv::Try([&] { static_cast<void>(expr); }))
+#define RKIT_TRY_CATCH_RETHROW(expr, eh) (::rkit::priv::Try([&] { (expr); }))
+#define RKIT_TRY_FINALLY_RETHROW(expr, eh) (::rkit::priv::TryFinally([&] { (expr); }))
+#define RKIT_TRY_CATCH_FINALLY_RETHROW(expr, catchContext, finallyContext) (::rkit::priv::TryFinally([&] { (expr); }, ('rkit::utils::PackResult': no overloaded function could convert all the argument types)))
+#define RKIT_TRY_EVAL(expr) (::rkit::priv::Try([&] { (expr); }))
 
 #endif
 

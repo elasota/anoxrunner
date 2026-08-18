@@ -98,29 +98,29 @@ namespace rkit
 	template<class T>
 	struct SimpleObjectAllocation;
 
-	template<class TType, class TPtrType, class... TArgs>
-	Result New(UniquePtr<TPtrType> &objPtr, TArgs&& ...args);
+	template<class TType, class... TArgs>
+	RKIT_NODISCARD UniquePtr<TType> New(TArgs&& ...args);
 
-	template<class TType, class TPtrType, class... TArgs>
-	Result NewWithAlloc(UniquePtr<TPtrType> &objPtr, IMallocDriver *alloc, TArgs&& ...args);
+	template<class TType, class... TArgs>
+	RKIT_NODISCARD UniquePtr<TType> NewWithAlloc(IMallocDriver *alloc, TArgs&& ...args);
 
-	template<class TType, class TPtrType>
-	Result New(UniquePtr<TPtrType> &objPtr);
+	template<class TType>
+	RKIT_NODISCARD UniquePtr<TType> New();
 
-	template<class TType, class TPtrType>
-	Result NewWithAlloc(UniquePtr<TPtrType> &objPtr, IMallocDriver *alloc);
+	template<class TType>
+	RKIT_NODISCARD UniquePtr<TType> NewWithAlloc(IMallocDriver *alloc);
 
-	template<class TType, class TPtrType, class... TArgs>
-	Result NewInitialize(UniquePtr<TPtrType> &objPtr, TArgs&& ...args);
+	template<class TType, class... TArgs>
+	RKIT_NODISCARD UniquePtr<TType> NewInitialize(TArgs&& ...args);
 
-	template<class TType, class TPtrType, class... TArgs>
-	Result NewInitializeWithAlloc(UniquePtr<TPtrType> &objPtr, IMallocDriver *alloc, TArgs&& ...args);
+	template<class TType, class... TArgs>
+	RKIT_NODISCARD UniquePtr<TType> NewInitializeWithAlloc(IMallocDriver *alloc, TArgs&& ...args);
 
-	template<class TType, class TPtrType>
-	Result NewInitialize(UniquePtr<TPtrType> &objPtr);
+	template<class TType>
+	RKIT_NODISCARD UniquePtr<TType> NewInitialize();
 
-	template<class TType, class TPtrType>
-	Result NewInitializeWithAlloc(UniquePtr<TPtrType> &objPtr, IMallocDriver *alloc);
+	template<class TType>
+	RKIT_NODISCARD UniquePtr<TType> NewInitializeWithAlloc(IMallocDriver *alloc);
 
 
 	template<class T>
@@ -134,80 +134,71 @@ namespace rkit
 #include "MallocDriver.h"
 #include "UniquePtr.h"
 
-template<class TType, class TPtrType, class... TArgs>
-inline rkit::Result rkit::NewWithAlloc(UniquePtr<TPtrType> &objPtr, IMallocDriver *alloc, TArgs&& ...args)
+template<class TType, class... TArgs>
+inline rkit::UniquePtr<TType> rkit::NewWithAlloc(IMallocDriver *alloc, TArgs&& ...args)
 {
 	void *mem = alloc->Alloc(priv::NewSizeAlignResolver<TType>::GetSize());
 	if (!mem)
 		RKIT_THROW(ResultCode::kOutOfMemory);
 
 	TType *obj = new (mem) TType(std::forward<TArgs>(args)...);
-	objPtr = UniquePtr<TPtrType>(obj, mem, alloc);
-
-	RKIT_RETURN_OK;
+	return UniquePtr<TType>(obj, mem, alloc);
 }
 
-template<class TType, class TPtrType, class... TArgs>
-inline rkit::Result rkit::NewInitializeWithAlloc(UniquePtr<TPtrType> &objPtr, IMallocDriver *alloc, TArgs&& ...args)
+template<class TType, class... TArgs>
+inline rkit::UniquePtr<TType> rkit::NewInitializeWithAlloc(IMallocDriver *alloc, TArgs&& ...args)
 {
-	UniquePtr<TType> obj;
-	(NewWithAlloc<TType, TPtrType>(obj, alloc));
+	UniquePtr<TType> obj = NewWithAlloc<TType>(obj, alloc);
 
 	TType *objRawPtr = obj.Get();
 	objRawPtr->Initialize(std::forward<TArgs>(args)...);
-	objPtr = std::move(obj);
 
-	RKIT_RETURN_OK;
+	return obj;
 }
 
-template<class TType, class TPtrType, class... TArgs>
-inline rkit::Result rkit::New(UniquePtr<TPtrType> &objPtr, TArgs&& ...args)
+template<class TType, class... TArgs>
+inline rkit::UniquePtr<TType> rkit::New(TArgs&& ...args)
 {
-	return NewWithAlloc<TType, TPtrType, TArgs...>(objPtr, GetDrivers().m_mallocDriver.Get(), std::forward<TArgs>(args)...);
+	return NewWithAlloc<TType, TArgs...>(GetDrivers().m_mallocDriver.Get(), std::forward<TArgs>(args)...);
 }
 
-template<class TType, class TPtrType, class... TArgs>
-inline rkit::Result rkit::NewInitialize(UniquePtr<TPtrType> &objPtr, TArgs&& ...args)
+template<class TType, class... TArgs>
+inline rkit::UniquePtr<TType> rkit::NewInitialize(TArgs&& ...args)
 {
-	return NewInitializeWithAlloc<TType, TPtrType, TArgs...>(objPtr, GetDrivers().m_mallocDriver.Get(), std::forward<TArgs>(args)...);
+	return NewInitializeWithAlloc<TType, TArgs...>(GetDrivers().m_mallocDriver.Get(), std::forward<TArgs>(args)...);
 }
 
-template<class TType, class TPtrType>
-rkit::Result rkit::NewWithAlloc(UniquePtr<TPtrType> &objPtr, IMallocDriver *alloc)
+template<class TType>
+inline rkit::UniquePtr<TType> rkit::NewWithAlloc(IMallocDriver *alloc)
 {
 	void *mem = alloc->Alloc(priv::NewSizeAlignResolver<TType>::GetSize());
 	if (!mem)
 		RKIT_THROW(ResultCode::kOutOfMemory);
 
 	TType *obj = new (mem) TType();
-	objPtr = UniquePtr<TPtrType>(obj, mem, alloc);
-
-	RKIT_RETURN_OK;
+	return UniquePtr<TType>(obj, mem, alloc);
 }
 
-template<class TType, class TPtrType>
-rkit::Result rkit::NewInitializeWithAlloc(UniquePtr<TPtrType> &objPtr, IMallocDriver *alloc)
+template<class TType>
+rkit::UniquePtr<TType> rkit::NewInitializeWithAlloc(IMallocDriver *alloc)
 {
-	UniquePtr<TType> obj;
-	(NewWithAlloc<TType, TPtrType>(obj, alloc));
+	UniquePtr<TType> obj = NewWithAlloc<TType>(alloc);
 
 	TType *objRawPtr = obj.Get();
 	objRawPtr->Initialize();
-	objPtr = std::move(obj);
-
-	RKIT_RETURN_OK;
+	return obj;
 }
 
-template<class TType, class TPtrType>
-rkit::Result rkit::New(UniquePtr<TPtrType> &objPtr)
+template<class TType>
+rkit::UniquePtr<TType> rkit::New()
 {
-	return NewWithAlloc<TType, TPtrType>(objPtr, GetDrivers().m_mallocDriver.Get());
+	return NewWithAlloc<TType>(GetDrivers().m_mallocDriver.Get());
 }
 
-template<class TType, class TPtrType>
-rkit::Result rkit::NewInitialize(UniquePtr<TPtrType> &objPtr)
+template<class TType>
+rkit::UniquePtr<TType> rkit::NewInitialize()
 {
-	return NewInitializeWithAlloc<TType, TPtrType>(objPtr, GetDrivers().m_mallocDriver.Get());
+	return NewInitializeWithAlloc<TType>(GetDrivers().m_mallocDriver.Get());
 }
 
 

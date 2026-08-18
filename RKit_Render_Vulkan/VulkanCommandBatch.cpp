@@ -828,13 +828,10 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanCommandBatchBase::Create(UniquePtr<VulkanCommandBatchBase> &outCmdBatch, VulkanDeviceBase &device, VulkanQueueProxyBase &queue, VulkanCommandAllocatorBase &cmdAlloc)
 	{
-		UniquePtr<VulkanCommandBatch> cmdBatch;
-		New<VulkanCommandBatch>(cmdBatch, device, queue, cmdAlloc);
+		UniquePtr<VulkanCommandBatch> cmdBatch = New<VulkanCommandBatch>(device, queue, cmdAlloc);
 
 		cmdBatch->Initialize();
 
 		outCmdBatch = std::move(cmdBatch);
-
-		RKIT_RETURN_OK;
 	}
 } } } // rkit::render::vulkan

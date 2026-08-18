@@ -3347,7 +3347,7 @@ namespace anox { namespace buildsystem
 
 	rkit::Result AnoxMDACompilerBase::Create(rkit::UniquePtr<AnoxMDACompilerBase> &outCompiler)
 	{
-		return rkit::New<AnoxMDACompiler>(outCompiler);
+		outCompiler = rkit::New<AnoxMDACompiler>();
 	}
 
 	rkit::Result AnoxMD2CompilerBase::ConstructOutputPath(rkit::CIPath &outPath, const rkit::StringView &identifier)
@@ -3357,11 +3357,11 @@ namespace anox { namespace buildsystem
 
 	rkit::Result AnoxMD2CompilerBase::Create(rkit::UniquePtr<AnoxMD2CompilerBase> &outCompiler)
 	{
-		return rkit::New<AnoxMD2Compiler>(outCompiler);
+		outCompiler = rkit::New<AnoxMD2Compiler>();
 	}
 
 	rkit::Result AnoxCTCCompilerBase::Create(rkit::UniquePtr<AnoxCTCCompilerBase> &outCompiler)
 	{
-		return rkit::New<AnoxCTCCompiler>(outCompiler);
+		outCompiler = rkit::New<AnoxCTCCompiler>();
 	}
 } }

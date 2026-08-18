@@ -82,8 +82,7 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanRenderTargetViewBase::Create(UniquePtr<VulkanRenderTargetViewBase> &outRTV, VulkanDeviceBase &device, VkImage image, VkFormat format, VkImageAspectFlags imageAspectFlags, VkImageViewType imageViewType, uint32_t mipSlice, ImagePlane plane, uint32_t firstArrayElement, uint32_t arraySize)
 	{
-		UniquePtr<VulkanRenderTargetView> rtv;
-		New<VulkanRenderTargetView>(rtv, device);
+		UniquePtr<VulkanRenderTargetView> rtv = New<VulkanRenderTargetView>(device);
 
 		rtv->Initialize(image, format, imageAspectFlags, imageViewType, mipSlice, plane, firstArrayElement, arraySize);
 

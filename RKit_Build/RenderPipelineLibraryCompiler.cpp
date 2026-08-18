@@ -794,8 +794,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			RKIT_THROW(ResultCode::kMalformedFile);
 		}
 
-		UniquePtr<rpc_interchange::Entity> entity;
-		New<T>(entity);
+		UniquePtr<rpc_interchange::Entity> entity = New<T>();
 
 		entity->SetName(entityName);
 
@@ -804,8 +803,6 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		(this->*parseFunc)(blamePath, parser, *obj);
 
 		m_entities.Set(entityName, std::move(entity));
-
-		RKIT_RETURN_OK;
 	}
 
 	Result LibraryAnalyzer::ParseStaticSampler(const Utf8Char_t *blamePath, TextParser_t &parser, rpc_interchange::StaticSamplerEntity &ss)
@@ -863,8 +860,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 			parser.ExpectToken(u8"=");
 
-			UniquePtr<render::PushConstantDesc> pcDesc;
-			New<render::PushConstantDesc>(pcDesc);
+			UniquePtr<render::PushConstantDesc> pcDesc = New<render::PushConstantDesc>();
 
 			ParseValue(blamePath, &rtti->m_base, pcDesc.Get(), false, parser);
 
@@ -917,8 +913,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			if (IsToken(nameToken, u8"}"))
 				break;
 
-			UniquePtr<render::StructureMemberDesc> smDesc;
-			New<render::StructureMemberDesc>(smDesc);
+			UniquePtr<render::StructureMemberDesc> smDesc = New<render::StructureMemberDesc>();
 
 			IndexString(nameToken, smDesc->m_name);
 			smDesc->m_type = valueType;
@@ -971,8 +966,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					VertexInputFeedMapping feedMapping;
 					feedMapping.m_name.Set(token);
 
-					UniquePtr<render::InputLayoutVertexFeedDesc> feedDesc;
-					New<render::InputLayoutVertexFeedDesc>(feedDesc);
+					UniquePtr<render::InputLayoutVertexFeedDesc> feedDesc = New<render::InputLayoutVertexFeedDesc>();
 
 					feedMapping.m_feedDesc = feedDesc.Get();
 					m_vertexFeedDescs.Append(std::move(feedDesc));
@@ -1253,8 +1247,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 			parser.ExpectToken(u8"=");
 
-			UniquePtr<render::DescriptorDesc> descDesc;
-			New<render::DescriptorDesc>(descDesc);
+			UniquePtr<render::DescriptorDesc> descDesc = New<render::DescriptorDesc>();
 
 			parser.ExpectToken(u8"{");
 
@@ -1508,8 +1501,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					String rtName;
 					rtName.Set(token);
 
-					UniquePtr<render::RenderOperationDesc> roDesc;
-					New<render::RenderOperationDesc>(roDesc);
+					UniquePtr<render::RenderOperationDesc> roDesc = New<render::RenderOperationDesc>();
 
 					parser.ExpectToken(u8"=");
 
@@ -1563,8 +1555,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 				parser.ExpectToken(u8"=");
 
-				UniquePtr<render::ShaderDesc> shaderDesc;
-				New<render::ShaderDesc>(shaderDesc);
+				UniquePtr<render::ShaderDesc> shaderDesc = New<render::ShaderDesc>();
 
 				ParseStruct(filePath, shaderDescRTTI, shaderDesc.Get(), parser);
 
@@ -1580,8 +1571,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			{
 				parser.ExpectToken(u8"=");
 
-				UniquePtr<render::DepthStencilOperationDesc> depthStencil;
-				New<render::DepthStencilOperationDesc>(depthStencil);
+				UniquePtr<render::DepthStencilOperationDesc> depthStencil = New<render::DepthStencilOperationDesc>();
 
 				ParseStruct(filePath, depthStencilOperationDescRTTI, depthStencil.Get(), parser);
 
@@ -1643,8 +1633,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		if ((renderPass->m_depthStencilTarget != nullptr) && (gp.GetDesc().m_depthStencil == nullptr))
 		{
-			UniquePtr<render::DepthStencilOperationDesc> depthStencilDesc;
-			New<render::DepthStencilOperationDesc>(depthStencilDesc);
+			UniquePtr<render::DepthStencilOperationDesc> depthStencilDesc = New<render::DepthStencilOperationDesc>();
 
 			depthStencilDesc->m_depthTest.Set(false);
 			depthStencilDesc->m_depthWrite.Set(false);
@@ -1701,8 +1690,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				{
 					if (!defaultRODesc)
 					{
-						UniquePtr<render::RenderOperationDesc> defaultRODescNew;
-						New<render::RenderOperationDesc>(defaultRODescNew);
+						UniquePtr<render::RenderOperationDesc> defaultRODescNew = New<render::RenderOperationDesc>();
 
 						defaultRODescNew->m_access = render::ReadWriteAccess::Read;	// FIXME: None?
 						defaultRODescNew->m_srcBlend = render::ColorBlendFactor::Zero;
@@ -1771,8 +1759,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 					CheckValidIdentifier(filePath, token, parser);
 
-					UniquePtr<render::RenderTargetDesc> rtDesc;
-					New<render::RenderTargetDesc>(rtDesc);
+					UniquePtr<render::RenderTargetDesc> rtDesc = New<render::RenderTargetDesc>();
 
 					IndexString(token, rtDesc->m_name);
 
@@ -1789,8 +1776,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			{
 				parser.ExpectToken(u8"=");
 
-				UniquePtr<render::DepthStencilTargetDesc> depthStencil;
-				New<render::DepthStencilTargetDesc>(depthStencil);
+				UniquePtr<render::DepthStencilTargetDesc> depthStencil = New<render::DepthStencilTargetDesc>();
 
 				ParseStruct(filePath, depthStencilTargetDescRTTI, depthStencil.Get(), parser);
 
@@ -1879,8 +1865,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		const render::VectorOrScalarNumericType *deduplicated = nullptr;
 		Deduplicate(m_vectorOrScalarTypes, inputSourcesType, deduplicated);
 
-		UniquePtr<render::InputLayoutVertexInputDesc> vid;
-		New<render::InputLayoutVertexInputDesc>(vid);
+		UniquePtr<render::InputLayoutVertexInputDesc> vid = New<render::InputLayoutVertexInputDesc>();
 		vid->m_byteOffset = inOutOffset;
 		vid->m_inputFeed = inputFeed;
 		vid->m_memberName = memberName;
@@ -2590,8 +2575,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			}
 		}
 
-		UniquePtr<T> newInst;
-		New<T>(newInst, instance);
+		UniquePtr<T> newInst = New<T>(instance);
 
 		outDeduplicated = newInst.Get();
 
@@ -2986,8 +2970,7 @@ namespace rkit { namespace buildsystem
 
 		data::IDataDriver *dataDriver = static_cast<data::IDataDriver *>(rkit::GetDrivers().FindDriver(IModuleDriver::kDefaultNamespace, u8"Data"));
 
-		UniquePtr<rpc_analyzer::LibraryAnalyzer> analyzer;
-		New<rpc_analyzer::LibraryAnalyzer>(analyzer, dataDriver, feedback);
+		UniquePtr<rpc_analyzer::LibraryAnalyzer> analyzer = New<rpc_analyzer::LibraryAnalyzer>(dataDriver, feedback);
 
 		analyzer->Run(depsNode);
 
@@ -3008,8 +2991,7 @@ namespace rkit { namespace buildsystem
 		data::IDataDriver *dataDriver = static_cast<data::IDataDriver *>(rkit::GetDrivers().FindDriver(IModuleDriver::kDefaultNamespace, u8"Data"));
 
 
-		UniquePtr<rpc_compiler::LibraryCompiler> compiler;
-		New<rpc_compiler::LibraryCompiler>(compiler, dataDriver, feedback);
+		UniquePtr<rpc_compiler::LibraryCompiler> compiler = New<rpc_compiler::LibraryCompiler>(dataDriver, feedback);
 
 		compiler->Run(depsNode);
 
@@ -3034,6 +3016,6 @@ namespace rkit { namespace buildsystem
 
 		data::IDataDriver *dataDriver = static_cast<data::IDataDriver *>(rkit::GetDrivers().FindDriver(IModuleDriver::kDefaultNamespace, u8"Data"));
 
-		return New<rpc_combiner::LibraryCombiner>(outCombiner, dataDriver);
+		outCombiner = New<rpc_combiner::LibraryCombiner>(dataDriver);
 	}
-} } // rpc::buildsystem
+} } // rkit::buildsystem

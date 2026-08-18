@@ -488,12 +488,10 @@ namespace rkit { namespace render { namespace vulkan
 
 		for (size_t i = 0; i < physicalDeviceCount; i++)
 		{
-			RCPtr<RenderVulkanPhysicalDevice> physDevice;
-			NewWithAlloc<RenderVulkanPhysicalDevice>(physDevice, m_alloc, physDevices[i]);
+			RCPtr<RenderVulkanPhysicalDevice> physDevice = NewRCWithAlloc<RenderVulkanPhysicalDevice>(m_alloc, physDevices[i]);
 			physDevice->InitPhysicalDevice(m_vki);
 
-			UniquePtr<IRenderAdapter> adapter;
-			NewWithAlloc<RenderVulkanAdapter>(adapter, m_alloc, physDevice);
+			UniquePtr<IRenderAdapter> adapter = NewWithAlloc<RenderVulkanAdapter>(m_alloc, physDevice);
 
 			adapters[i] = std::move(adapter);
 		}
@@ -1059,8 +1057,7 @@ namespace rkit { namespace render { namespace vulkan
 			}
 		}
 		
-
-		NewWithAlloc<VulkanAllocationCallbacks>(m_allocationCallbacks, m_alloc, m_alloc);
+		m_allocationCallbacks = NewWithAlloc<VulkanAllocationCallbacks>(m_alloc, m_alloc);
 
 		VkApplicationInfo appInfo = {};
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;

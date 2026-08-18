@@ -30,16 +30,13 @@ namespace rkit { namespace data
 
 	rkit::Result DataDriver::InitDriver(const DriverInitParameters *initParams)
 	{
-		New<RenderDataHandler>(m_renderDataHandler);
-
-		RKIT_RETURN_OK;
+		m_renderDataHandler = New<RenderDataHandler>();
 	}
 
 	void DataDriver::ShutdownDriver()
 	{
 		m_renderDataHandler.Reset();
 	}
-
 
 	IRenderDataHandler *DataDriver::GetRenderDataHandler() const
 	{

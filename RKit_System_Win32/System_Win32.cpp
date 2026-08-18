@@ -961,18 +961,16 @@ namespace rkit
 
 	Result AsyncFile_Win32::CreateReadRequester(UniquePtr<IAsyncReadRequester> &requester)
 	{
-		RCPtr<AsyncReadWriteRequesterInstance_Win32> requesterInstance;
-		New<AsyncReadWriteRequesterInstance_Win32>(requesterInstance, m_asioThread, m_instance);
+		RCPtr<AsyncReadWriteRequesterInstance_Win32> requesterInstance = NewRC<AsyncReadWriteRequesterInstance_Win32>(m_asioThread, m_instance);
 
-		return New<AsyncReadWriteRequester_Win32>(requester, requesterInstance);
+		requester = New<AsyncReadWriteRequester_Win32>(requesterInstance);
 	}
 
 	Result AsyncFile_Win32::CreateWriteRequester(UniquePtr<IAsyncWriteRequester> &requester)
 	{
-		RCPtr<AsyncReadWriteRequesterInstance_Win32> requesterInstance;
-		New<AsyncReadWriteRequesterInstance_Win32>(requesterInstance, m_asioThread, m_instance);
+		RCPtr<AsyncReadWriteRequesterInstance_Win32> requesterInstance = NewRC<AsyncReadWriteRequesterInstance_Win32>(m_asioThread, m_instance);
 
-		return New<AsyncReadWriteRequester_Win32>(requester, requesterInstance);
+		requester = New<AsyncReadWriteRequester_Win32>(requesterInstance);
 	}
 
 	DirectoryScan_Win32::DirectoryScan_Win32()
@@ -1308,7 +1306,7 @@ namespace rkit
 			m_setThreadDescriptionProc = nullptr;
 #endif
 
-		New<AsyncIOThread_Win32>(m_asioThread, *this);
+		m_asioThread = New<AsyncIOThread_Win32>(*this);
 		m_asioThread->Initialize();
 
 		RKIT_RETURN_OK;
@@ -1381,8 +1379,7 @@ namespace rkit
 		OSAbsPath pathCopy;
 		pathCopy.Set(path);
 
-		UniquePtr<OpenFileReadJobRunner> runner;
-		New<OpenFileReadJobRunner>(runner, outStream, pathCopy, allowFailure, *this);
+		UniquePtr<OpenFileReadJobRunner> runner = New<OpenFileReadJobRunner>(outStream, pathCopy, allowFailure, *this);
 
 		jobQueue.CreateJob(&outOpenJob, JobType::kIO, std::move(runner), dependencyJob);
 
@@ -1413,8 +1410,7 @@ namespace rkit
 		OSAbsPath pathCopy;
 		pathCopy.Set(path);
 
-		UniquePtr<OpenFileAsyncReadJobRunner> runner;
-		New<OpenFileAsyncReadJobRunner>(runner, outStream, pathCopy, allowFailure, *this);
+		UniquePtr<OpenFileAsyncReadJobRunner> runner = New<OpenFileAsyncReadJobRunner>(outStream, pathCopy, allowFailure, *this);
 
 		jobQueue.CreateJob(&outOpenJob, JobType::kIO, std::move(runner), dependencyJob);
 
@@ -1542,7 +1538,7 @@ namespace rkit
 			RKIT_THROW(ResultCode::kOperationFailed);
 
 		UniquePtr<Thread_Win32> thread;
-		RKIT_TRY_CATCH_RETHROW(NewWithAlloc<Thread_Win32>(thread, m_alloc),
+		RKIT_TRY_CATCH_RETHROW(thread = NewWithAlloc<Thread_Win32>(m_alloc),
 			CatchContext(
 				[hKickoffEvent]
 				{
@@ -1610,24 +1606,16 @@ namespace rkit
 
 	Result SystemDriver_Win32::CreateMutex(UniquePtr<IMutex> &outMutex)
 	{
-		UniquePtr<Mutex_Win32> mutex;
-		NewWithAlloc<Mutex_Win32>(mutex, m_alloc);
-
-		outMutex = std::move(mutex);
-
-		RKIT_RETURN_OK;
+		outMutex = NewWithAlloc<Mutex_Win32>(m_alloc);
 	}
 
 	Result SystemDriver_Win32::CreateEvent(UniquePtr<IEvent> &outEvent, bool autoReset, bool startSignaled)
 	{
-		UniquePtr<Event_Win32> event;
-		NewWithAlloc<Event_Win32>(event, m_alloc);
+		UniquePtr<Event_Win32> event = NewWithAlloc<Event_Win32>(m_alloc);
 
 		event->Initialize(autoReset, startSignaled);
 
 		outEvent = std::move(event);
-
-		RKIT_RETURN_OK;
 	}
 
 	void SystemDriver_Win32::SleepMSec(uint32_t msec) const
@@ -1818,8 +1806,7 @@ namespace rkit
 
 	Result SystemDriver_Win32::OpenDirectoryScanAbs(UniquePtr<IDirectoryScan> &outDirectoryScan, const OSAbsPathView &path, bool allowFailure)
 	{
-		UniquePtr<DirectoryScan_Win32> dirScan;
-		New<DirectoryScan_Win32>(dirScan);
+		UniquePtr<DirectoryScan_Win32> dirScan = New<DirectoryScan_Win32>();
 
 		ConstSpan<Utf16Char_t> pathChars = path.ToStringView().ToSpan();
 
@@ -1980,8 +1967,7 @@ namespace rkit
 		if (!libName)
 			RKIT_THROW(ResultCode::kInvalidParameter);
 
-		UniquePtr<SystemLibrary_Win32> sysLibrary;
-		New<SystemLibrary_Win32>(sysLibrary);
+		UniquePtr<SystemLibrary_Win32> sysLibrary = New<SystemLibrary_Win32>();
 
 		HMODULE hmodule = LoadLibraryW(libName);
 		if (!hmodule)
@@ -2187,7 +2173,7 @@ namespace rkit
 				RKIT_THROW(ResultCode::kFileOpenError);
 		}
 
-		RKIT_TRY_CATCH_RETHROW(New<File_Win32>(outFile, fHandle, static_cast<FilePos_t>(fileSize.QuadPart)),
+		RKIT_TRY_CATCH_RETHROW(outFile = New<File_Win32>(fHandle, static_cast<FilePos_t>(fileSize.QuadPart)),
 			CatchContext(
 				[fHandle]
 				{
@@ -2215,11 +2201,9 @@ namespace rkit
 
 		const FilePos_t initialSize = file->GetSize();
 
-		RCPtr<AsyncFileInstance_Win32> asyncFileInstance;
-		New<AsyncFileInstance_Win32>(asyncFileInstance, std::move(file));
+		RCPtr<AsyncFileInstance_Win32> asyncFileInstance = NewRC<AsyncFileInstance_Win32>(std::move(file));
 
-		UniquePtr<AsyncFile_Win32> stream;
-		New<AsyncFile_Win32>(stream, *m_asioThread, std::move(asyncFileInstance));
+		UniquePtr<AsyncFile_Win32> stream = New<AsyncFile_Win32>(*m_asioThread, std::move(asyncFileInstance));
 
 		outStream = std::move(stream);
 		outInitialSize = initialSize;
@@ -2315,9 +2299,7 @@ namespace rkit
 	{
 		IMallocDriver *alloc = GetDrivers().m_mallocDriver.Get();
 
-		UniquePtr<SystemDriver_Win32> driver;
-
-		NewWithAlloc<SystemDriver_Win32>(driver, alloc, alloc, *static_cast<const SystemModuleInitParameters_Win32 *>(baseInitParams));
+		UniquePtr<SystemDriver_Win32> driver = NewWithAlloc<SystemDriver_Win32>(alloc, alloc, *static_cast<const SystemModuleInitParameters_Win32 *>(baseInitParams));
 		ms_systemDriver = driver.Detach();
 		GetMutableDrivers().m_systemDriver = ms_systemDriver;
 

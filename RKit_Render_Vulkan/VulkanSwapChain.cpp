@@ -403,8 +403,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		uint32_t queueFamily = queue.GetQueueFamily();
 
-		UniquePtr<VulkanSwapChain> swapChain;
-		New<VulkanSwapChain>(swapChain, device, prototype.GetDisplay(), numImages, writeBehavior, queue);
+		UniquePtr<VulkanSwapChain> swapChain = New<VulkanSwapChain>(device, prototype.GetDisplay(), numImages, writeBehavior, queue);
 
 		swapChain->Initialize(prototype, fmt, writeBehavior, queueFamily);
 
@@ -415,25 +414,19 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanSwapChainPrototypeBase::Create(UniquePtr<VulkanSwapChainPrototypeBase> &outSwapChainPrototype, VulkanDeviceBase &device, IDisplay &display)
 	{
-		UniquePtr<VulkanSwapChainPrototype> swapChainPrototype;
-		New<VulkanSwapChainPrototype>(swapChainPrototype, device, display);
+		UniquePtr<VulkanSwapChainPrototype> swapChainPrototype = New<VulkanSwapChainPrototype>(device, display);
 
 		swapChainPrototype->Initialize();
 
 		outSwapChainPrototype = std::move(swapChainPrototype);
-
-		RKIT_RETURN_OK;
 	}
 
 	Result VulkanSwapChainSyncPointBase::Create(UniquePtr<VulkanSwapChainSyncPointBase> &outSyncPoint, VulkanDeviceBase &device)
 	{
-		UniquePtr<VulkanSwapChainSyncPoint> syncPoint;
-		New<VulkanSwapChainSyncPoint>(syncPoint, device);
+		UniquePtr<VulkanSwapChainSyncPoint> syncPoint = New<VulkanSwapChainSyncPoint>(device);
 
 		syncPoint->Initialize();
 
 		outSyncPoint = std::move(syncPoint);
-
-		RKIT_RETURN_OK;
 	}
 } } } // rkit::render::vulkan

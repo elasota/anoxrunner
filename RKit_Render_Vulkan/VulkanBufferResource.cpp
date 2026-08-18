@@ -126,7 +126,7 @@ namespace rkit { namespace render { namespace vulkan {
 		VkBuffer buffer = VK_NULL_HANDLE;
 		RKIT_VK_CHECK(device.GetDeviceAPI().vkCreateBuffer(device.GetDevice(), &createInfo, device.GetAllocCallbacks(), &buffer));
 
-		RKIT_TRY_CATCH_RETHROW(New<VulkanBufferPrototype>(outBufferPrototype, device, buffer),
+		RKIT_TRY_CATCH_RETHROW(outBufferPrototype = New<VulkanBufferPrototype>(device, buffer),
 			CatchContext(
 				[&device, buffer]
 				{

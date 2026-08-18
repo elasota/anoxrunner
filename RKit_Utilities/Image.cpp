@@ -90,7 +90,7 @@ namespace rkit { namespace utils {
 		switch (spec.m_pixelPacking)
 		{
 		case PixelPacking::kUInt8:
-			New<Image<uint8_t>>(image, spec);
+			image = New<Image<uint8_t>>(spec);
 			break;
 
 		default:
@@ -99,8 +99,6 @@ namespace rkit { namespace utils {
 		image->Initialize();
 
 		outImage = std::move(image);
-
-		RKIT_RETURN_OK;
 	}
 } } // rkit::utils
 

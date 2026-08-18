@@ -189,20 +189,20 @@ namespace rkit
 		RefCountedTracker *m_tracker;
 	};
 
-	template<class TType, class TPtrType, class... TArgs>
-	Result New(RCPtr<TPtrType> &objPtr, TArgs&& ...args);
+	template<class TType, class... TArgs>
+	RKIT_NODISCARD RCPtr<TType> NewRC(TArgs&& ...args);
 
-	template<class TType, class TPtrType, class... TArgs>
-	Result NewWithAlloc(RCPtr<TPtrType> &objPtr, IMallocDriver *alloc, TArgs&& ...args);
+	template<class TType, class... TArgs>
+	RKIT_NODISCARD RCPtr<TType> NewRCWithAlloc(IMallocDriver *alloc, TArgs&& ...args);
 
-	template<class TType, class TPtrType>
-	Result New(RCPtr<TPtrType> &objPtr);
+	template<class TType>
+	RKIT_NODISCARD RCPtr<TType> NewRC();
 
-	template<class RCType, class UPtrType>
-	Result MakeRC(RCPtr<RCType> &rcPtr, UniquePtr<UPtrType> &&uniquePtr);
+	template<class TType>
+	RKIT_NODISCARD RCPtr<TType> MakeRC(UniquePtr<TType> &&uniquePtr);
 
 	template<class T>
-	UniquePtr<T> RCPtrToUniquePtr(RCPtr<T> rcPtr);
+	RKIT_NODISCARD UniquePtr<T> RCPtrToUniquePtr(RCPtr<T> rcPtr);
 }
 
 #include "Drivers.h"
@@ -839,8 +839,8 @@ namespace rkit
 		return *this;
 	}
 
-	template<class TType, class TPtrType, class... TArgs>
-	inline Result NewWithAlloc(RCPtr<TPtrType> &objPtr, IMallocDriver *alloc, TArgs&& ...args)
+	template<class TType, class... TArgs>
+	inline RCPtr<TType> NewRCWithAlloc(IMallocDriver *alloc, TArgs&& ...args)
 	{
 		void *mem = alloc->Alloc(priv::NewSizeAlignResolver<TType>::GetSize());
 		if (!mem)
@@ -858,19 +858,17 @@ namespace rkit
 		priv::RefCountedInstantiator::InitRefCounted(*refCounted, allocation);
 		RefCountedTracker *tracker = priv::RefCountedInstantiator::GetTrackerFromObject(refCounted);
 
-		objPtr = RCPtr<TPtrType>(obj, tracker);
-
-		RKIT_RETURN_OK;
+		return RCPtr<TType>(obj, tracker);
 	}
 
-	template<class TType, class TPtrType, class... TArgs>
-	inline Result New(RCPtr<TPtrType> &objPtr, TArgs&& ...args)
+	template<class TType, class... TArgs>
+	inline RCPtr<TType> NewRC(TArgs&& ...args)
 	{
-		return NewWithAlloc<TType, TPtrType, TArgs...>(objPtr, GetDrivers().m_mallocDriver.Get(), std::forward<TArgs>(args)...);
+		return NewRCWithAlloc<TType, TArgs...>(GetDrivers().m_mallocDriver.Get(), std::forward<TArgs>(args)...);
 	}
 
-	template<class TType, class TPtrType>
-	Result NewWithAlloc(RCPtr<TPtrType> &objPtr, IMallocDriver *alloc)
+	template<class TType>
+	RCPtr<TType> NewRCWithAlloc(IMallocDriver *alloc)
 	{
 		void *mem = alloc->Alloc(priv::NewSizeAlignResolver<TType>::GetSize());
 		if (!mem)
@@ -888,36 +886,29 @@ namespace rkit
 		priv::RefCountedInstantiator::InitRefCounted(*refCounted, allocation);
 		RefCountedTracker *tracker = priv::RefCountedInstantiator::GetTrackerFromObject(refCounted);
 
-		objPtr = RCPtr<TPtrType>(obj, tracker);
-
-		RKIT_RETURN_OK;
+		return RCPtr<TType>(obj, tracker);
 	}
 
-	template<class TType, class TPtrType>
-	Result New(RCPtr<TPtrType> &objPtr)
+	template<class TType>
+	RCPtr<TType> NewRC()
 	{
-		return NewWithAlloc<TType, TPtrType>(objPtr, GetDrivers().m_mallocDriver.Get());
+		return NewRCWithAlloc<TType>(GetDrivers().m_mallocDriver.Get());
 	}
 
-	template<class RCType, class UPtrType>
-	Result MakeRC(RCPtr<RCType> &rcPtr, UniquePtr<UPtrType> &&uniquePtr)
+	template<class TType>
+	RCPtr<TType> MakeRC(UniquePtr<TType> &&uniquePtr)
 	{
-		RCType *object = uniquePtr.Get();
+		TType *object = uniquePtr.Get();
 
 		if (object == nullptr)
-		{
-			rcPtr.Reset();
-			RKIT_RETURN_OK;
-		}
+			return RCPtr<TType>();
 
-		UniquePtr<priv::UniquePtrTracker<UPtrType>> tracker;
-		New<priv::UniquePtrTracker<UPtrType>>(tracker, std::move(uniquePtr));
+		UniquePtr<priv::UniquePtrTracker<TType>> tracker = New<priv::UniquePtrTracker<TType>>(std::move(uniquePtr));
 
-		SimpleObjectAllocation<priv::UniquePtrTracker<UPtrType>> trackerAllocation = tracker.Detach();
+		SimpleObjectAllocation<priv::UniquePtrTracker<TType>> trackerAllocation = tracker.Detach();
 		trackerAllocation.m_obj->SetSelf(trackerAllocation);
 
-		rcPtr = RCPtr<RCType>(object, trackerAllocation.m_obj);
-		RKIT_RETURN_OK;
+		return RCPtr<TType>(object, trackerAllocation.m_obj);
 	}
 
 	template<class T>

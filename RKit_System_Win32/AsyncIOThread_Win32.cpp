@@ -203,8 +203,7 @@ namespace rkit
 
 		m_sysDriver.CreateEvent(m_startAndTerminateEvent, true, false);
 
-		UniquePtr<AsyncIOThreadContext_Win32> threadContext;
-		New<AsyncIOThreadContext_Win32>(threadContext, *m_startAndTerminateEvent, *m_pendingQueueMutex, *m_inProgressQueueMutex, m_kickEvent);
+		UniquePtr<AsyncIOThreadContext_Win32> threadContext = New<AsyncIOThreadContext_Win32>(*m_startAndTerminateEvent, *m_pendingQueueMutex, *m_inProgressQueueMutex, m_kickEvent);
 
 		m_threadContext = threadContext.Get();
 

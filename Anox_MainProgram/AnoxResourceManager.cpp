@@ -428,7 +428,7 @@ namespace anox
 	{
 		rkit::ISystemDriver &sysDriver = *rkit::GetDrivers().m_systemDriver;
 
-		rkit::New<AnoxResourceLoaderSynchronizer>(m_sync, this);
+		m_sync = rkit::NewRC<AnoxResourceLoaderSynchronizer>(this);
 		sysDriver.CreateMutex(m_loaderMutex);
 
 		m_sync->Init();
@@ -585,8 +585,7 @@ namespace anox
 
 				resLock.Unlock();
 
-				rkit::RCPtr<rkit::FutureContainer<AnoxResourceRetrieveResult>> futureContainer;
-				rkit::New<rkit::FutureContainer<AnoxResourceRetrieveResult>>(futureContainer);
+				rkit::RCPtr<rkit::FutureContainer<AnoxResourceRetrieveResult>> futureContainer = rkit::NewRC<rkit::FutureContainer<AnoxResourceRetrieveResult>>();
 
 				if (trackerPtr.IsValid())
 				{
@@ -623,8 +622,7 @@ namespace anox
 		// We have to do this because the unregistration happens in AnoxResourceTracker::RCTrackerZero,
 		// not the AnoxResourceTracker destructor.  However, unregistration ONLY happens if the resource
 		// has been linked.
-		rkit::UniquePtr<TKeyedTracker> keyedTrackerUPtr;
-		rkit::New<TKeyedTracker>(keyedTrackerUPtr, m_sync, key.GetResourceType(), std::move(resourceUPtr));
+		rkit::UniquePtr<TKeyedTracker> keyedTrackerUPtr = rkit::New<TKeyedTracker>(m_sync, key.GetResourceType(), std::move(resourceUPtr));
 
 		keyedTrackerUPtr->SetKey(key.GetResourceKey());
 
@@ -636,15 +634,14 @@ namespace anox
 
 		// Now that resourceRCPtr is set, failure will cause the mutex to be unlocked, followed by
 		// re-lock and unregistration of the resource by resourceRCPtr
-		rkit::RCPtr<rkit::FutureContainer<AnoxResourceRetrieveResult>> pendingFutureContainer;
-		rkit::New<rkit::FutureContainer<AnoxResourceRetrieveResult>>(pendingFutureContainer);
+		rkit::RCPtr<rkit::FutureContainer<AnoxResourceRetrieveResult>> pendingFutureContainer = rkit::NewRC<rkit::FutureContainer<AnoxResourceRetrieveResult>>();
 
 		tracker->m_pendingFutureContainer = pendingFutureContainer;
 
 		// Create the completion notifier
 		rkit::RCPtr<AnoxResourceTracker> trackerRCPtr = rkit::RCPtr<AnoxResourceTracker>(tracker, tracker);
 
-		rkit::New<AnoxResourceLoadCompletionNotifier>(loadCompleter, trackerRCPtr);
+		loadCompleter = rkit::NewRC<AnoxResourceLoadCompletionNotifier>(trackerRCPtr);
 
 		rkit::RCPtr<rkit::FutureContainer<AnoxResourceRetrieveResult>> recastContainer;
 
@@ -687,8 +684,7 @@ namespace anox
 			if (loadJob.IsValid())
 				completeJobDepSpan = rkit::Span<rkit::RCPtr<rkit::Job>>(&loadJob, 1);
 
-			rkit::UniquePtr<rkit::IJobRunner> completeJobRunner;
-			rkit::New<AnoxCompleteResourceLoadJobRunner>(completeJobRunner, loadCompleter);
+			rkit::UniquePtr<rkit::IJobRunner> completeJobRunner = rkit::New<AnoxCompleteResourceLoadJobRunner>(loadCompleter);
 			m_jobQueue->CreateJob(outJob, rkit::JobType::kNormalPriority, std::move(completeJobRunner), completeJobDepSpan);
 		}
 
@@ -799,9 +795,7 @@ namespace anox
 
 	rkit::Result AnoxResourceManagerBase::Create(rkit::UniquePtr<AnoxResourceManagerBase> &outResLoader, AnoxGameFileSystemBase *fileSystem, rkit::IJobQueue *jobQueue)
 	{
-		rkit::UniquePtr<AnoxResourceManager> resLoader;
-
-		rkit::New<AnoxResourceManager>(resLoader, fileSystem, jobQueue);
+		rkit::UniquePtr<AnoxResourceManager> resLoader = rkit::New<AnoxResourceManager>(fileSystem, jobQueue);
 		resLoader->Initialize();
 
 		outResLoader = std::move(resLoader);

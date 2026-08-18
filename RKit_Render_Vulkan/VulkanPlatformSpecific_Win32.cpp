@@ -16,7 +16,7 @@
 
 #include "rkit/Win32/Display_Win32.h"
 
-namespace rkit { namespace render { namespace vulkan { namespace platform
+namespace rkit::render::vulkan::platform
 {
 	class VulkanSurface_Win32 final : public IVulkanSurface
 	{
@@ -86,8 +86,6 @@ namespace rkit { namespace render { namespace vulkan { namespace platform
 		surfaceCreateInfo.hwnd = m_display.GetHWND();
 
 		RKIT_VK_CHECK(m_device.GetInstancePlatformAPI().vkCreateWin32SurfaceKHR(m_device.GetInstance(), &surfaceCreateInfo, m_device.GetAllocCallbacks(), &m_surface));
-
-		RKIT_RETURN_OK;
 	}
 
 	VkSurfaceKHR VulkanSurface_Win32::GetSurface() const
@@ -97,27 +95,21 @@ namespace rkit { namespace render { namespace vulkan { namespace platform
 
 	Result CreateSurfaceFromDisplay(UniquePtr<IVulkanSurface> &outSurface, VulkanDeviceBase &device, IDisplay &display)
 	{
-		UniquePtr<VulkanSurface_Win32> surf;
-		New<VulkanSurface_Win32>(surf, device, static_cast<IDisplay_Win32 &>(display));
+		UniquePtr<VulkanSurface_Win32> surf = New<VulkanSurface_Win32>(device, static_cast<IDisplay_Win32 &>(display));
 
 		surf->Initialize();
 
 		outSurface = std::move(surf);
-
-		RKIT_RETURN_OK;
 	}
 
 	Result AddInstanceExtensions(IInstanceExtensionEnumerator &enumerator)
 	{
 		enumerator.AddExtension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME, true);
-
-		RKIT_RETURN_OK;
 	}
 
 	Result AddDeviceExtensions(IDeviceExtensionEnumerator &enumerator)
 	{
-		RKIT_RETURN_OK;
 	}
-} } } } // rkit::render::vulkan::platform
+} // rkit::render::vulkan::platform
 
 #endif

@@ -718,6 +718,5 @@ namespace rkit { namespace utils
 
 rkit::Result rkit::utils::TextParserBase::Create(const Span<const uint8_t> &contents, utils::TextParserCommentType commentType, utils::TextParserLexerType lexType, UniquePtr<TextParserBase> &outParser)
 {
-	New<TextParser>(outParser, contents, commentType, lexType);
-	RKIT_RETURN_OK;
+	outParser = New<TextParser>(contents, commentType, lexType);
 }

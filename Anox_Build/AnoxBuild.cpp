@@ -74,8 +74,7 @@ void anox::BuildDriver::ShutdownDriver()
 rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBuildSystemInstance *instance)
 {
 	{
-		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler;
-		rkit::New<buildsystem::MaterialCompiler>(matCompiler, *m_pngDriver);
+		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler = rkit::New<buildsystem::MaterialCompiler>(*m_pngDriver);
 
 		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kFontMaterialNodeID, std::move(matCompiler));
 
@@ -83,8 +82,7 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 	}
 
 	{
-		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler;
-		rkit::New<buildsystem::MaterialCompiler>(matCompiler, *m_pngDriver);
+		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler = rkit::New<buildsystem::MaterialCompiler>(*m_pngDriver);
 
 		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kWorldMaterialNodeID, std::move(matCompiler));
 
@@ -92,8 +90,7 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 	}
 
 	{
-		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler;
-		rkit::New<buildsystem::MaterialCompiler>(matCompiler, *m_pngDriver);
+		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler = rkit::New<buildsystem::MaterialCompiler>(*m_pngDriver);
 
 		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kModelMaterialNodeID, std::move(matCompiler));
 
@@ -101,8 +98,7 @@ rkit::Result anox::BuildDriver::RegisterBuildSystemAddOn(rkit::buildsystem::IBui
 	}
 
 	{
-		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler;
-		rkit::New<buildsystem::MaterialCompiler>(matCompiler, *m_pngDriver);
+		rkit::UniquePtr<buildsystem::MaterialCompiler> matCompiler = rkit::New<buildsystem::MaterialCompiler>(*m_pngDriver);
 
 		instance->GetDependencyGraphFactory()->RegisterNodeCompiler(kAnoxNamespaceID, buildsystem::kInterfaceMaterialNodeID, std::move(matCompiler));
 

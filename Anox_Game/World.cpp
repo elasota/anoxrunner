@@ -188,8 +188,7 @@ namespace anox::game
 
 	rkit::Result World::Create(rkit::UniquePtr<World> &outWorld, ScriptManager &scriptManager)
 	{
-		rkit::UniquePtr<World> world;
-		rkit::New<World>(world, scriptManager);
+		rkit::UniquePtr<World> world = rkit::New<World>(scriptManager);
 		world->Impl().Initialize();
 
 		outWorld = std::move(world);

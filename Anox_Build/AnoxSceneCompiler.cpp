@@ -1442,6 +1442,6 @@ namespace anox::buildsystem
 
 	rkit::Result SceneCompilerBase::Create(rkit::UniquePtr<SceneCompilerBase> &outCompiler)
 	{
-		return rkit::New<SceneCompiler>(outCompiler);
+		outCompiler = rkit::New<SceneCompiler>();
 	}
 }

@@ -1123,7 +1123,7 @@ namespace anox { namespace buildsystem
 					rkit::UniquePtr<rkit::utils::IImage> image;
 					TextureCompilerBase::GetImage(image, feedback, m_pngDriver, rkit::buildsystem::BuildFileLocation::kSourceDir, path, frameImportDef.m_importDisposition);
 
-					rkit::MakeRC(bitmapPtrRef, std::move(image));
+					bitmapPtrRef = rkit::MakeRC(std::move(image));
 				}
 
 				if (optBitmapPtr)
@@ -1214,7 +1214,7 @@ namespace anox { namespace buildsystem
 						{
 							rkit::UniquePtr<rkit::utils::IImage> currentFrameImageUPtr;
 							utils.CloneImage(currentFrameImageUPtr, *prevFrameImage);
-							rkit::MakeRC(currentFrameImage, std::move(currentFrameImageUPtr));
+							currentFrameImage = rkit::MakeRC(std::move(currentFrameImageUPtr));
 						}
 
 						utils.BlitImageSigned(*currentFrameImage, *currentFrameBitmap, 0, 0, frameDef.m_xOffset, frameDef.m_yOffset, currentFrameBitmap->GetWidth(), currentFrameBitmap->GetHeight());

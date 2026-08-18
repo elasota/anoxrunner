@@ -2398,20 +2398,15 @@ namespace rkit { namespace render { namespace vulkan
 
 		m_isFinished = true;
 
-		UniquePtr<VulkanPipelineLibrary> pipelineLibrary;
-		New<VulkanPipelineLibrary>(pipelineLibrary, std::move(m_data));
+		UniquePtr<VulkanPipelineLibrary> pipelineLibrary = New<VulkanPipelineLibrary>(std::move(m_data));
 
 		outPipelineLibrary = std::move(pipelineLibrary);
-
-		RKIT_RETURN_OK;
 	}
 
 	Result PipelineLibraryLoaderBase::Create(VulkanDeviceBase &device, UniquePtr<PipelineLibraryLoaderBase> &outLoader, UniquePtr<IPipelineLibraryConfigValidator> &&validator,
 		UniquePtr<data::IRenderDataPackage> &&package, UniquePtr<ISeekableReadStream> &&packageStream, FilePos_t packageBinaryContentStart)
 	{
-		UniquePtr<VulkanPipelineLibraryLoader> loader;
-
-		New<VulkanPipelineLibraryLoader>(loader, device, std::move(validator), std::move(package), std::move(packageStream), packageBinaryContentStart);
+		UniquePtr<VulkanPipelineLibraryLoader> loader = New<VulkanPipelineLibraryLoader>(device, std::move(validator), std::move(package), std::move(packageStream), packageBinaryContentStart);
 
 		loader->Initialize();
 

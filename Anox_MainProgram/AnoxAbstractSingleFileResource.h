@@ -120,8 +120,7 @@ namespace anox
 		AnoxGameFileSystemBase &fileSystem = *systems.m_fileSystem;
 		rkit::IJobQueue &jobQueue = fileSystem.GetJobQueue();
 
-		rkit::RCPtr<AnoxAbstractSingleFileResourceLoaderState> loaderState;
-		rkit::New<State_t>(loaderState);
+		rkit::RCPtr<AnoxAbstractSingleFileResourceLoaderState> loaderState = rkit::NewRC<State_t>();
 
 		loaderState->m_functions = &AnoxSingleFileResourceLoaderCallbacksFor<TLoaderInfo>::ms_callbacks;
 		loaderState->m_resource = resourceBase;
@@ -141,8 +140,7 @@ namespace anox
 				jobQueue.CreateSignaledJob(waitForDependenciesSignaler, waitForDependenciesJob);
 			}
 
-			rkit::UniquePtr<rkit::IJobRunner> phaseJobRunner;
-			rkit::New<AnoxAbstractSingleFileLoaderPhaseJob>(phaseJobRunner, loaderState, phase, waitForDependenciesSignaler);
+			rkit::UniquePtr<rkit::IJobRunner> phaseJobRunner = rkit::New<AnoxAbstractSingleFileLoaderPhaseJob>(loaderState, phase, waitForDependenciesSignaler);
 
 			rkit::RCPtr<rkit::Job> phaseJob;
 			fileSystem.GetJobQueue().CreateJob(&phaseJob, rkit::JobType::kNormalPriority, std::move(phaseJobRunner), prevPhaseEndJob);
@@ -165,6 +163,6 @@ namespace anox
 	template<class TLoaderInfo>
 	rkit::Result AnoxAbstractSingleFileResourceLoader<TLoaderInfo>::CreateResourceObject(rkit::UniquePtr<typename TLoaderInfo::LoaderBase_t::ResourceBase_t> &outResource) const
 	{
-		return rkit::New<typename TLoaderInfo::Resource_t>(outResource);
+		outResource = rkit::New<typename TLoaderInfo::Resource_t>();
 	}
 }

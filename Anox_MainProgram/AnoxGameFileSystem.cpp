@@ -69,8 +69,7 @@ namespace anox
 
 	rkit::Result AnoxGameFileSystemBase::Create(rkit::UniquePtr<AnoxGameFileSystemBase> &outFileSystem, rkit::IJobQueue &jobQueue)
 	{
-		rkit::UniquePtr<AnoxGameFileSystem> fileSystem;
-		rkit::New<AnoxGameFileSystem>(fileSystem, jobQueue);
+		rkit::UniquePtr<AnoxGameFileSystem> fileSystem = rkit::New<AnoxGameFileSystem>(jobQueue);
 
 		outFileSystem = std::move(fileSystem);
 

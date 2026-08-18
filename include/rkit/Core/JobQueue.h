@@ -2,6 +2,7 @@
 
 namespace rkit
 {
+	class DebugString;
 	class Job;
 	class JobSignaler;
 
@@ -47,11 +48,15 @@ namespace rkit
 	{
 		virtual ~IJobQueue() {}
 
-		virtual Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const JobDependencyList &dependencies) = 0;
+		Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const JobDependencyList &dependencies);
 
-		virtual Result CreateSignaledJob(RCPtr<JobSignaler> &outSignaler, RCPtr<Job> &outJob) = 0;
+		Result CreateSignaledJob(RCPtr<JobSignaler> &outSignaler, RCPtr<Job> &outJob);
 
-		virtual Result CreateSignalJobRunner(UniquePtr<IJobRunner> &outJobRunner, const RCPtr<JobSignaler> &signaller) = 0;
+		virtual Result CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const JobDependencyList &dependencies, DebugString trace) = 0;
+
+		virtual Result CreateSignaledJob(RCPtr<JobSignaler> &outSignaler, RCPtr<Job> &outJob, DebugString trace) = 0;
+
+		virtual Result CreateSignalJobRunner(UniquePtr<IJobRunner> &outJobRunner, RCPtr<JobSignaler> signaller) = 0;
 
 		// Waits for work from a job queue.
 		// If "waitIfDepleted" is set, then wakeEvent must be an auto-reset event and terminatedEvent must not be signaled
@@ -73,5 +78,21 @@ namespace rkit
 	};
 }
 
+#include "rkit/Core/DebugString.h"
+
+namespace rkit
+{
+	inline Result IJobQueue::CreateJob(RCPtr<Job> *outJob, JobType jobType, UniquePtr<IJobRunner> &&jobRunner, const JobDependencyList &dependencies)
+	{
+		this->CreateJob(outJob, jobType, std::move(jobRunner), dependencies, DebugString());
+	}
+
+	inline Result IJobQueue::CreateSignaledJob(RCPtr<JobSignaler> &outSignaler, RCPtr<Job> &outJob)
+	{
+		this->CreateSignaledJob(outSignaler, outJob, DebugString());
+	}
+}
+
 // Include JobDependencyList since it's nearly always needed for this
 #include "rkit/Core/JobDependencyList.h"
+

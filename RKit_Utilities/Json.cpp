@@ -405,5 +405,5 @@ namespace rkit { namespace utils
 
 rkit::Result rkit::utils::CreateJsonDocument(UniquePtr<IJsonDocument> &outDocument, IMallocDriver *alloc, IReadStream *readStream)
 {
-	return NewWithAlloc<JsonDocument>(outDocument, alloc, alloc, readStream);
+	outDocument = NewWithAlloc<JsonDocument>(alloc, alloc, readStream);
 }

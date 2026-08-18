@@ -625,8 +625,7 @@ namespace rkit { namespace render
 		m_defaultWidth = width;
 		m_defaultHeight = height;
 
-		UniquePtr<ThreadContext> ctx;
-		NewWithAlloc<ThreadContext>(ctx, m_alloc, *this);
+		UniquePtr<ThreadContext> ctx = NewWithAlloc<ThreadContext>(m_alloc, *this);
 
 		sysDriver->CreateEvent(m_startEvent, false, false);
 		sysDriver->CreateEvent(m_exitEvent, true, false);
@@ -1199,8 +1198,7 @@ namespace rkit { namespace render
 
 	Result DisplayManager_Win32::CreateSplash(UniquePtr<IDisplay> &display, DisplayMode displayMode)
 	{
-		UniquePtr<SplashWindow_Win32> splashWindow;
-		NewWithAlloc<SplashWindow_Win32>(splashWindow, m_alloc, m_alloc, m_hInst);
+		UniquePtr<SplashWindow_Win32> splashWindow = NewWithAlloc<SplashWindow_Win32>(m_alloc, m_alloc, m_hInst);
 
 		splashWindow->Initialize(m_splashWCAtom);
 
@@ -1211,8 +1209,7 @@ namespace rkit { namespace render
 
 	Result DisplayManager_Win32::CreateRenderWindow(UniquePtr<IDisplay> &display, DisplayMode displayMode, uint32_t width, uint32_t height)
 	{
-		UniquePtr<RenderWindow_Win32> renderWindow;
-		NewWithAlloc<RenderWindow_Win32>(renderWindow, m_alloc, m_alloc, m_hInst);
+		UniquePtr<RenderWindow_Win32> renderWindow = NewWithAlloc<RenderWindow_Win32>(m_alloc, m_alloc, m_hInst);
 
 		renderWindow->Initialize(GetDrivers().m_systemDriver.Get(), m_renderWCAtom, width, height);
 
@@ -1241,8 +1238,7 @@ namespace rkit { namespace render
 
 	Result DisplayManagerBase_Win32::Create(UniquePtr<DisplayManagerBase_Win32> &outDisplayManager, IMallocDriver *alloc, HINSTANCE hInst)
 	{
-		UniquePtr<DisplayManager_Win32> displayManager;
-		NewWithAlloc<DisplayManager_Win32>(displayManager, alloc, alloc, hInst);
+		UniquePtr<DisplayManager_Win32> displayManager = NewWithAlloc<DisplayManager_Win32>(alloc, alloc, hInst);
 		displayManager->Initialize();
 
 		outDisplayManager = std::move(displayManager);

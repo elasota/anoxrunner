@@ -308,8 +308,7 @@ rkit::Result rkit::ResizableRingBuffer<TTraits>::Allocate(AddrOffset_t size, Add
 			newSize *= 2;
 		}
 
-		UniquePtr<LinkedMemChunk> memChunk;
-		NewWithAlloc<LinkedMemChunk>(memChunk, m_alloc, this, m_chunkAllocator, newSize);
+		UniquePtr<LinkedMemChunk> memChunk = NewWithAlloc<LinkedMemChunk>(m_alloc, this, m_chunkAllocator, newSize);
 
 		memChunk->GetMemChunk()->Initialize(newSize, TTraits::kMaxAlignment);
 

@@ -197,7 +197,7 @@ namespace rkit::utils
 
 	Result ModuleSandbox::CreateThreadContext(UniquePtr<sandbox::IThreadContext> &outThreadContext, const sandbox::ThreadCreationParameters &threadParams)
 	{
-		return rkit::New<ModuleThreadContext>(outThreadContext);
+		outThreadContext = rkit::New<ModuleThreadContext>();
 	}
 
 	Result ModuleSandbox::AllocDynamicMemory(sandbox::Address_t &outAddress, uint32_t &outMMID, size_t size)
@@ -245,7 +245,7 @@ namespace rkit::utils
 		UniquePtr<ModuleSandbox> sandbox;
 
 		RKIT_TRY_CATCH_RETHROW(
-			NewWithAlloc<ModuleSandbox>(sandbox, &alloc, entryDescriptor, module, &alloc, std::move(memMutex)),
+			sandbox = NewWithAlloc<ModuleSandbox>(&alloc, entryDescriptor, module, &alloc, std::move(memMutex)),
 			rkit::CatchContext(
 				[module]
 				{

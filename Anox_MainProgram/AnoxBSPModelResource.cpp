@@ -548,8 +548,7 @@ namespace anox
 		}
 
 
-		rkit::RCPtr<AnoxBSPModelResourceGPUResources> gpuResources;
-		rkit::New<AnoxBSPModelResourceGPUResources>(gpuResources);
+		rkit::RCPtr<AnoxBSPModelResourceGPUResources> gpuResources = rkit::NewRC<AnoxBSPModelResourceGPUResources>();
 
 		gpuResources->m_resourceKeepAlive = state.m_resource;
 
@@ -1005,8 +1004,7 @@ namespace anox
 	{
 		typedef AnoxAbstractSingleFileResourceLoader<AnoxBSPModelLoaderInfo> Loader_t;
 
-		rkit::RCPtr<Loader_t> loader;
-		rkit::New<Loader_t>(loader);
+		rkit::RCPtr<Loader_t> loader = rkit::NewRC<Loader_t>();
 
 		outLoader = std::move(loader);
 

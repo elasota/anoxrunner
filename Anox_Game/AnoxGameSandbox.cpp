@@ -199,8 +199,7 @@ namespace anox::game::sandbox
 		}
 
 		{
-			rkit::UniquePtr<InternalLogDriver> logDriver;
-			rkit::New<InternalLogDriver>(logDriver);
+			rkit::UniquePtr<InternalLogDriver> logDriver = rkit::New<InternalLogDriver>();
 			rkit::GetMutableDrivers().m_logDriver = logDriver.Detach();
 		}
 #endif

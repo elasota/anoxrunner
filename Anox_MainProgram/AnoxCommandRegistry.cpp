@@ -228,11 +228,6 @@ namespace anox
 
 	rkit::Result AnoxCommandRegistryBase::Create(rkit::UniquePtr<AnoxCommandRegistryBase> &outRegistry)
 	{
-		rkit::UniquePtr<AnoxCommandRegistry> registry;
-		rkit::New<AnoxCommandRegistry>(registry);
-
-		outRegistry = std::move(registry);
-
-		RKIT_RETURN_OK;
+		outRegistry = rkit::New<AnoxCommandRegistry>();
 	}
 }

@@ -2259,8 +2259,7 @@ namespace rkit { namespace data
 
 	Result RenderDataHandler::LoadPackage(IReadStream &stream, bool allowTempStrings, data::IRenderDataConfigurator *configurator, UniquePtr<IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *outBinaryContent) const
 	{
-		UniquePtr<Package> package;
-		New<Package>(package);
+		UniquePtr<Package> package = New<Package>();
 
 		package->Load(this, allowTempStrings, configurator, stream);
 
@@ -2292,11 +2291,11 @@ namespace rkit { namespace data
 	case RenderRTTIIndexableStructType::type:\
 		if (outList)\
 		{\
-			New<render_rtti::RenderRTTIList<render::type>>(*outList);\
+			*outList = New<render_rtti::RenderRTTIList<render::type>>();\
 		}\
 		if (outPtrList)\
 		{\
-			New<render_rtti::RenderRTTIObjectPtrList<render::type>>(*outPtrList);\
+			*outPtrList = New<render_rtti::RenderRTTIObjectPtrList<render::type>>();\
 		}\
 		if (outRTTI)\
 			*outRTTI = reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::type>::GetRTTIType());\

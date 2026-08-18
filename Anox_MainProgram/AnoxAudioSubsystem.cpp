@@ -1148,8 +1148,7 @@ namespace anox
 
 	rkit::Result AudioGarbageCollector::TryCreateGCJob(rkit::RCPtr<rkit::Job> &anOutJob)
 	{
-		rkit::UniquePtr<GCJobRunner> runner;
-		rkit::New<GCJobRunner>(runner);
+		rkit::UniquePtr<GCJobRunner> runner = rkit::New<GCJobRunner>();
 
 		AudioGarbageCollectable *firstCollectable = m_first.exchange(nullptr, std::memory_order_acquire);
 		if (firstCollectable)
@@ -1670,8 +1669,7 @@ namespace anox
 			}
 		}
 
-		rkit::RCPtr<AudioCommandList> cmdList;
-		rkit::New<AudioCommandList>(cmdList, this->m_gc);
+		rkit::RCPtr<AudioCommandList> cmdList = rkit::NewRC<AudioCommandList>(this->m_gc);
 		AudioCommandWord *cmdWords = cmdList->TryAllocCommandWords(numParamWords + AudioCommandList::kNumRequiredParams);
 
 		RKIT_ASSERT(cmdWords != nullptr);
@@ -2186,8 +2184,7 @@ namespace anox
 
 	rkit::Result AudioSubsystem::CreateEmitter(AudioEmitter *&outEmitter, rkit::RCPtr<IAudioSource> inSource)
 	{
-		rkit::RCPtr<AudioMixerEmitter> mixerEmitterRC;
-		rkit::New<AudioMixerEmitter>(mixerEmitterRC, Impl().m_gc, std::move(inSource));
+		rkit::RCPtr<AudioMixerEmitter> mixerEmitterRC = rkit::NewRC<AudioMixerEmitter>(Impl().m_gc, std::move(inSource));
 
 		AudioMixerEmitter *mixerEmitter = mixerEmitterRC.Get();
 		Impl().m_mixer.AddEmitter(std::move(mixerEmitterRC));
@@ -2209,8 +2206,7 @@ namespace anox
 
 	rkit::Result AudioSubsystem::Create(rkit::UniquePtr<AudioSubsystem> &outSubsystem, rkit::IJobQueue& jobQueue)
 	{
-		rkit::UniquePtr<AudioSubsystem> subsystem;
-		rkit::New<AudioSubsystem>(subsystem, jobQueue);
+		rkit::UniquePtr<AudioSubsystem> subsystem = rkit::New<AudioSubsystem>(jobQueue);
 
 		subsystem->Impl().Initialize();
 

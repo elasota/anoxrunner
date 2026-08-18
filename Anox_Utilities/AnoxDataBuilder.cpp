@@ -807,6 +807,6 @@ namespace anox { namespace utils
 
 	rkit::Result IDataBuilder::Create(anox::IUtilitiesDriver *utils, rkit::UniquePtr<IDataBuilder> &outDataBuilder)
 	{
-		return rkit::New<AnoxDataBuilder>(outDataBuilder, utils);
+		outDataBuilder = rkit::New<AnoxDataBuilder>(utils);
 	}
 } } // anox::utils

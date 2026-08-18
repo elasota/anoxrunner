@@ -220,15 +220,20 @@ namespace anox::buildsystem::ape_parse
 		switch (typeByte)
 		{
 		case 0:
-			return rkit::New<ExpressionOperand>(outOperand);
+			outOperand = rkit::New<ExpressionOperand>();
+			return;
 		case 4:
-			return rkit::New<FloatOperand>(outOperand);
+			outOperand = rkit::New<FloatOperand>();
+			return;
 		case 5:
-			return rkit::New<FloatVariableNameOperand>(outOperand);
+			outOperand = rkit::New<FloatVariableNameOperand>();
+			return;
 		case 16:
-			return rkit::New<StringOperand>(outOperand);
+			outOperand = rkit::New<StringOperand>();
+			return;
 		case 17:
-			return rkit::New<StringVariableNameOperand>(outOperand);
+			outOperand = rkit::New<StringVariableNameOperand>();
+			return;
 		default:
 			RKIT_THROW(rkit::ResultCode::kDataError);
 		}

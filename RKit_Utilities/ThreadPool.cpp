@@ -174,8 +174,7 @@ namespace rkit { namespace utils
 			sysDriver.CreateEvent(wakeEvent, true, false);
 			sysDriver.CreateEvent(terminateEvent, true, false);
 
-			UniquePtr<IThreadContext> context;
-			New<ThreadPoolThreadContext>(context, *this, std::move(jobTypes), std::move(wakeEvent), std::move(terminateEvent));
+			UniquePtr<IThreadContext> context = New<ThreadPoolThreadContext>(*this, std::move(jobTypes), std::move(wakeEvent), std::move(terminateEvent));
 
 			String threadName;
 #if RKIT_IS_DEBUG
@@ -215,12 +214,9 @@ namespace rkit { namespace utils
 
 	Result ThreadPoolBase::Create(UniquePtr<ThreadPoolBase> &outThreadPool, const IUtilitiesDriver &utils, uint32_t numThreads)
 	{
-		UniquePtr<ThreadPool> threadPool;
-		New<ThreadPool>(threadPool, utils, numThreads);
+		UniquePtr<ThreadPool> threadPool = New<ThreadPool>(utils, numThreads);
 		threadPool->Initialize();
 
 		outThreadPool = std::move(threadPool);
-
-		RKIT_RETURN_OK;
 	}
 } } // rkit::utils

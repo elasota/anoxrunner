@@ -411,26 +411,20 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanDevice::CreateBinaryCPUWaitableFence(UniquePtr<IBinaryCPUWaitableFence> &outFence, bool startSignaled)
 	{
-		UniquePtr<VulkanBinaryCPUWaitableFence> fence;
-		New<VulkanBinaryCPUWaitableFence>(fence, *this);
+		UniquePtr<VulkanBinaryCPUWaitableFence> fence = New<VulkanBinaryCPUWaitableFence>(*this);
 
 		fence->Initialize(startSignaled);
 
 		outFence = std::move(fence);
-
-		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::CreateBinaryGPUWaitableFence(UniquePtr<IBinaryGPUWaitableFence> &outFence)
 	{
-		UniquePtr<VulkanBinaryGPUWaitableFence> fence;
-		New<VulkanBinaryGPUWaitableFence>(fence, *this);
+		UniquePtr<VulkanBinaryGPUWaitableFence> fence = New<VulkanBinaryGPUWaitableFence>(*this);
 
 		fence->Initialize();
 
 		outFence = std::move(fence);
-
-		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::CreateSwapChainSyncPoint(UniquePtr<ISwapChainSyncPoint> &outSyncPoint)
@@ -698,8 +692,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(m_vkd.vkBindBufferMemory(m_device, vkBuffer, baseHeap.GetDeviceMemory(), static_cast<VkDeviceSize>(baseOffset)));
 
-		UniquePtr<VulkanBuffer> buffer;
-		New<VulkanBuffer>(buffer, *this, vkBuffer, baseAddress, memRegion.GetSize());
+		UniquePtr<VulkanBuffer> buffer = New<VulkanBuffer>(*this, vkBuffer, baseAddress, memRegion.GetSize());
 
 		prototype.DetachBuffer();
 
@@ -739,11 +732,9 @@ namespace rkit { namespace render { namespace vulkan
 
 		RKIT_VK_CHECK(m_vkd.vkBindImageMemory(m_device, image, baseHeap.GetDeviceMemory(), static_cast<VkDeviceSize>(baseOffset)));
 
-		New<VulkanImage>(outImage, *this, image, prototype.GetAllAspectFlags());
+		outImage = New<VulkanImage>(*this, image, prototype.GetAllAspectFlags());
 
 		prototype.DetachImage();
-
-		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDevice::CreateMemoryHeap(UniquePtr<IMemoryHeap> &outHeap, const HeapKey &heapKey, GPUMemorySize_t size)
@@ -768,7 +759,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_CHECK(m_vkd.vkAllocateMemory(m_device, &allocInfo, m_allocCallbacks, &deviceMemory));
 
 		UniquePtr<VulkanMemoryHeap> vkHeap;
-		RKIT_TRY_CATCH_RETHROW(New<VulkanMemoryHeap>(vkHeap, *this, deviceMemory, size, (memFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0),
+		RKIT_TRY_CATCH_RETHROW(vkHeap = New<VulkanMemoryHeap>(*this, deviceMemory, size, (memFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0),
 			CatchContext(
 				[this, deviceMemory]
 				{
@@ -826,8 +817,7 @@ namespace rkit { namespace render { namespace vulkan
 		UniquePtr<IMutex> queueMutex;
 		sysDriver.CreateMutex(queueMutex);
 
-		UniquePtr<VulkanDevice> vkDevice;
-		New<VulkanDevice>(vkDevice, vkg, vki, vkg_p, vki_p, inst, device, allocCallbacks, caps, reqs, physDevice, std::move(enabledExts), memProperties, std::move(queueMutex));
+		UniquePtr<VulkanDevice> vkDevice = New<VulkanDevice>(vkg, vki, vkg_p, vki_p, inst, device, allocCallbacks, caps, reqs, physDevice, std::move(enabledExts), memProperties, std::move(queueMutex));
 		
 		vkDevice->LoadDeviceAPI();
 		vkDevice->CreatePools();

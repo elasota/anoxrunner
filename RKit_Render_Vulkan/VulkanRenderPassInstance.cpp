@@ -18,7 +18,7 @@
 #include "rkit/Core/UniquePtr.h"
 #include "rkit/Core/Vector.h"
 
-namespace rkit { namespace render { namespace vulkan
+namespace rkit::render::vulkan
 {
 	class VulkanRenderPassInstance final : public VulkanRenderPassInstanceBase
 	{
@@ -159,13 +159,10 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanRenderPassInstanceBase::Create(UniquePtr<VulkanRenderPassInstanceBase> &renderPassInstance, VulkanDeviceBase &device, const RenderPassRef_t &renderPassRef, const RenderPassResources &resources)
 	{
-		UniquePtr<VulkanRenderPassInstance> instance;
-		New<VulkanRenderPassInstance>(instance, device);
+		UniquePtr<VulkanRenderPassInstance> instance = New<VulkanRenderPassInstance>(device);
 
 		instance->Initialize(renderPassRef, resources);
 
 		renderPassInstance = std::move(instance);
-
-		RKIT_RETURN_OK;
 	}
-} } } // rkit::render::vulkan
+} // rkit::render::vulkan

@@ -79,8 +79,7 @@ namespace anox::game
 	template<class TObjClass>
 	static rkit::Result WorldObjectFactory::CreateDynamic(World &world, TObjClass*& outObject)
 	{
-		rkit::RCPtr<WorldObjectProxy> proxy;
-		rkit::New<WorldObjectProxy>(proxy);
+		rkit::RCPtr<WorldObjectProxy> proxy = rkit::NewRC<WorldObjectProxy>();
 
 		ObjectFieldsBase<TObjClass> *fieldsRef = nullptr;
 
@@ -100,8 +99,7 @@ namespace anox::game
 	template<class TObjClass>
 	rkit::Result WorldObjectFactory::CreateLevelObjectTemplate(rkit::RCPtr<WorldObjectProxy> &outObjectProxy, void *&outFieldsRef, SerializeFromLevelFunction_t &outDeserializeFunction)
 	{
-		rkit::RCPtr<WorldObjectProxy> proxy;
-		rkit::New<WorldObjectProxy>(proxy);
+		rkit::RCPtr<WorldObjectProxy> proxy = rkit::NewRC<WorldObjectProxy>();
 
 		ObjectFieldsBase<TObjClass> *fieldsRef = nullptr;
 		WorldObjectInstantiator<TObjClass>::CreateObject(proxy->m_object, fieldsRef);

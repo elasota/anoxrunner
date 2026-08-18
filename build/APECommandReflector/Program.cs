@@ -593,7 +593,8 @@ namespace APEWindowCommandReflector
                 foreach (WindowCommandDef wcDef in windowCommandDefs)
                 {
                     sw.WriteLine("\t\tcase " + wcDef.Opcode.ToString() + ":");
-                    sw.WriteLine("\t\t\treturn rkit::New<" + wcDef.Name + "Command>(outCommand);");
+                    sw.WriteLine("\t\t\toutCommand = rkit::New<" + wcDef.Name + "Command>();");
+                    sw.WriteLine("\t\t\treturn;");
                 }
                 sw.WriteLine("\t\tdefault:");
                 sw.WriteLine("\t\t\tRKIT_THROW(rkit::ResultCode::kDataError);");

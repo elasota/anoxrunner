@@ -99,7 +99,7 @@ namespace anox::game
 
 	rkit::Result MusicManager::Create(rkit::UniquePtr<MusicManager> &outManager)
 	{
-		return rkit::NewInitialize<MusicManager>(outManager);
+		outManager = rkit::NewInitialize<MusicManager>();
 	}
 }
 

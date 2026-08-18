@@ -352,8 +352,7 @@ namespace rkit::audio::wasapi
 
 	Result WASAPIAudioOutputEndpoint::TryOpenOutputStream(UniquePtr<IAudioOutputStream> &outOutputStream, const AudioFormat &preferredAudioFormat, uint32_t bufferCapacityInSamples, IAudioOutputRenderer *renderer)
 	{
-		UniquePtr<WASAPIAudioOutputThreadContext> threadContextUniquePtr;
-		New<WASAPIAudioOutputThreadContext>(threadContextUniquePtr);
+		UniquePtr<WASAPIAudioOutputThreadContext> threadContextUniquePtr = New<WASAPIAudioOutputThreadContext>();
 
 		WASAPIAudioOutputThreadContext &threadContext = *threadContextUniquePtr;
 		threadContext.Initialize();
@@ -420,12 +419,10 @@ namespace rkit::audio::wasapi
 		streamProps.m_bufferSize = bufferSize;
 		streamProps.m_audioDriver = &m_audioDriver;
 
-		New<WASAPIAudioOutputStream>(outOutputStream, std::move(streamProps));
+		outOutputStream = New<WASAPIAudioOutputStream>(std::move(streamProps));
 
 		// Once everything has been handed off to the output stream, we no longer need to auto-cleanup the audio thread
 		initializedOK = true;
-
-		RKIT_RETURN_OK;
 	}
 
 	AudioDeviceID WASAPIAudioOutputEndpoint::AudioDeviceInfo::GetDeviceID() const
@@ -646,7 +643,7 @@ namespace rkit::audio::wasapi
 		if (!endpoint.IsValid())
 			RKIT_RETURN_OK;
 
-		return rkit::New<WASAPIAudioOutputEndpoint>(outEndpoint, std::move(mmDevice), std::move(endpoint), std::move(deviceID), *this);
+		outEndpoint = rkit::NewRC<WASAPIAudioOutputEndpoint>(std::move(mmDevice), std::move(endpoint), std::move(deviceID), *this);
 	}
 
 	rkit::audio::U64Fraction WASAPIAudioDriver::GetTimestamp() const
@@ -804,7 +801,7 @@ namespace rkit::audio::wasapi
 		CopySpanNonOverlapping(stringStorage.ToSpan(), ConstSpan<wchar_t>(deviceID, deviceIDLength + 1));
 		CoTaskMemFree(deviceID);
 
-		return rkit::New<WASAPIAudioDeviceID>(outDeviceID, std::move(stringStorage));
+		outDeviceID = rkit::NewRC<WASAPIAudioDeviceID>(std::move(stringStorage));
 	}
 
 	SampleType WASAPIAudioDriver::AudioSampleTypeFromSubFormat(const GUID &guid, WORD bitSize)

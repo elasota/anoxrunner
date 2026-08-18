@@ -1130,10 +1130,9 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 		stream.Reset();
 
-		New<DynamicIncludeResult>(outIncludeResult, std::move(path), std::move(contents));
+		outIncludeResult = New<DynamicIncludeResult>(std::move(path), std::move(contents));
 
 		outSucceeded = true;
-		RKIT_RETURN_OK;
 	}
 
 	Result RenderPipelineStageBuildJob::ProcessInclude(const StringView &headerName, const StringView &includerName, size_t includeDepth, bool isSystem, UniquePtr<IncludeResultBase> &outIncludeResult)
@@ -1147,7 +1146,8 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				String headerNameStr;
 				headerNameStr.Set(headerName);
 
-				return New<StaticIncludeResult>(outIncludeResult, std::move(headerNameStr), prefixVector.GetBuffer(), prefixVector.Count());
+				outIncludeResult = New<StaticIncludeResult>(std::move(headerNameStr), prefixVector.GetBuffer(), prefixVector.Count());
+				return;
 			}
 			if (headerName == u8"GlslShaderSuffix")
 			{
@@ -1156,7 +1156,8 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				String headerNameStr;
 				headerNameStr.Set(headerName);
 
-				return New<StaticIncludeResult>(outIncludeResult, std::move(headerNameStr), prefixVector.GetBuffer(), prefixVector.Count());
+				outIncludeResult = New<StaticIncludeResult>(std::move(headerNameStr), prefixVector.GetBuffer(), prefixVector.Count());
+				return;
 			}
 
 			RKIT_THROW(ResultCode::kOperationFailed);
@@ -1208,7 +1209,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			TryInclude(std::move(normalizedPath), succeeded, outIncludeResult);
 
 			if (succeeded)
-				RKIT_RETURN_OK;
+				return;
 		}
 		else
 		{
@@ -1254,7 +1255,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 					TryInclude(std::move(fullPath), succeeded, outIncludeResult);
 
 					if (succeeded)
-						RKIT_RETURN_OK;
+						return;
 				}
 			}
 		}
@@ -1481,11 +1482,11 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 	Result CreatePipelineCompiler(UniquePtr<IDependencyNodeCompiler> &outCompiler)
 	{
-		return New<RenderPipelineCompiler>(outCompiler, PipelineType::Graphics);
+		outCompiler = New<RenderPipelineCompiler>(PipelineType::Graphics);
 	}
 
 	Result CreateGraphicsPipelineStageCompiler(const GlslCApi *glslc, render::vulkan::GraphicPipelineStage stage, UniquePtr<IDependencyNodeCompiler> &outCompiler)
 	{
-		return New<RenderPipelineStageCompiler>(outCompiler, glslc, PipelineType::Graphics, static_cast<uint32_t>(stage));
+		outCompiler = New<RenderPipelineStageCompiler>(glslc, PipelineType::Graphics, static_cast<uint32_t>(stage));
 	}
 } } } // rkit::buildsystem::vulkan

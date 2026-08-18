@@ -165,15 +165,13 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		if (mutexProtected)
 		{
-			UniquePtr<MutexProtectedResourcePool<T>> pool;
-			New<MutexProtectedResourcePool<T>>(pool, factory);
+			UniquePtr<MutexProtectedResourcePool<T>> pool = New<MutexProtectedResourcePool<T>>(factory);
 			pool->Initialize();
 			outPool = std::move(pool);
 		}
 		else
 		{
-			UniquePtr<ResourcePool<T>> pool;
-			New<ResourcePool<T>>(pool, factory);
+			UniquePtr<ResourcePool<T>> pool = New<ResourcePool<T>>(factory);
 			pool->Initialize();
 			outPool = std::move(pool);
 		}

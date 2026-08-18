@@ -165,14 +165,12 @@ namespace anox
 		if (!m_device)
 			RKIT_RETURN_OK;
 
-		rkit::RCPtr<PerFramePerDisplayResources> displayResources;
-		rkit::New<PerFramePerDisplayResources>(displayResources);
+		rkit::RCPtr<PerFramePerDisplayResources> displayResources = rkit::NewRC<PerFramePerDisplayResources>();
 
 		displayResources->m_windowResources = this->m_resources.Get();
 		displayResources->m_swapChainSyncPoint = m_syncPoints[m_currentSyncPoint].Get();
 
-		rkit::UniquePtr<ISubmitJobRunner> acquireJobRunner;
-		rkit::New<AcquireJobRunner>(acquireJobRunner, *this, displayResources);
+		rkit::UniquePtr<ISubmitJobRunner> acquireJobRunner = rkit::New<AcquireJobRunner>(*this, displayResources);
 
 		graphicsSubsystem.CreateAndQueueSubmitJob(&displayResources->m_acquireJob, LogicalQueueType::kPresentation, std::move(acquireJobRunner), rkit::JobDependencyList());
 
@@ -186,8 +184,7 @@ namespace anox
 		if (!m_device)
 			RKIT_RETURN_OK;
 
-		rkit::UniquePtr<ISubmitJobRunner> presentJobRunner;
-		rkit::New<PresentJobRunner>(presentJobRunner, *this, m_currentPerDisplayResources);
+		rkit::UniquePtr<ISubmitJobRunner> presentJobRunner = rkit::New<PresentJobRunner>(*this, m_currentPerDisplayResources);
 
 		rkit::RCPtr<rkit::Job> presentJob;
 		graphicsSubsystem.CreateAndQueueSubmitJob(&presentJob, LogicalQueueType::kPresentation, std::move(presentJobRunner), rkit::JobDependencyList());
@@ -213,13 +210,10 @@ namespace anox
 		rkit::UniquePtr<rkit::render::ISwapChainPrototype> prototype = std::move(prototypeRef);
 		rkit::UniquePtr<RenderedWindowResources> resources = std::move(resourcesRef);
 
-		rkit::UniquePtr<RenderedWindow> window;
-		rkit::New<RenderedWindow>(window, std::move(display), std::move(resources), device);
+		rkit::UniquePtr<RenderedWindow> window = rkit::New<RenderedWindow>(std::move(display), std::move(resources), device);
 
 		window->Initialize(numSwapChainFrames, numSyncPoints, std::move(prototype), swapChainQueue);
 
 		outWindow = std::move(window);
-
-		RKIT_RETURN_OK;
 	}
 }

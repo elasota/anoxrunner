@@ -146,11 +146,6 @@ namespace anox
 	{
 		typedef AnoxAbstractSingleFileResourceLoader<AnoxEntityDefLoaderInfo> Loader_t;
 
-		rkit::RCPtr<Loader_t> loader;
-		rkit::New<Loader_t>(loader);
-
-		outLoader = std::move(loader);
-
-		RKIT_RETURN_OK;
+		outLoader = rkit::NewRC<Loader_t>();
 	}
 }
