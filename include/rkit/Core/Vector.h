@@ -62,6 +62,12 @@ namespace rkit
 		Result Append(const Span<const T> &items);
 		Result AppendMove(const Span<T> &items);
 
+		T &First();
+		const T &First() const;
+
+		T &Last();
+		const T &Last() const;
+
 		void Reset();
 
 		T *GetBuffer();
@@ -342,6 +348,34 @@ namespace rkit
 	Result Vector<T>::AppendMove(const Span<T> &items)
 	{
 		return InsertAtMove(m_count, items);
+	}
+
+	template<class T>
+	T &Vector<T>::First()
+	{
+		RKIT_ASSERT(m_count > 0);
+		return m_arr[0];
+	}
+
+	template<class T>
+	const T &Vector<T>::First() const
+	{
+		RKIT_ASSERT(m_count > 0);
+		return m_arr[0];
+	}
+
+	template<class T>
+	T &Vector<T>::Last()
+	{
+		RKIT_ASSERT(m_count > 0);
+		return m_arr[m_count - 1];
+	}
+
+	template<class T>
+	const T &Vector<T>::Last() const
+	{
+		RKIT_ASSERT(m_count > 0);
+		return m_arr[m_count - 1];
 	}
 
 	template<class T>

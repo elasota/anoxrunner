@@ -585,6 +585,7 @@ namespace rkit { namespace math {
 		}
 
 		TComponent GetLength() const;
+		TComponent GetLengthSquared() const;
 
 		Vec<TComponent, TSize> GetNormalized() const
 		{
@@ -640,9 +641,15 @@ namespace rkit { namespace math {
 	}
 
 	template<class TComponent, size_t TSize>
+	TComponent Vec<TComponent, TSize>::GetLengthSquared() const
+	{
+		return this->DotProduct(*this);
+	}
+
+	template<class TComponent, size_t TSize>
 	TComponent Vec<TComponent, TSize>::GetLength() const
 	{
-		return Sqrtf(this->DotProduct(*this));
+		return Sqrtf(this->GetLengthSquared());
 	}
 
 	template<class TComponent, size_t TSize>
@@ -785,6 +792,12 @@ namespace rkit { namespace math {
 	{
 		RKIT_ASSERT(index < TSize);
 		return this->InternalGetAt(index);
+	}
+
+	template<class TComponent>
+	Vec<TComponent, 3> CrossProduct(const Vec<TComponent, 3> &a, const Vec<TComponent, 3> &b)
+	{
+		return a.Swizzle<1, 2, 0>() * b.Swizzle<2, 0, 1>() - a.Swizzle<2, 0, 1>() * b.Swizzle<1, 2, 0>();
 	}
 } }
 

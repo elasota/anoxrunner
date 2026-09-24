@@ -92,9 +92,9 @@ namespace anox { namespace data { namespace priv {
 		bool primaryX = false;
 		bool negate = false;
 
-		if (magX > magZ)
+		if (magX >= magZ)
 		{
-			if (magX > magY)
+			if (magX >= magY)
 			{
 				// X is highest
 				primary = z;
@@ -113,7 +113,15 @@ namespace anox { namespace data { namespace priv {
 		}
 		else
 		{
-			if (magZ > magY)
+			if (magY >= magZ)
+			{
+				// Y is highest
+				primary = x;
+				secondary = z;
+				magnitude = y;
+				primaryX = true;
+			}
+			else
 			{
 				// Z is highest
 				primary = x;
@@ -121,14 +129,6 @@ namespace anox { namespace data { namespace priv {
 				magnitude = z;
 				primaryX = true;
 				secondaryY = true;
-			}
-			else
-			{
-				// Y is highest
-				primary = x;
-				secondary = z;
-				magnitude = y;
-				primaryX = true;
 			}
 		}
 
@@ -227,7 +227,7 @@ namespace anox { namespace data {
 		bool primaryX = false;
 		bool secondaryY = false;
 		bool negate = false;
-		priv::CompressNormalTemplate<uint32_t, double, 31>(primary, secondary, primaryX, secondaryY, negate, x, y, z);
+		priv::CompressNormalTemplate<uint32_t, double, 30>(primary, secondary, primaryX, secondaryY, negate, x, y, z);
 
 		uint32_t part0 = primary;
 		uint32_t part1 = secondary;

@@ -375,7 +375,7 @@ namespace SandboxAPIGenerator
                 string lastTargetChunk = targetPathChunks[targetPathChunks.Length - 1];
                 string targetPrefix = Path.Combine(dirPath, lastTargetChunk);
 
-                using (StreamWriter sw = new StreamWriter(targetPrefix + ".sb.generated.h"))
+                using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(targetPrefix + ".sb.generated.h"))
                 {
                     sw.WriteLine("#include \"rkit/Core/Result.h\"");
                     sw.WriteLine("#include \"rkit/Sandbox/SandboxEntryDescriptor.h\"");
@@ -426,7 +426,7 @@ namespace SandboxAPIGenerator
                     sw.WriteLine("}");
                 }
 
-                using (StreamWriter sw = new StreamWriter(targetPrefix + ".sb.generated.inl"))
+                using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(targetPrefix + ".sb.generated.inl"))
                 {
                     sw.WriteLine("#include \"" + lastTargetChunk + ".sb.generated.h\"");
                     sw.WriteLine("#include \"rkit/Sandbox/SandboxIO.h\"");
@@ -623,7 +623,7 @@ namespace SandboxAPIGenerator
                     sw.WriteLine("}");
                 }
 
-                using (StreamWriter sw = new StreamWriter(targetPrefix + ".host.generated.h"))
+                using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(targetPrefix + ".host.generated.h"))
                 {
                     sw.WriteLine("#include \"rkit/Sandbox/SandboxIO.h\"");
                     sw.WriteLine("#include \"rkit/Sandbox/SandboxHostDescriptor.h\"");
@@ -699,7 +699,7 @@ namespace SandboxAPIGenerator
                     sw.WriteLine("}");
                 }
 
-                using (StreamWriter sw = new StreamWriter(targetPrefix + ".host.generated.inl"))
+                using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(targetPrefix + ".host.generated.inl"))
                 {
                     sw.WriteLine("#include \"" + lastTargetChunk + ".host.generated.h\"");
                     sw.WriteLine("#include \"rkit/Sandbox/Sandbox.h\"");

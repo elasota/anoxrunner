@@ -95,7 +95,7 @@ namespace ProjectGenerator
                     return "\t\t&g_module_" + moduleName + ",";
                 };
 
-                using (StreamWriter sw = new StreamWriter(outputPath, false, Encoding.ASCII))
+                using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(outputPath, Encoding.ASCII))
                 {
                     sw.WriteLine("#include \"rkit/Core/ModuleGlue.h\"");
                     sw.WriteLine();

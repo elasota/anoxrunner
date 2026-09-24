@@ -10,8 +10,7 @@ namespace anox::game
 {
 	rkit::Result Scene::Initialize(SceneHandle handle)
 	{
-		m_startTime = GetWorld().GetCurrentTimeMSec() + 99u;
-		m_startTime -= m_startTime % 100u;
+		m_startTime = rkit::RoundUpToMultiple<uint64_t>(GetWorld().GetCurrentTimeMSec(), 100u);
 		m_scene = ResourceRef<SceneHandle>(std::move(handle));
 
 		size_t numBlocks = 0;

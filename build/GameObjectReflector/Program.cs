@@ -192,7 +192,7 @@ namespace GameObjectReflector
             Dictionary<string, int> classSizes = new Dictionary<string, int>();
             Dictionary<string, int> fieldCounts = new Dictionary<string, int>();
 
-            using (StreamWriter writer = new StreamWriter(Path.Combine(buildPath, "LevelEntities.generated.inl")))
+            using (StreamWriter writer = new BuildToolsCommon.WriteIfChangedStreamWriter(Path.Combine(buildPath, "LevelEntities.generated.inl")))
             {
                 writer.NewLine = "\n";
 
@@ -319,7 +319,7 @@ namespace GameObjectReflector
                 writer.WriteLine("}");
             }
 
-            using (StreamWriter writer = new StreamWriter(Path.Combine(gamePath, "WorldObjectSpawnDispatcher.generated.inl")))
+            using (StreamWriter writer = new BuildToolsCommon.WriteIfChangedStreamWriter(Path.Combine(gamePath, "WorldObjectSpawnDispatcher.generated.inl")))
             {
                 writer.NewLine = "\n";
 
@@ -356,7 +356,7 @@ namespace GameObjectReflector
             {
                 bool needsExplicitWorldObjectBase = false;
 
-                using (StreamWriter writer = new StreamWriter(Path.Combine(objectsPath, className + ".generated.h")))
+                using (StreamWriter writer = new BuildToolsCommon.WriteIfChangedStreamWriter(Path.Combine(objectsPath, className + ".generated.h")))
                 {
                     writer.NewLine = "\n";
 
@@ -406,15 +406,12 @@ namespace GameObjectReflector
 
                     if (needsRTTI)
                     {
-                        writer.WriteLine("\ttemplate<>");
-                        writer.WriteLine($"\tstruct ObjectRTTIImpl<::anox::game::{className}>;");
+                        writer.WriteLine($"\tstruct ObjectRTTI_{className};");
                     }
 
-                    writer.WriteLine("\ttemplate<>");
-                    writer.WriteLine($"\tstruct ObjectFieldsImpl<::anox::game::{className}>;");
+                    writer.WriteLine($"\tstruct ObjectFields_{className};");
                     writer.WriteLine();
-                    writer.WriteLine("\ttemplate<>");
-                    writer.WriteLine($"\tstruct ObjectFieldsImpl<::anox::game::{className}>");
+                    writer.WriteLine($"\tstruct ObjectFields_{className}");
                     writer.WriteLine($"\t\t: public ObjectFieldsBase<::anox::game::{className}>");
                     writer.WriteLine("\t{");
 
@@ -446,12 +443,12 @@ namespace GameObjectReflector
                         }
                     }
                     writer.WriteLine("\t};");
+
                     if (needsRTTI)
                     {
                         writer.WriteLine();
-                        writer.WriteLine("\ttemplate<>");
-                        writer.WriteLine($"\tstruct ObjectRTTIImpl<::anox::game::{className}>");
-                        writer.WriteLine($"\t\t: protected ObjectFieldsImpl<::anox::game::{className}>");
+                        writer.WriteLine($"\tstruct ObjectRTTI_{className}");
+                        writer.WriteLine($"\t\t: protected ObjectFields_{className}");
 
                         if (needsExplicitWorldObjectBase)
                             writer.WriteLine("\t\t, public ::anox::game::WorldObject");
@@ -505,9 +502,9 @@ namespace GameObjectReflector
                     writer.WriteLine("\ttemplate<>");
                     writer.WriteLine($"\tstruct ObjectRTTIResolver<::anox::game::{className}>");
                     writer.WriteLine("\t{");
-                    writer.WriteLine($"\t\ttypedef ObjectFieldsImpl<::anox::game::{className}> FieldType_t;");
+                    writer.WriteLine($"\t\ttypedef ObjectFields_{className} FieldType_t;");
                     if (needsRTTI)
-                        writer.WriteLine($"\t\ttypedef ObjectRTTIImpl<::anox::game::{className}> RTTIType_t;");
+                        writer.WriteLine($"\t\ttypedef ObjectRTTI_{className} RTTIType_t;");
                     else
                         writer.WriteLine($"\t\ttypedef FieldType_t RTTIType_t;");
                     writer.WriteLine("\t};");
@@ -515,7 +512,7 @@ namespace GameObjectReflector
                     writer.WriteLine("}");
                 }
 
-                using (StreamWriter writer = new StreamWriter(Path.Combine(objectsPath, className + ".generated.inl")))
+                using (StreamWriter writer = new BuildToolsCommon.WriteIfChangedStreamWriter(Path.Combine(objectsPath, className + ".generated.inl")))
                 {
                     writer.NewLine = "\n";
 
@@ -593,12 +590,12 @@ namespace GameObjectReflector
 
                     if (needsRTTI)
                     {
-                        writer.WriteLine($"\tconst RuntimeTypeInfo *ObjectRTTIImpl<::anox::game::{className}>::GetMostDerivedType()");
+                        writer.WriteLine($"\tconst RuntimeTypeInfo *ObjectRTTI_{className}::GetMostDerivedType()");
                         writer.WriteLine("\t{");
                         writer.WriteLine($"\t\treturn &AutoRTTI<::anox::game::{className}, BaseClasses_t>::ms_instance;");
                         writer.WriteLine("\t}");
                         writer.WriteLine();
-                        writer.WriteLine($"\tvoid *ObjectRTTIImpl<::anox::game::{className}>::GetMostDerivedObject()");
+                        writer.WriteLine($"\tvoid *ObjectRTTI_{className}::GetMostDerivedObject()");
                         writer.WriteLine("\t{");
                         writer.WriteLine($"\t\treturn static_cast<::anox::game::{className} *>(this);");
                         writer.WriteLine("\t}");

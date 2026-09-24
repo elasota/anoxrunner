@@ -215,7 +215,7 @@ namespace APEWindowCommandReflector
             Directory.CreateDirectory(outBuildDir);
             Directory.CreateDirectory(outDataIncludeDir);
 
-            using (StreamWriter sw = new StreamWriter(Path.Combine(outGameDir, "APEExternRegister.generated.inl")))
+            using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(Path.Combine(outGameDir, "APEExternRegister.generated.inl")))
             {
                 sw.NewLine = "\n";
                 sw.WriteLine("namespace anox::game");
@@ -228,7 +228,7 @@ namespace APEWindowCommandReflector
                 sw.WriteLine("}");
             }
 
-            using (StreamWriter sw = new StreamWriter(Path.Combine(outGameDir, "APEExternDispatch.generated.h")))
+            using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(Path.Combine(outGameDir, "APEExternDispatch.generated.h")))
             {
                 sw.NewLine = "\n";
                 sw.WriteLine("#pragma once");
@@ -275,7 +275,7 @@ namespace APEWindowCommandReflector
             }
 
 
-            using (StreamWriter sw = new StreamWriter(Path.Combine(outGameDir, "APEExternStubs.generated.inl")))
+            using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(Path.Combine(outGameDir, "APEExternStubs.generated.inl")))
             {
                 sw.NewLine = "\n";
                 sw.WriteLine("#include \"APEExternDispatch.generated.h\"");
@@ -305,7 +305,7 @@ namespace APEWindowCommandReflector
             }
 
 
-            using (StreamWriter sw = new StreamWriter(Path.Combine(outGameDir, "APEExternDispatch.generated.inl")))
+            using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(Path.Combine(outGameDir, "APEExternDispatch.generated.inl")))
             {
                 sw.NewLine = "\n";
                 sw.WriteLine("#include \"APEExternDispatch.generated.h\"");
@@ -351,7 +351,7 @@ namespace APEWindowCommandReflector
                 sw.WriteLine("}");
             }
 
-            using (StreamWriter sw = new StreamWriter(Path.Combine(outGameIncludeDir, "APEExternOpcodes.generated.h")))
+            using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(Path.Combine(outGameIncludeDir, "APEExternOpcodes.generated.h")))
             {
                 sw.NewLine = "\n";
 
@@ -375,7 +375,7 @@ namespace APEWindowCommandReflector
                 sw.WriteLine("}");
             }
 
-            using (StreamWriter sw = new StreamWriter(Path.Combine(outBuildDir, "APEExternMetadata.generated.inl")))
+            using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(Path.Combine(outBuildDir, "APEExternMetadata.generated.inl")))
             {
                 sw.NewLine = "\n";
 
@@ -435,7 +435,7 @@ namespace APEWindowCommandReflector
             Directory.CreateDirectory(outDataIncludeDir);
             Directory.CreateDirectory(outGameIncludeDir);
 
-            using (StreamWriter sw = new StreamWriter(Path.Combine(outBuildDir, "AnoxAPEWindowCommandData.generated.h")))
+            using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(Path.Combine(outBuildDir, "AnoxAPEWindowCommandData.generated.h")))
             {
                 sw.NewLine = "\n";
 
@@ -604,7 +604,7 @@ namespace APEWindowCommandReflector
                 sw.WriteLine("}");
             }
 
-            using (StreamWriter sw = new StreamWriter(Path.Combine(outDataIncludeDir, "APEWindowCommandOpcodes.generated.h")))
+            using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(Path.Combine(outDataIncludeDir, "APEWindowCommandOpcodes.generated.h")))
             {
                 sw.NewLine = "\n";
 
@@ -628,7 +628,7 @@ namespace APEWindowCommandReflector
                 sw.WriteLine("}");
             }
 
-            using (StreamWriter sw = new StreamWriter(Path.Combine(outGameIncludeDir, "APEWindowCommandHandler.generated.h")))
+            using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(Path.Combine(outGameIncludeDir, "APEWindowCommandHandler.generated.h")))
             {
                 sw.WriteLine("#pragma once");
                 sw.WriteLine();
@@ -655,7 +655,7 @@ namespace APEWindowCommandReflector
                 sw.WriteLine("}");
             }
 
-            using (StreamWriter sw = new StreamWriter(Path.Combine(outGameIncludeDir, "APECommandDispatcher.generated.h")))
+            using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(Path.Combine(outGameIncludeDir, "APECommandDispatcher.generated.h")))
             {
                 sw.NewLine = "\n";
 

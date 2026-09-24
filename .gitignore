@@ -43,3 +43,7 @@ build/APECommandReflector/obj/*
 build/APECommandReflector/bin/*
 build/SceneCommandReflector/obj/*
 build/SceneCommandReflector/bin/*
+build/BuildToolsCommon/obj/*
+build/BuildToolsCommon/bin/*
+build/DataFormatGenerator/obj/*
+build/DataFormatGenerator/bin/*

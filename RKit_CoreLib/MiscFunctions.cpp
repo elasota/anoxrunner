@@ -9,7 +9,7 @@ namespace rkit::utils
 		// TODO: Improve this
 		HashValue_t hash = baseHash;
 		for (size_t i = 0; i < size; i++)
-			hash = hash * 223u + bytes[i] * 4447u;
+			hash = hash * 223u + (bytes[i] ^ 0xffu) * 4447u;
 
 		return hash;
 	}

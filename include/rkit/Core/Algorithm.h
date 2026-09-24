@@ -258,6 +258,9 @@ namespace rkit
 	T AlignUp(const T &value, const T &alignment);
 
 	template<class T>
+	T RoundUpToMultiple(const T &dividend, const T &divisor);
+
+	template<class T>
 	T DivideRoundUp(const T &dividend, const T &divisor);
 
 	template<class T>
@@ -403,7 +406,14 @@ T rkit::DivideRoundUp(const T &dividend, const T &divisor)
 
 	if (remainder == 0)
 		return resultBase;
+
 	return resultBase + 1;
+}
+
+template<class T>
+T rkit::RoundUpToMultiple(const T &dividend, const T &divisor)
+{
+	return DivideRoundUp(dividend, divisor) * divisor;
 }
 
 template<class T>
@@ -919,13 +929,18 @@ bool rkit::CompareSpansEqual(const Span<const T> &srcA, const Span<const T> &src
 	if (sz != srcB.Count())
 		return false;
 
-	for (size_t i = 0; i < sz; i++)
+	if constexpr (std::is_arithmetic_v<T> && !std::is_floating_point_v<T>)
+		return !memcmp(ptrsA, ptrsB, sz * sizeof(T));
+	else
 	{
-		if (!TComparer::CompareEqual(ptrsA[i], ptrsB[i]))
-			return false;
-	}
+		for (size_t i = 0; i < sz; i++)
+		{
+			if (!TComparer::CompareEqual(ptrsA[i], ptrsB[i]))
+				return false;
+		}
 
-	return true;
+		return true;
+	}
 }
 
 template<class T, class TComparer>

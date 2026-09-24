@@ -13,6 +13,12 @@ namespace rkit
 		};
 
 		template<>
+		struct SizedIntHelper<1>
+		{
+			typedef uint8_t Type_t;
+		};
+
+		template<>
 		struct SizedIntHelper<2>
 		{
 			typedef uint16_t Type_t;

@@ -189,9 +189,7 @@ namespace anox::game
 		(WorldObjectFactory::CreateDynamic<Scene>(m_world, scene));
 
 		if (tempName.Length() == 0)
-		{
 			tempName.Set(name);
-		}
 
 		m_scenes.SetPrehashed(nameHash, std::move(tempName), ObjRef<Scene>(scene));
 

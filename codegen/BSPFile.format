@@ -1,0 +1,138 @@
+namespace anox.data2
+
+loader "include/anox/Data/AnoxBSPFileLoader"
+builder "Anox_Build/AnoxBSPFileBuilder"
+
+struct CompressedNormal64NoNegate
+{
+	uint32 part0
+	uint32 part1
+}
+
+struct BSPNormal deduplicated
+{
+	CompressedNormal64NoNegate normal
+}
+
+struct BSPPlane deduplicated
+{
+	BSPNormal normal
+	float dist
+}
+
+struct BSPMaterial deduplicated
+{
+	contentid contentID
+}
+
+struct BSPGeometryMaterial instanced
+{
+	BSPMaterial material
+}
+
+struct BSPGeometryLightmap deduplicated
+{
+	contentid contentID
+}
+
+struct BSPBrushSide
+{
+	invertible(BSPPlane) plane
+	BSPGeometryMaterial material
+	uint32 materialFlags
+}
+
+struct BSPTri
+{
+	array(uint16, 3) indexes
+}
+
+struct BSPDrawSurface instanced
+{
+	dynarray(BSPTri) tris
+	uint32 packedStyleIndexes
+}
+
+struct BSPTreeNode
+{
+	BSPPlane plane
+	array(int16, 3) minBounds
+	array(int16, 3) maxBounds
+	uint32 numFrontNodes
+	uint32 numBackNodes
+}
+
+struct BSPBrush instanced
+{
+	dynarray(BSPBrushSide) sides
+	uint32 contents
+}
+
+struct BSPTreeLeaf
+{
+	uint32 contentFlags
+
+	int16 visCluster
+	int16 visArea
+
+	array(int16, 3) minBounds
+	array(int16, 3) maxBounds
+
+	dynarray(BSPBrush) leafBrushes
+	clusterarray(BSPDrawSurface) drawSurfaces
+}
+
+struct BSPSurfaceSpec deduplicated
+{
+	float lightStyleVOffset
+	array(float, 3) normal
+}
+
+struct BSPLightmapGroup
+{
+	BSPGeometryLightmap lightmap
+	uint8 numLightStyles
+	dynarray(BSPDrawSurface) surfaces
+}
+
+struct BSPDrawMaterialGroup
+{
+	BSPGeometryMaterial material
+	dynarray(BSPLightmapGroup) lightmapGroup
+}
+
+struct BSPDrawVertex
+{
+	array(float, 3) xyz
+	BSPSurfaceSpec surfaceSpec
+	array(float, 2) uv
+	array(float, 2) lightUV
+}
+
+struct BSPDrawCluster
+{
+	dynarray(BSPDrawMaterialGroup) materialGroups
+	dynarray(BSPDrawVertex) drawVerts
+}
+
+struct BSPModel
+{
+	dynarray(BSPDrawCluster) drawClusters
+	array(float, 3) mins
+	array(float, 3) maxs
+	array(float, 3) origin
+
+	dynarray(BSPTreeNode) treeNodes
+	dynarray(BSPTreeLeaf) treeLeafs
+	dynarray(uint8) treeNodeSplitBits
+
+	bool rootIsLeaf
+}
+
+struct BSPFile
+{
+	dynarray(BSPModel) models
+	dynarray(BSPGeometryMaterial) allMaterials
+}
+
+formattype(BSPM) BSPFile

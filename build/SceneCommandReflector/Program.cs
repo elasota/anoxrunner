@@ -74,7 +74,7 @@ namespace SceneCommandReflector
         }
         private static void ExportCommandDefs(string outDir, IReadOnlyList<SceneCommandDef> commandDefs)
         {
-            using (StreamWriter stream = new StreamWriter(Path.Combine(outDir, "include", "anox", "Data", "SceneCommandOpcodes.generated.h")))
+            using (StreamWriter stream = new BuildToolsCommon.WriteIfChangedStreamWriter(Path.Combine(outDir, "include", "anox", "Data", "SceneCommandOpcodes.generated.h")))
             {
                 stream.NewLine = "\n";
 
@@ -99,7 +99,7 @@ namespace SceneCommandReflector
                 stream.WriteLine("}");
             }
 
-            using (StreamWriter stream = new StreamWriter(Path.Combine(outDir, "Anox_Build", "SceneCommandsDefs.generated.inl")))
+            using (StreamWriter stream = new BuildToolsCommon.WriteIfChangedStreamWriter(Path.Combine(outDir, "Anox_Build", "SceneCommandsDefs.generated.inl")))
             {
                 stream.NewLine = "\n";
 
