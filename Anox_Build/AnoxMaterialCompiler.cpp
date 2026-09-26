@@ -812,6 +812,8 @@ namespace anox { namespace buildsystem
 		analysisHeader.m_bilinear = true;
 		analysisHeader.m_mipMapped = true;
 		analysisHeader.m_isAutoColorType = false;
+		analysisHeader.m_width = 1;
+		analysisHeader.m_height = 1;
 
 		analysisHeader.m_materialType = data::MaterialType::kMissing;
 		analysisHeader.m_colorType = data::MaterialColorType::kRGBA;
@@ -869,6 +871,15 @@ namespace anox { namespace buildsystem
 	bool MaterialCompiler::IsToken(const rkit::Span<const rkit::Utf8Char_t> &span, const rkit::StringView &str)
 	{
 		return rkit::CompareSpansEqual(span, str.ToSpan());
+	}
+
+	rkit::Result MaterialCompiler::FetchDDSDimensions(rkit::IReadStream &stream, MaterialAnalysisHeader &header)
+	{
+		rkit::data::DDSHeader ddsHeader;
+		stream.ReadAll(&ddsHeader, sizeof(ddsHeader));
+
+		header.m_width = ddsHeader.m_width.Get();
+		header.m_height = ddsHeader.m_height.Get();
 	}
 
 	rkit::Result MaterialCompiler::AnalyzeDDSChannelUsage(rkit::IReadStream &stream, bool &rgbUsage, bool &alphaUsage, bool &lumaUsage)
@@ -1454,12 +1465,22 @@ namespace anox { namespace buildsystem
 
 			feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, intermediatePath, bitmapContentIDs[i].m_contentID);
 
-			if (analysisHeader.m_isAutoColorType)
+			if (analysisHeader.m_isAutoColorType || analysisHeader.m_materialType == data::MaterialType::kSingle)
 			{
 				rkit::UniquePtr<rkit::ISeekableReadStream> ddsFile;
 				feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, intermediatePath, ddsFile);
 
-				AnalyzeDDSChannelUsage(*ddsFile, rgbUsage, alphaUsage, lumaUsage);
+				if (analysisHeader.m_materialType == data::MaterialType::kSingle)
+				{
+					ddsFile->SeekStart(0);
+					FetchDDSDimensions(*ddsFile, analysisHeader);
+				}
+
+				if (analysisHeader.m_isAutoColorType)
+				{
+					ddsFile->SeekStart(0);
+					AnalyzeDDSChannelUsage(*ddsFile, rgbUsage, alphaUsage, lumaUsage);
+				}
 			}
 		}
 
@@ -1550,6 +1571,8 @@ namespace anox { namespace buildsystem
 			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outFile;
 			feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outputPath, outFile);
 
+			RKIT_ASSERT(materialHeader.m_width.Get() != 0 && materialHeader.m_height.Get() != 0);
+
 			outFile->WriteAll(&materialHeader, sizeof(materialHeader));
 			outFile->WriteAll(bitmapDefs.GetBuffer(), bitmapDefs.Count() * sizeof(bitmapDefs[0]));
 			outFile->WriteAll(frameDefs.GetBuffer(), frameDefs.Count() * sizeof(frameDefs[0]));
@@ -1585,6 +1608,6 @@ namespace anox { namespace buildsystem
 
 	uint32_t MaterialCompiler::GetVersion() const
 	{
-		return 5;
+		return 6;
 	}
 } } // anox::buildsystem

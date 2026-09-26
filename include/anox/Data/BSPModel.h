@@ -2,7 +2,10 @@
 
 #include "rkit/Core/Endian.h"
 #include "rkit/Core/FourCC.h"
+
 #include "rkit/Data/ContentID.h"
+
+#include "CompressedNormal.h"
 
 namespace anox { namespace data {
 	struct BSPFile

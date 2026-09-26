@@ -417,7 +417,7 @@ namespace DataFormatGenerator
                 sw.WriteLine();
                 sw.Write("namespace ");
 
-                foreach (string part in Namespace)
+                foreach (string part in Namespace!)
                 {
                     sw.Write(part);
                     sw.Write("::");
@@ -463,7 +463,7 @@ namespace DataFormatGenerator
                 sw.WriteLine();
                 sw.Write("namespace ");
 
-                foreach (string part in Namespace)
+                foreach (string part in Namespace!)
                 {
                     sw.Write(part);
                     sw.Write("::");
@@ -730,7 +730,7 @@ namespace DataFormatGenerator
                 sw.WriteLine("\t\t::rkit::Span<uint8_t> headerSpan = headerBlob.ModifyStaticArray().ToSpan();");
                 sw.WriteLine("\t\t::rkit::Span<uint8_t> mainObjectSpan = mainObjectBlob.ModifyStaticArray().ToSpan();");
 
-                for (int i = 0; i < FormatCode.Length; i++)
+                for (int i = 0; i < FormatCode!.Length; i++)
                     sw.WriteLine("\t\theaderSpan[" + i + "] = " + ((int)FormatCode[i]).ToString() + ";");
 
                 sw.WriteLine("\t\theaderSpan = headerSpan.SubSpan(" + FormatCode.Length.ToString() + ");");
@@ -813,7 +813,7 @@ namespace DataFormatGenerator
 
                 string namespaceBase = "";
 
-                foreach (string part in Namespace)
+                foreach (string part in Namespace!)
                 {
                     if (namespaceBase != "")
                         namespaceBase += "::";
@@ -825,7 +825,7 @@ namespace DataFormatGenerator
 
                 sw.WriteLine("namespace " + builderNS);
                 sw.WriteLine("{");
-                sw.WriteLine("\tclass " + FormatType.Name + "_BuilderLoader");
+                sw.WriteLine("\tclass " + FormatType!.Name + "_BuilderLoader");
                 sw.WriteLine("\t{");
                 sw.WriteLine("\tpublic:");
                 sw.WriteLine("\t\tvoid Convert(::" + builderNS + "::" + FormatType.Name + " &outObject, const ::" + namespaceBase + "::" + FormatType.Name + "_Instance &inInstance);");
@@ -873,6 +873,21 @@ namespace DataFormatGenerator
                     if (structDef.IsInstanced)
                         sw.WriteLine("\t\t::rkit::data::DataFormatBuilderHelper::InitRCPtrVector(m_instancesOf_" + structDef.Name + ", inInstance.m_instancesOf_" + structDef.Name + ".Count());");
                 }
+
+                foreach (KeyValuePair<string, StructDef> structDefKVP in _structs.Unroll())
+                {
+                    StructDef structDef = structDefKVP.Value;
+
+                    if (structDef.IsInstanced)
+                    {
+                        sw.WriteLine("\t\t::rkit::ProcessParallelSpans(m_instancesOf_" + structDef.Name + ".ToSpan(), inInstance.m_instancesOf_" + structDef.Name + ".ToSpan(),");
+                        sw.WriteLine("\t\t\t[this](::rkit::RCPtr<" + structDef.Name + "> &outItem, const ::" + namespaceBase + "::" + structDef.Name + " &inItem)");
+                        sw.WriteLine("\t\t\t{");
+                        sw.WriteLine("\t\t\t\tConvertStructContents(*outItem, inItem);");
+                        sw.WriteLine("\t\t\t});");
+                    }
+                }
+
                 sw.WriteLine("\t\tConvertStructContents(outObject, inInstance.m_rootObject);");
                 sw.WriteLine("\t}");
 
@@ -934,7 +949,7 @@ namespace DataFormatGenerator
 
                 {
                     bool isFirst = true;
-                    foreach (string part in Namespace)
+                    foreach (string part in Namespace!)
                     {
                         if (isFirst)
                             isFirst = false;
@@ -963,7 +978,7 @@ namespace DataFormatGenerator
                 }
 
                 sw.WriteLine();
-                sw.WriteLine("\tstruct " + FormatType.Name + "_Instance");
+                sw.WriteLine("\tstruct " + FormatType!.Name + "_Instance");
                 sw.WriteLine("\t{");
 
                 foreach (KeyValuePair<string, StructDef> structDefKVP in _structs.Unroll())
@@ -1658,7 +1673,7 @@ namespace DataFormatGenerator
             writer.WriteLine(indent + "::rkit::data::DataFormatBuilderHelper::" + funcName + "(" + outExpr + ", " + inExpr + ",");
             writer.WriteLine(indent + "\t[&](" + BuilderName(type.SubType!) + " &" + outName + ", " + DataName(type.SubType!, "::" + namespaceBase + "::") + " const& " + inName + ")");
             writer.WriteLine(indent + "\t{");
-            EmitConvertLines(writer, type.SubType, indent + "\t\t", outName, inName, namespaceBase);
+            EmitConvertLines(writer, type.SubType!, indent + "\t\t", outName, inName, namespaceBase);
             writer.WriteLine(indent + "\t});");
         }
 

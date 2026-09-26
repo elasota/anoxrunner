@@ -26,10 +26,11 @@
 
 #include "anox/CoreUtils/CoreUtils.h"
 
+#include "anox/Data/BSPModel.h"
 #include "anox/Data/CompressedNormal.h"
 #include "anox/Data/EntityDef.h"
 #include "anox/Data/EntitySpawnData.h"
-#include "anox/Data/BSPModel.h"
+#include "anox/Data/MaterialData.h"
 
 #include "anox/AnoxModule.h"
 #include "anox/AnoxUtilitiesDriver.h"
@@ -424,6 +425,7 @@ namespace anox { namespace buildsystem
 		static void ConvertPlane2(bool &outInverted, data2::builder::BSPPlane &outPlane, const BSPDataCollection &bsp, const BSPPlane &inPlane);
 
 		static rkit::Result BuildMaterials(data::BSPDataChunksVectors &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+		static rkit::Result BuildMaterials2(data2::builder::BSPFile &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 
 		static rkit::Result LoadBSPData(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, BSPDataCollection &bsp, rkit::Vector<LumpLoader> &loaders);
 
@@ -4058,6 +4060,88 @@ namespace anox { namespace buildsystem
 		RKIT_RETURN_OK;
 	}
 
+	rkit::Result BSPMapCompilerBase2::BuildMaterials2(data2::builder::BSPFile &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	{
+		using DimensionPair_t = rkit::Pair<uint32_t, uint32_t>;
+		using MaterialMap_t = rkit::HashMap<const data2::builder::BSPGeometryMaterial *, DimensionPair_t>;
+
+		MaterialMap_t materialDimensions;
+
+		for (size_t materialIndex = 0; materialIndex < paths.Count(); materialIndex++)
+		{
+			const rkit::CIPath &path = paths[materialIndex];
+
+			rkit::String materialIdentifier;
+			BSPMapCompiler::FormatWorldMaterialPath(materialIdentifier, path.ToString());
+
+			rkit::CIPath compiledMaterialPath;
+			MaterialCompiler::ConstructOutputPath(compiledMaterialPath, data::MaterialResourceType::kWorld, materialIdentifier);
+
+			rkit::data::ContentID contentID = {};
+
+			data2::builder::BSPGeometryMaterial *material = bspOutput.m_allMaterials[materialIndex].Get();
+
+			if (path != u8"null")
+			{
+				feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, contentID);
+
+				rkit::UniquePtr<rkit::ISeekableReadStream> stream;
+				feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, stream);
+
+				data::MaterialHeader materialHeader;
+				stream->ReadOneBinary(materialHeader);
+
+				materialDimensions.Set(material, rkit::Pair<uint32_t, uint32_t>(materialHeader.m_width.Get(), materialHeader.m_height.Get()));
+			}
+
+			material->m_material.m_contentID = contentID;
+		}
+
+		// Rescale surface UVs
+		for (data2::builder::BSPModel &model : bspOutput.m_models)
+		{
+			for (data2::builder::BSPDrawCluster &cluster : model.m_drawClusters)
+			{
+				rkit::BoolVector hasBeenScaled;
+				hasBeenScaled.Resize(cluster.m_drawVerts.Count());
+
+				for (const data2::builder::BSPDrawMaterialGroup &materialGroup : cluster.m_materialGroups)
+				{
+					const data2::builder::BSPGeometryMaterial *material = materialGroup.m_material.Get();
+
+					MaterialMap_t::ConstIterator_t it = materialDimensions.Find(material);
+					if (it != materialDimensions.end())
+					{
+						DimensionPair_t dimensions = it.Value();
+
+						const float w = static_cast<float>(dimensions.First());
+						const float h = static_cast<float>(dimensions.Second());
+
+						for (const data2::builder::BSPLightmapGroup &lightmapGroup : materialGroup.m_lightmapGroup)
+						{
+							for (const rkit::RCPtr<data2::builder::BSPDrawSurface> &surfPtr : lightmapGroup.m_surfaces)
+							{
+								for (const data2::builder::BSPTri &tri : surfPtr->m_tris)
+								{
+									for (uint16_t triVert : tri.m_indexes)
+									{
+										if (!hasBeenScaled[triVert])
+										{
+											hasBeenScaled.Set(triVert, true);
+											data2::builder::BSPDrawVertex &vert = cluster.m_drawVerts[triVert];
+											vert.m_uv[0] /= w;
+											vert.m_uv[1] /= h;
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	rkit::Result BSPMapCompilerBase2::LoadBSPData(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, BSPDataCollection &bsp, rkit::Vector<LumpLoader> &loaders)
 	{
 		const rkit::StringView identifier = depsNode->GetIdentifier();
@@ -4274,8 +4358,6 @@ namespace anox { namespace buildsystem
 	{
 		rkit::Vector<rkit::CIPath> uniqueTextures;
 
-		data::BSPDataChunksVectors bspData;
-
 		data2::builder::BSPFile bspFile;
 
 		{
@@ -4296,9 +4378,6 @@ namespace anox { namespace buildsystem
 
 			data2::builder::BSPFile_BuilderLoader builderLoader;
 			builderLoader.Convert(bspFile, bspFileInstance);
-
-			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
-			//ReadBSPModel(bspData, *inStream);
 		}
 
 		{
@@ -4314,13 +4393,7 @@ namespace anox { namespace buildsystem
 			ReadMaterialList(uniqueTextures, *inStream);
 		}
 
-		BuildMaterials(bspData, uniqueTextures.ToSpan(), feedback);
-
-		if (true)
-		{
-			// TODO: Recompute UV coordinates
-			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
-		}
+		BuildMaterials2(bspFile, uniqueTextures.ToSpan(), feedback);
 
 		{
 			rkit::String outPathStr;
@@ -4332,7 +4405,7 @@ namespace anox { namespace buildsystem
 			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
 			feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, outPath, outStream);
 
-			WriteBSPModel(bspData, *outStream);
+			data2::builder::BSPFile_Builder::WriteToStream(*outStream, bspFile);
 		}
 
 		RKIT_RETURN_OK;

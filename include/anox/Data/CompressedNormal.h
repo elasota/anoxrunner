@@ -1,3 +1,5 @@
+#pragma once
+
 #include "rkit/Core/Endian.h"
 
 namespace anox { namespace data
