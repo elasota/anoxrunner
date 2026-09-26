@@ -420,7 +420,7 @@ namespace anox { namespace buildsystem
 			rkit::ConstSpan<rkit::data::ContentID> lightMapContentIDs, rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions);
 		static void AddBSPLeaf2(data2::builder::BSPModel &bspOutput, rkit::Vector<NodeOrLeaf2> &srcFaceOrder, const BSPDataCollection &bsp,
 			rkit::ConstSpan<rkit::RCPtr<data2::builder::BSPBrush>> brushes, const BSPLeaf &inLeaf);
-		static void AddBSPNode2(data2::builder::BSPModel &bspOutput, rkit::Vector<NodeOrLeaf2> &srcFaceOrder, rkit::Vector<uint8_t> &splitPairs, size_t &totalNodeCount, const BSPDataCollection &bsp,
+		static void AddBSPNode2(data2::builder::BSPModel &bspOutput, rkit::Vector<NodeOrLeaf2> &srcFaceOrder, size_t &totalNodeCount, const BSPDataCollection &bsp,
 			rkit::ConstSpan<rkit::RCPtr<data2::builder::BSPBrush>> brushes, const BSPNode &inNode);
 		static void ConvertPlane2(bool &outInverted, data2::builder::BSPPlane &outPlane, const BSPDataCollection &bsp, const BSPPlane &inPlane);
 
@@ -1003,7 +1003,7 @@ namespace anox { namespace buildsystem
 
 	uint32_t BSPGeometryCompiler::GetVersion() const
 	{
-		return 3;
+		return 7;
 	}
 
 	BSPEntityCompiler::EntityAnalysisHandler::EntityAnalysisHandler(rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
@@ -2671,7 +2671,6 @@ namespace anox { namespace buildsystem
 		rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightMapDimensions,
 		rkit::ConstSpan<rkit::RCPtr<data2::builder::BSPBrush>> brushes)
 	{
-		rkit::Vector<uint8_t> splitPairs;
 		rkit::Vector<NodeOrLeaf2> nodeFaceOrder;
 
 		int32_t headNode = inModel.m_headNode.Get();
@@ -2685,25 +2684,7 @@ namespace anox { namespace buildsystem
 		else
 		{
 			bspOutput.m_rootIsLeaf = false;
-			AddBSPNode2(bspOutput, nodeFaceOrder, splitPairs, totalNodeCount, bsp, brushes, bsp.m_nodes[headNode]);
-		}
-
-		while (splitPairs.Count() % 4 != 0)
-			splitPairs.Append(0);
-
-		size_t numSplitBytes = splitPairs.Count() / 4;
-		bspOutput.m_treeNodeSplitBits.Resize(numSplitBytes);
-
-		rkit::ConstSpan<uint8_t> inSplitSpan = splitPairs.ToSpan();
-		rkit::Span<uint8_t> outSplitSpan = bspOutput.m_treeNodeSplitBits.ToSpan();
-
-		for (size_t i = 0; i < numSplitBytes; i++)
-		{
-			uint8_t outByte = 0;
-			for (size_t bit2Offset = 0; bit2Offset < 4; bit2Offset++)
-				outByte |= ((inSplitSpan[i + bit2Offset]) << (bit2Offset * 2));
-
-			outSplitSpan[i] = outByte;
+			AddBSPNode2(bspOutput, nodeFaceOrder, totalNodeCount, bsp, brushes, bsp.m_nodes[headNode]);
 		}
 
 		for (size_t axis = 0; axis < 3; axis++)
@@ -3167,7 +3148,7 @@ namespace anox { namespace buildsystem
 		srcFaceOrder.Append(nol);
 	}
 
-	void BSPMapCompilerBase2::AddBSPNode2(data2::builder::BSPModel &bspOutput, rkit::Vector<NodeOrLeaf2> &srcFaceOrder, rkit::Vector<uint8_t> &splitPairs, size_t &totalNodeCount, const BSPDataCollection &bsp,
+	void BSPMapCompilerBase2::AddBSPNode2(data2::builder::BSPModel &bspOutput, rkit::Vector<NodeOrLeaf2> &srcFaceOrder, size_t &totalNodeCount, const BSPDataCollection &bsp,
 		rkit::ConstSpan<rkit::RCPtr<data2::builder::BSPBrush>> brushes, const BSPNode &inNode)
 	{
 		data2::builder::BSPTreeNode outNode;
@@ -3196,21 +3177,13 @@ namespace anox { namespace buildsystem
 		if (isInverted)
 			rkit::Swap(children[0], children[1]);
 
-		uint8_t splitBits = 0;
-		if (children[0] < 0)
-			splitBits |= 1;
-		if (children[1] < 0)
-			splitBits |= 2;
-
-		splitPairs.Append(splitBits);
-
 		size_t childNodeCounts[2] = { 0, 0 };
 		for (int ch = 0; ch < 2; ch++)
 		{
 			if (children[ch] < 0)
 				AddBSPLeaf2(bspOutput, srcFaceOrder, bsp, brushes, bsp.m_leafs[-1 - children[ch]]);
 			else
-				AddBSPNode2(bspOutput, srcFaceOrder, splitPairs, childNodeCounts[ch], bsp, brushes, bsp.m_nodes[children[ch]]);
+				AddBSPNode2(bspOutput, srcFaceOrder, childNodeCounts[ch], bsp, brushes, bsp.m_nodes[children[ch]]);
 		}
 
 		bspOutput.m_treeNodes[outNodeIndex].m_numFrontNodes = childNodeCounts[0];

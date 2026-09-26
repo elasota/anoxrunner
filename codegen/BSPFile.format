@@ -125,7 +125,6 @@ struct BSPModel
 
 	dynarray(BSPTreeNode) treeNodes
 	dynarray(BSPTreeLeaf) treeLeafs
-	dynarray(uint8) treeNodeSplitBits
 
 	bool rootIsLeaf
 }
