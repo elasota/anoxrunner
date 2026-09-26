@@ -1,6 +1,7 @@
 namespace anox.data2
 
 loader "include/anox/Data/AnoxBSPFileLoader"
+builderloader "anox/Data/AnoxBSPFileLoader"
 builder "Anox_Build/AnoxBSPFileBuilder"
 
 struct CompressedNormal64NoNegate

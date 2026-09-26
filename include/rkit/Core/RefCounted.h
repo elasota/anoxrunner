@@ -14,6 +14,9 @@ namespace rkit
 	template<class T>
 	class WeakPtr;
 
+	template<class T>
+	class RCPtr;
+
 	class RefCounted;
 	class WeakRefTracker;
 	struct RefCountedTracker;

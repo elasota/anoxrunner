@@ -2,4 +2,5 @@ build\SandboxAPIGenerator\bin\Release\net9.0\SandboxAPIGenerator.exe codegen/Ano
 build\GameObjectReflector\bin\Release\net9.0\GameObjectReflector.exe codegen/AnoxEntityClasses.ec .
 build\APECommandReflector\bin\Release\net9.0\APECommandReflector.exe codegen/AnoxWindowCommands.txt codegen/AnoxAPEExterns.txt .
 build\SceneCommandReflector\bin\Release\net9.0\SceneCommandReflector.exe codegen/AnoxSceneCommands.txt .
+build\DataFormatGenerator\bin\Release\net9.0\DataFormatGenerator.exe codegen/BSPFile.format
 pause

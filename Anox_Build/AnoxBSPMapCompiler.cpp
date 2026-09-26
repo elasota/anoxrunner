@@ -1,5 +1,3 @@
-#include "anox/Data/AnoxBSPFileLoader.loader.h"
-
 #include "AnoxBSPMapCompiler.h"
 
 #include "AnoxEntityDefCompiler.h"
@@ -42,6 +40,8 @@
 
 #include "AnoxBSPFileBuilder.generated.h"
 #include "AnoxBSPFileBuilder.generated.inl"
+
+#include "AnoxBSPFileBuilder.loader.generated.inl"
 
 #include <cmath>
 
@@ -2967,7 +2967,6 @@ namespace anox { namespace buildsystem
 		// Remove any duplicates
 		faceOrder.Resize(faceOrder.Count() - rkit::DeduplicateSortedList(faceOrder.begin(), faceOrder.end()));
 
-
 		auto packStylesForStorage = [](const uint8_t(&styles)[4], int numUniqueStyles) -> uint32_t
 			{
 				uint32_t packedStyles = 0;
@@ -3048,10 +3047,10 @@ namespace anox { namespace buildsystem
 			inFaceToOutFace[inFaceIndex] = outFaceIndex;
 		}
 
+		rkit::Vector<rkit::RCPtr<data2::builder::BSPDrawSurface>> allFaceSurfaces;
+
 		for (uint16_t inFaceIndex : faceOrder)
 		{
-			const size_t outFaceIndex = inFaceToOutFace[inFaceIndex].Get();
-
 			const BSPFaceStats &faceStats = stats[inFaceIndex];
 			const BSPFace &inFace = bsp.m_faces[inFaceIndex];
 
@@ -3101,7 +3100,37 @@ namespace anox { namespace buildsystem
 
 			GenerateTris2(drawCluster, *drawSurf, bsp, inFace, faceStats, lightmapDimensions);
 
-			lightMapGroup.m_surfaces.Append(std::move(drawSurf));
+			allFaceSurfaces.Append(drawSurf);
+			lightMapGroup.m_surfaces.Append(drawSurf);
+		}
+
+		// Build draw cluster lists
+		for (const NodeOrLeaf2 &nodeOrLeaf : nodeFaceOrder)
+		{
+			if (!nodeOrLeaf.m_isLeaf)
+				continue;
+
+			const size_t inLeafIndex = nodeOrLeaf.m_inIndex;
+			const size_t outLeafIndex = nodeOrLeaf.m_outIndex;
+
+			const BSPLeaf &inLeaf = bsp.m_leafs[inLeafIndex];
+
+			data2::builder::BSPTreeLeaf &outLeaf = bspOutput.m_treeLeafs[outLeafIndex];
+
+			const uint16_t firstLeafFace = inLeaf.m_firstLeafFace.Get();
+			const uint16_t numLeafFaces = inLeaf.m_numLeafFaces.Get();
+
+			for (size_t lfi = 0; lfi < numLeafFaces; lfi++)
+			{
+				const uint16_t faceIndex = bsp.m_leafFaces[lfi + firstLeafFace].Get();
+
+				rkit::Optional<size_t> outFace = inFaceToOutFace[faceIndex];
+
+				if (outFace.IsSet())
+					outLeaf.m_drawSurfaces.Append(allFaceSurfaces[outFace.Get()]);
+
+				faceOrder.Append(faceIndex);
+			}
 		}
 	}
 
@@ -4247,6 +4276,8 @@ namespace anox { namespace buildsystem
 
 		data::BSPDataChunksVectors bspData;
 
+		data2::builder::BSPFile bspFile;
+
 		{
 			rkit::String inPathStr;
 			FormatGeometryPath(inPathStr, depsNode->GetIdentifier());
@@ -4256,6 +4287,15 @@ namespace anox { namespace buildsystem
 
 			rkit::UniquePtr<rkit::ISeekableReadStream> inStream;
 			feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, inPath, inStream);
+
+			data2::BSPFile_Instance bspFileInstance;
+
+			data2::loader::BSPFile_Loader loader;
+			if (!loader.Load(bspFileInstance, *inStream))
+				RKIT_THROW(rkit::ResultCode::kDataError);
+
+			data2::builder::BSPFile_BuilderLoader builderLoader;
+			builderLoader.Convert(bspFile, bspFileInstance);
 
 			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 			//ReadBSPModel(bspData, *inStream);

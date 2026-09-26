@@ -169,7 +169,7 @@ namespace rkit::utils
 		using ParseType_t = typename std::conditional<std::is_unsigned<T>::value, uint64_t, int64_t>::type;
 		static_assert(sizeof(T) <= sizeof(ParseType_t), "Type is too big");
 
-		uint64_t result = 0;
+		ParseType_t result = 0;
 		size_t len = chars.Count();
 		bool succeeded = false;
 

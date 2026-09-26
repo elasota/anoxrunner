@@ -816,25 +816,14 @@ int rkit::priv::FindBitsHelper<T, true>::FindLowestSetBit(T value)
 {
 	if (value == 0)
 		return -1;
-
-	int result = 0;
-	while (((value >> result) & 1) == 0)
-		result++;
-
-	return result;
+	else
+		return std::countr_zero(value);
 }
 
 template<class T>
 int rkit::priv::FindBitsHelper<T, true>::FindHighestSetBit(T value)
 {
-	if (value == 0)
-		return -1;
-
-	int result = 0;
-	while ((value >> result) != 1)
-		result++;
-
-	return result;
+	return sizeof(T) * 8 - 1 - std::countl_zero(value);
 }
 
 template<class T>

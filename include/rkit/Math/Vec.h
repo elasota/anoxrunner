@@ -797,7 +797,7 @@ namespace rkit { namespace math {
 	template<class TComponent>
 	Vec<TComponent, 3> CrossProduct(const Vec<TComponent, 3> &a, const Vec<TComponent, 3> &b)
 	{
-		return a.Swizzle<1, 2, 0>() * b.Swizzle<2, 0, 1>() - a.Swizzle<2, 0, 1>() * b.Swizzle<1, 2, 0>();
+		return a.template Swizzle<1, 2, 0>() * b.template Swizzle<2, 0, 1>() - a.template Swizzle<2, 0, 1>() * b.template Swizzle<1, 2, 0>();
 	}
 } }
 

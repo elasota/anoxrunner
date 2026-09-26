@@ -1,5 +1,6 @@
 ﻿using BuildToolsCommon;
 using System.Data.SqlTypes;
+using System.Net.Mime;
 using System.Security.AccessControl;
 
 namespace DataFormatGenerator
@@ -85,6 +86,60 @@ namespace DataFormatGenerator
         }
     }
 
+    internal struct CompoundSize
+    {
+        public int ByteSize { get; private set; }
+        public int ContentIDCount { get; private set; }
+
+        public CompoundSize(int byteSize, int contentIDCount)
+        {
+            this.ByteSize = byteSize;
+            this.ContentIDCount = contentIDCount;
+        }
+
+        public CompoundSize(int byteSize)
+        {
+            this.ByteSize = byteSize;
+            this.ContentIDCount = 0;
+        }
+
+        public CompoundSize Add(CompoundSize other)
+        {
+            return new CompoundSize(this.ByteSize + other.ByteSize, this.ContentIDCount + other.ContentIDCount);
+        }
+
+        public override string ToString()
+        {
+            string? bytePart = null;
+            string? contentIDPart = null;
+
+            if (ByteSize > 0)
+                bytePart = ByteSize.ToString();
+            if (ContentIDCount > 0)
+                contentIDPart = "(sizeof(::rkit::data::ContentID) * " + ContentIDCount.ToString() + "u)";
+
+            if (bytePart != null)
+            {
+                if (contentIDPart != null)
+                    return "(" + bytePart + " + " + contentIDPart + ")";
+                else
+                    return bytePart;
+            }
+            else
+            {
+                if (contentIDPart != null)
+                    return contentIDPart;
+                else
+                    return "0";
+            }
+        }
+
+        internal CompoundSize Mul(int count)
+        {
+            return new CompoundSize(this.ByteSize * count, this.ContentIDCount * count);
+        }
+    }
+
     internal class FormatBuilder
     {
         IList<string>? _namespace = null;
@@ -104,6 +159,7 @@ namespace DataFormatGenerator
             }
         }
 
+        public string? BuilderLoaderPath { get; private set; }
         public string? LoaderPath { get; private set; }
         public string? FormatCode { get; private set; }
         public string? BuilderPath { get; private set; }
@@ -134,6 +190,13 @@ namespace DataFormatGenerator
             Token pathToken = lexer.ExpectTokenOfType(TokenType.QuotedString);
 
             LoaderPath = lexer.UnquoteString(pathToken);
+        }
+
+        internal void ParseBuilderLoader(ByteBlobLexer lexer)
+        {
+            Token pathToken = lexer.ExpectTokenOfType(TokenType.QuotedString);
+
+            BuilderLoaderPath = lexer.UnquoteString(pathToken);
         }
 
         internal void ParseBuilder(ByteBlobLexer lexer)
@@ -338,60 +401,8 @@ namespace DataFormatGenerator
             FormatType = structDef;
         }
 
-        internal void Export()
+        internal void ExportBuilderHeader()
         {
-            if (Namespace == null)
-                throw new Exception("No namespace was specified");
-
-            if (LoaderPath == null)
-                throw new Exception("No loader path was specified");
-
-            if (FormatCode == null)
-                throw new Exception("No format code was specified");
-
-            if (BuilderPath == null)
-                throw new Exception("No builder path was specified");
-
-            if (FormatType == null)
-                throw new Exception("No format type was specified");
-
-            string fullNamespace = "";
-            foreach (string part in Namespace)
-                fullNamespace = fullNamespace + "::" + part;
-
-            List<byte> hashInput = new List<byte>();
-
-            hashInput.AddRange(IntToBytes(Namespace.Count));
-            foreach (string part in Namespace)
-                AddStringToHash(hashInput, part);
-
-            KeyValuePair<string, StructDef>[] unrolledStructs = _structs.Unroll();
-
-            Dictionary<StructDef, int> structDefToIndex = new Dictionary<StructDef, int>(); ;
-
-            {
-                int index = 0;
-
-                foreach (KeyValuePair<string, StructDef> structDef in unrolledStructs)
-                {
-                    structDefToIndex.Add(structDef.Value, index);
-                    index++;
-                }
-            }
-
-            hashInput.AddRange(IntToBytes(unrolledStructs.Length));
-            foreach (KeyValuePair<string, StructDef> structDef in unrolledStructs)
-                AddStructDefToHash(hashInput, structDef.Value, structDefToIndex);
-
-            hashInput.AddRange(IntToBytes(structDefToIndex[FormatType]));
-
-            uint versionCode = 0;
-
-            {
-                byte[] versionHash = System.Security.Cryptography.SHA256.HashData(hashInput.ToArray());
-                for (int i = 0; i < 4; i++)
-                    versionCode = (versionCode << 8) + versionHash[i];
-            }
 
             using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(this.BuilderPath + ".generated.h"))
             {
@@ -420,31 +431,6 @@ namespace DataFormatGenerator
                     StructDef structDef = structDefKVP.Value;
                     sw.WriteLine("\tstruct " + structDef.Name);
                     sw.WriteLine("\t{");
-                    sw.Write("\t\tstatic constexpr size_t kContentsSize = ");
-
-                    {
-                        bool isFirst = true;
-                        foreach (StructMember member in structDef.Members)
-                        {
-                            if (isFirst)
-                                isFirst = false;
-                            else
-                                sw.Write(" + ");
-
-                            sw.Write(MemberSizeString(member));
-                        }
-                    }
-                    sw.WriteLine(";");
-
-
-                    sw.Write("\t\tstatic constexpr size_t kInlineSize = ");
-                    if (structDef.IsInstanced || structDef.IsDeduplicated)
-                        sw.Write("sizeof(uint32_t)");
-                    else
-                        sw.Write("kContentsSize");
-
-                    sw.WriteLine(";");
-                    sw.WriteLine();
 
                     foreach (StructMember member in structDef.Members)
                     {
@@ -460,7 +446,10 @@ namespace DataFormatGenerator
 
                 sw.WriteLine("}");
             }
+        }
 
+        internal void ExportBuilderInl(int headerSize, int numInstanceBlobs, uint versionCode)
+        {
             using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(this.BuilderPath + ".generated.inl"))
             {
                 sw.NewLine = "\n";
@@ -499,14 +488,14 @@ namespace DataFormatGenerator
                     if (structDef.IsInstanced)
                         sw.WriteLine("\t\t::rkit::HashMap<const " + structDef.Name + "*, uint32_t> m_instancesOf_" + structDef.Name + ";");
                     else if (structDef.IsDeduplicated)
-                        sw.WriteLine("\t\t::rkit::HashMap<::rkit::data::ByteBlob<" + structDef.Name + "::kContentsSize>, uint32_t> m_instancesOf_" + structDef.Name + ";");
+                        sw.WriteLine("\t\t::rkit::HashMap<::rkit::data::ByteBlob<" + StructContentsSize(structDef).ToString() + ">, uint32_t> m_instancesOf_" + structDef.Name + ";");
                 }
 
                 sw.WriteLine();
 
                 foreach (TypeDef typeDef in _dynArrayTypes.Unroll())
                 {
-                    sw.WriteLine("\t\t::rkit::Vector<::rkit::data::ByteBlob<" + TypeInlineSizeString(typeDef) + ">> m_dynArraysOf_" + DynArrayNameString(typeDef) + ";");
+                    sw.WriteLine("\t\t::rkit::Vector<::rkit::data::ByteBlob<" + TypeInlineCompoundSize(typeDef) + ">> m_dynArraysOf_" + DynArrayNameString(typeDef) + ";");
                 }
 
                 sw.WriteLine();
@@ -524,10 +513,10 @@ namespace DataFormatGenerator
 
                 string[] staticLines =
                 {
-                    "template<class TClass>",
+                    "template<class TClass, size_t TUnitSize>",
                     "void WriteInstances(::rkit::IWriteStream &outStream, const ::rkit::HashMap<const TClass *, uint32_t> &hashMap)",
                     "{",
-                    "\t::rkit::Vector<::rkit::data::ByteBlob<TClass::kContentsSize>> contentBlobs;",
+                    "\t::rkit::Vector<::rkit::data::ByteBlob<TUnitSize>> contentBlobs;",
                     "\tcontentBlobs.Resize(hashMap.Count());",
                     "\tfor (const ::rkit::HashMapKeyValueView<const TClass *, const uint32_t> &kvp : hashMap)",
                     "\t{",
@@ -631,7 +620,7 @@ namespace DataFormatGenerator
                         sw.WriteLine();
                         sw.WriteLine("\t\tuint32_t ResolveStructReference(const " + instanceSignature + " &ref)");
                         sw.WriteLine("\t\t{");
-                        sw.WriteLine("\t\t\t::rkit::data::ByteBlob<" + structDef.Name + "::kContentsSize> contents;");
+                        sw.WriteLine("\t\t\t::rkit::data::ByteBlob<" + StructContentsSize(structDef) + "> contents;");
                         sw.WriteLine("\t\t\t::rkit::Span<uint8_t> contentsSpan = contents.ModifyStaticArray().ToSpan();");
                         sw.WriteLine("\t\t\tWriteStructContents(contentsSpan, ref);");
                         sw.WriteLine("\t\t\treturn ::rkit::data::DataFormatWriter::Deduplicate(m_instancesOf_" + structDef.Name + ", contents);");
@@ -719,22 +708,6 @@ namespace DataFormatGenerator
                     }
                 }
 
-                int headerSize = FormatCode.Length + 4;
-                int numInstanceBlobs = 0;
-
-                foreach (KeyValuePair<string, StructDef> structDefKVP in _structs.Unroll())
-                {
-                    StructDef structDef = structDefKVP.Value;
-
-                    if (structDef.IsInstanced || structDef.IsDeduplicated)
-                        headerSize += 4;
-
-                    if (structDef.IsInstanced)
-                        numInstanceBlobs++;
-                }
-
-                headerSize += _dynArrayTypes.Count * 4;
-
                 sw.WriteLine("\tvoid " + FormatType!.Name + "_Builder::WriteToStream(::rkit::IWriteStream &outStream, const " + FormatType!.Name + " &obj)");
                 sw.WriteLine("\t{");
                 sw.WriteLine("\t\t" + FormatType!.Name + "_Builder builder;");
@@ -753,7 +726,7 @@ namespace DataFormatGenerator
 
                 sw.WriteLine();
                 sw.WriteLine("\t\t::rkit::data::ByteBlob<" + headerSize.ToString() + "> headerBlob;");
-                sw.WriteLine("\t\t::rkit::data::ByteBlob<" + FormatType!.Name + "::kContentsSize> mainObjectBlob;");
+                sw.WriteLine("\t\t::rkit::data::ByteBlob<" + StructContentsSize(FormatType) + "> mainObjectBlob;");
                 sw.WriteLine("\t\t::rkit::Span<uint8_t> headerSpan = headerBlob.ModifyStaticArray().ToSpan();");
                 sw.WriteLine("\t\t::rkit::Span<uint8_t> mainObjectSpan = mainObjectBlob.ModifyStaticArray().ToSpan();");
 
@@ -774,12 +747,11 @@ namespace DataFormatGenerator
 
                         if (structDef.IsInstanced)
                         {
-                            sw.WriteLine("\t\tWriteInstances(instanceStreams[" + instanceBlobIndex.ToString() + "], m_instancesOf_" + structDef.Name + ");");
+                            sw.WriteLine("\t\tWriteInstances<" + structDef.Name + ", " + StructContentsSize(structDef) + ">(instanceStreams[" + instanceBlobIndex.ToString() + "], m_instancesOf_" + structDef.Name + ");");
                             instanceBlobIndex++;
                         }
                     }
                 }
-
 
                 foreach (KeyValuePair<string, StructDef> structDefKVP in _structs.Unroll())
                 {
@@ -793,7 +765,7 @@ namespace DataFormatGenerator
                 {
                     StructDef structDef = structDefKVP.Value;
 
-                    if (structDef.IsDeduplicated || structDef.IsDeduplicated)
+                    if (structDef.IsDeduplicated)
                         sw.WriteLine("\t\tWriteInlineStruct(headerSpan, static_cast<uint32_t>(m_instancesOf_" + structDef.Name + ".Count()));");
                 }
 
@@ -802,7 +774,6 @@ namespace DataFormatGenerator
 
                 sw.WriteLine();
                 sw.WriteLine("\t\toutStream.WriteAllSpan(headerBlob.GetStaticArray().ToSpan());");
-
 
                 if (numInstanceBlobs > 0)
                 {
@@ -825,7 +796,120 @@ namespace DataFormatGenerator
                 sw.WriteLine("\t}");
                 sw.WriteLine("}");
             }
+        }
 
+        internal void ExportBuilderLoaderInl()
+        {
+            using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(this.BuilderPath + ".loader.generated.inl"))
+            {
+                sw.NewLine = "\n";
+
+                sw.WriteLine("#include \"" + Path.GetFileName(this.BuilderPath) + ".generated.h\"");
+                sw.WriteLine();
+                sw.WriteLine("#include \"rkit/Data/DataFormatBuilderHelper.h\"");
+                sw.WriteLine();
+                sw.WriteLine("#include \"" + BuilderLoaderPath + ".loader.generated.h\"");
+                sw.WriteLine();
+
+                string namespaceBase = "";
+
+                foreach (string part in Namespace)
+                {
+                    if (namespaceBase != "")
+                        namespaceBase += "::";
+                    namespaceBase += part;
+                }
+
+                string builderNS = namespaceBase + "::builder";
+                string loaderNS = namespaceBase + "::loader";
+
+                sw.WriteLine("namespace " + builderNS);
+                sw.WriteLine("{");
+                sw.WriteLine("\tclass " + FormatType.Name + "_BuilderLoader");
+                sw.WriteLine("\t{");
+                sw.WriteLine("\tpublic:");
+                sw.WriteLine("\t\tvoid Convert(::" + builderNS + "::" + FormatType.Name + " &outObject, const ::" + namespaceBase + "::" + FormatType.Name + "_Instance &inInstance);");
+                sw.WriteLine("\tprivate:");
+
+                foreach (KeyValuePair<string, StructDef> structDefKVP in _structs.Unroll())
+                {
+                    StructDef structDef = structDefKVP.Value;
+
+                    sw.WriteLine("\t\tvoid ConvertStructContents(" + structDef.Name + " &outStruct, const ::" + namespaceBase + "::" + structDef.Name + " &inStruct);");
+                }
+
+                foreach (KeyValuePair<string, StructDef> structDefKVP in _structs.Unroll())
+                {
+                    StructDef structDef = structDefKVP.Value;
+
+                    TypeDef typeDef = new TypeDef(TypeDefKind.Struct, structDef);
+
+                    sw.WriteLine("\t\tvoid ConvertInlineStruct(" + BuilderName(typeDef) + " &outValue, ::" + namespaceBase + "::" + DataName(typeDef) + " const& inValue);");
+                }
+
+                sw.WriteLine();
+                sw.WriteLine("\t\tconst ::" + namespaceBase + "::" + FormatType.Name + "_Instance *m_instance = nullptr;");
+                foreach (KeyValuePair<string, StructDef> structDefKVP in _structs.Unroll())
+                {
+                    StructDef structDef = structDefKVP.Value;
+
+                    if (structDef.IsInstanced)
+                        sw.WriteLine("\t\t::rkit::Vector<::rkit::RCPtr<::" + builderNS + "::" + structDef.Name + ">> m_instancesOf_" + structDef.Name + ";");
+                }
+
+                sw.WriteLine("\t};");
+                sw.WriteLine("}");
+                sw.WriteLine();
+                sw.WriteLine("namespace " + builderNS);
+                sw.WriteLine("{");
+                sw.WriteLine("\tinline void " + FormatType.Name + "_BuilderLoader::Convert(::" + builderNS + "::" + FormatType.Name + " &outObject, const ::" + namespaceBase + "::" + FormatType.Name + "_Instance &inInstance)");
+                sw.WriteLine("\t{");
+                sw.WriteLine("\t\tm_instance = &inInstance;");
+
+                foreach (KeyValuePair<string, StructDef> structDefKVP in _structs.Unroll())
+                {
+                    StructDef structDef = structDefKVP.Value;
+
+                    if (structDef.IsInstanced)
+                        sw.WriteLine("\t\t::rkit::data::DataFormatBuilderHelper::InitRCPtrVector(m_instancesOf_" + structDef.Name + ", inInstance.m_instancesOf_" + structDef.Name + ".Count());");
+                }
+                sw.WriteLine("\t\tConvertStructContents(outObject, inInstance.m_rootObject);");
+                sw.WriteLine("\t}");
+
+                foreach (KeyValuePair<string, StructDef> structDefKVP in _structs.Unroll())
+                {
+                    StructDef structDef = structDefKVP.Value;
+
+                    TypeDef typeDef = new TypeDef(TypeDefKind.Struct, structDef);
+
+                    sw.WriteLine();
+                    sw.WriteLine("\tinline void " + FormatType.Name + "_BuilderLoader::ConvertInlineStruct(" + BuilderName(typeDef) + " &outValue, ::" + namespaceBase + "::" + DataName(typeDef) + " const& inValue)");
+                    sw.WriteLine("\t{");
+
+                    if (structDef.IsInstanced)
+                        sw.WriteLine("\t\toutValue = m_instancesOf_" + structDef.Name + "[inValue - m_instance->m_instancesOf_" + structDef.Name + ".GetBuffer()];");
+                    else if (structDef.IsDeduplicated)
+                        sw.WriteLine("\t\tConvertStructContents(outValue, *inValue);");
+                    else
+                        sw.WriteLine("\t\tConvertStructContents(outValue, inValue);");
+
+                    sw.WriteLine("\t}");
+                    sw.WriteLine();
+                    sw.WriteLine("\tinline void " + FormatType.Name + "_BuilderLoader:: ConvertStructContents(" + structDef.Name + " &outStruct, const ::" + namespaceBase + "::" + structDef.Name + " &inStruct)");
+                    sw.WriteLine("\t{");
+
+                    foreach (StructMember member in structDef.Members)
+                        EmitConvertLines(sw, member.Type, "\t\t", "outStruct.m_" + member.Name, "inStruct.m_" + member.Name, namespaceBase);
+
+                    sw.WriteLine("\t}");
+                }
+
+                sw.WriteLine("}");
+            }
+        }
+
+        internal void ExportInstanceHeader()
+        {
             using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(this.LoaderPath + ".generated.h"))
             {
                 sw.NewLine = "\n";
@@ -840,6 +924,11 @@ namespace DataFormatGenerator
                 sw.WriteLine("#include \"rkit/Core/Span.h\"");
                 sw.WriteLine();
                 sw.WriteLine("#include <stdint.h>");
+                sw.WriteLine();
+                sw.WriteLine("namespace rkit");
+                sw.WriteLine("{");
+                sw.WriteLine("\tstruct IReadStream;");
+                sw.WriteLine("}");
                 sw.WriteLine();
                 sw.Write("namespace ");
 
@@ -892,11 +981,93 @@ namespace DataFormatGenerator
                     else
                         sw.WriteLine("\t\t::rkit::Vector<" + DataDynArrayContentsTypeString(type) + "> m_dynArraysOf_" + DynArrayNameString(type) + ";");
                 }
+                sw.WriteLine("\t\t" + FormatType.Name + " m_rootObject;");
 
                 sw.WriteLine("\t};");
                 sw.WriteLine("}");
             }
+        }
 
+        internal void Export()
+        {
+            if (Namespace == null)
+                throw new Exception("No namespace was specified");
+
+            if (LoaderPath == null)
+                throw new Exception("No loader path was specified");
+
+            if (FormatCode == null)
+                throw new Exception("No format code was specified");
+
+            if (BuilderPath == null)
+                throw new Exception("No builder path was specified");
+
+            if (FormatType == null)
+                throw new Exception("No format type was specified");
+
+            int headerSize = FormatCode.Length + 4;
+            int numInstanceBlobs = 0;
+
+            foreach (KeyValuePair<string, StructDef> structDefKVP in _structs.Unroll())
+            {
+                StructDef structDef = structDefKVP.Value;
+
+                if (structDef.IsInstanced || structDef.IsDeduplicated)
+                    headerSize += 4;
+
+                if (structDef.IsInstanced)
+                    numInstanceBlobs++;
+            }
+
+            headerSize += _dynArrayTypes.Count * 4;
+
+            string fullNamespace = "";
+            foreach (string part in Namespace)
+                fullNamespace = fullNamespace + "::" + part;
+
+            List<byte> hashInput = new List<byte>();
+
+            hashInput.AddRange(IntToBytes(Namespace!.Count));
+            foreach (string part in Namespace)
+                AddStringToHash(hashInput, part);
+
+            KeyValuePair<string, StructDef>[] unrolledStructs = _structs.Unroll();
+
+            Dictionary<StructDef, int> structDefToIndex = new Dictionary<StructDef, int>(); ;
+
+            {
+                int index = 0;
+
+                foreach (KeyValuePair<string, StructDef> structDef in unrolledStructs)
+                {
+                    structDefToIndex.Add(structDef.Value, index);
+                    index++;
+                }
+            }
+
+            hashInput.AddRange(IntToBytes(unrolledStructs.Length));
+            foreach (KeyValuePair<string, StructDef> structDef in unrolledStructs)
+                AddStructDefToHash(hashInput, structDef.Value, structDefToIndex);
+
+            hashInput.AddRange(IntToBytes(structDefToIndex[FormatType]));
+
+            uint versionCode = 0;
+
+            {
+                byte[] versionHash = System.Security.Cryptography.SHA256.HashData(hashInput.ToArray());
+                for (int i = 0; i < 4; i++)
+                    versionCode = (versionCode << 8) + versionHash[i];
+            }
+
+            ExportBuilderHeader();
+            ExportBuilderInl(headerSize, numInstanceBlobs, versionCode);
+
+            if (BuilderLoaderPath != null)
+            {
+                ExportBuilderLoaderInl();
+            }
+
+            ExportInstanceHeader();
 
             using (StreamWriter sw = new BuildToolsCommon.WriteIfChangedStreamWriter(this.LoaderPath + ".loader.generated.h"))
             {
@@ -906,6 +1077,31 @@ namespace DataFormatGenerator
                 sw.WriteLine();
                 sw.WriteLine("#include \"" + Path.GetFileName(this.LoaderPath) + ".generated.h\"");
                 sw.WriteLine();
+                sw.WriteLine("#include \"rkit/Data/DataFormatReader.h\"");
+                sw.WriteLine();
+                sw.WriteLine("#include \"rkit/Core/Stream.h\"");
+                sw.WriteLine();
+
+                {
+                    bool isFirst = true;
+                    sw.Write("namespace ");
+                    foreach (string part in Namespace)
+                    {
+                        if (isFirst)
+                            isFirst = false;
+                        else
+                            sw.Write("::");
+                        sw.Write(part);
+                    }
+                    sw.WriteLine();
+                    sw.WriteLine("{");
+                    sw.WriteLine("\tstruct " + FormatType.Name + "_Instance;");
+                    sw.WriteLine("}");
+                }
+
+                string instanceName = FormatType.Name + "_Instance";
+                string loaderName = FormatType.Name + "_Loader";
+
                 sw.Write("namespace ");
 
                 foreach (string part in Namespace)
@@ -915,9 +1111,321 @@ namespace DataFormatGenerator
                 }
                 sw.WriteLine("loader");
                 sw.WriteLine("{");
-                sw.WriteLine("\tstruct " + FormatType.Name + "_Loader");
+                sw.WriteLine("\tclass " + loaderName);
                 sw.WriteLine("\t{");
+                sw.WriteLine("\tpublic:");
+                sw.WriteLine("\t\tRKIT_NODISCARD bool Load(" + instanceName + " &instance, ::rkit::IReadStream &stream);");
+                sw.WriteLine("\tprivate:");
+                sw.WriteLine("\t\tinline static bool FirstChanceDataFailure()");
+                sw.WriteLine("\t\t{");
+                sw.WriteLine("\t\t\treturn false;");
+                sw.WriteLine("\t\t}");
+                sw.WriteLine("\t\tconst " + instanceName + " *m_instance = nullptr;");
+
+                foreach (TypeDef typeDef in _dynArrayTypes.Unroll())
+                {
+                    string contentsType;
+                    if (typeDef.Kind == TypeDefKind.ClusterRef)
+                        contentsType = "::rkit::data::ClusterRef";
+                    else
+                        contentsType = DataDynArrayContentsTypeString(typeDef);
+
+                    sw.WriteLine("\t\t::rkit::Span<" + contentsType + "> m_currentOutSliceOf_" + DynArrayNameString(typeDef) + ";");
+                    sw.WriteLine("\t\t::rkit::Span<uint8_t const> m_currentInSliceOf_" + DynArrayNameString(typeDef) + ";");
+                }
+
+                string[] baseTypes = { "uint8_t", "uint16_t", "uint32_t", "int8_t", "int16_t", "int32_t", "float", "double", "::rkit::data::ContentID", "bool", "::rkit::data::ClusterRef" };
+
+                foreach (string baseType in baseTypes)
+                {
+                    sw.WriteLine("\t\tbool ReadInstances(::rkit::Span<" + baseType + "> objs, ::rkit::Span<const uint8_t> &inSpan) noexcept;");
+                    sw.WriteLine("\t\tbool ReadInlineStruct(" + baseType + "& obj, ::rkit::Span<const uint8_t> &inSpan) noexcept;");
+                }
+                sw.WriteLine();
+
+                sw.WriteLine("\t\ttemplate<class T>");
+                sw.WriteLine("\t\tbool ReadArrayItems(::rkit::Span<T const> &inlineItems, ::rkit::Span<T> &blobItems, ::rkit::Span<const uint8_t> &itemsSpan, ::rkit::Span<const uint8_t> &counterSpan, size_t unitSize) noexcept;");
+                sw.WriteLine("\t\ttemplate<class T>");
+                sw.WriteLine("\t\tbool ReadClusterArrayItems(::rkit::data::ClusterSpan<T> &inlineItems, ::rkit::Span<::rkit::data::ClusterRef> &clusterRefs, ::rkit::Span<const uint8_t> &itemsSpan, ::rkit::Span<const uint8_t> &counterSpan, ::rkit::Span<const T> instances) noexcept;");
+
+                sw.WriteLine();
+                sw.WriteLine("\t\tinline static bool ReadByteSpan(::rkit::Span<uint8_t> bytes, ::rkit::IReadStream &stream)");
+                sw.WriteLine("\t\t{");
+                sw.WriteLine("\t\t\tsize_t countRead = 0;");
+                sw.WriteLine("\t\t\tstream.ReadPartial(bytes.Ptr(), bytes.Count(), countRead);");
+                sw.WriteLine("\t\t\treturn countRead == bytes.Count();");
+                sw.WriteLine("\t\t}");
+
+                foreach (KeyValuePair<string, StructDef> structDefKVP in _structs.Unroll())
+                {
+                    StructDef structDef = structDefKVP.Value;
+
+                    sw.WriteLine("\t\tbool ReadInstances(::rkit::Span<" + structDef.Name + "> objs, ::rkit::Span<const uint8_t> &inSpan) noexcept;");
+
+                    string structKey = structDef.Name;
+                    if (structDef.IsInstanced || structDef.IsDeduplicated)
+                    {
+                        structKey += " const*";
+                        sw.WriteLine("\t\tbool ResolveStructInstance(" + structKey + "& obj, uint32_t index);");
+                    }
+
+                    sw.WriteLine("\t\tbool ReadInlineStruct(" + structKey + "& obj, ::rkit::Span<const uint8_t> &inSpan);");
+
+                    if (structDef.IsInstanced || structDef.IsDeduplicated)
+                        sw.WriteLine("\t\tbool ReadInlineStruct(::rkit::data::Invertible<" + structKey + ">& obj, ::rkit::Span<const uint8_t> &inSpan);");
+                }
+                sw.WriteLine("\t\ttemplate<class T>");
+                sw.WriteLine("\t\tbool ReadInstancesFromStream(::rkit::Span<T> objs, ::rkit::IReadStream &stream, size_t unitSize);");
+
+                sw.WriteLine();
+                sw.WriteLine("\t\ttemplate<class T>");
+                sw.WriteLine("\t\tinline static bool PreloadInstances(::rkit::Span<const uint8_t> &headerSpan, ::rkit::Vector<T> &itemVector, ::rkit::Vector<uint8_t> &byteVector, size_t unitSize, ::rkit::IReadStream &stream)");
+                sw.WriteLine("\t\t{");
+                sw.WriteLine("\t\t\tuint32_t count = 0;");
+                sw.WriteLine("\t\t\t::rkit::data::DataFormatReader::ReadSpan(::rkit::Span<uint32_t>(&count, 1), headerSpan);");
+                sw.WriteLine("\t\t\tif (std::numeric_limits<size_t>::max() / unitSize < count) return FirstChanceDataFailure();");
+                sw.WriteLine("\t\t\titemVector.Resize(count);");
+                sw.WriteLine("\t\t\tbyteVector.Resize(count * unitSize);");
+                sw.WriteLine("\t\t\treturn ReadByteSpan(byteVector.ToSpan(), stream);");
+                sw.WriteLine("\t\t}");
+
+                sw.WriteLine();
+                sw.WriteLine("\t\ttemplate<class T>");
+                sw.WriteLine("\t\tinline static bool PreloadInstances(::rkit::Span<const uint8_t> &headerSpan, ::rkit::data::ClusterRefVector<T> &vector, ::rkit::Vector<uint8_t> &byteVector, size_t unitSize, ::rkit::IReadStream &stream)");
+                sw.WriteLine("\t\t{");
+                sw.WriteLine("\t\t\treturn PreloadInstances(headerSpan, vector.ModifyClusterVector(), byteVector, unitSize, stream);");
+                sw.WriteLine("\t\t}");
+
+                sw.WriteLine();
+                sw.WriteLine("\t\ttemplate<class T>");
+                sw.WriteLine("\t\tinline bool ParseInstances(::rkit::Span<T> instanceSpan, ::rkit::Span<const uint8_t> &inSpan, size_t unitSize)");
+                sw.WriteLine("\t\t{");
+                sw.WriteLine("\t\t\tconst size_t instanceSize = instanceSpan.Count() * unitSize;");
+                sw.WriteLine("\t\t\t::rkit::Span<const uint8_t> sliceSpan = inSpan.SubSpan(0, instanceSize);");
+                sw.WriteLine("\t\t\tinSpan = sliceSpan.SubSpan(instanceSize);");
+                sw.WriteLine("\t\t\treturn ReadInstances(instanceSpan, sliceSpan);");
+
+                sw.WriteLine("\t\t}");
+
                 sw.WriteLine("\t};");
+                sw.WriteLine("}");
+                sw.WriteLine();
+
+                sw.Write("namespace ");
+                foreach (string part in Namespace)
+                {
+                    sw.Write(part);
+                    sw.Write("::");
+                }
+                sw.WriteLine("loader");
+                sw.WriteLine("{");
+                sw.WriteLine("\tinline bool " + FormatType.Name + "_Loader::Load(" + FormatType.Name + "_Instance &instance, ::rkit::IReadStream &stream)");
+                sw.WriteLine("\t{");
+                sw.WriteLine("\t\tm_instance = &instance;");
+                sw.WriteLine("\t\t::rkit::StaticArray<uint8_t, " + headerSize + "> headerBlob;");
+                sw.WriteLine("\t\tif (!ReadByteSpan(headerBlob.ToSpan(), stream)) return FirstChanceDataFailure();");
+                sw.WriteLine("\t\t::rkit::Span<uint8_t const> headerSpan = headerBlob.ToSpan();");
+
+                for (int i = 0; i < FormatCode.Length; i++)
+                    sw.WriteLine("\t\tif (headerSpan[" + i + "] != " + ((int)FormatCode[i]).ToString() + ") return FirstChanceDataFailure();");
+
+                sw.WriteLine("\t\theaderSpan = headerSpan.SubSpan(" + FormatCode.Length.ToString() + ");");
+                sw.WriteLine("\t\t{");
+                sw.WriteLine("\t\t\tuint32_t versionCode = 0;");
+                sw.WriteLine("\t\t\t::rkit::data::DataFormatReader::ReadSpan(::rkit::Span<uint32_t>(&versionCode, 1), headerSpan);");
+                sw.WriteLine("\t\t\tif (versionCode != static_cast<uint32_t>(" + versionCode.ToString() + "u)) return FirstChanceDataFailure();");
+                sw.WriteLine("\t\t}");
+
+                // Alloc instances
+                {
+                    List<StructDef> instanced = new List<StructDef>();
+                    List<StructDef> deduped = new List<StructDef>();
+
+                    foreach (KeyValuePair<string, StructDef> structDefKVP in _structs.Unroll())
+                    {
+                        StructDef structDef = structDefKVP.Value;
+                        if (structDef.IsInstanced)
+                            instanced.Add(structDef);
+                        else if (structDef.IsDeduplicated)
+                            deduped.Add(structDef);
+                    }
+
+                    List<StructDef> combined = new List<StructDef>(instanced);
+                    combined.AddRange(deduped);
+
+                    foreach (StructDef structDef in combined)
+                    {
+                        sw.WriteLine("\t\t::rkit::Vector<uint8_t> byteBlobOfInstancesOf_" + structDef.Name + ";");
+                        sw.WriteLine("\t\tif (!PreloadInstances(headerSpan, instance.m_instancesOf_" + structDef.Name + ", byteBlobOfInstancesOf_" + structDef.Name + ", " + StructContentsSize(structDef) + ", stream)) return FirstChanceDataFailure();");
+
+                        if (structDef.IsInstanced || structDef.IsDeduplicated)
+                            sw.WriteLine("\t\t::rkit::Span<const uint8_t> byteBlobSpanOfInstancesOf_" + structDef.Name + " = byteBlobOfInstancesOf_" + structDef.Name + ".ToSpan();");
+                    }
+                }
+
+                foreach (TypeDef typeDef in _dynArrayTypes.Unroll())
+                {
+                    string arrName = DynArrayNameString(typeDef);
+
+                    sw.WriteLine("\t\t::rkit::Vector<uint8_t> byteBlobOfArraysOf_" + arrName + ";");
+                    sw.WriteLine("\t\tif (!PreloadInstances(headerSpan, instance.m_dynArraysOf_" + arrName + ", byteBlobOfArraysOf_" + arrName + ", " + TypeInlineCompoundSize(typeDef) + ", stream)) return FirstChanceDataFailure();");
+                }
+
+
+                foreach (TypeDef typeDef in _dynArrayTypes.Unroll())
+                {
+                    string spanConversionSuffix = ".ToSpan()";
+                    if (typeDef.Kind == TypeDefKind.ClusterRef)
+                    {
+                        sw.WriteLine("\t\tinstance.m_dynArraysOf_" + DynArrayNameString(typeDef) + ".SetInstances(instance.m_instancesOf_" + DynArrayNameString(typeDef.SubType!) + ".ToSpan());");
+                        spanConversionSuffix = ".ModifyClusterVector()" + spanConversionSuffix;
+                    }
+
+                    sw.WriteLine("\t\tm_currentOutSliceOf_" + DynArrayNameString(typeDef) + " = instance.m_dynArraysOf_" + DynArrayNameString(typeDef) + spanConversionSuffix + ";");
+                    sw.WriteLine("\t\tm_currentInSliceOf_" + DynArrayNameString(typeDef) + " = byteBlobOfArraysOf_" + DynArrayNameString(typeDef) + ".ToSpan();");
+                }
+
+                sw.WriteLine();
+
+                // Read instances
+                foreach (KeyValuePair<string, StructDef> structDefKVP in _structs.Unroll())
+                {
+                    StructDef structDef = structDefKVP.Value;
+
+                    if (structDef.IsInstanced || structDef.IsDeduplicated)
+                        sw.WriteLine("\t\tif (!ParseInstances(instance.m_instancesOf_" + structDef.Name + ".ToSpan(), byteBlobSpanOfInstancesOf_" + structDef.Name + ", " + StructContentsSize(structDef) + ")) return false;");
+                }
+
+                sw.WriteLine("\t\t::rkit::StaticArray<uint8_t, " + StructContentsSize(FormatType) + "> rootObjectBytes;");
+                sw.WriteLine("\t\t::rkit::Span<const uint8_t> rootObjectSpan = rootObjectBytes.ToSpan();");
+                sw.WriteLine("\t\tif (!ReadByteSpan(rootObjectBytes.ToSpan(), stream)) return FirstChanceDataFailure();");
+                sw.WriteLine("\t\tif (!ParseInstances(::rkit::Span<" + FormatType.Name + ">(&instance.m_rootObject, 1), rootObjectSpan, rootObjectSpan.Count())) return FirstChanceDataFailure();");
+
+                // Validate that all arrays were consumed
+                foreach (TypeDef typeDef in _dynArrayTypes.Unroll())
+                    sw.WriteLine("\t\tif (m_currentOutSliceOf_" + DynArrayNameString(typeDef) + ".Count() != 0) return FirstChanceDataFailure();");
+
+                sw.WriteLine();
+                sw.WriteLine("\t\treturn true;");
+                sw.WriteLine("\t}");
+
+                foreach (KeyValuePair<string, StructDef> structDefKVP in _structs.Unroll())
+                {
+                    StructDef structDef = structDefKVP.Value;
+
+                    sw.WriteLine();
+                    sw.WriteLine("\tinline bool " + FormatType!.Name + "_Loader::ReadInstances(::rkit::Span<" + structDef.Name + "> objs, ::rkit::Span<const uint8_t> &inSpan) noexcept");
+                    sw.WriteLine("\t{");
+                    sw.WriteLine("\t\t::rkit::Span<const uint8_t> slice = inSpan.SubSpan(0, " + StructContentsSize(structDef) + " * objs.Count());");
+                    sw.WriteLine("\t\tinSpan = inSpan.SubSpan(slice.Count());");
+                    sw.WriteLine("\t\tfor (auto &baseItem : objs)");
+                    sw.WriteLine("\t\t{");
+                    foreach (StructMember member in structDef.Members)
+                        EmitReadLines(sw, member.Type, "\t\t\t", "slice", "baseItem.m_" + member.Name);
+                    sw.WriteLine("\t\t}");
+
+                    sw.WriteLine("\t\treturn true;");
+                    sw.WriteLine("\t}");
+
+                    string structKey = structDef.Name;
+                    if (structDef.IsInstanced || structDef.IsDeduplicated)
+                    {
+                        structKey += " const*";
+
+                        sw.WriteLine();
+                        sw.WriteLine("\tbool " + FormatType!.Name + "_Loader::ResolveStructInstance(" + structKey + "& obj, uint32_t index)");
+                        sw.WriteLine("\t{");
+                        sw.WriteLine("\t\t::rkit::Span<const " + structDef.Name + "> instances = m_instance->m_instancesOf_" + structDef.Name + ".ToSpan();");
+                        sw.WriteLine("\t\tif (index >= instances.Count()) return FirstChanceDataFailure();");
+                        sw.WriteLine("\t\tobj = &instances[index];");
+                        sw.WriteLine("\t\treturn true;");
+                        sw.WriteLine("\t}");
+
+                    }
+
+                    if (structDef.IsInstanced || structDef.IsDeduplicated)
+                    {
+                        sw.WriteLine();
+                        sw.WriteLine("\tbool " + FormatType!.Name + "_Loader::ReadInlineStruct(" + structKey + "& obj, ::rkit::Span<const uint8_t> &inSpan)");
+                        sw.WriteLine("\t{");
+                        sw.WriteLine("\t\tuint32_t index = 0;");
+                        sw.WriteLine("\t\tif (!ReadInlineStruct(index, inSpan)) return FirstChanceDataFailure();");
+                        sw.WriteLine("\t\treturn ResolveStructInstance(obj, index);");
+                        sw.WriteLine("\t}");
+                        sw.WriteLine();
+                        sw.WriteLine("\tbool " + FormatType!.Name + "_Loader::ReadInlineStruct(::rkit::data::Invertible<" + structKey + ">& obj, ::rkit::Span<const uint8_t> &inSpan)");
+                        sw.WriteLine("\t{");
+                        sw.WriteLine("\t\tuint32_t index = 0;");
+                        sw.WriteLine("\t\tif (!ReadInlineStruct(index, inSpan)) return FirstChanceDataFailure();");
+                        sw.WriteLine("\t\t" + structKey + " ptr = nullptr;");
+                        sw.WriteLine("\t\tif (!ResolveStructInstance(ptr, index >> 1)) return FirstChanceDataFailure();");
+                        sw.WriteLine("\t\tobj.Set(ptr, (index & 1) != 0);");
+                        sw.WriteLine("\t\treturn true;");
+                        sw.WriteLine("\t}");
+                    }
+                    else
+                    {
+                        sw.WriteLine();
+                        sw.WriteLine("\tbool " + FormatType!.Name + "_Loader::ReadInlineStruct(" + structKey + "& obj, ::rkit::Span<const uint8_t> &inSpan)");
+                        sw.WriteLine("\t{");
+                        sw.WriteLine("\t\treturn ReadInstances(::rkit::Span<" + structKey + ">(&obj, 1), inSpan);");
+                        sw.WriteLine("\t}");
+                    }
+                }
+
+                foreach (string baseType in baseTypes)
+                {
+                    sw.WriteLine();
+                    sw.WriteLine("\tinline bool " + FormatType!.Name + "_Loader::ReadInstances(::rkit::Span<" + baseType + "> objs, ::rkit::Span<const uint8_t> &inSpan) noexcept");
+                    sw.WriteLine("\t{");
+                    sw.WriteLine("\t\t::rkit::data::DataFormatReader::ReadSpan(objs, inSpan);");
+                    sw.WriteLine("\t\treturn true;");
+                    sw.WriteLine("\t}");
+                    sw.WriteLine();
+                    sw.WriteLine("\tinline bool " + FormatType!.Name + "_Loader::ReadInlineStruct(" + baseType + "& obj, ::rkit::Span<const uint8_t> &inSpan) noexcept");
+                    sw.WriteLine("\t{");
+                    sw.WriteLine("\t\t::rkit::data::DataFormatReader::ReadSpan(::rkit::Span<" + baseType + ">(&obj, 1), inSpan);");
+                    sw.WriteLine("\t\treturn true;");
+                    sw.WriteLine("\t}");
+                }
+                sw.WriteLine();
+
+                foreach (TypeDef typeDef in _dynArrayTypes.Unroll())
+                {
+                    if (IsPrimitiveType(typeDef.Kind) || typeDef.Kind == TypeDefKind.Struct)
+                        continue;
+                }
+
+                sw.WriteLine();
+                sw.WriteLine("\ttemplate<class T>");
+                sw.WriteLine("\tinline bool " + FormatType!.Name + "_Loader::ReadArrayItems(::rkit::Span<T const> &inlineItems, ::rkit::Span<T> &blobItems, ::rkit::Span<const uint8_t> &itemsSpan, ::rkit::Span<const uint8_t> &counterSpan, size_t unitSize) noexcept");
+                sw.WriteLine("\t{");
+                sw.WriteLine("\t\tuint32_t count = 0;");
+                sw.WriteLine("\t\tif (!ReadInlineStruct(count, counterSpan)) return FirstChanceDataFailure();");
+                sw.WriteLine("\t\tif (count > blobItems.Count()) return FirstChanceDataFailure();");
+                sw.WriteLine("\t\t::rkit::Span<T> itemsSlice = blobItems.SubSpan(0, count);");
+                sw.WriteLine("\t\tblobItems = blobItems.SubSpan(count);");
+                sw.WriteLine("\t\t::rkit::Span<const uint8_t> bytesSlice = itemsSpan.SubSpan(0, count * unitSize);");
+                sw.WriteLine("\t\titemsSpan = itemsSpan.SubSpan(count * unitSize);");
+                sw.WriteLine("\t\tinlineItems = itemsSlice;");
+                sw.WriteLine("\t\tfor (T &item : itemsSlice)");
+                sw.WriteLine("\t\t{");
+                sw.WriteLine("\t\t\tif (!ReadInlineStruct(item, bytesSlice))");
+                sw.WriteLine("\t\t\t\treturn FirstChanceDataFailure();");
+                sw.WriteLine("\t\t}");
+                sw.WriteLine("\t\treturn true;");
+                sw.WriteLine("\t}");
+
+                sw.WriteLine();
+                sw.WriteLine("\ttemplate<class T>");
+                sw.WriteLine("\tinline bool " + FormatType!.Name + "_Loader::ReadClusterArrayItems(::rkit::data::ClusterSpan<T> &inlineItems, ::rkit::Span<::rkit::data::ClusterRef> &clusterRefs, ::rkit::Span<const uint8_t> &itemsSpan, ::rkit::Span<const uint8_t> &counterSpan, ::rkit::Span<const T> instances) noexcept");
+                sw.WriteLine("\t{");
+                sw.WriteLine("\t\t::rkit::Span<const ::rkit::data::ClusterRef> inlineRefs;");
+                sw.WriteLine("\t\tif (!ReadArrayItems(inlineRefs, clusterRefs, itemsSpan, counterSpan, 8)) return FirstChanceDataFailure();");
+                sw.WriteLine("\t\tif (!::rkit::data::DataFormatReader::ValidateClusterRefs(inlineRefs, instances.Count())) return FirstChanceDataFailure();");
+                sw.WriteLine("\t\tinlineItems = ::rkit::data::ClusterSpan<T>(instances.Ptr(), inlineRefs);");
+                sw.WriteLine("\t\treturn true;");
+                sw.WriteLine("\t}");
                 sw.WriteLine("}");
             }
         }
@@ -933,6 +1441,8 @@ namespace DataFormatGenerator
                     return "::rkit::Span<" + DataDynArrayContentsTypeString(type.SubType!) + " const>";
                 case TypeDefKind.ClusterArray:
                     return "::rkit::data::ClusterLocator<" + DataDynArrayContentsTypeString(type.SubType!) + ">";
+                case TypeDefKind.ClusterRef:
+                    return "::rkit::data::ClusterRef";
 
                 case TypeDefKind.Struct:
                     {
@@ -995,11 +1505,6 @@ namespace DataFormatGenerator
                 default:
                     throw new ArgumentException("Unknown type kind");
             }
-        }
-
-        private string MemberSizeString(StructMember member)
-        {
-            return TypeInlineSizeString(member.Type);
         }
 
         private void EmitCollectInstancesLinesForStructMember(StreamWriter writer, TypeDef type, string indent, string valueExpr)
@@ -1094,55 +1599,160 @@ namespace DataFormatGenerator
                     return;
 
                 case TypeDefKind.FixedArray:
-                    writer.WriteLine(indent + "for (const auto &item : " + valueExpr + ")");
-                    EmitWriteLines(writer, type.SubType!, indent + "\t", spanExpr, "item");
+                    {
+                        string itemName = "item" + indent.Length.ToString();
+                        writer.WriteLine(indent + "for (const auto &" + itemName + " : " + valueExpr + ")");
+                        writer.WriteLine(indent + "{");
+                        EmitWriteLines(writer, type.SubType!, indent + "\t", spanExpr, itemName);
+                        writer.WriteLine(indent + "}");
+                    }
                     return;
                 default:
                     throw new ArgumentException("Unknown type kind");
             }
         }
 
-        private string TypeInlineSizeString(TypeDef type)
+        private void EmitReadLines(StreamWriter writer, TypeDef type, string indent, string spanExpr, string valueExpr)
         {
             switch (type.Kind)
             {
-                case TypeDefKind.UInt8:
                 case TypeDefKind.Bool:
-                    return "sizeof(uint8_t)";
+                case TypeDefKind.UInt8:
                 case TypeDefKind.UInt16:
-                    return "sizeof(uint16_t)";
-                case TypeDefKind.UInt32:
-                case TypeDefKind.DynArray:
-                case TypeDefKind.ClusterArray:
-                    return "sizeof(uint32_t)";
-                case TypeDefKind.ClusterRef:
-                    return "(sizeof(uint32_t) * 2)";
                 case TypeDefKind.SInt8:
-                    return "sizeof(int8_t)";
                 case TypeDefKind.SInt16:
-                    return "sizeof(int16_t)";
                 case TypeDefKind.SInt32:
-                    return "sizeof(int32_t)";
                 case TypeDefKind.Float32:
-                    return "sizeof(float)";
                 case TypeDefKind.Float64:
-                    return "sizeof(double)";
-
+                case TypeDefKind.UInt32:
+                case TypeDefKind.ContentID:
                 case TypeDefKind.Struct:
-                    return type.StructDef!.Name + "::kInlineSize";
+                case TypeDefKind.Invertible:
+                    writer.WriteLine(indent + "if (!ReadInlineStruct(" + valueExpr + ", " + spanExpr + ")) return FirstChanceDataFailure();");
+                    return;
+                case TypeDefKind.DynArray:
+                    writer.WriteLine(indent + "if (!ReadArrayItems(" + valueExpr + ", m_currentOutSliceOf_" + DynArrayNameString(type.SubType!) + ", m_currentInSliceOf_" + DynArrayNameString(type.SubType!) + ", " + spanExpr + ", " + TypeInlineCompoundSize(type.SubType!) + ")) return FirstChanceDataFailure();");
+                    return;
+                case TypeDefKind.ClusterArray:
+                    writer.WriteLine(indent + "if (!ReadClusterArrayItems(" + valueExpr + ", m_currentOutSliceOf_ClusterOf_" + DynArrayNameString(type.SubType!) + ", m_currentInSliceOf_ClusterOf_" + DynArrayNameString(type.SubType!) + ", " + spanExpr + ", m_instance->m_instancesOf_" + type.SubType!.StructDef!.Name + ".ToSpan())) return FirstChanceDataFailure();");
+                    return;
 
                 case TypeDefKind.FixedArray:
-                    return "(" + type.Count.ToString() + " * " + TypeInlineSizeString(type.SubType!) + ")";
-                case TypeDefKind.Invertible:
-                    return TypeInlineSizeString(type.SubType!);
-                case TypeDefKind.ContentID:
-                    return "sizeof(::rkit::data::ContentID)";
+                    {
+                        string itemName = "item" + indent.Length.ToString();
+                        writer.WriteLine(indent + "for (auto &" + itemName + " : " + valueExpr + ")");
+                        writer.WriteLine(indent + "{");
+                        EmitReadLines(writer, type.SubType!, indent + "\t", spanExpr, itemName);
+                        writer.WriteLine(indent + "}");
+                    }
+                    return;
                 default:
                     throw new ArgumentException("Unknown type kind");
             }
         }
 
-        private string DataName(TypeDef typeDef)
+        private void EmitSubtypeLambdaConvertLines(StreamWriter writer, TypeDef type, string indent, string outExpr, string inExpr, string namespaceBase, string funcName)
+        {
+            string inName = "inValue" + indent.Length;
+            string outName = "outValue" + indent.Length;
+            writer.WriteLine(indent + "::rkit::data::DataFormatBuilderHelper::" + funcName + "(" + outExpr + ", " + inExpr + ",");
+            writer.WriteLine(indent + "\t[&](" + BuilderName(type.SubType!) + " &" + outName + ", " + DataName(type.SubType!, "::" + namespaceBase + "::") + " const& " + inName + ")");
+            writer.WriteLine(indent + "\t{");
+            EmitConvertLines(writer, type.SubType, indent + "\t\t", outName, inName, namespaceBase);
+            writer.WriteLine(indent + "\t});");
+        }
+
+        private void EmitConvertLines(StreamWriter writer, TypeDef type, string indent, string outExpr, string inExpr, string namespaceBase)
+        {
+            switch (type.Kind)
+            {
+                case TypeDefKind.Bool:
+                case TypeDefKind.UInt8:
+                case TypeDefKind.UInt16:
+                case TypeDefKind.SInt8:
+                case TypeDefKind.SInt16:
+                case TypeDefKind.SInt32:
+                case TypeDefKind.Float32:
+                case TypeDefKind.Float64:
+                case TypeDefKind.UInt32:
+                case TypeDefKind.ContentID:
+                    writer.WriteLine(indent + outExpr + " = " + inExpr + ";");
+                    return;
+                case TypeDefKind.Invertible:
+                    EmitSubtypeLambdaConvertLines(writer, type, indent, outExpr, inExpr, namespaceBase, "ConvertInvertible");
+                    return;
+                case TypeDefKind.Struct:
+                    writer.WriteLine(indent + "ConvertInlineStruct(" + outExpr + ", " + inExpr + ");");
+                    return;
+                case TypeDefKind.DynArray:
+                    EmitSubtypeLambdaConvertLines(writer, type, indent, outExpr, inExpr, namespaceBase, "ConvertVector");
+                    return;
+                case TypeDefKind.ClusterArray:
+                    EmitSubtypeLambdaConvertLines(writer, type, indent, outExpr, inExpr, namespaceBase, "ConvertClusterArray");
+                    return;
+
+                case TypeDefKind.FixedArray:
+                    EmitSubtypeLambdaConvertLines(writer, type, indent, outExpr, inExpr, namespaceBase, "ConvertFixedArray");
+                    return;
+                default:
+                    throw new ArgumentException("Unknown type kind");
+            }
+        }
+
+        private static CompoundSize StructContentsSize(StructDef structDef)
+        {
+            CompoundSize totalSize = new CompoundSize(0);
+
+            foreach (StructMember member in structDef.Members)
+                totalSize = totalSize.Add(TypeInlineCompoundSize(member.Type));
+
+            return totalSize;
+        }
+
+        private static CompoundSize StructInlineSize(StructDef structDef)
+        {
+            if (structDef.IsInstanced || structDef.IsDeduplicated)
+                return new CompoundSize(4);
+
+            return StructContentsSize(structDef);
+        }
+
+        private static CompoundSize TypeInlineCompoundSize(TypeDef type)
+        {
+            switch (type.Kind)
+            {
+                case TypeDefKind.UInt8:
+                case TypeDefKind.Bool:
+                case TypeDefKind.SInt8:
+                    return new CompoundSize(1);
+                case TypeDefKind.UInt16:
+                case TypeDefKind.SInt16:
+                    return new CompoundSize(2);
+                case TypeDefKind.UInt32:
+                case TypeDefKind.SInt32:
+                case TypeDefKind.Float32:
+                case TypeDefKind.DynArray:
+                case TypeDefKind.ClusterArray:
+                    return new CompoundSize(4);
+                case TypeDefKind.ClusterRef:
+                case TypeDefKind.Float64:
+                    return new CompoundSize(8);
+
+                case TypeDefKind.Struct:
+                    return StructInlineSize(type.StructDef!);
+
+                case TypeDefKind.FixedArray:
+                    return TypeInlineCompoundSize(type.SubType!).Mul(type.Count);
+                case TypeDefKind.Invertible:
+                    return TypeInlineCompoundSize(type.SubType!);
+                case TypeDefKind.ContentID:
+                    return new CompoundSize(0, 1);
+                default:
+                    throw new ArgumentException("Unknown type kind");
+            }
+        }
+
+        private string DataName(TypeDef typeDef, string namespacePrefix)
         {
             if (IsPrimitiveType(typeDef.Kind))
                 return PrimitiveName(typeDef.Kind);
@@ -1157,21 +1767,27 @@ namespace DataFormatGenerator
                             StructDef structDef = typeDef.StructDef!;
 
                             if (structDef.IsInstanced || structDef.IsDeduplicated)
-                                return structDef.Name + " const*";
+                                return namespacePrefix + structDef.Name + " const*";
                             else
-                                return structDef.Name;
+                                return namespacePrefix + structDef.Name;
                         }
                     case TypeDefKind.FixedArray:
-                        return "::rkit::StaticArray<" + DataName(typeDef.SubType!) + ", " + typeDef.Count.ToString() + ">";
+                        return "::rkit::StaticArray<" + DataName(typeDef.SubType!, namespacePrefix) + ", " + typeDef.Count.ToString() + ">";
                     case TypeDefKind.Invertible:
-                        return "::rkit::data::Invertible<" + DataName(typeDef.SubType!) + ">";
+                        return "::rkit::data::Invertible<" + DataName(typeDef.SubType!, namespacePrefix) + ">";
                     case TypeDefKind.ClusterArray:
+                        return "::rkit::data::ClusterSpan<" + namespacePrefix + typeDef.SubType!.StructDef!.Name + ">";
                     case TypeDefKind.DynArray:
-                        return "::rkit::Span<" + DataName(typeDef.SubType!) + " const>";
+                        return "::rkit::Span<" + DataName(typeDef.SubType!, namespacePrefix) + " const>";
                     default:
                         throw new Exception("Internal error");
                 }
             }
+        }
+
+        private string DataName(TypeDef typeDef)
+        {
+            return DataName(typeDef, "");
         }
 
         private string BuilderName(TypeDef typeDef)
@@ -1500,6 +2116,8 @@ namespace DataFormatGenerator
                     builder.ParseLoader(lexer);
                 else if (lexer.TokenIsString(token, "builder"))
                     builder.ParseBuilder(lexer);
+                else if (lexer.TokenIsString(token, "builderloader"))
+                    builder.ParseBuilderLoader(lexer);
                 else if (lexer.TokenIsString(token, "formattype"))
                     builder.ParseFormatType(lexer);
                 else
