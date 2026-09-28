@@ -197,6 +197,23 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_RETURN_OK;
 	}
 
+	void VulkanUtils::InsertIntoStructChainRecursive(void *head, void *follower)
+	{
+		for (;;)
+		{
+			uint8_t *pNextAddr = static_cast<uint8_t *>(head) + offsetof(VkBaseInStructure, pNext);
+			void *currentNext = nullptr;
+			memcpy(&currentNext, pNextAddr, sizeof(void *));
+			if (currentNext == nullptr)
+			{
+				memcpy(pNextAddr, &follower, sizeof(void *));
+				return;
+			}
+			else
+				head = currentNext;
+		}
+	}
+
 	Result VulkanUtils::ConvertPipelineStageBits(VkPipelineStageFlags &outFlags, const EnumMask<PipelineStage> &stages)
 	{
 		VkPipelineStageFlags flags = 0;

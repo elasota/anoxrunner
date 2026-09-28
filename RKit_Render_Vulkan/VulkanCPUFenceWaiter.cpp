@@ -18,12 +18,12 @@ namespace rkit::render::vulkan
 
 		Result WaitForFences(const Span<const Pair<ICPUVisibleTimelineFence *, TimelinePoint_t>> &timelineWaits, bool waitAll) override;
 		Result WaitForFencesTimed(bool &outTimeout, const Span<const Pair<ICPUVisibleTimelineFence *, TimelinePoint_t>> &timelineWaits, uint64_t timeoutMSec, bool waitAll) override;
-		Result WaitForBinaryFences(const Span<IBinaryCPUWaitableFence *> &binaryWaits, bool waitAll) override;
-		Result WaitForBinaryFencesTimed(bool &outTimeout, const Span<IBinaryCPUWaitableFence *> &binaryWaits, uint64_t timeoutMSec, bool waitAll) override;
+		Result WaitForBinaryFences(const Span<IBinaryCPUWaitableFence *const> &binaryWaits, bool waitAll) override;
+		Result WaitForBinaryFencesTimed(bool &outTimeout, const Span<IBinaryCPUWaitableFence *const> &binaryWaits, uint64_t timeoutMSec, bool waitAll) override;
 
 	private:
 		Result WaitForFencesNanoSec(bool &outTimeout, const Span<const Pair<ICPUVisibleTimelineFence *, TimelinePoint_t>> &timelineWaits, uint64_t timeoutNSec, bool waitAll) const;
-		Result WaitForBinaryFencesNanoSec(bool &outTimeout, const Span<IBinaryCPUWaitableFence *> &binaryWaits, uint64_t timeoutNSec, bool waitAll) const;
+		Result WaitForBinaryFencesNanoSec(bool &outTimeout, const Span<IBinaryCPUWaitableFence *const> &binaryWaits, uint64_t timeoutNSec, bool waitAll) const;
 
 		VulkanDeviceBase &m_device;
 	};
@@ -82,7 +82,7 @@ namespace rkit::render::vulkan
 		RKIT_RETURN_OK;
 	}
 
-	Result VulkanCPUFenceWaiter::WaitForBinaryFencesNanoSec(bool &outTimeout, const Span<IBinaryCPUWaitableFence *> &binaryWaits, uint64_t timeoutNSec, bool waitAll) const
+	Result VulkanCPUFenceWaiter::WaitForBinaryFencesNanoSec(bool &outTimeout, const Span<IBinaryCPUWaitableFence *const> &binaryWaits, uint64_t timeoutNSec, bool waitAll) const
 	{
 		const size_t kStaticSize = 16;
 
@@ -136,13 +136,13 @@ namespace rkit::render::vulkan
 		return this->WaitForFencesNanoSec(outTimeout, timelineWaits, timeoutMSec * static_cast<uint64_t>(1000000), waitAll);
 	}
 
-	Result VulkanCPUFenceWaiter::WaitForBinaryFences(const Span<IBinaryCPUWaitableFence *> &binaryWaits, bool waitAll)
+	Result VulkanCPUFenceWaiter::WaitForBinaryFences(const Span<IBinaryCPUWaitableFence *const> &binaryWaits, bool waitAll)
 	{
 		bool timeout = false;
 		return this->WaitForBinaryFencesNanoSec(timeout, binaryWaits, std::numeric_limits<uint64_t>::max(), waitAll);
 	}
 
-	Result VulkanCPUFenceWaiter::WaitForBinaryFencesTimed(bool &outTimeout, const Span<IBinaryCPUWaitableFence *> &binaryWaits, uint64_t timeoutMSec, bool waitAll)
+	Result VulkanCPUFenceWaiter::WaitForBinaryFencesTimed(bool &outTimeout, const Span<IBinaryCPUWaitableFence *const> &binaryWaits, uint64_t timeoutMSec, bool waitAll)
 	{
 		constexpr uint64_t maxNSec = (std::numeric_limits<uint64_t>::max() - 1) / 1000000;
 		if (timeoutMSec > maxNSec)

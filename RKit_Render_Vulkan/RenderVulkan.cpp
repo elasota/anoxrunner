@@ -17,12 +17,15 @@
 #include "VulkanAPI.h"
 #include "VulkanAPILoader.h"
 #include "VulkanCheck.h"
+#include "VulkanUtils.h"
 #include "VulkanAutoObject.h"
 #include "VulkanDevice.h"
 #include "VulkanPlatformAPI.h"
 #include "VulkanPlatformSpecific.h"
+#include "VulkanRenderDoc.h"
 
 #include <cstring>
+
 
 namespace rkit { namespace render { namespace vulkan
 {
@@ -124,6 +127,8 @@ namespace rkit { namespace render { namespace vulkan
 		const VulkanInstanceAPI &GetInstanceAPI() const;
 
 	private:
+		class PhysicalDeviceFeaturesBase;
+
 		struct ExtensionEnumeration
 		{
 			const char *m_layerName = nullptr;
@@ -146,14 +151,101 @@ namespace rkit { namespace render { namespace vulkan
 			bool m_isAvailableInBase = false;
 		};
 
+		template<class TFeatureStruct, VkStructureType TStructureEnum>
+		struct FeaturesItem
+		{
+			using FeatureStructType_t = TFeatureStruct;
+
+			FeaturesItem();
+
+			TFeatureStruct m_featureStruct;
+		};
+
+		class FeatureCollectionTypeTag
+		{
+		private:
+			bool m_unused = false;
+		};
+
+		template<class T>
+		class FeatureCollectionTypeTagForType
+		{
+		public:
+			static const FeatureCollectionTypeTag *GetInstance();
+
+		private:
+			static FeatureCollectionTypeTag ms_instance;
+		};
+
+		template<class... TFeatureItems>
+		class FeatureCollection
+		{
+		private:
+			static void *FindFeature(const FeatureCollectionTypeTag *featureTag) = delete;
+			static void *Link() = delete;
+		};
+
+		template<>
+		class FeatureCollection<>
+		{
+		public:
+			static void *FindFeature(const FeatureCollectionTypeTag *featureTag);
+			static void *Link();
+		};
+
+		template<class TFeatureItem, class... TMoreItems>
+		class FeatureCollection<TFeatureItem, TMoreItems...>
+		{
+		public:
+			FeatureCollection();
+
+			void *FindFeature(const FeatureCollectionTypeTag *featureTag);
+			void *Link();
+
+		private:
+			TFeatureItem m_item;
+			FeatureCollection<TMoreItems...> m_moreItems;
+		};
+
+		class PhysicalDeviceFeaturesBase
+		{
+		public:
+			PhysicalDeviceFeaturesBase();
+
+			VkPhysicalDeviceFeatures2 &GetFeatures2();
+			const VkPhysicalDeviceFeatures2 &GetFeatures2() const;
+
+		private:
+			VkPhysicalDeviceFeatures2 m_features2 = {};
+		};
+
+		template<class... TFeatureItems>
+		class PhysicalDeviceFeatures final : public PhysicalDeviceFeaturesBase
+		{
+		public:
+			PhysicalDeviceFeatures();
+
+			template<class T>
+			T *FindFeature();
+
+			static void *FindFeatureItem(PhysicalDeviceFeaturesBase &blob, const FeatureCollectionTypeTag *featureTag);
+
+		private:
+			FeatureCollection<TFeatureItems...> m_featureCollection;
+		};
+
 		class CapsSyncer
 		{
 		public:
+			typedef void *(*FeatureFinderFunc_t)(PhysicalDeviceFeaturesBase &blob, const FeatureCollectionTypeTag *featureTag);
+
 			CapsSyncer(const RenderDeviceCaps &wantedCaps, RenderDeviceCaps &grantedCaps,
-				VkPhysicalDeviceFeatures &enabledFeatures, const VkPhysicalDeviceFeatures &supportedFeatures,
+				PhysicalDeviceFeaturesBase &enabledFeatures, const PhysicalDeviceFeaturesBase &supportedFeatures, FeatureFinderFunc_t featureFinder,
 				const VkPhysicalDeviceLimits &limits);
 
-			void SyncFeature(RenderDeviceBoolCap cap, VkBool32 (VkPhysicalDeviceFeatures::*featureFlag)) const;
+			template<class TFeatureStruct>
+			void SyncFeature(RenderDeviceBoolCap cap, VkBool32 (TFeatureStruct:: *featureFlag)) const;
+
 			void SyncLimit(RenderDeviceUInt32Cap cap, uint32_t limit) const;
 
 			void SyncMin(RenderDeviceUInt32Cap cap, uint32_t limit) const;
@@ -161,8 +253,9 @@ namespace rkit { namespace render { namespace vulkan
 		private:
 			const RenderDeviceCaps &m_wantedCaps;
 			RenderDeviceCaps &m_grantedCaps;
-			VkPhysicalDeviceFeatures &m_enabledFeatures;
-			const VkPhysicalDeviceFeatures &m_supportedFeatures;
+			PhysicalDeviceFeaturesBase &m_enabledFeatures;
+			const PhysicalDeviceFeaturesBase &m_supportedFeatures;
+			FeatureFinderFunc_t m_featureFinder;
 			const VkPhysicalDeviceLimits &m_limits;
 		};
 
@@ -501,14 +594,23 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result RenderVulkanDriver::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const Span<CommandQueueTypeRequest> &queueRequests, const IRenderDeviceCaps &requiredCaps, const IRenderDeviceCaps &optionalCaps, IRenderAdapter &adapter)
 	{
+		using PhysicalDeviceFeatures_t =
+			PhysicalDeviceFeatures<
+				FeaturesItem<VkPhysicalDeviceTimelineSemaphoreFeatures, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES>
+			>;
+
 		RenderVulkanAdapter &vkAdapter = static_cast<RenderVulkanAdapter &>(adapter);
 
 		RCPtr<RenderVulkanPhysicalDevice> rPhysDevice(&vkAdapter.GetPhysicalDevice());
 
 		VkPhysicalDevice physDevice = rPhysDevice->GetPhysDevice();
 
-		VkPhysicalDeviceFeatures supportedFeatures = {};
-		m_vki.vkGetPhysicalDeviceFeatures(physDevice, &supportedFeatures);
+		PhysicalDeviceFeatures_t supportedFeatures;
+
+		if (IsInstanceExtensionEnabled(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME))
+			m_vki.vkGetPhysicalDeviceFeatures2(physDevice, supportedFeatures.FindFeature<VkPhysicalDeviceFeatures2>());
+		else
+			m_vki.vkGetPhysicalDeviceFeatures(physDevice, supportedFeatures.FindFeature<VkPhysicalDeviceFeatures>());
 
 		VkPhysicalDeviceProperties deviceProperties = {};
 		m_vki.vkGetPhysicalDeviceProperties(physDevice, &deviceProperties);
@@ -516,7 +618,7 @@ namespace rkit { namespace render { namespace vulkan
 		VkPhysicalDeviceMemoryProperties memProperties = {};
 		m_vki.vkGetPhysicalDeviceMemoryProperties(physDevice, &memProperties);
 
-		VkPhysicalDeviceFeatures enabledFeatures = {};
+		PhysicalDeviceFeatures_t enabledFeatures;
 
 		render::RenderDeviceCaps wantedCaps;
 		wantedCaps.RaiseTo(optionalCaps);
@@ -524,7 +626,7 @@ namespace rkit { namespace render { namespace vulkan
 
 		render::RenderDeviceCaps grantedCaps;
 
-		CapsSyncer syncer(wantedCaps, grantedCaps, enabledFeatures, supportedFeatures, deviceProperties.limits);
+		CapsSyncer syncer(wantedCaps, grantedCaps, enabledFeatures, supportedFeatures, PhysicalDeviceFeatures_t::FindFeatureItem, deviceProperties.limits);
 
 		syncer.SyncFeature(RenderDeviceBoolCap::kIndependentBlend, &VkPhysicalDeviceFeatures::independentBlend);
 		syncer.SyncLimit(RenderDeviceUInt32Cap::kMaxTexture1DSize, deviceProperties.limits.maxImageDimension1D);
@@ -532,6 +634,7 @@ namespace rkit { namespace render { namespace vulkan
 		syncer.SyncLimit(RenderDeviceUInt32Cap::kMaxTexture3DSize, deviceProperties.limits.maxImageDimension3D);
 		syncer.SyncLimit(RenderDeviceUInt32Cap::kMaxTextureCubeSize, deviceProperties.limits.maxImageDimensionCube);
 		syncer.SyncLimit(RenderDeviceUInt32Cap::kMaxTextureArrayLayers, deviceProperties.limits.maxImageArrayLayers);
+		syncer.SyncFeature(RenderDeviceBoolCap::kTimelineFence, &VkPhysicalDeviceTimelineSemaphoreFeatures::timelineSemaphore);
 
 		if (!grantedCaps.MeetsOrExceeds(requiredCaps))
 		{
@@ -600,8 +703,10 @@ namespace rkit { namespace render { namespace vulkan
 
 		Vector<QueryItem> requestedDeviceExtensions;
 
-
 		requestedDeviceExtensions.Append(QueryItem(VK_KHR_SWAPCHAIN_EXTENSION_NAME, true));
+
+		if (grantedCaps.GetBoolCap(RenderDeviceBoolCap::kTimelineFence))
+			requestedDeviceExtensions.Append(QueryItem(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME, true));
 
 		{
 			DeviceExtensionEnumerator enumerator(requestedDeviceExtensions);
@@ -655,9 +760,13 @@ namespace rkit { namespace render { namespace vulkan
 		devCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		devCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.Count());
 		devCreateInfo.pQueueCreateInfos = queueCreateInfos.GetBuffer();
-		devCreateInfo.pEnabledFeatures = &enabledFeatures;
 		devCreateInfo.enabledExtensionCount = static_cast<uint32_t>(exts.Count());
 		devCreateInfo.ppEnabledExtensionNames = exts.GetBuffer();
+
+		if (IsInstanceExtensionEnabled(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME))
+			VulkanUtils::InsertIntoStructChain(devCreateInfo, *enabledFeatures.FindFeature<VkPhysicalDeviceFeatures2>());
+		else
+			devCreateInfo.pEnabledFeatures = enabledFeatures.FindFeature<VkPhysicalDeviceFeatures>();
 
 		VkDevice device = VK_NULL_HANDLE;
 		RKIT_VK_CHECK(m_vki.vkCreateDevice(rPhysDevice->GetPhysDevice(), &devCreateInfo, GetAllocCallbacks(), &device));
@@ -808,23 +917,122 @@ namespace rkit { namespace render { namespace vulkan
 	{
 	}
 
+
+	///////////////////////////////////////////////////////////////////////////////////////////////
+
+
+	template<class TFeatureStruct, VkStructureType TStructureEnum>
+	RenderVulkanDriver::FeaturesItem<TFeatureStruct, TStructureEnum>::FeaturesItem()
+		: m_featureStruct{}
+	{
+		m_featureStruct.sType = TStructureEnum;
+	}
+
+	template<class T>
+	const RenderVulkanDriver::FeatureCollectionTypeTag *RenderVulkanDriver::FeatureCollectionTypeTagForType<T>::GetInstance()
+	{
+		return &ms_instance;
+	}
+
+	template<class T>
+	RenderVulkanDriver::FeatureCollectionTypeTag RenderVulkanDriver::FeatureCollectionTypeTagForType<T>::ms_instance;
+
+	void *RenderVulkanDriver::FeatureCollection<>::FindFeature(const FeatureCollectionTypeTag *featureTag)
+	{
+		return nullptr;
+	}
+
+	void *RenderVulkanDriver::FeatureCollection<>::Link()
+	{
+		return nullptr;
+	}
+
+	template<class TFeatureItem, class... TMoreItems>
+	RenderVulkanDriver::FeatureCollection<TFeatureItem, TMoreItems...>::FeatureCollection()
+	{
+	}
+
+	template<class TFeatureItem, class... TMoreItems>
+	void *RenderVulkanDriver::FeatureCollection<TFeatureItem, TMoreItems...>::FindFeature(const FeatureCollectionTypeTag *featureTag)
+	{
+		const FeatureCollectionTypeTag *thisTag = FeatureCollectionTypeTagForType<typename TFeatureItem::FeatureStructType_t>::GetInstance();
+		if (featureTag == thisTag)
+			return &m_item.m_featureStruct;
+
+		return m_moreItems.FindFeature(featureTag);
+	}
+
+	template<class TFeatureItem, class... TMoreItems>
+	void *RenderVulkanDriver::FeatureCollection<TFeatureItem, TMoreItems...>::Link()
+	{
+		m_item.m_featureStruct.pNext = m_moreItems.Link();
+		return &m_item.m_featureStruct;
+	}
+
+	
+	RenderVulkanDriver::PhysicalDeviceFeaturesBase::PhysicalDeviceFeaturesBase()
+		: m_features2{}
+	{
+		m_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+	}
+
+	VkPhysicalDeviceFeatures2 &RenderVulkanDriver::PhysicalDeviceFeaturesBase::GetFeatures2()
+	{
+		return m_features2;
+	}
+
+	const VkPhysicalDeviceFeatures2 &RenderVulkanDriver::PhysicalDeviceFeaturesBase::GetFeatures2() const
+	{
+		return m_features2;
+	}
+
+	template<class... TFeatureItems>
+	RenderVulkanDriver::PhysicalDeviceFeatures<TFeatureItems...>::PhysicalDeviceFeatures()
+	{
+		this->GetFeatures2().pNext = m_featureCollection.Link();
+	}
+
+	template<class... TFeatureItems>
+	template<class T>
+	T *RenderVulkanDriver::PhysicalDeviceFeatures<TFeatureItems...>::FindFeature()
+	{
+		return static_cast<T *>(FindFeatureItem(*this, FeatureCollectionTypeTagForType<T>::GetInstance()));
+	}
+
+	template<class... TFeatureItems>
+	void *RenderVulkanDriver::PhysicalDeviceFeatures<TFeatureItems...>::FindFeatureItem(PhysicalDeviceFeaturesBase &base, const FeatureCollectionTypeTag *featureTag)
+	{
+		if (featureTag == FeatureCollectionTypeTagForType<VkPhysicalDeviceFeatures>::GetInstance())
+			return &base.GetFeatures2().features;
+
+		if (featureTag == FeatureCollectionTypeTagForType<VkPhysicalDeviceFeatures2>::GetInstance())
+			return &base.GetFeatures2();
+
+		return static_cast<PhysicalDeviceFeatures<TFeatureItems...> &>(base).m_featureCollection.FindFeature(featureTag);
+	}
+
 	RenderVulkanDriver::CapsSyncer::CapsSyncer(const RenderDeviceCaps &wantedCaps, RenderDeviceCaps &grantedCaps,
-		VkPhysicalDeviceFeatures &enabledFeatures, const VkPhysicalDeviceFeatures &supportedFeatures,
+		PhysicalDeviceFeaturesBase &enabledFeatures, const PhysicalDeviceFeaturesBase &supportedFeatures, FeatureFinderFunc_t featureFinder,
 		const VkPhysicalDeviceLimits &limits)
 		: m_wantedCaps(wantedCaps)
 		, m_grantedCaps(grantedCaps)
 		, m_enabledFeatures(enabledFeatures)
 		, m_supportedFeatures(supportedFeatures)
+		, m_featureFinder(featureFinder)
 		, m_limits(limits)
 	{
 	}
 
-	void RenderVulkanDriver::CapsSyncer::SyncFeature(RenderDeviceBoolCap cap, VkBool32(VkPhysicalDeviceFeatures:: *featureFlag)) const
+	template<class TFeatureStruct>
+	void RenderVulkanDriver::CapsSyncer::SyncFeature(RenderDeviceBoolCap cap, VkBool32(TFeatureStruct:: *featureFlag)) const
 	{
 		if (m_wantedCaps.GetBoolCap(cap))
 		{
-			const VkBool32 *supportedLoc = &(m_supportedFeatures.*featureFlag);
-			VkBool32 *enabledLoc = &(m_enabledFeatures.*featureFlag);
+			const TFeatureStruct *supportedFeatureStruct = static_cast<const TFeatureStruct *>(m_featureFinder(const_cast<PhysicalDeviceFeaturesBase &>(m_supportedFeatures), FeatureCollectionTypeTagForType<TFeatureStruct>::GetInstance()));
+			TFeatureStruct *enabledFeatureStruct = static_cast<TFeatureStruct *>(m_featureFinder(m_enabledFeatures, FeatureCollectionTypeTagForType<TFeatureStruct>::GetInstance()));
+
+			const VkBool32 *supportedLoc = &(supportedFeatureStruct->*featureFlag);
+			VkBool32 *enabledLoc = &(enabledFeatureStruct->*featureFlag);
 
 			if (*supportedLoc)
 			{
@@ -923,6 +1131,9 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result RenderVulkanDriver::InitDriver(const DriverInitParameters *initParamsBase)
 	{
+		// FIXME: Do this conditionally
+		VulkanRenderDocHandler::Load();
+
 		const RenderDriverInitProperties *initParams = static_cast<const RenderDriverInitProperties *>(initParamsBase);
 
 		m_validationLevel = initParams->m_validationLevel;
@@ -955,6 +1166,7 @@ namespace rkit { namespace render { namespace vulkan
 		}
 
 		requestedInstanceExtensions.Append(QueryItem(VK_KHR_SURFACE_EXTENSION_NAME, true));
+		requestedInstanceExtensions.Append(QueryItem(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME, false));
 
 		// Add this after since the enumerator will deduplicate
 		{

@@ -1,4 +1,4 @@
-namespace anox.data2
+namespace anox.data
 
 loader "include/anox/Data/AnoxBSPFileLoader"
 builderloader "anox/Data/AnoxBSPFileLoader"

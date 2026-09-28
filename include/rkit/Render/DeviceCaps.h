@@ -7,6 +7,7 @@ namespace rkit { namespace render
 	enum class RenderDeviceBoolCap
 	{
 		kIndependentBlend,
+		kTimelineFence,
 
 		kCount,
 	};

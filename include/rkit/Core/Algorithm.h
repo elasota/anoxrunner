@@ -70,6 +70,66 @@ namespace rkit
 		typedef uint64_t Type_t;
 	};
 
+	template<size_t TSize>
+	struct SIntOfAtLeastSize : public SIntOfSize<TSize>
+	{
+	};
+
+	template<>
+	struct SIntOfAtLeastSize<0> : public SIntOfSize<1>
+	{
+	};
+
+	template<>
+	struct SIntOfAtLeastSize<3> : public SIntOfSize<4>
+	{
+	};
+
+	template<>
+	struct SIntOfAtLeastSize<5> : public SIntOfSize<8>
+	{
+	};
+
+	template<>
+	struct SIntOfAtLeastSize<6> : public SIntOfSize<8>
+	{
+	};
+
+	template<>
+	struct SIntOfAtLeastSize<7> : public SIntOfSize<8>
+	{
+	};
+
+	template<size_t TSize>
+	struct UIntOfAtLeastSize : public UIntOfSize<TSize>
+	{
+	};
+
+	template<>
+	struct UIntOfAtLeastSize<0> : public UIntOfSize<1>
+	{
+	};
+
+	template<>
+	struct UIntOfAtLeastSize<3> : public UIntOfSize<4>
+	{
+	};
+
+	template<>
+	struct UIntOfAtLeastSize<5> : public UIntOfSize<8>
+	{
+	};
+
+	template<>
+	struct UIntOfAtLeastSize<6> : public UIntOfSize<8>
+	{
+	};
+
+	template<>
+	struct UIntOfAtLeastSize<7> : public UIntOfSize<8>
+	{
+	};
+
 	template<class TSubType>
 	struct DefaultOperatorsMixin
 	{

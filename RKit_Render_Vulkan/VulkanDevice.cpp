@@ -52,6 +52,9 @@ namespace rkit { namespace render { namespace vulkan
 
 		Result CreateBinaryCPUWaitableFence(UniquePtr<IBinaryCPUWaitableFence> &outFence, bool startSignaled) override;
 		Result CreateBinaryGPUWaitableFence(UniquePtr<IBinaryGPUWaitableFence> &outFence) override;
+		Result CreateCPUVisibleTimelineFence(UniquePtr<ICPUVisibleTimelineFence> &outFence, TimelinePoint_t initialValue) override;
+		Result CreateTimelineFence(UniquePtr<ITimelineFence> &outFence, TimelinePoint_t initialValue) override;
+
 		Result CreateSwapChainSyncPoint(UniquePtr<ISwapChainSyncPoint> &outSyncPoint) override;
 
 		Result CreateRenderPassInstance(UniquePtr<IRenderPassInstance> &outInstance, const RenderPassRef_t &renderPass, const RenderPassResources &resources) override;
@@ -424,6 +427,20 @@ namespace rkit { namespace render { namespace vulkan
 
 		fence->Initialize();
 
+		outFence = std::move(fence);
+	}
+
+	Result VulkanDevice::CreateCPUVisibleTimelineFence(UniquePtr<ICPUVisibleTimelineFence> &outFence, TimelinePoint_t initialValue)
+	{
+		UniquePtr<VulkanTimelineFence> fence = New<VulkanTimelineFence>(*this, true);
+		fence->Initialize(initialValue);
+		outFence = std::move(fence);
+	}
+
+	Result VulkanDevice::CreateTimelineFence(UniquePtr<ITimelineFence> &outFence, TimelinePoint_t initialValue)
+	{
+		UniquePtr<VulkanTimelineFence> fence = New<VulkanTimelineFence>(*this, false);
+		fence->Initialize(initialValue);
 		outFence = std::move(fence);
 	}
 

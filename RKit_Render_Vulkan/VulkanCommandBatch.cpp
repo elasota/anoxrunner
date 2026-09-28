@@ -9,6 +9,7 @@
 #include "rkit/Render/DepthStencilTargetClear.h"
 #include "rkit/Render/ImageRect.h"
 #include "rkit/Render/RenderTargetClear.h"
+#include "rkit/Render/TimelineSignal.h"
 
 #include "VulkanAPI.h"
 #include "VulkanBufferResource.h"
@@ -98,11 +99,10 @@ namespace rkit { namespace render { namespace vulkan
 		~VulkanCommandBatch();
 
 		Result ResetCommandBatch() override;
-		Result OpenCommandBatch(bool cpuWaitable) override;
+		Result OpenCommandBatch() override;
 
 		Result Submit() override;
-		Result WaitForCompletion(ICPUFenceWaiter& fenceWaiter) override;
-		Result CloseBatch() override;
+		bool IsClosed() const;
 
 		Result OpenCopyCommandEncoder(ICopyCommandEncoder *&outCopyCommandEncoder) override;
 		Result OpenComputeCommandEncoder(IComputeCommandEncoder *&outCopyCommandEncoder) override;
@@ -110,13 +110,15 @@ namespace rkit { namespace render { namespace vulkan
 
 		Result AddWaitForFence(IBinaryGPUWaitableFence &fence, const PipelineStageMask_t &subsequentStageMask) override;
 		Result AddSignalFence(IBinaryGPUWaitableFence &fence) override;
+		Result AddWaitForTimelineFence(ITimelineFence &fence, const PipelineStageMask_t &subsequentStageMask, TimelinePoint_t value) override;
+		Result AddSignalTimelineFence(const TimelineSignalIntent &signalIntent) override;
 
 		Result Initialize();
 
 		Result StartNewEncoder(EncoderType encoderType);
 
-		Result AddWaitForVkSema(VkSemaphore sema, const PipelineStageMask_t &subsequentStageMask);
-		Result AddSignalVkSema(VkSemaphore sema);
+		Result AddWaitForVkSema(VkSemaphore sema, const PipelineStageMask_t &subsequentStageMask, uint64_t value);
+		Result AddSignalVkSema(VkSemaphore sema, uint64_t value);
 
 		Result OpenCommandBuffer(VkCommandBuffer &outCmdBuffer);
 		Result OpenRenderPass(VkCommandBuffer &outCmdBuffer, const VulkanRenderPassInstanceBase &rpi);
@@ -124,6 +126,9 @@ namespace rkit { namespace render { namespace vulkan
 
 		VulkanDeviceBase &GetDevice() const;
 		VulkanQueueProxyBase &GetQueue() const;
+
+	protected:
+		Result CloseBatchInternal() override;
 
 	private:
 		static const size_t kNumEncoderTypes = static_cast<size_t>(EncoderType::kCount);
@@ -138,15 +143,16 @@ namespace rkit { namespace render { namespace vulkan
 
 		Vector<VkCommandBuffer> m_cmdBuffers;
 
+		// We can use a single list of semas because signal semas are always after wait semas
+		// Adding a wait sema to a batch that already has signal semas will add another VkSubmitInfo
 		Vector<VkSemaphore> m_semas;
+		Vector<uint64_t> m_semaValues;
 		Vector<VkPipelineStageFlags> m_waitDstStageMasks;
 
 		Vector<VkSubmitInfo> m_submits;
+		Vector<VkTimelineSemaphoreSubmitInfo> m_timelineSemaSubmitInfos;
 		bool m_isCommandListOpen = false;
 		bool m_isRenderPassOpen = false;
-
-		VkFence m_completionFence = VK_NULL_HANDLE;
-		bool m_isCPUWaitable = false;
 
 		VulkanCopyCommandEncoder m_copyCommandEncoder;
 		VulkanGraphicsCommandEncoder m_graphicsCommandEncoder;
@@ -381,7 +387,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		VkPipelineStageFlags stageFlags = 0;
 
-		m_batch.AddWaitForVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetAcquireSema(), subsequentStages);
+		m_batch.AddWaitForVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetAcquireSema(), subsequentStages, 0);
 
 		RKIT_RETURN_OK;
 	}
@@ -390,7 +396,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		VkPipelineStageFlags stageFlags = 0;
 
-		m_batch.AddSignalVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetPresentSema());
+		m_batch.AddSignalVkSema(static_cast<VulkanSwapChainSyncPointBase &>(syncPoint).GetPresentSema(), 0);
 
 		RKIT_RETURN_OK;
 	}
@@ -494,8 +500,6 @@ namespace rkit { namespace render { namespace vulkan
 
 	VulkanCommandBatch::~VulkanCommandBatch()
 	{
-		if (m_completionFence != VK_NULL_HANDLE)
-			m_device.GetDeviceAPI().vkDestroyFence(m_device.GetDevice(), m_completionFence, m_device.GetAllocCallbacks());
 	}
 
 	Result VulkanCommandBatch::ResetCommandBatch()
@@ -503,52 +507,29 @@ namespace rkit { namespace render { namespace vulkan
 		m_cmdBuffers.ShrinkToSize(0);
 
 		m_semas.ShrinkToSize(0);
+		m_semaValues.ShrinkToSize(0);
 		m_waitDstStageMasks.ShrinkToSize(0);
 
 		m_submits.ShrinkToSize(0);
-
-		if (m_isCPUWaitable)
-		{
-			RKIT_ASSERT(m_completionFence != VK_NULL_HANDLE);
-			m_device.GetDeviceAPI().vkResetFences(m_device.GetDevice(), 1, &m_completionFence);
-
-			m_isCPUWaitable = false;
-		}
+		m_timelineSemaSubmitInfos.ShrinkToSize(0);
 
 		RKIT_RETURN_OK;
 	}
 
-	Result VulkanCommandBatch::OpenCommandBatch(bool cpuWaitable)
+	Result VulkanCommandBatch::OpenCommandBatch()
 	{
-		if (cpuWaitable)
-		{
-			if (m_completionFence == VK_NULL_HANDLE)
-			{
-				VkFenceCreateInfo fenceCreateInfo = {};
-				fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-
-				RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateFence(m_device.GetDevice(), &fenceCreateInfo, m_device.GetAllocCallbacks(), &m_completionFence));
-			}
-			else
-			{
-				RKIT_VK_CHECK(m_device.GetDeviceAPI().vkResetFences(m_device.GetDevice(), 1, &m_completionFence));
-			}
-		}
-
-		m_isCPUWaitable = cpuWaitable;
-
-		RKIT_RETURN_OK;
 	}
 
 	Result VulkanCommandBatch::Submit()
 	{
-		CloseBatch();
+		RKIT_ASSERT(IsClosed());
 
-		if (m_submits.Count() == 0 && m_completionFence == VK_NULL_HANDLE)
-			RKIT_RETURN_OK;
+		if (m_submits.Count() == 0)
+			return;
 
 		const VkCommandBuffer *cmdBuffers = m_cmdBuffers.GetBuffer();
 		const VkSemaphore *semas = m_semas.GetBuffer();
+		const uint64_t *semaValues = m_semaValues.GetBuffer();
 		const VkPipelineStageFlags *waitStageFlags = m_waitDstStageMasks.GetBuffer();
 
 		for (VkSubmitInfo &submitInfo : m_submits)
@@ -559,47 +540,83 @@ namespace rkit { namespace render { namespace vulkan
 				cmdBuffers += submitInfo.commandBufferCount;
 			}
 
+			bool needsTimelineSemaInfo = false;
+
+			const uint64_t *waitSemaValues = semaValues;
+
 			if (submitInfo.waitSemaphoreCount > 0)
 			{
 				submitInfo.pWaitSemaphores = semas;
 				submitInfo.pWaitDstStageMask = waitStageFlags;
 
 				semas += submitInfo.waitSemaphoreCount;
+				semaValues += submitInfo.waitSemaphoreCount;
 				waitStageFlags += submitInfo.waitSemaphoreCount;
+
+				if (!needsTimelineSemaInfo)
+				{
+					for (const uint64_t &semaValue : rkit::ConstSpan<uint64_t>(waitSemaValues, submitInfo.waitSemaphoreCount))
+					{
+						if (semaValue != 0)
+						{
+							needsTimelineSemaInfo = true;
+							break;
+						}
+					}
+				}
 			}
+
+			const uint64_t *signalSemaValues = semaValues;
 
 			if (submitInfo.signalSemaphoreCount > 0)
 			{
+				if (!needsTimelineSemaInfo)
+				{
+					for (const uint64_t &semaValue : rkit::ConstSpan<uint64_t>(signalSemaValues, submitInfo.signalSemaphoreCount))
+					{
+						if (semaValue != 0)
+						{
+							needsTimelineSemaInfo = true;
+							break;
+						}
+					}
+				}
+
 				submitInfo.pSignalSemaphores = semas;
 
 				semas += submitInfo.signalSemaphoreCount;
+				semaValues += submitInfo.signalSemaphoreCount;
+			}
+
+			if (needsTimelineSemaInfo)
+			{
+				if (m_timelineSemaSubmitInfos.Count() == 0)
+					m_timelineSemaSubmitInfos.Resize(m_submits.Count());
+
+				VkTimelineSemaphoreSubmitInfo &timelineSubmitInfo = m_timelineSemaSubmitInfos[(&submitInfo) - m_submits.GetBuffer()];
+				timelineSubmitInfo = {};
+				timelineSubmitInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+				timelineSubmitInfo.pSignalSemaphoreValues = signalSemaValues;
+				timelineSubmitInfo.pWaitSemaphoreValues = waitSemaValues;
+				timelineSubmitInfo.signalSemaphoreValueCount = submitInfo.signalSemaphoreCount;
+				timelineSubmitInfo.waitSemaphoreValueCount = submitInfo.waitSemaphoreCount;
+
+				VulkanUtils::InsertIntoStructChain(submitInfo, timelineSubmitInfo);
 			}
 		}
 
-		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkQueueSubmit(m_queue.GetVkQueue(), static_cast<uint32_t>(m_submits.Count()), m_submits.GetBuffer(), m_completionFence));
-
-		RKIT_RETURN_OK;
+		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkQueueSubmit(m_queue.GetVkQueue(), static_cast<uint32_t>(m_submits.Count()), m_submits.GetBuffer(), VK_NULL_HANDLE));
 	}
 
-	Result VulkanCommandBatch::WaitForCompletion(ICPUFenceWaiter& fenceWaiter)
-	{
-		if (!m_isCPUWaitable)
-			RKIT_THROW(ResultCode::kInternalError);
-
-		if (m_completionFence == VK_NULL_HANDLE)
-			RKIT_THROW(ResultCode::kInternalError);
-
-		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkWaitForFences(m_device.GetDevice(), 1, &m_completionFence, VK_TRUE, UINT64_MAX));
-
-		RKIT_RETURN_OK;
-	}
-
-	Result VulkanCommandBatch::CloseBatch()
+	Result VulkanCommandBatch::CloseBatchInternal()
 	{
 		StartNewEncoder(EncoderType::kNone);
 		CheckCloseCommandList();
+	}
 
-		RKIT_RETURN_OK;
+	bool VulkanCommandBatch::IsClosed() const
+	{
+		return m_isCommandListOpen == false && m_currentEncoderType == EncoderType::kNone;
 	}
 
 	Result VulkanCommandBatch::OpenCopyCommandEncoder(ICopyCommandEncoder *&outCopyCommandEncoder)
@@ -629,15 +646,30 @@ namespace rkit { namespace render { namespace vulkan
 
 	Result VulkanCommandBatch::AddWaitForFence(IBinaryGPUWaitableFence &fence, const PipelineStageMask_t &subsequentStageMask)
 	{
-		return AddWaitForVkSema(static_cast<VulkanBinaryGPUWaitableFence &>(fence).GetSemaphore(), subsequentStageMask);
+		return AddWaitForVkSema(static_cast<VulkanBinaryGPUWaitableFence &>(fence).GetSemaphore(), subsequentStageMask, 0);
 	}
 
 	Result VulkanCommandBatch::AddSignalFence(IBinaryGPUWaitableFence &fence)
 	{
-		return AddSignalVkSema(static_cast<VulkanBinaryGPUWaitableFence &>(fence).GetSemaphore());
+		return AddSignalVkSema(static_cast<VulkanBinaryGPUWaitableFence &>(fence).GetSemaphore(), 0);
 	}
 
-	Result VulkanCommandBatch::AddWaitForVkSema(VkSemaphore sema, const PipelineStageMask_t &subsequentStages)
+	Result VulkanCommandBatch::AddWaitForTimelineFence(ITimelineFence &fence, const PipelineStageMask_t &subsequentStageMask, TimelinePoint_t value)
+	{
+		RKIT_ASSERT(value != 0);
+		return AddWaitForVkSema(static_cast<VulkanTimelineFence &>(fence).GetSemaphore(), subsequentStageMask, value);
+	}
+
+	Result VulkanCommandBatch::AddSignalTimelineFence(const TimelineSignalIntent &signalIntent)
+	{
+		if (signalIntent.GetType() == TimelineSignalType::kNone)
+			return;
+
+		RKIT_ASSERT(signalIntent.GetTimelinePoint() != 0);
+		return AddSignalVkSema(static_cast<VulkanTimelineFence *>(signalIntent.GetFence())->GetSemaphore(), signalIntent.GetTimelinePoint());
+	}
+
+	Result VulkanCommandBatch::AddWaitForVkSema(VkSemaphore sema, const PipelineStageMask_t &subsequentStages, uint64_t value)
 	{
 		VkSubmitInfo *submitItem = nullptr;
 		if (m_submits.Count() > 0)
@@ -657,13 +689,22 @@ namespace rkit { namespace render { namespace vulkan
 		VkPipelineStageFlags stageFlagBits = 0;
 		VulkanUtils::ConvertPipelineStageBits(stageFlagBits, subsequentStages);
 
-		m_semas.Append(sema);
+		size_t oldWaitCount = m_semas.Count();
 
-		RKIT_TRY_CATCH_RETHROW(m_waitDstStageMasks.Append(stageFlagBits),
+		auto addSema = [&]()
+			{
+				m_semas.Append(sema);
+				m_waitDstStageMasks.Append(stageFlagBits);
+				m_semaValues.Append(value);
+			};
+
+		RKIT_TRY_CATCH_RETHROW(addSema(),
 			CatchContext(
-				[this]
+				[this, oldWaitCount]
 				{
-					m_semas.ShrinkToSize(m_semas.Count() - 1);
+					m_semas.ShrinkToSize(oldWaitCount);
+					m_waitDstStageMasks.ShrinkToSize(oldWaitCount);
+					m_semaValues.ShrinkToSize(oldWaitCount);
 				}
 			)
 		);
@@ -673,7 +714,7 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_RETURN_OK;
 	}
 
-	Result VulkanCommandBatch::AddSignalVkSema(VkSemaphore sema)
+	Result VulkanCommandBatch::AddSignalVkSema(VkSemaphore sema, uint64_t value)
 	{
 		VkSubmitInfo *submitItem = nullptr;
 		if (m_submits.Count() > 0)
@@ -688,7 +729,23 @@ namespace rkit { namespace render { namespace vulkan
 			CreateNewSubmitItem(submitItem);
 		}
 
-		m_semas.Append(sema);
+		size_t oldSemaCount = m_semas.Count();
+
+		auto addSema = [&]()
+			{
+				m_semas.Append(sema);
+				m_semaValues.Append(value);
+			};
+
+		RKIT_TRY_CATCH_RETHROW(addSema(),
+			CatchContext(
+				[this, oldSemaCount]
+				{
+					m_semas.ShrinkToSize(oldSemaCount);
+					m_semaValues.ShrinkToSize(oldSemaCount);
+				}
+			)
+		);
 
 		submitItem->signalSemaphoreCount++;
 

@@ -2,6 +2,8 @@
 
 #include "rkit/Core/RefCounted.h"
 
+#include "rkit/Render/TimelinePoint.h"
+
 namespace rkit
 {
 	template<class T>
@@ -25,6 +27,7 @@ namespace anox
 	{
 		rkit::render::IBaseCommandBatch **m_frameEndBatchPtr = nullptr;
 		rkit::RCPtr<rkit::Job> *m_frameEndJobPtr = nullptr;
+		rkit::render::TimelinePoint_t *m_frameEndGraphicsTimelinePointPtr = nullptr;
 	};
 
 	struct PerFramePerDisplayResources final : public rkit::RefCounted

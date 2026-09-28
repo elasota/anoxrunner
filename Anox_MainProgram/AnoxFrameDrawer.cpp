@@ -50,7 +50,7 @@ namespace anox
 		public:
 			explicit RecordTestCommandsJobRunner(rkit::render::IGraphicsCommandBatch **cmdBatchRef, const rkit::RCPtr<PerFramePerDisplayResources> &perDisplayResources);
 
-			rkit::Result RunRecord(rkit::render::IGraphicsCommandAllocator &commandAllocator) override;
+			rkit::Result RunRecord(rkit::render::IGraphicsCommandAllocator &commandAllocator, const rkit::render::TimelineSignalIntent &signalIntent) override;
 
 		private:
 			rkit::render::IGraphicsCommandBatch **m_cmdBatchRef;
@@ -64,9 +64,9 @@ namespace anox
 	{
 	}
 
-	rkit::Result FrameDrawer::RecordTestCommandsJobRunner::RunRecord(rkit::render::IGraphicsCommandAllocator &commandAllocator)
+	rkit::Result FrameDrawer::RecordTestCommandsJobRunner::RunRecord(rkit::render::IGraphicsCommandAllocator &commandAllocator, const rkit::render::TimelineSignalIntent &signalIntent)
 	{
-		commandAllocator.OpenGraphicsCommandBatch(*m_cmdBatchRef, false);
+		commandAllocator.OpenGraphicsCommandBatch(*m_cmdBatchRef);
 
 		rkit::render::IGraphicsCommandBatch &cmdBatch = **m_cmdBatchRef;
 
@@ -130,16 +130,12 @@ namespace anox
 
 		encoder->SignalSwapChainPresentReady(*m_perDisplayResources->m_swapChainSyncPoint, pipelineStages);
 
-		cmdBatch.CloseBatch();
-
-		RKIT_RETURN_OK;
+		cmdBatch.CloseBatch(signalIntent);
 	}
 
 	rkit::Result FrameDrawer::SubmitTestCommandsJobRunner::RunSubmit(rkit::render::IGraphicsCommandQueue &commandQueue)
 	{
 		m_cmdBatch->Submit();
-
-		RKIT_RETURN_OK;
 	}
 
 

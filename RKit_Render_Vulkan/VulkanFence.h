@@ -11,7 +11,7 @@ namespace rkit { namespace render { namespace vulkan
 	class VulkanTimelineFence final : public ICPUVisibleTimelineFence
 	{
 	public:
-		VulkanTimelineFence(VulkanDeviceBase &device);
+		explicit VulkanTimelineFence(VulkanDeviceBase &device, bool cpuVisible);
 		~VulkanTimelineFence();
 
 		Result Initialize(uint64_t initialValue);
@@ -21,9 +21,13 @@ namespace rkit { namespace render { namespace vulkan
 
 		VkSemaphore GetSemaphore() const;
 
+		ICPUVisibleTimelineFence *ToCPUVisibleInternal() override;
+
 	private:
 		VulkanDeviceBase &m_device;
 		VkSemaphore m_sema;
+
+		bool m_cpuVisible;
 	};
 
 	class VulkanBinaryCPUWaitableFence final : public IBinaryCPUWaitableFence
@@ -33,6 +37,7 @@ namespace rkit { namespace render { namespace vulkan
 		~VulkanBinaryCPUWaitableFence();
 
 		Result Initialize(bool startSignaled);
+
 		Result ResetFence() override;
 
 		VkFence GetFence() const;

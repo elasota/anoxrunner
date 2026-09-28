@@ -26,7 +26,6 @@
 
 #include "anox/CoreUtils/CoreUtils.h"
 
-#include "anox/Data/BSPModel.h"
 #include "anox/Data/CompressedNormal.h"
 #include "anox/Data/EntityDef.h"
 #include "anox/Data/EntitySpawnData.h"
@@ -387,14 +386,10 @@ namespace anox { namespace buildsystem
 			rkit::Vector<rkit::data::ContentID> &outContentIDs, const BSPDataCollection &bsp, const rkit::Vector<BSPFaceStats> &faceStats, const rkit::Vector<rkit::UniquePtr<priv::LightmapTree>> &lightmapTrees);
 		static bool LightmapFitsInNode(const priv::LightmapTreeNode &node, uint16_t width, uint16_t height);
 
-		static rkit::Result BuildGeometry(data::BSPDataChunksVectors &bspOutput, const BSPDataCollection &bsp,
-			rkit::ConstSpan<BSPFaceStats> stats, rkit::Span<size_t> faceModelIndex,
-			rkit::ConstSpan<size_t> texInfoToUniqueTexIndex, rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions);
-
-		static rkit::Result BuildGeometry2(data2::builder::BSPFile &bspOutput, const BSPDataCollection &bsp,
+		static rkit::Result BuildGeometry2(data::builder::BSPFile &bspOutput, const BSPDataCollection &bsp,
 			rkit::ConstSpan<BSPFaceStats> stats,
 			rkit::ConstSpan<size_t> texInfoToUniqueTexIndex,
-			rkit::ConstSpan<rkit::RCPtr<data2::builder::BSPGeometryMaterial>> texInfoToMaterial,
+			rkit::ConstSpan<rkit::RCPtr<data::builder::BSPGeometryMaterial>> texInfoToMaterial,
 			rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions,
 			rkit::ConstSpan<rkit::data::ContentID> lightMapContentIDs);
 
@@ -406,31 +401,27 @@ namespace anox { namespace buildsystem
 			size_t m_outIndex = 0;
 		};
 
-		static void GenerateTris2(data2::builder::BSPDrawCluster &outCluster, data2::builder::BSPDrawSurface &outSurf, const BSPDataCollection &bsp,
+		static void GenerateTris2(data::builder::BSPDrawCluster &outCluster, data::builder::BSPDrawSurface &outSurf, const BSPDataCollection &bsp,
 			const BSPFace &inFace, const BSPFaceStats &faceStats, rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions);
-		static void BuildBSPTree2(data2::builder::BSPModel &bspOutput, const BSPDataCollection &bsp, const BSPModel &inModel,
+		static void BuildBSPTree2(data::builder::BSPModel &bspOutput, const BSPDataCollection &bsp, const BSPModel &inModel,
 			rkit::ConstSpan<size_t> texInfoToUniqueTexIndex,
-			rkit::ConstSpan<rkit::RCPtr<data2::builder::BSPGeometryMaterial>> texInfoToMaterial, rkit::ConstSpan<BSPFaceStats> stats,
+			rkit::ConstSpan<rkit::RCPtr<data::builder::BSPGeometryMaterial>> texInfoToMaterial, rkit::ConstSpan<BSPFaceStats> stats,
 			rkit::ConstSpan<rkit::data::ContentID> lightMapContentIDs,
 			rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightMapDimensions,
-			rkit::ConstSpan<rkit::RCPtr<data2::builder::BSPBrush>> brushes);
-		static void BuildDrawClusters2(data2::builder::BSPModel &bspOutput, const BSPDataCollection &bsp, const BSPModel &inModel, rkit::ConstSpan<NodeOrLeaf2> nodeFaceOrder,
+			rkit::ConstSpan<rkit::RCPtr<data::builder::BSPBrush>> brushes);
+		static void BuildDrawClusters2(data::builder::BSPModel &bspOutput, const BSPDataCollection &bsp, const BSPModel &inModel, rkit::ConstSpan<NodeOrLeaf2> nodeFaceOrder,
 			rkit::Span<rkit::Optional<size_t>> inFaceToOutFace, rkit::ConstSpan<size_t> texInfoToUniqueTexIndex,
-			rkit::ConstSpan<rkit::RCPtr<data2::builder::BSPGeometryMaterial>> texInfoToMaterial, rkit::ConstSpan<BSPFaceStats> stats,
+			rkit::ConstSpan<rkit::RCPtr<data::builder::BSPGeometryMaterial>> texInfoToMaterial, rkit::ConstSpan<BSPFaceStats> stats,
 			rkit::ConstSpan<rkit::data::ContentID> lightMapContentIDs, rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions);
-		static void AddBSPLeaf2(data2::builder::BSPModel &bspOutput, rkit::Vector<NodeOrLeaf2> &srcFaceOrder, const BSPDataCollection &bsp,
-			rkit::ConstSpan<rkit::RCPtr<data2::builder::BSPBrush>> brushes, const BSPLeaf &inLeaf);
-		static void AddBSPNode2(data2::builder::BSPModel &bspOutput, rkit::Vector<NodeOrLeaf2> &srcFaceOrder, size_t &totalNodeCount, const BSPDataCollection &bsp,
-			rkit::ConstSpan<rkit::RCPtr<data2::builder::BSPBrush>> brushes, const BSPNode &inNode);
-		static void ConvertPlane2(bool &outInverted, data2::builder::BSPPlane &outPlane, const BSPDataCollection &bsp, const BSPPlane &inPlane);
+		static void AddBSPLeaf2(data::builder::BSPModel &bspOutput, rkit::Vector<NodeOrLeaf2> &srcFaceOrder, const BSPDataCollection &bsp,
+			rkit::ConstSpan<rkit::RCPtr<data::builder::BSPBrush>> brushes, const BSPLeaf &inLeaf);
+		static void AddBSPNode2(data::builder::BSPModel &bspOutput, rkit::Vector<NodeOrLeaf2> &srcFaceOrder, size_t &totalNodeCount, const BSPDataCollection &bsp,
+			rkit::ConstSpan<rkit::RCPtr<data::builder::BSPBrush>> brushes, const BSPNode &inNode);
+		static void ConvertPlane2(bool &outInverted, data::builder::BSPPlane &outPlane, const BSPDataCollection &bsp, const BSPPlane &inPlane);
 
-		static rkit::Result BuildMaterials(data::BSPDataChunksVectors &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
-		static rkit::Result BuildMaterials2(data2::builder::BSPFile &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
+		static rkit::Result BuildMaterials2(data::builder::BSPFile &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
 
 		static rkit::Result LoadBSPData(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback, BSPDataCollection &bsp, rkit::Vector<LumpLoader> &loaders);
-
-		static rkit::Result WriteBSPModel(const data::BSPDataChunksVectors &bspOutput, rkit::IWriteStream &outStream);
-		static rkit::Result ReadBSPModel(data::BSPDataChunksVectors &bspOutput, rkit::IReadStream &inStream);
 
 		static rkit::Result WriteMaterialList(const rkit::ConstSpan<rkit::CIPath> &uniqueTextures, rkit::IWriteStream &outStream);
 		static rkit::Result ReadMaterialList(rkit::Vector<rkit::CIPath> &uniqueTextures, rkit::IReadStream &inStream);
@@ -485,10 +476,8 @@ namespace anox { namespace buildsystem
 		uint32_t GetVersion() const override;
 
 	private:
-		void RunCompile2(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback);
-
 		static void IndexTextures(rkit::Vector<size_t> &texInfoToUniqueTexture, rkit::Vector<rkit::CIPath> &uniqueTextures, const BSPDataCollection &bsp);
-		static void IndexTextures2(rkit::Vector<rkit::RCPtr<data2::builder::BSPGeometryMaterial>> &texInfoToMaterial, rkit::Vector<rkit::CIPath> &uniqueTextures, const BSPDataCollection &bsp);
+		static void IndexTextures2(rkit::Vector<rkit::RCPtr<data::builder::BSPGeometryMaterial>> &texInfoToMaterial, rkit::Vector<rkit::CIPath> &uniqueTextures, const BSPDataCollection &bsp);
 	};
 
 	class BSPEntityCompiler final : public BSPMapCompilerBase2
@@ -790,7 +779,7 @@ namespace anox { namespace buildsystem
 		}
 	}
 
-	rkit::Result BSPGeometryCompiler::RunCompile2(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	rkit::Result BSPGeometryCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		BSPDataCollection bsp;
 
@@ -816,21 +805,21 @@ namespace anox { namespace buildsystem
 		rkit::Vector<rkit::UniquePtr<priv::LightmapTree>> lightmapTrees;
 		LoadFaceStats(depsNode, feedback, faceStats, lightmapTrees);
 
-		rkit::Vector<rkit::RCPtr<data2::builder::BSPGeometryMaterial>> texInfoToMaterial;
+		rkit::Vector<rkit::RCPtr<data::builder::BSPGeometryMaterial>> texInfoToMaterial;
 		rkit::Vector<size_t> texInfoToUniqueTex;
 		rkit::Vector<rkit::CIPath> uniqueTextures;
-		rkit::Vector<rkit::RCPtr<data2::builder::BSPGeometryMaterial>> materials;
+		rkit::Vector<rkit::RCPtr<data::builder::BSPGeometryMaterial>> materials;
 
 		IndexTextures(texInfoToUniqueTex, uniqueTextures, bsp);
 
 		materials.Resize(uniqueTextures.Count());
 		texInfoToMaterial.Resize(texInfoToUniqueTex.Count());
 
-		for (rkit::RCPtr<data2::builder::BSPGeometryMaterial>& materialRCPtr : materials)
-			materialRCPtr = rkit::MakeRC(rkit::New<data2::builder::BSPGeometryMaterial>());
+		for (rkit::RCPtr<data::builder::BSPGeometryMaterial>& materialRCPtr : materials)
+			materialRCPtr = rkit::MakeRC(rkit::New<data::builder::BSPGeometryMaterial>());
 
 		rkit::ProcessParallelSpans(texInfoToMaterial.ToSpan(), texInfoToUniqueTex.ToSpan(),
-			[&materials](rkit::RCPtr<data2::builder::BSPGeometryMaterial> &outMaterialRef, size_t inUniqueTex)
+			[&materials](rkit::RCPtr<data::builder::BSPGeometryMaterial> &outMaterialRef, size_t inUniqueTex)
 			{
 				outMaterialRef = materials[inUniqueTex];
 			});
@@ -865,7 +854,7 @@ namespace anox { namespace buildsystem
 			lightmapTrees.Reset();
 		}
 
-		data2::builder::BSPFile bspFile;
+		data::builder::BSPFile bspFile;
 
 		bspFile.m_allMaterials = std::move(materials);
 
@@ -881,7 +870,7 @@ namespace anox { namespace buildsystem
 			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
 			feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outStream);
 
-			data2::builder::BSPFile_Builder::WriteToStream(*outStream, bspFile);
+			data::builder::BSPFile_Builder::WriteToStream(*outStream, bspFile);
 		}
 
 		{
@@ -896,114 +885,11 @@ namespace anox { namespace buildsystem
 
 			WriteMaterialList(uniqueTextures.ToSpan(), *outStream);
 		}
-	}
-
-	rkit::Result BSPGeometryCompiler::RunCompile(rkit::buildsystem::IDependencyNode *depsNode, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
-	{
-		if (true)
-		{
-			return RunCompile2(depsNode, feedback);
-		}
-
-		BSPDataCollection bsp;
-
-		rkit::Vector<LumpLoader> loaders;
-		loaders.Append(LumpLoader(BSPLumpIndex::kModels, bsp.m_models));
-		loaders.Append(LumpLoader(BSPLumpIndex::kNodes, bsp.m_nodes));
-		loaders.Append(LumpLoader(BSPLumpIndex::kLeafs, bsp.m_leafs));
-		loaders.Append(LumpLoader(BSPLumpIndex::kLeafFaces, bsp.m_leafFaces));
-		loaders.Append(LumpLoader(BSPLumpIndex::kLeafBrushes, bsp.m_leafBrushes));
-		loaders.Append(LumpLoader(BSPLumpIndex::kTexInfo, bsp.m_texInfos));
-		loaders.Append(LumpLoader(BSPLumpIndex::kFaceEdges, bsp.m_faceEdges));
-		loaders.Append(LumpLoader(BSPLumpIndex::kFaces, bsp.m_faces));
-		loaders.Append(LumpLoader(BSPLumpIndex::kPlanes, bsp.m_planes));
-		loaders.Append(LumpLoader(BSPLumpIndex::kEdges, bsp.m_edges));
-		loaders.Append(LumpLoader(BSPLumpIndex::kVerts, bsp.m_verts));
-		loaders.Append(LumpLoader(BSPLumpIndex::kLightmaps, bsp.m_lightMapData));
-		loaders.Append(LumpLoader(BSPLumpIndex::kBrushes, bsp.m_brushes));
-		loaders.Append(LumpLoader(BSPLumpIndex::kBrushSides, bsp.m_brushSides));
-
-		LoadBSPData(depsNode, feedback, bsp, loaders);
-
-		rkit::Vector<BSPFaceStats> faceStats;
-		rkit::Vector<rkit::UniquePtr<priv::LightmapTree>> lightmapTrees;
-		LoadFaceStats(depsNode, feedback, faceStats, lightmapTrees);
-
-		rkit::Vector<size_t> texInfoToUniqueTexture;
-		rkit::Vector<rkit::CIPath> uniqueTextures;
-
-		IndexTextures(texInfoToUniqueTexture, uniqueTextures, bsp);
-
-		rkit::Vector<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions;
-		rkit::Vector<rkit::data::ContentID> lightmapContentIDs;
-
-		{
-			lightmapDimensions.Resize(lightmapTrees.Count());
-			lightmapContentIDs.Resize(lightmapTrees.Count());
-
-			for (size_t lightmapIndex = 0; lightmapIndex < lightmapTrees.Count(); lightmapIndex++)
-			{
-				const priv::LightmapTree &tree = *lightmapTrees[lightmapIndex];
-
-				for (const priv::LightmapTreeNode &node : tree.m_nodes)
-				{
-					if (node.m_isOccupied)
-					{
-						BSPFaceStats &specificFaceStats = faceStats[node.m_ident.m_faceIndex];
-						specificFaceStats.m_atlasIndex = lightmapIndex;
-						specificFaceStats.m_lightmapPos[0] = node.m_x;
-						specificFaceStats.m_lightmapPos[1] = node.m_y;
-					}
-				}
-
-				lightmapDimensions[lightmapIndex] = rkit::Pair<uint16_t, uint16_t>(tree.m_nodes[0].m_width, tree.m_nodes[0].m_height);
-			}
-
-			ExportLightmaps(depsNode, feedback, lightmapContentIDs, bsp, faceStats, lightmapTrees);
-
-			lightmapTrees.Reset();
-		}
-
-		rkit::Vector<size_t> faceModelIndex;
-		faceModelIndex.Resize(bsp.m_faces.Count());
-
-		data::BSPDataChunksVectors bspOutput;
-		BuildGeometry(bspOutput, bsp, faceStats.ToSpan(), faceModelIndex.ToSpan(), texInfoToUniqueTexture.ToSpan(), lightmapDimensions.ToSpan());
-
-		bspOutput.m_lightmaps = std::move(lightmapContentIDs);
-
-		{
-			rkit::String outPathStr;
-			FormatGeometryPath(outPathStr, depsNode->GetIdentifier());
-
-			rkit::CIPath outPath;
-			outPath.Set(outPathStr);
-
-			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
-			feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outStream);
-
-			WriteBSPModel(bspOutput, *outStream);
-		}
-
-		{
-			rkit::String outPathStr;
-			FormatMaterialListPath(outPathStr, depsNode->GetIdentifier());
-
-			rkit::CIPath outPath;
-			outPath.Set(outPathStr);
-
-			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
-			feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, outPath, outStream);
-
-			WriteMaterialList(uniqueTextures.ToSpan(), *outStream);
-		}
-
-		RKIT_RETURN_OK;
 	}
 
 	uint32_t BSPGeometryCompiler::GetVersion() const
 	{
-		return 7;
+		return 8;
 	}
 
 	BSPEntityCompiler::EntityAnalysisHandler::EntityAnalysisHandler(rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
@@ -2612,23 +2498,23 @@ namespace anox { namespace buildsystem
 		RKIT_RETURN_OK;
 	}
 
-	rkit::Result BSPMapCompilerBase2::BuildGeometry2(data2::builder::BSPFile &bspOutput, const BSPDataCollection &bsp,
+	rkit::Result BSPMapCompilerBase2::BuildGeometry2(data::builder::BSPFile &bspOutput, const BSPDataCollection &bsp,
 		rkit::ConstSpan<BSPFaceStats> stats,
 		rkit::ConstSpan<size_t> texInfoToUniqueTexIndex,
-		rkit::ConstSpan<rkit::RCPtr<data2::builder::BSPGeometryMaterial>> texInfoToMaterial,
+		rkit::ConstSpan<rkit::RCPtr<data::builder::BSPGeometryMaterial>> texInfoToMaterial,
 		rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightMapDimensions,
 		rkit::ConstSpan<rkit::data::ContentID> lightMapContentIDs)
 	{
 		const size_t numBrushes = bsp.m_brushes.Count();
 
-		rkit::Vector<rkit::RCPtr<data2::builder::BSPBrush>> outBrushes;
+		rkit::Vector<rkit::RCPtr<data::builder::BSPBrush>> outBrushes;
 
 		outBrushes.Resize(numBrushes);
 
 		rkit::ProcessParallelSpans(outBrushes.ToSpan(), bsp.m_brushes.ToSpan(),
-			[&bsp, texInfoToMaterial](rkit::RCPtr<data2::builder::BSPBrush> &outBrushRef, const BSPBrush &inBrush)
+			[&bsp, texInfoToMaterial](rkit::RCPtr<data::builder::BSPBrush> &outBrushRef, const BSPBrush &inBrush)
 			{
-				rkit::UniquePtr<data2::builder::BSPBrush> outBrush = rkit::New<data2::builder::BSPBrush>();
+				rkit::UniquePtr<data::builder::BSPBrush> outBrush = rkit::New<data::builder::BSPBrush>();
 
 				outBrush->m_contents = inBrush.m_contents.Get();
 
@@ -2637,13 +2523,13 @@ namespace anox { namespace buildsystem
 				outBrush->m_sides.Resize(numSides);
 
 				rkit::ProcessParallelSpans(outBrush->m_sides.ToSpan(), bsp.m_brushSides.ToSpan().SubSpan(inBrush.m_firstBrushSide.Get(), numSides),
-					[&bsp, texInfoToMaterial](data2::builder::BSPBrushSide &outBrushSide, const BSPBrushSide &brushSide)
+					[&bsp, texInfoToMaterial](data::builder::BSPBrushSide &outBrushSide, const BSPBrushSide &brushSide)
 					{
 						outBrushSide.m_material = texInfoToMaterial[brushSide.m_texInfo.Get()];
 						outBrushSide.m_materialFlags = bsp.m_texInfos[brushSide.m_texInfo.Get()].m_flags.Get();
 
 						bool isInverted = false;
-						data2::builder::BSPPlane plane;
+						data::builder::BSPPlane plane;
 						ConvertPlane2(isInverted, plane, bsp, bsp.m_planes[brushSide.m_plane.Get()]);
 
 						outBrushSide.m_plane.SetInverted(isInverted);
@@ -2656,20 +2542,20 @@ namespace anox { namespace buildsystem
 
 		for (const BSPModel &inModel : bsp.m_models)
 		{
-			data2::builder::BSPModel outModel;
+			data::builder::BSPModel outModel;
 			BuildBSPTree2(outModel, bsp, inModel, texInfoToUniqueTexIndex, texInfoToMaterial, stats, lightMapContentIDs, lightMapDimensions, outBrushes.ToSpan());
 
 			bspOutput.m_models.Append(std::move(outModel));
 		}
 	}
 
-	void BSPMapCompilerBase2::BuildBSPTree2(data2::builder::BSPModel &bspOutput, const BSPDataCollection &bsp, const BSPModel &inModel,
+	void BSPMapCompilerBase2::BuildBSPTree2(data::builder::BSPModel &bspOutput, const BSPDataCollection &bsp, const BSPModel &inModel,
 		rkit::ConstSpan<size_t> texInfoToUniqueTexIndex,
-		rkit::ConstSpan<rkit::RCPtr<data2::builder::BSPGeometryMaterial>> texInfoToMaterial,
+		rkit::ConstSpan<rkit::RCPtr<data::builder::BSPGeometryMaterial>> texInfoToMaterial,
 		rkit::ConstSpan<BSPFaceStats> stats,
 		rkit::ConstSpan<rkit::data::ContentID> lightMapContentIDs,
 		rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightMapDimensions,
-		rkit::ConstSpan<rkit::RCPtr<data2::builder::BSPBrush>> brushes)
+		rkit::ConstSpan<rkit::RCPtr<data::builder::BSPBrush>> brushes)
 	{
 		rkit::Vector<NodeOrLeaf2> nodeFaceOrder;
 
@@ -2701,7 +2587,7 @@ namespace anox { namespace buildsystem
 		BuildDrawClusters2(bspOutput, bsp, inModel, nodeFaceOrder.ToSpan(), inFaceToOutFace.ToSpan(), texInfoToUniqueTexIndex, texInfoToMaterial, stats, lightMapContentIDs, lightMapDimensions);
 	}
 
-	void BSPMapCompilerBase2::GenerateTris2(data2::builder::BSPDrawCluster &outCluster, data2::builder::BSPDrawSurface &outSurf, const BSPDataCollection &bsp, const BSPFace &inFace, const BSPFaceStats &faceStats, rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions)
+	void BSPMapCompilerBase2::GenerateTris2(data::builder::BSPDrawCluster &outCluster, data::builder::BSPDrawSurface &outSurf, const BSPDataCollection &bsp, const BSPFace &inFace, const BSPFaceStats &faceStats, rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions)
 	{
 		using ProtoTri_t = rkit::StaticArray<size_t, 3>;
 		using InVertAndPosition_t = rkit::Pair<uint16_t, rkit::math::Vec3>;
@@ -2808,7 +2694,7 @@ namespace anox { namespace buildsystem
 				pendingWindings.Append(std::move(windingList));
 			}
 
-			data2::builder::BSPTri outTri;
+			data::builder::BSPTri outTri;
 			for (size_t subIndex = 0; subIndex < 3; subIndex++)
 			{
 				const size_t indexInVertList = lastWindingList[bestIndexes[subIndex]];
@@ -2864,7 +2750,7 @@ namespace anox { namespace buildsystem
 
 			const BSPPlane &bspPlane = bsp.m_planes[inFace.m_plane.Get()];
 
-			data2::builder::BSPDrawVertex outVert;
+			data::builder::BSPDrawVertex outVert;
 			outVert.m_lightUV = lightUV;
 			outVert.m_surfaceSpec.m_lightStyleVOffset;
 			outVert.m_surfaceSpec.m_lightStyleVOffset = lightStyleVOffset;
@@ -2882,10 +2768,10 @@ namespace anox { namespace buildsystem
 		}
 	}
 
-	void BSPMapCompilerBase2::BuildDrawClusters2(data2::builder::BSPModel &bspOutput,
+	void BSPMapCompilerBase2::BuildDrawClusters2(data::builder::BSPModel &bspOutput,
 		const BSPDataCollection &bsp, const BSPModel &inModel, rkit::ConstSpan<NodeOrLeaf2> nodeFaceOrder,
 		rkit::Span<rkit::Optional<size_t>> inFaceToOutFace, rkit::ConstSpan<size_t> texInfoToUniqueTexIndex,
-		rkit::ConstSpan<rkit::RCPtr<data2::builder::BSPGeometryMaterial>> texInfoToMaterial, rkit::ConstSpan<BSPFaceStats> stats,
+		rkit::ConstSpan<rkit::RCPtr<data::builder::BSPGeometryMaterial>> texInfoToMaterial, rkit::ConstSpan<BSPFaceStats> stats,
 		rkit::ConstSpan<rkit::data::ContentID> lightMapContentIDs, rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions)
 	{
 		size_t numOutFaces = 0;
@@ -3030,7 +2916,7 @@ namespace anox { namespace buildsystem
 			inFaceToOutFace[inFaceIndex] = outFaceIndex;
 		}
 
-		rkit::Vector<rkit::RCPtr<data2::builder::BSPDrawSurface>> allFaceSurfaces;
+		rkit::Vector<rkit::RCPtr<data::builder::BSPDrawSurface>> allFaceSurfaces;
 
 		for (uint16_t inFaceIndex : faceOrder)
 		{
@@ -3042,23 +2928,23 @@ namespace anox { namespace buildsystem
 			if (bspOutput.m_drawClusters.Count() == 0
 				|| (0x10000 - bspOutput.m_drawClusters.Last().m_drawVerts.Count()) < inFace.m_numEdges.Get())
 			{
-				bspOutput.m_drawClusters.Append(data2::builder::BSPDrawCluster());
+				bspOutput.m_drawClusters.Append(data::builder::BSPDrawCluster());
 			}
 
-			data2::builder::BSPDrawCluster &drawCluster = bspOutput.m_drawClusters.Last();
+			data::builder::BSPDrawCluster &drawCluster = bspOutput.m_drawClusters.Last();
 
-			const rkit::RCPtr<data2::builder::BSPGeometryMaterial> material = texInfoToMaterial[inFace.m_texture.Get()];
+			const rkit::RCPtr<data::builder::BSPGeometryMaterial> material = texInfoToMaterial[inFace.m_texture.Get()];
 
 			if (drawCluster.m_materialGroups.Count() == 0
 				|| drawCluster.m_materialGroups.Last().m_material.Get() != material.Get())
 			{
-				data2::builder::BSPDrawMaterialGroup mg;
+				data::builder::BSPDrawMaterialGroup mg;
 				mg.m_material = material;
 
 				drawCluster.m_materialGroups.Append(std::move(mg));
 			}
 
-			data2::builder::BSPDrawMaterialGroup &materialGroup = drawCluster.m_materialGroups.Last();
+			data::builder::BSPDrawMaterialGroup &materialGroup = drawCluster.m_materialGroups.Last();
 
 			rkit::data::ContentID lightMapContentID;
 			if (faceStats.m_atlasIndex.IsSet())
@@ -3068,16 +2954,16 @@ namespace anox { namespace buildsystem
 				|| materialGroup.m_lightmapGroup.Last().m_lightmap.m_contentID != lightMapContentID
 				|| materialGroup.m_lightmapGroup.Last().m_numLightStyles != faceStats.m_numUniqueStyles)
 			{
-				data2::builder::BSPLightmapGroup lg;
+				data::builder::BSPLightmapGroup lg;
 				lg.m_numLightStyles = faceStats.m_numUniqueStyles;
 				lg.m_lightmap.m_contentID = lightMapContentID;
 
 				materialGroup.m_lightmapGroup.Append(std::move(lg));
 			}
 
-			data2::builder::BSPLightmapGroup &lightMapGroup = materialGroup.m_lightmapGroup.Last();
+			data::builder::BSPLightmapGroup &lightMapGroup = materialGroup.m_lightmapGroup.Last();
 
-			rkit::RCPtr<data2::builder::BSPDrawSurface> drawSurf = rkit::MakeRC(rkit::New<data2::builder::BSPDrawSurface>());
+			rkit::RCPtr<data::builder::BSPDrawSurface> drawSurf = rkit::MakeRC(rkit::New<data::builder::BSPDrawSurface>());
 
 			drawSurf->m_packedStyleIndexes = packStylesForStorage(faceStats.m_uniqueStyles, faceStats.m_numUniqueStyles);
 
@@ -3098,7 +2984,7 @@ namespace anox { namespace buildsystem
 
 			const BSPLeaf &inLeaf = bsp.m_leafs[inLeafIndex];
 
-			data2::builder::BSPTreeLeaf &outLeaf = bspOutput.m_treeLeafs[outLeafIndex];
+			data::builder::BSPTreeLeaf &outLeaf = bspOutput.m_treeLeafs[outLeafIndex];
 
 			const uint16_t firstLeafFace = inLeaf.m_firstLeafFace.Get();
 			const uint16_t numLeafFaces = inLeaf.m_numLeafFaces.Get();
@@ -3117,10 +3003,10 @@ namespace anox { namespace buildsystem
 		}
 	}
 
-	void BSPMapCompilerBase2::AddBSPLeaf2(data2::builder::BSPModel &bspOutput, rkit::Vector<NodeOrLeaf2> &srcFaceOrder, const BSPDataCollection &bsp,
-		rkit::ConstSpan<rkit::RCPtr<data2::builder::BSPBrush>> brushes, const BSPLeaf &inLeaf)
+	void BSPMapCompilerBase2::AddBSPLeaf2(data::builder::BSPModel &bspOutput, rkit::Vector<NodeOrLeaf2> &srcFaceOrder, const BSPDataCollection &bsp,
+		rkit::ConstSpan<rkit::RCPtr<data::builder::BSPBrush>> brushes, const BSPLeaf &inLeaf)
 	{
-		data2::builder::BSPTreeLeaf outLeaf;
+		data::builder::BSPTreeLeaf outLeaf;
 		outLeaf.m_contentFlags = inLeaf.m_contentFlags.Get();
 		outLeaf.m_visCluster = inLeaf.m_cluster.Get();
 		outLeaf.m_visArea = inLeaf.m_area.Get();
@@ -3148,10 +3034,10 @@ namespace anox { namespace buildsystem
 		srcFaceOrder.Append(nol);
 	}
 
-	void BSPMapCompilerBase2::AddBSPNode2(data2::builder::BSPModel &bspOutput, rkit::Vector<NodeOrLeaf2> &srcFaceOrder, size_t &totalNodeCount, const BSPDataCollection &bsp,
-		rkit::ConstSpan<rkit::RCPtr<data2::builder::BSPBrush>> brushes, const BSPNode &inNode)
+	void BSPMapCompilerBase2::AddBSPNode2(data::builder::BSPModel &bspOutput, rkit::Vector<NodeOrLeaf2> &srcFaceOrder, size_t &totalNodeCount, const BSPDataCollection &bsp,
+		rkit::ConstSpan<rkit::RCPtr<data::builder::BSPBrush>> brushes, const BSPNode &inNode)
 	{
-		data2::builder::BSPTreeNode outNode;
+		data::builder::BSPTreeNode outNode;
 
 		for (int i = 0; i < 3; i++)
 		{
@@ -3192,7 +3078,7 @@ namespace anox { namespace buildsystem
 		totalNodeCount = childNodeCounts[0] + childNodeCounts[1] + 1;
 	}
 
-	void BSPMapCompilerBase2::ConvertPlane2(bool &outInverted, data2::builder::BSPPlane &outPlane, const BSPDataCollection &bsp, const BSPPlane &inPlane)
+	void BSPMapCompilerBase2::ConvertPlane2(bool &outInverted, data::builder::BSPPlane &outPlane, const BSPDataCollection &bsp, const BSPPlane &inPlane)
 	{
 		bool negated = false;
 		uint32_t part0 = 0;
@@ -3207,836 +3093,10 @@ namespace anox { namespace buildsystem
 		outPlane.m_normal.m_normal.m_part1 = part1;
 	}
 
-	rkit::Result BSPMapCompilerBase2::BuildGeometry(data::BSPDataChunksVectors &bspOutput,
-		const BSPDataCollection &bsp, rkit::ConstSpan<BSPFaceStats> stats,
-		rkit::Span<size_t> faceModelIndex, rkit::ConstSpan<size_t> texInfoToUniqueTexIndex,
-		rkit::ConstSpan<rkit::Pair<uint16_t, uint16_t>> lightmapDimensions)
-	{
-		rkit::Vector<BSPGeometryCluster> geoClusters;
-		rkit::Vector<size_t> leafOrder;
-		rkit::Vector<size_t> nodeOrder;
-		rkit::Vector<uint16_t> faceOrder;
-		rkit::Vector<size_t> leafModel;
-		rkit::Vector<size_t> brushOrder;
-
-		rkit::HashMap<IndexedNormal_t, size_t> normalLookup;
-		rkit::HashMap<IndexedPlane_t, size_t> planeLookup;
-
-		rkit::BoolVector leafUsedBits;
-		rkit::BoolVector nodeUsedBits;
-		rkit::BoolVector faceUsedBits;
-		rkit::BoolVector brushUsedBits;
-
-		leafUsedBits.Resize(bsp.m_leafs.Count());
-		nodeUsedBits.Resize(bsp.m_nodes.Count());
-		faceUsedBits.Resize(bsp.m_faces.Count());
-		brushUsedBits.Resize(bsp.m_brushes.Count());
-
-		leafModel.Resize(bsp.m_leafs.Count());
-
-		// Index axial planes first
-		for (uint32_t axis = 0; axis < 3; axis++)
-		{
-			float normal[3] = { 0.f, 0.f, 0.f };
-
-			normal[axis] = 1.f;
-
-			IndexedNormal_t compressedNormal = {};
-			bool negated = false;
-			data::CompressNormal64NoNegate(compressedNormal.m_values[0], compressedNormal.m_values[1], negated, normal[0], normal[1], normal[2]);
-
-			uint32_t normalIndex = 0;
-			IndexNonFlippableNormal(normalIndex, normalLookup, compressedNormal);
-
-			RKIT_ASSERT(normalIndex == axis);
-		}
-
-		// Gather BSP nodes
-		size_t numModel0Leafs = 0;
-		for (size_t modelIndex = 0; modelIndex < bsp.m_models.Count(); modelIndex++)
-		{
-			const BSPModel &model = bsp.m_models[modelIndex];
-
-			const size_t firstLeafInLeafOrder = leafOrder.Count();
-
-			rkit::Vector<int32_t> backNodeStack;
-
-			int32_t headNode = model.m_headNode.Get();
-
-			if (headNode < 0)
-			{
-				ScanLeaf(bsp, leafOrder, leafUsedBits, headNode);
-			}
-			else
-			{
-				size_t currentNode = static_cast<size_t>(headNode);
-				for (;;)
-				{
-					bool shouldPopStack = false;
-
-					if (currentNode >= bsp.m_nodes.Count())
-					{
-						rkit::log::Error(u8"Node out of range");
-						RKIT_THROW(rkit::ResultCode::kDataError);
-					}
-
-					nodeOrder.Append(currentNode);
-
-					if (nodeUsedBits[currentNode])
-					{
-						rkit::log::Error(u8"Node was in the tree multiple times");
-						RKIT_THROW(rkit::ResultCode::kDataError);
-					}
-
-					nodeUsedBits.Set(currentNode, true);
-
-					const BSPNode &node = bsp.m_nodes[currentNode];
-
-					const uint32_t inPlaneIndex = node.m_plane.Get();
-					if (inPlaneIndex >= bsp.m_planes.Count())
-					{
-						rkit::log::Error(u8"Plane index out of range");
-						RKIT_THROW(rkit::ResultCode::kDataError);
-					}
-
-					uint32_t outPlaneIndex = 0;
-					IndexFlippablePlane(outPlaneIndex, planeLookup, normalLookup, bsp.m_planes[inPlaneIndex]);
-
-					int32_t backNode = node.m_back.Get();
-					int32_t frontNode = node.m_front.Get();
-
-					if (outPlaneIndex & 1)
-						rkit::Swap(backNode, frontNode);
-
-					if (frontNode < 0)
-					{
-						ScanLeaf(bsp, leafOrder, leafUsedBits, frontNode);
-
-						if (backNode < 0)
-						{
-							ScanLeaf(bsp, leafOrder, leafUsedBits, backNode);
-
-							bool done = (backNodeStack.Count() == 0);
-
-							while (backNodeStack.Count() > 0)
-							{
-								const size_t newSize = backNodeStack.Count() - 1;
-								const int32_t nextBackNode = backNodeStack[newSize];
-								backNodeStack.ShrinkToSize(newSize);
-
-								done = (backNodeStack.Count() == 0);
-
-								if (nextBackNode < 0)
-								{
-									ScanLeaf(bsp, leafOrder, leafUsedBits, nextBackNode);
-								}
-								else
-								{
-									currentNode = static_cast<size_t>(nextBackNode);
-									done = false;
-									break;
-								}
-							}
-
-							if (done)
-								break;
-						}
-						else
-						{
-							currentNode = static_cast<size_t>(backNode);
-						}
-					}
-					else
-					{
-						backNodeStack.Append(backNode);
-						currentNode = static_cast<size_t>(frontNode);
-					}
-				}
-			}
-
-			const size_t lastLeafInLeafOrderExcl = leafOrder.Count();
-
-			for (size_t leafOrderIndex = firstLeafInLeafOrder; leafOrderIndex < lastLeafInLeafOrderExcl; leafOrderIndex++)
-				leafModel[leafOrder[leafOrderIndex]] = modelIndex;
-
-			if (modelIndex == 0)
-				numModel0Leafs = leafOrder.Count();
-		}
-
-		// Gather brushes
-		for (size_t leafIndex : leafOrder)
-		{
-			const BSPLeaf &leaf = bsp.m_leafs[leafIndex];
-
-			const uint16_t firstLeafBrush = leaf.m_firstLeafBrush.Get();
-			const uint16_t numLeafBrushes = leaf.m_numLeafBrushes.Get();
-
-			if (firstLeafBrush > bsp.m_leafBrushes.Count() || bsp.m_leafBrushes.Count() - firstLeafBrush < numLeafBrushes)
-			{
-				rkit::log::Error(u8"Leafbrush count out of range");
-				RKIT_THROW(rkit::ResultCode::kDataError);
-			}
-
-			for (uint16_t lbi = 0; lbi < numLeafBrushes; lbi++)
-			{
-				const uint16_t brushIndex = bsp.m_leafBrushes[lbi + firstLeafBrush].Get();
-
-				if (brushIndex > bsp.m_brushes.Count())
-				{
-					rkit::log::Error(u8"Brush index out of range");
-					RKIT_THROW(rkit::ResultCode::kDataError);
-				}
-
-				if (!brushUsedBits[brushIndex])
-				{
-					brushUsedBits.Set(brushIndex, true);
-					brushOrder.Append(brushIndex);
-				}
-			}
-		}
-
-		// Gather brush planes
-		for (size_t brushIndex : brushOrder)
-		{
-			const BSPBrush &brush = bsp.m_brushes[brushIndex];
-
-			const uint16_t firstBrushSide = brush.m_firstBrushSide.Get();
-			const uint16_t numBrushSides = brush.m_numBrushSides.Get();
-
-			if (firstBrushSide > bsp.m_brushSides.Count() || bsp.m_brushSides.Count() - firstBrushSide < numBrushSides)
-			{
-				rkit::log::Error(u8"Brushside count out of range");
-				RKIT_THROW(rkit::ResultCode::kDataError);
-			}
-
-			for (uint16_t bsi = 0; bsi < numBrushSides; bsi++)
-			{
-				const BSPBrushSide &brushSide = bsp.m_brushSides[bsi + firstBrushSide];
-
-				const uint16_t planeIndex = brushSide.m_plane.Get();
-
-				if (planeIndex >= bsp.m_planes.Count())
-				{
-					rkit::log::Error(u8"Plane index out of range");
-					RKIT_THROW(rkit::ResultCode::kDataError);
-				}
-
-				uint32_t indexedPlane = 0;
-				IndexFlippablePlane(indexedPlane, planeLookup, normalLookup, bsp.m_planes[planeIndex]);
-			}
-		}
-
-		// CAUTION: Keyed by input face, values are output leafs (for sorting)
-		rkit::Vector<rkit::Vector<size_t>> faceLeafs;
-
-		faceLeafs.Resize(bsp.m_faces.Count());
-
-		// Gather leafs
-		for (size_t outLeafIndex = 0; outLeafIndex < leafOrder.Count(); outLeafIndex++)
-		{
-			size_t inLeafIndex = leafOrder[outLeafIndex];
-
-			const BSPLeaf &leaf = bsp.m_leafs[inLeafIndex];
-			size_t modelIndex = leafModel[inLeafIndex];
-
-			const uint16_t firstLeafFace = leaf.m_firstLeafFace.Get();
-			const uint16_t numLeafFaces = leaf.m_numLeafFaces.Get();
-
-			if (firstLeafFace > bsp.m_leafFaces.Count() || (bsp.m_leafFaces.Count() - firstLeafFace) < numLeafFaces)
-			{
-				rkit::log::Error(u8"Invalid face list");
-				RKIT_THROW(rkit::ResultCode::kDataError);
-			}
-
-			for (size_t lfi = 0; lfi < numLeafFaces; lfi++)
-			{
-				const uint16_t faceIndex = bsp.m_leafFaces[lfi + firstLeafFace].Get();
-				if (faceIndex >= faceUsedBits.Count())
-				{
-					rkit::log::Error(u8"Invalid face index");
-					RKIT_THROW(rkit::ResultCode::kDataError);
-				}
-
-				faceLeafs[faceIndex].Append(outLeafIndex);
-
-				if (faceUsedBits[faceIndex])
-				{
-					if (faceModelIndex[faceIndex] != modelIndex)
-					{
-						rkit::log::Error(u8"Face used in multiple models");
-						RKIT_THROW(rkit::ResultCode::kDataError);
-					}
-					continue;
-				}
-
-				faceUsedBits.Set(faceIndex, true);
-				faceModelIndex[faceIndex] = modelIndex;
-
-				faceOrder.Append(faceIndex);
-			}
-		}
-
-		leafModel.Reset();
-
-		// Sort all leaf lists
-		for (rkit::Vector<size_t> &leafList : faceLeafs)
-			rkit::QuickSort(leafList.begin(), leafList.end());
-
-		rkit::QuickSort(faceOrder.begin(), faceOrder.end(), [&bsp, &faceLeafs, stats, texInfoToUniqueTexIndex, faceModelIndex](const uint16_t &fia, const uint16_t &fib)
-		{
-			const size_t modelIndexA = faceModelIndex[fia];
-			const size_t modelIndexB = faceModelIndex[fib];
-
-			// First priority: Group by model
-			if (modelIndexA != modelIndexB)
-				return modelIndexA < modelIndexB;
-
-			const BSPFace &faceA = bsp.m_faces[fia];
-			const BSPFace &faceB = bsp.m_faces[fib];
-
-			const uint16_t texA = faceA.m_texture.Get();
-			const uint16_t texB = faceB.m_texture.Get();
-
-			// Second priority: Group by material
-			if (texA != texB)
-			{
-				const size_t utexA = texInfoToUniqueTexIndex[texA];
-				const size_t utexB = texInfoToUniqueTexIndex[texB];
-
-				if (utexA != utexB)
-					return utexA < utexB;
-			}
-
-			// Third priority: Group by lightmap
-			const rkit::Optional<size_t> &lmA = stats[fia].m_atlasIndex;
-			const rkit::Optional<size_t> &lmB = stats[fib].m_atlasIndex;
-
-			if (lmA.IsSet() != lmB.IsSet())
-				return lmB.IsSet();
-
-			if (lmA.IsSet())
-			{
-				const size_t lmIndexA = lmA.Get();
-				const size_t lmIndexB = lmB.Get();
-
-				if (lmIndexA != lmIndexB)
-					return lmIndexA < lmIndexB;
-			}
-
-			// Fourth priority: Group by leaf list
-			const rkit::Vector<size_t> &leafListA = faceLeafs[fia];
-			const rkit::Vector<size_t> &leafListB = faceLeafs[fib];
-
-			for (size_t i = 0; i < leafListA.Count(); i++)
-			{
-				if (i >= leafListB.Count())
-					return true;
-
-				const size_t leafA = leafListA[i];
-				const size_t leafB = leafListB[i];
-
-				if (leafA != leafB)
-					return leafA < leafB;
-			}
-
-			if (leafListB.Count() > leafListA.Count())
-				return false;
-
-			// Final priority: Group by original index
-			return (&fia) < (&fib);
-		});
-
-		BSPGeometryClusterLookups lookups;
-		for (size_t faceIndex : faceOrder)
-		{
-			const BSPFace &face = bsp.m_faces[faceIndex];
-
-			bool emittedIntoLastCluster = false;
-			if (geoClusters.Count() > 0)
-			{
-				EmitFace(emittedIntoLastCluster, geoClusters[geoClusters.Count() - 1], lookups, normalLookup, faceIndex, stats[faceIndex],
-					faceModelIndex[faceIndex], texInfoToUniqueTexIndex[face.m_texture.Get()], bsp, lightmapDimensions);
-			}
-
-			if (!emittedIntoLastCluster)
-			{
-				lookups.Clear();
-				geoClusters.Append(BSPGeometryCluster());
-
-				EmitFace(emittedIntoLastCluster, geoClusters[geoClusters.Count() - 1], lookups, normalLookup, faceIndex, stats[faceIndex],
-					faceModelIndex[faceIndex], texInfoToUniqueTexIndex[face.m_texture.Get()], bsp, lightmapDimensions);
-
-				if (!emittedIntoLastCluster)
-				{
-					rkit::log::Error(u8"Failed to emit face");
-					RKIT_THROW(rkit::ResultCode::kInternalError);
-				}
-			}
-		}
-
-		// Generate merges
-
-		// Key and value are both input face indexes
-		rkit::Vector<size_t> inFaceToOutFace;
-		inFaceToOutFace.Resize(bsp.m_faces.Count());
-
-		rkit::Vector<size_t> modelPostMergeFaceCount;
-		modelPostMergeFaceCount.Resize(bsp.m_models.Count());
-
-		size_t numFaces = 0;
-		{
-			size_t outFaceIndex = 0;
-
-			for (BSPGeometryCluster &geometryCluster : geoClusters)
-			{
-				const size_t numFaces = geometryCluster.m_faces.Count();
-
-				if (numFaces >= 2)
-				{
-					BSPRenderableFace *baseFace = &geometryCluster.m_faces[0];
-
-					for (size_t gcfi = 1; gcfi < numFaces; gcfi++)
-					{
-						BSPRenderableFace *candidateFace = &geometryCluster.m_faces[gcfi];
-
-						if (baseFace->m_atlasIndex == candidateFace->m_atlasIndex
-							&& baseFace->m_materialIndex == candidateFace->m_materialIndex
-							&& baseFace->m_modelIndex == candidateFace->m_modelIndex)
-						{
-							const rkit::Vector<size_t> &baseFaceLeafs = faceLeafs[baseFace->m_originalFaceIndex];
-							const rkit::Vector<size_t> &candidateFaceLeafs = faceLeafs[candidateFace->m_originalFaceIndex];
-
-							if (rkit::CompareSpansEqual(baseFaceLeafs.ToSpan(), candidateFaceLeafs.ToSpan()))
-								baseFace->m_mergeWidth++;
-							else
-								baseFace = candidateFace;
-						}
-					}
-				}
-
-				// Finalize mappings and collapse merges
-				for (size_t gcfi = 0; gcfi < geometryCluster.m_faces.Count(); gcfi++)
-				{
-					inFaceToOutFace[geometryCluster.m_faces[gcfi].m_originalFaceIndex] = outFaceIndex;
-
-					const size_t modelIndex = geometryCluster.m_faces[gcfi].m_modelIndex;
-
-					for (;;)
-					{
-						BSPRenderableFace &rface = geometryCluster.m_faces[gcfi];
-
-						if (rface.m_mergeWidth <= 1)
-							break;
-
-						const BSPRenderableFace &faceToDelete = geometryCluster.m_faces[gcfi + 1];
-
-						rface.m_mergeWidth--;
-						rface.m_numTris += faceToDelete.m_numTris;
-
-						inFaceToOutFace[faceToDelete.m_originalFaceIndex] = outFaceIndex;
-
-						geometryCluster.m_faces.RemoveRange(gcfi + 1, 1);
-					}
-
-					modelPostMergeFaceCount[modelIndex]++;
-					outFaceIndex++;
-				}
-			}
-		}
-
-		// Generate reorderings
-		rkit::Vector<size_t> inNodeToOutNode;
-		inNodeToOutNode.Resize(bsp.m_nodes.Count());
-
-		rkit::Vector<size_t> inLeafToOutLeaf;
-		inLeafToOutLeaf.Resize(bsp.m_leafs.Count());
-
-		rkit::Vector<size_t> inBrushToOutBrush;
-		inBrushToOutBrush.Resize(bsp.m_brushes.Count());
-
-		for (size_t i = 0; i < leafOrder.Count(); i++)
-			inLeafToOutLeaf[leafOrder[i]] = i;
-
-		for (size_t i = 0; i < brushOrder.Count(); i++)
-			inBrushToOutBrush[brushOrder[i]] = i;
-
-		// Generate face draw surfs
-		{
-			rkit::Vector<rkit::Vector<size_t>> leafDrawFaces;
-			rkit::BoolVector model0FaceEmitted;
-
-			leafDrawFaces.Resize(numModel0Leafs);
-
-			const size_t numModel0Faces = (modelPostMergeFaceCount.Count() > 0) ? modelPostMergeFaceCount[0] : 0;
-
-			model0FaceEmitted.Resize(numModel0Faces);
-
-			for (size_t inFaceIndex = 0; inFaceIndex < faceLeafs.Count(); inFaceIndex++)
-			{
-				const size_t outFaceIndex = inFaceToOutFace[inFaceIndex];
-
-				if (outFaceIndex >= numModel0Faces || model0FaceEmitted[outFaceIndex])
-					continue;
-
-				model0FaceEmitted.Set(outFaceIndex, true);
-
-				for (const size_t outLeafIndex : faceLeafs[inFaceIndex])
-				{
-					if (outLeafIndex < numModel0Leafs)
-					{
-						leafDrawFaces[outLeafIndex].Append(outFaceIndex);
-					}
-				}
-			}
-
-			for (size_t outLeafIndex = 0; outLeafIndex < numModel0Leafs; outLeafIndex++)
-			{
-				rkit::Vector<size_t> &faceList = leafDrawFaces[outLeafIndex];
-				rkit::QuickSort(faceList.begin(), faceList.end());
-
-				rkit::Optional<rkit::Pair<uint32_t, uint32_t>> faceTagBits;
-
-				size_t numDrawSurfaceLocators = 0;
-				auto flushLocator = [&faceTagBits, &bspOutput, &numDrawSurfaceLocators]()
-					-> rkit::Result
-					{
-						if (faceTagBits.IsSet())
-						{
-							data::BSPLeafDrawSurfaceLocator locator = {};
-							locator.m_drawSurfChunkIndex = faceTagBits.Get().First();
-							locator.m_bits = faceTagBits.Get().Second();
-
-							bspOutput.m_model0LeafDrawSurfaceLocators.Append(locator);
-							numDrawSurfaceLocators++;
-						}
-
-						RKIT_RETURN_OK;
-					};
-
-				for (size_t outFaceIndex : faceList)
-				{
-					const uint32_t faceBitsChunkIndex = static_cast<uint32_t>(outFaceIndex / 32u);
-					if (!faceTagBits.IsSet() || faceTagBits.Get().First() != faceBitsChunkIndex)
-					{
-						flushLocator();
-						faceTagBits = rkit::Pair<uint32_t, uint32_t>(faceBitsChunkIndex, 0);
-					}
-
-					faceTagBits.Get().Second() |= (1u << (outFaceIndex % 32u));
-				}
-
-				flushLocator();
-				bspOutput.m_model0LeafDrawSurfaceLocatorCounts.Append(rkit::endian::LittleUInt16_t(static_cast<uint16_t>(numDrawSurfaceLocators)));
-			}
-		}
-
-		// Emit all of the geometry
-		bspOutput.m_treeNodes.Resize(nodeOrder.Count());
-		bspOutput.m_treeNodeSplitBits.Resize((nodeOrder.Count() + 3u) / 4u);
-		bspOutput.m_leafs.Resize(leafOrder.Count());
-		bspOutput.m_planes.Resize(planeLookup.Count());
-		bspOutput.m_normals.Resize(normalLookup.Count());
-		bspOutput.m_brushes.Resize(brushOrder.Count());
-
-		// Emit normals
-		for (rkit::HashMapKeyValueView<IndexedNormal_t, const size_t> it : normalLookup)
-		{
-			const IndexedNormal_t &inNormal = it.Key();
-			data::BSPNormal &outNormal = bspOutput.m_normals[it.Value()];
-
-			outNormal.m_normal.m_part0 = inNormal.m_values[0];
-			outNormal.m_normal.m_part1 = inNormal.m_values[1];
-		}
-
-		// Emit planes
-		for (rkit::HashMapKeyValueView<IndexedPlane_t, const size_t> it : planeLookup)
-		{
-			const IndexedPlane_t &inPlane = it.Key();
-			data::BSPPlane &outPlane = bspOutput.m_planes[it.Value()];
-
-			outPlane.m_normal = inPlane.m_values[0];
-			outPlane.m_dist = rkit::endian::LittleFloat32_t::FromBits(inPlane.m_values[1]);
-		}
-
-		// Emit BSP tree
-		for (size_t outNodeIndex = 0; outNodeIndex < nodeOrder.Count(); outNodeIndex++)
-		{
-			size_t inNodeIndex = nodeOrder[outNodeIndex];
-
-			const BSPNode &inNode = bsp.m_nodes[inNodeIndex];
-			data::BSPTreeNode &outNode = bspOutput.m_treeNodes[outNodeIndex];
-
-			RKIT_ASSERT(nodeUsedBits[inNodeIndex]);
-
-			uint32_t planeIndex = 0;
-			IndexFlippablePlane(planeIndex, planeLookup, normalLookup, bsp.m_planes[inNode.m_plane.Get()]);
-
-			for (int axis = 0; axis < 3; axis++)
-			{
-				outNode.m_minBounds[axis] = inNode.m_minBounds[axis];
-				outNode.m_maxBounds[axis] = inNode.m_maxBounds[axis];
-			}
-
-			// Not actually flippable, we just flip the nodes
-			outNode.m_plane = (planeIndex >> 1);
-
-			int32_t inFrontNode = inNode.m_front.Get();
-			int32_t inBackNode = inNode.m_back.Get();
-
-			if (planeIndex & 1)
-				rkit::Swap(inFrontNode, inBackNode);
-
-			uint8_t splitBits = 0;
-			if (inFrontNode >= 0)
-				splitBits |= 1;
-			if (inBackNode >= 0)
-				splitBits |= 2;
-
-			uint8_t subPosition = outNodeIndex % 4;
-			if (subPosition == 0)
-				bspOutput.m_treeNodeSplitBits[outNodeIndex / 4] = splitBits;
-			else
-				bspOutput.m_treeNodeSplitBits[outNodeIndex / 4] |= (splitBits << (subPosition * 2));
-		}
-
-		for (size_t outLeafIndex = 0; outLeafIndex < leafOrder.Count(); outLeafIndex++)
-		{
-			size_t inLeafIndex = leafOrder[outLeafIndex];
-
-			const BSPLeaf &inLeaf = bsp.m_leafs[inLeafIndex];
-			data::BSPTreeLeaf &outLeaf = bspOutput.m_leafs[outLeafIndex];
-
-			RKIT_ASSERT(leafUsedBits[inLeafIndex]);
-
-			outLeaf.m_contentFlags = inLeaf.m_contentFlags;
-			outLeaf.m_area = inLeaf.m_area;
-			outLeaf.m_cluster = inLeaf.m_cluster;
-			outLeaf.m_contentFlags = inLeaf.m_contentFlags;
-
-			for (int axis = 0; axis < 3; axis++)
-			{
-				outLeaf.m_minBounds[axis] = inLeaf.m_minBounds[axis];
-				outLeaf.m_maxBounds[axis] = inLeaf.m_maxBounds[axis];
-			}
-
-			// Emit brushes
-			const uint16_t firstLeafBrush = inLeaf.m_firstLeafBrush.Get();
-			const uint16_t numLeafBrushes = inLeaf.m_numLeafBrushes.Get();
-
-			outLeaf.m_numLeafBrushes = numLeafBrushes;
-
-			for (uint16_t lbi = 0; lbi < numLeafBrushes; lbi++)
-			{
-				const uint16_t inBrushIndex = bsp.m_leafBrushes[lbi + firstLeafBrush].Get();
-
-				RKIT_ASSERT(brushUsedBits[inBrushIndex]);
-
-				const rkit::endian::LittleUInt16_t outBrushIndex(static_cast<uint16_t>(inBrushToOutBrush[inBrushIndex]));
-				bspOutput.m_leafBrushes.Append(outBrushIndex);
-			}
-		}
-
-		// Emit brushes
-		for (size_t outBrushIndex = 0; outBrushIndex < brushOrder.Count(); outBrushIndex++)
-		{
-			size_t inBrushIndex = brushOrder[outBrushIndex];
-
-			const BSPBrush &inBrush = bsp.m_brushes[inBrushIndex];
-			data::BSPBrush &outBrush = bspOutput.m_brushes[outBrushIndex];
-
-			RKIT_ASSERT(brushUsedBits[inBrushIndex]);
-
-			outBrush.m_contents = inBrush.m_contents;
-			outBrush.m_numBrushSides = inBrush.m_numBrushSides;
-
-			const uint32_t numBrushSides = inBrush.m_numBrushSides.Get();
-			const uint32_t firstBrushSide = inBrush.m_firstBrushSide.Get();
-
-			for (size_t bsi = 0; bsi < numBrushSides; bsi++)
-			{
-				const BSPBrushSide &inBrushSide = bsp.m_brushSides[bsi + firstBrushSide];
-				data::BSPBrushSide outBrushSide = {};
-
-				const uint16_t texInfoIndex = inBrushSide.m_texInfo.Get();
-
-				if (texInfoIndex == 0xffffu)
-				{
-					outBrushSide.m_materialFlags = 0;
-					outBrushSide.m_material = static_cast<uint32_t>(-1);
-				}
-				else
-				{
-					if (texInfoIndex >= bsp.m_texInfos.Count())
-					{
-						rkit::log::Error(u8"Invalid texinfo index");
-						RKIT_THROW(rkit::ResultCode::kDataError);
-					}
-
-					outBrushSide.m_materialFlags = bsp.m_texInfos[texInfoIndex].m_flags;
-					outBrushSide.m_material = static_cast<uint32_t>(texInfoToUniqueTexIndex[texInfoIndex]);
-				}
-
-				uint32_t planeIndex = 0;
-				IndexFlippablePlane(planeIndex, planeLookup, normalLookup, bsp.m_planes[inBrushSide.m_plane.Get()]);
-
-				outBrushSide.m_plane = planeIndex;
-
-				bspOutput.m_brushSides.Append(outBrushSide);
-			}
-		}
-
-		rkit::Vector<rkit::Vector<data::BSPModelDrawClusterModelGroupRef>> modelDrawClusters;
-
-		modelDrawClusters.Resize(bsp.m_models.Count());
-
-		// Emit geometry
-		for (size_t geoClusterIndex = 0; geoClusterIndex < geoClusters.Count(); geoClusterIndex++)
-		{
-			const BSPGeometryCluster &geoCluster = geoClusters[geoClusterIndex];
-
-			data::BSPDrawMaterialGroup *matGroup = nullptr;
-			data::BSPDrawLightmapGroup *lmGroup = nullptr;
-			data::BSPDrawModelGroup *modelGroup = nullptr;
-
-			data::BSPDrawCluster drawCluster = {};
-
-			rkit::Optional<uint32_t> lastModelIndex;
-
-			for (const BSPRenderableFace &face : geoCluster.m_faces)
-			{
-				if (!lastModelIndex.IsSet() || lastModelIndex.Get() != face.m_modelIndex)
-				{
-					lastModelIndex = face.m_modelIndex;
-
-					{
-						data::BSPModelDrawClusterModelGroupRef modelDrawCluster = {};
-						modelDrawCluster.m_drawClusterIndex = static_cast<uint32_t>(geoClusterIndex);
-						modelDrawCluster.m_modelGroupIndex = drawCluster.m_numModelGroups;
-
-						modelDrawClusters[face.m_modelIndex].Append(modelDrawCluster);
-					}
-
-					bspOutput.m_drawModelGroups.Append(data::BSPDrawModelGroup());
-					modelGroup = &bspOutput.m_drawModelGroups[bspOutput.m_drawModelGroups.Count() - 1];
-
-					drawCluster.m_numModelGroups = drawCluster.m_numModelGroups.Get() + 1;
-
-					lmGroup = nullptr;
-					matGroup = nullptr;
-				}
-
-				if (matGroup == nullptr || face.m_materialIndex != matGroup->m_materialIndex.Get())
-				{
-					bspOutput.m_materialGroups.Append(data::BSPDrawMaterialGroup());
-					matGroup = &bspOutput.m_materialGroups[bspOutput.m_materialGroups.Count() - 1];
-					matGroup->m_materialIndex = face.m_materialIndex;
-
-					modelGroup->m_numMaterialGroups = modelGroup->m_numMaterialGroups.Get() + 1;
-
-					lmGroup = nullptr;
-				}
-
-				if (lmGroup == nullptr || face.m_atlasIndex != lmGroup->m_atlasIndex.Get())
-				{
-					bspOutput.m_lightmapGroups.Append(data::BSPDrawLightmapGroup());
-					lmGroup = &bspOutput.m_lightmapGroups[bspOutput.m_lightmapGroups.Count() - 1];
-					lmGroup->m_atlasIndex = face.m_atlasIndex;
-
-					matGroup->m_numLightmapGroups = matGroup->m_numLightmapGroups.Get() + 1;
-				}
-
-				lmGroup->m_numSurfaces = lmGroup->m_numSurfaces.Get() + 1;
-
-				data::BSPDrawSurface drawFace = {};
-				drawFace.m_numTris = face.m_numTris;
-
-				bspOutput.m_drawSurfaces.Append(drawFace);
-
-				for (uint16_t index : geoCluster.m_indexes.ToSpan().SubSpan(face.m_firstTri * 3, face.m_numTris * 3))
-				{
-					bspOutput.m_drawTriIndexes.Append(rkit::endian::LittleUInt16_t(index));
-				}
-			}
-
-			RKIT_ASSERT(geoCluster.m_verts.Count() > 0 && geoCluster.m_verts.Count() <= 0x10000);
-			drawCluster.m_numVertsMinusOne = static_cast<uint16_t>(geoCluster.m_verts.Count() - 1u);
-
-			for (const BSPGeometryVertex_t &bspVert : geoCluster.m_verts)
-			{
-				data::BSPDrawVertex outVert = {};
-				outVert.m_xyz[0] = rkit::endian::LittleFloat32_t::FromBits(bspVert.m_values[0]);
-				outVert.m_xyz[1] = rkit::endian::LittleFloat32_t::FromBits(bspVert.m_values[1]);
-				outVert.m_xyz[2] = rkit::endian::LittleFloat32_t::FromBits(bspVert.m_values[2]);
-				outVert.m_uv[0] = rkit::endian::LittleFloat32_t::FromBits(bspVert.m_values[3]);
-				outVert.m_uv[1] = rkit::endian::LittleFloat32_t::FromBits(bspVert.m_values[4]);
-				outVert.m_lightUV[0] = rkit::endian::LittleFloat32_t::FromBits(bspVert.m_values[5]);
-				outVert.m_lightUV[1] = rkit::endian::LittleFloat32_t::FromBits(bspVert.m_values[6]);
-				outVert.m_normal = bspVert.m_values[7];
-
-				bspOutput.m_drawVerts.Append(outVert);
-			}
-
-			bspOutput.m_drawClusters.Append(drawCluster);
-		}
-
-		bspOutput.m_models.Resize(bsp.m_models.Count());
-
-		for (size_t modelIndex = 0; modelIndex < bsp.m_models.Count(); modelIndex++)
-		{
-			const BSPModel &inModel = bsp.m_models[modelIndex];
-			data::BSPModel &outModel = bspOutput.m_models[modelIndex];
-
-			outModel.m_numDrawSurfaces = static_cast<uint32_t>(modelPostMergeFaceCount[modelIndex]);
-
-			const rkit::Vector<data::BSPModelDrawClusterModelGroupRef> &drawClusters = modelDrawClusters[modelIndex];
-
-			for (int axis = 0; axis < 3; axis++)
-			{
-				outModel.m_maxs[axis] = inModel.m_maxs[axis];
-				outModel.m_mins[axis] = inModel.m_mins[axis];
-				outModel.m_origin[axis] = inModel.m_origin[axis];
-			}
-
-			outModel.m_numModelDrawClusterModelGroups = static_cast<uint32_t>(drawClusters.Count());
-			outModel.m_rootIsLeaf = (inModel.m_headNode.Get() < 0) ? 1 : 0;
-
-			bspOutput.m_modelDrawClusterModelGroupRefs.Append(drawClusters.ToSpan());
-		}
-
-		RKIT_RETURN_OK;
-	}
-
-	rkit::Result BSPMapCompilerBase2::BuildMaterials(data::BSPDataChunksVectors &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
-	{
-		bspOutput.m_materials.Resize(paths.Count());
-
-		for (size_t materialIndex = 0; materialIndex < paths.Count(); materialIndex++)
-		{
-			const rkit::CIPath &path = paths[materialIndex];
-
-			rkit::String materialIdentifier;
-			BSPMapCompiler::FormatWorldMaterialPath(materialIdentifier, path.ToString());
-
-			rkit::CIPath compiledMaterialPath;
-			MaterialCompiler::ConstructOutputPath(compiledMaterialPath, data::MaterialResourceType::kWorld, materialIdentifier);
-
-			rkit::data::ContentID contentID = {};
-
-			if (path != u8"null")
-			{
-				feedback->IndexCAS(rkit::buildsystem::BuildFileLocation::kIntermediateDir, compiledMaterialPath, contentID);
-			}
-
-			bspOutput.m_materials[materialIndex] = contentID;
-		}
-
-		RKIT_RETURN_OK;
-	}
-
-	rkit::Result BSPMapCompilerBase2::BuildMaterials2(data2::builder::BSPFile &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
+	rkit::Result BSPMapCompilerBase2::BuildMaterials2(data::builder::BSPFile &bspOutput, rkit::ConstSpan<rkit::CIPath> paths, rkit::buildsystem::IDependencyNodeCompilerFeedback *feedback)
 	{
 		using DimensionPair_t = rkit::Pair<uint32_t, uint32_t>;
-		using MaterialMap_t = rkit::HashMap<const data2::builder::BSPGeometryMaterial *, DimensionPair_t>;
+		using MaterialMap_t = rkit::HashMap<const data::builder::BSPGeometryMaterial *, DimensionPair_t>;
 
 		MaterialMap_t materialDimensions;
 
@@ -4052,7 +3112,7 @@ namespace anox { namespace buildsystem
 
 			rkit::data::ContentID contentID = {};
 
-			data2::builder::BSPGeometryMaterial *material = bspOutput.m_allMaterials[materialIndex].Get();
+			data::builder::BSPGeometryMaterial *material = bspOutput.m_allMaterials[materialIndex].Get();
 
 			if (path != u8"null")
 			{
@@ -4071,16 +3131,16 @@ namespace anox { namespace buildsystem
 		}
 
 		// Rescale surface UVs
-		for (data2::builder::BSPModel &model : bspOutput.m_models)
+		for (data::builder::BSPModel &model : bspOutput.m_models)
 		{
-			for (data2::builder::BSPDrawCluster &cluster : model.m_drawClusters)
+			for (data::builder::BSPDrawCluster &cluster : model.m_drawClusters)
 			{
 				rkit::BoolVector hasBeenScaled;
 				hasBeenScaled.Resize(cluster.m_drawVerts.Count());
 
-				for (const data2::builder::BSPDrawMaterialGroup &materialGroup : cluster.m_materialGroups)
+				for (const data::builder::BSPDrawMaterialGroup &materialGroup : cluster.m_materialGroups)
 				{
-					const data2::builder::BSPGeometryMaterial *material = materialGroup.m_material.Get();
+					const data::builder::BSPGeometryMaterial *material = materialGroup.m_material.Get();
 
 					MaterialMap_t::ConstIterator_t it = materialDimensions.Find(material);
 					if (it != materialDimensions.end())
@@ -4090,18 +3150,18 @@ namespace anox { namespace buildsystem
 						const float w = static_cast<float>(dimensions.First());
 						const float h = static_cast<float>(dimensions.Second());
 
-						for (const data2::builder::BSPLightmapGroup &lightmapGroup : materialGroup.m_lightmapGroup)
+						for (const data::builder::BSPLightmapGroup &lightmapGroup : materialGroup.m_lightmapGroup)
 						{
-							for (const rkit::RCPtr<data2::builder::BSPDrawSurface> &surfPtr : lightmapGroup.m_surfaces)
+							for (const rkit::RCPtr<data::builder::BSPDrawSurface> &surfPtr : lightmapGroup.m_surfaces)
 							{
-								for (const data2::builder::BSPTri &tri : surfPtr->m_tris)
+								for (const data::builder::BSPTri &tri : surfPtr->m_tris)
 								{
 									for (uint16_t triVert : tri.m_indexes)
 									{
 										if (!hasBeenScaled[triVert])
 										{
 											hasBeenScaled.Set(triVert, true);
-											data2::builder::BSPDrawVertex &vert = cluster.m_drawVerts[triVert];
+											data::builder::BSPDrawVertex &vert = cluster.m_drawVerts[triVert];
 											vert.m_uv[0] /= w;
 											vert.m_uv[1] /= h;
 										}
@@ -4178,40 +3238,6 @@ namespace anox { namespace buildsystem
 	{
 		return path.Format(u8"ax_bsp/{}.materials", identifier.GetChars());
 	}
-
-	rkit::Result BSPMapCompilerBase2::WriteBSPModel(const data::BSPDataChunksVectors &bspOutput, rkit::IWriteStream &outStream)
-	{
-		data::BSPFile bspFile = {};
-		bspFile.m_fourCC = data::BSPFile::kFourCC;
-		bspFile.m_version = data::BSPFile::kVersion;
-
-		outStream.WriteAll(&bspFile, sizeof(bspFile));
-
-		VectorWriterVisitor visitor(outStream);
-
-		data::BSPDataChunksProcessor::VisitAllChunks(bspOutput, visitor);
-
-		RKIT_RETURN_OK;
-	}
-
-	rkit::Result BSPMapCompilerBase2::ReadBSPModel(data::BSPDataChunksVectors &bspData, rkit::IReadStream &inStream)
-	{
-		data::BSPFile bspFile = {};
-		bspFile.m_fourCC = data::BSPFile::kFourCC;
-		bspFile.m_version = data::BSPFile::kVersion;
-
-		inStream.ReadAll(&bspFile, sizeof(bspFile));
-
-		if (bspFile.m_fourCC.Get() != data::BSPFile::kFourCC
-			|| bspFile.m_version.Get() != data::BSPFile::kVersion)
-			RKIT_THROW(rkit::ResultCode::kDataError);
-
-		VectorReaderVisitor visitor(inStream);
-		data::BSPDataChunksProcessor::VisitAllChunks(bspData, visitor);
-
-		RKIT_RETURN_OK;
-	}
-
 
 	rkit::Result BSPMapCompilerBase2::WriteMaterialList(const rkit::ConstSpan<rkit::CIPath> &uniqueTextures, rkit::IWriteStream &outStream)
 	{
@@ -4331,7 +3357,7 @@ namespace anox { namespace buildsystem
 	{
 		rkit::Vector<rkit::CIPath> uniqueTextures;
 
-		data2::builder::BSPFile bspFile;
+		data::builder::BSPFile bspFile;
 
 		{
 			rkit::String inPathStr;
@@ -4343,13 +3369,13 @@ namespace anox { namespace buildsystem
 			rkit::UniquePtr<rkit::ISeekableReadStream> inStream;
 			feedback->OpenInput(rkit::buildsystem::BuildFileLocation::kIntermediateDir, inPath, inStream);
 
-			data2::BSPFile_Instance bspFileInstance;
+			data::BSPFile_Instance bspFileInstance;
 
-			data2::loader::BSPFile_Loader loader;
+			data::loader::BSPFile_Loader loader;
 			if (!loader.Load(bspFileInstance, *inStream))
 				RKIT_THROW(rkit::ResultCode::kDataError);
 
-			data2::builder::BSPFile_BuilderLoader builderLoader;
+			data::builder::BSPFile_BuilderLoader builderLoader;
 			builderLoader.Convert(bspFile, bspFileInstance);
 		}
 
@@ -4378,7 +3404,7 @@ namespace anox { namespace buildsystem
 			rkit::UniquePtr<rkit::ISeekableReadWriteStream> outStream;
 			feedback->OpenOutput(rkit::buildsystem::BuildFileLocation::kOutputFiles, outPath, outStream);
 
-			data2::builder::BSPFile_Builder::WriteToStream(*outStream, bspFile);
+			data::builder::BSPFile_Builder::WriteToStream(*outStream, bspFile);
 		}
 
 		RKIT_RETURN_OK;

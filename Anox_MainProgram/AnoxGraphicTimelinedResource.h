@@ -3,7 +3,11 @@
 #include "rkit/Core/Atomic.h"
 #include "rkit/Core/RefCounted.h"
 
+#include "rkit/Render/Fence.h"
+
 #include <stdint.h>
+
+#include "AnoxLogicalQueue.h"
 
 namespace anox
 {
@@ -24,7 +28,20 @@ namespace anox
 
 		void DisposeResource();
 
+		bool IsActiveOnQueue(LogicalQueueType queueType) const;
+
+		void MakeActiveOnQueue(LogicalQueueType queueType) const;
+		void RemoveFromQueue(LogicalQueueType queueType) const;
+
 	private:
+		void FinishRemovingFromQueue(LogicalQueueType queueType);
+
+		static constexpr size_t kNumQueues = static_cast<size_t>(LogicalQueueType::kCount);
+		using ActiveQueueFlags_t = rkit::UIntOfAtLeastSize<(kNumQueues + 7) / 8>::Type_t;
+
+		rkit::AtomicInt<ActiveQueueFlags_t> m_activeQueues;
+		rkit::StaticArray<rkit::render::TimelinePoint_t, kNumQueues> m_disposeSyncPoints;
+
 		IGraphicsSubsystem &m_subsystem;
 		rkit::AtomicInt<uint64_t> m_lastUsedGlobalSyncPoint;
 		GraphicTimelinedResource *m_next = nullptr;

@@ -33,6 +33,7 @@
 #include "rkit/Render/RenderPassInstance.h"
 #include "rkit/Render/RenderPassResources.h"
 #include "rkit/Render/SwapChain.h"
+#include "rkit/Render/TimelineSignal.h"
 
 #include "rkit/Utilities/ThreadPool.h"
 
@@ -135,6 +136,15 @@ namespace anox
 		rkit::Result CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies) override;
 		rkit::Result CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<ISubmitJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies) override;
 
+		rkit::Result CreateAndQueueRecordAndSubmitJob(rkit::RCPtr<rkit::Job> *outJob,
+			LogicalQueueType queueType,
+			rkit::UniquePtr<IRecordJobRunner> &&recordJobRunner,
+			const rkit::JobDependencyList &recordDependencies,
+			rkit::UniquePtr<ISubmitJobRunner> &&submitJobRunner,
+			const rkit::JobDependencyList &submitDependencies,
+			rkit::render::TimelineSignalType signalType,
+			rkit::render::TimelinePoint_t *outTimelinePoint) override;
+
 		rkit::Result CreateAsyncCreateTextureJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<ITexture> &outTexture, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData, const rkit::JobDependencyList &dependencies) override;
 		rkit::Result CreateAsyncCreateAndFillBufferJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<IBuffer> &outBuffer,
 			const rkit::RCPtr<BufferInitializer> &bufferInitializer, const rkit::JobDependencyList &dependencies) override;
@@ -160,6 +170,21 @@ namespace anox
 		{
 			uint64_t m_keyIndex = 0;
 			T m_resolution = T();
+		};
+
+		class RecordAndSubmitDepsConcatenator final : private rkit::ISpan<rkit::Job *>
+		{
+		public:
+			explicit RecordAndSubmitDepsConcatenator(rkit::Job *recordJob, const rkit::ISpan<rkit::Job *> &deps);
+
+			const rkit::ISpan<rkit::Job *> &GetSpan() const;
+
+		private:
+			size_t Count() const override;
+			rkit::Job *operator[](size_t index) const override;
+
+			rkit::Job *m_recordJob = nullptr;
+			const rkit::ISpan<rkit::Job *> &m_otherDeps;
 		};
 
 		class RenderDataConfigurator final : public rkit::data::IRenderDataConfigurator, public rkit::render::IPipelineLibraryConfigValidator
@@ -315,13 +340,14 @@ namespace anox
 		class RunRecordJobRunner final : public rkit::IJobRunner
 		{
 		public:
-			explicit RunRecordJobRunner(rkit::UniquePtr<IRecordJobRunner> &&recordJob, rkit::render::IBaseCommandAllocator &cmdAlloc);
+			explicit RunRecordJobRunner(rkit::UniquePtr<IRecordJobRunner> &&recordJob, rkit::render::IBaseCommandAllocator &cmdAlloc, const rkit::render::TimelineSignalIntent &signalIntent);
 
 			rkit::Result Run() override;
 
 		private:
 			rkit::UniquePtr<IRecordJobRunner> m_recordJob;
 			rkit::render::IBaseCommandAllocator &m_cmdAlloc;
+			rkit::render::TimelineSignalIntent m_signalIntent;
 		};
 
 		class RunSubmitJobRunner final : public rkit::IJobRunner
@@ -408,13 +434,14 @@ namespace anox
 		class CloseFrameRecordRunner final : public IGraphicsRecordJobRunner_t
 		{
 		public:
-			explicit CloseFrameRecordRunner(rkit::render::IBaseCommandBatch *&outBatchPtr, rkit::render::IBinaryGPUWaitableFence *asyncUploadFence);
+			explicit CloseFrameRecordRunner(rkit::render::IBaseCommandBatch *&outBatchPtr, rkit::render::ITimelineFence *asyncUploadFence, rkit::render::TimelinePoint_t asyncUploadTimelinePoint);
 
-			rkit::Result RunRecord(rkit::render::IGraphicsCommandAllocator &cmdAlloc) override;
+			rkit::Result RunRecord(rkit::render::IGraphicsCommandAllocator &cmdAlloc, const rkit::render::TimelineSignalIntent &signalIntent) override;
 
 		private:
 			rkit::render::IBaseCommandBatch *&m_outBatchPtr;
-			rkit::render::IBinaryGPUWaitableFence *m_asyncUploadFence;
+			rkit::render::ITimelineFence *m_asyncUploadFence;
+			rkit::render::TimelinePoint_t m_asyncUploadTimelinePoint;
 		};
 
 
@@ -436,7 +463,7 @@ namespace anox
 		public:
 			explicit AsyncUploadPrepareTargetsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint);
 
-			rkit::Result RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc) override;
+			rkit::Result RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc, const rkit::render::TimelineSignalIntent &signalIntent) override;
 
 		private:
 			rkit::render::ICopyCommandBatch **m_cmdBatchRef;
@@ -460,13 +487,11 @@ namespace anox
 		class CopyAsyncUploadsRecordRunner final : public ICopyRecordJobRunner_t
 		{
 		public:
-			explicit CopyAsyncUploadsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint, uint64_t globalSyncPoint,
-				rkit::render::IBinaryGPUWaitableFence *fence);
+			explicit CopyAsyncUploadsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint, uint64_t globalSyncPoint);
 
-			rkit::Result RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc) override;
+			rkit::Result RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc, const rkit::render::TimelineSignalIntent &signalIntent) override;
 
 		private:
-			rkit::render::IBinaryGPUWaitableFence *m_fence;
 			rkit::render::ICopyCommandBatch **m_cmdBatchRef;
 			FrameSyncPoint &m_syncPoint;
 			uint64_t m_globalSyncPoint;
@@ -514,6 +539,9 @@ namespace anox
 		{
 			rkit::RCPtr<rkit::Job> m_lastRecordJob;
 			rkit::RCPtr<rkit::Job> m_lastSubmitJob;
+
+			rkit::UniquePtr<rkit::render::ICPUVisibleTimelineFence> m_timelineFence;
+			rkit::render::TimelinePoint_t m_lastSubmitID = 0;
 
 			virtual rkit::render::IBaseCommandQueue *GetBaseCommandQueue() const = 0;
 			virtual rkit::Result CreateCommandAllocator(rkit::render::IRenderDevice &renderDevice, rkit::UniquePtr<rkit::render::IBaseCommandAllocator> &cmdAlloc, bool isBundle) = 0;
@@ -638,6 +666,7 @@ namespace anox
 		{
 			rkit::render::IBaseCommandBatch *m_frameEndBatch = nullptr;
 			rkit::RCPtr<rkit::Job> m_frameEndJob;
+			rkit::render::TimelinePoint_t m_frameEndGraphicsTimelinePoint = 0;
 
 			GraphicTimelinedResourceStack m_condemnedResources;
 
@@ -691,6 +720,7 @@ namespace anox
 		};
 
 		rkit::Result CreateAndQueueJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<rkit::IJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies, rkit::RCPtr<rkit::Job> (LogicalQueueBase::*queueMember));
+		rkit::Result CreateAndQueueRecordJobInternal(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies, const rkit::render::TimelineSignalIntent &signalIntent);
 
 		rkit::Result TransitionDisplayMode();
 		rkit::Result TransitionBackend();
@@ -713,6 +743,10 @@ namespace anox
 		// The contiguous high amount will only be non-zero if the low amount is also non-zero.
 		void GetAsyncUploadHeapStats(uint32_t &outContiguousLow, uint32_t &outContiguousHigh) const;
 		void ConsumeAsyncUploadSpace(uint32_t space);
+
+		LogicalQueueBase *GetLogicalQueue(LogicalQueueType queueType);
+		const LogicalQueueBase *GetLogicalQueue(LogicalQueueType queueType) const;
+		bool IsSameQueue(LogicalQueueType queueTypeA, LogicalQueueType queueTypeB) const;
 
 		rkit::Optional<rkit::render::DisplayMode> m_currentDisplayMode;
 		rkit::render::DisplayMode m_desiredDisplayMode = rkit::render::DisplayMode::kSplash;
@@ -1088,6 +1122,38 @@ namespace anox
 		return m_graphicsSubsystem.m_pipelineLibraryLoader->CompileUnmergedGraphicsPipeline(lp.m_pipelineIndex, lp.m_variationIndex);
 	}
 
+	GraphicsSubsystem::RecordAndSubmitDepsConcatenator::RecordAndSubmitDepsConcatenator(rkit::Job *recordJob, const rkit::ISpan<rkit::Job *> &deps)
+		: m_recordJob(recordJob)
+		, m_otherDeps(deps)
+	{
+	}
+
+	const rkit::ISpan<rkit::Job *> &GraphicsSubsystem::RecordAndSubmitDepsConcatenator::GetSpan() const
+	{
+		if (m_recordJob == nullptr)
+			return m_otherDeps;
+		else
+			return *this;
+	}
+
+	size_t GraphicsSubsystem::RecordAndSubmitDepsConcatenator::Count() const
+	{
+		return m_otherDeps.Count() + ((m_recordJob != nullptr) ? 1 : 0);
+	}
+
+	rkit::Job *GraphicsSubsystem::RecordAndSubmitDepsConcatenator::operator[](size_t index) const
+	{
+		if (m_recordJob != nullptr)
+		{
+			if (index == 0)
+				return m_recordJob;
+			else
+				--index;
+		}
+
+		return m_otherDeps[index];
+	}
+
 	GraphicsSubsystem::RenderDataConfigurator::RenderDataConfigurator(const anox::RestartRequiringGraphicsSettings &gfxSettings)
 		: m_gfxSettings(gfxSettings)
 	{
@@ -1138,15 +1204,16 @@ namespace anox
 		RKIT_RETURN_OK;
 	}
 
-	GraphicsSubsystem::RunRecordJobRunner::RunRecordJobRunner(rkit::UniquePtr<IRecordJobRunner> &&recordJob, rkit::render::IBaseCommandAllocator &cmdAlloc)
+	GraphicsSubsystem::RunRecordJobRunner::RunRecordJobRunner(rkit::UniquePtr<IRecordJobRunner> &&recordJob, rkit::render::IBaseCommandAllocator &cmdAlloc, const rkit::render::TimelineSignalIntent &signalIntent)
 		: m_recordJob(std::move(recordJob))
 		, m_cmdAlloc(cmdAlloc)
+		, m_signalIntent(signalIntent)
 	{
 	}
 
 	rkit::Result GraphicsSubsystem::RunRecordJobRunner::Run()
 	{
-		return m_recordJob->RunBase(m_cmdAlloc);
+		return m_recordJob->RunBase(m_cmdAlloc, m_signalIntent);
 	}
 
 	GraphicsSubsystem::RunSubmitJobRunner::RunSubmitJobRunner(rkit::UniquePtr<ISubmitJobRunner> &&submitJob, rkit::render::IBaseCommandQueue &cmdQueue)
@@ -1593,23 +1660,22 @@ namespace anox
 		RKIT_RETURN_OK;
 	}
 
-	GraphicsSubsystem::CloseFrameRecordRunner::CloseFrameRecordRunner(rkit::render::IBaseCommandBatch *&outBatchPtr, rkit::render::IBinaryGPUWaitableFence *asyncUploadFence)
+	GraphicsSubsystem::CloseFrameRecordRunner::CloseFrameRecordRunner(rkit::render::IBaseCommandBatch *&outBatchPtr, rkit::render::ITimelineFence *asyncUploadFence, rkit::render::TimelinePoint_t asyncUploadTimelinePoint)
 		: m_outBatchPtr(outBatchPtr)
 		, m_asyncUploadFence(asyncUploadFence)
+		, m_asyncUploadTimelinePoint(asyncUploadTimelinePoint)
 	{
 	}
 
-	rkit::Result GraphicsSubsystem::CloseFrameRecordRunner::RunRecord(rkit::render::IGraphicsCommandAllocator &cmdAlloc)
+	rkit::Result GraphicsSubsystem::CloseFrameRecordRunner::RunRecord(rkit::render::IGraphicsCommandAllocator &cmdAlloc, const rkit::render::TimelineSignalIntent &signalIntent)
 	{
 		rkit::render::IGraphicsCommandBatch *batch = nullptr;
-		cmdAlloc.OpenGraphicsCommandBatch(batch, true);
+		cmdAlloc.OpenGraphicsCommandBatch(batch);
 
 		if (m_asyncUploadFence)
-		{
-			batch->AddWaitForFence(*m_asyncUploadFence, rkit::render::PipelineStageMask_t({ rkit::render::PipelineStage::kTopOfPipe }));
-		}
+			batch->AddWaitForTimelineFence(*m_asyncUploadFence, rkit::render::PipelineStageMask_t({ rkit::render::PipelineStage::kTopOfPipe }), m_asyncUploadTimelinePoint);
 
-		batch->CloseBatch();
+		batch->CloseBatch(signalIntent);
 
 		m_outBatchPtr = batch;
 
@@ -1637,9 +1703,9 @@ namespace anox
 	{
 	}
 
-	rkit::Result GraphicsSubsystem::AsyncUploadPrepareTargetsRecordRunner::RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc)
+	rkit::Result GraphicsSubsystem::AsyncUploadPrepareTargetsRecordRunner::RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc, const rkit::render::TimelineSignalIntent &signalIntent)
 	{
-		cmdAlloc.OpenCopyCommandBatch(*m_cmdBatchRef, false);
+		cmdAlloc.OpenCopyCommandBatch(*m_cmdBatchRef);
 
 		rkit::render::ICopyCommandBatch *cmdBatch = *m_cmdBatchRef;
 
@@ -1684,9 +1750,7 @@ namespace anox
 		cmdBatch->OpenCopyCommandEncoder(cmdEncoder);
 		cmdEncoder->PipelineBarrier(barrierGroup);
 
-		cmdBatch->CloseBatch();
-
-		RKIT_RETURN_OK;
+		cmdBatch->CloseBatch(signalIntent);
 	}
 
 	GraphicsSubsystem::CopyAsyncUploadsSubmitRunner::CopyAsyncUploadsSubmitRunner(FrameSyncPoint &syncPoint)
@@ -1706,17 +1770,16 @@ namespace anox
 		return &m_cmdBatch;
 	}
 
-	GraphicsSubsystem::CopyAsyncUploadsRecordRunner::CopyAsyncUploadsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint, uint64_t globalSyncPoint, rkit::render::IBinaryGPUWaitableFence *fence)
+	GraphicsSubsystem::CopyAsyncUploadsRecordRunner::CopyAsyncUploadsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint, uint64_t globalSyncPoint)
 		: m_cmdBatchRef(cmdBatchRef)
 		, m_syncPoint(syncPoint)
 		, m_globalSyncPoint(globalSyncPoint)
-		, m_fence(fence)
 	{
 	}
 
-	rkit::Result GraphicsSubsystem::CopyAsyncUploadsRecordRunner::RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc)
+	rkit::Result GraphicsSubsystem::CopyAsyncUploadsRecordRunner::RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc, const rkit::render::TimelineSignalIntent &signalIntent)
 	{
-		cmdAlloc.OpenCopyCommandBatch(*m_cmdBatchRef, false);
+		cmdAlloc.OpenCopyCommandBatch(*m_cmdBatchRef);
 
 		rkit::render::ICopyCommandBatch *cmdBatch = *m_cmdBatchRef;
 
@@ -1741,11 +1804,7 @@ namespace anox
 				*copyAction.m_srcBuffer, copyAction.m_srcOffset, copyAction.m_size);
 		}
 
-		cmdBatch->AddSignalFence(*m_fence);
-
-		cmdBatch->CloseBatch();
-
-		RKIT_RETURN_OK;
+		cmdBatch->CloseBatch(signalIntent);
 	}
 
 	GraphicsSubsystem::CloseFrameSubmitRunner::CloseFrameSubmitRunner(rkit::render::IBaseCommandBatch *&frameEndBatchPtr)
@@ -2331,6 +2390,7 @@ namespace anox
 		rkit::render::RenderDeviceCaps optionalCaps;
 
 		requiredCaps.SetUInt32Cap(rkit::render::RenderDeviceUInt32Cap::kMaxTexture2DSize, 1024);
+		requiredCaps.SetBoolCap(rkit::render::RenderDeviceBoolCap::kTimelineFence, true);
 
 		rkit::UniquePtr<rkit::render::IRenderDevice> device;
 		renderDriver->CreateDevice(device, queueRequests.ToSpan(), requiredCaps, optionalCaps, *adapters[0]);
@@ -2482,6 +2542,22 @@ namespace anox
 		m_asyncUploadHeapIsFull = (m_asyncUploadHeapHighMark == m_asyncUploadHeapLowMark);
 	}
 
+
+	GraphicsSubsystem::LogicalQueueBase *GraphicsSubsystem::GetLogicalQueue(LogicalQueueType queueType)
+	{
+		return m_logicalQueues[static_cast<size_t>(queueType)];
+	}
+
+	const GraphicsSubsystem::LogicalQueueBase *GraphicsSubsystem::GetLogicalQueue(LogicalQueueType queueType) const
+	{
+		return m_logicalQueues[static_cast<size_t>(queueType)];
+	}
+
+	bool GraphicsSubsystem::IsSameQueue(LogicalQueueType queueTypeA, LogicalQueueType queueTypeB) const
+	{
+		return GetLogicalQueue(queueTypeA) == GetLogicalQueue(queueTypeB);
+	}
+
 	rkit::Result GraphicsSubsystem::CreateAndQueueJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<rkit::IJobRunner> &&jobRunnerRef, const rkit::JobDependencyList &dependencies, rkit::RCPtr<rkit::Job>(LogicalQueueBase:: *queueMember))
 	{
 		rkit::UniquePtr<rkit::IJobRunner> jobRunner = std::move(jobRunnerRef);
@@ -2526,7 +2602,6 @@ namespace anox
 
 		rkit::RCPtr<rkit::Job> newJob;
 		m_threadPool.GetJobQueue()->CreateJob(&newJob, rkit::JobType::kNormalPriority, std::move(jobRunner), *spanToPass);
-
 
 		jobRef = newJob;
 
@@ -2580,6 +2655,8 @@ namespace anox
 		if (m_graphicsComputeQueue)
 		{
 			m_graphicsComputeLogicalQueue.m_commandQueue = m_graphicsComputeQueue;
+			m_renderDevice->CreateCPUVisibleTimelineFence(m_graphicsComputeLogicalQueue.m_timelineFence, 0);
+
 			m_logicalQueues[static_cast<size_t>(LogicalQueueType::kGraphics)] = &m_graphicsComputeLogicalQueue;
 			m_logicalQueues[static_cast<size_t>(LogicalQueueType::kPrimaryCompute)] = &m_graphicsComputeLogicalQueue;
 			m_logicalQueues[static_cast<size_t>(LogicalQueueType::kAsyncCompute)] = &m_graphicsComputeLogicalQueue;
@@ -2588,12 +2665,16 @@ namespace anox
 		if (m_graphicsQueue)
 		{
 			m_graphicsLogicalQueue.m_commandQueue = m_graphicsQueue;
+			m_renderDevice->CreateCPUVisibleTimelineFence(m_graphicsLogicalQueue.m_timelineFence, 0);
+
 			m_logicalQueues[static_cast<size_t>(LogicalQueueType::kGraphics)] = &m_graphicsLogicalQueue;
 		}
 
 		if (m_asyncComputeQueue)
 		{
 			m_asyncComputeLogicalQueue.m_commandQueue = m_asyncComputeQueue;
+			m_renderDevice->CreateCPUVisibleTimelineFence(m_asyncComputeLogicalQueue.m_timelineFence, 0);
+
 			m_logicalQueues[static_cast<size_t>(LogicalQueueType::kAsyncCompute)] = &m_asyncComputeLogicalQueue;
 
 			if (!m_graphicsComputeQueue)
@@ -2603,6 +2684,8 @@ namespace anox
 		if (m_dmaQueue)
 		{
 			m_dmaLogicalQueue.m_commandQueue = m_dmaQueue;
+			m_renderDevice->CreateCPUVisibleTimelineFence(m_dmaLogicalQueue.m_timelineFence, 0);
+
 			m_logicalQueues[static_cast<size_t>(LogicalQueueType::kDMA)] = &m_dmaLogicalQueue;
 		}
 
@@ -2939,7 +3022,7 @@ namespace anox
 			m_threadPool.GetJobQueue()->CheckFault();
 
 			RKIT_ASSERT(syncPoint.m_frameEndBatch != nullptr);
-			syncPoint.m_frameEndBatch->WaitForCompletion(*m_fenceWaiter);
+			m_fenceWaiter->WaitForFence(*GetLogicalQueue(LogicalQueueType::kGraphics)->m_timelineFence, syncPoint.m_frameEndGraphicsTimelinePoint);
 		}
 
 		if (syncPoint.m_asyncUploadActionSet.m_cleanupJob.IsValid())
@@ -3085,10 +3168,13 @@ namespace anox
 
 			rkit::UniquePtr<AsyncUploadPrepareTargetsRecordRunner> prepareRecordRunner = rkit::New<AsyncUploadPrepareTargetsRecordRunner>(prepareSubmitRunner->GetCmdBatchRef(), syncPoint);
 
-			rkit::RCPtr<rkit::Job> recordJob;
-			CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kDMA, std::move(prepareRecordRunner), rkit::JobDependencyList());
-
-			CreateAndQueueSubmitJob(nullptr, LogicalQueueType::kDMA, std::move(prepareSubmitRunner), recordJob);
+			CreateAndQueueRecordAndSubmitJob(nullptr, LogicalQueueType::kDMA,
+				std::move(prepareRecordRunner),
+				rkit::JobDependencyList(),
+				std::move(prepareSubmitRunner),
+				rkit::JobDependencyList(),
+				rkit::render::TimelineSignalType::kGPUWaitable,
+				nullptr);
 		}
 
 		if (actionSet.m_stripedMemCpy.Count() > 0)
@@ -3119,6 +3205,7 @@ namespace anox
 
 		m_currentFrameResources->m_frameEndBatchPtr = &syncPoint.m_frameEndBatch;
 		m_currentFrameResources->m_frameEndJobPtr = &syncPoint.m_frameEndJob;
+		m_currentFrameResources->m_frameEndGraphicsTimelinePointPtr = &syncPoint.m_frameEndGraphicsTimelinePoint;
 
 		m_gameWindow->BeginFrame(*this);
 
@@ -3151,35 +3238,44 @@ namespace anox
 		rkit::StaticArray<rkit::RCPtr<rkit::Job>, 1> frameEndRecordDeps;
 		size_t numFrameEndRecordDeps = 0;
 
-		rkit::render::IBinaryGPUWaitableFence *asyncUploadGPUFence = nullptr;
+		rkit::Optional<rkit::render::TimelinePoint_t> asyncUploadGPUFence;
 
 		if (asyncUploadMemCopyJob.IsValid())
 		{
-			fenceFactory.CreateFence(asyncUploadGPUFence);
+			const bool needGraphicsWaitOnDMA = !IsSameQueue(LogicalQueueType::kDMA, LogicalQueueType::kGraphics);
 
 			// Post async upload submits to the end of the frame
 			rkit::UniquePtr<CopyAsyncUploadsSubmitRunner> submitRunner = rkit::New<CopyAsyncUploadsSubmitRunner>(syncPoint);
-			rkit::UniquePtr<CopyAsyncUploadsRecordRunner> recordRunner = rkit::New<CopyAsyncUploadsRecordRunner>(submitRunner->GetCmdBatchRef(), syncPoint, m_currentGlobalSyncPoint, asyncUploadGPUFence);
+			rkit::UniquePtr<CopyAsyncUploadsRecordRunner> recordRunner = rkit::New<CopyAsyncUploadsRecordRunner>(submitRunner->GetCmdBatchRef(), syncPoint, m_currentGlobalSyncPoint);
 
-			rkit::RCPtr<rkit::Job> recordJob;
-			CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kDMA, std::move(recordRunner), asyncUploadMemCopyJob);
+			rkit::render::TimelinePoint_t fenceID = 0;
 
-			rkit::RCPtr<rkit::Job> submitJob;
-			CreateAndQueueSubmitJob(&submitJob, LogicalQueueType::kDMA, std::move(submitRunner), recordJob);
+			rkit::RCPtr<rkit::Job> submitJob2;
+			CreateAndQueueRecordAndSubmitJob(&submitJob2, LogicalQueueType::kDMA,
+				std::move(recordRunner), asyncUploadMemCopyJob,
+				std::move(submitRunner), rkit::JobDependencyList(),
+				needGraphicsWaitOnDMA ? rkit::render::TimelineSignalType::kGPUWaitable : rkit::render::TimelineSignalType::kNone,
+				needGraphicsWaitOnDMA ? &fenceID : nullptr
+			);
 
-			frameEndRecordDeps[numFrameEndRecordDeps++] = submitJob;
+			frameEndRecordDeps[numFrameEndRecordDeps++] = submitJob2;
+
+			if (needGraphicsWaitOnDMA)
+				asyncUploadGPUFence = fenceID;
 		}
 
 		rkit::UniquePtr<CloseFrameSubmitRunner> closeFrameSubmitRunner = rkit::New<CloseFrameSubmitRunner>(*m_currentFrameResources->m_frameEndBatchPtr);
+		rkit::UniquePtr<CloseFrameRecordRunner> closeFrameRecordRunner = rkit::New<CloseFrameRecordRunner>(
+			*closeFrameSubmitRunner->GetLastBatchRef(),
+			asyncUploadGPUFence.IsSet() ? GetLogicalQueue(LogicalQueueType::kDMA)->m_timelineFence.Get() : nullptr,
+			asyncUploadGPUFence.IsSet() ? asyncUploadGPUFence.Get() : 0);
 
-		rkit::UniquePtr<CloseFrameRecordRunner> closeFrameRecordRunner = rkit::New<CloseFrameRecordRunner>(*closeFrameSubmitRunner->GetLastBatchRef(), asyncUploadGPUFence);
-
-		rkit::RCPtr<rkit::Job> closeFrameRecordJob;
-		CreateAndQueueRecordJob(&closeFrameRecordJob, LogicalQueueType::kGraphics, std::move(closeFrameRecordRunner),
-			frameEndRecordDeps.ToSpan().SubSpan(0, numFrameEndRecordDeps));
 
 		rkit::RCPtr<rkit::Job> closeFrameSubmitJob;
-		CreateAndQueueSubmitJob(&closeFrameSubmitJob, LogicalQueueType::kGraphics, std::move(closeFrameSubmitRunner), closeFrameRecordJob);
+		CreateAndQueueRecordAndSubmitJob(&closeFrameSubmitJob, LogicalQueueType::kGraphics,
+			std::move(closeFrameRecordRunner), rkit::JobDependencyList(),
+			std::move(closeFrameSubmitRunner), rkit::JobDependencyList(),
+			rkit::render::TimelineSignalType::kCPUWaitable, m_currentFrameResources->m_frameEndGraphicsTimelinePointPtr);
 
 		*m_currentFrameResources->m_frameEndJobPtr = closeFrameSubmitJob;
 
@@ -3240,6 +3336,11 @@ namespace anox
 
 	rkit::Result GraphicsSubsystem::CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies)
 	{
+		return CreateAndQueueRecordJobInternal(outJob, queueType, std::move(jobRunner), dependencies, rkit::render::TimelineSignalIntent());
+	}
+
+	rkit::Result GraphicsSubsystem::CreateAndQueueRecordJobInternal(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies, const rkit::render::TimelineSignalIntent &signalIntent)
+	{
 		FrameSyncPoint &syncPoint = m_syncPoints[m_currentSyncPoint];
 
 		rkit::render::CommandQueueType cmdQueueType = m_logicalQueues[static_cast<size_t>(queueType)]->GetBaseCommandQueue()->GetCommandQueueType();
@@ -3248,7 +3349,7 @@ namespace anox
 
 		rkit::render::IBaseCommandAllocator *cmdAllocator = cmdListHandler.m_commandAllocator.Get();
 
-		rkit::UniquePtr<RunRecordJobRunner> runRecordJobRunner = rkit::New<RunRecordJobRunner>(std::move(jobRunner), *cmdAllocator);
+		rkit::UniquePtr<RunRecordJobRunner> runRecordJobRunner = rkit::New<RunRecordJobRunner>(std::move(jobRunner), *cmdAllocator, signalIntent);
 
 		return this->CreateAndQueueJob(outJob, queueType, std::move(runRecordJobRunner), dependencies, &LogicalQueueBase::m_lastRecordJob);
 	}
@@ -3264,6 +3365,38 @@ namespace anox
 		rkit::UniquePtr<RunSubmitJobRunner> runSubmitJobRunner = rkit::New<RunSubmitJobRunner>(std::move(jobRunner), *cmdListHandler.m_commandQueue);
 
 		return this->CreateAndQueueJob(outJob, queueType, std::move(runSubmitJobRunner), dependencies, &LogicalQueueBase::m_lastSubmitJob);
+	}
+
+	rkit::Result GraphicsSubsystem::CreateAndQueueRecordAndSubmitJob(
+		rkit::RCPtr<rkit::Job> *outJob,
+		LogicalQueueType queueType,
+		rkit::UniquePtr<IRecordJobRunner> &&recordJobRunner,
+		const rkit::JobDependencyList &recordDependencies,
+		rkit::UniquePtr<ISubmitJobRunner> &&submitJobRunner,
+		const rkit::JobDependencyList &submitDependencies,
+		rkit::render::TimelineSignalType signalType,
+		rkit::render::TimelinePoint_t *outTimelinePoint)
+	{
+		rkit::render::TimelinePoint_t timelinePoint = 0;
+
+		rkit::render::TimelineSignalIntent signalIntent;
+		if (signalType != rkit::render::TimelineSignalType::kNone)
+		{
+			LogicalQueueBase *logicalQueue = m_logicalQueues[static_cast<size_t>(queueType)];
+			timelinePoint = ++(logicalQueue->m_lastSubmitID);
+
+			signalIntent = rkit::render::TimelineSignalIntent(*logicalQueue->m_timelineFence, signalType, timelinePoint);
+		}
+
+		rkit::RCPtr<rkit::Job> recordJob;
+		CreateAndQueueRecordJobInternal(&recordJob, queueType, std::move(recordJobRunner), recordDependencies, signalIntent);
+
+		RecordAndSubmitDepsConcatenator concatenator(recordJob.Get(), submitDependencies.GetSpan());
+
+		CreateAndQueueSubmitJob(outJob, queueType, std::move(submitJobRunner), rkit::JobDependencyList(concatenator.GetSpan()));
+
+		if (outTimelinePoint)
+			*outTimelinePoint = timelinePoint;
 	}
 
 	rkit::Result GraphicsSubsystem::CreateAsyncCreateTextureJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<ITexture> &outTexture, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData, const rkit::JobDependencyList &dependencies)

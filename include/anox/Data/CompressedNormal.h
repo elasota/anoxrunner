@@ -2,7 +2,7 @@
 
 #include "rkit/Core/Endian.h"
 
-namespace anox { namespace data
+namespace anox::data
 {
 	struct CompressedNormal32
 	{
@@ -22,19 +22,7 @@ namespace anox { namespace data
 		// X,Y,Z = normalize(X,Y,Z)
 		rkit::endian::LittleUInt32_t m_value;
 	};
-
-	struct CompressedNormal64NoNegate
-	{
-		rkit::endian::LittleUInt32_t m_part0;
-		rkit::endian::LittleUInt32_t m_part1;
-	};
-
-	struct CompressedNormal64
-	{
-		rkit::endian::LittleUInt32_t m_part0;
-		rkit::endian::LittleUInt32_t m_part1;
-	};
-} } // anox::data
+} // anox::data
 
 #include <math.h>
 

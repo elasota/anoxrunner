@@ -4,11 +4,14 @@
 #include "VulkanCheck.h"
 #include "VulkanDevice.h"
 
-namespace rkit { namespace render { namespace vulkan
+#include "rkit/Core/Vector.h"
+
+namespace rkit::render::vulkan
 {
-	VulkanTimelineFence::VulkanTimelineFence(VulkanDeviceBase &device)
+	VulkanTimelineFence::VulkanTimelineFence(VulkanDeviceBase &device, bool cpuVisible)
 		: m_device(device)
 		, m_sema(VK_NULL_HANDLE)
+		, m_cpuVisible(cpuVisible)
 	{
 	}
 
@@ -56,6 +59,11 @@ namespace rkit { namespace render { namespace vulkan
 	VkSemaphore VulkanTimelineFence::GetSemaphore() const
 	{
 		return m_sema;
+	}
+
+	ICPUVisibleTimelineFence *VulkanTimelineFence::ToCPUVisibleInternal()
+	{
+		return m_cpuVisible ? this : nullptr;
 	}
 
 	VulkanBinaryCPUWaitableFence::VulkanBinaryCPUWaitableFence(VulkanDeviceBase &device)
@@ -108,4 +116,4 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateSemaphore(m_device.GetDevice(), &semaCreateInfo, m_device.GetAllocCallbacks(), &m_sema));
 		RKIT_RETURN_OK;
 	}
-} } } // rkit::render::vulkan
+} // rkit::render::vulkan

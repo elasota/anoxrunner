@@ -19,6 +19,7 @@ namespace rkit::render::vulkan
 	{
 		RKIT_VK_API_START(VulkanInstanceAPI);
 		RKIT_VK_API(vkGetPhysicalDeviceFeatures);
+		RKIT_VK_API_EXT(vkGetPhysicalDeviceFeatures2, VK_KHR_get_physical_device_properties2);
 		RKIT_VK_API(vkEnumeratePhysicalDevices);
 		RKIT_VK_API(vkEnumerateDeviceExtensionProperties);
 		RKIT_VK_API(vkGetPhysicalDeviceProperties);

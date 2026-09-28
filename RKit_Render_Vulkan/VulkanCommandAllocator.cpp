@@ -21,10 +21,10 @@ namespace rkit::render::vulkan
 
 		IInternalCommandAllocator *ToInternalCommandAllocator() override;
 
-		Result OpenCopyCommandBatch(ICopyCommandBatch *&outCommandBatch, bool cpuWaitable) override;
-		Result OpenGraphicsCommandBatch(IGraphicsCommandBatch *&outCommandBatch, bool cpuWaitable) override;
-		Result OpenComputeCommandBatch(IComputeCommandBatch *&outCommandBatch, bool cpuWaitable) override;
-		Result OpenGraphicsComputeCommandBatch(IGraphicsComputeCommandBatch *&outCommandBatch, bool cpuWaitable) override;
+		Result OpenCopyCommandBatch(ICopyCommandBatch *&outCommandBatch) override;
+		Result OpenGraphicsCommandBatch(IGraphicsCommandBatch *&outCommandBatch) override;
+		Result OpenComputeCommandBatch(IComputeCommandBatch *&outCommandBatch) override;
+		Result OpenGraphicsComputeCommandBatch(IGraphicsComputeCommandBatch *&outCommandBatch) override;
 
 		Result ResetCommandAllocator(bool discardResources) override;
 
@@ -36,9 +36,9 @@ namespace rkit::render::vulkan
 		DynamicCastRef_t InternalDynamicCast() override;
 
 		template<class TCommandBatchType>
-		Result TypedOpenCommandBatch(TCommandBatchType *&outCommandBath, bool cpuWaitable);
+		Result TypedOpenCommandBatch(TCommandBatchType *&outCommandBath);
 
-		Result OpenCommandBatch(VulkanCommandBatchBase *&outCommandBatch, bool cpuWaitable);
+		Result OpenCommandBatch(VulkanCommandBatchBase *&outCommandBatch);
 
 	private:
 		Vector<UniquePtr<VulkanCommandBatchBase>> m_commandBatches;
@@ -97,28 +97,27 @@ namespace rkit::render::vulkan
 		return this;
 	}
 
-	Result VulkanCommandAllocator::OpenCopyCommandBatch(ICopyCommandBatch *&outCommandBatch, bool cpuWaitable)
+	Result VulkanCommandAllocator::OpenCopyCommandBatch(ICopyCommandBatch *&outCommandBatch)
 	{
 		IComputeCommandBatch *intermediateBatch = nullptr;
-		TypedOpenCommandBatch(intermediateBatch, cpuWaitable);
+		TypedOpenCommandBatch(intermediateBatch);
 
 		outCommandBatch = intermediateBatch;
-		RKIT_RETURN_OK;
 	}
 
-	Result VulkanCommandAllocator::OpenGraphicsCommandBatch(IGraphicsCommandBatch *&outCommandBatch, bool cpuWaitable)
+	Result VulkanCommandAllocator::OpenGraphicsCommandBatch(IGraphicsCommandBatch *&outCommandBatch)
 	{
-		return TypedOpenCommandBatch(outCommandBatch, cpuWaitable);
+		return TypedOpenCommandBatch(outCommandBatch);
 	}
 
-	Result VulkanCommandAllocator::OpenComputeCommandBatch(IComputeCommandBatch *&outCommandBatch, bool cpuWaitable)
+	Result VulkanCommandAllocator::OpenComputeCommandBatch(IComputeCommandBatch *&outCommandBatch)
 	{
-		return TypedOpenCommandBatch(outCommandBatch, cpuWaitable);
+		return TypedOpenCommandBatch(outCommandBatch);
 	}
 
-	Result VulkanCommandAllocator::OpenGraphicsComputeCommandBatch(IGraphicsComputeCommandBatch *&outCommandBatch, bool cpuWaitable)
+	Result VulkanCommandAllocator::OpenGraphicsComputeCommandBatch(IGraphicsComputeCommandBatch *&outCommandBatch)
 	{
-		return TypedOpenCommandBatch(outCommandBatch, cpuWaitable);
+		return TypedOpenCommandBatch(outCommandBatch);
 	}
 
 	Result VulkanCommandAllocator::ResetCommandAllocator(bool discardResources)
@@ -215,18 +214,18 @@ namespace rkit::render::vulkan
 	}
 
 	template<class TCommandBatchType>
-	Result VulkanCommandAllocator::TypedOpenCommandBatch(TCommandBatchType *&outCommandBatch, bool cpuWaitable)
+	Result VulkanCommandAllocator::TypedOpenCommandBatch(TCommandBatchType *&outCommandBatch)
 	{
 		VulkanCommandBatchBase *cmdBatch = nullptr;
 
-		OpenCommandBatch(cmdBatch, cpuWaitable);
+		OpenCommandBatch(cmdBatch);
 
 		outCommandBatch = cmdBatch;
 
 		RKIT_RETURN_OK;
 	}
 
-	Result VulkanCommandAllocator::OpenCommandBatch(VulkanCommandBatchBase *&outCommandBatch, bool cpuWaitable)
+	Result VulkanCommandAllocator::OpenCommandBatch(VulkanCommandBatchBase *&outCommandBatch)
 	{
 		VulkanCommandBatchBase *cmdBatchPtr = nullptr;
 
@@ -238,7 +237,7 @@ namespace rkit::render::vulkan
 
 			cmdBatchPtr = cmdBatch.Get();
 
-			cmdBatchPtr->OpenCommandBatch(cpuWaitable);
+			cmdBatchPtr->OpenCommandBatch();
 
 			m_commandBatches.Append(std::move(cmdBatch));
 			m_numAllocatedBatches++;
@@ -249,7 +248,7 @@ namespace rkit::render::vulkan
 
 			cmdBatchPtr->ResetCommandBatch();
 
-			cmdBatchPtr->OpenCommandBatch(cpuWaitable);
+			cmdBatchPtr->OpenCommandBatch();
 
 			m_numAllocatedBatches++;
 		}

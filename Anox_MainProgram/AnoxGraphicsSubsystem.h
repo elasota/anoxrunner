@@ -2,6 +2,9 @@
 
 #include "rkit/Render/DisplayManager.h"
 #include "rkit/Render/BufferSpec.h"
+#include "rkit/Render/TimelinePoint.h"
+#include "rkit/Render/TimelineSignalType.h"
+
 #include "rkit/Core/Span.h"
 
 #include "AnoxLogicalQueue.h"
@@ -99,6 +102,15 @@ namespace anox
 
 		virtual rkit::Result CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies) = 0;
 		virtual rkit::Result CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<ISubmitJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies) = 0;
+		virtual rkit::Result CreateAndQueueRecordAndSubmitJob(
+			rkit::RCPtr<rkit::Job> *outJob,
+			LogicalQueueType queueType,
+			rkit::UniquePtr<IRecordJobRunner> &&recordJobRunner,
+			const rkit::JobDependencyList &recordDependencies,
+			rkit::UniquePtr<ISubmitJobRunner> &&submitJobRunner,
+			const rkit::JobDependencyList &submitDependencies,
+			rkit::render::TimelineSignalType signalType,
+			rkit::render::TimelinePoint_t *outTimelinePoint) = 0;
 
 		virtual rkit::Result CreateAsyncCreateTextureJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<ITexture> &outTexture, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData, const rkit::JobDependencyList &dependencies) = 0;
 		virtual rkit::Result CreateAsyncCreateAndFillBufferJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<IBuffer> &outBuffer, const rkit::RCPtr<BufferInitializer> &bufferInitializer, const rkit::JobDependencyList &dependencies) = 0;

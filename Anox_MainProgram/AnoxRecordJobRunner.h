@@ -1,15 +1,14 @@
 #pragma once
 
-namespace rkit
+namespace rkit::render
 {
-	namespace render
-	{
-		struct IBaseCommandAllocator;
-		struct IGraphicsCommandAllocator;
-		struct IGraphicsComputeCommandAllocator;
-		struct IComputeCommandAllocator;
-		struct ICopyCommandAllocator;
-	}
+	struct IBaseCommandAllocator;
+	struct IGraphicsCommandAllocator;
+	struct IGraphicsComputeCommandAllocator;
+	struct IComputeCommandAllocator;
+	struct ICopyCommandAllocator;
+
+	class TimelineSignalIntent;
 }
 
 
@@ -19,7 +18,7 @@ namespace anox
 	{
 		virtual ~IRecordJobRunner() {}
 
-		virtual rkit::Result RunBase(rkit::render::IBaseCommandAllocator &commandAllocator) = 0;
+		virtual rkit::Result RunBase(rkit::render::IBaseCommandAllocator &commandAllocator, const rkit::render::TimelineSignalIntent &signalIntent) = 0;
 	};
 
 	template<class T>
@@ -27,10 +26,10 @@ namespace anox
 	{
 		virtual ~ITypedRecordJobRunner() {}
 
-		virtual rkit::Result RunRecord(T &commandAllocator) = 0;
+		virtual rkit::Result RunRecord(T &commandAllocator, const rkit::render::TimelineSignalIntent &signalIntent) = 0;
 
 	protected:
-		rkit::Result RunBase(rkit::render::IBaseCommandAllocator &commandAllocator) override final;
+		rkit::Result RunBase(rkit::render::IBaseCommandAllocator &commandAllocator, const rkit::render::TimelineSignalIntent &signalIntent) override final;
 	};
 
 	typedef ITypedRecordJobRunner<rkit::render::IComputeCommandAllocator> IComputeRecordJobRunner_t;
@@ -46,10 +45,10 @@ namespace anox
 namespace anox
 {
 	template<class T>
-	rkit::Result ITypedRecordJobRunner<T>::RunBase(rkit::render::IBaseCommandAllocator &commandAllocator)
+	rkit::Result ITypedRecordJobRunner<T>::RunBase(rkit::render::IBaseCommandAllocator &commandAllocator, const rkit::render::TimelineSignalIntent &signalIntent)
 	{
 		T *retypedCmdAllocator = commandAllocator.DynamicCast<T>();
 
-		return this->RunRecord(*retypedCmdAllocator);
+		return this->RunRecord(*retypedCmdAllocator, signalIntent);
 	}
 }

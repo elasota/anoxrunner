@@ -23,5 +23,16 @@ namespace anox
 	class AnoxBSPModelResourceBase : public AnoxResourceBase
 	{
 	public:
+		struct DrawSurfTriRange
+		{
+			uint32_t m_firstTri = 0;
+			uint32_t m_numTris = 0;
+		};
+
+		struct DrawClusterVertRange
+		{
+			uint32_t m_firstVert = 0;
+			uint32_t m_numVerts = 0;
+		};
 	};
 }

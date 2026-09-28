@@ -82,6 +82,8 @@ namespace rkit { namespace render
 
 		virtual Result CreateBinaryCPUWaitableFence(UniquePtr<IBinaryCPUWaitableFence> &outFence, bool startSignaled) = 0;
 		virtual Result CreateBinaryGPUWaitableFence(UniquePtr<IBinaryGPUWaitableFence> &outFence) = 0;
+		virtual Result CreateCPUVisibleTimelineFence(UniquePtr<ICPUVisibleTimelineFence> &outFence, TimelinePoint_t initialValue) = 0;
+		virtual Result CreateTimelineFence(UniquePtr<ITimelineFence> &outFence, TimelinePoint_t initialValue) = 0;
 		virtual Result CreateSwapChainSyncPoint(UniquePtr<ISwapChainSyncPoint> &outSyncPoint) = 0;
 
 		virtual Result CreateRenderPassInstance(UniquePtr<IRenderPassInstance> &outInstance, const RenderPassRef_t &renderPass, const RenderPassResources &resources) = 0;
