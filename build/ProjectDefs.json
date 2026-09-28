@@ -163,7 +163,8 @@
 		"type": "module",
 		"configs":
 		[
-			"VulkanSDK"
+			"VulkanSDK",
+			"renderdoc_export",
 		],
 		"refs":
 		[

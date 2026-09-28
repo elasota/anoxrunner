@@ -29,3 +29,7 @@
 	path = thirdparty/minimp3
 	url = https://github.com/lieff/minimp3.git
 	branch = master
+[submodule "thirdparty/renderdoc"]
+	path = thirdparty/renderdoc
+	url = https://github.com/baldurk/renderdoc.git
+	branch = v1.x
