@@ -19,16 +19,15 @@
 
 #include <cstring>
 
-namespace rkit { namespace buildsystem { namespace rpc_interchange
+namespace rkit::buildsystem::rpc_interchange
 {
 	enum class EntityType
 	{
 		StaticSampler,
-		PushConstants,
 		StructDef,
 		InputLayout,
 		GraphicsPipeline,
-		DescriptorLayout,
+		PipelineLayout,
 		RenderPass,
 	};
 
@@ -51,35 +50,6 @@ namespace rkit { namespace buildsystem { namespace rpc_interchange
 
 	private:
 		String m_name;
-	};
-
-	class StaticSamplerEntity final : public Entity
-	{
-	public:
-		explicit StaticSamplerEntity() {}
-
-		render::SamplerDesc &GetDesc() { return m_desc; }
-		const render::SamplerDesc &GetDesc() const { return m_desc; }
-		EntityType GetEntityType() const override { return EntityType::StaticSampler; }
-
-	private:
-		render::SamplerDesc m_desc;
-	};
-
-	class PushConstantsEntity final : public Entity
-	{
-	public:
-		explicit PushConstantsEntity() {}
-
-		render::PushConstantListDesc &GetDesc() { return m_desc; }
-
-		Vector<const render::PushConstantDesc *> &GetPushConstantsVector() { return m_pushConstants; }
-
-		EntityType GetEntityType() const override { return EntityType::PushConstants; }
-
-	private:
-		render::PushConstantListDesc m_desc;
-		Vector<const render::PushConstantDesc *> m_pushConstants;
 	};
 
 	class StructDefEntity final : public Entity
@@ -115,19 +85,23 @@ namespace rkit { namespace buildsystem { namespace rpc_interchange
 		Vector<const render::InputLayoutVertexInputDesc *> m_vertexInputs;
 	};
 
-	class DescriptorLayoutEntity final : public Entity
+	class PipelineLayoutEntity final : public Entity
 	{
 	public:
-		explicit DescriptorLayoutEntity() {}
+		explicit PipelineLayoutEntity() {}
 
-		render::DescriptorLayoutDesc &GetDesc() { return m_desc; }
-		Vector<const render::DescriptorDesc *> &GetDescriptorDescs() { return m_descriptorDescs; }
+		render::PipelineLayoutDesc &GetDesc() { return m_desc; }
+		Vector<const render::DescriptorHeapBindingDesc *> &GetDescriptorHeaps() { return m_descriptorHeaps; }
+		Vector<const render::LayoutInlineConstantDesc *> &GetLayoutInlineConstants() { return m_layoutInlineConstants; }
+		Vector<const render::LayoutConstantBufferDesc *> &GetLayoutConstantBuffers() { return m_layoutConstantBuffers; }
 
-		EntityType GetEntityType() const override { return EntityType::DescriptorLayout; }
+		EntityType GetEntityType() const override { return EntityType::PipelineLayout; }
 
 	private:
-		render::DescriptorLayoutDesc m_desc;
-		Vector<const render::DescriptorDesc *> m_descriptorDescs;
+		render::PipelineLayoutDesc m_desc;
+		rkit::Vector<const render::DescriptorHeapBindingDesc *> m_descriptorHeaps;
+		rkit::Vector<const render::LayoutInlineConstantDesc *> m_layoutInlineConstants;
+		rkit::Vector<const render::LayoutConstantBufferDesc *> m_layoutConstantBuffers;
 	};
 
 	class GraphicsPipelineEntity final : public Entity
@@ -136,19 +110,20 @@ namespace rkit { namespace buildsystem { namespace rpc_interchange
 		explicit GraphicsPipelineEntity() {}
 
 		render::GraphicsPipelineDesc &GetDesc() { return m_desc; }
-		render::PipelineLayoutDesc &GetPipelineLayout() { return m_pipelineLayout; }
 
-		Vector<const render::DescriptorLayoutDesc *> &GetDescriptorLayouts() { return m_descriptorLayouts; }
+		Vector<const render::RenderTargetDesc *> &GetRenderTargets() { return m_renderTargets; }
 		Vector<const render::RenderOperationDesc *> &GetRenderOperations() { return m_renderOperations; }
+		Vector<const render::DescriptorHeapBindingDesc *> &GetDescriptorHeapBindings() { return m_descriptorHeapBindings; }
+		Vector<const render::ConstantBufferBindingDesc *> &GetConstantBufferBindings() { return m_constantBufferBindings; }
 
 		EntityType GetEntityType() const override { return EntityType::GraphicsPipeline; }
 
 	private:
 		render::GraphicsPipelineDesc m_desc;
-		render::PipelineLayoutDesc m_pipelineLayout;
-		Vector<const render::DescriptorLayoutDesc *> m_descriptorLayouts;
 		Vector<const render::RenderTargetDesc *> m_renderTargets;
 		Vector<const render::RenderOperationDesc *> m_renderOperations;
+		Vector<const render::DescriptorHeapBindingDesc *> m_descriptorHeapBindings;
+		Vector<const render::ConstantBufferBindingDesc *> m_constantBufferBindings;
 	};
 
 	class RenderPassEntity final : public Entity
@@ -165,9 +140,9 @@ namespace rkit { namespace buildsystem { namespace rpc_interchange
 		render::RenderPassDesc m_desc;
 		Vector<const render::RenderTargetDesc *> m_rtDescs;
 	};
-} } } // rkit::buildsystem::rpc_interchange
+} // rkit::buildsystem::rpc_interchange
 
-namespace rkit { namespace buildsystem { namespace rpc_common
+namespace rkit::buildsystem::rpc_common
 {
 	const uint32_t kLibraryIndexID = RKIT_FOURCC('R', 'P', 'L', 'I');
 	const uint32_t kLibraryIndexVersion = 1;
@@ -180,9 +155,9 @@ namespace rkit { namespace buildsystem { namespace rpc_common
 		static Result FormatIndexPath(CIPath &path, const StringView &identifier);
 		static Result FormatCombinedOutputPath(CIPath &path, const StringView &identifier);
 	};
-} } } // rkit::buildsystem::rpc_common
+} // rkit::buildsystem::rpc_common
 
-namespace rkit { namespace buildsystem { namespace rpc_analyzer
+namespace rkit::buildsystem::rpc_analyzer
 {
 	class IncludedFileKey
 	{
@@ -271,18 +246,6 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			bool m_strideIsSet = false;
 		};
 
-		enum class DescriptorTypeClassification
-		{
-			Unknown,
-
-			Sampler,
-			ConstantBuffer,
-			Buffer,
-			ByteAddressBuffer,
-			Texture,
-			RWTexture,
-		};
-
 		Result ScanTopStackItem(AnalyzerIncludeStack &item);
 		Result ParseTopStackItem(AnalyzerIncludeStack &item);
 		Result ParseDirective(const Utf8Char_t *filePath, TextParser_t &parser, bool &outHaveDirective);
@@ -290,15 +253,13 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		Result ParseIncludeDirective(const Utf8Char_t *filePath, TextParser_t &parser);
 
 		template<class T>
-		Result ParseEntity(const Utf8Char_t *blamePath, TextParser_t &parser, Result(LibraryAnalyzer:: *parseFunc)(const Utf8Char_t *, TextParser_t &, T &));
+		Result ParseEntity(const Utf8Char_t *blamePath, TextParser_t &parser, Result(LibraryAnalyzer:: *parseFunc)(const Utf8Char_t *, StringView, TextParser_t &, T &));
 
-		Result ParseStaticSampler(const Utf8Char_t *filePath, TextParser_t &parser, rpc_interchange::StaticSamplerEntity &ss);
-		Result ParsePushConstants(const Utf8Char_t *filePath, TextParser_t &parser, rpc_interchange::PushConstantsEntity &pc);
-		Result ParseStructDef(const Utf8Char_t *filePath, TextParser_t &parser, rpc_interchange::StructDefEntity &pc);
-		Result ParseInputLayout(const Utf8Char_t *filePath, TextParser_t &parser, rpc_interchange::InputLayoutEntity &il);
-		Result ParseDescriptorLayout(const Utf8Char_t *filePath, TextParser_t &parser, rpc_interchange::DescriptorLayoutEntity &dl);
-		Result ParseGraphicsPipeline(const Utf8Char_t *filePath, TextParser_t &parser, rpc_interchange::GraphicsPipelineEntity &gp);
-		Result ParseRenderPass(const Utf8Char_t *filePath, TextParser_t &parser, rpc_interchange::RenderPassEntity &gp);
+		Result ParseStructDef(const Utf8Char_t *filePath, StringView name, TextParser_t &parser, rpc_interchange::StructDefEntity &pc);
+		Result ParseInputLayout(const Utf8Char_t *filePath, StringView name, TextParser_t &parser, rpc_interchange::InputLayoutEntity &il);
+		Result ParsePipelineLayout(const Utf8Char_t *filePath, StringView name, TextParser_t &parser, rpc_interchange::PipelineLayoutEntity &pl);
+		Result ParseGraphicsPipeline(const Utf8Char_t *filePath, StringView name, TextParser_t &parser, rpc_interchange::GraphicsPipelineEntity &gp);
+		Result ParseRenderPass(const Utf8Char_t *filePath, StringView name, TextParser_t &parser, rpc_interchange::RenderPassEntity &gp);
 
 		Result ResolveQuotedString(ShortTempToken &outToken, const Span<const Utf8Char_t> &inToken);
 		Result ResolveInputLayoutVertexInputs(const Utf8Char_t *filePath, size_t line, size_t col, render::TempStringIndex_t feedName, const Span<const Utf8Char_t> &nameBase, Vector<const render::InputLayoutVertexInputDesc *> &descsVector, uint32_t &inOutOffset, const render::ValueType &inputSourcesType, render::InputLayoutVertexFeedDesc *inputFeed);
@@ -345,7 +306,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		Result IndexString(const render::GlobalStringIndex_t &globalIndex, render::TempStringIndex_t &outStringIndex);
 
-		static DescriptorTypeClassification ClassifyDescriptorType(render::DescriptorType descType);
+		static bool IsBindingTyped(render::DescriptorBindingType descType);
 
 		void RemoveTopStackItem();
 
@@ -366,15 +327,18 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		Vector<ConfigKey> m_configKeys;
 		Vector<render::GlobalStringIndex_t> m_tempStrings;
 
-		Vector<UniquePtr<render::PushConstantDesc>> m_pcDescs;
 		Vector<UniquePtr<render::StructureMemberDesc>> m_smDescs;
 		Vector<UniquePtr<render::InputLayoutVertexInputDesc>> m_vertexInputDescs;
-		Vector<UniquePtr<render::DescriptorDesc>> m_dDescs;
 		Vector<UniquePtr<render::RenderTargetDesc>> m_rtDescs;
 		Vector<UniquePtr<render::RenderOperationDesc>> m_roDescs;
 		Vector<UniquePtr<render::ShaderDesc>> m_shaderDescs;
 		Vector<UniquePtr<render::DepthStencilOperationDesc>> m_depthStencilOperationDescs;
 		Vector<UniquePtr<render::DepthStencilTargetDesc>> m_depthStencilTargetDescs;
+		Vector<UniquePtr<render::DescriptorHeapBindingDesc>> m_dhbDescs;
+		Vector<UniquePtr<render::LayoutInlineConstantDesc>> m_licDescs;
+		Vector<UniquePtr<render::LayoutConstantBufferDesc>> m_lcbDescs;
+		Vector<UniquePtr<render::ConstantBufferBindingDesc>> m_cbbDescs;
+
 
 		Vector<render::GraphicsPipelineNameLookup> m_graphicsPipelines;
 		Vector<render::RenderPassNameLookup> m_renderPasses;
@@ -387,9 +351,9 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		Vector<UniquePtr<render::InputLayoutVertexFeedDesc>> m_vertexFeedDescs;
 	};
-} } } // rkit::buildsystem::rpc_analyzer
+} // rkit::buildsystem::rpc_analyzer
 
-namespace rkit { namespace buildsystem { namespace rpc_combiner
+namespace rkit::buildsystem::rpc_combiner
 {
 	class LibraryCombiner final : public IPipelineLibraryCombiner, public NoCopy
 	{
@@ -425,9 +389,9 @@ namespace rkit { namespace buildsystem { namespace rpc_combiner
 
 		data::IDataDriver *m_dataDriver;
 	};
-} } } // rkit::buildsystem::rpc_combiner
+} // rkit::buildsystem::rpc_combiner
 
-namespace rkit { namespace buildsystem { namespace rpc_compiler
+namespace rkit::buildsystem::rpc_compiler
 {
 	class LibraryCompiler final : public rpc_common::LibraryCompilerBase
 	{
@@ -441,7 +405,7 @@ namespace rkit { namespace buildsystem { namespace rpc_compiler
 
 		IDependencyNodeCompilerFeedback *m_feedback;
 	};
-} } } // rkit::buildsystem::rpc_compiler
+} // rkit::buildsystem::rpc_compiler
 
 namespace rkit
 {
@@ -455,7 +419,7 @@ namespace rkit
 	};
 }
 
-namespace rkit { namespace buildsystem { namespace rpc_common
+namespace rkit::buildsystem::rpc_common
 {
 	Result LibraryCompilerBase::FormatGraphicPipelinePath(CIPath &path, const StringView &identifier, size_t pipelineIndex)
 	{
@@ -488,9 +452,9 @@ namespace rkit { namespace buildsystem { namespace rpc_common
 
 		return path.Set(str);
 	}
-} } } // rkit::buildsystem::rpc_common
+} // rkit::buildsystem::rpc_common
 
-namespace rkit { namespace buildsystem { namespace rpc_analyzer
+namespace rkit::buildsystem::rpc_analyzer
 {
 	IncludedFileKey::IncludedFileKey(BuildFileLocation location, const CIPath &str)
 		: m_location(location)
@@ -741,16 +705,12 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			{
 				if (IsToken(directiveToken, u8"include"))
 					return ParseIncludeDirective(path, parser);
-				else if (IsToken(directiveToken, u8"StaticSampler"))
-					return ParseEntity(path, parser, &LibraryAnalyzer::ParseStaticSampler);
-				else if (IsToken(directiveToken, u8"PushConstants"))
-					return ParseEntity(path, parser, &LibraryAnalyzer::ParsePushConstants);
 				else if (IsToken(directiveToken, u8"struct"))
 					return ParseEntity(path, parser, &LibraryAnalyzer::ParseStructDef);
 				else if (IsToken(directiveToken, u8"InputLayout"))
 					return ParseEntity(path, parser, &LibraryAnalyzer::ParseInputLayout);
-				else if (IsToken(directiveToken, u8"DescriptorLayout"))
-					return ParseEntity(path, parser, &LibraryAnalyzer::ParseDescriptorLayout);
+				else if (IsToken(directiveToken, u8"PipelineLayout"))
+					return ParseEntity(path, parser, &LibraryAnalyzer::ParsePipelineLayout);
 				else if (IsToken(directiveToken, u8"GraphicsPipeline"))
 					return ParseEntity(path, parser, &LibraryAnalyzer::ParseGraphicsPipeline);
 				else if (IsToken(directiveToken, u8"RenderPass"))
@@ -776,7 +736,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 	}
 
 	template<class T>
-	Result LibraryAnalyzer::ParseEntity(const Utf8Char_t *blamePath, TextParser_t &parser, Result(LibraryAnalyzer:: *parseFunc)(const Utf8Char_t *, TextParser_t &, T &))
+	Result LibraryAnalyzer::ParseEntity(const Utf8Char_t *blamePath, TextParser_t &parser, Result(LibraryAnalyzer:: *parseFunc)(const Utf8Char_t *, StringView, TextParser_t &, T &))
 	{
 		size_t line = 0;
 		size_t col = 0;
@@ -800,81 +760,16 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		T *obj = static_cast<T *>(entity.Get());
 
-		(this->*parseFunc)(blamePath, parser, *obj);
+		(this->*parseFunc)(blamePath, entityName, parser, *obj);
 
 		m_entities.Set(entityName, std::move(entity));
 	}
 
-	Result LibraryAnalyzer::ParseStaticSampler(const Utf8Char_t *blamePath, TextParser_t &parser, rpc_interchange::StaticSamplerEntity &ss)
+	Result LibraryAnalyzer::ParseStructDef(const Utf8Char_t *blamePath, StringView name, TextParser_t &parser, rpc_interchange::StructDefEntity &sd)
 	{
-		const data::RenderRTTIStructType *rtti = m_dataDriver->GetRenderDataHandler()->GetSamplerDescRTTI();
+		render::TempStringIndex_t structNameTSI;
+		IndexString(name.ToSpan(), structNameTSI);
 
-		parser.ExpectToken(u8"{");
-
-		for (;;)
-		{
-			Span<const Utf8Char_t> token;
-			parser.RequireToken(token);
-
-			if (IsToken(token, u8"}"))
-				break;
-
-			ParseDynamicStructMember(blamePath, token, rtti, ss.GetDesc(), parser);
-		}
-
-		RKIT_RETURN_OK;
-	}
-
-	Result LibraryAnalyzer::ParsePushConstants(const Utf8Char_t *blamePath, TextParser_t &parser, rpc_interchange::PushConstantsEntity &pc)
-	{
-		const data::RenderRTTIStructType *rtti = m_dataDriver->GetRenderDataHandler()->GetPushConstantDescRTTI();
-
-		parser.ExpectToken(u8"{");
-
-		for (;;)
-		{
-			Span<const Utf8Char_t> nameToken;
-
-			size_t line = 0;
-			size_t col = 0;
-			parser.GetLocation(line, col);
-
-			parser.RequireToken(nameToken);
-
-			if (IsToken(nameToken, u8"}"))
-				break;
-
-			render::TempStringIndex_t tsi;
-			IndexString(nameToken, tsi);
-
-			for (const render::PushConstantDesc *pcDesc : pc.GetPushConstantsVector())
-			{
-				if (pcDesc->m_name == tsi)
-				{
-					rkit::log::ErrorFmt(u8"{} [{}:{}] Push constant with this name already exists", blamePath, line, col);
-					RKIT_THROW(ResultCode::kMalformedFile);
-				}
-			}
-
-			CheckValidIdentifier(blamePath, nameToken, parser);
-
-			parser.ExpectToken(u8"=");
-
-			UniquePtr<render::PushConstantDesc> pcDesc = New<render::PushConstantDesc>();
-
-			ParseValue(blamePath, &rtti->m_base, pcDesc.Get(), false, parser);
-
-			pc.GetPushConstantsVector().Append(pcDesc.Get());
-			this->m_pcDescs.Append(std::move(pcDesc));
-		}
-
-		pc.GetDesc().m_pushConstants = pc.GetPushConstantsVector().ToSpan();
-
-		RKIT_RETURN_OK;
-	}
-
-	Result LibraryAnalyzer::ParseStructDef(const Utf8Char_t *blamePath, TextParser_t &parser, rpc_interchange::StructDefEntity &sd)
-	{
 		parser.ExpectToken(u8"{");
 
 		for (;;)
@@ -922,12 +817,11 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			this->m_smDescs.Append(std::move(smDesc));
 		}
 
+		sd.GetDesc().m_name = structNameTSI;
 		sd.GetDesc().m_members = sd.GetStructMembersVector().ToSpan();
-
-		RKIT_RETURN_OK;
 	}
 
-	Result LibraryAnalyzer::ParseInputLayout(const Utf8Char_t *blamePath, TextParser_t &parser, rpc_interchange::InputLayoutEntity &il)
+	Result LibraryAnalyzer::ParseInputLayout(const Utf8Char_t *blamePath, StringView name, TextParser_t &parser, rpc_interchange::InputLayoutEntity &il)
 	{
 		parser.ExpectToken(u8"{");
 
@@ -1215,11 +1109,30 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		RKIT_RETURN_OK;
 	}
 
-	Result LibraryAnalyzer::ParseDescriptorLayout(const Utf8Char_t *filePath, TextParser_t &parser, rpc_interchange::DescriptorLayoutEntity &dl)
+	Result LibraryAnalyzer::ParsePipelineLayout(const Utf8Char_t *filePath, StringView name, TextParser_t &parser, rpc_interchange::PipelineLayoutEntity &pl)
 	{
 		parser.ExpectToken(u8"{");
 
-		const data::RenderRTTIStructType *descRTTI = m_dataDriver->GetRenderDataHandler()->GetDescriptorDescRTTI();
+		const data::RenderRTTIStructType *pipelineLayoutRTTI = m_dataDriver->GetRenderDataHandler()->GetPipelineLayoutDescRTTI();
+		const data::RenderRTTIStructType *inlineConstantRTTI = m_dataDriver->GetRenderDataHandler()->GetLayoutInlineConstantDescRTTI();
+		const data::RenderRTTIStructType *constantBufferRTTI = m_dataDriver->GetRenderDataHandler()->GetLayoutConstantBufferRTTI();
+
+		auto haveExistingCB = [&pl](const render::TempStringIndex_t& nameStr) -> bool
+			{
+				for (const render::LayoutConstantBufferDesc *existingDesc : pl.GetLayoutConstantBuffers())
+				{
+					if (existingDesc->m_name == nameStr)
+						return true;
+				}
+
+				for (const render::LayoutInlineConstantDesc *existingDesc : pl.GetLayoutInlineConstants())
+				{
+					if (existingDesc->m_name == nameStr)
+						return true;
+				}
+
+				return false;
+			};
 
 		for (;;)
 		{
@@ -1233,225 +1146,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			if (IsToken(token, u8"}"))
 				break;
 
-			render::TempStringIndex_t descNameIndex;
-			IndexString(token, descNameIndex);
-
-			for (const render::DescriptorDesc *existingDesc : dl.GetDescriptorDescs())
-			{
-				if (existingDesc->m_name == descNameIndex)
-				{
-					rkit::log::ErrorFmt(u8"{} [{}:{}] Descriptor with that name already exists", filePath, line, col);
-					RKIT_THROW(ResultCode::kMalformedFile);
-				}
-			}
-
-			parser.ExpectToken(u8"=");
-
-			UniquePtr<render::DescriptorDesc> descDesc = New<render::DescriptorDesc>();
-
-			parser.ExpectToken(u8"{");
-
-			parser.RequireToken(token);
-
-			bool typeWasSpecified = false;
-			for (;;)
-			{
-				parser.GetLocation(line, col);
-
-				if (IsToken(token, u8"}"))
-					break;
-
-				if (IsToken(token, u8"Type"))
-				{
-					if (typeWasSpecified)
-					{
-						rkit::log::ErrorFmt(u8"{} [{}:{}] Type was already specified", filePath, line, col);
-						RKIT_THROW(ResultCode::kMalformedFile);
-					}
-
-					typeWasSpecified = true;
-
-					parser.ExpectToken(u8"=");
-
-					parser.GetLocation(line, col);
-					parser.RequireToken(token);
-
-					const data::RenderRTTIEnumType *typeEnumType = m_dataDriver->GetRenderDataHandler()->GetDescriptorTypeRTTI();
-					render::DescriptorType descType = render::DescriptorType::Count;
-
-					for (size_t i = 0; i < typeEnumType->m_numOptions; i++)
-					{
-						const data::RenderRTTIEnumOption &option = typeEnumType->m_options[i];
-						if (IsTokenChars(token, option.m_name, option.m_nameLength))
-						{
-							descType = static_cast<render::DescriptorType>(option.m_value);
-							break;
-						}
-					}
-
-					if (descType == render::DescriptorType::Count)
-					{
-						rkit::log::ErrorFmt(u8"{} [{}:{}] Invalid descriptor type", filePath, line, col);
-						RKIT_THROW(ResultCode::kMalformedFile);
-					}
-
-					descDesc->m_descriptorType = descType;
-
-					DescriptorTypeClassification classification = ClassifyDescriptorType(descType);
-
-					switch (classification)
-					{
-					case DescriptorTypeClassification::Texture:
-					case DescriptorTypeClassification::RWTexture:
-						parser.RequireToken(token);
-						if (IsToken(token, u8"<"))
-						{
-							parser.GetLocation(line, col);
-
-							parser.RequireToken(token);
-							ParseValueType(filePath, descDesc->m_valueType, token, parser);
-							parser.ExpectToken(u8">");
-
-							if (descDesc->m_valueType.m_type != render::ValueTypeType::Numeric && descDesc->m_valueType.m_type != render::ValueTypeType::VectorNumeric)
-							{
-								rkit::log::ErrorFmt(u8"{} [{}:{}] Invalid type for texture", filePath, line, col);
-								RKIT_THROW(ResultCode::kMalformedFile);
-							}
-
-							parser.RequireToken(token);
-						}
-						break;
-					case DescriptorTypeClassification::Buffer:
-					case DescriptorTypeClassification::ConstantBuffer:
-						parser.ExpectToken(u8"<");
-
-						parser.GetLocation(line, col);
-
-						parser.RequireToken(token);
-						ParseValueType(filePath, descDesc->m_valueType, token, parser);
-						parser.ExpectToken(u8">");
-
-						parser.RequireToken(token);
-						break;
-					case DescriptorTypeClassification::ByteAddressBuffer:
-					case DescriptorTypeClassification::Sampler:
-						parser.RequireToken(token);
-						break;
-
-					default:
-						RKIT_THROW(ResultCode::kInternalError);
-					}
-
-					if (IsToken(token, u8"["))
-					{
-						parser.GetLocation(line, col);
-						parser.RequireToken(token);
-
-						if (IsToken(token, u8"]"))
-							descDesc->m_arraySize = 0;
-						else
-						{
-							uint64_t arraySize = 0;
-							ParseUIntConstant(filePath, line, col, token, std::numeric_limits<uint32_t>::max(), arraySize);
-
-							if (arraySize < 2)
-							{
-								rkit::log::ErrorFmt(u8"{} [{}:{}] Invalid descriptor array size", filePath, line, col);
-								RKIT_THROW(ResultCode::kMalformedFile);
-							}
-
-							descDesc->m_arraySize = static_cast<uint32_t>(arraySize);
-
-							parser.RequireToken(token);
-						}
-					}
-				}
-				else if (IsToken(token, u8"Sampler"))
-				{
-					if (!typeWasSpecified)
-					{
-						rkit::log::ErrorFmt(u8"{} [{}:{}] Static sampler must be after type", filePath, line, col);
-						RKIT_THROW(ResultCode::kMalformedFile);
-					}
-
-					DescriptorTypeClassification classification = ClassifyDescriptorType(descDesc->m_descriptorType);
-					if (classification != DescriptorTypeClassification::Texture)
-					{
-						rkit::log::ErrorFmt(u8"{} [{}:{}] Static sampler is only valid for texture types", filePath, line, col);
-						RKIT_THROW(ResultCode::kMalformedFile);
-					}
-
-					parser.ExpectToken(u8"=");
-
-					parser.GetLocation(line, col);
-
-					parser.RequireToken(token);
-
-					HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(StringSliceView(token));
-					if (it == m_entities.end())
-					{
-						rkit::log::ErrorFmt(u8"{} [{}:{}] Unknown static sampler", filePath, line, col);
-						RKIT_THROW(ResultCode::kMalformedFile);
-					}
-
-					if (it.Value()->GetEntityType() != rpc_interchange::EntityType::StaticSampler)
-					{
-						rkit::log::ErrorFmt(u8"{} [{}:{}] Value wasn't a static sampler", filePath, line, col);
-						RKIT_THROW(ResultCode::kMalformedFile);
-					}
-
-					descDesc->m_staticSamplerDesc = &static_cast<const rpc_interchange::StaticSamplerEntity *>(it.Value().Get())->GetDesc();
-
-					parser.RequireToken(token);
-				}
-				else
-				{
-					rkit::log::ErrorFmt(u8"{} [{}:{}] Invalid descriptor desc property", filePath, line, col);
-					RKIT_THROW(ResultCode::kMalformedFile);
-				}
-			}
-
-			if (!typeWasSpecified)
-			{
-				rkit::log::ErrorFmt(u8"{} [{}:{}] Descriptor missing type", filePath, line, col);
-				RKIT_THROW(ResultCode::kMalformedFile);
-			}
-
-			descDesc->m_name = descNameIndex;
-
-			dl.GetDescriptorDescs().Append(descDesc.Get());
-
-			m_dDescs.Append(std::move(descDesc));
-		}
-
-		dl.GetDesc().m_descriptors = dl.GetDescriptorDescs().ToSpan();
-
-		RKIT_RETURN_OK;
-	}
-
-	Result LibraryAnalyzer::ParseGraphicsPipeline(const Utf8Char_t *filePath, TextParser_t &parser, rpc_interchange::GraphicsPipelineEntity &gp)
-	{
-		parser.ExpectToken(u8"{");
-
-		const data::RenderRTTIStructType *pipelineRTTI = m_dataDriver->GetRenderDataHandler()->GetGraphicsPipelineDescRTTI();
-		const data::RenderRTTIStructType *shaderDescRTTI = m_dataDriver->GetRenderDataHandler()->GetShaderDescRTTI();
-		const data::RenderRTTIStructType *depthStencilOperationDescRTTI = m_dataDriver->GetRenderDataHandler()->GetDepthStencilOperationDescRTTI();
-
-		HashMap<String, const render::RenderOperationDesc *> nameToRODesc;
-
-		for (;;)
-		{
-			Span<const Utf8Char_t> token;
-			parser.RequireToken(token);
-
-			size_t line = 0;
-			size_t col = 0;
-			parser.GetLocation(line, col);
-
-			if (IsToken(token, u8"}"))
-				break;
-
-			if (IsToken(token, u8"DescriptorLayouts"))
+			if (IsToken(token, u8"InlineConstants"))
 			{
 				parser.ExpectToken(u8"=");
 				parser.ExpectToken(u8"{");
@@ -1465,21 +1160,145 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					if (IsToken(token, u8"}"))
 						break;
 
-					HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(StringSliceView(token));
+					render::TempStringIndex_t nameStr;
+					IndexString(token, nameStr);
 
-					if (it == m_entities.end())
+					if (haveExistingCB(nameStr))
 					{
-						rkit::log::ErrorFmt(u8"{} [{}:{}] Couldn't resolve descriptor layout", filePath, line, col);
+						rkit::log::ErrorFmt(u8"{} [{}:{}] Constant buffer was specified multiple times", filePath, line, col);
 						RKIT_THROW(ResultCode::kMalformedFile);
 					}
 
-					if (it.Value()->GetEntityType() != rpc_interchange::EntityType::DescriptorLayout)
+					parser.ExpectToken(u8"=");
+
+					rkit::UniquePtr<render::LayoutInlineConstantDesc> ic = rkit::New<render::LayoutInlineConstantDesc>();
+					ParseStruct(filePath, inlineConstantRTTI, ic.Get(), parser);
+
+					ic->m_name = nameStr;
+					pl.GetLayoutInlineConstants().Append(ic.Get());
+
+					m_licDescs.Append(std::move(ic));
+				}
+			}
+			else if (IsToken(token, u8"ConstantBufferBindings"))
+			{
+				parser.ExpectToken(u8"=");
+				parser.ExpectToken(u8"{");
+
+				for (;;)
+				{
+					parser.GetLocation(line, col);
+
+					parser.RequireToken(token);
+
+					if (IsToken(token, u8"}"))
+						break;
+
+					render::TempStringIndex_t nameStr;
+					IndexString(token, nameStr);
+
+					if (haveExistingCB(nameStr))
 					{
-						rkit::log::ErrorFmt(u8"{} [{}:{}] Value wasn't a descriptor layout", filePath, line, col);
+						rkit::log::ErrorFmt(u8"{} [{}:{}] Constant buffer was specified multiple times", filePath, line, col);
 						RKIT_THROW(ResultCode::kMalformedFile);
 					}
 
-					gp.GetDescriptorLayouts().Append(&static_cast<rpc_interchange::DescriptorLayoutEntity *>(it.Value().Get())->GetDesc());
+					parser.ExpectToken(u8"=");
+
+					rkit::UniquePtr<render::LayoutConstantBufferDesc> cb = rkit::New<render::LayoutConstantBufferDesc>();
+					ParseStruct(filePath, constantBufferRTTI, cb.Get(), parser);
+
+					cb->m_name = nameStr;
+					pl.GetLayoutConstantBuffers().Append(cb.Get());
+
+					m_lcbDescs.Append(std::move(cb));
+				}
+			}
+			else
+			{
+				ParseStructMember(filePath, token, pipelineLayoutRTTI, &pl.GetDesc(), parser);
+			}
+		}
+
+		pl.GetDesc().m_constantBuffers = pl.GetLayoutConstantBuffers().ToSpan();
+		pl.GetDesc().m_inlineConstants = pl.GetLayoutInlineConstants().ToSpan();
+	}
+
+	Result LibraryAnalyzer::ParseGraphicsPipeline(const Utf8Char_t *filePath, StringView name, TextParser_t &parser, rpc_interchange::GraphicsPipelineEntity &gp)
+	{
+		parser.ExpectToken(u8"{");
+
+		const data::RenderRTTIStructType *pipelineRTTI = m_dataDriver->GetRenderDataHandler()->GetGraphicsPipelineDescRTTI();
+		const data::RenderRTTIStructType *shaderDescRTTI = m_dataDriver->GetRenderDataHandler()->GetShaderDescRTTI();
+		const data::RenderRTTIStructType *depthStencilOperationDescRTTI = m_dataDriver->GetRenderDataHandler()->GetDepthStencilOperationDescRTTI();
+		const data::RenderRTTIEnumType *descriptorBindingTypeRTTI = m_dataDriver->GetRenderDataHandler()->GetDescriptorBindingTypeRTTI();
+
+		HashMap<String, const render::RenderOperationDesc *> nameToRODesc;
+
+		for (;;)
+		{
+			size_t line = 0;
+			size_t col = 0;
+			Span<const Utf8Char_t> token;
+			parser.RequireToken(token);
+
+			parser.GetLocation(line, col);
+
+			if (IsToken(token, u8"}"))
+				break;
+
+			if (IsToken(token, u8"ConstantBuffers"))
+			{
+				parser.ExpectToken(u8"=");
+				parser.ExpectToken(u8"{");
+
+				for (;;)
+				{
+					parser.GetLocation(line, col);
+
+					parser.RequireToken(token);
+
+					if (IsToken(token, u8"}"))
+						break;
+
+					render::TempStringIndex_t nameStr;
+					IndexString(token, nameStr);
+
+					const render::PipelineLayoutDesc *pipelineLayout = gp.GetDesc().m_pipelineLayout;
+					if (!pipelineLayout)
+					{
+						rkit::log::ErrorFmt(u8"{} [{}:{}] Pipeline layout must be specified before binding a constant buffer", filePath, line, col);
+						RKIT_THROW(ResultCode::kMalformedFile);
+					}
+
+					size_t index = 0;
+					for (const render::LayoutConstantBufferDesc *bufferDesc : pipelineLayout->m_constantBuffers)
+					{
+						if (bufferDesc->m_name == nameStr)
+							break;
+
+						index++;
+					}
+
+					if (index == pipelineLayout->m_constantBuffers.Count())
+					{
+						rkit::log::ErrorFmt(u8"{} [{}:{}] Constant buffer binding not found", filePath, line, col);
+						RKIT_THROW(ResultCode::kMalformedFile);
+					}
+
+					parser.ExpectToken(u8"=");
+					parser.RequireToken(token);
+
+					render::ValueType valueType;
+					ParseValueType(filePath, valueType, token, parser);
+
+					rkit::UniquePtr<render::ConstantBufferBindingDesc> cbBinding = rkit::New<render::ConstantBufferBindingDesc>();
+					cbBinding->m_bindingIndex = static_cast<uint32_t>(index);
+					cbBinding->m_valueType = valueType;
+
+					gp.GetConstantBufferBindings().Append(cbBinding.Get());
+
+					m_cbbDescs.Append(std::move(cbBinding));
 				}
 			}
 			else if (IsToken(token, u8"RenderTargets"))
@@ -1518,9 +1337,74 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					m_roDescs.Append(std::move(roDesc));
 				}
 			}
-			else if (IsToken(token, u8"PushConstants"))
+			else if (IsToken(token, u8"DescriptorHeaps"))
 			{
-				RKIT_THROW(ResultCode::kNotYetImplemented);
+
+				parser.ExpectToken(u8"=");
+				parser.ExpectToken(u8"{");
+
+				for (;;)
+				{
+					parser.GetLocation(line, col);
+
+					parser.RequireToken(token);
+
+					if (IsToken(token, u8"}"))
+						break;
+
+					render::TempStringIndex_t nameStr;
+					IndexString(token, nameStr);
+
+					parser.ExpectToken(u8"=");
+
+					render::DescriptorBindingType bindingType = render::DescriptorBindingType::Count;
+					ParseEnum(filePath, descriptorBindingTypeRTTI, &bindingType, false, parser);
+
+					render::ValueType valueType;
+
+					if (IsBindingTyped(bindingType))
+					{
+						parser.ExpectToken(u8"<");
+						parser.RequireToken(token);
+						ParseValueType(filePath, valueType, token, parser);
+						parser.ExpectToken(u8">");
+					}
+					
+
+
+					ParseValueType(filePath, valueType, token, parser);
+
+					rkit::UniquePtr<render::DescriptorHeapBindingDesc> dhBinding = rkit::New<render::DescriptorHeapBindingDesc>();
+					dhBinding->m_name = nameStr;
+					dhBinding->m_type = bindingType;
+					dhBinding->m_valueType = valueType;
+
+					gp.GetDescriptorHeapBindings().Append(dhBinding.Get());
+
+					m_dhbDescs.Append(std::move(dhBinding));
+				}
+			}
+			else if (IsToken(token, u8"PipelineLayout"))
+			{
+				parser.ExpectToken(u8"=");
+
+				parser.GetLocation(line, col);
+				parser.RequireToken(token);
+
+				HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(StringSliceView(token));
+				if (it == m_entities.end())
+				{
+					rkit::log::ErrorFmt(u8"{} [{}:{}] Unknown pipeline layout identifier", filePath, line, col);
+					RKIT_THROW(ResultCode::kMalformedFile);
+				}
+
+				if (it.Value()->GetEntityType() != rpc_interchange::EntityType::PipelineLayout)
+				{
+					rkit::log::ErrorFmt(u8"{} [{}:{}] Value wasn't a pipeline layout", filePath, line, col);
+					RKIT_THROW(ResultCode::kMalformedFile);
+				}
+
+				gp.GetDesc().m_pipelineLayout = &static_cast<rpc_interchange::PipelineLayoutEntity *>(it.Value().Get())->GetDesc();
 			}
 			else if (IsToken(token, u8"VertexShaderOutput"))
 			{
@@ -1607,9 +1491,14 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 			}
 		}
 
-		gp.GetPipelineLayout().m_descriptorLayouts = gp.GetDescriptorLayouts().ToSpan();
-
-		gp.GetDesc().m_pipelineLayout = &gp.GetPipelineLayout();
+		if (gp.GetDesc().m_pipelineLayout == nullptr)
+		{
+			size_t line = 0;
+			size_t col = 0;
+			parser.GetLocation(line, col);
+			rkit::log::ErrorFmt(u8"{} [{}:{}] Pipeline did not specify PipelineLayout", filePath, line, col);
+			RKIT_THROW(ResultCode::kMalformedFile);
+		}
 
 		const render::RenderPassDesc *renderPass = gp.GetDesc().m_executeInPass;
 
@@ -1713,6 +1602,8 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		}
 
 		gp.GetDesc().m_renderTargets = gp.GetRenderOperations().ToSpan();
+		gp.GetDesc().m_constantBufferBindings = gp.GetConstantBufferBindings().ToSpan();
+		gp.GetDesc().m_descriptorHeapBindings = gp.GetDescriptorHeapBindings().ToSpan();
 
 		render::GraphicsPipelineNameLookup nameLookup;
 		IndexString(gp.GetName().ToSpan(), nameLookup.m_name);
@@ -1723,7 +1614,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		RKIT_RETURN_OK;
 	}
 
-	Result LibraryAnalyzer::ParseRenderPass(const Utf8Char_t *filePath, TextParser_t &parser, rpc_interchange::RenderPassEntity &rp)
+	Result LibraryAnalyzer::ParseRenderPass(const Utf8Char_t *filePath, StringView name, TextParser_t &parser, rpc_interchange::RenderPassEntity &rp)
 	{
 		parser.ExpectToken(u8"{");
 
@@ -2146,7 +2037,7 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 					Deduplicate(m_vectorTypes, vectorType, deduplicated);
 
 					valueType = render::ValueType(deduplicated);
-					RKIT_RETURN_OK;
+					return;
 				}
 			}
 			else if (extraChars == 3)
@@ -2157,15 +2048,15 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 				if ((c0 >= '2' && c0 <= '4') && c1 == 'x' && (c2 >= '2' && c2 <= '4'))
 				{
 					render::CompoundNumericType compoundType;
-					compoundType.m_cols = static_cast<render::VectorDimension>(static_cast<int>(render::VectorDimension::Dimension2) + (c0 - '2'));
-					compoundType.m_rows = static_cast<render::VectorDimension>(static_cast<int>(render::VectorDimension::Dimension2) + (c2 - '2'));
+					compoundType.m_rows = static_cast<render::VectorDimension>(static_cast<int>(render::VectorDimension::Dimension2) + (c0 - '2'));
+					compoundType.m_cols = static_cast<render::VectorDimension>(static_cast<int>(render::VectorDimension::Dimension2) + (c2 - '2'));
 					compoundType.m_numericType = ntr.m_numericType;
 
 					const render::CompoundNumericType *deduplicated = nullptr;
 					Deduplicate(m_compoundTypes, compoundType, deduplicated);
 
 					valueType = render::ValueType(deduplicated);
-					RKIT_RETURN_OK;
+					return;
 				}
 			}
 		}
@@ -2540,8 +2431,6 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		parser.ExpectToken(u8"=");
 
 		ParseValue(blamePath, resolvedField->m_getTypeFunc(), fieldPtr, resolvedField->m_isConfigurable, parser);
-
-		RKIT_RETURN_OK;
 	}
 
 	template<class T>
@@ -2584,43 +2473,36 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 		RKIT_RETURN_OK;
 	}
 
-	LibraryAnalyzer::DescriptorTypeClassification LibraryAnalyzer::ClassifyDescriptorType(render::DescriptorType descType)
+	bool LibraryAnalyzer::IsBindingTyped(render::DescriptorBindingType descType)
 	{
 		switch (descType)
 		{
-		case render::DescriptorType::Sampler:
-			return DescriptorTypeClassification::Sampler;
+		case render::DescriptorBindingType::Sampler:
+		case render::DescriptorBindingType::ByteAddressBuffer:
+		case render::DescriptorBindingType::RWByteAddressBuffer:
+			return false;
 
-		case render::DescriptorType::StaticConstantBuffer:
-		case render::DescriptorType::DynamicConstantBuffer:
-			return DescriptorTypeClassification::ConstantBuffer;
-
-		case render::DescriptorType::Buffer:
-		case render::DescriptorType::RWBuffer:
-			return DescriptorTypeClassification::Buffer;
-
-		case render::DescriptorType::ByteAddressBuffer:
-		case render::DescriptorType::RWByteAddressBuffer:
-			return DescriptorTypeClassification::ByteAddressBuffer;
-
-		case render::DescriptorType::Texture1D:
-		case render::DescriptorType::Texture1DArray:
-		case render::DescriptorType::Texture2D:
-		case render::DescriptorType::Texture2DArray:
-		case render::DescriptorType::Texture2DMS:
-		case render::DescriptorType::Texture2DMSArray:
-		case render::DescriptorType::Texture3D:
-		case render::DescriptorType::TextureCube:
-		case render::DescriptorType::TextureCubeArray:
-		case render::DescriptorType::RWTexture1D:
-		case render::DescriptorType::RWTexture1DArray:
-		case render::DescriptorType::RWTexture2D:
-		case render::DescriptorType::RWTexture2DArray:
-		case render::DescriptorType::RWTexture3D:
-			return DescriptorTypeClassification::Texture;
+		case render::DescriptorBindingType::Buffer:
+		case render::DescriptorBindingType::RWBuffer:
+		case render::DescriptorBindingType::Texture1D:
+		case render::DescriptorBindingType::Texture1DArray:
+		case render::DescriptorBindingType::Texture2D:
+		case render::DescriptorBindingType::Texture2DArray:
+		case render::DescriptorBindingType::Texture2DMS:
+		case render::DescriptorBindingType::Texture2DMSArray:
+		case render::DescriptorBindingType::Texture3D:
+		case render::DescriptorBindingType::TextureCube:
+		case render::DescriptorBindingType::TextureCubeArray:
+		case render::DescriptorBindingType::RWTexture1D:
+		case render::DescriptorBindingType::RWTexture1DArray:
+		case render::DescriptorBindingType::RWTexture2D:
+		case render::DescriptorBindingType::RWTexture2DArray:
+		case render::DescriptorBindingType::RWTexture3D:
+			return true;
 
 		default:
-			return DescriptorTypeClassification::Unknown;
+			RKIT_ASSERT(false);
+			return false;
 		}
 	}
 
@@ -2755,9 +2637,9 @@ namespace rkit { namespace buildsystem { namespace rpc_analyzer
 
 		RKIT_RETURN_OK;
 	}
-} } } // rkit::buildsystem::rpc_analyzer
+} // rkit::buildsystem::rpc_analyzer
 
-namespace rkit { namespace buildsystem { namespace rpc_combiner
+namespace rkit::buildsystem::rpc_combiner
 {
 	LibraryCombiner::LibraryCombiner(data::IDataDriver *dataDriver)
 		: m_dataDriver(dataDriver)
@@ -2867,9 +2749,9 @@ namespace rkit { namespace buildsystem { namespace rpc_combiner
 	{
 		return m_binaryContent[index].ToSpan();
 	}
-} } } // rkit::buildsystem::rpc_combiner
+} // rkit::buildsystem::rpc_combiner
 
-namespace rkit { namespace buildsystem { namespace rpc_compiler
+namespace rkit::buildsystem::rpc_compiler
 {
 	LibraryCompiler::LibraryCompiler(data::IDataDriver *dataDriver, IDependencyNodeCompilerFeedback *feedback)
 		: m_combiner(dataDriver)
@@ -2946,9 +2828,9 @@ namespace rkit { namespace buildsystem { namespace rpc_compiler
 
 		RKIT_RETURN_OK;
 	}
-} } } // rkit::buildsystem::rpc_compiler
+} // rkit::buildsystem::rpc_compiler
 
-namespace rkit { namespace buildsystem
+namespace rkit::buildsystem
 {
 	RenderPipelineLibraryCompiler::RenderPipelineLibraryCompiler()
 	{
@@ -3018,4 +2900,4 @@ namespace rkit { namespace buildsystem
 
 		outCombiner = New<rpc_combiner::LibraryCombiner>(dataDriver);
 	}
-} } // rkit::buildsystem
+} // rkit::buildsystem

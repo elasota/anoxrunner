@@ -3,6 +3,7 @@
 #include "rkit/Utilities/Sha2.h"
 #include "rkit/Utilities/ShadowFile.h"
 
+#include "rkit/Render/DeviceCaps.h"
 #include "rkit/Render/PipelineLibrary.h"
 #include "rkit/Render/PipelineLibraryItem.h"
 #include "rkit/Render/RenderDefs.h"
@@ -21,6 +22,8 @@
 #include "rkit/Core/String.h"
 #include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/UniquePtr.h"
+#include "rkit/Core/StripedRef.h"
+#include "rkit/Core/StripedVector.h"
 #include "rkit/Core/Vector.h"
 
 #include "rkit/Vulkan/GraphicsPipeline.h"
@@ -74,6 +77,17 @@ namespace rkit { namespace render { namespace vulkan
 		m_renderPass = renderPass;
 	}
 
+	struct PipelineLayoutMetadata
+	{
+	};
+
+	struct PipelineLayout
+	{
+		VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
+		VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
+		PipelineLayoutMetadata m_metadata;
+	};
+
 	struct VulkanPipelineLibraryData : public NoCopy
 	{
 		explicit VulkanPipelineLibraryData(VulkanDeviceBase &device);
@@ -85,9 +99,7 @@ namespace rkit { namespace render { namespace vulkan
 		Vector<size_t> m_graphicPipelinePermutationStarts;
 		Vector<VkPipeline> m_allPipelines;
 		Vector<VulkanRenderPass> m_renderPasses;
-		Vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
-		Vector<VkPipelineLayout> m_pipelineLayouts;
-		Vector<VkSampler> m_samplers;
+		Vector<PipelineLayout> m_pipelineLayouts;
 
 		HashMap<StringView, const RenderPassDesc *> m_nameToRenderPass;
 
@@ -106,9 +118,7 @@ namespace rkit { namespace render { namespace vulkan
 		, m_graphicPipelinePermutationStarts(std::move(other.m_graphicPipelinePermutationStarts))
 		, m_allPipelines(std::move(other.m_allPipelines))
 		, m_renderPasses(std::move(other.m_renderPasses))
-		, m_descriptorSetLayouts(std::move(other.m_descriptorSetLayouts))
 		, m_pipelineLayouts(std::move(other.m_pipelineLayouts))
-		, m_samplers(std::move(other.m_samplers))
 		, m_nameToRenderPass(std::move(other.m_nameToRenderPass))
 		, m_package(std::move(other.m_package))
 		, m_mergedCache(other.m_mergedCache)
@@ -128,22 +138,12 @@ namespace rkit { namespace render { namespace vulkan
 				vkd.vkDestroyPipeline(device, pipeline, allocCallbacks);
 		}
 
-		for (const VkPipelineLayout &pl : m_pipelineLayouts)
+		for (const PipelineLayout &pl : m_pipelineLayouts)
 		{
-			if (pl != VK_NULL_HANDLE)
-				vkd.vkDestroyPipelineLayout(device, pl, allocCallbacks);
-		}
-
-		for (const VkDescriptorSetLayout &dsLayout : m_descriptorSetLayouts)
-		{
-			if (dsLayout != VK_NULL_HANDLE)
-				vkd.vkDestroyDescriptorSetLayout(device, dsLayout, allocCallbacks);
-		}
-
-		for (const VkSampler &s : m_samplers)
-		{
-			if (s != VK_NULL_HANDLE)
-				vkd.vkDestroySampler(device, s, allocCallbacks);
+			if (pl.m_pipelineLayout != VK_NULL_HANDLE)
+				vkd.vkDestroyPipelineLayout(device, pl.m_pipelineLayout, allocCallbacks);
+			if (pl.m_descriptorSetLayout != VK_NULL_HANDLE)
+				vkd.vkDestroyDescriptorSetLayout(device, pl.m_descriptorSetLayout, allocCallbacks);
 		}
 
 		for (const VulkanRenderPass &rp : m_renderPasses)
@@ -280,7 +280,6 @@ namespace rkit { namespace render { namespace vulkan
 
 		static Result ResolveAnyStageFlags(VkPipelineStageFlags &outStageFlags, StageVisibility visibility);
 		static Result ResolveGraphicsStageFlags(VkPipelineStageFlags &outStageFlags, StageVisibility visibility);
-		static Result ResolveDescriptorType(VkDescriptorType &outDescType, DescriptorType descType);
 
 		static Result ResolveFilter(VkFilter &outFilter, Filter filter);
 		static Result ResolveSamplerMipMapMode(VkSamplerMipmapMode &outMipmapMode, MipMapMode mipmapMode);
@@ -295,9 +294,7 @@ namespace rkit { namespace render { namespace vulkan
 		static Result ResolveStoreOp(VkAttachmentStoreOp &outStoreOp, RenderPassStoreOp storeOp);
 		static Result ResolveLoadOp(VkAttachmentLoadOp &outLoadOp, RenderPassLoadOp loadOp);
 
-		Result FindSampler(VkSampler &outSampler, const SamplerDesc *sampler) const;
-		Result FindDescriptorSetLayout(VkDescriptorSetLayout &outDSL, const DescriptorLayoutDesc *descLayout) const;
-		Result FindPipelineLayout(VkPipelineLayout &outPipelineLayout, const PipelineLayoutDesc *pipelineLayout) const;
+		Result FindPipelineLayout(const PipelineLayout *&outPipelineLayout, const PipelineLayoutDesc *pipelineLayout) const;
 		Result FindRenderPass(VkRenderPass &outRenderPass, const RenderPassDesc *renderPass) const;
 
 		Result CreateRenderPass(VkRenderPass &outRenderPass, const RenderPassDesc &rpDesc);
@@ -501,138 +498,12 @@ namespace rkit { namespace render { namespace vulkan
 			SafeAdd(binaryContentStart, binaryContentStart, static_cast<FilePos_t>(binaryContentSize));
 		}
 
-		// Samplers
-		{
-			data::IRenderRTTIListBase *samplers = m_data.m_package->GetIndexable(rkit::data::RenderRTTIIndexableStructType::SamplerDesc);
-			const size_t numSamplers = samplers->GetCount();
-
-			m_data.m_samplers.Resize(numSamplers);
-
-			for (VkSampler &s : m_data.m_samplers)
-				s = VK_NULL_HANDLE;
-
-			for (size_t i = 0; i < numSamplers; i++)
-			{
-				const render::SamplerDesc *sampler = static_cast<const render::SamplerDesc *>(samplers->GetElementPtr(i));
-
-				VkSamplerCreateInfo samplerCreateInfo = {};
-				samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-				ResolveFilter(samplerCreateInfo.magFilter, ResolveConfigurable(sampler->m_magFilter));
-				ResolveFilter(samplerCreateInfo.minFilter, ResolveConfigurable(sampler->m_minFilter));
-				ResolveSamplerMipMapMode(samplerCreateInfo.mipmapMode, ResolveConfigurable(sampler->m_mipMapMode));
-				ResolveSamplerAddressMode(samplerCreateInfo.addressModeU, ResolveConfigurable(sampler->m_addressModeU));
-				ResolveSamplerAddressMode(samplerCreateInfo.addressModeV, ResolveConfigurable(sampler->m_addressModeV));
-				ResolveSamplerAddressMode(samplerCreateInfo.addressModeW, ResolveConfigurable(sampler->m_addressModeW));
-				samplerCreateInfo.mipLodBias = ResolveConfigurable(sampler->m_mipLodBias);
-				samplerCreateInfo.minLod = ResolveConfigurable(sampler->m_minLod);
-
-				if (sampler->m_maxLod.m_state == ConfigurableValueState::Default)
-					samplerCreateInfo.maxLod = VK_LOD_CLAMP_NONE;
-				else
-					samplerCreateInfo.maxLod = ResolveConfigurable(sampler->m_maxLod);
-
-				ComparisonFunction cmpFunction = ResolveConfigurable(sampler->m_compareFunction);
-
-				if (cmpFunction != ComparisonFunction::Disabled)
-				{
-					samplerCreateInfo.compareEnable = VK_TRUE;
-					ResolveCompareOp(samplerCreateInfo.compareOp, cmpFunction);
-				}
-
-				AnisotropicFiltering anisoFiltering = ResolveConfigurable(sampler->m_anisotropy);
-				if (anisoFiltering != AnisotropicFiltering::Disabled)
-				{
-					samplerCreateInfo.anisotropyEnable = VK_TRUE;
-					ResolveAnisotropy(samplerCreateInfo.maxAnisotropy, anisoFiltering);
-				}
-
-				RKIT_VK_CHECK(vkd.vkCreateSampler(m_device.GetDevice(), &samplerCreateInfo, m_device.GetAllocCallbacks(), &m_data.m_samplers[i]));
-			}
-		}
-
-		// Descriptor set layouts
-		{
-			data::IRenderRTTIListBase *descriptorLayouts = m_data.m_package->GetIndexable(rkit::data::RenderRTTIIndexableStructType::DescriptorLayoutDesc);
-			const size_t numDescriptorLayouts = descriptorLayouts->GetCount();
-
-			m_data.m_descriptorSetLayouts.Resize(numDescriptorLayouts);
-
-			for (VkDescriptorSetLayout &dsl : m_data.m_descriptorSetLayouts)
-				dsl = VK_NULL_HANDLE;
-
-			for (size_t dli = 0; dli < numDescriptorLayouts; dli++)
-			{
-				const render::DescriptorLayoutDesc *dslDesc = static_cast<const render::DescriptorLayoutDesc *>(descriptorLayouts->GetElementPtr(dli));
-
-				Vector<VkDescriptorSetLayoutBinding> bindings;
-				bindings.Resize(dslDesc->m_descriptors.Count());
-
-				Vector<Vector<VkSampler>> immutableSamplers;
-				immutableSamplers.Resize(dslDesc->m_descriptors.Count());
-
-				for (size_t di = 0; di < dslDesc->m_descriptors.Count(); di++)
-				{
-					Vector<VkSampler> &bindingImmutableSamplers = immutableSamplers[di];
-					VkDescriptorSetLayoutBinding &vkBinding = bindings[di];
-					const DescriptorDesc *descriptorDesc = dslDesc->m_descriptors[di];
-
-					vkBinding = {};
-					ResolveGraphicsStageFlags(vkBinding.stageFlags, descriptorDesc->m_visibility);
-					ResolveDescriptorType(vkBinding.descriptorType, descriptorDesc->m_descriptorType);
-
-					if (descriptorDesc->m_arraySize == 0)
-					{
-						rkit::log::Error(u8"Pipeline contains unbounded descriptors, but device doesn't support unbounded descriptors");
-						RKIT_THROW(ResultCode::kOperationFailed);
-					}
-
-					if (descriptorDesc->m_staticSamplerDesc)
-					{
-						if (vkBinding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
-							vkBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-						else
-						{
-							if (vkBinding.descriptorType != VK_DESCRIPTOR_TYPE_SAMPLER)
-							{
-								rkit::log::Error(u8"Pipeline contains a static sampler assigned to a descriptor that isn't a sampler or sampled texture");
-								RKIT_THROW(ResultCode::kOperationFailed);
-							}
-						}
-
-						VkSampler sampler = VK_NULL_HANDLE;
-						FindSampler(sampler, descriptorDesc->m_staticSamplerDesc);
-
-						bindingImmutableSamplers.Resize(descriptorDesc->m_arraySize);
-
-						for (VkSampler &samplerRef : bindingImmutableSamplers)
-							samplerRef = sampler;
-					}
-
-					vkBinding.descriptorCount = descriptorDesc->m_arraySize;
-					vkBinding.pImmutableSamplers = bindingImmutableSamplers.GetBuffer();
-					vkBinding.binding = static_cast<uint32_t>(di);
-
-					// possibly unused: m_valueType;
-				}
-
-				VkDescriptorSetLayoutCreateInfo dslCreateInfo = {};
-				dslCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-				dslCreateInfo.bindingCount = static_cast<uint32_t>(bindings.Count());
-				dslCreateInfo.pBindings = bindings.GetBuffer();
-
-				RKIT_VK_CHECK(vkd.vkCreateDescriptorSetLayout(m_device.GetDevice(), &dslCreateInfo, m_device.GetAllocCallbacks(), &m_data.m_descriptorSetLayouts[dli]));
-			}
-		}
-
 		// Pipeline layouts
 		{
 			data::IRenderRTTIListBase *pipelineLayouts = m_data.m_package->GetIndexable(rkit::data::RenderRTTIIndexableStructType::PipelineLayoutDesc);
 			const size_t numPipelineLayouts = pipelineLayouts->GetCount();
 
 			m_data.m_pipelineLayouts.Resize(numPipelineLayouts);
-
-			for (VkPipelineLayout &pl : m_data.m_pipelineLayouts)
-				pl = VK_NULL_HANDLE;
 
 			for (size_t pi = 0; pi < numPipelineLayouts; pi++)
 			{
@@ -641,53 +512,10 @@ namespace rkit { namespace render { namespace vulkan
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
-				Vector<VkDescriptorSetLayout> setLayouts;
-				setLayouts.Resize(plDesc->m_descriptorLayouts.Count());
-
-				for (size_t dli = 0; dli < plDesc->m_descriptorLayouts.Count(); dli++)
-				{
-					FindDescriptorSetLayout(setLayouts[dli], plDesc->m_descriptorLayouts[dli]);
-				}
-
-				pipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.Count());
-				pipelineLayoutCreateInfo.pSetLayouts = setLayouts.GetBuffer();
-
-				Vector<VkPushConstantRange> pcRanges;
-
-				if (plDesc->m_pushConstantList)
-				{
-					for (const PushConstantDesc *pcDesc : plDesc->m_pushConstantList->m_pushConstants)
-					{
-						VkPushConstantRange pcRange = {};
-						ResolveAnyStageFlags(pcRange.stageFlags, pcDesc->m_stageVisibility);
-						pcRange.offset = 0;
-						ResolvePushConstantSize(pcRange.size, pcDesc->m_type);
-
-						if (pcRange.size == 0)
-							continue;
-
-						if (pcRanges.Count() != 0)
-						{
-							VkPushConstantRange &prevRange = pcRanges[pcRanges.Count() - 1];
-							if (pcRange.stageFlags == prevRange.stageFlags)
-								prevRange.size += pcRange.size;
-							else
-							{
-								pcRange.offset += prevRange.offset;
-								pcRanges.Append(pcRange);
-							}
-						}
-						else
-						{
-							pcRanges.Append(pcRange);
-						}
-					}
-				}
-
-				pipelineLayoutCreateInfo.pushConstantRangeCount = static_cast<uint32_t>(pcRanges.Count());
-				pipelineLayoutCreateInfo.pPushConstantRanges = pcRanges.GetBuffer();
-
+				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+#if 0
 				RKIT_VK_CHECK(vkd.vkCreatePipelineLayout(m_device.GetDevice(), &pipelineLayoutCreateInfo, m_device.GetAllocCallbacks(), &m_data.m_pipelineLayouts[pi]));
+#endif
 			}
 		}
 
@@ -1414,53 +1242,6 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_RETURN_OK;
 	}
 
-	Result VulkanPipelineLibraryLoader::ResolveDescriptorType(VkDescriptorType &outDescType, DescriptorType descType)
-	{
-		switch (descType)
-		{
-		case DescriptorType::Sampler:
-			outDescType = VK_DESCRIPTOR_TYPE_SAMPLER;
-			break;
-
-		case DescriptorType::StaticConstantBuffer:
-		case DescriptorType::DynamicConstantBuffer:
-			outDescType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			break;
-
-		case DescriptorType::Buffer:
-		case DescriptorType::RWBuffer:
-		case DescriptorType::ByteAddressBuffer:
-		case DescriptorType::RWByteAddressBuffer:
-			outDescType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			break;
-
-		case DescriptorType::Texture1D:
-		case DescriptorType::Texture1DArray:
-		case DescriptorType::Texture2D:
-		case DescriptorType::Texture2DArray:
-		case DescriptorType::Texture2DMS:
-		case DescriptorType::Texture2DMSArray:
-		case DescriptorType::Texture3D:
-		case DescriptorType::TextureCube:
-		case DescriptorType::TextureCubeArray:
-			outDescType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-			break;
-
-		case DescriptorType::RWTexture1D:
-		case DescriptorType::RWTexture1DArray:
-		case DescriptorType::RWTexture2D:
-		case DescriptorType::RWTexture2DArray:
-		case DescriptorType::RWTexture3D:
-			outDescType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-			break;
-
-		default:
-			RKIT_THROW(ResultCode::kInternalError);
-		}
-
-		RKIT_RETURN_OK;
-	}
-
 	Result VulkanPipelineLibraryLoader::ResolveFilter(VkFilter &outFilter, Filter filter)
 	{
 		switch (filter)
@@ -1655,36 +1436,11 @@ namespace rkit { namespace render { namespace vulkan
 		index = static_cast<size_t>(object - firstElement);\
 	} while (false)
 
-	Result VulkanPipelineLibraryLoader::FindSampler(VkSampler &outSampler, const SamplerDesc *sampler) const
-	{
-		RKIT_VK_FIND_FROM_LIST(SamplerDesc, sampler);
-
-		if (m_data.m_samplers[index] == VK_NULL_HANDLE)
-			RKIT_THROW(ResultCode::kOperationFailed);
-
-		outSampler = m_data.m_samplers[index];
-		RKIT_RETURN_OK;
-	}
-
-	Result VulkanPipelineLibraryLoader::FindDescriptorSetLayout(VkDescriptorSetLayout &outDSL, const DescriptorLayoutDesc *descLayout) const
-	{
-		RKIT_VK_FIND_FROM_LIST(DescriptorLayoutDesc, descLayout);
-
-		if (m_data.m_descriptorSetLayouts[index] == VK_NULL_HANDLE)
-			RKIT_THROW(ResultCode::kOperationFailed);
-
-		outDSL = m_data.m_descriptorSetLayouts[index];
-		RKIT_RETURN_OK;
-	}
-
-	Result VulkanPipelineLibraryLoader::FindPipelineLayout(VkPipelineLayout &outPipelineLayout, const PipelineLayoutDesc *pipelineLayout) const
+	Result VulkanPipelineLibraryLoader::FindPipelineLayout(const PipelineLayout *&outPipelineLayout, const PipelineLayoutDesc *pipelineLayout) const
 	{
 		RKIT_VK_FIND_FROM_LIST(PipelineLayoutDesc, pipelineLayout);
 
-		if (m_data.m_pipelineLayouts[index] == VK_NULL_HANDLE)
-			RKIT_THROW(ResultCode::kOperationFailed);
-
-		outPipelineLayout = m_data.m_pipelineLayouts[index];
+		outPipelineLayout = &m_data.m_pipelineLayouts[index];
 		RKIT_RETURN_OK;
 	}
 
@@ -2055,6 +1811,9 @@ namespace rkit { namespace render { namespace vulkan
 		dynamicStateCreateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.Count());
 		dynamicStateCreateInfo.pDynamicStates = dynamicStates.GetBuffer();
 
+		const PipelineLayout *pipelineLayout = nullptr;
+		FindPipelineLayout(pipelineLayout, pipelineDesc->m_pipelineLayout);
+
 		VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
 		pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 
@@ -2066,7 +1825,7 @@ namespace rkit { namespace render { namespace vulkan
 		pipelineCreateInfo.pMultisampleState = &multisampleStateCreateInfo;
 		pipelineCreateInfo.pDepthStencilState = &depthStencilCreateInfo;
 		pipelineCreateInfo.pColorBlendState = &blendStateCreateInfo;
-		FindPipelineLayout(pipelineCreateInfo.layout, pipelineDesc->m_pipelineLayout);
+		pipelineCreateInfo.layout = pipelineLayout->m_pipelineLayout;
 		FindRenderPass(pipelineCreateInfo.renderPass, renderPassDesc);
 		pipelineCreateInfo.subpass = 0;
 

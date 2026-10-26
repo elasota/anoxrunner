@@ -3,6 +3,7 @@
 
 #include "rkit/Core/Algorithm.h"
 #include "rkit/Core/DriverModuleStub.h"
+
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/MallocDriver.h"
 #include "rkit/Core/ModuleDriver.h"
@@ -27,7 +28,7 @@
 #include <cstring>
 
 
-namespace rkit { namespace render { namespace vulkan
+namespace rkit::render::vulkan
 {
 	namespace results
 	{
@@ -180,17 +181,17 @@ namespace rkit { namespace render { namespace vulkan
 		template<class... TFeatureItems>
 		class FeatureCollection
 		{
-		private:
-			static void *FindFeature(const FeatureCollectionTypeTag *featureTag) = delete;
-			static void *Link() = delete;
 		};
 
-		template<>
-		class FeatureCollection<>
+		template<class TFeatureItem>
+		class FeatureCollection<TFeatureItem>
 		{
 		public:
-			static void *FindFeature(const FeatureCollectionTypeTag *featureTag);
-			static void *Link();
+			void *FindFeature(const FeatureCollectionTypeTag *featureTag);
+			void *Link();
+
+		private:
+			TFeatureItem m_item;
 		};
 
 		template<class TFeatureItem, class... TMoreItems>
@@ -245,6 +246,9 @@ namespace rkit { namespace render { namespace vulkan
 
 			template<class TFeatureStruct>
 			void SyncFeature(RenderDeviceBoolCap cap, VkBool32 (TFeatureStruct:: *featureFlag)) const;
+
+			template<class... TFeatureStruct>
+			void SyncFeatures(RenderDeviceBoolCap cap, VkBool32(TFeatureStruct:: *...featureFlag)) const;
 
 			void SyncLimit(RenderDeviceUInt32Cap cap, uint32_t limit) const;
 
@@ -596,7 +600,8 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		using PhysicalDeviceFeatures_t =
 			PhysicalDeviceFeatures<
-				FeaturesItem<VkPhysicalDeviceTimelineSemaphoreFeatures, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES>
+				FeaturesItem<VkPhysicalDeviceTimelineSemaphoreFeatures, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES>,
+				FeaturesItem<VkPhysicalDeviceDescriptorIndexingFeatures, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES>
 			>;
 
 		RenderVulkanAdapter &vkAdapter = static_cast<RenderVulkanAdapter &>(adapter);
@@ -635,6 +640,11 @@ namespace rkit { namespace render { namespace vulkan
 		syncer.SyncLimit(RenderDeviceUInt32Cap::kMaxTextureCubeSize, deviceProperties.limits.maxImageDimensionCube);
 		syncer.SyncLimit(RenderDeviceUInt32Cap::kMaxTextureArrayLayers, deviceProperties.limits.maxImageArrayLayers);
 		syncer.SyncFeature(RenderDeviceBoolCap::kTimelineFence, &VkPhysicalDeviceTimelineSemaphoreFeatures::timelineSemaphore);
+
+		syncer.SyncFeatures(RenderDeviceBoolCap::kDescriptorIndexing,
+			&VkPhysicalDeviceDescriptorIndexingFeatures::descriptorBindingPartiallyBound,
+			&VkPhysicalDeviceDescriptorIndexingFeatures::descriptorBindingVariableDescriptorCount,
+			&VkPhysicalDeviceDescriptorIndexingFeatures::descriptorBindingUpdateUnusedWhilePending);
 
 		if (!grantedCaps.MeetsOrExceeds(requiredCaps))
 		{
@@ -704,6 +714,9 @@ namespace rkit { namespace render { namespace vulkan
 		Vector<QueryItem> requestedDeviceExtensions;
 
 		requestedDeviceExtensions.Append(QueryItem(VK_KHR_SWAPCHAIN_EXTENSION_NAME, true));
+
+		if (grantedCaps.GetBoolCap(RenderDeviceBoolCap::kDescriptorIndexing))
+			requestedDeviceExtensions.Append(QueryItem(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, true));
 
 		if (grantedCaps.GetBoolCap(RenderDeviceBoolCap::kTimelineFence))
 			requestedDeviceExtensions.Append(QueryItem(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME, true));
@@ -937,14 +950,21 @@ namespace rkit { namespace render { namespace vulkan
 	template<class T>
 	RenderVulkanDriver::FeatureCollectionTypeTag RenderVulkanDriver::FeatureCollectionTypeTagForType<T>::ms_instance;
 
-	void *RenderVulkanDriver::FeatureCollection<>::FindFeature(const FeatureCollectionTypeTag *featureTag)
+	template<class TFeatureItem>
+	void *RenderVulkanDriver::FeatureCollection<TFeatureItem>::FindFeature(const FeatureCollectionTypeTag *featureTag)
 	{
+		const FeatureCollectionTypeTag *thisTag = FeatureCollectionTypeTagForType<typename TFeatureItem::FeatureStructType_t>::GetInstance();
+		if (featureTag == thisTag)
+			return &m_item.m_featureStruct;
+
 		return nullptr;
 	}
 
-	void *RenderVulkanDriver::FeatureCollection<>::Link()
+	template<class TFeatureItem>
+	void *RenderVulkanDriver::FeatureCollection<TFeatureItem>::Link()
 	{
-		return nullptr;
+		m_item.m_featureStruct.pNext = nullptr;
+		return &m_item.m_featureStruct;
 	}
 
 	template<class TFeatureItem, class... TMoreItems>
@@ -1026,17 +1046,45 @@ namespace rkit { namespace render { namespace vulkan
 	template<class TFeatureStruct>
 	void RenderVulkanDriver::CapsSyncer::SyncFeature(RenderDeviceBoolCap cap, VkBool32(TFeatureStruct:: *featureFlag)) const
 	{
+		SyncFeatures(cap, featureFlag);
+	}
+
+	template<class... TFeatureStructs>
+	void RenderVulkanDriver::CapsSyncer::SyncFeatures(RenderDeviceBoolCap cap, VkBool32(TFeatureStructs:: *...featureFlag)) const
+	{
 		if (m_wantedCaps.GetBoolCap(cap))
 		{
-			const TFeatureStruct *supportedFeatureStruct = static_cast<const TFeatureStruct *>(m_featureFinder(const_cast<PhysicalDeviceFeaturesBase &>(m_supportedFeatures), FeatureCollectionTypeTagForType<TFeatureStruct>::GetInstance()));
-			TFeatureStruct *enabledFeatureStruct = static_cast<TFeatureStruct *>(m_featureFinder(m_enabledFeatures, FeatureCollectionTypeTagForType<TFeatureStruct>::GetInstance()));
-
-			const VkBool32 *supportedLoc = &(supportedFeatureStruct->*featureFlag);
-			VkBool32 *enabledLoc = &(enabledFeatureStruct->*featureFlag);
-
-			if (*supportedLoc)
+			const VkBool32 *supportedLocs[] =
 			{
-				*enabledLoc = VK_TRUE;
+				&((static_cast<const TFeatureStructs *>(
+					m_featureFinder(const_cast<PhysicalDeviceFeaturesBase &>(m_supportedFeatures), FeatureCollectionTypeTagForType<TFeatureStructs>::GetInstance())
+					))->*featureFlag)...
+			};
+			VkBool32 *enabledLocs[] =
+			{
+				&((static_cast<TFeatureStructs *>(
+					m_featureFinder(m_enabledFeatures, FeatureCollectionTypeTagForType<TFeatureStructs>::GetInstance())
+					))->*featureFlag)...
+			};
+			constexpr size_t numSupportedLocs = sizeof(supportedLocs) / sizeof(supportedLocs[0]);
+			constexpr size_t numEnabledLocs = sizeof(enabledLocs) / sizeof(enabledLocs[0]);
+
+			static_assert(numSupportedLocs == numEnabledLocs, "Supported and enabled locs size lists should match");
+
+			bool allSupported = true;
+			for (size_t i = 0; i < numSupportedLocs; i++)
+			{
+				if (!(*supportedLocs[i]))
+				{
+					allSupported = false;
+					break;
+				}
+			}
+
+			if (allSupported)
+			{
+				for (size_t i = 0; i < numEnabledLocs; i++)
+					(*enabledLocs[i]) = VK_TRUE;
 				m_grantedCaps.SetBoolCap(cap, true);
 			}
 		}
@@ -1373,6 +1421,6 @@ namespace rkit { namespace render { namespace vulkan
 		m_vkLibrary.Reset();
 		m_instanceExtensions.Reset();
 	}
-} } } // rkit::render::vulkan
+} // rkit::render::vulkan
 
 RKIT_IMPLEMENT_MODULE(RKit, Render_Vulkan, ::rkit::render::vulkan::RenderVulkanModule)

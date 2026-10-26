@@ -230,17 +230,30 @@ namespace rkit
 			Reallocate(size);
 		}
 
-		size_t count = m_count;
+		size_t initialCount = m_count;
+
+		T *arr = m_arr;
+		size_t count = initialCount;
 		while (size < count)
 		{
-			count--;
-			m_arr[count].~T();
+			--count;
+			arr[count].~T();
 		}
 
-		while (size > count)
+		try
 		{
-			new (m_arr + count) T();
-			count++;
+			while (size > count)
+			{
+				new (arr + count) T();
+				++count;
+			}
+		}
+		catch (...)
+		{
+			while (count > initialCount)
+				arr[count].~T();
+
+			throw;
 		}
 
 		m_count = count;
@@ -263,28 +276,38 @@ namespace rkit
 			RKIT_THROW(ResultCode::kOutOfMemory);
 
 		T *newArr = static_cast<T *>(newMem);
-		size_t count = m_count;
 
 		m_arr = newArr;
-
 		m_capacity = size;
-		m_count = size;
+		m_count = 0;
 
-		for (size_t i = 0; i < size; i++)
-			new (newArr + i) T();
+		size_t count = 0;
+		try
+		{
+			while (count < size)
+			{
+				new (newArr + count) T();
+				++count;
+			}
+		}
+		catch (...)
+		{
+			while (count > 0)
+			{
+				--count;
+				newArr[count].~T();
+			}
+			throw;
+		}
 
-		RKIT_RETURN_OK;
+		m_count = count;
 	}
 
 	template<class T>
 	Result Vector<T>::Reserve(size_t size)
 	{
 		if (m_capacity < size)
-		{
 			Reallocate(size);
-		}
-
-		RKIT_RETURN_OK;
 	}
 
 	template<class T>
@@ -433,16 +456,42 @@ namespace rkit
 			assignCount = itemsCount;
 
 		size_t i = 0;
-		while (i < assignCount)
-		{
-			TBehavior::Assign(&newArr[index + i], itemsPtr[i]);
-			i++;
-		}
 
-		while (i < itemsCount)
+		try
 		{
-			TBehavior::Construct(&newArr[index + i], itemsPtr[i]);
-			i++;
+			while (i < assignCount)
+			{
+				TBehavior::Assign(&newArr[index + i], itemsPtr[i]);
+				i++;
+			}
+
+			while (i < itemsCount)
+			{
+				TBehavior::Construct(&newArr[index + i], itemsPtr[i]);
+				i++;
+			}
+		}
+		catch (...)
+		{
+			while (i >= assignCount)
+			{
+				--i;
+				newArr[index + i].~T();
+			}
+
+			while (relocatePos <= relocateConstructStop)
+			{
+				newArr[relocatePos - itemsCount] = std::move(newArr[relocatePos]);
+				++relocatePos;
+			}
+			while (relocatePos <= newCount)
+			{
+				newArr[relocatePos - itemsCount] = std::move(newArr[relocatePos]);
+				newArr[relocatePos].~T();
+				++relocatePos;
+			}
+
+			throw;
 		}
 
 		m_count = newCount;
@@ -521,8 +570,6 @@ namespace rkit
 		m_arr = newArr;
 
 		m_capacity = newCapacity;
-
-		RKIT_RETURN_OK;
 	}
 
 	template<class T>
@@ -556,7 +603,7 @@ namespace rkit
 	Result Vector<T>::EnsureCapacityForMore(size_t extra)
 	{
 		if (m_capacity - m_count >= extra)
-			RKIT_RETURN_OK;
+			return;
 
 		if (extra == 1)
 			return EnsureCapacityForOneMore();

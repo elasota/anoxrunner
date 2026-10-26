@@ -173,6 +173,7 @@ namespace rkit { namespace render
 
 	enum class StageVisibility
 	{
+		None,
 		All,
 
 		Vertex,
@@ -181,12 +182,9 @@ namespace rkit { namespace render
 		Count,
 	};
 
-	enum class DescriptorType
+	enum class DescriptorBindingType
 	{
 		Sampler,
-
-		StaticConstantBuffer,
-		DynamicConstantBuffer,
 
 		Buffer,
 		RWBuffer,

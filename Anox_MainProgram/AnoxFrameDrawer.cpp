@@ -118,6 +118,7 @@ namespace anox
 			barrier.m_subsequentStages = rkit::render::PipelineStageMask_t({ rkit::render::PipelineStage::kPresentSubmit });
 			barrier.m_priorAccess = rkit::render::ResourceAccessMask_t({ rkit::render::ResourceAccess::kRenderTarget });
 			barrier.m_subsequentAccess = rkit::render::ResourceAccessMask_t({ rkit::render::ResourceAccess::kPresentSource });
+			barrier.m_priorLayout = rkit::render::ImageLayout::RenderTarget;
 			barrier.m_subsequentLayout = rkit::render::ImageLayout::PresentSource;
 
 			barrier.m_image = scFrameResources.m_colorTargetImage;
@@ -137,7 +138,6 @@ namespace anox
 	{
 		m_cmdBatch->Submit();
 	}
-
 
 	rkit::render::IGraphicsCommandBatch **FrameDrawer::SubmitTestCommandsJobRunner::GetCmdBatchRef()
 	{

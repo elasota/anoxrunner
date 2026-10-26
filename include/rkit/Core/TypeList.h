@@ -14,6 +14,41 @@ namespace rkit
 	{
 	};
 
+	template<class TTypeList, class TCandidateType>
+	struct TypeListContains
+	{
+	};
+
+	template<class TCandidateType>
+	struct TypeListContains<TypeList<>, TCandidateType>
+	{
+		static const bool kValue = false;
+	};
+
+	template<class TOnlyType, class TCandidateType>
+	struct TypeListContains<TypeList<TOnlyType>, TCandidateType>
+	{
+		static const bool kValue = false;
+	};
+
+	template<class TCandidateType>
+	struct TypeListContains<TypeList<TCandidateType>, TCandidateType>
+	{
+		static const bool kValue = true;
+	};
+
+	template<class TCandidateType, class TFirstType, class... TMoreTypes>
+	struct TypeListContains<TypeList<TFirstType, TMoreTypes...>, TCandidateType>
+	{
+		static const bool kValue = false;
+	};
+
+	template<class TCandidateType, class... TMoreTypes>
+	struct TypeListContains<TypeList<TCandidateType, TMoreTypes...>, TCandidateType>
+	{
+		static const bool kValue = true;
+	};
+
 	template<>
 	struct TypeListSize<TypeList<>>
 	{
@@ -40,19 +75,19 @@ namespace rkit
 	template<class TFirstType, class... TMoreTypes>
 	struct TypeListElement<0, TypeList<TFirstType, TMoreTypes...>>
 	{
-		typedef TFirstType Resolution_t;
+		typedef TFirstType Type_t;
 	};
 
 	template<class TType>
 	struct TypeListElement<0, TypeList<TType>>
 	{
-		typedef TType Resolution_t;
+		typedef TType Type_t;
 	};
 
 	template<size_t TIndex, class TFirstType, class... TMoreTypes>
 	struct TypeListElement<TIndex, TypeList<TFirstType, TMoreTypes...>>
 	{
-		typedef typename TypeListElement<TIndex - 1, TypeList<TMoreTypes...>>::Resolution_t Resolution_t;
+		typedef typename TypeListElement<TIndex - 1, TypeList<TMoreTypes...>>::Type_t Type_t;
 	};
 
 	template<class TTypeList, class TAdditional>

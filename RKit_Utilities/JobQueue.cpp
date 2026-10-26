@@ -576,10 +576,9 @@ namespace rkit { namespace utils
 		if (resultJob->m_numWaitingDependencies == 0)
 			AddRunnableJob(resultJob, jobType);
 
+		// This must be absolutely last, since outJob may be at the same location as one of the dependencies
 		if (outJob)
 			*outJob = std::move(resultJob);
-
-		RKIT_RETURN_OK;
 	}
 
 	Result JobQueue::CreateSignaledJob(RCPtr<JobSignaler> &outSignaler, RCPtr<Job> &outJob, DebugString trace)

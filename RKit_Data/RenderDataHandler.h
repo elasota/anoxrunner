@@ -8,10 +8,10 @@ namespace rkit { namespace data
 	class RenderDataHandler final : public IRenderDataHandler
 	{
 	public:
-		const RenderRTTIStructType *GetSamplerDescRTTI() const override;
-		const RenderRTTIStructType *GetPushConstantDescRTTI() const override;
-		const RenderRTTIStructType *GetDescriptorDescRTTI() const override;
-		const RenderRTTIEnumType *GetDescriptorTypeRTTI() const override;
+		const RenderRTTIEnumType *GetDescriptorBindingTypeRTTI() const override;
+		const RenderRTTIStructType *GetPipelineLayoutDescRTTI() const override;
+		const RenderRTTIStructType *GetLayoutInlineConstantDescRTTI() const override;
+		const RenderRTTIStructType *GetLayoutConstantBufferRTTI() const override;
 		const RenderRTTIStructType *GetGraphicsPipelineDescRTTI() const override;
 		const RenderRTTIStructType *GetGraphicsPipelineNameLookupRTTI() const override;
 		const RenderRTTIStructType *GetRenderTargetDescRTTI() const override;

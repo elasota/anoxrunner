@@ -29,8 +29,14 @@ Mapping of pipeline layouts to D3D12 root signature:
 Only buffer descriptors and constant buffers may be inlined in D3D12.
 
 Inlined sampler states are in HLSL in D3D12.  In Vulkan they are created with the
-descriptor set.
+descriptor set.  Older hardware doesn't support UAB uniform buffers.
 
+
+Bindless:
+Pascal doesn't support UAB uniform buffers
+RKit resource tables have one buffer for all constant buffers
+In Vulkan, these are bound as descriptors with dynamic offsets
+In D3D12, they are CBV root constants
 
 
 

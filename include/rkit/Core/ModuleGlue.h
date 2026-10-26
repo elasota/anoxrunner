@@ -3,6 +3,7 @@
 #include "rkit/Core/CoreDefs.h"
 #include "rkit/Core/Result.h"
 #include "rkit/Core/FourCC.h"
+#include "rkit/Core/RKitAssert.h"
 
 #include "rkit/Core/SystemDriver.h"
 #include "rkit/Core/Drivers.h"
@@ -20,15 +21,18 @@
 #else
 
 #define RKIT_IMPLEMENT_ASSERTION_CHECK_FUNC	\
-	void ::rkit::priv::AssertionCheckFunc(bool expr, const char *exprStr, const char *file, unsigned int line)\
+	namespace rkit::priv\
 	{\
-		if (!expr)\
+		void AssertionCheckFunc(bool expr, const char *exprStr, const char *file, unsigned int line)\
 		{\
-			IAssertDriver *assertDriver = GetDrivers().GetAssertDriver();\
-			if (assertDriver)\
-				assertDriver->AssertionFailure(exprStr, file, line);\
-			else\
-				abort();\
+			if (!expr)\
+			{\
+				IAssertDriver *assertDriver = GetDrivers().GetAssertDriver();\
+				if (assertDriver)\
+					assertDriver->AssertionFailure(exprStr, file, line);\
+				else\
+					abort();\
+			}\
 		}\
 	}
 

@@ -70,6 +70,12 @@ namespace rkit
 		template<size_t TIndex>
 		const T &GetAt() const;
 
+		template<class TDesiredType>
+		TDesiredType &GetUnique();
+
+		template<class TDesiredType>
+		const TDesiredType &GetUnique() const;
+
 	private:
 		T m_value;
 	};
@@ -94,6 +100,11 @@ namespace rkit
 		template<size_t TIndex>
 		const typename priv::TupleTypeAtIndex<TIndex, TFirst, TMore...>::Type_t &GetAt() const;
 
+		template<class TDesiredType>
+		TDesiredType &GetUnique();
+
+		template<class TDesiredType>
+		const TDesiredType &GetUnique() const;
 
 	private:
 		TFirst m_first;
@@ -127,6 +138,9 @@ namespace rkit { namespace priv
 		return firstValue;
 	}
 } } // rkit::priv
+
+#include "rkit/Core/TypeList.h"
+#include "rkit/Core/TypeTraits.h"
 
 #include <utility>
 
@@ -172,7 +186,7 @@ namespace rkit
 	template<class T>
 	Tuple<T> &Tuple<T>::operator=(const Tuple<T> &other)
 	{
-		m_value = other;
+		m_value = other.m_value;
 		return *this;
 	}
 
@@ -189,6 +203,22 @@ namespace rkit
 	const T &Tuple<T>::GetAt() const
 	{
 		static_assert(TIndex == 0);
+		return m_value;
+	}
+
+	template<class T>
+	template<class TDesiredType>
+	TDesiredType &Tuple<T>::GetUnique()
+	{
+		static_assert((IsSameType<T, TDesiredType>::kValue), "Requested type is missing");
+		return m_value;
+	}
+
+	template<class T>
+	template<class TDesiredType>
+	const TDesiredType &Tuple<T>::GetUnique() const
+	{
+		static_assert((IsSameType<T, TDesiredType>::kValue), "Requested type is missing");
 		return m_value;
 	}
 
@@ -248,5 +278,25 @@ namespace rkit
 	const typename priv::TupleTypeAtIndex<TIndex, TFirst, TMore...>::Type_t &Tuple<TFirst, TMore...>::GetAt() const
 	{
 		return priv::TupleGetAtHelper<TIndex, TFirst, TMore...>::GetConst(m_first, m_more);
+	}
+
+	template<class TFirst, class... TMore>
+	template<class TDesiredType>
+	TDesiredType &Tuple<TFirst, TMore...>::GetUnique()
+	{
+		if constexpr (IsSameType<TFirst, TDesiredType>::kValue)
+		{
+			static_assert(!TypeListContains<TypeList<TMore...>, TDesiredType>::kValue, "Can't use GetUnique when the type list contains multiple of the same type");
+			return m_first;
+		}
+		else
+			return m_more.template GetUnique<TDesiredType>();
+	}
+
+	template<class TFirst, class... TMore>
+	template<class TDesiredType>
+	const TDesiredType &Tuple<TFirst, TMore...>::GetUnique() const
+	{
+		return const_cast<Tuple<TFirst, TMore...> *>(this)->template GetUnique<TDesiredType>();
 	}
 }

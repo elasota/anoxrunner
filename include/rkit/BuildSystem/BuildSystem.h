@@ -33,6 +33,7 @@ namespace rkit
 		struct IDependencyGraphFactory;
 		struct IPackageBuilder;
 		struct IPackageObjectWriter;
+		struct IStructTreeBuilder;
 		struct FileStatusView;
 		struct IDependencyNodeCompiler;
 
@@ -103,6 +104,7 @@ namespace rkit
 		{
 			virtual Result CreateBuildSystemInstance(UniquePtr<IBuildSystemInstance> &outInstance) const = 0;
 			virtual Result CreatePackageObjectWriter(UniquePtr<IPackageObjectWriter> &outWriter) const = 0;
+			virtual Result CreateStructTreeBuilder(UniquePtr<IStructTreeBuilder> &outWriter) const = 0;
 			virtual Result CreatePackageBuilder(data::IRenderDataHandler *dataHandler, IPackageObjectWriter *objWriter, bool allowTempStrings, UniquePtr<IPackageBuilder> &outBuilder) const = 0;
 			virtual Result CreatePipelineLibraryCombiner(UniquePtr<IPipelineLibraryCombiner> &outCombiner) const = 0;
 		};

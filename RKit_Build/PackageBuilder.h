@@ -22,4 +22,10 @@ namespace rkit { namespace buildsystem
 	public:
 		static Result Create(UniquePtr<IPackageObjectWriter> &outPackageObjectWriter);
 	};
+
+	class StructTreeBuilderBase : public IStructTreeBuilder
+	{
+	public:
+		static Result Create(UniquePtr<IStructTreeBuilder> &outStructTreeBuilder);
+	};
 } } // rkit::buildsystem

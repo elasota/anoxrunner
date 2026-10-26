@@ -9,7 +9,7 @@
 
 #include <cstdint>
 
-namespace rkit { namespace render
+namespace rkit::render
 {
 	struct StructureMemberDesc;
 
@@ -37,7 +37,7 @@ namespace rkit { namespace render
 	private:
 		IndexType_t m_index;
 	};
-} } // rkit::render
+} // rkit::render
 
 namespace rkit
 {
@@ -141,23 +141,6 @@ namespace rkit { namespace render
 	template<class T, int TDefault>
 	using ConfigurableValueFloat = ConfigurableValueWithDefault<T, FloatDefaultResolver<T, TDefault>>;
 
-	struct SamplerDesc
-	{
-		ConfigurableValue<Filter, Filter::Linear> m_minFilter;
-		ConfigurableValue<Filter, Filter::Linear> m_magFilter;
-		ConfigurableValue<MipMapMode, MipMapMode::Linear> m_mipMapMode;
-		ConfigurableValue<AddressMode, AddressMode::Repeat> m_addressModeU;
-		ConfigurableValue<AddressMode, AddressMode::Repeat> m_addressModeV;
-		ConfigurableValue<AddressMode, AddressMode::Repeat> m_addressModeW;
-		ConfigurableValueFloat<float, 0> m_mipLodBias;
-		ConfigurableValueFloat<float, 0> m_minLod;
-		ConfigurableValueNoDefault<float> m_maxLod;
-
-		ConfigurableValue<AnisotropicFiltering, AnisotropicFiltering::Disabled> m_anisotropy;
-
-		ConfigurableValue<ComparisonFunction, ComparisonFunction::Disabled> m_compareFunction;
-	};
-
 	struct VectorOrScalarNumericType
 	{
 		NumericType m_numericType = NumericType::Float32;
@@ -239,6 +222,7 @@ namespace rkit { namespace render
 
 	struct StructureType
 	{
+		TempStringIndex_t m_name;
 		ConstSpan<const StructureMemberDesc *> m_members;
 	};
 
@@ -271,41 +255,43 @@ namespace rkit { namespace render
 		ConfigurableValue<ComparisonFunction, ComparisonFunction::Equal> m_compareFunc;
 	};
 
-	struct PushConstantDesc
+	struct LayoutInlineConstantDesc
 	{
 		TempStringIndex_t m_name;
+
 		ValueType m_type;
-		StageVisibility m_stageVisibility = StageVisibility::All;
+		StageVisibility m_visibility = StageVisibility::All;
 	};
 
-	struct PushConstantListDesc
-	{
-		ConstSpan<const PushConstantDesc *> m_pushConstants;
-	};
-
-	struct DescriptorDesc
+	struct LayoutConstantBufferDesc
 	{
 		TempStringIndex_t m_name;
 
 		StageVisibility m_visibility = StageVisibility::All;
-
-		DescriptorType m_descriptorType = DescriptorType::Texture2D;
-		uint32_t m_arraySize = 1;			// 0 = Unbounded
-		bool m_globallyCoherent = false;
-		ValueType m_valueType;
-
-		const SamplerDesc *m_staticSamplerDesc;
 	};
 
-	struct DescriptorLayoutDesc
+	struct ConstantBufferBindingDesc
 	{
-		ConstSpan<const DescriptorDesc *> m_descriptors;
+		uint32_t m_bindingIndex = 0;
+		ValueType m_valueType;
+	};
+
+	struct DescriptorHeapBindingDesc
+	{
+		TempStringIndex_t m_name;
+		DescriptorBindingType m_type = DescriptorBindingType::Count;
+		ValueType m_valueType;
 	};
 
 	struct PipelineLayoutDesc
 	{
-		ConstSpan<const DescriptorLayoutDesc *> m_descriptorLayouts;
-		const PushConstantListDesc *m_pushConstantList = nullptr;
+		StageVisibility m_textureHeapVisibility = StageVisibility::None;
+		StageVisibility m_rwTextureHeapVisibility = StageVisibility::None;
+		StageVisibility m_samplerHeapVisibility = StageVisibility::None;
+		StageVisibility m_bufferHeapVisibility = StageVisibility::None;
+
+		ConstSpan<const LayoutInlineConstantDesc *> m_inlineConstants;
+		ConstSpan<const LayoutConstantBufferDesc *> m_constantBuffers;
 	};
 
 	struct BinaryContent
@@ -434,6 +420,8 @@ namespace rkit { namespace render
 
 		const DepthStencilOperationDesc *m_depthStencil = nullptr;
 		ConstSpan<const RenderOperationDesc *> m_renderTargets;
+		ConstSpan<const DescriptorHeapBindingDesc *> m_descriptorHeapBindings;
+		ConstSpan<const ConstantBufferBindingDesc *> m_constantBufferBindings;
 
 		const InputLayoutDesc *m_inputLayout = nullptr;
 		const StructureType *m_vertexShaderOutput = nullptr;

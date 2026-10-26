@@ -384,8 +384,6 @@ namespace anox
 				drawSurf.m_tris = rkit::Span<const data::BSPTri>();
 			});
 
-		rkit::Vector<AnoxBSPModelResourceBase::DrawSurfTriRange> m_drawSurfTriRanges;
-
 		resource.m_instance.m_dynArraysOf_BSPTri.Reset();
 		resource.m_instance.m_dynArraysOf_BSPDrawVertex.Reset();
 		resource.m_instance.m_instancesOf_BSPSurfaceSpec.Reset();	// Surface specs are only referenced by verts

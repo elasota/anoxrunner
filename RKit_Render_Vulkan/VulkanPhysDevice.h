@@ -8,7 +8,7 @@
 
 #include "IncludeVulkan.h"
 
-namespace rkit { namespace render { namespace vulkan
+namespace rkit::render::vulkan
 {
 	class RenderVulkanDriver;
 	struct VulkanInstanceAPI;
@@ -42,4 +42,4 @@ namespace rkit { namespace render { namespace vulkan
 		QueueFamilyInfo m_queueFamilyInfos[kNumCommandQueueTypes];
 		Vector<uint32_t> m_unknownQueueFamilies;
 	};
-} } } // rkit::render::vulkan
+} // rkit::render::vulkan

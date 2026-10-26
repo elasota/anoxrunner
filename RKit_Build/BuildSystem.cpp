@@ -23,6 +23,7 @@ namespace rkit { namespace buildsystem
 
 		Result CreateBuildSystemInstance(UniquePtr<IBuildSystemInstance> &outInstance) const override;
 		Result CreatePackageObjectWriter(UniquePtr<IPackageObjectWriter> &outWriter) const override;
+		Result CreateStructTreeBuilder(UniquePtr<IStructTreeBuilder> &outTreeBuilder) const override;
 		Result CreatePackageBuilder(data::IRenderDataHandler *dataHandler, IPackageObjectWriter *objWriter, bool allowTempStrings, UniquePtr<IPackageBuilder> &outBuilder) const override;
 		Result CreatePipelineLibraryCombiner(UniquePtr<IPipelineLibraryCombiner> &outCombiner) const override;
 	};
@@ -46,6 +47,11 @@ namespace rkit { namespace buildsystem
 	Result BuildSystemDriver::CreatePackageObjectWriter(UniquePtr<IPackageObjectWriter> &outWriter) const
 	{
 		return PackageObjectWriterBase::Create(outWriter);
+	}
+
+	Result BuildSystemDriver::CreateStructTreeBuilder(UniquePtr<IStructTreeBuilder> &outBuilder) const
+	{
+		return StructTreeBuilderBase::Create(outBuilder);
 	}
 
 	Result BuildSystemDriver::CreatePackageBuilder(data::IRenderDataHandler *dataHandler, IPackageObjectWriter *objWriter, bool allowTempStrings, UniquePtr<IPackageBuilder> &outBuilder) const

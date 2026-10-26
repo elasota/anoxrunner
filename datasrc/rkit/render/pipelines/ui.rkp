@@ -1,13 +1,42 @@
 include "rkit/render/bindings.rki"
 
+struct S_InterfacePixelConstants
+{
+	float4 InterformTransform
+	uint PrevFrame_NextFrame
+	uint NumVerts
+	float FrameInterpolator
+}
+
+
+PipelineLayout PL_Interface
+{
+	TextureHeapVisibility = Pixel
+	SamplerHeapVisibility = Pixel
+
+	ConstantBufferBindings =
+	{
+		PixelConstants =
+		{
+			Visibility = Pixel
+		}
+	}
+}
+
 GraphicsPipeline GP_InterfaceSimple
 {
-	DescriptorLayouts =
+	InputLayout = IL_InterfaceSimple
+	PipelineLayout = PL_Interface
+
+	DescriptorHeaps =
 	{
-		DL_Interface
+		Texture2DHeap = Texture2D<float4>
 	}
 
-	InputLayout = IL_InterfaceSimple
+	ConstantBuffers =
+	{
+		PixelConstants = S_InterfacePixelConstants
+	}
 
 	VertexShader =
 	{

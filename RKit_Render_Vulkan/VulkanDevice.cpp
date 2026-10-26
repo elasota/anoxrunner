@@ -823,8 +823,6 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		CreateResourcePool<VkSemaphore>(m_semaPool, m_semaFactory, true);
 		CreateResourcePool<VkFence>(m_fencePool, m_fenceFactory, true);
-
-		RKIT_RETURN_OK;
 	}
 
 	Result VulkanDeviceBase::CreateDevice(UniquePtr<IRenderDevice> &outDevice, const VulkanGlobalAPI &vkg, const VulkanInstanceAPI &vki, const VulkanGlobalPlatformAPI &vkg_p, const VulkanInstancePlatformAPI &vki_p, VkInstance inst, VkDevice device, const QueueFamilySpec(&queues)[static_cast<size_t>(CommandQueueType::kCount)], const VkAllocationCallbacks *allocCallbacks, const RenderDeviceCaps &caps, const RenderDeviceRequirements &reqs, const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<AsciiStringView> &&enabledExts, const VkPhysicalDeviceMemoryProperties &memProperties)

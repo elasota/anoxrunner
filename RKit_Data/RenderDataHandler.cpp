@@ -878,25 +878,8 @@ namespace rkit { namespace data
 			RTTI_ENUM_OPTION(Pixel)
 		RTTI_ENUM_END
 
-		RTTI_STRUCT_BEGIN_INDEXABLE(SamplerDesc)
-			RTTI_STRUCT_FIELD(minFilter)
-			RTTI_STRUCT_FIELD(magFilter)
-			RTTI_STRUCT_FIELD(mipMapMode)
-			RTTI_STRUCT_FIELD(addressModeU)
-			RTTI_STRUCT_FIELD(addressModeV)
-			RTTI_STRUCT_FIELD(addressModeW)
-			RTTI_STRUCT_FIELD(mipLodBias)
-			RTTI_STRUCT_FIELD(minLod)
-			RTTI_STRUCT_FIELD(maxLod)
-			RTTI_STRUCT_FIELD(anisotropy)
-			RTTI_STRUCT_FIELD(compareFunction)
-		RTTI_STRUCT_END
-
-		RTTI_ENUM_BEGIN(DescriptorType)
+		RTTI_ENUM_BEGIN(DescriptorBindingType)
 			RTTI_ENUM_OPTION(Sampler)
-
-			RTTI_ENUM_OPTION(StaticConstantBuffer)
-			RTTI_ENUM_OPTION(DynamicConstantBuffer)
 
 			RTTI_ENUM_OPTION(Buffer)
 			RTTI_ENUM_OPTION(RWBuffer)
@@ -920,26 +903,6 @@ namespace rkit { namespace data
 			RTTI_ENUM_OPTION(RWTexture2DArray)
 			RTTI_ENUM_OPTION(RWTexture3D)
 		RTTI_ENUM_END
-
-		RTTI_STRUCT_BEGIN_INDEXABLE(DescriptorDesc)
-			RTTI_STRUCT_FIELD_INVISIBLE(name)
-			RTTI_STRUCT_FIELD(visibility)
-			RTTI_STRUCT_FIELD(descriptorType)
-			RTTI_STRUCT_FIELD(arraySize)
-			RTTI_STRUCT_FIELD(globallyCoherent)
-			RTTI_STRUCT_FIELD(valueType)
-			RTTI_STRUCT_FIELD(staticSamplerDesc)
-		RTTI_STRUCT_END
-
-		RTTI_STRUCT_BEGIN_INDEXABLE(PushConstantDesc)
-			RTTI_STRUCT_FIELD(type)
-			RTTI_STRUCT_FIELD(stageVisibility)
-			RTTI_STRUCT_FIELD_INVISIBLE(name)
-		RTTI_STRUCT_END
-
-		RTTI_STRUCT_BEGIN_INDEXABLE(PushConstantListDesc)
-			RTTI_STRUCT_FIELD(pushConstants)
-		RTTI_STRUCT_END
 
 		RTTI_ENUM_BEGIN(InputLayoutVertexInputStepping)
 			RTTI_ENUM_OPTION(Vertex)
@@ -970,16 +933,39 @@ namespace rkit { namespace data
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(StructureType)
+			RTTI_STRUCT_FIELD_INVISIBLE(name)
 			RTTI_STRUCT_FIELD(members)
 		RTTI_STRUCT_END
 
-		RTTI_STRUCT_BEGIN_INDEXABLE(DescriptorLayoutDesc)
-			RTTI_STRUCT_FIELD(descriptors)
+		RTTI_STRUCT_BEGIN_INDEXABLE(LayoutConstantBufferDesc)
+			RTTI_STRUCT_FIELD_INVISIBLE(name)
+			RTTI_STRUCT_FIELD(visibility)
+		RTTI_STRUCT_END
+
+		RTTI_STRUCT_BEGIN_INDEXABLE(LayoutInlineConstantDesc)
+			RTTI_STRUCT_FIELD_INVISIBLE(name)
+			RTTI_STRUCT_FIELD(type)
+			RTTI_STRUCT_FIELD(visibility)
+		RTTI_STRUCT_END
+
+		RTTI_STRUCT_BEGIN_INDEXABLE(ConstantBufferBindingDesc)
+			RTTI_STRUCT_FIELD_INVISIBLE(bindingIndex)
+			RTTI_STRUCT_FIELD_INVISIBLE(valueType)
+		RTTI_STRUCT_END
+
+		RTTI_STRUCT_BEGIN_INDEXABLE(DescriptorHeapBindingDesc)
+			RTTI_STRUCT_FIELD_INVISIBLE(name)
+			RTTI_STRUCT_FIELD_INVISIBLE(type)
+			RTTI_STRUCT_FIELD_INVISIBLE(valueType)
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(PipelineLayoutDesc)
-			RTTI_STRUCT_FIELD(descriptorLayouts)
-			RTTI_STRUCT_FIELD_NULLABLE(pushConstantList)
+			RTTI_STRUCT_FIELD(textureHeapVisibility)
+			RTTI_STRUCT_FIELD(rwTextureHeapVisibility)
+			RTTI_STRUCT_FIELD(samplerHeapVisibility)
+			RTTI_STRUCT_FIELD(bufferHeapVisibility)
+			RTTI_STRUCT_FIELD_INVISIBLE(constantBuffers)
+			RTTI_STRUCT_FIELD_INVISIBLE(inlineConstants)
 		RTTI_STRUCT_END
 
 		RTTI_ENUM_BEGIN(IndexSize)
@@ -1141,6 +1127,8 @@ namespace rkit { namespace data
 
 			RTTI_STRUCT_FIELD_NULLABLE(depthStencil)
 			RTTI_STRUCT_FIELD(renderTargets)
+			RTTI_STRUCT_FIELD_INVISIBLE(descriptorHeapBindings)
+			RTTI_STRUCT_FIELD_INVISIBLE(constantBufferBindings)
 		RTTI_STRUCT_END
 
 		RTTI_STRUCT_BEGIN_INDEXABLE(GraphicsPipelineNameLookup)
@@ -2157,24 +2145,24 @@ namespace rkit { namespace data
 			RKIT_RETURN_OK;
 	}
 
-	const RenderRTTIStructType *RenderDataHandler::GetSamplerDescRTTI() const
+	const RenderRTTIEnumType *RenderDataHandler::GetDescriptorBindingTypeRTTI() const
 	{
-		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::SamplerDesc>::GetRTTIType());
+		return reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::DescriptorBindingType>::GetRTTIType());
 	}
 
-	const RenderRTTIStructType *RenderDataHandler::GetPushConstantDescRTTI() const
+	const RenderRTTIStructType *RenderDataHandler::GetPipelineLayoutDescRTTI() const
 	{
-		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::PushConstantDesc>::GetRTTIType());
+		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::PipelineLayoutDesc>::GetRTTIType());
 	}
 
-	const RenderRTTIStructType *RenderDataHandler::GetDescriptorDescRTTI() const
+	const RenderRTTIStructType *RenderDataHandler::GetLayoutInlineConstantDescRTTI() const
 	{
-		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::DescriptorDesc>::GetRTTIType());
+		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::LayoutInlineConstantDesc>::GetRTTIType());
 	}
 
-	const RenderRTTIEnumType *RenderDataHandler::GetDescriptorTypeRTTI() const
+	const RenderRTTIStructType *RenderDataHandler::GetLayoutConstantBufferRTTI() const
 	{
-		return reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::DescriptorType>::GetRTTIType());
+		return reinterpret_cast<const RenderRTTIStructType *>(render_rtti::RTTIResolver<render::LayoutConstantBufferDesc>::GetRTTIType());
 	}
 
 	const RenderRTTIStructType *RenderDataHandler::GetGraphicsPipelineDescRTTI() const
@@ -2311,26 +2299,25 @@ namespace rkit { namespace data
 		LINK_INDEXABLE_LIST_TYPE(GraphicsPipelineDesc)
 		LINK_INDEXABLE_LIST_TYPE(RenderTargetDesc)
 		LINK_INDEXABLE_LIST_TYPE(RenderOperationDesc)
-		LINK_INDEXABLE_LIST_TYPE(PushConstantDesc)
-		LINK_INDEXABLE_LIST_TYPE(PushConstantListDesc)
 		LINK_INDEXABLE_LIST_TYPE(ShaderDesc)
 		LINK_INDEXABLE_LIST_TYPE(StructureType)
 		LINK_INDEXABLE_LIST_TYPE(StructureMemberDesc)
 		LINK_INDEXABLE_LIST_TYPE(InputLayoutDesc)
 		LINK_INDEXABLE_LIST_TYPE(PipelineLayoutDesc)
-		LINK_INDEXABLE_LIST_TYPE(DescriptorLayoutDesc)
-		LINK_INDEXABLE_LIST_TYPE(DescriptorDesc)
 		LINK_INDEXABLE_LIST_TYPE(InputLayoutVertexFeedDesc)
 		LINK_INDEXABLE_LIST_TYPE(InputLayoutVertexInputDesc)
 		LINK_INDEXABLE_LIST_TYPE(CompoundNumericType)
 		LINK_INDEXABLE_LIST_TYPE(VectorNumericType)
 		LINK_INDEXABLE_LIST_TYPE(VectorOrScalarNumericType)
-		LINK_INDEXABLE_LIST_TYPE(SamplerDesc)
 		LINK_INDEXABLE_LIST_TYPE(ContentKey)
 		LINK_INDEXABLE_LIST_TYPE(ShaderPermutationTree)
 		LINK_INDEXABLE_LIST_TYPE(ShaderPermutationTreeBranch)
 		LINK_INDEXABLE_LIST_TYPE(RenderPassDesc)
 		LINK_INDEXABLE_LIST_TYPE(RenderPassNameLookup)
+		LINK_INDEXABLE_LIST_TYPE(LayoutInlineConstantDesc)
+		LINK_INDEXABLE_LIST_TYPE(LayoutConstantBufferDesc)
+		LINK_INDEXABLE_LIST_TYPE(ConstantBufferBindingDesc)
+		LINK_INDEXABLE_LIST_TYPE(DescriptorHeapBindingDesc)
 
 		default:
 			RKIT_THROW(ResultCode::kInternalError);

@@ -2,6 +2,7 @@
 
 #include "rkit/Core/HashTable.h"
 #include "rkit/Core/LogDriver.h"
+#include "rkit/Core/Pair.h"
 #include "rkit/Core/Stream.h"
 #include "rkit/Core/String.h"
 #include "rkit/Core/Vector.h"
@@ -9,6 +10,8 @@
 #include "rkit/Render/RenderDefs.h"
 
 #include "rkit/Utilities/Sha2.h"
+
+#include <algorithm>
 
 namespace rkit { namespace buildsystem
 {
@@ -107,6 +110,20 @@ namespace rkit { namespace buildsystem
 
 		HashMap<size_t, size_t> m_stringIndexToConfigKeyIndex;
 		Vector<ConfigKey> m_configKeys;
+	};
+
+	class StructTreeBuilder final : public StructTreeBuilderBase
+	{
+	public:
+		void AddStruct(const render::StructureType *structType) override;
+		rkit::ConstSpan<const render::StructureType *> Finalize() override;
+
+	private:
+		void InsertStructAtDepth(const render::StructureType *structType, size_t depth);
+		void InsertStructMembers(const render::StructureType *structType, size_t depth);
+
+		rkit::HashMap<const render::StructureType *, size_t> m_structTreeDepth;
+		rkit::Vector<const render::StructureType *> m_structures;
 	};
 
 	class PackageObjectWriter final : public IPackageObjectWriter
@@ -494,6 +511,52 @@ namespace rkit { namespace buildsystem
 		PackageObjectWriter::WriteUInt32(m_dataHandler->GetPackageIdentifier(), stream);
 
 		RKIT_RETURN_OK;
+	}
+
+	void StructTreeBuilder::AddStruct(const render::StructureType *structType)
+	{
+		InsertStructAtDepth(structType, 0);
+	}
+
+	void StructTreeBuilder::InsertStructAtDepth(const render::StructureType *structType, size_t depth)
+	{
+		rkit::HashValue_t hash = rkit::Hasher<const render::StructureType *>::ComputeHash(0, structType);
+
+		rkit::HashMap<const render::StructureType *, size_t>::Iterator_t it = m_structTreeDepth.FindPrehashed(hash, structType);
+
+		if (it == m_structTreeDepth.end())
+		{
+			m_structTreeDepth.SetPrehashed(hash, structType, depth);
+			m_structures.Append(structType);
+			InsertStructMembers(structType, depth + 1);
+		}
+		else if (it.Value() < depth)
+		{
+			it.Value() = depth;
+			InsertStructMembers(structType, depth + 1);
+		}
+	}
+
+	void StructTreeBuilder::InsertStructMembers(const render::StructureType *structType, size_t depth)
+	{
+		for (const render::StructureMemberDesc *memberDesc : structType->m_members)
+		{
+			if (memberDesc->m_type.m_type == render::ValueTypeType::Structure)
+				InsertStructAtDepth(memberDesc->m_type.m_value.m_structureType, depth);
+		}
+	}
+
+	rkit::ConstSpan<const render::StructureType *> StructTreeBuilder::Finalize()
+	{
+		std::stable_sort(m_structures.begin(), m_structures.end(), [this](const render::StructureType *a, const render::StructureType *b)
+			{
+				const size_t depthA = m_structTreeDepth.Find(a).Value();
+				const size_t depthB = m_structTreeDepth.Find(b).Value();
+
+				return depthB < depthA;
+			});
+
+		return m_structures.ToSpan();
 	}
 
 	Result PackageObjectWriter::WriteObject(IPackageBuilder &pkgBuilder, const void *obj, const data::RenderRTTITypeBase *rtti, IWriteStream &stream) const
@@ -973,5 +1036,10 @@ namespace rkit { namespace buildsystem
 	Result PackageObjectWriterBase::Create(UniquePtr<IPackageObjectWriter> &outPackageObjectWriter)
 	{
 		outPackageObjectWriter = New<PackageObjectWriter>();
+	}
+
+	Result StructTreeBuilderBase::Create(UniquePtr<IStructTreeBuilder> &outStructTreeBuilder)
+	{
+		outStructTreeBuilder = New<StructTreeBuilder>();
 	}
 } } // rkit::buildsystem

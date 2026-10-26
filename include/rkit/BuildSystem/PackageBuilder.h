@@ -24,6 +24,11 @@ namespace rkit
 		struct RenderRTTITypeBase;
 		struct IRenderDataHandler;
 	}
+
+	namespace render
+	{
+		struct StructureType;
+	}
 }
 
 namespace rkit
@@ -85,6 +90,14 @@ namespace rkit
 			virtual const IPackageObjectWriter *GetWriter() const = 0;
 
 			virtual Result WritePackage(ISeekableWriteStream &stream) const = 0;
+		};
+
+		struct IStructTreeBuilder
+		{
+			virtual ~IStructTreeBuilder() {}
+
+			virtual void AddStruct(const render::StructureType *structType) = 0;
+			virtual Span<const render::StructureType *const> Finalize() = 0;
 		};
 
 		struct IPackageObjectWriter

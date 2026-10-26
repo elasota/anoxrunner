@@ -8,6 +8,7 @@ namespace rkit { namespace render
 	{
 		kIndependentBlend,
 		kTimelineFence,
+		kDescriptorIndexing,
 
 		kCount,
 	};
@@ -19,6 +20,8 @@ namespace rkit { namespace render
 		kMaxTexture3DSize,
 		kMaxTextureCubeSize,
 		kMaxTextureArrayLayers,
+		kMaxBoundDescriptorSets,
+		kMaxPushConstantRanges,
 
 		kCount,
 	};

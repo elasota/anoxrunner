@@ -50,7 +50,7 @@ namespace rkit { namespace data
 		VectorOrScalarDimension,
 		NumericType,
 		StageVisibility,
-		DescriptorType,
+		DescriptorBindingType,
 		IndexSize,
 		PrimitiveTopology,
 		FillMode,
@@ -67,17 +67,16 @@ namespace rkit { namespace data
 		ImageLayout,
 
 		// Structs
-		SamplerDesc,
-		PushConstantDesc,
-		PushConstantListDesc,
 		StructureMemberDesc,
 		StructureType,
-		DescriptorDesc,
 		RenderTargetFormat,
 		RenderTargetDesc,
 		RenderOperationDesc,
+		LayoutInlineConstantDesc,
+		LayoutConstantBufferDesc,
+		ConstantBufferBindingDesc,
+		DescriptorHeapBindingDesc,
 		PipelineLayoutDesc,
-		DescriptorLayoutDesc,
 		DepthStencilTargetDesc,
 		RenderPassDesc,
 		RenderPassNameLookup,
@@ -110,21 +109,20 @@ namespace rkit { namespace data
 		GraphicsPipelineDesc,
 		RenderTargetDesc,
 		RenderOperationDesc,
-		PushConstantDesc,
-		PushConstantListDesc,
 		ShaderDesc,
 		StructureType,
 		StructureMemberDesc,
 		InputLayoutDesc,
+		LayoutInlineConstantDesc,
+		LayoutConstantBufferDesc,
+		ConstantBufferBindingDesc,
+		DescriptorHeapBindingDesc,
 		PipelineLayoutDesc,
-		DescriptorLayoutDesc,
-		DescriptorDesc,
 		InputLayoutVertexFeedDesc,
 		InputLayoutVertexInputDesc,
 		VectorOrScalarNumericType,
 		VectorNumericType,
 		CompoundNumericType,
-		SamplerDesc,
 		ContentKey,
 		ShaderPermutationTree,
 		ShaderPermutationTreeBranch,
@@ -359,10 +357,10 @@ namespace rkit { namespace data
 	{
 		virtual ~IRenderDataHandler() {}
 
-		virtual const RenderRTTIStructType *GetSamplerDescRTTI() const = 0;
-		virtual const RenderRTTIStructType *GetPushConstantDescRTTI() const = 0;
-		virtual const RenderRTTIStructType *GetDescriptorDescRTTI() const = 0;
-		virtual const RenderRTTIEnumType *GetDescriptorTypeRTTI() const = 0;
+		virtual const RenderRTTIEnumType *GetDescriptorBindingTypeRTTI() const = 0;
+		virtual const RenderRTTIStructType *GetPipelineLayoutDescRTTI() const = 0;
+		virtual const RenderRTTIStructType *GetLayoutInlineConstantDescRTTI() const = 0;
+		virtual const RenderRTTIStructType *GetLayoutConstantBufferRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetGraphicsPipelineDescRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetGraphicsPipelineNameLookupRTTI() const = 0;
 		virtual const RenderRTTIStructType *GetRenderTargetDescRTTI() const = 0;

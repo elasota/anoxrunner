@@ -764,6 +764,7 @@ namespace anox
 		rkit::UniquePtr<anox::IGraphicsResourceManager> m_resourceManager;
 
 		rkit::utils::IThreadPool &m_threadPool;
+		rkit::RCPtr<rkit::Job> m_lastDisposeJob;
 
 		rkit::CIPathView m_pipelinesCacheFileName;
 
@@ -2391,6 +2392,7 @@ namespace anox
 
 		requiredCaps.SetUInt32Cap(rkit::render::RenderDeviceUInt32Cap::kMaxTexture2DSize, 1024);
 		requiredCaps.SetBoolCap(rkit::render::RenderDeviceBoolCap::kTimelineFence, true);
+		requiredCaps.SetBoolCap(rkit::render::RenderDeviceBoolCap::kDescriptorIndexing, true);
 
 		rkit::UniquePtr<rkit::render::IRenderDevice> device;
 		renderDriver->CreateDevice(device, queueRequests.ToSpan(), requiredCaps, optionalCaps, *adapters[0]);
@@ -3054,27 +3056,16 @@ namespace anox
 
 		// Handle timelined resource disposal
 		{
+			// Pull condemned resources from the last version of this frame
 			GraphicTimelinedResourceStack disposeNow = std::move(syncPoint.m_condemnedResources);
 
-			while (GraphicTimelinedResource *resource = m_unsortedCondemnedResources.Pop())
-			{
-				const uint64_t globalSyncPoint = resource->GetGlobalSyncPoint();
-				const uint64_t framesAgo = m_currentGlobalSyncPoint - globalSyncPoint;
-
-				if (framesAgo >= m_numSyncPoints)
-					disposeNow.PushUnsafe(resource);
-				else
-				{
-					const uint8_t binIntoSyncPoint = (m_currentSyncPoint + m_numSyncPoints - static_cast<uint8_t>(framesAgo)) % m_numSyncPoints;
-					m_syncPoints[binIntoSyncPoint].m_condemnedResources.PushUnsafe(resource);
-				}
-			}
+			syncPoint.m_condemnedResources = std::move(m_unsortedCondemnedResources);
 
 			if (!disposeNow.IsEmptyUnsafe())
 			{
 				rkit::UniquePtr<AsyncDisposeResourceJobRunner> disposeRunner = rkit::New<AsyncDisposeResourceJobRunner>(std::move(disposeNow));
 
-				m_threadPool.GetJobQueue()->CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(disposeRunner), rkit::JobDependencyList());
+				m_threadPool.GetJobQueue()->CreateJob(&m_lastDisposeJob, rkit::JobType::kNormalPriority, std::move(disposeRunner), m_lastDisposeJob);
 			}
 		}
 
@@ -3324,7 +3315,6 @@ namespace anox
 		rkit::MutexLock lock(*m_setupMutex);
 		m_setupProgress = progress;
 	}
-
 
 	void GraphicsSubsystem::SetPipelineLibraryLoader(rkit::UniquePtr<rkit::render::IPipelineLibraryLoader> &&loader, rkit::UniquePtr<LivePipelineSets> &&livePipelineSets, bool haveExistingMergedCache)
 	{

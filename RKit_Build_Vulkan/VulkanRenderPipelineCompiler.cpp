@@ -9,12 +9,15 @@
 #include "rkit/Render/RenderDefs.h"
 
 #include "rkit/Vulkan/GraphicsPipeline.h"
+#include "rkit/Vulkan/DescriptorHeap.h"
 
 #include "rkit/Core/BufferStream.h"
 #include "rkit/Core/FourCC.h"
+#include "rkit/Core/HashTable.h"
 #include "rkit/Core/LogDriver.h"
 #include "rkit/Core/Module.h"
 #include "rkit/Core/ModuleDriver.h"
+#include "rkit/Core/Optional.h"
 #include "rkit/Core/Path.h"
 #include "rkit/Core/Stream.h"
 
@@ -109,13 +112,15 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		static Result WriteUIntString(IWriteStream &stream, uint64_t value);
 
 		static Result WriteRTFormat(IWriteStream &stream, const render::RenderTargetFormat &format);
+		static Result WriteValueType(IWriteStream &stream, IStructTreeBuilder& structTreeBuilder, const data::IRenderDataPackage &pkg, const render::ValueType& valueType);
 		static Result WriteVectorOrScalarNumericType(IWriteStream &stream, const render::VectorOrScalarNumericType &format);
 		static Result WriteVectorNumericType(IWriteStream &stream, const render::VectorNumericType &format);
 		static Result WriteNumericType(IWriteStream &stream, const render::NumericType numericType);
 		static Result WriteVectorOrScalarDimension(IWriteStream &stream, const render::VectorOrScalarDimension vectorOrScalarDimension);
 		static Result WriteVectorDimension(IWriteStream &stream, const render::VectorDimension vectorDimension);
-		static Result WriteTextureDescriptorType(IWriteStream &stream, const render::DescriptorType descriptorType, const render::ValueType &valueType);
+		static Result WriteTextureDescriptorBindingType(IWriteStream &stream, const render::DescriptorBindingType descriptorType, const render::ValueType &valueType);
 		static Result WriteConfigurableRTFormat(IWriteStream &stream, const render::ConfigurableValueBase<render::RenderTargetFormat> &format);
+		static Result WriteStructTree(IWriteStream &stream, const data::IRenderDataPackage &pkg, IStructTreeBuilder &structTreeBuilder);
 
 		Result NormalizePath(String &path) const;
 		Result TryInclude(CIPath &&path, bool &outSucceeded, UniquePtr<IncludeResultBase> &outIncludeResult) const;
@@ -136,6 +141,8 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		IDependencyNodeCompilerFeedback *m_feedback;
 		PipelineType m_pipelineType;
 
+		BufferStream m_defsPrefixStream;
+		BufferStream m_structsPrefixStream;
 		BufferStream m_prefixStream;
 		UniquePtr<IReadWriteStream> m_mainContentStream;
 		BufferStream m_suffixStream;
@@ -292,7 +299,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 	uint32_t RenderPipelineCompiler::GetVersion() const
 	{
-		return 1;
+		return 2;
 	}
 
 	Result RenderPipelineCompiler::CompileGraphicsPipeline(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback, data::IRenderDataPackage *package, const Span<const Vector<uint8_t>> &pkgBinaryContent, const render::GraphicsPipelineNameLookup *nameLookup)
@@ -407,13 +414,6 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			pipelineDesc->m_vertexShaderOutput = nullptr;
 		}
 
-		const data::IRenderRTTIListBase *descriptorDescs = package.GetIndexable(data::RenderRTTIIndexableStructType::DescriptorDesc);
-		for (size_t i = 0; i < descriptorDescs->GetCount(); i++)
-		{
-			render::DescriptorDesc *descriptorDesc = const_cast<render::DescriptorDesc *>(static_cast<const render::DescriptorDesc *>(descriptorDescs->GetElementPtr(i)));
-			descriptorDesc->m_globallyCoherent = false;
-		}
-
 		RKIT_RETURN_OK;
 	}
 
@@ -466,6 +466,11 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 	Result RenderPipelineStageBuildJob::RunGraphics(const data::IRenderDataPackage *package, const render::GraphicsPipelineDesc *pipeline, render::vulkan::GraphicPipelineStage stage)
 	{
+		rkit::buildsystem::IBuildSystemDriver *bsDriver = static_cast<rkit::buildsystem::IBuildSystemDriver *>(rkit::GetDrivers().FindDriver(rkit::IModuleDriver::kDefaultNamespace, u8"BuildSystem"));
+
+		UniquePtr<IStructTreeBuilder> structTreeBuilder;
+		bsDriver->CreateStructTreeBuilder(structTreeBuilder);
+
 		render::StageVisibility requiredVisibility = render::StageVisibility::All;
 
 		switch (stage)
@@ -492,23 +497,18 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 		m_shaderSourcePath.Set(package->GetString(sourceFileIndex.GetIndex()));
 
-		WriteString(m_prefixStream, u8"#define float2 vec2\n");
-		WriteString(m_prefixStream, u8"#define float3 vec3\n");
-		WriteString(m_prefixStream, u8"#define float4 vec4\n");
-		WriteString(m_prefixStream, u8"#define float2x2 mat2x2\n");
-		WriteString(m_prefixStream, u8"#define float2x3 mat2x3\n");
-		WriteString(m_prefixStream, u8"#define float2x4 mat2x4\n");
-		WriteString(m_prefixStream, u8"#define float3x2 mat3x2\n");
-		WriteString(m_prefixStream, u8"#define float3x3 mat3x3\n");
-		WriteString(m_prefixStream, u8"#define float3x4 mat3x4\n");
-		WriteString(m_prefixStream, u8"#define float4x2 mat4x2\n");
-		WriteString(m_prefixStream, u8"#define float4x3 mat4x3\n");
-		WriteString(m_prefixStream, u8"#define float4x4 mat4x4\n");
-
-		if (pipeline->m_pipelineLayout->m_pushConstantList)
-		{
-			RKIT_THROW(ResultCode::kNotYetImplemented);
-		}
+		WriteString(m_defsPrefixStream, u8"#define float2 vec2\n");
+		WriteString(m_defsPrefixStream, u8"#define float3 vec3\n");
+		WriteString(m_defsPrefixStream, u8"#define float4 vec4\n");
+		WriteString(m_defsPrefixStream, u8"#define float2x2 mat2x2\n");
+		WriteString(m_defsPrefixStream, u8"#define float2x3 mat2x3\n");
+		WriteString(m_defsPrefixStream, u8"#define float2x4 mat2x4\n");
+		WriteString(m_defsPrefixStream, u8"#define float3x2 mat3x2\n");
+		WriteString(m_defsPrefixStream, u8"#define float3x3 mat3x3\n");
+		WriteString(m_defsPrefixStream, u8"#define float3x4 mat3x4\n");
+		WriteString(m_defsPrefixStream, u8"#define float4x2 mat4x2\n");
+		WriteString(m_defsPrefixStream, u8"#define float4x3 mat4x3\n");
+		WriteString(m_defsPrefixStream, u8"#define float4x4 mat4x4\n");
 
 		if (stage == render::vulkan::GraphicPipelineStage::Vertex && pipeline->m_inputLayout != nullptr)
 		{
@@ -578,78 +578,136 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			WriteString(m_prefixStream, u8"};\n");
 		}
 
-		ConstSpan<const render::DescriptorLayoutDesc *> descriptorLayouts = pipeline->m_pipelineLayout->m_descriptorLayouts;
-		for (size_t dlSlot = 0; dlSlot < descriptorLayouts.Count(); dlSlot++)
+		const render::PipelineLayoutDesc *pipelineLayout = pipeline->m_pipelineLayout;
+
+		constexpr size_t kNumHeaps = static_cast<size_t>(render::vulkan::DescriptorHeapType::Count);
+		rkit::StaticArray<rkit::Optional<uint32_t>, kNumHeaps> heapBindingIndexes;
+		rkit::StaticArray<render::StageVisibility, kNumHeaps> heapStageVisibilities;
+
+		for (render::StageVisibility &visibility : heapStageVisibilities)
+			visibility = render::StageVisibility::None;
+
+		uint32_t numHeapBindings = 0;
+
+		heapStageVisibilities[static_cast<size_t>(render::vulkan::DescriptorHeapType::Buffer)] = pipelineLayout->m_bufferHeapVisibility;
+		heapStageVisibilities[static_cast<size_t>(render::vulkan::DescriptorHeapType::Texture)] = pipelineLayout->m_textureHeapVisibility;
+		heapStageVisibilities[static_cast<size_t>(render::vulkan::DescriptorHeapType::RWTexture)] = pipelineLayout->m_rwTextureHeapVisibility;
+		heapStageVisibilities[static_cast<size_t>(render::vulkan::DescriptorHeapType::Sampler)] = pipelineLayout->m_samplerHeapVisibility;
+
+		for (size_t i = 0; i < kNumHeaps; i++)
 		{
-			const render::DescriptorLayoutDesc *dl = descriptorLayouts[dlSlot];
+			if (heapStageVisibilities[i] != render::StageVisibility::None)
+				heapBindingIndexes[i] = numHeapBindings++;
+		}
 
-			for (size_t descSlot = 0; descSlot < dl->m_descriptors.Count(); descSlot++)
+		const uint32_t firstCBBinding = numHeapBindings;
+
+		ConstSpan<const render::LayoutInlineConstantDesc *> layoutInlineConstants = pipelineLayout->m_inlineConstants;
+		if (layoutInlineConstants.Count() > 0)
+			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+
+		ConstSpan<const render::LayoutConstantBufferDesc *> layoutConstantBuffers = pipelineLayout->m_constantBuffers;
+
+		ConstSpan<const render::DescriptorHeapBindingDesc *> descriptorHeaps = pipeline->m_descriptorHeapBindings;
+		ConstSpan<const render::ConstantBufferBindingDesc *> constantBuffers = pipeline->m_constantBufferBindings;
+
+		for (const render::DescriptorHeapBindingDesc *heapBinding : descriptorHeaps)
+		{
+			render::vulkan::DescriptorHeapType heapType = render::vulkan::DescriptorHeapType::Count;
+
+			switch (heapBinding->m_type)
 			{
-				const render::DescriptorDesc *descriptor = dl->m_descriptors[descSlot];
+			case render::DescriptorBindingType::Sampler:
+				heapType = render::vulkan::DescriptorHeapType::Sampler;
+				break;
 
-				if (descriptor->m_visibility != render::StageVisibility::All && descriptor->m_visibility != requiredVisibility)
-					continue;
+			case render::DescriptorBindingType::Buffer:
+			case render::DescriptorBindingType::ByteAddressBuffer:
+			case render::DescriptorBindingType::RWBuffer:
+			case render::DescriptorBindingType::RWByteAddressBuffer:
+				heapType = render::vulkan::DescriptorHeapType::Buffer;
+				break;
 
-				WriteString(m_prefixStream, u8"layout(set = ");
-				WriteUIntString(m_prefixStream, dlSlot);
-				WriteString(m_prefixStream, u8", binding = ");
-				WriteUIntString(m_prefixStream, descSlot);
+			case render::DescriptorBindingType::Texture1D:
+			case render::DescriptorBindingType::Texture1DArray:
+			case render::DescriptorBindingType::Texture2D:
+			case render::DescriptorBindingType::Texture2DArray:
+			case render::DescriptorBindingType::Texture2DMS:
+			case render::DescriptorBindingType::Texture2DMSArray:
+			case render::DescriptorBindingType::Texture3D:
+			case render::DescriptorBindingType::TextureCube:
+			case render::DescriptorBindingType::TextureCubeArray:
+				heapType = render::vulkan::DescriptorHeapType::Texture;
+				break;
 
-				switch (descriptor->m_descriptorType)
-				{
-				case render::DescriptorType::StaticConstantBuffer:
-				case render::DescriptorType::DynamicConstantBuffer:
-					WriteString(m_prefixStream, u8", std140");
-					break;
-				default:
-					break;
-				}
+			case render::DescriptorBindingType::RWTexture1D:
+			case render::DescriptorBindingType::RWTexture1DArray:
+			case render::DescriptorBindingType::RWTexture2D:
+			case render::DescriptorBindingType::RWTexture2DArray:
+			case render::DescriptorBindingType::RWTexture3D:
+				heapType = render::vulkan::DescriptorHeapType::RWTexture;
+				break;
 
-				WriteString(m_prefixStream, u8") ");
+			default:
+				RKIT_THROW(rkit::ResultCode::kInternalError);
+			};
 
-				switch (descriptor->m_descriptorType)
-				{
-				case render::DescriptorType::Sampler:
-					WriteString(m_prefixStream, u8"sampler ");
-					break;
+			const render::StageVisibility stageVisibility = heapStageVisibilities[static_cast<size_t>(heapType)];
 
-				case render::DescriptorType::StaticConstantBuffer:
-				case render::DescriptorType::DynamicConstantBuffer:
-					WriteString(m_prefixStream, u8"uniform ");
-					break;
+			if (stageVisibility != render::StageVisibility::All && stageVisibility != requiredVisibility)
+				continue;
 
-				case render::DescriptorType::Buffer:
-				case render::DescriptorType::ByteAddressBuffer:
-					WriteString(m_prefixStream, u8"readonly buffer ");
-					break;
+			WriteString(m_prefixStream, u8"layout(set = 0, binding = ");
+			WriteUIntString(m_prefixStream, heapBindingIndexes[static_cast<size_t>(heapType)].Get());
+			WriteString(m_prefixStream, u8") uniform ");
 
-				case render::DescriptorType::RWBuffer:
-				case render::DescriptorType::RWByteAddressBuffer:
-					WriteString(m_prefixStream, u8"buffer ");
-					break;
+			switch (heapType)
+			{
+			case render::vulkan::DescriptorHeapType::Sampler:
+				WriteString(m_prefixStream, u8"sampler ");
+				break;
 
-				case render::DescriptorType::Texture1D:
-				case render::DescriptorType::Texture2D:
-				case render::DescriptorType::Texture2DArray:
-				case render::DescriptorType::Texture2DMS:
-				case render::DescriptorType::Texture2DMSArray:
-				case render::DescriptorType::Texture3D:
-				case render::DescriptorType::TextureCube:
-				case render::DescriptorType::TextureCubeArray:
-				case render::DescriptorType::RWTexture1D:
-				case render::DescriptorType::RWTexture1DArray:
-				case render::DescriptorType::RWTexture2D:
-				case render::DescriptorType::RWTexture2DArray:
-				case render::DescriptorType::RWTexture3D:
-					WriteString(m_prefixStream, u8"uniform ");
-					WriteTextureDescriptorType(m_prefixStream, descriptor->m_descriptorType, descriptor->m_valueType);
-					WriteString(m_prefixStream, u8" ");
-					break;
-				}
+			case render::vulkan::DescriptorHeapType::Buffer:
+				WriteString(m_prefixStream, u8"buffer ");
+				break;
 
-				WriteString(m_prefixStream, package->GetString(descriptor->m_name.GetIndex()));
-				WriteString(m_prefixStream, u8";\n");
+			case render::vulkan::DescriptorHeapType::Texture:
+				WriteTextureDescriptorBindingType(m_prefixStream, heapBinding->m_type, heapBinding->m_valueType);
+				WriteString(m_prefixStream, u8" ");
+				break;
+
+			default:
+				RKIT_THROW(ResultCode::kInternalError);
 			}
+
+			WriteString(m_prefixStream, package->GetString(heapBinding->m_name.GetIndex()));
+			WriteString(m_prefixStream, u8";\n");
+		}
+
+		for (size_t cbIndex = 0; cbIndex < constantBuffers.Count(); cbIndex++)
+		{
+			const render::ConstantBufferBindingDesc *cbBinding = constantBuffers[cbIndex];
+
+			if (cbBinding->m_bindingIndex >= pipelineLayout->m_constantBuffers.Count())
+			{
+				rkit::log::Error(u8"Constant buffer binding index was out of range");
+				RKIT_THROW(ResultCode::kMalformedFile);
+			}
+
+			const render::LayoutConstantBufferDesc *cbConstantBuffer = pipelineLayout->m_constantBuffers[cbBinding->m_bindingIndex];
+
+			if (cbConstantBuffer->m_visibility != render::StageVisibility::All && cbConstantBuffer->m_visibility != requiredVisibility)
+				continue;
+
+			WriteString(m_prefixStream, u8"layout(set = 0, binding = ");
+			WriteUIntString(m_prefixStream, cbIndex + firstCBBinding);
+			WriteString(m_prefixStream, u8", std140) uniform _inline_cb_");
+			WriteUIntString(m_prefixStream, cbIndex);
+			WriteString(m_prefixStream, u8"\n{\n\t");
+			WriteValueType(m_prefixStream, *structTreeBuilder, *package, cbBinding->m_valueType);
+			WriteString(m_prefixStream, u8" ");
+			WriteString(m_prefixStream, package->GetString(cbConstantBuffer->m_name.GetIndex()));
+			WriteString(m_prefixStream, u8";\n};\n");
 		}
 
 		WriteString(m_suffixStream, u8"void main()\n");
@@ -707,6 +765,8 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		if (rpDesc->m_renderTargets.Count() > static_cast<size_t>(std::numeric_limits<int>::max()))
 			RKIT_THROW(ResultCode::kIntegerOverflow);
 
+		WriteStructTree(m_structsPrefixStream, *package, *structTreeBuilder);
+
 		m_glslangResource.max_draw_buffers = static_cast<int>(rpDesc->m_renderTargets.Count());
 
 		return Compile();
@@ -716,6 +776,8 @@ namespace rkit { namespace buildsystem { namespace vulkan
 	{
 		String mainShaderContent;
 		mainShaderContent.Append(u8"#extension GL_ARB_shading_language_include : enable\n"
+			u8"#include <GlslDefines>\n"
+			u8"#include <GlslShaderIOTypes>\n"
 			u8"#include <GlslShaderPrefix>\n"
 			u8"#include \"./");
 		mainShaderContent.Append(m_shaderSourcePath);
@@ -857,8 +919,32 @@ namespace rkit { namespace buildsystem { namespace vulkan
 	{
 		WriteNumericType(stream, format.m_numericType);
 		WriteVectorOrScalarDimension(stream, format.m_cols);
+	}
 
-		RKIT_RETURN_OK;
+	Result RenderPipelineStageBuildJob::WriteValueType(IWriteStream &stream, IStructTreeBuilder &structTreeBuilder, const data::IRenderDataPackage &pkg,  const render::ValueType &valueType)
+	{
+		switch (valueType.m_type)
+		{
+		case render::ValueTypeType::Structure:
+			{
+				const render::StructureType *structType = valueType.m_value.m_structureType;
+				structTreeBuilder.AddStruct(structType);
+				return stream.WriteAllSpan(pkg.GetString(structType->m_name.GetIndex()).ToSpan());
+			}
+			break;
+
+		case render::ValueTypeType::CompoundNumeric:
+			RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+
+		case render::ValueTypeType::Numeric:
+			return WriteNumericType(stream, valueType.m_value.m_numericType);
+
+		case render::ValueTypeType::VectorNumeric:
+			return WriteVectorNumericType(stream, *valueType.m_value.m_vectorNumericType);
+
+		default:
+			RKIT_THROW(rkit::ResultCode::kInternalError);
+		};
 	}
 
 	Result RenderPipelineStageBuildJob::WriteVectorNumericType(IWriteStream &stream, const render::VectorNumericType &format)
@@ -943,10 +1029,31 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			return WriteString(stream, u8"float4");
 	}
 
-	Result RenderPipelineStageBuildJob::WriteTextureDescriptorType(IWriteStream &stream, const render::DescriptorType descriptorType, const render::ValueType &valueType)
+	Result RenderPipelineStageBuildJob::WriteStructTree(IWriteStream &stream, const data::IRenderDataPackage &pkg, IStructTreeBuilder &structTreeBuilder)
+	{
+		for (const render::StructureType *structType : structTreeBuilder.Finalize())
+		{
+			WriteString(stream, u8"struct ");
+			WriteString(stream, pkg.GetString(structType->m_name.GetIndex()));
+			WriteString(stream, u8"\n{\n");
+
+			for (const render::StructureMemberDesc *member : structType->m_members)
+			{
+				WriteString(stream, u8"\t");
+				WriteValueType(stream, structTreeBuilder, pkg, member->m_type);
+				WriteString(stream, u8" ");
+				WriteString(stream, pkg.GetString(member->m_name.GetIndex()));
+				WriteString(stream, u8";\n");
+			}
+
+			WriteString(stream, u8"};\n");
+		}
+	}
+
+	Result RenderPipelineStageBuildJob::WriteTextureDescriptorBindingType(IWriteStream &stream, const render::DescriptorBindingType descriptorType, const render::ValueType &valueType)
 	{
 		if (valueType.m_type == render::ValueTypeType::VectorNumeric)
-			return WriteTextureDescriptorType(stream, descriptorType, render::ValueType(valueType.m_value.m_vectorNumericType->m_numericType));
+			return WriteTextureDescriptorBindingType(stream, descriptorType, render::ValueType(valueType.m_value.m_vectorNumericType->m_numericType));
 
 		if (valueType.m_type != render::ValueTypeType::Numeric)
 		{
@@ -980,29 +1087,29 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 		switch (descriptorType)
 		{
-		case render::DescriptorType::Texture1D:
-		case render::DescriptorType::Texture1DArray:
-		case render::DescriptorType::RWTexture1D:
-		case render::DescriptorType::RWTexture1DArray:
+		case render::DescriptorBindingType::Texture1D:
+		case render::DescriptorBindingType::Texture1DArray:
+		case render::DescriptorBindingType::RWTexture1D:
+		case render::DescriptorBindingType::RWTexture1DArray:
 			WriteString(stream, u8"1D");
 			break;
 
-		case render::DescriptorType::Texture2D:
-		case render::DescriptorType::Texture2DArray:
-		case render::DescriptorType::Texture2DMS:
-		case render::DescriptorType::Texture2DMSArray:
-		case render::DescriptorType::RWTexture2D:
-		case render::DescriptorType::RWTexture2DArray:
+		case render::DescriptorBindingType::Texture2D:
+		case render::DescriptorBindingType::Texture2DArray:
+		case render::DescriptorBindingType::Texture2DMS:
+		case render::DescriptorBindingType::Texture2DMSArray:
+		case render::DescriptorBindingType::RWTexture2D:
+		case render::DescriptorBindingType::RWTexture2DArray:
 			WriteString(stream, u8"2D");
 			break;
 
-		case render::DescriptorType::Texture3D:
-		case render::DescriptorType::RWTexture3D:
+		case render::DescriptorBindingType::Texture3D:
+		case render::DescriptorBindingType::RWTexture3D:
 			WriteString(stream, u8"3D");
 			break;
 
-		case render::DescriptorType::TextureCube:
-		case render::DescriptorType::TextureCubeArray:
+		case render::DescriptorBindingType::TextureCube:
+		case render::DescriptorBindingType::TextureCubeArray:
 			WriteString(stream, u8"Cube");
 			break;
 
@@ -1012,36 +1119,34 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 		switch (descriptorType)
 		{
-		case render::DescriptorType::Texture1DArray:
-		case render::DescriptorType::RWTexture1DArray:
-		case render::DescriptorType::Texture2DArray:
-		case render::DescriptorType::TextureCubeArray:
+		case render::DescriptorBindingType::Texture1DArray:
+		case render::DescriptorBindingType::RWTexture1DArray:
+		case render::DescriptorBindingType::Texture2DArray:
+		case render::DescriptorBindingType::TextureCubeArray:
 			WriteString(stream, u8"Array");
 			break;
 
-		case render::DescriptorType::Texture2DMSArray:
-		case render::DescriptorType::RWTexture2DArray:
+		case render::DescriptorBindingType::Texture2DMSArray:
+		case render::DescriptorBindingType::RWTexture2DArray:
 			WriteString(stream, u8"MSArray");
 			break;
 
-		case render::DescriptorType::Texture2DMS:
+		case render::DescriptorBindingType::Texture2DMS:
 			WriteString(stream, u8"MS");
 			break;
 
-		case render::DescriptorType::Texture1D:
-		case render::DescriptorType::RWTexture1D:
-		case render::DescriptorType::Texture2D:
-		case render::DescriptorType::RWTexture2D:
-		case render::DescriptorType::Texture3D:
-		case render::DescriptorType::RWTexture3D:
-		case render::DescriptorType::TextureCube:
+		case render::DescriptorBindingType::Texture1D:
+		case render::DescriptorBindingType::RWTexture1D:
+		case render::DescriptorBindingType::Texture2D:
+		case render::DescriptorBindingType::RWTexture2D:
+		case render::DescriptorBindingType::Texture3D:
+		case render::DescriptorBindingType::RWTexture3D:
+		case render::DescriptorBindingType::TextureCube:
 			break;
 
 		default:
 			RKIT_THROW(ResultCode::kInternalError);
 		}
-
-		RKIT_RETURN_OK;
 	}
 
 
@@ -1139,6 +1244,26 @@ namespace rkit { namespace buildsystem { namespace vulkan
 	{
 		if (isSystem)
 		{
+			if (headerName == u8"GlslDefines")
+			{
+				const Vector<uint8_t> &prefixVector = m_defsPrefixStream.GetBuffer();
+
+				String headerNameStr;
+				headerNameStr.Set(headerName);
+
+				outIncludeResult = New<StaticIncludeResult>(std::move(headerNameStr), prefixVector.GetBuffer(), prefixVector.Count());
+				return;
+			}
+			if (headerName == u8"GlslShaderIOTypes")
+			{
+				const Vector<uint8_t> &prefixVector = m_structsPrefixStream.GetBuffer();
+
+				String headerNameStr;
+				headerNameStr.Set(headerName);
+
+				outIncludeResult = New<StaticIncludeResult>(std::move(headerNameStr), prefixVector.GetBuffer(), prefixVector.Count());
+				return;
+			}
 			if (headerName == u8"GlslShaderPrefix")
 			{
 				const Vector<uint8_t> &prefixVector = m_prefixStream.GetBuffer();

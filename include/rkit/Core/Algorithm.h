@@ -520,7 +520,6 @@ inline TUnsigned rkit::ToUnsignedAbs(TSigned v)
 	return priv::ToUnsignedAbs<TSigned, TUnsigned>(v);
 }
 
-
 template<class T>
 T rkit::Min(const T &a, const T &b)
 {
