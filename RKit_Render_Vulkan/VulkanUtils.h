@@ -3,6 +3,7 @@
 #include "IncludeVulkan.h"
 
 #include "rkit/Render/RenderDefs.h"
+#include "rkit/Render/RenderEnums.h"
 #include "rkit/Render/ImagePlane.h"
 #include "rkit/Render/PipelineStage.h"
 #include "rkit/Render/ResourceAccess.h"
@@ -20,9 +21,13 @@ namespace rkit
 
 namespace rkit::render::vulkan
 {
+	enum class DescriptorHeapType;
+
 	class VulkanUtils
 	{
 	public:
+		static VkDescriptorType DescriptorTypeForHeapType(DescriptorHeapType heapType);
+		static VkShaderStageFlags ConvertStageVisibility(StageVisibility stageVisibility);
 		static Result ResolveRenderTargetFormat(VkFormat &outVkFormat, RenderTargetFormat rtFormat);
 		static Result ResolveRenderTargetFormatAspectFlags(VkImageAspectFlags &outFlags, RenderTargetFormat rtFormat);
 		static Result ConvertPipelineStageBits(VkPipelineStageFlags &outFlags, const EnumMask<PipelineStage> &stages);

@@ -644,7 +644,11 @@ namespace rkit::render::vulkan
 		syncer.SyncFeatures(RenderDeviceBoolCap::kDescriptorIndexing,
 			&VkPhysicalDeviceDescriptorIndexingFeatures::descriptorBindingPartiallyBound,
 			&VkPhysicalDeviceDescriptorIndexingFeatures::descriptorBindingVariableDescriptorCount,
-			&VkPhysicalDeviceDescriptorIndexingFeatures::descriptorBindingUpdateUnusedWhilePending);
+			&VkPhysicalDeviceDescriptorIndexingFeatures::descriptorBindingUpdateUnusedWhilePending,
+			&VkPhysicalDeviceDescriptorIndexingFeatures::descriptorBindingSampledImageUpdateAfterBind,
+			&VkPhysicalDeviceDescriptorIndexingFeatures::descriptorBindingStorageBufferUpdateAfterBind,
+			&VkPhysicalDeviceDescriptorIndexingFeatures::descriptorBindingStorageImageUpdateAfterBind
+			);
 
 		if (!grantedCaps.MeetsOrExceeds(requiredCaps))
 		{

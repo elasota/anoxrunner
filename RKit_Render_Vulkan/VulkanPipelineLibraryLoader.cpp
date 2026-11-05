@@ -27,6 +27,7 @@
 #include "rkit/Core/Vector.h"
 
 #include "rkit/Vulkan/GraphicsPipeline.h"
+#include "rkit/Vulkan/DescriptorHeap.h"
 
 #include "VulkanAPI.h"
 #include "VulkanCheck.h"
@@ -79,17 +80,26 @@ namespace rkit { namespace render { namespace vulkan
 
 	struct PipelineLayoutMetadata
 	{
+		static constexpr size_t kNumHeaps = static_cast<size_t>(DescriptorHeapType::Count);
+
+		rkit::StaticArray<rkit::Optional<uint32_t>, kNumHeaps> m_descriptorHeapIndexes;
+		uint32_t m_firstCBBinding = 0;
+		uint32_t m_numConstantBuffers = 0;
+		uint32_t m_numPushConstants = 0;
 	};
 
 	struct PipelineLayout
 	{
-		VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
 		VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
+
 		PipelineLayoutMetadata m_metadata;
 	};
 
 	struct VulkanPipelineLibraryData : public NoCopy
 	{
+		static constexpr size_t kNumHeapTypes = static_cast<size_t>(DescriptorHeapType::Count);
+
+		VulkanPipelineLibraryData() = delete;
 		explicit VulkanPipelineLibraryData(VulkanDeviceBase &device);
 		VulkanPipelineLibraryData(VulkanPipelineLibraryData &&other);
 		~VulkanPipelineLibraryData();
@@ -100,6 +110,8 @@ namespace rkit { namespace render { namespace vulkan
 		Vector<VkPipeline> m_allPipelines;
 		Vector<VulkanRenderPass> m_renderPasses;
 		Vector<PipelineLayout> m_pipelineLayouts;
+		StaticArray<VkDescriptorSetLayout, kNumHeapTypes> m_heapDescriptorSetLayouts;
+		Vector<VkDescriptorSetLayout> m_cbDescriptorSetLayouts;
 
 		HashMap<StringView, const RenderPassDesc *> m_nameToRenderPass;
 
@@ -111,6 +123,8 @@ namespace rkit { namespace render { namespace vulkan
 	VulkanPipelineLibraryData::VulkanPipelineLibraryData(VulkanDeviceBase &device)
 		: m_device(device)
 	{
+		for (VkDescriptorSetLayout &layout : m_heapDescriptorSetLayouts)
+			layout = VK_NULL_HANDLE;
 	}
 
 	VulkanPipelineLibraryData::VulkanPipelineLibraryData(VulkanPipelineLibraryData &&other)
@@ -142,8 +156,6 @@ namespace rkit { namespace render { namespace vulkan
 		{
 			if (pl.m_pipelineLayout != VK_NULL_HANDLE)
 				vkd.vkDestroyPipelineLayout(device, pl.m_pipelineLayout, allocCallbacks);
-			if (pl.m_descriptorSetLayout != VK_NULL_HANDLE)
-				vkd.vkDestroyDescriptorSetLayout(device, pl.m_descriptorSetLayout, allocCallbacks);
 		}
 
 		for (const VulkanRenderPass &rp : m_renderPasses)
@@ -154,6 +166,18 @@ namespace rkit { namespace render { namespace vulkan
 
 		if (m_mergedCache != VK_NULL_HANDLE)
 			vkd.vkDestroyPipelineCache(device, m_mergedCache, allocCallbacks);
+
+		for (const VkDescriptorSetLayout &layout : m_heapDescriptorSetLayouts)
+		{
+			if (layout != VK_NULL_HANDLE)
+				vkd.vkDestroyDescriptorSetLayout(device, layout, allocCallbacks);
+		}
+
+		for (const VkDescriptorSetLayout &layout : m_cbDescriptorSetLayouts)
+		{
+			if (layout != VK_NULL_HANDLE)
+				vkd.vkDestroyDescriptorSetLayout(device, layout, allocCallbacks);
+		}
 	}
 
 	class VulkanPipelineLibrary final : public IPipelineLibrary, public IPipelineLibraryItemResolver
@@ -299,6 +323,8 @@ namespace rkit { namespace render { namespace vulkan
 
 		Result CreateRenderPass(VkRenderPass &outRenderPass, const RenderPassDesc &rpDesc);
 
+		Result CreateCBLayoutOfSize(VkDescriptorSetLayout &outLayout, uint32_t numCBs);
+
 		Result CheckedCreateGraphicsPipeline(VkPipelineCache &pipelineCache, CompiledPipeline &pipeline, size_t pipelineIndex, size_t permutationIndex);
 		Result CheckedCompileUnmergedGraphicsPipeline(VkPipelineCache &pipelineCache, CompiledPipeline &pipeline, size_t pipelineIndex, size_t permutationIndex);
 		Result LoadShaderModule(size_t binaryContentIndex);
@@ -440,6 +466,38 @@ namespace rkit { namespace render { namespace vulkan
 	{
 		const VulkanDeviceAPI &vkd = m_device.GetDeviceAPI();
 
+		// Create one descriptor set layout per heap type
+		for (uint32_t i = 0; i < static_cast<uint32_t>(DescriptorHeapType::Count); i++)
+		{
+			VkDescriptorBindingFlags bindingFlags = {};
+			bindingFlags = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT
+				| VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT
+				| VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT
+				| VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+
+			VkDescriptorSetLayoutBinding binding = {};
+			binding.binding = 0;
+			binding.descriptorType = VulkanUtils::DescriptorTypeForHeapType(static_cast<DescriptorHeapType>(i));
+			binding.descriptorCount = 0;
+			binding.stageFlags = VK_SHADER_STAGE_ALL;
+			binding.pImmutableSamplers = nullptr;
+
+			VkDescriptorSetLayoutBindingFlagsCreateInfo descriptorSetLayoutBindingFlagsCreateInfo = {};
+			descriptorSetLayoutBindingFlagsCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+			descriptorSetLayoutBindingFlagsCreateInfo.pBindingFlags = &bindingFlags;
+			descriptorSetLayoutBindingFlagsCreateInfo.bindingCount = 1;
+
+			VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
+			descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			descriptorSetLayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+			descriptorSetLayoutCreateInfo.bindingCount = 1;
+			descriptorSetLayoutCreateInfo.pBindings = &binding;
+
+			VulkanUtils::InsertIntoStructChain(descriptorSetLayoutCreateInfo, descriptorSetLayoutBindingFlagsCreateInfo);
+
+			RKIT_VK_CHECK(vkd.vkCreateDescriptorSetLayout(m_device.GetDevice(), &descriptorSetLayoutCreateInfo, m_device.GetAllocCallbacks(), &m_data.m_heapDescriptorSetLayouts[i]));
+		}
+
 		size_t totalPermutations = 0;
 
 		data::IRenderRTTIListBase *graphicsPipelines = m_data.m_package->GetIndexable(rkit::data::RenderRTTIIndexableStructType::GraphicsPipelineDesc);
@@ -507,15 +565,51 @@ namespace rkit { namespace render { namespace vulkan
 
 			for (size_t pi = 0; pi < numPipelineLayouts; pi++)
 			{
-				const render::PipelineLayoutDesc *plDesc = static_cast<const render::PipelineLayoutDesc *>(pipelineLayouts->GetElementPtr(pi));
+				PipelineLayout &pl = m_data.m_pipelineLayouts[pi];
+				PipelineLayoutMetadata &plm = pl.m_metadata;
+
+				const PipelineLayoutDesc *plDesc = static_cast<const PipelineLayoutDesc *>(pipelineLayouts->GetElementPtr(pi));
+
+				size_t numCBs = plDesc->m_constantBuffers.Count();
+
+				rkit::StaticArray<const OptionalStageVisibilityDesc *, PipelineLayoutMetadata::kNumHeaps> stageVisibility;
+				for (const OptionalStageVisibilityDesc *&visibility : stageVisibility)
+					visibility = nullptr;
+
+				stageVisibility[static_cast<size_t>(DescriptorHeapType::Buffer)] = plDesc->m_bufferHeapVisibility;
+				stageVisibility[static_cast<size_t>(DescriptorHeapType::Texture)] = plDesc->m_textureHeapVisibility;
+				stageVisibility[static_cast<size_t>(DescriptorHeapType::RWTexture)] = plDesc->m_rwTextureHeapVisibility;
+				stageVisibility[static_cast<size_t>(DescriptorHeapType::Sampler)] = plDesc->m_samplerHeapVisibility;
+
+				rkit::StaticArray<VkDescriptorSetLayout, static_cast<size_t>(DescriptorHeapType::Count) + 1> descriptorSetLayouts;
+
+				uint32_t numHeapBindings = 0;
+				for (size_t i = 0; i < PipelineLayoutMetadata::kNumHeaps; i++)
+				{
+					if (stageVisibility[i] != nullptr)
+					{
+						descriptorSetLayouts[numHeapBindings] = m_data.m_heapDescriptorSetLayouts[i];
+						plm.m_descriptorHeapIndexes[i] = numHeapBindings;
+
+						numHeapBindings++;
+					}
+				}
+
+				if (numCBs > 0)
+				{
+					CreateCBLayoutOfSize(descriptorSetLayouts[numHeapBindings], numCBs);
+					numHeapBindings++;
+				}
 
 				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
 				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+				pipelineLayoutCreateInfo.setLayoutCount = numHeapBindings;
+				pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts.GetBuffer();
 
-				RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
-#if 0
-				RKIT_VK_CHECK(vkd.vkCreatePipelineLayout(m_device.GetDevice(), &pipelineLayoutCreateInfo, m_device.GetAllocCallbacks(), &m_data.m_pipelineLayouts[pi]));
-#endif
+				if (plDesc->m_inlineConstants.Count() > 0)
+					RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+
+				RKIT_VK_CHECK(vkd.vkCreatePipelineLayout(m_device.GetDevice(), &pipelineLayoutCreateInfo, m_device.GetAllocCallbacks(), &m_data.m_pipelineLayouts[pi].m_pipelineLayout));
 			}
 		}
 
@@ -551,8 +645,6 @@ namespace rkit { namespace render { namespace vulkan
 				m_data.m_nameToRenderPass.Set(name, nameLookup.m_renderPass);
 			}
 		}
-
-		RKIT_RETURN_OK;
 	}
 
 	void VulkanPipelineLibraryLoader::SetMergedLibraryStream(UniquePtr<ISeekableReadStream> &&cacheReadStream, ISeekableReadWriteStream *cacheWriteStream)
@@ -1560,6 +1652,43 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateRenderPass(m_device.GetDevice(), &renderPassCreateInfo, m_device.GetAllocCallbacks(), &outRenderPass));
 
 		RKIT_RETURN_OK;
+	}
+
+	Result VulkanPipelineLibraryLoader::CreateCBLayoutOfSize(VkDescriptorSetLayout &outLayout, uint32_t numCBs)
+	{
+		while (numCBs >= m_data.m_cbDescriptorSetLayouts.Count())
+			m_data.m_cbDescriptorSetLayouts.Append(VK_NULL_HANDLE);
+
+		VkDescriptorSetLayout &layoutRef = m_data.m_cbDescriptorSetLayouts[numCBs];
+
+		if (layoutRef == VK_NULL_HANDLE)
+		{
+			rkit::Vector<VkDescriptorSetLayoutBinding> bindings;
+
+			bindings.Resize(numCBs);
+
+			for (uint32_t i = 0; i < numCBs; i++)
+			{
+				VkDescriptorSetLayoutBinding binding = {};
+				binding.binding = i;
+				binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+				binding.descriptorCount = 1;
+				binding.stageFlags = VK_SHADER_STAGE_ALL;
+				binding.pImmutableSamplers = nullptr;
+
+				bindings.Append(binding);
+			}
+
+			VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
+			descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			descriptorSetLayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+			descriptorSetLayoutCreateInfo.bindingCount = 1;
+			descriptorSetLayoutCreateInfo.pBindings = bindings.GetBuffer();
+
+			RKIT_VK_CHECK(m_device.GetDeviceAPI().vkCreateDescriptorSetLayout(m_device.GetDevice(), &descriptorSetLayoutCreateInfo, m_device.GetAllocCallbacks(), &layoutRef));
+		}
+
+		outLayout = layoutRef;
 	}
 
 	Result VulkanPipelineLibraryLoader::CheckedCreateGraphicsPipeline(VkPipelineCache &pipelineCache, CompiledPipeline &pipeline, size_t pipelineIndex, size_t permutationIndex)

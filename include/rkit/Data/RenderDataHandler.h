@@ -76,6 +76,7 @@ namespace rkit { namespace data
 		LayoutConstantBufferDesc,
 		ConstantBufferBindingDesc,
 		DescriptorHeapBindingDesc,
+		OptionalStageVisibilityDesc,
 		PipelineLayoutDesc,
 		DepthStencilTargetDesc,
 		RenderPassDesc,
@@ -117,6 +118,7 @@ namespace rkit { namespace data
 		LayoutConstantBufferDesc,
 		ConstantBufferBindingDesc,
 		DescriptorHeapBindingDesc,
+		OptionalStageVisibilityDesc,
 		PipelineLayoutDesc,
 		InputLayoutVertexFeedDesc,
 		InputLayoutVertexInputDesc,
@@ -162,17 +164,6 @@ namespace rkit { namespace data
 
 		const Utf8Char_t *m_name;
 		size_t m_nameLength;
-	};
-
-	struct RenderRTTIArrayType
-	{
-		RenderRTTITypeBase base;
-
-		const RenderRTTITypeBase *m_elementType;
-		size_t m_elementSize;
-
-		Result (*m_appendVectorAndUpdateSpanFunc)(void *vectorPtr, void *spanPtr, void **outItemPtr);
-		size_t (*m_getSpanCountFunc)(const void *spanPtr);
 	};
 
 	struct RenderRTTIEnumType
@@ -369,6 +360,7 @@ namespace rkit { namespace data
 		virtual const RenderRTTIStructType *GetDepthStencilOperationDescRTTI() const = 0;
 		virtual const RenderRTTIEnumType *GetNumericTypeRTTI() const = 0;
 		virtual const RenderRTTIEnumType *GetInputLayoutVertexInputSteppingRTTI() const = 0;
+		virtual const RenderRTTIEnumType *GetStageVisibilityRTTI() const = 0;
 		virtual const RenderRTTIObjectPtrType *GetVectorNumericTypePtrRTTI() const = 0;
 		virtual const RenderRTTIObjectPtrType *GetCompoundNumericTypePtrRTTI() const = 0;
 		virtual const RenderRTTIObjectPtrType *GetStructureTypePtrRTTI() const = 0;

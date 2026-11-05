@@ -1,11 +1,44 @@
 #include "VulkanUtils.h"
 
 #include "rkit/Render/ImageRect.h"
+#include "rkit/Vulkan/DescriptorHeap.h"
 
 #include "rkit/Core/EnumMask.h"
 
 namespace rkit { namespace render { namespace vulkan
 {
+	VkDescriptorType VulkanUtils::DescriptorTypeForHeapType(DescriptorHeapType heapType)
+	{
+		switch (heapType)
+		{
+		case DescriptorHeapType::Texture:
+			return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+		case DescriptorHeapType::RWTexture:
+			return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		case DescriptorHeapType::Sampler:
+			return VK_DESCRIPTOR_TYPE_SAMPLER;
+		case DescriptorHeapType::Buffer:
+			return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		default:
+			RKIT_THROW(ResultCode::kInternalError);
+		}
+	}
+
+	VkShaderStageFlags VulkanUtils::ConvertStageVisibility(StageVisibility stageVisibility)
+	{
+		switch (stageVisibility)
+		{
+		case StageVisibility::All:
+			return VK_SHADER_STAGE_ALL;
+		case StageVisibility::Vertex:
+			return VK_SHADER_STAGE_VERTEX_BIT;
+		case StageVisibility::Pixel:
+			return VK_SHADER_STAGE_FRAGMENT_BIT;
+		default:
+			RKIT_THROW(ResultCode::kInternalError);
+		}
+	}
+
 	Result VulkanUtils::ResolveRenderTargetFormat(VkFormat &outVkFormat, RenderTargetFormat rtFormat)
 	{
 		switch (rtFormat)
@@ -19,8 +52,6 @@ namespace rkit { namespace render { namespace vulkan
 		default:
 			RKIT_THROW(ResultCode::kInternalError);
 		}
-
-		RKIT_RETURN_OK;
 	}
 
 	Result VulkanUtils::ResolveRenderTargetFormatAspectFlags(VkImageAspectFlags &outFlags, RenderTargetFormat rtFormat)

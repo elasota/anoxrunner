@@ -3,6 +3,7 @@
 #include "rkit/Core/Span.h"
 #include "rkit/Core/StringView.h"
 #include "rkit/Core/Hasher.h"
+#include "rkit/Core/Optional.h"
 
 #include "RenderDefProtos.h"
 #include "RenderEnums.h"
@@ -283,12 +284,17 @@ namespace rkit { namespace render
 		ValueType m_valueType;
 	};
 
+	struct OptionalStageVisibilityDesc
+	{
+		StageVisibility m_visibility = StageVisibility::All;
+	};
+
 	struct PipelineLayoutDesc
 	{
-		StageVisibility m_textureHeapVisibility = StageVisibility::None;
-		StageVisibility m_rwTextureHeapVisibility = StageVisibility::None;
-		StageVisibility m_samplerHeapVisibility = StageVisibility::None;
-		StageVisibility m_bufferHeapVisibility = StageVisibility::None;
+		const OptionalStageVisibilityDesc *m_textureHeapVisibility = nullptr;
+		const OptionalStageVisibilityDesc *m_rwTextureHeapVisibility = nullptr;
+		const OptionalStageVisibilityDesc *m_samplerHeapVisibility = nullptr;
+		const OptionalStageVisibilityDesc *m_bufferHeapVisibility = nullptr;
 
 		ConstSpan<const LayoutInlineConstantDesc *> m_inlineConstants;
 		ConstSpan<const LayoutConstantBufferDesc *> m_constantBuffers;

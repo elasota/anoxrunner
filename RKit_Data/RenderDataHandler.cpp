@@ -959,11 +959,15 @@ namespace rkit { namespace data
 			RTTI_STRUCT_FIELD_INVISIBLE(valueType)
 		RTTI_STRUCT_END
 
+		RTTI_STRUCT_BEGIN_INDEXABLE(OptionalStageVisibilityDesc)
+			RTTI_STRUCT_FIELD_INVISIBLE(visibility)
+		RTTI_STRUCT_END
+
 		RTTI_STRUCT_BEGIN_INDEXABLE(PipelineLayoutDesc)
-			RTTI_STRUCT_FIELD(textureHeapVisibility)
-			RTTI_STRUCT_FIELD(rwTextureHeapVisibility)
-			RTTI_STRUCT_FIELD(samplerHeapVisibility)
-			RTTI_STRUCT_FIELD(bufferHeapVisibility)
+			RTTI_STRUCT_FIELD_INVISIBLE_NULLABLE(textureHeapVisibility)
+			RTTI_STRUCT_FIELD_INVISIBLE_NULLABLE(rwTextureHeapVisibility)
+			RTTI_STRUCT_FIELD_INVISIBLE_NULLABLE(samplerHeapVisibility)
+			RTTI_STRUCT_FIELD_INVISIBLE_NULLABLE(bufferHeapVisibility)
 			RTTI_STRUCT_FIELD_INVISIBLE(constantBuffers)
 			RTTI_STRUCT_FIELD_INVISIBLE(inlineConstants)
 		RTTI_STRUCT_END
@@ -2205,6 +2209,11 @@ namespace rkit { namespace data
 		return reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::InputLayoutVertexInputStepping>::GetRTTIType());
 	}
 
+	const RenderRTTIEnumType *RenderDataHandler::GetStageVisibilityRTTI() const
+	{
+		return reinterpret_cast<const RenderRTTIEnumType *>(render_rtti::RTTIResolver<render::StageVisibility>::GetRTTIType());
+	}
+
 	const RenderRTTIObjectPtrType *RenderDataHandler::GetVectorNumericTypePtrRTTI() const
 	{
 		return reinterpret_cast<const RenderRTTIObjectPtrType *>(render_rtti::RTTIResolver<const render::VectorNumericType *>::GetRTTIType());
@@ -2303,6 +2312,7 @@ namespace rkit { namespace data
 		LINK_INDEXABLE_LIST_TYPE(StructureType)
 		LINK_INDEXABLE_LIST_TYPE(StructureMemberDesc)
 		LINK_INDEXABLE_LIST_TYPE(InputLayoutDesc)
+		LINK_INDEXABLE_LIST_TYPE(OptionalStageVisibilityDesc)
 		LINK_INDEXABLE_LIST_TYPE(PipelineLayoutDesc)
 		LINK_INDEXABLE_LIST_TYPE(InputLayoutVertexFeedDesc)
 		LINK_INDEXABLE_LIST_TYPE(InputLayoutVertexInputDesc)

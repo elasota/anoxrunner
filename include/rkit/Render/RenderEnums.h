@@ -173,7 +173,6 @@ namespace rkit { namespace render
 
 	enum class StageVisibility
 	{
-		None,
 		All,
 
 		Vertex,

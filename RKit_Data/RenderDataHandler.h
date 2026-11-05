@@ -20,6 +20,7 @@ namespace rkit { namespace data
 		const RenderRTTIStructType *GetDepthStencilOperationDescRTTI() const override;
 		const RenderRTTIEnumType *GetNumericTypeRTTI() const override;
 		const RenderRTTIEnumType *GetInputLayoutVertexInputSteppingRTTI() const override;
+		const RenderRTTIEnumType *GetStageVisibilityRTTI() const override;
 		const RenderRTTIObjectPtrType *GetVectorNumericTypePtrRTTI() const override;
 		const RenderRTTIObjectPtrType *GetCompoundNumericTypePtrRTTI() const override;
 		const RenderRTTIObjectPtrType *GetStructureTypePtrRTTI() const override;

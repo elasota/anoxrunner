@@ -8,7 +8,6 @@ struct S_InterfacePixelConstants
 	float FrameInterpolator
 }
 
-
 PipelineLayout PL_Interface
 {
 	TextureHeapVisibility = Pixel

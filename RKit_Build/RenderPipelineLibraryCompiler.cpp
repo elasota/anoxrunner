@@ -219,6 +219,12 @@ namespace rkit::buildsystem::rpc_analyzer
 		Span<const uint8_t> ResolveBinaryContent(size_t index) const override;
 
 	private:
+		struct HeapVisibilityFieldMetadata
+		{
+			StringView m_name;
+			const render::OptionalStageVisibilityDesc *(render::PipelineLayoutDesc:: *m_visibilityField);
+		};
+
 		struct ConfigKey
 		{
 			render::GlobalStringIndex_t m_name;
@@ -339,6 +345,7 @@ namespace rkit::buildsystem::rpc_analyzer
 		Vector<UniquePtr<render::LayoutConstantBufferDesc>> m_lcbDescs;
 		Vector<UniquePtr<render::ConstantBufferBindingDesc>> m_cbbDescs;
 
+		StaticArray<render::OptionalStageVisibilityDesc, static_cast<size_t>(render::StageVisibility::Count)> m_optionalStageVisibilityDescs;
 
 		Vector<render::GraphicsPipelineNameLookup> m_graphicsPipelines;
 		Vector<render::RenderPassNameLookup> m_renderPasses;
@@ -529,6 +536,8 @@ namespace rkit::buildsystem::rpc_analyzer
 		: m_feedback(feedback)
 		, m_dataDriver(dataDriver)
 	{
+		for (size_t i = 0; i < static_cast<size_t>(render::StageVisibility::Count); i++)
+			m_optionalStageVisibilityDescs[i].m_visibility = static_cast<render::StageVisibility>(i);
 	}
 
 	Result LibraryAnalyzer::Run(IDependencyNode *depsNode)
@@ -1116,6 +1125,23 @@ namespace rkit::buildsystem::rpc_analyzer
 		const data::RenderRTTIStructType *pipelineLayoutRTTI = m_dataDriver->GetRenderDataHandler()->GetPipelineLayoutDescRTTI();
 		const data::RenderRTTIStructType *inlineConstantRTTI = m_dataDriver->GetRenderDataHandler()->GetLayoutInlineConstantDescRTTI();
 		const data::RenderRTTIStructType *constantBufferRTTI = m_dataDriver->GetRenderDataHandler()->GetLayoutConstantBufferRTTI();
+		const data::RenderRTTIEnumType *stageVisibilityRTTI = m_dataDriver->GetRenderDataHandler()->GetStageVisibilityRTTI();
+
+		const HeapVisibilityFieldMetadata heapVisibilityFields[] =
+		{
+			{
+				u8"TextureHeapVisibility", &render::PipelineLayoutDesc::m_textureHeapVisibility
+			},
+			{
+				u8"RWTextureHeapVisibility", &render::PipelineLayoutDesc::m_rwTextureHeapVisibility
+			},
+			{
+				u8"SamplerHeapVisibility", &render::PipelineLayoutDesc::m_samplerHeapVisibility
+			},
+			{
+				u8"BufferHeapVisibility", &render::PipelineLayoutDesc::m_bufferHeapVisibility
+			},
+		};
 
 		auto haveExistingCB = [&pl](const render::TempStringIndex_t& nameStr) -> bool
 			{
@@ -1216,7 +1242,25 @@ namespace rkit::buildsystem::rpc_analyzer
 			}
 			else
 			{
-				ParseStructMember(filePath, token, pipelineLayoutRTTI, &pl.GetDesc(), parser);
+				bool isVisibilityField = false;
+				for (const HeapVisibilityFieldMetadata &fieldMetadata : heapVisibilityFields)
+				{
+					if (IsTokenChars(token, fieldMetadata.m_name.GetChars(), fieldMetadata.m_name.Length()))
+					{
+						parser.ExpectToken(u8"=");
+
+						render::StageVisibility stageVisibility = render::StageVisibility::Count;
+						ParseEnum(filePath, stageVisibilityRTTI, &stageVisibility, false, parser);
+
+						(pl.GetDesc().*(fieldMetadata.m_visibilityField)) = &m_optionalStageVisibilityDescs[static_cast<size_t>(stageVisibility)];
+
+						isVisibilityField = true;
+						break;
+					}
+				}
+
+				if (!isVisibilityField)
+					ParseStructMember(filePath, token, pipelineLayoutRTTI, &pl.GetDesc(), parser);
 			}
 		}
 

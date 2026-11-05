@@ -299,7 +299,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 	uint32_t RenderPipelineCompiler::GetVersion() const
 	{
-		return 2;
+		return 4;
 	}
 
 	Result RenderPipelineCompiler::CompileGraphicsPipeline(IDependencyNode *depsNode, IDependencyNodeCompilerFeedback *feedback, data::IRenderDataPackage *package, const Span<const Vector<uint8_t>> &pkgBinaryContent, const render::GraphicsPipelineNameLookup *nameLookup)
@@ -581,26 +581,14 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		const render::PipelineLayoutDesc *pipelineLayout = pipeline->m_pipelineLayout;
 
 		constexpr size_t kNumHeaps = static_cast<size_t>(render::vulkan::DescriptorHeapType::Count);
-		rkit::StaticArray<rkit::Optional<uint32_t>, kNumHeaps> heapBindingIndexes;
-		rkit::StaticArray<render::StageVisibility, kNumHeaps> heapStageVisibilities;
-
-		for (render::StageVisibility &visibility : heapStageVisibilities)
-			visibility = render::StageVisibility::None;
-
-		uint32_t numHeapBindings = 0;
+		StaticArray<const render::OptionalStageVisibilityDesc *, kNumHeaps> heapStageVisibilities;
 
 		heapStageVisibilities[static_cast<size_t>(render::vulkan::DescriptorHeapType::Buffer)] = pipelineLayout->m_bufferHeapVisibility;
 		heapStageVisibilities[static_cast<size_t>(render::vulkan::DescriptorHeapType::Texture)] = pipelineLayout->m_textureHeapVisibility;
 		heapStageVisibilities[static_cast<size_t>(render::vulkan::DescriptorHeapType::RWTexture)] = pipelineLayout->m_rwTextureHeapVisibility;
 		heapStageVisibilities[static_cast<size_t>(render::vulkan::DescriptorHeapType::Sampler)] = pipelineLayout->m_samplerHeapVisibility;
 
-		for (size_t i = 0; i < kNumHeaps; i++)
-		{
-			if (heapStageVisibilities[i] != render::StageVisibility::None)
-				heapBindingIndexes[i] = numHeapBindings++;
-		}
-
-		const uint32_t firstCBBinding = numHeapBindings;
+		const uint32_t cbSetIndex = static_cast<size_t>(render::vulkan::DescriptorHeapType::Count);
 
 		ConstSpan<const render::LayoutInlineConstantDesc *> layoutInlineConstants = pipelineLayout->m_inlineConstants;
 		if (layoutInlineConstants.Count() > 0)
@@ -652,14 +640,14 @@ namespace rkit { namespace buildsystem { namespace vulkan
 				RKIT_THROW(rkit::ResultCode::kInternalError);
 			};
 
-			const render::StageVisibility stageVisibility = heapStageVisibilities[static_cast<size_t>(heapType)];
+			const render::OptionalStageVisibilityDesc *stageVisibility = heapStageVisibilities[static_cast<size_t>(heapType)];
 
-			if (stageVisibility != render::StageVisibility::All && stageVisibility != requiredVisibility)
+			if (stageVisibility != nullptr && stageVisibility->m_visibility != render::StageVisibility::All && stageVisibility->m_visibility != requiredVisibility)
 				continue;
 
-			WriteString(m_prefixStream, u8"layout(set = 0, binding = ");
-			WriteUIntString(m_prefixStream, heapBindingIndexes[static_cast<size_t>(heapType)].Get());
-			WriteString(m_prefixStream, u8") uniform ");
+			WriteString(m_prefixStream, u8"layout(set = ");
+			WriteUIntString(m_prefixStream, static_cast<size_t>(heapType));
+			WriteString(m_prefixStream, u8", binding = 0) uniform ");
 
 			switch (heapType)
 			{
@@ -681,7 +669,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			}
 
 			WriteString(m_prefixStream, package->GetString(heapBinding->m_name.GetIndex()));
-			WriteString(m_prefixStream, u8";\n");
+			WriteString(m_prefixStream, u8"[];\n");
 		}
 
 		for (size_t cbIndex = 0; cbIndex < constantBuffers.Count(); cbIndex++)
@@ -699,8 +687,10 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			if (cbConstantBuffer->m_visibility != render::StageVisibility::All && cbConstantBuffer->m_visibility != requiredVisibility)
 				continue;
 
-			WriteString(m_prefixStream, u8"layout(set = 0, binding = ");
-			WriteUIntString(m_prefixStream, cbIndex + firstCBBinding);
+			WriteString(m_prefixStream, u8"layout(set = ");
+			WriteUIntString(m_prefixStream, cbSetIndex);
+			WriteString(m_prefixStream, u8", binding = ");
+			WriteUIntString(m_prefixStream, cbIndex);
 			WriteString(m_prefixStream, u8", std140) uniform _inline_cb_");
 			WriteUIntString(m_prefixStream, cbIndex);
 			WriteString(m_prefixStream, u8"\n{\n\t");
@@ -1537,7 +1527,7 @@ namespace rkit { namespace buildsystem { namespace vulkan
 
 	uint32_t RenderPipelineStageCompiler::GetVersion() const
 	{
-		return 1;
+		return 3;
 	}
 
 	Result PipelineCompilerBase::LoadPackage(BuildFileLocation location, const CIPathView &path, bool allowTempStrings, IDependencyNodeCompilerFeedback *feedback, UniquePtr<data::IRenderDataPackage> &outPackage, Vector<Vector<uint8_t>> *binaryContent)
