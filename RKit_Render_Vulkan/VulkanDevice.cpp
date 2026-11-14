@@ -4,6 +4,7 @@
 #include "VulkanAPILoader.h"
 #include "VulkanBufferResource.h"
 #include "VulkanCommandAllocator.h"
+#include "VulkanConstantBufferMultiView.h"
 #include "VulkanCheck.h"
 #include "VulkanFence.h"
 #include "VulkanCPUFenceWaiter.h"
@@ -17,6 +18,7 @@
 #include "VulkanPlatformSpecific.h"
 #include "VulkanRenderPassInstance.h"
 #include "VulkanResourcePool.h"
+#include "VulkanResourceTable.h"
 #include "VulkanImageResource.h"
 
 #include "rkit/Render/BufferSpec.h"
@@ -101,16 +103,27 @@ namespace rkit { namespace render { namespace vulkan
 			const BufferResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &concurrentQueues) override;
 		Result CreateBuffer(UniquePtr<IBufferResource> &outImage, UniquePtr<IBufferPrototype> &&bufferPrototype, const MemoryRegion &memRegion, const Span<const uint8_t> &initialData) override;
 
+		Result CreateConstantBufferMultiView(UniquePtr<IConstantBufferMultiView> &outCBMV, const ConstantBufferMultiViewSpec &spec) override;
+
+		Result CreateStructuredBufferView(UniquePtr<IBufferView> &outBufferView, IBufferResource &buffer, const StructuredBufferViewSpec &spec) override;
+		Result CreateTypelessBufferView(UniquePtr<IBufferView> &outBufferView, IBufferResource &buffer, const TypelessBufferViewSpec &spec) override;
+		Result CreateRWStructuredBufferView(UniquePtr<IRWBufferView> &outBufferView, IBufferResource &buffer, const StructuredBufferViewSpec &spec) override;
+		Result CreateRWTypelessBufferView(UniquePtr<IRWBufferView> &outBufferView, IBufferResource &buffer, const TypelessBufferViewSpec &spec) override;
+
 		Result CreateImagePrototype(UniquePtr<IImagePrototype> &outImagePrototype, const ImageSpec &imageSpec,
 			const ImageResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &concurrentQueues) override;
 		Result CreateImage(UniquePtr<IImageResource> &outImage, UniquePtr<IImagePrototype> &&imagePrototype,
 			const MemoryRegion &memRegion, const Span<const uint8_t> &initialData) override;
+
+		Result CreateResourceTable(UniquePtr<IResourceTable> &outTable, const ResourceTableSpec &tableSpec) override;
 
 		Result CreateMemoryHeap(UniquePtr<IMemoryHeap> &outHeap, const HeapKey &heapKey, GPUMemorySize_t size) override;
 
 		bool SupportsInitialTextureData() const override;
 		bool SupportsInitialBufferData() const override;
 		uint32_t GetUploadHeapAlignment() const override;
+		uint32_t GetConstantBufferAlignment() const override;
+		uint32_t GetConstantMaxSize() const override;
 
 		Result LoadDeviceAPI();
 		Result CreatePools();
@@ -620,6 +633,9 @@ namespace rkit { namespace render { namespace vulkan
 			return false;
 		}
 
+		if (heapSpec.m_cpuAccessible)
+			requiredHeapFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+
 		if ((memType.propertyFlags & requiredMemFlags) != requiredMemFlags)
 			return false;
 
@@ -718,6 +734,31 @@ namespace rkit { namespace render { namespace vulkan
 		RKIT_RETURN_OK;
 	}
 
+	Result VulkanDevice::CreateConstantBufferMultiView(UniquePtr<IConstantBufferMultiView> &outCBMV, const ConstantBufferMultiViewSpec &spec)
+	{
+		outCBMV = VulkanConstantBufferMultiView::Create(*this, spec);
+	}
+
+	Result VulkanDevice::CreateStructuredBufferView(UniquePtr<IBufferView> &outBufferView, IBufferResource &buffer, const StructuredBufferViewSpec &spec)
+	{
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+	}
+
+	Result VulkanDevice::CreateTypelessBufferView(UniquePtr<IBufferView> &outBufferView, IBufferResource &buffer, const TypelessBufferViewSpec &spec)
+	{
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+	}
+
+	Result VulkanDevice::CreateRWStructuredBufferView(UniquePtr<IRWBufferView> &outBufferView, IBufferResource &buffer, const StructuredBufferViewSpec &spec)
+	{
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+	}
+
+	Result VulkanDevice::CreateRWTypelessBufferView(UniquePtr<IRWBufferView> &outBufferView, IBufferResource &buffer, const TypelessBufferViewSpec &spec)
+	{
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+	}
+
 	Result VulkanDevice::CreateImagePrototype(UniquePtr<IImagePrototype> &outImagePrototype, const ImageSpec &imageSpec,
 		const ImageResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &concurrentQueues)
 	{
@@ -752,6 +793,12 @@ namespace rkit { namespace render { namespace vulkan
 		outImage = New<VulkanImage>(*this, image, prototype.GetAllAspectFlags());
 
 		prototype.DetachImage();
+	}
+
+
+	Result VulkanDevice::CreateResourceTable(UniquePtr<IResourceTable> &outTable, const ResourceTableSpec &tableSpec)
+	{
+		outTable = HeterogeneousResourceTable::Create(*this, tableSpec);
 	}
 
 	Result VulkanDevice::CreateMemoryHeap(UniquePtr<IMemoryHeap> &outHeap, const HeapKey &heapKey, GPUMemorySize_t size)
@@ -809,6 +856,23 @@ namespace rkit { namespace render { namespace vulkan
 	uint32_t VulkanDevice::GetUploadHeapAlignment() const
 	{
 		return static_cast<uint32_t>(m_physDevice->GetPhysDeviceProperties().limits.nonCoherentAtomSize);
+	}
+
+	uint32_t VulkanDevice::GetConstantBufferAlignment() const
+	{
+		return static_cast<uint32_t>(m_physDevice->GetPhysDeviceProperties().limits.minUniformBufferOffsetAlignment);
+	}
+
+	uint32_t VulkanDevice::GetConstantMaxSize() const
+	{
+		VkDeviceSize sz = m_physDevice->GetPhysDeviceProperties().limits.maxUniformBufferRange;
+		if (sz > std::numeric_limits<uint32_t>::max())
+		{
+			sz = std::numeric_limits<uint32_t>::max();
+			sz -= sz % GetConstantBufferAlignment();
+		}
+
+		return static_cast<uint32_t>(sz);
 	}
 
 	Result VulkanDevice::LoadDeviceAPI()

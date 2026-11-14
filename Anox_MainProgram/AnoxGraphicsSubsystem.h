@@ -40,9 +40,15 @@ namespace rkit
 
 	namespace render
 	{
+		struct IConstantBufferMultiView;
+		struct IComputeCommandEncoder;
+		struct IGraphicsCommandEncoder;
 		struct IBinaryGPUWaitableFence;
+		struct IInternalPipelineLayout;
 		struct IRenderDeviceCaps;
+		struct IPipelineLibrary;
 		struct IRenderDeviceRequirements;
+		struct ResourceTableSpec;
 	}
 }
 
@@ -53,6 +59,7 @@ namespace anox
 	struct IGameDataFileSystem;
 	struct ITexture;
 	struct IBuffer;
+	struct IResourceTable;
 	class GraphicTimelinedResource;
 
 	enum class RenderBackend
@@ -80,6 +87,15 @@ namespace anox
 		rkit::render::BufferResourceSpec m_resSpec;
 	};
 
+	struct IGraphicsRecordHelper
+	{
+		template<class T>
+		void SetConstantBufferDataFromStruct(uint8_t slot, const T &object);
+
+		virtual void SetConstantBufferDataFromSpan(uint8_t slot, rkit::Span<const uint8_t> data) = 0;
+		virtual void CommitGraphicsBindings(rkit::render::IGraphicsCommandEncoder &cmdEncoder, const rkit::render::IInternalPipelineLayout &pipelineLayout) = 0;
+	};
+
 	struct IGraphicsSubsystem
 	{
 		virtual ~IGraphicsSubsystem() {}
@@ -99,6 +115,8 @@ namespace anox
 
 		virtual const rkit::render::IRenderDeviceCaps &GetDeviceCaps() const = 0;
 		virtual const rkit::render::IRenderDeviceRequirements &GetDeviceRequirements() const = 0;
+		virtual const rkit::render::IPipelineLibrary &GetPipelineLibrary() const = 0;
+		virtual IGraphicsRecordHelper &GetRecordHelper() = 0;
 
 		virtual rkit::Result CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies) = 0;
 		virtual rkit::Result CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<ISubmitJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies) = 0;
@@ -115,8 +133,21 @@ namespace anox
 		virtual rkit::Result CreateAsyncCreateTextureJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<ITexture> &outTexture, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData, const rkit::JobDependencyList &dependencies) = 0;
 		virtual rkit::Result CreateAsyncCreateAndFillBufferJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<IBuffer> &outBuffer, const rkit::RCPtr<BufferInitializer> &bufferInitializer, const rkit::JobDependencyList &dependencies) = 0;
 
+		virtual rkit::RCPtr<IResourceTable> CreateResourceTable(rkit::render::ResourceTableSpec &resourceTableSpec) = 0;
+
 		virtual void CondemnTimelinedResource(GraphicTimelinedResource &timelinedResource) = 0;
 
 		static rkit::Result Create(rkit::UniquePtr<IGraphicsSubsystem> &outSubsystem, IGameDataFileSystem &fileSystem, rkit::data::IDataDriver &dataDriver, rkit::utils::IThreadPool &threadPool, anox::RenderBackend defaultBackend);
 	};
+}
+
+#include "rkit/Core/Span.h"
+
+namespace anox
+{
+	template<class T>
+	void IGraphicsRecordHelper::SetConstantBufferDataFromStruct(uint8_t slot, const T &object)
+	{
+		return this->SetConstantBufferDataFromSpan(slot, rkit::Span<const T>(&object, 1).ReinterpretCast<const uint8_t>());
+	}
 }

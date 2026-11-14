@@ -539,10 +539,9 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			}
 		}
 
-		if ((stage == render::vulkan::GraphicPipelineStage::Vertex || stage == render::vulkan::GraphicPipelineStage::Pixel) && pipeline->m_vertexShaderOutput != nullptr)
-		{
-			RKIT_THROW(ResultCode::kNotYetImplemented);
-		}
+		const bool haveVSOutput = ((stage == render::vulkan::GraphicPipelineStage::Vertex || stage == render::vulkan::GraphicPipelineStage::Pixel) && pipeline->m_vertexShaderOutput != nullptr);
+		if (haveVSOutput)
+			structTreeBuilder->AddStruct(pipeline->m_vertexShaderOutput);
 
 		if (stage == render::vulkan::GraphicPipelineStage::Pixel)
 		{
@@ -700,6 +699,18 @@ namespace rkit { namespace buildsystem { namespace vulkan
 			WriteString(m_prefixStream, u8";\n};\n");
 		}
 
+		if (haveVSOutput)
+		{
+			WriteString(m_prefixStream, u8"layout(location = 0) ");
+			if (stage == render::vulkan::GraphicPipelineStage::Vertex)
+				WriteString(m_prefixStream, u8"out ");
+			else
+				WriteString(m_prefixStream, u8"in ");
+
+			WriteString(m_prefixStream, package->GetString(pipeline->m_vertexShaderOutput->m_name.GetIndex()));
+			WriteString(m_prefixStream, u8" _vs_ps_interchange;\n");
+		}
+
 		WriteString(m_suffixStream, u8"void main()\n");
 		WriteString(m_suffixStream, u8"{\n");
 
@@ -727,6 +738,9 @@ namespace rkit { namespace buildsystem { namespace vulkan
 		{
 			WriteString(m_suffixStream, u8"pOutput");
 		}
+
+		if (haveVSOutput)
+			WriteString(m_suffixStream, u8", _vs_ps_interchange");
 
 		WriteString(m_suffixStream, u8");\n");
 

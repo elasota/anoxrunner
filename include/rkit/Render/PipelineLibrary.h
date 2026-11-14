@@ -7,13 +7,11 @@
 
 namespace rkit { namespace render
 {
-	template<class TDesc, class TCompiled>
-	class PipelineLibraryItemRef;
-
 	struct IPipelineLibrary
 	{
 		virtual ~IPipelineLibrary() {}
 
-		virtual RenderPassRef_t FindRenderPass(const StringSliceView &name) = 0;
+		virtual RenderPassRef_t FindRenderPass(const StringSliceView &name) const = 0;
+		virtual GraphicsPipelineRef_t FindGraphicsPipeline(const StringSliceView &name) const = 0;
 	};
 } } // rkit::render

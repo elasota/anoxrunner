@@ -21,9 +21,6 @@ namespace anox
 
 		explicit GraphicTimelinedResource(IGraphicsSubsystem &subsystem);
 
-		void Touch(uint64_t globalSyncPoint);
-		uint64_t GetGlobalSyncPoint() const;
-
 		void RCTrackerZero() override;
 
 		void DisposeResource();
@@ -43,7 +40,6 @@ namespace anox
 		rkit::StaticArray<rkit::render::TimelinePoint_t, kNumQueues> m_disposeSyncPoints;
 
 		IGraphicsSubsystem &m_subsystem;
-		rkit::AtomicInt<uint64_t> m_lastUsedGlobalSyncPoint;
 		GraphicTimelinedResource *m_next = nullptr;
 	};
 

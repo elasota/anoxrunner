@@ -1,6 +1,8 @@
 
 
-void VertexMain(out float4 position)
+void VertexMain(out float4 position, out S_InterfaceVSOut vsOut)
 {
 	position = float4(VertexInput_Load_VertexCoords_VertexCoord(), 0, 1);
+	vsOut.color = float3(position.x, position.y, 0);
 }
+

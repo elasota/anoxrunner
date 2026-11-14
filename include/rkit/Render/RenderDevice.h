@@ -34,14 +34,17 @@ namespace rkit
 	}
 }
 
-namespace rkit { namespace render
+namespace rkit::render
 {
 	struct IBaseCommandQueue;
 	struct IBinaryCPUWaitableFence;
 	struct IBinaryGPUWaitableFence;
 	struct IBufferPrototype;
 	struct IBufferResource;
+	struct IBufferView;
+	struct IRWBufferView;
 	struct IComputeCommandAllocator;
+	struct IConstantBufferMultiView;
 	struct ICopyCommandAllocator;
 	struct ICopyCommandQueue;
 	struct IComputeCommandQueue;
@@ -61,6 +64,7 @@ namespace rkit { namespace render
 	struct IPipelineLibraryConfigValidator;
 	struct IRenderDeviceCaps;
 	struct IRenderDeviceRequirements;
+	struct IResourceTable;
 	struct ISwapChainPrototype;
 	struct ISwapChain;
 	struct BufferSpec;
@@ -70,6 +74,10 @@ namespace rkit { namespace render
 	class HeapKey;
 	class MemoryRegion;
 	struct RenderPassResources;
+	struct ResourceTableSpec;
+	struct StructuredBufferViewSpec;
+	struct TypelessBufferViewSpec;
+	struct ConstantBufferMultiViewSpec;
 
 	struct IRenderDevice
 	{
@@ -106,6 +114,11 @@ namespace rkit { namespace render
 			const BufferResourceSpec &resourceSpec, const Span<IBaseCommandQueue *const> &restrictedQueues) = 0;
 		virtual Result CreateBuffer(UniquePtr<IBufferResource> &outBuffer, UniquePtr<IBufferPrototype> &&bufferPrototype,
 			const MemoryRegion &memRegion, const Span<const uint8_t> &initialData) = 0;
+		virtual Result CreateConstantBufferMultiView(UniquePtr<IConstantBufferMultiView> &outBufferView, const ConstantBufferMultiViewSpec &spec) = 0;
+		virtual Result CreateStructuredBufferView(UniquePtr<IBufferView> &outBufferView, IBufferResource &buffer, const StructuredBufferViewSpec &spec) = 0;
+		virtual Result CreateTypelessBufferView(UniquePtr<IBufferView> &outBufferView, IBufferResource &buffer, const TypelessBufferViewSpec &spec) = 0;
+		virtual Result CreateRWStructuredBufferView(UniquePtr<IRWBufferView> &outBufferView, IBufferResource &buffer, const StructuredBufferViewSpec &spec) = 0;
+		virtual Result CreateRWTypelessBufferView(UniquePtr<IRWBufferView> &outBufferView, IBufferResource &buffer, const TypelessBufferViewSpec &spec) = 0;
 
 		virtual Result CreateImagePrototype(UniquePtr<IImagePrototype> &outImagePrototype, const ImageSpec &imageSpec,
 			const ImageResourceSpec &resourceSpec, const Span<IBaseCommandQueue * const> &restrictedQueues) = 0;
@@ -114,16 +127,20 @@ namespace rkit { namespace render
 
 		virtual Result CreateMemoryHeap(UniquePtr<IMemoryHeap> &outHeap, const HeapKey &heapKey, GPUMemorySize_t size) = 0;
 
+		virtual Result CreateResourceTable(UniquePtr<IResourceTable> &outTable, const ResourceTableSpec &tableSpec) = 0;
+
 		virtual bool SupportsInitialTextureData() const = 0;
 		virtual bool SupportsInitialBufferData() const = 0;
 		virtual uint32_t GetUploadHeapAlignment() const = 0;
+		virtual uint32_t GetConstantBufferAlignment() const = 0;
+		virtual uint32_t GetConstantMaxSize() const = 0;
 
 		Result CreateBufferPrototype(UniquePtr<IBufferPrototype> &outBufferPrototype, const BufferSpec &bufferSpec,
 			const BufferResourceSpec &resourceSpec);
 		Result CreateImagePrototype(UniquePtr<IImagePrototype> &outImagePrototype, const ImageSpec &imageSpec,
 			const ImageResourceSpec &resourceSpec);
 	};
-} } // rkit::render
+} // rkit::render
 
 #include "rkit/Core/Result.h"
 #include "rkit/Core/Span.h"

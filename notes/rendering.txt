@@ -78,11 +78,11 @@ VkFramebuffer
 Descriptor and resource type equivalencies:
 
 ConstantBufferView -> Buffer
-ShaderResourceView ->
-UnorderedAccessView
-Sampler
-RenderTargetView
-DepthStencilView
+ShaderResourceView -> Image View/Storage Buffer
+UnorderedAccessView -> Storage Buffer
+Sampler -> Sampler
+RenderTargetView -> Image view
+DepthStencilView -> Image view with depth-stencil aspect
 
 
 Vulkan needs a "framebuffer" which is a collection of render targets.

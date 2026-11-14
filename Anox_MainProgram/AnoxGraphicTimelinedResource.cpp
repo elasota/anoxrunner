@@ -6,19 +6,8 @@ namespace anox
 {
 	GraphicTimelinedResource::GraphicTimelinedResource(IGraphicsSubsystem &subsystem)
 		: m_subsystem(subsystem)
-		, m_lastUsedGlobalSyncPoint(0)
 		, m_next(nullptr)
 	{
-	}
-
-	void GraphicTimelinedResource::Touch(uint64_t globalSyncPoint)
-	{
-		m_lastUsedGlobalSyncPoint.Max(globalSyncPoint);
-	}
-
-	uint64_t GraphicTimelinedResource::GetGlobalSyncPoint() const
-	{
-		return m_lastUsedGlobalSyncPoint.Get();
 	}
 
 	void GraphicTimelinedResource::RCTrackerZero()

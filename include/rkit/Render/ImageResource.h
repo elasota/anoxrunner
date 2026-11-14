@@ -1,8 +1,9 @@
 #pragma once
 
 #include "rkit/Core/NoCopy.h"
+#include "HeapSpec.h"
 
-namespace rkit { namespace render
+namespace rkit::render
 {
 	class MemoryRequirementsView;
 
@@ -17,4 +18,4 @@ namespace rkit { namespace render
 
 		virtual MemoryRequirementsView GetMemoryRequirements() const = 0;
 	};
-} } // rkit::render
+} // rkit::render

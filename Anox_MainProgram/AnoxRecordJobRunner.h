@@ -14,11 +14,13 @@ namespace rkit::render
 
 namespace anox
 {
+	struct IGraphicsRecordHelper;
+
 	struct IRecordJobRunner
 	{
 		virtual ~IRecordJobRunner() {}
 
-		virtual rkit::Result RunBase(rkit::render::IBaseCommandAllocator &commandAllocator, const rkit::render::TimelineSignalIntent &signalIntent) = 0;
+		virtual rkit::Result RunBase(rkit::render::IBaseCommandAllocator &commandAllocator, IGraphicsRecordHelper &recordHelper, const rkit::render::TimelineSignalIntent &signalIntent) = 0;
 	};
 
 	template<class T>
@@ -26,10 +28,10 @@ namespace anox
 	{
 		virtual ~ITypedRecordJobRunner() {}
 
-		virtual rkit::Result RunRecord(T &commandAllocator, const rkit::render::TimelineSignalIntent &signalIntent) = 0;
+		virtual rkit::Result RunRecord(T &commandAllocator, IGraphicsRecordHelper &recordHelper, const rkit::render::TimelineSignalIntent &signalIntent) = 0;
 
 	protected:
-		rkit::Result RunBase(rkit::render::IBaseCommandAllocator &commandAllocator, const rkit::render::TimelineSignalIntent &signalIntent) override final;
+		rkit::Result RunBase(rkit::render::IBaseCommandAllocator &commandAllocator, IGraphicsRecordHelper &recordHelper, const rkit::render::TimelineSignalIntent &signalIntent) override final;
 	};
 
 	typedef ITypedRecordJobRunner<rkit::render::IComputeCommandAllocator> IComputeRecordJobRunner_t;
@@ -45,10 +47,10 @@ namespace anox
 namespace anox
 {
 	template<class T>
-	rkit::Result ITypedRecordJobRunner<T>::RunBase(rkit::render::IBaseCommandAllocator &commandAllocator, const rkit::render::TimelineSignalIntent &signalIntent)
+	rkit::Result ITypedRecordJobRunner<T>::RunBase(rkit::render::IBaseCommandAllocator &commandAllocator, IGraphicsRecordHelper &recordHelper, const rkit::render::TimelineSignalIntent &signalIntent)
 	{
 		T *retypedCmdAllocator = commandAllocator.DynamicCast<T>();
 
-		return this->RunRecord(*retypedCmdAllocator, signalIntent);
+		return this->RunRecord(*retypedCmdAllocator, recordHelper, signalIntent);
 	}
 }

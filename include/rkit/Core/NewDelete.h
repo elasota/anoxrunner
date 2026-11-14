@@ -84,6 +84,13 @@ namespace rkit
 			}
 		};
 	}
+
+	class OpaqueConstructor
+	{
+	public:
+		template<class T, class... TArgs>
+		static T *Construct(void *mem, TArgs&& ...args);
+	};
 }
 
 #include "Result.h"
@@ -133,6 +140,13 @@ namespace rkit
 #include "Drivers.h"
 #include "MallocDriver.h"
 #include "UniquePtr.h"
+#include "Result.h"
+
+template<class T, class... TArgs>
+T *rkit::OpaqueConstructor::Construct(void *mem, TArgs&& ...args)
+{
+	return new (mem) T(std::forward<TArgs>(args)...);
+}
 
 template<class TType, class... TArgs>
 inline rkit::UniquePtr<TType> rkit::NewWithAlloc(IMallocDriver *alloc, TArgs&& ...args)
@@ -141,7 +155,17 @@ inline rkit::UniquePtr<TType> rkit::NewWithAlloc(IMallocDriver *alloc, TArgs&& .
 	if (!mem)
 		RKIT_THROW(ResultCode::kOutOfMemory);
 
-	TType *obj = new (mem) TType(std::forward<TArgs>(args)...);
+	typedef TType *(*CtorFunction_t)(void *mem, TArgs&& ...args);
+
+	const CtorFunction_t ctor = OpaqueConstructor::template Construct<TType, TArgs...>;
+
+	TType *obj = nullptr;
+	RKIT_TRY_CATCH_RETHROW(obj = ctor(mem, std::forward<TArgs>(args)...),
+		rkit::CatchContext([alloc, mem]
+			{
+				alloc->Free(mem);
+			})
+	);
 	return UniquePtr<TType>(obj, mem, alloc);
 }
 

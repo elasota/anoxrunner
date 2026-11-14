@@ -29,6 +29,15 @@ namespace rkit { namespace render { namespace vulkan {
 			m_device.GetDeviceAPI().vkDestroyBuffer(m_device.GetDevice(), m_buffer, m_device.GetAllocCallbacks());
 	}
 
+	void VulkanBuffer::CopyDataToBuffer(GPUMemoryOffset_t destOffset, Span<const uint8_t> data) const
+	{
+		RKIT_ASSERT(destOffset <= m_size);
+		RKIT_ASSERT(m_size - static_cast<GPUMemorySize_t>(destOffset) >= data.Count());
+
+		uint8_t *cpuPtr = static_cast<uint8_t *>(m_baseAddress.GetHeap()->GetCPUPtr()) + m_baseAddress.GetOffset();
+		memcpy(cpuPtr, data.Ptr(), data.Count());
+	}
+
 	VulkanBufferPrototype::VulkanBufferPrototype(VulkanDeviceBase &device, VkBuffer buffer)
 		: m_device(device)
 		, m_buffer(buffer)

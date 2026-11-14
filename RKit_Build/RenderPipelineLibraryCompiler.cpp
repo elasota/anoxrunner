@@ -1452,7 +1452,25 @@ namespace rkit::buildsystem::rpc_analyzer
 			}
 			else if (IsToken(token, u8"VertexShaderOutput"))
 			{
-				RKIT_THROW(ResultCode::kNotYetImplemented);
+				parser.ExpectToken(u8"=");
+
+				parser.GetLocation(line, col);
+				parser.RequireToken(token);
+
+				HashMap<String, UniquePtr<rpc_interchange::Entity>>::ConstIterator_t it = m_entities.Find(StringSliceView(token));
+				if (it == m_entities.end())
+				{
+					rkit::log::ErrorFmt(u8"{} [{}:{}] Unknown vertex shader output identifier", filePath, line, col);
+					RKIT_THROW(ResultCode::kMalformedFile);
+				}
+
+				if (it.Value()->GetEntityType() != rpc_interchange::EntityType::StructDef)
+				{
+					rkit::log::ErrorFmt(u8"{} [{}:{}] Value wasn't a struct def", filePath, line, col);
+					RKIT_THROW(ResultCode::kMalformedFile);
+				}
+
+				gp.GetDesc().m_vertexShaderOutput = &static_cast<rpc_interchange::StructDefEntity *>(it.Value().Get())->GetDesc();
 			}
 			else if (IsToken(token, u8"InputLayout"))
 			{

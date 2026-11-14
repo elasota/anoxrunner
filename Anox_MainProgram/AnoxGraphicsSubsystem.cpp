@@ -4,10 +4,11 @@
 #include "AnoxFrameDrawer.h"
 #include "AnoxPeriodicResources.h"
 #include "AnoxRecordJobRunner.h"
+#include "AnoxResourceTable.h"
 #include "AnoxSubmitJobRunner.h"
+#include "AnoxGraphicsSubsystem.h"
 
 #include "anox/AnoxFileSystem.h"
-#include "AnoxGraphicsSubsystem.h"
 
 #include "rkit/Render/Barrier.h"
 #include "rkit/Render/BufferSpec.h"
@@ -17,12 +18,14 @@
 #include "rkit/Render/CommandBatch.h"
 #include "rkit/Render/CommandEncoder.h"
 #include "rkit/Render/CommandQueue.h"
+#include "rkit/Render/ConstantBufferMultiView.h"
 #include "rkit/Render/DeviceCaps.h"
 #include "rkit/Render/DisplayManager.h"
 #include "rkit/Render/HeapSpec.h"
 #include "rkit/Render/ImageResource.h"
 #include "rkit/Render/ImageSpec.h"
 #include "rkit/Render/Memory.h"
+#include "rkit/Render/PipelineLayout.h"
 #include "rkit/Render/PipelineLibrary.h"
 #include "rkit/Render/PipelineLibraryItem.h"
 #include "rkit/Render/PipelineLibraryItemProtos.h"
@@ -32,6 +35,7 @@
 #include "rkit/Render/RenderDevice.h"
 #include "rkit/Render/RenderPassInstance.h"
 #include "rkit/Render/RenderPassResources.h"
+#include "rkit/Render/ResourceTable.h"
 #include "rkit/Render/SwapChain.h"
 #include "rkit/Render/TimelineSignal.h"
 
@@ -76,13 +80,16 @@
 #include "AnoxGraphicsSettings.h"
 #include "AnoxGraphicTimelinedResource.h"
 
-namespace rkit { namespace render {
+namespace rkit::render
+{
 	struct IRenderDeviceCaps;
-} }
+}
 
 namespace anox
 {
 	struct IGameDataFileSystem;
+	class GraphicsSubsystem;
+
 
 	class Texture final : public ITexture, public GraphicTimelinedResource
 	{
@@ -110,6 +117,92 @@ namespace anox
 		rkit::UniquePtr<rkit::render::IBufferResource> m_resource;
 	};
 
+	class ResourceTable final : public IResourceTable, public GraphicTimelinedResource
+	{
+	public:
+		explicit ResourceTable(IGraphicsSubsystem &subsystem);
+
+		rkit::render::IResourceTable *GetRenderResource() const;
+		void SetRenderResources(rkit::UniquePtr<rkit::render::IResourceTable> &&resource);
+
+	private:
+		rkit::UniquePtr<rkit::render::IResourceTable> m_resourceTable;
+	};
+
+	class ConstantBufferMultiView final : public GraphicTimelinedResource
+	{
+	public:
+		explicit ConstantBufferMultiView(IGraphicsSubsystem &subsystem);
+
+		rkit::render::IConstantBufferMultiView *GetRenderResource() const;
+		void SetRenderResources(rkit::UniquePtr<rkit::render::IConstantBufferMultiView> &&resource);
+
+	private:
+		rkit::UniquePtr<rkit::render::IConstantBufferMultiView> m_resource;
+	};
+
+	class GraphicsRecordHelper final : public IGraphicsRecordHelper
+	{
+	public:
+		GraphicsRecordHelper() = delete;
+
+		explicit GraphicsRecordHelper(GraphicsSubsystem &owner);
+
+		void ReloadDevice();
+
+		void SetConstantBufferDataFromSpan(uint8_t slot, rkit::Span<const uint8_t> data) override;
+		void CommitGraphicsBindings(rkit::render::IGraphicsCommandEncoder &cmdEncoder, const rkit::render::IInternalPipelineLayout &pipelineLayout) override;
+
+		void Reset();
+
+		void BeginNewCycle();
+		void RetireOldestCycle();
+
+	public:
+		static constexpr size_t kMaxCBViewCacheEntries = 256;
+		static constexpr uint8_t kMaxCBSlots = 16;
+
+		struct ConstantBufferSlotData
+		{
+			rkit::Vector<uint8_t> m_contents;
+			rkit::Optional<uint32_t> m_committedOffset;
+			bool m_needsCopy = false;
+		};
+
+		struct MultiViewCacheItem
+		{
+			rkit::RCPtr<ConstantBufferMultiView> m_multiView;
+
+			rkit::StaticArray<uint32_t, kMaxCBSlots> m_sizes;
+			size_t m_numSizes = 0;
+		};
+
+		struct CycleInfo
+		{
+			uint32_t m_amountUsed;
+		};
+
+		void CreateNewBufferForBindings(uint8_t numBindings);
+		bool TryCommitBindings(uint8_t numBindings);
+
+		rkit::RCPtr<Buffer> m_currentBuffer;
+
+		uint32_t m_bufferSize = 0;
+		uint32_t m_bufferStart = 0;
+		uint32_t m_bufferUsed = 0;
+		uint32_t m_bufferAlignment = 0;
+		uint32_t m_bufferMaxChunkSize = 0;
+
+		GraphicsSubsystem &m_owner;
+
+		rkit::Vector<MultiViewCacheItem> m_cbViewCache;
+		size_t m_cbCacheIndex = 0;
+
+		rkit::StaticArray<ConstantBufferSlotData, kMaxCBSlots> m_data;
+		uint16_t m_numCommittedSlots = 0;
+		rkit::Vector<CycleInfo> m_cycles;
+	};
+
 	class GraphicsSubsystem final : public IGraphicsSubsystem, public rkit::NoCopy
 	{
 	public:
@@ -132,6 +225,8 @@ namespace anox
 		rkit::Optional<rkit::render::DisplayMode> GetDisplayMode() const override;
 		const rkit::render::IRenderDeviceCaps &GetDeviceCaps() const override;
 		const rkit::render::IRenderDeviceRequirements &GetDeviceRequirements() const override;
+		const rkit::render::IPipelineLibrary &GetPipelineLibrary() const override;
+		IGraphicsRecordHelper &GetRecordHelper() override;
 
 		rkit::Result CreateAndQueueRecordJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<IRecordJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies) override;
 		rkit::Result CreateAndQueueSubmitJob(rkit::RCPtr<rkit::Job> *outJob, LogicalQueueType queueType, rkit::UniquePtr<ISubmitJobRunner> &&jobRunner, const rkit::JobDependencyList &dependencies) override;
@@ -148,6 +243,8 @@ namespace anox
 		rkit::Result CreateAsyncCreateTextureJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<ITexture> &outTexture, const rkit::RCPtr<rkit::Vector<uint8_t>> &textureData, const rkit::JobDependencyList &dependencies) override;
 		rkit::Result CreateAsyncCreateAndFillBufferJob(rkit::RCPtr<rkit::Job> *outJob, rkit::RCPtr<IBuffer> &outBuffer,
 			const rkit::RCPtr<BufferInitializer> &bufferInitializer, const rkit::JobDependencyList &dependencies) override;
+
+		rkit::RCPtr<IResourceTable> CreateResourceTable(rkit::render::ResourceTableSpec &resourceTableSpec) override;
 
 		void CondemnTimelinedResource(GraphicTimelinedResource &timelinedResource) override;
 
@@ -340,13 +437,14 @@ namespace anox
 		class RunRecordJobRunner final : public rkit::IJobRunner
 		{
 		public:
-			explicit RunRecordJobRunner(rkit::UniquePtr<IRecordJobRunner> &&recordJob, rkit::render::IBaseCommandAllocator &cmdAlloc, const rkit::render::TimelineSignalIntent &signalIntent);
+			explicit RunRecordJobRunner(rkit::UniquePtr<IRecordJobRunner> &&recordJob, rkit::render::IBaseCommandAllocator &cmdAlloc, IGraphicsRecordHelper &recordHelper, const rkit::render::TimelineSignalIntent &signalIntent);
 
 			rkit::Result Run() override;
 
 		private:
 			rkit::UniquePtr<IRecordJobRunner> m_recordJob;
 			rkit::render::IBaseCommandAllocator &m_cmdAlloc;
+			IGraphicsRecordHelper &m_recordHelper;
 			rkit::render::TimelineSignalIntent m_signalIntent;
 		};
 
@@ -436,7 +534,7 @@ namespace anox
 		public:
 			explicit CloseFrameRecordRunner(rkit::render::IBaseCommandBatch *&outBatchPtr, rkit::render::ITimelineFence *asyncUploadFence, rkit::render::TimelinePoint_t asyncUploadTimelinePoint);
 
-			rkit::Result RunRecord(rkit::render::IGraphicsCommandAllocator &cmdAlloc, const rkit::render::TimelineSignalIntent &signalIntent) override;
+			rkit::Result RunRecord(rkit::render::IGraphicsCommandAllocator &cmdAlloc, IGraphicsRecordHelper &recordHelper, const rkit::render::TimelineSignalIntent &signalIntent) override;
 
 		private:
 			rkit::render::IBaseCommandBatch *&m_outBatchPtr;
@@ -463,7 +561,7 @@ namespace anox
 		public:
 			explicit AsyncUploadPrepareTargetsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint);
 
-			rkit::Result RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc, const rkit::render::TimelineSignalIntent &signalIntent) override;
+			rkit::Result RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc, IGraphicsRecordHelper &recordHelper, const rkit::render::TimelineSignalIntent &signalIntent) override;
 
 		private:
 			rkit::render::ICopyCommandBatch **m_cmdBatchRef;
@@ -489,7 +587,7 @@ namespace anox
 		public:
 			explicit CopyAsyncUploadsRecordRunner(rkit::render::ICopyCommandBatch **cmdBatchRef, FrameSyncPoint &syncPoint, uint64_t globalSyncPoint);
 
-			rkit::Result RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc, const rkit::render::TimelineSignalIntent &signalIntent) override;
+			rkit::Result RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc, IGraphicsRecordHelper &recordHelper, const rkit::render::TimelineSignalIntent &signalIntent) override;
 
 		private:
 			rkit::render::ICopyCommandBatch **m_cmdBatchRef;
@@ -780,6 +878,8 @@ namespace anox
 		rkit::UniquePtr<LivePipelineSets> m_livePipelineSets;
 		bool m_haveExistingMergedCache = false;
 
+		GraphicsRecordHelper m_recordHelper;
+
 		IGameDataFileSystem &m_fileSystem;
 		rkit::data::IDataDriver &m_dataDriver;
 
@@ -883,6 +983,363 @@ namespace anox
 	{
 		m_resource = std::move(resource);
 		m_heap = std::move(heap);
+	}
+
+	ResourceTable::ResourceTable(IGraphicsSubsystem &subsystem)
+		: GraphicTimelinedResource(subsystem)
+	{
+	}
+
+	rkit::render::IResourceTable *ResourceTable::GetRenderResource() const
+	{
+		return m_resourceTable.Get();
+	}
+
+	void ResourceTable::SetRenderResources(rkit::UniquePtr<rkit::render::IResourceTable> &&resource)
+	{
+		m_resourceTable = std::move(resource);
+	}
+
+	ConstantBufferMultiView::ConstantBufferMultiView(IGraphicsSubsystem &subsystem)
+		: GraphicTimelinedResource(subsystem)
+	{
+	}
+
+	rkit::render::IConstantBufferMultiView *ConstantBufferMultiView::GetRenderResource() const
+	{
+		return m_resource.Get();
+	}
+
+	void ConstantBufferMultiView::SetRenderResources(rkit::UniquePtr<rkit::render::IConstantBufferMultiView> &&resource)
+	{
+		m_resource = std::move(resource);
+	}
+
+	GraphicsRecordHelper::GraphicsRecordHelper(GraphicsSubsystem &owner)
+		: m_owner(owner)
+	{
+	}
+
+	void GraphicsRecordHelper::ReloadDevice()
+	{
+		m_bufferAlignment = m_owner.GetDevice()->GetConstantBufferAlignment();
+		m_bufferMaxChunkSize = m_owner.GetDevice()->GetConstantMaxSize();
+	}
+
+	void GraphicsRecordHelper::SetConstantBufferDataFromSpan(uint8_t slot, rkit::Span<const uint8_t> data)
+	{
+		if (data.Count() > m_bufferMaxChunkSize)
+			RKIT_THROW(rkit::ResultCode::kOutOfMemory);
+
+		ConstantBufferSlotData &slotData = m_data[slot];
+
+		slotData.m_contents.Resize(rkit::RoundUpToMultiple<size_t>(data.Count(), m_bufferAlignment));
+		rkit::CopySpanNonOverlapping(slotData.m_contents.ToSpan().SubSpan(0, data.Count()), data);
+
+		slotData.m_committedOffset.Reset();
+	}
+
+	void GraphicsRecordHelper::CommitGraphicsBindings(rkit::render::IGraphicsCommandEncoder &cmdEncoder, const rkit::render::IInternalPipelineLayout &pipelineLayout)
+	{
+		const uint8_t constantBindingCount = pipelineLayout.GetConstantBindingCount();
+
+		if (!TryCommitBindings(constantBindingCount))
+		{
+			CreateNewBufferForBindings(constantBindingCount);
+			if (!TryCommitBindings(constantBindingCount))
+				RKIT_THROW(rkit::ResultCode::kInternalError);
+		}
+
+		for (size_t i = 0; i < constantBindingCount; i++)
+		{
+			ConstantBufferSlotData &slotData = m_data[i];
+			if (slotData.m_needsCopy)
+			{
+				m_currentBuffer->GetRenderResource()->CopyDataToBuffer(slotData.m_committedOffset.Get(), slotData.m_contents.ToSpan());
+				slotData.m_needsCopy = false;
+			}
+		}
+
+		MultiViewCacheItem *cachedCBV = nullptr;
+		for (MultiViewCacheItem &cbv : m_cbViewCache)
+		{
+			if (cbv.m_sizes.Count() != constantBindingCount)
+				continue;
+
+			bool isMatch = true;
+			for (size_t i = 0; i < constantBindingCount; i++)
+			{
+				if (cbv.m_sizes[i] != m_data[i].m_contents.Count())
+				{
+					isMatch = false;
+					break;
+				}
+			}
+
+			if (isMatch)
+			{
+				cachedCBV = &cbv;
+				break;
+			}
+		}
+
+		if (!cachedCBV)
+		{
+			if (m_cbCacheIndex == kMaxCBViewCacheEntries)
+				m_cbCacheIndex = 0;
+			else if (m_cbCacheIndex == m_cbViewCache.Count())
+				m_cbViewCache.Append(MultiViewCacheItem());
+			else if (m_cbCacheIndex == m_cbViewCache.Count() - 1)
+			{
+				m_cbViewCache.Append(MultiViewCacheItem());
+				m_cbCacheIndex;
+			}
+
+			cachedCBV = &m_cbViewCache[m_cbCacheIndex];
+		}
+
+		cachedCBV->m_numSizes = 0;
+		cachedCBV->m_multiView.Reset();
+
+		rkit::StaticArray<rkit::render::ConstantBufferMultiViewBufferSpec, kMaxCBSlots> cbMultiViewSpecs;
+		for (size_t i = 0; i < constantBindingCount; i++)
+		{
+			cbMultiViewSpecs[i].m_resource = m_currentBuffer->GetRenderResource();
+			cbMultiViewSpecs[i].m_size = m_data[i].m_contents.Count();
+		}
+
+		const auto cbSpecsSpan = cbMultiViewSpecs.ToSpan().SubSpan(0, constantBindingCount).ToConstRefISpan();
+
+		rkit::render::ConstantBufferMultiViewSpec cbMultiViewSpec = {};
+		cbMultiViewSpec.m_buffers = &cbSpecsSpan;
+
+		rkit::UniquePtr<rkit::render::IConstantBufferMultiView> cbMultiViewResource;
+		m_owner.GetDevice()->CreateConstantBufferMultiView(cbMultiViewResource, cbMultiViewSpec);
+
+		rkit::RCPtr<ConstantBufferMultiView> cbMultiView = rkit::NewRC<ConstantBufferMultiView>(m_owner);
+		cbMultiView->SetRenderResources(std::move(cbMultiViewResource));
+
+		cachedCBV->m_multiView = std::move(cbMultiView);
+
+		rkit::StaticArray<uint32_t, kMaxCBSlots> cbOffsets;
+
+		for (size_t i = 0; i < constantBindingCount; i++)
+		{
+			cachedCBV->m_sizes[i] = m_data[i].m_contents.Count();
+			cbOffsets[i] = m_data[i].m_committedOffset.Get();
+		}
+
+		cachedCBV->m_numSizes = constantBindingCount;
+
+		cmdEncoder.SetGraphicsConstantBuffers(pipelineLayout, *cachedCBV->m_multiView->GetRenderResource(), cbOffsets.ToSpan().SubSpan(0, constantBindingCount));
+
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+	}
+
+	void GraphicsRecordHelper::Reset()
+	{
+		m_currentBuffer.Reset();
+		m_cbViewCache.Reset();
+		m_cycles.Reset();
+
+		for (ConstantBufferSlotData &slotData : m_data)
+			slotData = ConstantBufferSlotData();
+
+		m_bufferSize = 0;
+		m_bufferStart = 0;
+		m_bufferUsed = 0;
+		m_bufferAlignment = 0;
+		m_bufferMaxChunkSize = 0;
+		m_numCommittedSlots = 0;
+		m_cbCacheIndex = 0;
+	}
+
+	void GraphicsRecordHelper::BeginNewCycle()
+	{
+		m_cycles.Append(CycleInfo());
+
+		for (size_t i = 0; i < m_numCommittedSlots; i++)
+			m_data[i].m_committedOffset.Reset();
+
+		m_numCommittedSlots = 0;
+	}
+
+	void GraphicsRecordHelper::RetireOldestCycle()
+	{
+		const CycleInfo &cycleToRetire = m_cycles[0];
+
+		{
+			const uint32_t distanceToEnd = m_bufferSize - m_bufferUsed;
+			if (cycleToRetire.m_amountUsed >= distanceToEnd)
+				m_bufferStart = cycleToRetire.m_amountUsed - distanceToEnd;
+			else
+				m_bufferStart += cycleToRetire.m_amountUsed;
+
+			m_bufferUsed -= cycleToRetire.m_amountUsed;
+
+			if (m_bufferUsed == 0)
+				m_bufferStart = 0;
+		}
+
+		m_cycles.RemoveAtIndex(0);
+	}
+
+	void GraphicsRecordHelper::CreateNewBufferForBindings(uint8_t numBindings)
+	{
+		// Nothing is bound in the new CB
+		m_cbViewCache.ShrinkToSize(0);
+		m_cbCacheIndex = 0;
+
+		for (size_t i = 0; i < m_numCommittedSlots; i++)
+			m_data[i].m_committedOffset.Reset();
+
+		m_numCommittedSlots = 0;
+
+		for (CycleInfo &cycleInfo : m_cycles)
+			cycleInfo.m_amountUsed = 0;
+
+		const size_t maxSize = rkit::RoundUpToMultiple<size_t>(std::numeric_limits<size_t>::max() - m_bufferAlignment, m_bufferAlignment);
+
+		size_t totalSizeNeeded = 0;
+		for (size_t i = 0; i < numBindings; i++)
+		{
+			const size_t itemSize = m_data[i].m_contents.Count();
+
+			if (maxSize - totalSizeNeeded < itemSize)
+				RKIT_THROW(rkit::ResultCode::kOutOfMemory);
+
+			totalSizeNeeded += itemSize;
+		}
+
+		constexpr size_t kMinSize = 1 * 1024 * 1024;
+		size_t sizeCalc = m_bufferSize;
+
+		// Try to double size if we run out
+		if (sizeCalc < maxSize / 2)
+			sizeCalc *= 2u;
+		sizeCalc = rkit::Max<size_t>(kMinSize, sizeCalc);
+
+		while (sizeCalc < totalSizeNeeded)
+		{
+			if (sizeCalc < maxSize / 2)
+				sizeCalc *= 2u;
+			else
+				RKIT_THROW(rkit::ResultCode::kOutOfMemory);
+		}
+
+		rkit::render::IRenderDevice *device = m_owner.GetDevice();
+
+		rkit::render::BufferSpec bufferSpec = {};
+		bufferSpec.m_size = sizeCalc;
+
+		rkit::render::BufferResourceSpec resSpec = {};
+		resSpec.m_usage.Add({ rkit::render::BufferUsageFlag::kConstantBuffer });
+
+		rkit::UniquePtr<rkit::render::IBufferPrototype> prototype;
+		device->CreateBufferPrototype(prototype, bufferSpec, resSpec);
+
+		const rkit::render::MemoryRequirementsView memReqs = prototype->GetMemoryRequirements();
+
+		// Find a good heap
+		rkit::render::HeapSpec heapSpec = {};
+		heapSpec.m_allowBuffers = true;
+		heapSpec.m_cpuAccessible = true;
+		heapSpec.m_heapType = rkit::render::HeapType::kUpload;
+
+		rkit::render::GPUMemorySize_t memSize = memReqs.Size();
+
+		rkit::Optional<rkit::render::HeapKey> heapKey = memReqs.FindSuitableHeap(heapSpec);
+		if (!heapKey.IsSet())
+			RKIT_THROW(rkit::ResultCode::kInternalError);
+
+		rkit::UniquePtr<rkit::render::IMemoryHeap> memHeap;
+		m_owner.GetDevice()->CreateMemoryHeap(memHeap, heapKey.Get(), memReqs.Size());
+
+		rkit::UniquePtr<rkit::render::IBufferResource> buffer;
+		m_owner.GetDevice()->CreateBuffer(buffer, std::move(prototype), memHeap->GetRegion(), rkit::Span<const uint8_t>());
+
+		rkit::RCPtr<Buffer> tlBuffer = rkit::NewRC<Buffer>(m_owner);
+
+		tlBuffer->SetRenderResources(std::move(buffer), std::move(memHeap));
+
+		m_currentBuffer = std::move(tlBuffer);
+	}
+
+	bool GraphicsRecordHelper::TryCommitBindings(uint8_t numBindings)
+	{
+		uint32_t startPos = 0;
+		uint32_t endPos = 0;
+
+		{
+			const uint32_t distanceToEnd = m_bufferSize - m_bufferStart;
+			if (distanceToEnd > m_bufferUsed)
+			{
+				endPos = m_bufferStart + m_bufferUsed;
+				startPos = 0;
+			}
+			else
+			{
+				endPos = m_bufferSize;
+				startPos = m_bufferUsed - distanceToEnd;
+			}
+		}
+
+		uint32_t totalSpaceConsumed = 0;
+
+		auto allocateIntoSpan = [](rkit::Span<ConstantBufferSlotData> slots, uint32_t &spaceConsumedVar, uint32_t &spanStartVar, uint32_t spanEndPos) -> bool
+			{
+				const uint32_t initialStart = spanStartVar;
+
+				bool completelyFilled = true;
+
+				for (ConstantBufferSlotData &slotData : slots)
+				{
+					if (slotData.m_committedOffset.IsSet())
+						continue;
+
+					const uint32_t spaceAvailable = spanEndPos - spanStartVar;
+
+					if (spaceAvailable <= slotData.m_contents.Count())
+					{
+						slotData.m_committedOffset = spanStartVar;
+						slotData.m_needsCopy = true;
+
+						spanStartVar += slotData.m_contents.Count();
+					}
+					else
+						completelyFilled = false;
+				}
+
+				spaceConsumedVar += spanStartVar - initialStart;
+
+				return completelyFilled;
+			};
+
+		// Try to add slots to the end
+		bool needtoUseStartSpace = false;
+		if (endPos == m_bufferSize)
+			needtoUseStartSpace = true;
+		else
+			needtoUseStartSpace = allocateIntoSpan(m_data.ToSpan(), totalSpaceConsumed, endPos, m_bufferSize);
+
+		// Try to add slots at the start
+		if (needtoUseStartSpace)
+		{
+			// Consume the remainder of the end position
+			totalSpaceConsumed += m_bufferSize - endPos;
+
+			if (!allocateIntoSpan(m_data.ToSpan(), totalSpaceConsumed, startPos, m_bufferStart))
+				return false;
+		}
+
+		// Successfully committed all data, record the usage for this cycle and update total usage
+		this->m_cycles.Last().m_amountUsed += totalSpaceConsumed;
+		m_bufferUsed += totalSpaceConsumed;
+
+		if (numBindings > m_numCommittedSlots)
+			m_numCommittedSlots = numBindings;
+
+		return true;
 	}
 
 	GraphicsSubsystem::CheckPipelinesJob::CheckPipelinesJob(GraphicsSubsystem &graphicsSubsystem, const rkit::Future<rkit::UniquePtr<rkit::ISeekableReadStream>> &stream, const rkit::CIPathView &pipelinesCacheFileName)
@@ -1205,16 +1662,17 @@ namespace anox
 		RKIT_RETURN_OK;
 	}
 
-	GraphicsSubsystem::RunRecordJobRunner::RunRecordJobRunner(rkit::UniquePtr<IRecordJobRunner> &&recordJob, rkit::render::IBaseCommandAllocator &cmdAlloc, const rkit::render::TimelineSignalIntent &signalIntent)
+	GraphicsSubsystem::RunRecordJobRunner::RunRecordJobRunner(rkit::UniquePtr<IRecordJobRunner> &&recordJob, rkit::render::IBaseCommandAllocator &cmdAlloc, IGraphicsRecordHelper &recordHelper, const rkit::render::TimelineSignalIntent &signalIntent)
 		: m_recordJob(std::move(recordJob))
 		, m_cmdAlloc(cmdAlloc)
+		, m_recordHelper(recordHelper)
 		, m_signalIntent(signalIntent)
 	{
 	}
 
 	rkit::Result GraphicsSubsystem::RunRecordJobRunner::Run()
 	{
-		return m_recordJob->RunBase(m_cmdAlloc, m_signalIntent);
+		return m_recordJob->RunBase(m_cmdAlloc, m_recordHelper, m_signalIntent);
 	}
 
 	GraphicsSubsystem::RunSubmitJobRunner::RunSubmitJobRunner(rkit::UniquePtr<ISubmitJobRunner> &&submitJob, rkit::render::IBaseCommandQueue &cmdQueue)
@@ -1668,7 +2126,7 @@ namespace anox
 	{
 	}
 
-	rkit::Result GraphicsSubsystem::CloseFrameRecordRunner::RunRecord(rkit::render::IGraphicsCommandAllocator &cmdAlloc, const rkit::render::TimelineSignalIntent &signalIntent)
+	rkit::Result GraphicsSubsystem::CloseFrameRecordRunner::RunRecord(rkit::render::IGraphicsCommandAllocator &cmdAlloc, IGraphicsRecordHelper &recordHelper, const rkit::render::TimelineSignalIntent &signalIntent)
 	{
 		rkit::render::IGraphicsCommandBatch *batch = nullptr;
 		cmdAlloc.OpenGraphicsCommandBatch(batch);
@@ -1704,7 +2162,7 @@ namespace anox
 	{
 	}
 
-	rkit::Result GraphicsSubsystem::AsyncUploadPrepareTargetsRecordRunner::RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc, const rkit::render::TimelineSignalIntent &signalIntent)
+	rkit::Result GraphicsSubsystem::AsyncUploadPrepareTargetsRecordRunner::RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc, IGraphicsRecordHelper &recordHelper, const rkit::render::TimelineSignalIntent &signalIntent)
 	{
 		cmdAlloc.OpenCopyCommandBatch(*m_cmdBatchRef);
 
@@ -1778,7 +2236,7 @@ namespace anox
 	{
 	}
 
-	rkit::Result GraphicsSubsystem::CopyAsyncUploadsRecordRunner::RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc, const rkit::render::TimelineSignalIntent &signalIntent)
+	rkit::Result GraphicsSubsystem::CopyAsyncUploadsRecordRunner::RunRecord(rkit::render::ICopyCommandAllocator &cmdAlloc, IGraphicsRecordHelper &recordHelper, const rkit::render::TimelineSignalIntent &signalIntent)
 	{
 		cmdAlloc.OpenCopyCommandBatch(*m_cmdBatchRef);
 
@@ -1790,7 +2248,6 @@ namespace anox
 		for (const BufferToTextureCopyAction &copyAction : m_syncPoint.m_asyncUploadActionSet.m_bufferToTextureCopy)
 		{
 			Texture &texture = *copyAction.m_texture;
-			texture.Touch(m_globalSyncPoint);
 
 			cmdEncoder->CopyBufferToImage(*texture.GetRenderResource(), copyAction.m_destRect, *copyAction.m_buffer, copyAction.m_footprint,
 				copyAction.m_imageLayout, copyAction.m_mipLevel, copyAction.m_arrayElement, copyAction.m_imagePlane);
@@ -1799,7 +2256,6 @@ namespace anox
 		for (const BufferToBufferCopyAction &copyAction : m_syncPoint.m_asyncUploadActionSet.m_bufferToBufferCopy)
 		{
 			Buffer &destBuffer = *copyAction.m_destBuffer;
-			destBuffer.Touch(m_globalSyncPoint);
 
 			cmdEncoder->CopyBufferToBuffer(*destBuffer.GetRenderResource(), copyAction.m_destOffset,
 				*copyAction.m_srcBuffer, copyAction.m_srcOffset, copyAction.m_size);
@@ -2065,7 +2521,6 @@ namespace anox
 		return actionSet.m_prepareImageForTransfer.Append(action);
 	}
 
-
 	rkit::Result GraphicsSubsystem::TextureUploadTask::PumpTask(bool &isCompleted, UploadActionSet &actionSet, GraphicsSubsystem &subsystem)
 	{
 		isCompleted = false;
@@ -2273,6 +2728,7 @@ namespace anox
 		, m_threadPool(threadPool)
 		, m_dataDriver(dataDriver)
 		, m_desiredBackend(desiredBackend)
+		, m_recordHelper(*this)
 	{
 		for (LogicalQueueBase *&logicalQueue : m_logicalQueues)
 			logicalQueue = nullptr;
@@ -2294,6 +2750,8 @@ namespace anox
 
 		m_asyncUploadActiveTask.Reset();
 		m_asyncUploadWaitingTasks.Reset();
+		m_recordHelper.Reset();
+
 		m_unsortedCondemnedResources = GraphicTimelinedResourceStack();
 
 		m_pipelineLibraryLoader.Reset();
@@ -2399,6 +2857,8 @@ namespace anox
 
 		m_renderDevice = std::move(device);
 
+		m_recordHelper.ReloadDevice();
+
 		m_syncPoints.Reset();
 
 		m_syncPoints.Resize(m_numSyncPoints);
@@ -2462,8 +2922,6 @@ namespace anox
 			m_asyncUploadHeapHighMark = 0;
 			m_asyncUploadHeapIsFull = false;
 		}
-
-		RKIT_RETURN_OK;
 	}
 
 	rkit::Result GraphicsSubsystem::WaitForRenderingTasks()
@@ -3034,6 +3492,8 @@ namespace anox
 			syncPoint.m_asyncUploadActionSet.m_cleanupJob.Reset();
 		}
 
+		m_recordHelper.RetireOldestCycle();
+
 		// When the frame is retired, all of the uploads have been pushed,
 		// so the buffer can't be full.
 		m_asyncUploadHeapLowMark = syncPoint.m_asyncUploadHeapFinalHighMark;
@@ -3068,7 +3528,6 @@ namespace anox
 				m_threadPool.GetJobQueue()->CreateJob(&m_lastDisposeJob, rkit::JobType::kNormalPriority, std::move(disposeRunner), m_lastDisposeJob);
 			}
 		}
-
 
 		rkit::StaticBoolArray<static_cast<size_t>(rkit::render::CommandQueueType::kCount)> cmdQueueReset;
 
@@ -3200,6 +3659,8 @@ namespace anox
 
 		m_gameWindow->BeginFrame(*this);
 
+		m_recordHelper.BeginNewCycle();
+
 		RKIT_RETURN_OK;
 	}
 
@@ -3295,6 +3756,16 @@ namespace anox
 		return m_renderDevice->GetRequirements();
 	}
 
+	const rkit::render::IPipelineLibrary &GraphicsSubsystem::GetPipelineLibrary() const
+	{
+		return *m_pipelineLibrary;
+	}
+
+	IGraphicsRecordHelper &GraphicsSubsystem::GetRecordHelper()
+	{
+		return m_recordHelper;
+	}
+
 	rkit::render::IRenderDevice *GraphicsSubsystem::GetDevice() const
 	{
 		return m_renderDevice.Get();
@@ -3339,7 +3810,7 @@ namespace anox
 
 		rkit::render::IBaseCommandAllocator *cmdAllocator = cmdListHandler.m_commandAllocator.Get();
 
-		rkit::UniquePtr<RunRecordJobRunner> runRecordJobRunner = rkit::New<RunRecordJobRunner>(std::move(jobRunner), *cmdAllocator, signalIntent);
+		rkit::UniquePtr<RunRecordJobRunner> runRecordJobRunner = rkit::New<RunRecordJobRunner>(std::move(jobRunner), *cmdAllocator, m_recordHelper, signalIntent);
 
 		return this->CreateAndQueueJob(outJob, queueType, std::move(runRecordJobRunner), dependencies, &LogicalQueueBase::m_lastRecordJob);
 	}
@@ -3431,6 +3902,17 @@ namespace anox
 		jobQueue.CreateJob(nullptr, rkit::JobType::kNormalPriority, std::move(allocStorageJobRunner), dependencies);
 
 		RKIT_RETURN_OK;
+	}
+
+	rkit::RCPtr<IResourceTable> GraphicsSubsystem::CreateResourceTable(rkit::render::ResourceTableSpec &resourceTableSpec)
+	{
+		rkit::UniquePtr<rkit::render::IResourceTable> renderResourceTable;
+		m_renderDevice->CreateResourceTable(renderResourceTable, resourceTableSpec);
+
+		rkit::RCPtr<ResourceTable> resourceTable = rkit::NewRC<ResourceTable>(*this);
+		resourceTable->SetRenderResources(std::move(renderResourceTable));
+
+		return resourceTable;
 	}
 
 	void GraphicsSubsystem::CondemnTimelinedResource(GraphicTimelinedResource &timelinedResource)

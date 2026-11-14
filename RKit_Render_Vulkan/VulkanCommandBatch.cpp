@@ -15,10 +15,12 @@
 #include "VulkanBufferResource.h"
 #include "VulkanCheck.h"
 #include "VulkanCommandAllocator.h"
+#include "VulkanConstantBufferMultiView.h"
 #include "VulkanDevice.h"
 #include "VulkanFence.h"
 #include "VulkanImageResource.h"
 #include "VulkanQueueProxy.h"
+#include "VulkanPipelineLayout.h"
 #include "VulkanRenderPassInstance.h"
 #include "VulkanSwapChain.h"
 #include "VulkanUtils.h"
@@ -72,7 +74,8 @@ namespace rkit { namespace render { namespace vulkan
 		Result WaitForSwapChainAcquire(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &subsequentStages) override;
 		Result SignalSwapChainPresentReady(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &priorStages) override;
 		Result PipelineBarrier(const BarrierGroup &barrierGroup) override;
-		Result ClearTargets(const Span<const RenderTargetClear> &renderTargetClears, const DepthStencilTargetClear *depthStencilClear, const Span<const ImageRect2D> &rects) override;
+		Result ClearTargets(const Span<const RenderTargetClear> &renderTargetClears, const DepthStencilTargetClear *depthStencilClear, Span<const ImageRect2D> rects) override;
+		Result SetGraphicsConstantBuffers(const IInternalPipelineLayout &pipelineLayout, const IConstantBufferMultiView &constantViews, Span<const uint32_t> offsets) override;
 
 		Result OpenEncoder(IRenderPassInstance &rpi);
 
@@ -406,7 +409,7 @@ namespace rkit { namespace render { namespace vulkan
 		return CommonPipelineBarrier(barrierGroup);
 	}
 
-	Result VulkanGraphicsCommandEncoder::ClearTargets(const Span<const RenderTargetClear> &renderTargetClears, const DepthStencilTargetClear *depthStencilClear, const Span<const ImageRect2D> &rects)
+	Result VulkanGraphicsCommandEncoder::ClearTargets(const Span<const RenderTargetClear> &renderTargetClears, const DepthStencilTargetClear *depthStencilClear, const Span<const ImageRect2D> rects)
 	{
 		const VulkanDeviceBase &device = m_batch.GetDevice();
 
@@ -475,16 +478,39 @@ namespace rkit { namespace render { namespace vulkan
 		m_batch.OpenRenderPass(cmdBuffer, *m_rpi);
 
 		device.GetDeviceAPI().vkCmdClearAttachments(cmdBuffer, static_cast<uint32_t>(clearAttachments.Count()), clearAttachments.GetBuffer(), static_cast<uint32_t>(clearRects.Count()), clearRects.GetBuffer());
+	}
 
-		RKIT_RETURN_OK;
+	Result VulkanGraphicsCommandEncoder::SetGraphicsConstantBuffers(const IInternalPipelineLayout &pipelineLayoutBase, const IConstantBufferMultiView &constantViewsBase, const Span<const uint32_t> offsets)
+	{
+		const VulkanPipelineLayout &pipelineLayout = static_cast<const VulkanPipelineLayout &>(pipelineLayoutBase);
+		const VulkanConstantBufferMultiView &cbv = static_cast<const VulkanConstantBufferMultiView &>(constantViewsBase);
+
+		RKIT_ASSERT(pipelineLayout.m_metadata.m_numConstantBuffers == offsets.Count());
+
+		VkCommandBuffer cmdBuffer;
+		m_batch.OpenCommandBuffer(cmdBuffer);
+
+		const VulkanDeviceBase &device = m_batch.GetDevice();
+
+
+		const VkDescriptorSet descriptorSet = cbv.GetDescriptorSet();
+
+		device.GetDeviceAPI().vkCmdBindDescriptorSets(cmdBuffer,
+			VK_PIPELINE_BIND_POINT_GRAPHICS,
+			pipelineLayout.m_pipelineLayout,
+			pipelineLayout.m_metadata.m_constantBufferDescriptorSetIndex.Get(),
+			1,
+			&descriptorSet,
+			offsets.Count(),
+			offsets.Ptr());
+
+		RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
 	}
 
 	Result VulkanGraphicsCommandEncoder::OpenEncoder(IRenderPassInstance &rpi)
 	{
 		m_rpi = static_cast<VulkanRenderPassInstanceBase *>(&rpi);
 		m_isRendering = false;
-
-		RKIT_RETURN_OK;
 	}
 
 	VulkanCommandBatch::VulkanCommandBatch(VulkanDeviceBase &device, VulkanQueueProxyBase &queue, VulkanCommandAllocatorBase &cmdAlloc)

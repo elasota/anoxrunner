@@ -8,6 +8,11 @@ struct S_InterfacePixelConstants
 	float FrameInterpolator
 }
 
+struct S_InterfaceVSOut
+{
+	float3 color
+}
+
 PipelineLayout PL_Interface
 {
 	TextureHeapVisibility = Pixel
@@ -48,6 +53,8 @@ GraphicsPipeline GP_InterfaceSimple
 		Source = "ui_ps.rkc"
 		EntryPoint = "PixelMain"
 	}
+	
+	VertexShaderOutput = S_InterfaceVSOut
 
 	PrimitiveTopology = TriangleList
 

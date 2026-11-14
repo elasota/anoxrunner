@@ -52,8 +52,12 @@ namespace rkit::render::vulkan
 		RKIT_VK_API(vkCreateGraphicsPipelines);
 		RKIT_VK_API(vkCreateShaderModule);
 		RKIT_VK_API(vkDestroyShaderModule);
+		RKIT_VK_API(vkCreateDescriptorPool);
 		RKIT_VK_API(vkCreateDescriptorSetLayout);
+		RKIT_VK_API(vkDestroyDescriptorPool);
+		RKIT_VK_API(vkAllocateDescriptorSets);
 		RKIT_VK_API(vkDestroyDescriptorSetLayout);
+		RKIT_VK_API(vkUpdateDescriptorSets);
 		RKIT_VK_API(vkCreateSampler);
 		RKIT_VK_API(vkDestroySampler);
 		RKIT_VK_API(vkCreatePipelineLayout);
@@ -84,6 +88,7 @@ namespace rkit::render::vulkan
 		RKIT_VK_API(vkCmdBeginRenderPass);
 		RKIT_VK_API(vkCmdClearAttachments);
 		RKIT_VK_API(vkCmdEndRenderPass);
+		RKIT_VK_API(vkCmdBindDescriptorSets);
 		RKIT_VK_API(vkCmdPipelineBarrier);
 		RKIT_VK_API(vkCmdCopyBuffer);
 		RKIT_VK_API(vkCmdCopyBufferToImage);

@@ -3,11 +3,18 @@
 namespace rkit { namespace render
 {
 	struct IPipelineLibrary;
+
 	struct RenderPassDesc;
+	struct PipelineLayoutDesc;
+
+	struct IInternalRenderPass;
+	struct IInternalPipelineLayout;
 
 	struct IPipelineLibraryItemResolver
 	{
 		virtual IInternalRenderPass *ResolveCompiled(const RenderPassDesc &renderPass) const = 0;
+		virtual IInternalPipelineLayout *ResolveCompiled(const PipelineLayoutDesc &pipelineLayout) const = 0;
+		virtual IInternalGraphicsPipeline *ResolveCompiled(const GraphicsPipelineDesc &pipelineLayout) const = 0;
 	};
 
 	template<class TDesc, class TCompiled>

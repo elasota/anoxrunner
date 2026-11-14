@@ -19,7 +19,9 @@ namespace rkit { namespace render
 	struct IBinaryCPUWaitableFence;
 	struct IBinaryGPUWaitableFence;
 	struct IBufferResource;
+	struct IConstantBufferMultiView;
 	struct IImageResource;
+	struct IInternalPipelineLayout;
 	struct ISwapChainSyncPoint;
 	struct ImageRect2D;
 	struct ImageRect3D;
@@ -34,7 +36,8 @@ namespace rkit { namespace render
 		virtual Result WaitForSwapChainAcquire(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &subsequentStages) = 0;
 		virtual Result SignalSwapChainPresentReady(ISwapChainSyncPoint &syncPoint, const rkit::EnumMask<rkit::render::PipelineStage> &priorStages) = 0;
 		virtual Result PipelineBarrier(const BarrierGroup &barrierGroup) = 0;
-		virtual Result ClearTargets(const Span<const RenderTargetClear> &renderTargetClears, const DepthStencilTargetClear *depthStencilClear, const Span<const ImageRect2D> &rects) = 0;
+		virtual Result ClearTargets(const Span<const RenderTargetClear> &renderTargetClears, const DepthStencilTargetClear *depthStencilClear, Span<const ImageRect2D> rects) = 0;
+		virtual Result SetGraphicsConstantBuffers(const IInternalPipelineLayout &pipelineLayout, const IConstantBufferMultiView &constantViews, Span<const uint32_t> offsets) = 0;
 	};
 
 	struct IComputeCommandEncoder : public IBaseCommandEncoder

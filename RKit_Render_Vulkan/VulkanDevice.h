@@ -23,14 +23,14 @@ namespace rkit
 	class Vector;
 }
 
-namespace rkit { namespace render
+namespace rkit::render
 {
 	class RenderDeviceCaps;
 	class RenderDeviceRequirements;
 	struct HeapSpec;
-} } // rkit::render
+} // rkit::render
 
-namespace rkit { namespace render { namespace vulkan
+namespace rkit::render::vulkan
 {
 	struct VulkanDeviceAPI;
 	struct VulkanGlobalAPI;
@@ -87,4 +87,4 @@ namespace rkit { namespace render { namespace vulkan
 			const RCPtr<RenderVulkanPhysicalDevice> &physDevice, Vector<AsciiStringView> &&enabledExts,
 			const VkPhysicalDeviceMemoryProperties &memProperties);
 	};
-} } } // rkit::render::vulkan
+} // rkit::render::vulkan

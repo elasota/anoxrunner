@@ -4,9 +4,11 @@
 #include "rkit/Utilities/ShadowFile.h"
 
 #include "rkit/Render/DeviceCaps.h"
+#include "rkit/Render/PipelineLayout.h"
 #include "rkit/Render/PipelineLibrary.h"
 #include "rkit/Render/PipelineLibraryItem.h"
 #include "rkit/Render/RenderDefs.h"
+#include "rkit/Render/GraphicsPipeline.h"
 
 #include "rkit/Data/RenderDataHandler.h"
 
@@ -32,6 +34,7 @@
 #include "VulkanAPI.h"
 #include "VulkanCheck.h"
 #include "VulkanDevice.h"
+#include "VulkanPipelineLayout.h"
 #include "VulkanPhysDevice.h"
 #include "VulkanRenderPass.h"
 #include "VulkanUtils.h"
@@ -78,21 +81,12 @@ namespace rkit { namespace render { namespace vulkan
 		m_renderPass = renderPass;
 	}
 
-	struct PipelineLayoutMetadata
+	struct VulkanGraphicsPipelineTree final : public IInternalGraphicsPipeline
 	{
-		static constexpr size_t kNumHeaps = static_cast<size_t>(DescriptorHeapType::Count);
+		size_t m_permutationStart = 0;
+		VulkanPipelineLayout *m_pipelineLayout = nullptr;
 
-		rkit::StaticArray<rkit::Optional<uint32_t>, kNumHeaps> m_descriptorHeapIndexes;
-		uint32_t m_firstCBBinding = 0;
-		uint32_t m_numConstantBuffers = 0;
-		uint32_t m_numPushConstants = 0;
-	};
-
-	struct PipelineLayout
-	{
-		VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
-
-		PipelineLayoutMetadata m_metadata;
+		IInternalPipelineLayout &GetPipelineLayout() const override { return *m_pipelineLayout; }
 	};
 
 	struct VulkanPipelineLibraryData : public NoCopy
@@ -106,14 +100,16 @@ namespace rkit { namespace render { namespace vulkan
 
 		VulkanDeviceBase &m_device;
 
-		Vector<size_t> m_graphicPipelinePermutationStarts;
+		Vector<VulkanGraphicsPipelineTree> m_graphicsPipelines;
+
 		Vector<VkPipeline> m_allPipelines;
 		Vector<VulkanRenderPass> m_renderPasses;
-		Vector<PipelineLayout> m_pipelineLayouts;
+		Vector<rkit::UniquePtr<VulkanPipelineLayout>> m_pipelineLayouts;
 		StaticArray<VkDescriptorSetLayout, kNumHeapTypes> m_heapDescriptorSetLayouts;
 		Vector<VkDescriptorSetLayout> m_cbDescriptorSetLayouts;
 
 		HashMap<StringView, const RenderPassDesc *> m_nameToRenderPass;
+		HashMap<StringView, const GraphicsPipelineDesc *> m_nameToGraphicsPipeline;
 
 		VkPipelineCache m_mergedCache = VK_NULL_HANDLE;
 
@@ -129,11 +125,12 @@ namespace rkit { namespace render { namespace vulkan
 
 	VulkanPipelineLibraryData::VulkanPipelineLibraryData(VulkanPipelineLibraryData &&other)
 		: m_device(other.m_device)
-		, m_graphicPipelinePermutationStarts(std::move(other.m_graphicPipelinePermutationStarts))
+		, m_graphicsPipelines(std::move(other.m_graphicsPipelines))
 		, m_allPipelines(std::move(other.m_allPipelines))
 		, m_renderPasses(std::move(other.m_renderPasses))
 		, m_pipelineLayouts(std::move(other.m_pipelineLayouts))
 		, m_nameToRenderPass(std::move(other.m_nameToRenderPass))
+		, m_nameToGraphicsPipeline(std::move(other.m_nameToGraphicsPipeline))
 		, m_package(std::move(other.m_package))
 		, m_mergedCache(other.m_mergedCache)
 	{
@@ -152,10 +149,10 @@ namespace rkit { namespace render { namespace vulkan
 				vkd.vkDestroyPipeline(device, pipeline, allocCallbacks);
 		}
 
-		for (const PipelineLayout &pl : m_pipelineLayouts)
+		for (const rkit::UniquePtr<VulkanPipelineLayout> &pl : m_pipelineLayouts)
 		{
-			if (pl.m_pipelineLayout != VK_NULL_HANDLE)
-				vkd.vkDestroyPipelineLayout(device, pl.m_pipelineLayout, allocCallbacks);
+			if (pl->m_pipelineLayout != VK_NULL_HANDLE)
+				vkd.vkDestroyPipelineLayout(device, pl->m_pipelineLayout, allocCallbacks);
 		}
 
 		for (const VulkanRenderPass &rp : m_renderPasses)
@@ -185,9 +182,12 @@ namespace rkit { namespace render { namespace vulkan
 	public:
 		explicit VulkanPipelineLibrary(VulkanPipelineLibraryData &&pipelineLibraryData);
 
-		RenderPassRef_t FindRenderPass(const StringSliceView &name) override;
+		RenderPassRef_t FindRenderPass(const StringSliceView &name) const override;
+		GraphicsPipelineRef_t FindGraphicsPipeline(const StringSliceView &name) const override;
 
 		IInternalRenderPass *ResolveCompiled(const RenderPassDesc &renderPass) const override;
+		IInternalPipelineLayout *ResolveCompiled(const PipelineLayoutDesc &pipelineLayout) const override;
+		IInternalGraphicsPipeline *ResolveCompiled(const GraphicsPipelineDesc &pipelineLayout) const override;
 
 	private:
 		VulkanPipelineLibraryData m_data;
@@ -198,7 +198,7 @@ namespace rkit { namespace render { namespace vulkan
 	{
 	}
 
-	RenderPassRef_t VulkanPipelineLibrary::FindRenderPass(const StringSliceView &name)
+	RenderPassRef_t VulkanPipelineLibrary::FindRenderPass(const StringSliceView &name) const
 	{
 		HashMap<StringView, const RenderPassDesc *>::ConstIterator_t it = m_data.m_nameToRenderPass.Find(name);
 
@@ -208,12 +208,38 @@ namespace rkit { namespace render { namespace vulkan
 		return RenderPassRef_t(*this, it.Value());
 	}
 
+	GraphicsPipelineRef_t VulkanPipelineLibrary::FindGraphicsPipeline(const StringSliceView &name) const
+	{
+		HashMap<StringView, const GraphicsPipelineDesc *>::ConstIterator_t it = m_data.m_nameToGraphicsPipeline.Find(name);
+
+		if (it == m_data.m_nameToGraphicsPipeline.end())
+			return GraphicsPipelineRef_t();
+
+		return GraphicsPipelineRef_t(*this, it.Value());
+	}
+
 	IInternalRenderPass *VulkanPipelineLibrary::ResolveCompiled(const RenderPassDesc &renderPass) const
 	{
 		const RenderPassDesc *indexables = static_cast<const RenderPassDesc *>(m_data.m_package->GetIndexable(data::RenderRTTIIndexableStructType::RenderPassDesc)->GetElementPtr(0));
 		size_t itemIndex = static_cast<size_t>((&renderPass) - indexables);
 
 		return const_cast<VulkanRenderPass *>(&m_data.m_renderPasses[itemIndex]);
+	}
+
+	IInternalPipelineLayout *VulkanPipelineLibrary::ResolveCompiled(const PipelineLayoutDesc &pipelineLayout) const
+	{
+		const PipelineLayoutDesc *indexables = static_cast<const PipelineLayoutDesc *>(m_data.m_package->GetIndexable(data::RenderRTTIIndexableStructType::PipelineLayoutDesc)->GetElementPtr(0));
+		size_t itemIndex = static_cast<size_t>((&pipelineLayout) - indexables);
+
+		return m_data.m_pipelineLayouts[itemIndex].Get();
+	}
+
+	IInternalGraphicsPipeline *VulkanPipelineLibrary::ResolveCompiled(const GraphicsPipelineDesc &graphicsPipeline) const
+	{
+		const GraphicsPipelineDesc *indexables = static_cast<const GraphicsPipelineDesc *>(m_data.m_package->GetIndexable(data::RenderRTTIIndexableStructType::GraphicsPipelineDesc)->GetElementPtr(0));
+		size_t itemIndex = static_cast<size_t>((&graphicsPipeline) - indexables);
+
+		return const_cast<VulkanGraphicsPipelineTree *>(&m_data.m_graphicsPipelines[itemIndex]);
 	}
 
 	class VulkanPipelineLibraryLoader final : public PipelineLibraryLoaderBase
@@ -318,7 +344,7 @@ namespace rkit { namespace render { namespace vulkan
 		static Result ResolveStoreOp(VkAttachmentStoreOp &outStoreOp, RenderPassStoreOp storeOp);
 		static Result ResolveLoadOp(VkAttachmentLoadOp &outLoadOp, RenderPassLoadOp loadOp);
 
-		Result FindPipelineLayout(const PipelineLayout *&outPipelineLayout, const PipelineLayoutDesc *pipelineLayout) const;
+		Result FindPipelineLayout(const VulkanPipelineLayout *&outPipelineLayout, const PipelineLayoutDesc *pipelineLayout) const;
 		Result FindRenderPass(VkRenderPass &outRenderPass, const RenderPassDesc *renderPass) const;
 
 		Result CreateRenderPass(VkRenderPass &outRenderPass, const RenderPassDesc &rpDesc);
@@ -498,41 +524,114 @@ namespace rkit { namespace render { namespace vulkan
 			RKIT_VK_CHECK(vkd.vkCreateDescriptorSetLayout(m_device.GetDevice(), &descriptorSetLayoutCreateInfo, m_device.GetAllocCallbacks(), &m_data.m_heapDescriptorSetLayouts[i]));
 		}
 
+		// Pipeline layouts
+		{
+			data::IRenderRTTIListBase *pipelineLayouts = m_data.m_package->GetIndexable(rkit::data::RenderRTTIIndexableStructType::PipelineLayoutDesc);
+			const size_t numPipelineLayouts = pipelineLayouts->GetCount();
+
+			m_data.m_pipelineLayouts.Resize(numPipelineLayouts);
+
+			for (size_t pi = 0; pi < numPipelineLayouts; pi++)
+			{
+				rkit::UniquePtr<VulkanPipelineLayout> &plPtr = m_data.m_pipelineLayouts[pi];
+				plPtr = rkit::New<VulkanPipelineLayout>();
+
+				VulkanPipelineLayout &pl = *plPtr;
+				VulkanPipelineLayoutMetadata &plm = pl.m_metadata;
+
+				const PipelineLayoutDesc *plDesc = static_cast<const PipelineLayoutDesc *>(pipelineLayouts->GetElementPtr(pi));
+
+				size_t numCBs = plDesc->m_constantBuffers.Count();
+
+				rkit::StaticArray<const OptionalStageVisibilityDesc *, VulkanPipelineLayoutMetadata::kNumHeaps> stageVisibility;
+				for (const OptionalStageVisibilityDesc *&visibility : stageVisibility)
+					visibility = nullptr;
+
+				stageVisibility[static_cast<size_t>(DescriptorHeapType::Buffer)] = plDesc->m_bufferHeapVisibility;
+				stageVisibility[static_cast<size_t>(DescriptorHeapType::Texture)] = plDesc->m_textureHeapVisibility;
+				stageVisibility[static_cast<size_t>(DescriptorHeapType::RWTexture)] = plDesc->m_rwTextureHeapVisibility;
+				stageVisibility[static_cast<size_t>(DescriptorHeapType::Sampler)] = plDesc->m_samplerHeapVisibility;
+
+				rkit::StaticArray<VkDescriptorSetLayout, static_cast<size_t>(DescriptorHeapType::Count) + 1> descriptorSetLayouts;
+
+				uint32_t numHeapBindings = 0;
+				for (size_t i = 0; i < VulkanPipelineLayoutMetadata::kNumHeaps; i++)
+				{
+					if (stageVisibility[i] != nullptr)
+					{
+						descriptorSetLayouts[numHeapBindings] = m_data.m_heapDescriptorSetLayouts[i];
+						plm.m_descriptorHeapIndexes[i] = numHeapBindings;
+
+						numHeapBindings++;
+					}
+				}
+
+				if (numCBs > 0)
+				{
+					plm.m_constantBufferDescriptorSetIndex = numHeapBindings;
+
+					CreateCBLayoutOfSize(descriptorSetLayouts[numHeapBindings], numCBs);
+					numHeapBindings++;
+
+					if (numCBs > 255)
+						RKIT_THROW(rkit::ResultCode::kDataError);
+
+					plm.m_numConstantBuffers = static_cast<uint8_t>(numCBs);
+				}
+
+				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
+				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+				pipelineLayoutCreateInfo.setLayoutCount = numHeapBindings;
+				pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts.GetBuffer();
+
+				if (plDesc->m_inlineConstants.Count() > 0)
+					RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
+
+				RKIT_VK_CHECK(vkd.vkCreatePipelineLayout(m_device.GetDevice(), &pipelineLayoutCreateInfo, m_device.GetAllocCallbacks(), &pl.m_pipelineLayout));
+			}
+		}
+
 		size_t totalPermutations = 0;
+
+		const PipelineLayoutDesc *packagePipelineLayouts = static_cast<const PipelineLayoutDesc *>(m_data.m_package->GetIndexable(rkit::data::RenderRTTIIndexableStructType::PipelineLayoutDesc)->GetElementPtr(0));
 
 		data::IRenderRTTIListBase *graphicsPipelines = m_data.m_package->GetIndexable(rkit::data::RenderRTTIIndexableStructType::GraphicsPipelineDesc);
 		const size_t numGraphicsPipelines = graphicsPipelines->GetCount();
 
 		const size_t numAllPipelines = numGraphicsPipelines;
 
-		m_data.m_graphicPipelinePermutationStarts.Resize(numAllPipelines);
-
-		for (size_t i = 0; i < numGraphicsPipelines; i++)
+		// Graphics pipelines
 		{
-			const GraphicsPipelineDesc *pipelineDesc = static_cast<const GraphicsPipelineDesc *>(graphicsPipelines->GetElementPtr(i));
+			m_data.m_graphicsPipelines.Resize(numAllPipelines);
 
-			size_t treeWidth = 0;
-			if (pipelineDesc->m_permutationTree == nullptr)
-				treeWidth = 1;
-			else
+			for (size_t i = 0; i < numGraphicsPipelines; i++)
 			{
-				ConstSpan<const ShaderPermutationTreeBranch *> branches = pipelineDesc->m_permutationTree->m_branches;
+				const GraphicsPipelineDesc *pipelineDesc = static_cast<const GraphicsPipelineDesc *>(graphicsPipelines->GetElementPtr(i));
 
-				size_t branchWidth = 0;
-				for (const ShaderPermutationTreeBranch *branch : branches)
+				size_t treeWidth = 0;
+				if (pipelineDesc->m_permutationTree == nullptr)
+					treeWidth = 1;
+				else
 				{
-					if (branch->m_subTree == nullptr)
-						branchWidth = 1;
-					else
-						branchWidth = branch->m_subTree->m_width;
+					ConstSpan<const ShaderPermutationTreeBranch *> branches = pipelineDesc->m_permutationTree->m_branches;
 
-					SafeAdd(treeWidth, treeWidth, branchWidth);
+					size_t branchWidth = 0;
+					for (const ShaderPermutationTreeBranch *branch : branches)
+					{
+						if (branch->m_subTree == nullptr)
+							branchWidth = 1;
+						else
+							branchWidth = branch->m_subTree->m_width;
+
+						SafeAdd(treeWidth, treeWidth, branchWidth);
+					}
 				}
+
+				m_data.m_graphicsPipelines[i].m_permutationStart = totalPermutations;
+				m_data.m_graphicsPipelines[i].m_pipelineLayout = m_data.m_pipelineLayouts[pipelineDesc->m_pipelineLayout - packagePipelineLayouts].Get();
+
+				SafeAdd(totalPermutations, totalPermutations, treeWidth);
 			}
-
-			m_data.m_graphicPipelinePermutationStarts[i] = totalPermutations;
-
-			SafeAdd(totalPermutations, totalPermutations, treeWidth);
 		}
 
 		m_data.m_allPipelines.Resize(totalPermutations);
@@ -554,63 +653,6 @@ namespace rkit { namespace render { namespace vulkan
 			m_binaryContents[i].m_filePos = binaryContentStart;
 
 			SafeAdd(binaryContentStart, binaryContentStart, static_cast<FilePos_t>(binaryContentSize));
-		}
-
-		// Pipeline layouts
-		{
-			data::IRenderRTTIListBase *pipelineLayouts = m_data.m_package->GetIndexable(rkit::data::RenderRTTIIndexableStructType::PipelineLayoutDesc);
-			const size_t numPipelineLayouts = pipelineLayouts->GetCount();
-
-			m_data.m_pipelineLayouts.Resize(numPipelineLayouts);
-
-			for (size_t pi = 0; pi < numPipelineLayouts; pi++)
-			{
-				PipelineLayout &pl = m_data.m_pipelineLayouts[pi];
-				PipelineLayoutMetadata &plm = pl.m_metadata;
-
-				const PipelineLayoutDesc *plDesc = static_cast<const PipelineLayoutDesc *>(pipelineLayouts->GetElementPtr(pi));
-
-				size_t numCBs = plDesc->m_constantBuffers.Count();
-
-				rkit::StaticArray<const OptionalStageVisibilityDesc *, PipelineLayoutMetadata::kNumHeaps> stageVisibility;
-				for (const OptionalStageVisibilityDesc *&visibility : stageVisibility)
-					visibility = nullptr;
-
-				stageVisibility[static_cast<size_t>(DescriptorHeapType::Buffer)] = plDesc->m_bufferHeapVisibility;
-				stageVisibility[static_cast<size_t>(DescriptorHeapType::Texture)] = plDesc->m_textureHeapVisibility;
-				stageVisibility[static_cast<size_t>(DescriptorHeapType::RWTexture)] = plDesc->m_rwTextureHeapVisibility;
-				stageVisibility[static_cast<size_t>(DescriptorHeapType::Sampler)] = plDesc->m_samplerHeapVisibility;
-
-				rkit::StaticArray<VkDescriptorSetLayout, static_cast<size_t>(DescriptorHeapType::Count) + 1> descriptorSetLayouts;
-
-				uint32_t numHeapBindings = 0;
-				for (size_t i = 0; i < PipelineLayoutMetadata::kNumHeaps; i++)
-				{
-					if (stageVisibility[i] != nullptr)
-					{
-						descriptorSetLayouts[numHeapBindings] = m_data.m_heapDescriptorSetLayouts[i];
-						plm.m_descriptorHeapIndexes[i] = numHeapBindings;
-
-						numHeapBindings++;
-					}
-				}
-
-				if (numCBs > 0)
-				{
-					CreateCBLayoutOfSize(descriptorSetLayouts[numHeapBindings], numCBs);
-					numHeapBindings++;
-				}
-
-				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
-				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-				pipelineLayoutCreateInfo.setLayoutCount = numHeapBindings;
-				pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts.GetBuffer();
-
-				if (plDesc->m_inlineConstants.Count() > 0)
-					RKIT_THROW(rkit::ResultCode::kNotYetImplemented);
-
-				RKIT_VK_CHECK(vkd.vkCreatePipelineLayout(m_device.GetDevice(), &pipelineLayoutCreateInfo, m_device.GetAllocCallbacks(), &m_data.m_pipelineLayouts[pi].m_pipelineLayout));
-			}
 		}
 
 		// Render passes
@@ -643,6 +685,23 @@ namespace rkit { namespace render { namespace vulkan
 				StringView name = m_data.m_package->GetString(nameLookup.m_name.GetIndex());
 
 				m_data.m_nameToRenderPass.Set(name, nameLookup.m_renderPass);
+			}
+		}
+
+		// Graphics pipeline lookups
+		{
+			data::IRenderRTTIListBase *graphicsPipelines = m_data.m_package->GetIndexable(rkit::data::RenderRTTIIndexableStructType::GraphicsPipelineDesc);
+			data::IRenderRTTIListBase *graphicsPipelineNameLookups = m_data.m_package->GetIndexable(rkit::data::RenderRTTIIndexableStructType::GraphicsPipelineNameLookup);
+
+			const size_t numGraphicsPipelineNameLookups = graphicsPipelineNameLookups->GetCount();
+
+			for (size_t i = 0; i < numGraphicsPipelineNameLookups; i++)
+			{
+				const render::GraphicsPipelineNameLookup &nameLookup = *static_cast<const render::GraphicsPipelineNameLookup *>(graphicsPipelineNameLookups->GetElementPtr(i));
+
+				StringView name = m_data.m_package->GetString(nameLookup.m_name.GetIndex());
+
+				m_data.m_nameToGraphicsPipeline.Set(name, nameLookup.m_pipeline);
 			}
 		}
 	}
@@ -731,7 +790,7 @@ namespace rkit { namespace render { namespace vulkan
 		if (m_data.m_mergedCache == VK_NULL_HANDLE)
 			RKIT_THROW(ResultCode::kInternalError);
 
-		VkPipeline &outPipelineRef = m_data.m_allPipelines[m_data.m_graphicPipelinePermutationStarts[pipelineIndex] + permutationIndex];
+		VkPipeline &outPipelineRef = m_data.m_allPipelines[m_data.m_graphicsPipelines[pipelineIndex].m_permutationStart + permutationIndex];
 		if (outPipelineRef != VK_NULL_HANDLE)
 			RKIT_THROW(ResultCode::kInternalError);
 
@@ -1528,12 +1587,11 @@ namespace rkit { namespace render { namespace vulkan
 		index = static_cast<size_t>(object - firstElement);\
 	} while (false)
 
-	Result VulkanPipelineLibraryLoader::FindPipelineLayout(const PipelineLayout *&outPipelineLayout, const PipelineLayoutDesc *pipelineLayout) const
+	Result VulkanPipelineLibraryLoader::FindPipelineLayout(const VulkanPipelineLayout *&outPipelineLayout, const PipelineLayoutDesc *pipelineLayout) const
 	{
 		RKIT_VK_FIND_FROM_LIST(PipelineLayoutDesc, pipelineLayout);
 
-		outPipelineLayout = &m_data.m_pipelineLayouts[index];
-		RKIT_RETURN_OK;
+		outPipelineLayout = m_data.m_pipelineLayouts[index].Get();
 	}
 
 	Result VulkanPipelineLibraryLoader::FindRenderPass(VkRenderPass &outRenderPass, const RenderPassDesc *renderPass) const
@@ -1545,7 +1603,6 @@ namespace rkit { namespace render { namespace vulkan
 			RKIT_THROW(ResultCode::kOperationFailed);
 
 		outRenderPass = vkRenderPass;
-		RKIT_RETURN_OK;
 	}
 
 	Result VulkanPipelineLibraryLoader::CreateRenderPass(VkRenderPass &outRenderPass, const RenderPassDesc &renderPassDesc)
@@ -1669,19 +1726,18 @@ namespace rkit { namespace render { namespace vulkan
 
 			for (uint32_t i = 0; i < numCBs; i++)
 			{
-				VkDescriptorSetLayoutBinding binding = {};
+				VkDescriptorSetLayoutBinding &binding = bindings[i];
+
 				binding.binding = i;
 				binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 				binding.descriptorCount = 1;
 				binding.stageFlags = VK_SHADER_STAGE_ALL;
 				binding.pImmutableSamplers = nullptr;
-
-				bindings.Append(binding);
 			}
 
 			VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
 			descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			descriptorSetLayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+			descriptorSetLayoutCreateInfo.flags = 0;
 			descriptorSetLayoutCreateInfo.bindingCount = 1;
 			descriptorSetLayoutCreateInfo.pBindings = bindings.GetBuffer();
 
@@ -1698,7 +1754,7 @@ namespace rkit { namespace render { namespace vulkan
 		const render::GraphicsPipelineDesc *pipelineDesc = static_cast<const render::GraphicsPipelineDesc *>(m_data.m_package->GetIndexable(data::RenderRTTIIndexableStructType::GraphicsPipelineDesc)->GetElementPtr(pipelineIndex));
 		const render::RenderPassDesc *renderPassDesc = pipelineDesc->m_executeInPass;
 
-		VkPipeline &outPipelineRef = m_data.m_allPipelines[m_data.m_graphicPipelinePermutationStarts[pipelineIndex] + permutationIndex];
+		VkPipeline &outPipelineRef = m_data.m_allPipelines[m_data.m_graphicsPipelines[pipelineIndex].m_permutationStart + permutationIndex];
 
 		const size_t kMaxGraphicsStages = static_cast<size_t>(GraphicPipelineStage::Count);
 
@@ -1940,7 +1996,7 @@ namespace rkit { namespace render { namespace vulkan
 		dynamicStateCreateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.Count());
 		dynamicStateCreateInfo.pDynamicStates = dynamicStates.GetBuffer();
 
-		const PipelineLayout *pipelineLayout = nullptr;
+		const VulkanPipelineLayout *pipelineLayout = nullptr;
 		FindPipelineLayout(pipelineLayout, pipelineDesc->m_pipelineLayout);
 
 		VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};

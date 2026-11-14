@@ -1,6 +1,7 @@
 
 
-void PixelMain(out PixelShaderOutput psOut)
+void PixelMain(out PixelShaderOutput psOut, in S_InterfaceVSOut vsOut)
 {
-	psOut.Color = float4(1, 0, 0.5, 1);
+	psOut.Color = float4(vsOut.color, 1);
 }
+

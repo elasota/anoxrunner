@@ -28,6 +28,8 @@ namespace rkit { namespace render { namespace vulkan {
 		VulkanBuffer(VulkanDeviceBase &device, VkBuffer buffer, const MemoryAddress &baseAddress, GPUMemorySize_t size);
 		~VulkanBuffer();
 
+		void CopyDataToBuffer(GPUMemoryOffset_t destOffset, Span<const uint8_t> data) const override;
+
 		VkBuffer GetVkBuffer() const;
 
 		const MemoryAddress &GetBaseAddress() const;

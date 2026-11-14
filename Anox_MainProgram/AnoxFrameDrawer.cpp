@@ -12,7 +12,10 @@
 #include "rkit/Render/CommandBatch.h"
 #include "rkit/Render/CommandAllocator.h"
 #include "rkit/Render/CommandEncoder.h"
+#include "rkit/Render/GraphicsPipeline.h"
 #include "rkit/Render/ImageRect.h"
+#include "rkit/Render/PipelineLibrary.h"
+#include "rkit/Render/PipelineLibraryItem.h"
 #include "rkit/Render/PipelineStage.h"
 #include "rkit/Render/RenderTargetClear.h"
 
@@ -48,23 +51,25 @@ namespace anox
 		class RecordTestCommandsJobRunner final : public IGraphicsRecordJobRunner_t
 		{
 		public:
-			explicit RecordTestCommandsJobRunner(rkit::render::IGraphicsCommandBatch **cmdBatchRef, const rkit::RCPtr<PerFramePerDisplayResources> &perDisplayResources);
+			explicit RecordTestCommandsJobRunner(rkit::render::IGraphicsCommandBatch **cmdBatchRef, const rkit::render::IInternalGraphicsPipeline &pipeline, const rkit::RCPtr<PerFramePerDisplayResources> &perDisplayResources);
 
-			rkit::Result RunRecord(rkit::render::IGraphicsCommandAllocator &commandAllocator, const rkit::render::TimelineSignalIntent &signalIntent) override;
+			rkit::Result RunRecord(rkit::render::IGraphicsCommandAllocator &commandAllocator, IGraphicsRecordHelper &recordHelper, const rkit::render::TimelineSignalIntent &signalIntent) override;
 
 		private:
 			rkit::render::IGraphicsCommandBatch **m_cmdBatchRef;
+			const rkit::render::IInternalGraphicsPipeline &m_pipeline;
 			rkit::RCPtr<PerFramePerDisplayResources> m_perDisplayResources;
 		};
 	};
 
-	FrameDrawer::RecordTestCommandsJobRunner::RecordTestCommandsJobRunner(rkit::render::IGraphicsCommandBatch **cmdBatchRef, const rkit::RCPtr<PerFramePerDisplayResources> &perDisplayResources)
+	FrameDrawer::RecordTestCommandsJobRunner::RecordTestCommandsJobRunner(rkit::render::IGraphicsCommandBatch **cmdBatchRef, const rkit::render::IInternalGraphicsPipeline &pipeline, const rkit::RCPtr<PerFramePerDisplayResources> &perDisplayResources)
 		: m_cmdBatchRef(cmdBatchRef)
+		, m_pipeline(pipeline)
 		, m_perDisplayResources(perDisplayResources)
 	{
 	}
 
-	rkit::Result FrameDrawer::RecordTestCommandsJobRunner::RunRecord(rkit::render::IGraphicsCommandAllocator &commandAllocator, const rkit::render::TimelineSignalIntent &signalIntent)
+	rkit::Result FrameDrawer::RecordTestCommandsJobRunner::RunRecord(rkit::render::IGraphicsCommandAllocator &commandAllocator, IGraphicsRecordHelper &recordHelper, const rkit::render::TimelineSignalIntent &signalIntent)
 	{
 		commandAllocator.OpenGraphicsCommandBatch(*m_cmdBatchRef);
 
@@ -96,6 +101,18 @@ namespace anox
 
 			encoder->PipelineBarrier(barrierGroup);
 		}
+
+		struct S_InterfacePixelConstants
+		{
+			float m_interformTransform[4] = {};
+			uint32_t m_prevFrame_nextFrame = 0;
+			uint32_t m_numVerts = 0;
+			float m_frameInterpolator = 0;
+		};
+
+		S_InterfacePixelConstants constants;
+		recordHelper.SetConstantBufferDataFromStruct(0, constants);
+		recordHelper.CommitGraphicsBindings(*encoder, m_pipeline.GetPipelineLayout());
 
 		{
 			rkit::render::RenderTargetClear rtClear;
@@ -148,11 +165,15 @@ namespace anox
 	{
 		rkit::RCPtr<PerFramePerDisplayResources> perDisplayResources = renderedWindow.GetCurrentFrameResources();
 
+		const rkit::render::GraphicsPipelineRef_t pipelineRef = graphicsSubsystem.GetPipelineLibrary().FindGraphicsPipeline(u8"GP_InterfaceSimple");
+		if (!pipelineRef.IsValid())
+			RKIT_THROW(rkit::ResultCode::kInternalError);
+
 		rkit::RCPtr<rkit::Job> submitJob;
 		rkit::UniquePtr<SubmitTestCommandsJobRunner> submitJobRunner = rkit::New<SubmitTestCommandsJobRunner>();
 
 		rkit::RCPtr<rkit::Job> recordJob;
-		rkit::UniquePtr<RecordTestCommandsJobRunner> recordJobRunner = rkit::New<RecordTestCommandsJobRunner>(submitJobRunner->GetCmdBatchRef(), perDisplayResources);
+		rkit::UniquePtr<RecordTestCommandsJobRunner> recordJobRunner = rkit::New<RecordTestCommandsJobRunner>(submitJobRunner->GetCmdBatchRef(), *pipelineRef.ResolveCompiled(), perDisplayResources);
 
 		graphicsSubsystem.CreateAndQueueRecordJob(&recordJob, LogicalQueueType::kGraphics, std::move(recordJobRunner), rkit::Span<rkit::RCPtr<rkit::Job>>(&perDisplayResources->m_acquireJob, 1));
 
